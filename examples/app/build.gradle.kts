@@ -1,0 +1,71 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+  alias(libs.plugins.kotlinMultiplatform)
+  alias(libs.plugins.androidKmpLibrary)
+  alias(libs.plugins.composeMultiplatform)
+  alias(libs.plugins.composeCompiler)
+}
+
+kotlin {
+  androidLibrary {
+    namespace = "com.linroid.kdown.examples.app"
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    minSdk = libs.versions.android.minSdk.get().toInt()
+
+    compilerOptions {
+      jvmTarget.set(JvmTarget.JVM_11)
+    }
+  }
+
+  listOf(
+    iosArm64(),
+    iosSimulatorArm64()
+  ).forEach { iosTarget ->
+    iosTarget.binaries.framework {
+      baseName = "ExamplesApp"
+      isStatic = true
+    }
+  }
+
+  jvm()
+
+  @OptIn(ExperimentalWasmDsl::class)
+  wasmJs {
+    browser()
+    binaries.executable()
+  }
+
+  sourceSets {
+    commonMain.dependencies {
+      implementation(projects.library.ktor)
+      implementation(libs.kotlinx.coroutines.core)
+      implementation(libs.compose.runtime)
+      implementation(libs.compose.foundation)
+      implementation(libs.compose.material3)
+      implementation(libs.compose.ui)
+      implementation(libs.compose.components.resources)
+      implementation(libs.compose.uiToolingPreview)
+      implementation(libs.androidx.lifecycle.viewmodelCompose)
+      implementation(libs.androidx.lifecycle.runtimeCompose)
+    }
+    commonTest.dependencies {
+      implementation(libs.kotlin.test)
+    }
+    androidMain.dependencies {
+      implementation(libs.compose.uiToolingPreview)
+      implementation(libs.ktor.client.okhttp)
+    }
+    iosMain.dependencies {
+      implementation(libs.ktor.client.darwin)
+    }
+    jvmMain.dependencies {
+      implementation(libs.kotlinx.coroutinesSwing)
+      implementation(libs.ktor.client.cio)
+    }
+    wasmJsMain.dependencies {
+      implementation(libs.ktor.client.js)
+    }
+  }
+}
