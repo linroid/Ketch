@@ -8,6 +8,8 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import platform.Foundation.NSData
 import platform.Foundation.NSFileHandle
 import platform.Foundation.NSFileManager
@@ -22,12 +24,17 @@ import platform.Foundation.writeData
 
 @OptIn(ExperimentalForeignApi::class)
 actual class FileAccessor actual constructor(private val path: String) {
+  private val filePath = Path(path)
   private val fileManager = NSFileManager.defaultManager
   private var fileHandle: NSFileHandle? = null
   private val mutex = Mutex()
 
   private suspend fun getOrCreateHandle(): NSFileHandle = mutex.withLock {
     fileHandle ?: run {
+      val parent = filePath.parent
+      if (parent != null && !SystemFileSystem.exists(parent)) {
+        SystemFileSystem.createDirectories(parent)
+      }
       if (!fileManager.fileExistsAtPath(path)) {
         fileManager.createFileAtPath(path, null, null)
       }
@@ -68,15 +75,14 @@ actual class FileAccessor actual constructor(private val path: String) {
   actual suspend fun delete() {
     withContext(Dispatchers.IO) {
       close()
-      @Suppress("DEPRECATION")
-      fileManager.removeItemAtPath(path, error = null)
+      if (SystemFileSystem.exists(filePath)) {
+        SystemFileSystem.delete(filePath)
+      }
     }
   }
 
   actual suspend fun size(): Long = withContext(Dispatchers.IO) {
-    @Suppress("DEPRECATION")
-    val attrs = fileManager.attributesOfItemAtPath(path, error = null)
-    (attrs?.get(NSFileSize) as? Number)?.toLong() ?: 0L
+    SystemFileSystem.metadataOrNull(filePath)?.size ?: 0L
   }
 
   actual suspend fun preallocate(size: Long) {
