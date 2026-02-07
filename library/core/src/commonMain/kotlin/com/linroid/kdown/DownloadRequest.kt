@@ -1,7 +1,6 @@
 package com.linroid.kdown
 
 import kotlinx.io.files.Path
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 data class DownloadRequest(
