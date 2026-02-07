@@ -6,10 +6,13 @@ import com.linroid.kdown.FileAccessor
 import com.linroid.kdown.HttpEngine
 import com.linroid.kdown.KDownLogger
 import com.linroid.kdown.MetadataStore
+import com.linroid.kdown.TaskStore
 import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.model.DownloadMetadata
 import com.linroid.kdown.model.DownloadProgress
 import com.linroid.kdown.model.DownloadState
+import com.linroid.kdown.model.TaskRecord
+import com.linroid.kdown.model.TaskState
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.files.Path
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +31,7 @@ import kotlinx.coroutines.sync.withLock
 internal class DownloadCoordinator(
   private val httpEngine: HttpEngine,
   private val metadataStore: MetadataStore,
+  private val taskStore: TaskStore,
   private val config: DownloadConfig,
   private val fileAccessorFactory: (Path) -> FileAccessor
 ) {
@@ -47,6 +51,20 @@ internal class DownloadCoordinator(
   ): StateFlow<DownloadState> {
     val stateFlow = MutableStateFlow<DownloadState>(DownloadState.Pending)
 
+    val now = currentTimeMillis()
+    taskStore.save(
+      TaskRecord(
+        taskId = request.taskId,
+        url = request.url,
+        destPath = request.destPath,
+        connections = request.connections,
+        headers = request.headers,
+        state = TaskState.PENDING,
+        createdAt = now,
+        updatedAt = now
+      )
+    )
+
     val job = scope.launch {
       try {
         executeDownload(request, stateFlow)
@@ -58,6 +76,7 @@ internal class DownloadCoordinator(
           is KDownError -> e
           else -> KDownError.Unknown(e)
         }
+        updateTaskState(request.taskId, TaskState.FAILED, error.message)
         stateFlow.value = DownloadState.Failed(error)
       }
     }
@@ -121,6 +140,14 @@ internal class DownloadCoordinator(
       }
     }
 
+    updateTaskRecord(request.taskId) {
+      it.copy(
+        state = TaskState.DOWNLOADING,
+        totalBytes = totalBytes,
+        updatedAt = now
+      )
+    }
+
     try {
       KDownLogger.d("Coordinator") { "Preallocating $totalBytes bytes for taskId=${request.taskId}" }
       fileAccessor.preallocate(totalBytes)
@@ -131,6 +158,15 @@ internal class DownloadCoordinator(
 
       fileAccessor.flush()
       metadataStore.clear(request.taskId)
+
+      updateTaskRecord(request.taskId) {
+        it.copy(
+          state = TaskState.COMPLETED,
+          downloadedBytes = totalBytes,
+          updatedAt = currentTimeMillis()
+        )
+      }
+
       KDownLogger.i("Coordinator") { "Download completed successfully for taskId=${request.taskId}" }
       stateFlow.value = DownloadState.Completed(request.destPath)
     } finally {
@@ -259,7 +295,16 @@ internal class DownloadCoordinator(
 
       active.metadata?.let { metadata ->
         KDownLogger.d("Coordinator") { "Saving pause state for taskId=$taskId" }
-        metadataStore.save(taskId, metadata.copy(updatedAt = currentTimeMillis()))
+        val now = currentTimeMillis()
+        metadataStore.save(taskId, metadata.copy(updatedAt = now))
+
+        updateTaskRecord(taskId) {
+          it.copy(
+            state = TaskState.PAUSED,
+            downloadedBytes = metadata.downloadedBytes,
+            updatedAt = now
+          )
+        }
       }
 
       active.fileAccessor?.let { accessor ->
@@ -282,6 +327,10 @@ internal class DownloadCoordinator(
 
     val stateFlow = MutableStateFlow<DownloadState>(DownloadState.Pending)
 
+    updateTaskRecord(taskId) {
+      it.copy(state = TaskState.DOWNLOADING, updatedAt = currentTimeMillis())
+    }
+
     val job = scope.launch {
       try {
         resumeDownload(taskId, metadata, stateFlow)
@@ -293,6 +342,7 @@ internal class DownloadCoordinator(
           is KDownError -> e
           else -> KDownError.Unknown(e)
         }
+        updateTaskState(taskId, TaskState.FAILED, error.message)
         stateFlow.value = DownloadState.Failed(error)
       }
     }
@@ -344,6 +394,15 @@ internal class DownloadCoordinator(
 
       fileAccessor.flush()
       metadataStore.clear(taskId)
+
+      updateTaskRecord(taskId) {
+        it.copy(
+          state = TaskState.COMPLETED,
+          downloadedBytes = metadata.totalBytes,
+          updatedAt = currentTimeMillis()
+        )
+      }
+
       stateFlow.value = DownloadState.Completed(metadata.destPath)
     } finally {
       fileAccessor.close()
@@ -362,11 +421,34 @@ internal class DownloadCoordinator(
       activeDownloads.remove(taskId)
     }
     metadataStore.clear(taskId)
+    updateTaskState(taskId, TaskState.CANCELED)
   }
 
   suspend fun getState(taskId: String): DownloadState? {
     return mutex.withLock {
       activeDownloads[taskId]?.stateFlow?.value
     }
+  }
+
+  private suspend fun updateTaskState(
+    taskId: String,
+    state: TaskState,
+    errorMessage: String? = null
+  ) {
+    updateTaskRecord(taskId) {
+      it.copy(
+        state = state,
+        errorMessage = errorMessage,
+        updatedAt = currentTimeMillis()
+      )
+    }
+  }
+
+  private suspend fun updateTaskRecord(
+    taskId: String,
+    update: (TaskRecord) -> TaskRecord
+  ) {
+    val existing = taskStore.load(taskId) ?: return
+    taskStore.save(update(existing))
   }
 }

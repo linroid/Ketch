@@ -1,0 +1,28 @@
+CREATE TABLE task_records (
+  task_id TEXT NOT NULL PRIMARY KEY,
+  url TEXT NOT NULL,
+  dest_path TEXT NOT NULL,
+  connections INTEGER NOT NULL DEFAULT 4,
+  headers TEXT NOT NULL DEFAULT '{}',
+  state TEXT NOT NULL DEFAULT 'PENDING',
+  total_bytes INTEGER NOT NULL DEFAULT -1,
+  downloaded_bytes INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+save:
+INSERT OR REPLACE INTO task_records(
+  task_id, url, dest_path, connections, headers, state,
+  total_bytes, downloaded_bytes, error_message, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+load:
+SELECT * FROM task_records WHERE task_id = ?;
+
+loadAll:
+SELECT * FROM task_records;
+
+remove:
+DELETE FROM task_records WHERE task_id = ?;

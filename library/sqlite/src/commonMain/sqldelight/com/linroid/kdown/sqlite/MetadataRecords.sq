@@ -1,0 +1,14 @@
+CREATE TABLE metadata_records (
+  task_id TEXT NOT NULL PRIMARY KEY,
+  metadata_json TEXT NOT NULL
+);
+
+save:
+INSERT OR REPLACE INTO metadata_records(task_id, metadata_json)
+VALUES (?, ?);
+
+load:
+SELECT metadata_json FROM metadata_records WHERE task_id = ?;
+
+remove:
+DELETE FROM metadata_records WHERE task_id = ?;
