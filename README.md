@@ -1,112 +1,183 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM), Server.
+# KDown
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform
-  applications.
-  It contains several subfolders:
-    - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-    - Other folders are for Kotlin code that will be compiled for only the platform indicated in the
-      folder name.
-      For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-      the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-      Similarly, if you want to edit the Desktop (JVM) specific part,
-      the [jvmMain](./composeApp/src/jvmMain/kotlin)
-      folder is the appropriate location.
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.0-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-4c8dec?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
+[![Ktor](https://img.shields.io/badge/Ktor-3.4.0-087CFA.svg?logo=ktor&logoColor=white)](https://ktor.io)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Android](https://img.shields.io/badge/Android-24+-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com)
+[![iOS](https://img.shields.io/badge/iOS-supported-000000.svg?logo=apple&logoColor=white)](https://developer.apple.com)
+[![JVM](https://img.shields.io/badge/JVM-11+-DB380E.svg?logo=openjdk&logoColor=white)](https://openjdk.org)
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-6b48ff.svg?logo=anthropic&logoColor=white)](https://claude.ai/claude-code)
 
-* [/iosApp](./iosApp/iosApp) contains iOS applications. Even if you’re sharing your UI with Compose
-  Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for
-  your project.
+A Kotlin Multiplatform download library with pause/resume, multi-threaded segmented downloads, and progress tracking.
 
-* [/server](./server/src/main/kotlin) is for the Ktor server application.
+## Features
 
-* [/shared](./shared/src) is for the code that will be shared between all targets in the project.
-  The most important subfolder is [commonMain](./shared/src/commonMain/kotlin). If preferred, you
-  can add code to the platform-specific folders here too.
+- **Multi-platform** - Android, iOS, JVM/Desktop, and WebAssembly (Wasm)
+- **Segmented downloads** - Split files into N concurrent segments using HTTP Range requests for faster downloads
+- **Pause / Resume** - True resume using HTTP Range headers, not restart-from-zero
+- **Persistent resume** - Metadata is persisted so downloads survive app restarts
+- **Resume validation** - ETag / Last-Modified checks ensure the remote file hasn't changed
+- **Progress tracking** - Aggregated progress across all segments via `StateFlow`, with download speed
+- **Retry with backoff** - Configurable exponential backoff for transient network errors and 5xx responses
+- **Cancellation** - Robust coroutine-based cancellation
+- **Pluggable HTTP engine** - Ships with a Ktor adapter; bring your own `HttpEngine` if needed
 
-### Build and Run Android Application
+## Architecture
 
-To build and run the development version of the Android app, use the run configuration from the run
-widget
-in your IDE’s toolbar or build it directly from the terminal:
+```
+library/
+  core/       # Platform-agnostic download engine (commonMain)
+  ktor/       # Ktor-based HttpEngine implementation
+examples/
+  cli/        # JVM CLI sample
+  app/        # Compose Multiplatform app
+  desktopApp/ # Desktop (JVM) app
+  androidApp/ # Android app
+  webApp/     # Wasm browser app
+```
 
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:assembleDebug
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:assembleDebug
-  ```
+Key internal components:
 
-### Build and Run Desktop (JVM) Application
+| Class | Role |
+|---|---|
+| `KDown` | Main entry point |
+| `DownloadCoordinator` | Orchestrates segment jobs, manages state |
+| `SegmentDownloader` | Downloads a single byte-range segment |
+| `RangeSupportDetector` | Probes server for Range/ETag/content-length |
+| `FileAccessor` | expect/actual abstraction for random-access file writes |
+| `JsonMetadataStore` | File-based metadata persistence (kotlinx-io) |
 
-To build and run the development version of the desktop app, use the run configuration from the run
-widget
-in your IDE’s toolbar or run it directly from the terminal:
+## Quick Start
 
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:run
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:run
-  ```
+```kotlin
+// 1. Create a KDown instance
+val kdown = KDown(
+  httpEngine = KtorHttpEngine(),
+  metadataStore = JsonMetadataStore(metadataDir),
+  config = DownloadConfig(
+    maxConnections = 4,
+    retryCount = 3,
+    retryDelayMs = 1000
+  )
+)
 
-### Build and Run Server
+// 2. Start a download
+val task = kdown.download(
+  DownloadRequest(
+    url = "https://example.com/large-file.zip",
+    destPath = "/path/to/output.zip",
+    connections = 4
+  )
+)
 
-To build and run the development version of the server, use the run configuration from the run
-widget
-in your IDE’s toolbar or run it directly from the terminal:
+// 3. Observe progress
+launch {
+  task.state.collect { state ->
+    when (state) {
+      is DownloadState.Downloading -> {
+        val p = state.progress
+        println("${(p.percent * 100).toInt()}%  ${p.bytesPerSecond / 1024} KB/s")
+      }
+      is DownloadState.Completed -> println("Done: ${state.filePath}")
+      is DownloadState.Failed -> println("Error: ${state.error}")
+      else -> {}
+    }
+  }
+}
 
-- on macOS/Linux
-  ```shell
-  ./gradlew :server:run
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :server:run
-  ```
+// 4. Pause / Resume / Cancel
+task.pause()
+val resumed = kdown.resume(task.taskId)
+task.cancel()
 
-### Build and Run Web Application
+// 5. Or just await the result
+val result = task.await() // Result<String>
+```
 
-To build and run the development version of the web app, use the run configuration from the run
-widget
-in your IDE's toolbar or run it directly from the terminal:
+## Modules
 
-- for the Wasm target (faster, modern browsers):
-    - on macOS/Linux
-      ```shell
-      ./gradlew :composeApp:wasmJsBrowserDevelopmentRun
-      ```
-    - on Windows
-      ```shell
-      .\gradlew.bat :composeApp:wasmJsBrowserDevelopmentRun
-      ```
-- for the JS target (slower, supports older browsers):
-    - on macOS/Linux
-      ```shell
-      ./gradlew :composeApp:jsBrowserDevelopmentRun
-      ```
-    - on Windows
-      ```shell
-      .\gradlew.bat :composeApp:jsBrowserDevelopmentRun
-      ```
+### `library:core`
 
-### Build and Run iOS Application
+The platform-agnostic download engine. No HTTP client dependency -- just the `HttpEngine` interface:
 
-To build and run the development version of the iOS app, use the run configuration from the run
-widget
-in your IDE’s toolbar or open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+```kotlin
+interface HttpEngine {
+  suspend fun head(url: String): ServerInfo
+  suspend fun download(url: String, range: LongRange?, onData: suspend (ByteArray) -> Unit)
+  fun close()
+}
+```
+
+### `library:ktor`
+
+A ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
+
+| Platform | Ktor Engine |
+|---|---|
+| Android | OkHttp |
+| iOS | Darwin |
+| JVM | CIO |
+| Wasm/JS | Js |
+
+## Configuration
+
+```kotlin
+DownloadConfig(
+  maxConnections = 4,           // max concurrent segments
+  retryCount = 3,               // retries per segment
+  retryDelayMs = 1000,          // base delay (exponential backoff)
+  progressUpdateIntervalMs = 200, // progress throttle
+  bufferSize = 8192             // read buffer size
+)
+```
+
+## Error Handling
+
+All errors are modeled as a sealed class `KDownError`:
+
+| Type | Retryable | Description |
+|---|---|---|
+| `Network` | Yes | Connection / timeout failures |
+| `Http(code)` | 5xx only | Non-success HTTP status |
+| `Disk` | No | File I/O failures |
+| `Unsupported` | No | Server doesn't support required features |
+| `ValidationFailed` | No | ETag / Last-Modified mismatch on resume |
+| `Canceled` | No | Download was canceled |
+| `Unknown` | No | Unexpected errors |
+
+## How It Works
+
+1. **Probe** -- HEAD request to get `Content-Length`, `Accept-Ranges`, `ETag`, `Last-Modified`
+2. **Plan** -- If ranges are supported, split the file into N segments; otherwise fall back to a single connection
+3. **Download** -- Each segment downloads its byte range concurrently and writes to the correct file offset
+4. **Persist** -- Segment progress is saved to `MetadataStore` so pause/resume works across restarts
+5. **Resume** -- On resume, validates server identity (ETag/Last-Modified), then continues from last offsets
+
+## Current Limitations
+
+- No download queue/scheduler (one `download()` call = one task)
+- No bandwidth throttling
+- WebAssembly file writes are limited by browser APIs
+- iOS support is best-effort via expect/actual
+
+## Building
+
+```bash
+# Build all
+./gradlew build
+
+# Run CLI example
+./gradlew :examples:cli:run --args="https://example.com/file.zip"
+
+# Run desktop example
+./gradlew :examples:desktopApp:run
+```
+
+## License
+
+Apache-2.0
 
 ---
 
-Learn more
-about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
-[Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
-
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack
-channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them
-on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
+*This project was built with [Claude Code](https://claude.ai/claude-code) by Anthropic.*
