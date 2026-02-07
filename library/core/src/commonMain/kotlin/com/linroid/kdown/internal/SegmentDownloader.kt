@@ -13,6 +13,7 @@ internal class SegmentDownloader(
   suspend fun download(
     url: String,
     segment: Segment,
+    headers: Map<String, String> = emptyMap(),
     onProgress: suspend (bytesDownloaded: Long) -> Unit
   ): Segment {
     if (segment.isComplete) {
@@ -22,7 +23,7 @@ internal class SegmentDownloader(
     var downloadedBytes = segment.downloadedBytes
     val range = segment.currentOffset..segment.end
 
-    httpEngine.download(url, range) { data ->
+    httpEngine.download(url, range, headers) { data ->
       coroutineContext.ensureActive()
 
       val writeOffset = segment.start + downloadedBytes

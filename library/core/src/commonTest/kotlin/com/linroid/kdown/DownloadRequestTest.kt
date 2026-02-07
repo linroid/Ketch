@@ -54,4 +54,23 @@ class DownloadRequestTest {
       DownloadRequest(url = "https://example.com/file", destPath = Path("/tmp/file"), connections = -1)
     }
   }
+
+  @Test
+  fun defaultHeaders_isEmpty() {
+    val request = DownloadRequest(url = "https://example.com/file", destPath = Path("/tmp/file"))
+    assertEquals(emptyMap(), request.headers)
+  }
+
+  @Test
+  fun customHeaders_preserved() {
+    val headers = mapOf("Authorization" to "Bearer token123", "X-Custom" to "value")
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+      destPath = Path("/tmp/file"),
+      headers = headers
+    )
+    assertEquals(headers, request.headers)
+    assertEquals("Bearer token123", request.headers["Authorization"])
+    assertEquals("value", request.headers["X-Custom"])
+  }
 }

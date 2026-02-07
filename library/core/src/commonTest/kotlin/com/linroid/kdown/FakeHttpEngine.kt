@@ -25,11 +25,16 @@ class FakeHttpEngine(
     private set
   var downloadCallCount = 0
     private set
+  var lastHeadHeaders: Map<String, String> = emptyMap()
+    private set
+  var lastDownloadHeaders: Map<String, String> = emptyMap()
+    private set
   var closed = false
     private set
 
-  override suspend fun head(url: String): ServerInfo {
+  override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
     headCallCount++
+    lastHeadHeaders = headers
     if (failOnHead) {
       throw KDownError.Network(RuntimeException("Simulated network failure"))
     }
@@ -42,9 +47,11 @@ class FakeHttpEngine(
   override suspend fun download(
     url: String,
     range: LongRange?,
+    headers: Map<String, String>,
     onData: suspend (ByteArray) -> Unit
   ) {
     downloadCallCount++
+    lastDownloadHeaders = headers
 
     if (httpErrorCode > 0) {
       throw KDownError.Http(httpErrorCode, "Simulated HTTP error")
