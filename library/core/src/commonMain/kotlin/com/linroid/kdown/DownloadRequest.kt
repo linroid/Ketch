@@ -7,7 +7,8 @@ data class DownloadRequest(
   val url: String,
   val destPath: Path,
   val taskId: String = generateTaskId(),
-  val connections: Int = 4
+  val connections: Int = 4,
+  val headers: Map<String, String> = emptyMap()
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }
