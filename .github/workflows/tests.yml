@@ -34,7 +34,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-jvm
           path: '**/build/test-results/**/TEST-*.xml'
@@ -57,7 +57,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-android
           path: '**/build/test-results/**/TEST-*.xml'
@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-ios
           path: '**/build/test-results/**/TEST-*.xml'
@@ -103,7 +103,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-wasmjs
           path: '**/build/test-results/**/TEST-*.xml'
