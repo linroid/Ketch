@@ -1,6 +1,5 @@
 package com.linroid.kdown
 
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 data class DownloadRequest(
@@ -16,7 +15,6 @@ data class DownloadRequest(
   }
 
   companion object {
-    @OptIn(ExperimentalUuidApi::class)
     fun generateTaskId(): String = Uuid.random().toString()
   }
 }

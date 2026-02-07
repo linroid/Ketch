@@ -9,3 +9,12 @@ plugins {
   alias(libs.plugins.kotlinJvm) apply false
   alias(libs.plugins.kotlinMultiplatform) apply false
 }
+
+subprojects {
+  tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
+    compilerOptions {
+      freeCompilerArgs.add("-Xexpect-actual-classes")
+      optIn.addAll("kotlin.uuid.ExperimentalUuidApi", "kotlin.time.ExperimentalTime")
+    }
+  }
+}
