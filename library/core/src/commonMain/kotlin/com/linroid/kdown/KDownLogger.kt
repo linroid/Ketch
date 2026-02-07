@@ -1,19 +1,11 @@
 package com.linroid.kdown
 
 /**
- * Logger holder for KDown components.
- * This is set by the KDown instance and used by all KDown modules.
+ * Logger wrapper for KDown components that adds tag prefixes.
  *
  * @suppress This is internal API and should not be used directly by library users.
  */
-object KDownLogger {
-  var logger: Logger = Logger.None
-    private set
-
-  fun setLogger(logger: Logger) {
-    this.logger = logger
-  }
-
+internal class KDownLogger(private val logger: Logger) {
   fun v(tag: String, message: () -> String) {
     logger.v { "[$tag] ${message()}" }
   }

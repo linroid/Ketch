@@ -1,33 +1,31 @@
 package com.linroid.kdown
 
-import platform.Foundation.NSLog
-
 internal actual fun consoleLogger(): Logger = object : Logger {
   override fun v(message: () -> String) {
-    NSLog("[VERBOSE] ${message()}")
+    println("[VERBOSE] ${message()}")
   }
 
   override fun d(message: () -> String) {
-    NSLog("[DEBUG] ${message()}")
+    println("[DEBUG] ${message()}")
   }
 
   override fun i(message: () -> String) {
-    NSLog("[INFO] ${message()}")
+    println("[INFO] ${message()}")
   }
 
   override fun w(message: () -> String, throwable: Throwable?) {
-    NSLog("[WARN] ${message()}")
+    println("[WARN] ${message()}")
     throwable?.let {
-      NSLog("  Exception: ${it.message}")
-      NSLog("  ${it.stackTraceToString()}")
+      println("  Exception: ${it.message}")
+      println("  ${it.stackTraceToString()}")
     }
   }
 
   override fun e(message: () -> String, throwable: Throwable?) {
-    NSLog("[ERROR] ${message()}")
+    println("[ERROR] ${message()}")
     throwable?.let {
-      NSLog("  Exception: ${it.message}")
-      NSLog("  ${it.stackTraceToString()}")
+      println("  Exception: ${it.message}")
+      println("  ${it.stackTraceToString()}")
     }
   }
 }

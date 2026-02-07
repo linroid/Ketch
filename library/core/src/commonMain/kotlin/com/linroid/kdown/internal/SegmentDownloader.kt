@@ -9,7 +9,8 @@ import kotlin.coroutines.coroutineContext
 
 internal class SegmentDownloader(
   private val httpEngine: HttpEngine,
-  private val fileAccessor: FileAccessor
+  private val fileAccessor: FileAccessor,
+  private val logger: KDownLogger
 ) {
   suspend fun download(
     url: String,
@@ -22,10 +23,11 @@ internal class SegmentDownloader(
     }
 
     val remainingBytes = segment.totalBytes - segment.downloadedBytes
-    KDownLogger.d("SegmentDownloader") {
+    logger.d("SegmentDownloader") {
       "Starting segment ${segment.index}: range ${segment.start}..${segment.end} ($remainingBytes bytes remaining)"
     }
 
+    val initialBytes = segment.downloadedBytes
     var downloadedBytes = segment.downloadedBytes
     val range = segment.currentOffset..segment.end
 
@@ -38,8 +40,8 @@ internal class SegmentDownloader(
       onProgress(downloadedBytes)
     }
 
-    KDownLogger.d("SegmentDownloader") {
-      "Completed segment ${segment.index}: downloaded ${segment.totalBytes} bytes"
+    logger.d("SegmentDownloader") {
+      "Completed segment ${segment.index}: downloaded ${downloadedBytes - initialBytes} bytes"
     }
 
     return segment.copy(downloadedBytes = downloadedBytes)

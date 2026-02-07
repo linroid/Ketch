@@ -13,19 +13,21 @@ import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
 
 class KtorHttpEngine(
-  private val client: HttpClient = HttpClient()
+  private val client: HttpClient = HttpClient(),
+  logger: Logger = Logger.None
 ) : HttpEngine {
+  private val kdownLogger = KDownLogger(logger)
 
   override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
     try {
-      KDownLogger.d("KtorHttpEngine") { "HEAD request: $url" }
+      kdownLogger.d("KtorHttpEngine") { "HEAD request: $url" }
       val customHeaders = headers
       val response = client.head(url) {
         customHeaders.forEach { (name, value) -> header(name, value) }
       }
 
       if (!response.status.isSuccess()) {
-        KDownLogger.e("KtorHttpEngine") {
+        kdownLogger.e("KtorHttpEngine") {
           "HTTP error ${response.status.value}: ${response.status.description}"
         }
         throw KDownError.Http(response.status.value, response.status.description)
@@ -45,7 +47,7 @@ class KtorHttpEngine(
     } catch (e: KDownError) {
       throw e
     } catch (e: Exception) {
-      KDownLogger.e("KtorHttpEngine") { "Network error: ${e.message}" }
+      kdownLogger.e("KtorHttpEngine") { "Network error: ${e.message}" }
       throw KDownError.Network(e)
     }
   }
@@ -58,9 +60,9 @@ class KtorHttpEngine(
   ) {
     try {
       if (range != null) {
-        KDownLogger.d("KtorHttpEngine") { "GET request: $url, range=${range.first}-${range.last}" }
+        kdownLogger.d("KtorHttpEngine") { "GET request: $url, range=${range.first}-${range.last}" }
       } else {
-        KDownLogger.d("KtorHttpEngine") { "GET request: $url (no range)" }
+        kdownLogger.d("KtorHttpEngine") { "GET request: $url (no range)" }
       }
       val customHeaders = headers
       client.prepareGet(url) {
@@ -71,7 +73,7 @@ class KtorHttpEngine(
       }.execute { response ->
         val status = response.status
         if (!status.isSuccess()) {
-          KDownLogger.e("KtorHttpEngine") {
+          kdownLogger.e("KtorHttpEngine") {
             "HTTP error ${status.value}: ${status.description}"
           }
           throw KDownError.Http(status.value, status.description)
@@ -91,7 +93,7 @@ class KtorHttpEngine(
     } catch (e: KDownError) {
       throw e
     } catch (e: Exception) {
-      KDownLogger.e("KtorHttpEngine") { "Network error: ${e.message}" }
+      kdownLogger.e("KtorHttpEngine") { "Network error: ${e.message}" }
       throw KDownError.Network(e)
     }
   }
