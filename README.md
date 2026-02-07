@@ -31,6 +31,7 @@ A Kotlin Multiplatform download library with pause/resume, multi-threaded segmen
 library/
   core/       # Platform-agnostic download engine (commonMain)
   ktor/       # Ktor-based HttpEngine implementation
+  kermit/     # Optional Kermit logging integration
 examples/
   cli/        # JVM CLI sample
   app/        # Compose Multiplatform app
@@ -97,6 +98,62 @@ task.cancel()
 val result = task.await() // Result<String>
 ```
 
+## Logging
+
+KDown provides pluggable logging support. By default, logging is disabled for zero overhead.
+
+### Built-in Console Logger
+
+Use the platform-specific console logger for quick debugging:
+
+```kotlin
+val kdown = KDown(
+  httpEngine = KtorHttpEngine(),
+  logger = Logger.console()  // Logs to Logcat (Android), NSLog (iOS), stdout/stderr (JVM)
+)
+```
+
+### Structured Logging with Kermit
+
+For production use, integrate with [Kermit](https://github.com/touchlab/Kermit) for structured, multi-platform logging:
+
+```kotlin
+// Add dependency: implementation("com.linroid.kdown:kermit:1.0.0")
+
+val kdown = KDown(
+  httpEngine = KtorHttpEngine(),
+  logger = KermitLogger(
+    minSeverity = Severity.Debug,
+    tag = "MyApp"
+  )
+)
+```
+
+### Custom Logger
+
+Implement the `Logger` interface to integrate with your own logging framework:
+
+```kotlin
+class MyLogger : Logger {
+  override fun v(message: () -> String) { /* verbose log */ }
+  override fun d(message: () -> String) { /* debug log */ }
+  override fun i(message: () -> String) { /* info log */ }
+  override fun w(message: () -> String, throwable: Throwable?) { /* warning log */ }
+  override fun e(message: () -> String, throwable: Throwable?) { /* error log */ }
+}
+
+val kdown = KDown(httpEngine = KtorHttpEngine(), logger = MyLogger())
+```
+
+**Log Levels:**
+- **Verbose**: Detailed diagnostics (segment-level progress)
+- **Debug**: Internal operations (server detection, metadata save/load)
+- **Info**: User-facing events (download start/complete, server capabilities)
+- **Warn**: Recoverable errors (retry attempts, validation warnings)
+- **Error**: Fatal failures (download failures, network errors)
+
+See [LOGGING.md](LOGGING.md) for detailed logging documentation.
+
 ## Modules
 
 ### `library:core`
@@ -121,6 +178,10 @@ A ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
 | iOS | Darwin |
 | JVM | CIO |
 | Wasm/JS | Js |
+
+### `library:kermit`
+
+Optional [Kermit](https://github.com/touchlab/Kermit) integration for production-grade structured logging across all platforms.
 
 ## Configuration
 

@@ -4,6 +4,7 @@ import com.linroid.kdown.DownloadConfig
 import com.linroid.kdown.DownloadRequest
 import com.linroid.kdown.FileAccessor
 import com.linroid.kdown.HttpEngine
+import com.linroid.kdown.KDownLogger
 import com.linroid.kdown.MetadataStore
 import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.model.DownloadMetadata
@@ -77,6 +78,7 @@ internal class DownloadCoordinator(
     request: DownloadRequest,
     stateFlow: MutableStateFlow<DownloadState>
   ) {
+    KDownLogger.d("Coordinator") { "Detecting server capabilities for ${request.url}" }
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(request.url)
 
@@ -84,8 +86,14 @@ internal class DownloadCoordinator(
       ?: throw KDownError.Unsupported
 
     val segments = if (serverInfo.supportsResume && request.connections > 1) {
+      KDownLogger.i("Coordinator") {
+        "Server supports range requests. Using ${request.connections} connections, totalBytes=$totalBytes"
+      }
       SegmentCalculator.calculateSegments(totalBytes, request.connections)
     } else {
+      KDownLogger.i("Coordinator") {
+        "Server does not support range requests or single connection requested. Using 1 connection, totalBytes=$totalBytes"
+      }
       SegmentCalculator.singleSegment(totalBytes)
     }
 
@@ -113,13 +121,16 @@ internal class DownloadCoordinator(
     }
 
     try {
+      KDownLogger.d("Coordinator") { "Preallocating $totalBytes bytes for taskId=${request.taskId}" }
       fileAccessor.preallocate(totalBytes)
+      KDownLogger.d("Coordinator") { "Saving metadata for taskId=${request.taskId}" }
       metadataStore.save(request.taskId, metadata)
 
       downloadWithRetry(request.taskId, metadata, fileAccessor, stateFlow)
 
       fileAccessor.flush()
       metadataStore.clear(request.taskId)
+      KDownLogger.i("Coordinator") { "Download completed successfully for taskId=${request.taskId}" }
       stateFlow.value = DownloadState.Completed(request.destPath)
     } finally {
       fileAccessor.close()
@@ -151,11 +162,13 @@ internal class DownloadCoordinator(
         }
 
         if (!error.isRetryable || retryCount >= config.retryCount) {
+          KDownLogger.e("Coordinator") { "Download failed after $retryCount retries: ${error.message}" }
           throw error
         }
 
         retryCount++
         val delayMs = config.retryDelayMs * (1 shl (retryCount - 1))
+        KDownLogger.w("Coordinator") { "Retry attempt $retryCount after ${delayMs}ms delay: ${error.message}" }
         delay(delayMs)
 
         metadata = metadataStore.load(taskId) ?: metadata
@@ -240,9 +253,11 @@ internal class DownloadCoordinator(
   suspend fun pause(taskId: String) {
     mutex.withLock {
       val active = activeDownloads[taskId] ?: return
+      KDownLogger.i("Coordinator") { "Pausing download for taskId=$taskId" }
       active.job.cancel()
 
       active.metadata?.let { metadata ->
+        KDownLogger.d("Coordinator") { "Saving pause state for taskId=$taskId" }
         metadataStore.save(taskId, metadata.copy(updatedAt = currentTimeMillis()))
       }
 
@@ -298,16 +313,21 @@ internal class DownloadCoordinator(
     metadata: DownloadMetadata,
     stateFlow: MutableStateFlow<DownloadState>
   ) {
+    KDownLogger.i("Coordinator") { "Resuming download for taskId=$taskId, url=${metadata.url}" }
+    KDownLogger.d("Coordinator") { "Validating server state for resume" }
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(metadata.url)
 
     if (metadata.etag != null && serverInfo.etag != metadata.etag) {
+      KDownLogger.w("Coordinator") { "ETag mismatch - file has changed on server" }
       throw KDownError.ValidationFailed("ETag mismatch - file has changed on server")
     }
 
     if (metadata.lastModified != null && serverInfo.lastModified != metadata.lastModified) {
+      KDownLogger.w("Coordinator") { "Last-Modified mismatch - file has changed on server" }
       throw KDownError.ValidationFailed("Last-Modified mismatch - file has changed on server")
     }
+    KDownLogger.d("Coordinator") { "Server validation passed, continuing resume" }
 
     val fileAccessor = fileAccessorFactory(metadata.destPath)
 
@@ -333,6 +353,7 @@ internal class DownloadCoordinator(
   }
 
   suspend fun cancel(taskId: String) {
+    KDownLogger.i("Coordinator") { "Canceling download for taskId=$taskId" }
     mutex.withLock {
       val active = activeDownloads[taskId]
       active?.job?.cancel()

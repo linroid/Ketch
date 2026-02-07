@@ -12,8 +12,14 @@ class KDown(
   private val httpEngine: HttpEngine,
   private val metadataStore: MetadataStore = InMemoryMetadataStore(),
   private val config: DownloadConfig = DownloadConfig.Default,
-  private val fileAccessorFactory: (Path) -> FileAccessor = { path -> FileAccessor(path) }
+  private val fileAccessorFactory: (Path) -> FileAccessor = { path -> FileAccessor(path) },
+  logger: Logger = Logger.None
 ) {
+  init {
+    KDownLogger.setLogger(logger)
+    KDownLogger.i("KDown") { "KDown v$VERSION initialized" }
+  }
+
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
   private val coordinator = DownloadCoordinator(
@@ -24,6 +30,9 @@ class KDown(
   )
 
   suspend fun download(request: DownloadRequest): DownloadTask {
+    KDownLogger.i("KDown") {
+      "Starting download: taskId=${request.taskId}, url=${request.url}, connections=${request.connections}"
+    }
     val stateFlow = coordinator.start(request, scope)
 
     return DownloadTask(
@@ -36,10 +45,12 @@ class KDown(
   }
 
   suspend fun pause(taskId: String) {
+    KDownLogger.i("KDown") { "Pausing download: taskId=$taskId" }
     coordinator.pause(taskId)
   }
 
   suspend fun resume(taskId: String): DownloadTask? {
+    KDownLogger.i("KDown") { "Resuming download: taskId=$taskId" }
     val stateFlow = coordinator.resume(taskId, scope) ?: return null
 
     return DownloadTask(
@@ -52,10 +63,12 @@ class KDown(
   }
 
   suspend fun cancel(taskId: String) {
+    KDownLogger.i("KDown") { "Canceling download: taskId=$taskId" }
     coordinator.cancel(taskId)
   }
 
   fun close() {
+    KDownLogger.i("KDown") { "Closing KDown" }
     httpEngine.close()
     scope.cancel()
   }
