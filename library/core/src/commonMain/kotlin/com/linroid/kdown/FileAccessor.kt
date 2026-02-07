@@ -1,6 +1,8 @@
 package com.linroid.kdown
 
-expect class FileAccessor(path: String) {
+import kotlinx.io.files.Path
+
+expect class FileAccessor(path: Path) {
   suspend fun writeAt(offset: Long, data: ByteArray)
   suspend fun flush()
   fun close()

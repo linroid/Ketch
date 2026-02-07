@@ -2,6 +2,7 @@ package com.linroid.kdown
 
 import com.linroid.kdown.model.DownloadMetadata
 import com.linroid.kdown.model.Segment
+import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +26,7 @@ class DownloadMetadataTest {
   ) = DownloadMetadata(
     taskId = "test-task-1",
     url = "https://example.com/file.bin",
-    destPath = "/tmp/file.bin",
+    destPath = Path("/tmp/file.bin"),
     totalBytes = 1000,
     acceptRanges = true,
     etag = etag,

@@ -1,6 +1,8 @@
 package com.linroid.kdown
 
-actual class FileAccessor actual constructor(private val path: String) {
+import kotlinx.io.files.Path
+
+actual class FileAccessor actual constructor(private val path: Path) {
 
   actual suspend fun writeAt(offset: Long, data: ByteArray) {
     throw UnsupportedOperationException("FileAccessor is not supported on Wasm/JS platform")

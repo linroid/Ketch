@@ -8,18 +8,17 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import java.io.RandomAccessFile
 
-actual class FileAccessor actual constructor(private val path: String) {
-  private val filePath = Path(path)
+actual class FileAccessor actual constructor(private val path: Path) {
   private var randomAccessFile: RandomAccessFile? = null
   private val mutex = Mutex()
 
   private suspend fun getOrCreateFile(): RandomAccessFile = mutex.withLock {
     randomAccessFile ?: run {
-      val parent = filePath.parent
+      val parent = path.parent
       if (parent != null && !SystemFileSystem.exists(parent)) {
         SystemFileSystem.createDirectories(parent)
       }
-      RandomAccessFile(path, "rw").also { randomAccessFile = it }
+      RandomAccessFile(path.toString(), "rw").also { randomAccessFile = it }
     }
   }
 
@@ -49,14 +48,14 @@ actual class FileAccessor actual constructor(private val path: String) {
   actual suspend fun delete() {
     withContext(Dispatchers.IO) {
       close()
-      if (SystemFileSystem.exists(filePath)) {
-        SystemFileSystem.delete(filePath)
+      if (SystemFileSystem.exists(path)) {
+        SystemFileSystem.delete(path)
       }
     }
   }
 
   actual suspend fun size(): Long = withContext(Dispatchers.IO) {
-    SystemFileSystem.metadataOrNull(filePath)?.size ?: 0L
+    SystemFileSystem.metadataOrNull(path)?.size ?: 0L
   }
 
   actual suspend fun preallocate(size: Long) {

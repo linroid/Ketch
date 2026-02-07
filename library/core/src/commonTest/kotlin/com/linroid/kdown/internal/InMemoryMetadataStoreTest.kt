@@ -3,6 +3,7 @@ package com.linroid.kdown.internal
 import com.linroid.kdown.model.DownloadMetadata
 import com.linroid.kdown.model.Segment
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -12,7 +13,7 @@ class InMemoryMetadataStoreTest {
   private fun createMetadata(taskId: String = "task-1") = DownloadMetadata(
     taskId = taskId,
     url = "https://example.com/file.bin",
-    destPath = "/tmp/file.bin",
+    destPath = Path("/tmp/file.bin"),
     totalBytes = 1000,
     acceptRanges = true,
     etag = "\"abc\"",

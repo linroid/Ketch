@@ -10,6 +10,7 @@ import com.linroid.kdown.model.DownloadMetadata
 import com.linroid.kdown.model.DownloadProgress
 import com.linroid.kdown.model.DownloadState
 import kotlinx.coroutines.CancellationException
+import kotlinx.io.files.Path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -27,7 +28,7 @@ internal class DownloadCoordinator(
   private val httpEngine: HttpEngine,
   private val metadataStore: MetadataStore,
   private val config: DownloadConfig,
-  private val fileAccessorFactory: (String) -> FileAccessor
+  private val fileAccessorFactory: (Path) -> FileAccessor
 ) {
   private val mutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveDownload>()

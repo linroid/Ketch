@@ -26,7 +26,12 @@ kotlin {
 
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs {
-    browser()
+    browser {
+      testTask {
+        // kotlinx.io.files.Path requires Node.js APIs unavailable in browser tests
+        enabled = false
+      }
+    }
   }
 
   sourceSets {

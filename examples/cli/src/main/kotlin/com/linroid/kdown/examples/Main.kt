@@ -8,6 +8,7 @@ import com.linroid.kdown.model.DownloadState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.io.files.Path
 
 fun main(args: Array<String>) {
   println("KDown CLI Example - Version ${KDown.VERSION}")
@@ -27,7 +28,7 @@ fun main(args: Array<String>) {
   }
 
   val url = args[0]
-  val destination = args.getOrNull(1) ?: url.substringAfterLast("/")
+  val destination = Path(args.getOrNull(1) ?: url.substringAfterLast("/"))
 
   println("Downloading: $url")
   println("Destination: $destination")

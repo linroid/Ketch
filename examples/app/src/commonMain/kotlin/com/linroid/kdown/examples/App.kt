@@ -45,6 +45,7 @@ import com.linroid.kdown.KDown
 import com.linroid.kdown.KtorHttpEngine
 import com.linroid.kdown.model.DownloadState
 import kotlinx.coroutines.launch
+import kotlinx.io.files.Path
 
 @Composable
 fun App() {
@@ -493,9 +494,9 @@ private data class PublicExample(
   val suggestedName: String
 )
 
-private fun buildDestPath(fileName: String): String {
+private fun buildDestPath(fileName: String): Path {
   val safeName = fileName.ifBlank { "kdown-download.bin" }
-  return "downloads/$safeName"
+  return Path("downloads/$safeName")
 }
 
 private fun startDownload(
@@ -505,7 +506,7 @@ private fun startDownload(
   taskErrors: MutableMap<String, String>,
   entryId: String,
   url: String,
-  destPath: String
+  destPath: Path
 ) {
   taskErrors.remove(entryId)
   scope.launch {

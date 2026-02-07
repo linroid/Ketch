@@ -4,6 +4,7 @@ import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.model.DownloadState
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.io.files.Path
 
 class DownloadTask internal constructor(
   val taskId: String,
@@ -24,7 +25,7 @@ class DownloadTask internal constructor(
     cancelAction()
   }
 
-  suspend fun await(): Result<String> {
+  suspend fun await(): Result<Path> {
     val finalState = state.first { it.isTerminal }
     return when (finalState) {
       is DownloadState.Completed -> Result.success(finalState.filePath)
