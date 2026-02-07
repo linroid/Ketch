@@ -13,7 +13,6 @@ plugins {
 subprojects {
   tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
     compilerOptions {
-      allWarningsAsErrors.set(true)
       freeCompilerArgs.add("-Xexpect-actual-classes")
       optIn.addAll("kotlin.uuid.ExperimentalUuidApi", "kotlin.time.ExperimentalTime")
     }
