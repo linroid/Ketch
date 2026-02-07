@@ -128,4 +128,40 @@ class DownloadMetadataTest {
     assertEquals(0, metadata.segments[0].downloadedBytes)
     assertEquals(2000L, metadata.updatedAt)
   }
+
+  @Test
+  fun defaultHeaders_isEmpty() {
+    val metadata = createMetadata()
+    assertEquals(emptyMap(), metadata.headers)
+  }
+
+  @Test
+  fun serializationRoundTrip_withHeaders() {
+    val headers = mapOf("Authorization" to "Bearer token", "X-Custom" to "value")
+    val original = createMetadata().copy(headers = headers)
+    val serialized = json.encodeToString(DownloadMetadata.serializer(), original)
+    val deserialized = json.decodeFromString<DownloadMetadata>(serialized)
+    assertEquals(original, deserialized)
+    assertEquals(headers, deserialized.headers)
+  }
+
+  @Test
+  fun deserialization_withoutHeaders_defaultsToEmpty() {
+    val jsonStr = """
+      {
+        "taskId": "t1",
+        "url": "https://example.com/f",
+        "destPath": "/tmp/f",
+        "totalBytes": 100,
+        "acceptRanges": false,
+        "etag": null,
+        "lastModified": null,
+        "segments": [],
+        "createdAt": 0,
+        "updatedAt": 0
+      }
+    """.trimIndent()
+    val metadata = json.decodeFromString<DownloadMetadata>(jsonStr)
+    assertEquals(emptyMap(), metadata.headers)
+  }
 }

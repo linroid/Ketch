@@ -75,4 +75,13 @@ class RangeSupportDetectorTest {
     detector.detect("https://example.com/file")
     assertEquals(1, engine.headCallCount)
   }
+
+  @Test
+  fun detect_passesCustomHeaders() = runTest {
+    val engine = FakeHttpEngine()
+    val detector = RangeSupportDetector(engine)
+    val headers = mapOf("Authorization" to "Bearer token", "X-Custom" to "value")
+    detector.detect("https://example.com/file", headers)
+    assertEquals(headers, engine.lastHeadHeaders)
+  }
 }

@@ -16,9 +16,12 @@ class KtorHttpEngine(
   private val client: HttpClient = HttpClient()
 ) : HttpEngine {
 
-  override suspend fun head(url: String): ServerInfo {
+  override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
     try {
-      val response = client.head(url)
+      val customHeaders = headers
+      val response = client.head(url) {
+        customHeaders.forEach { (name, value) -> header(name, value) }
+      }
 
       if (!response.status.isSuccess()) {
         throw KDownError.Http(response.status.value, response.status.description)
@@ -45,10 +48,13 @@ class KtorHttpEngine(
   override suspend fun download(
     url: String,
     range: LongRange?,
+    headers: Map<String, String>,
     onData: suspend (ByteArray) -> Unit
   ) {
     try {
+      val customHeaders = headers
       client.prepareGet(url) {
+        customHeaders.forEach { (name, value) -> header(name, value) }
         if (range != null) {
           header(HttpHeaders.Range, "bytes=${range.first}-${range.last}")
         }

@@ -6,7 +6,7 @@ import com.linroid.kdown.model.ServerInfo
 internal class RangeSupportDetector(
   private val httpEngine: HttpEngine
 ) {
-  suspend fun detect(url: String): ServerInfo {
-    return httpEngine.head(url)
+  suspend fun detect(url: String, headers: Map<String, String> = emptyMap()): ServerInfo {
+    return httpEngine.head(url, headers)
   }
 }

@@ -78,7 +78,7 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>
   ) {
     val detector = RangeSupportDetector(httpEngine)
-    val serverInfo = detector.detect(request.url)
+    val serverInfo = detector.detect(request.url, request.headers)
 
     val totalBytes = serverInfo.contentLength
       ?: throw KDownError.Unsupported
@@ -99,6 +99,7 @@ internal class DownloadCoordinator(
       etag = serverInfo.etag,
       lastModified = serverInfo.lastModified,
       segments = segments,
+      headers = request.headers,
       createdAt = now,
       updatedAt = now
     )
@@ -204,7 +205,7 @@ internal class DownloadCoordinator(
       val results = incompleteSegments.map { segment ->
         async {
           val downloader = SegmentDownloader(httpEngine, fileAccessor)
-          downloader.download(metadata.url, segment) { bytesDownloaded ->
+          downloader.download(metadata.url, segment, metadata.headers) { bytesDownloaded ->
             segmentMutex.withLock {
               segmentProgress[segment.index] = bytesDownloaded
             }
@@ -299,7 +300,7 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>
   ) {
     val detector = RangeSupportDetector(httpEngine)
-    val serverInfo = detector.detect(metadata.url)
+    val serverInfo = detector.detect(metadata.url, metadata.headers)
 
     if (metadata.etag != null && serverInfo.etag != metadata.etag) {
       throw KDownError.ValidationFailed("ETag mismatch - file has changed on server")

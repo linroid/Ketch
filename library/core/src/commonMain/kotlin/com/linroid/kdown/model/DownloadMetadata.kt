@@ -33,6 +33,7 @@ data class DownloadMetadata(
   val etag: String?,
   val lastModified: String?,
   val segments: List<Segment>,
+  val headers: Map<String, String> = emptyMap(),
   val createdAt: Long,
   val updatedAt: Long
 ) {
