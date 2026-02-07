@@ -13,7 +13,6 @@ import kotlinx.io.files.SystemFileSystem
 import platform.Foundation.NSData
 import platform.Foundation.NSFileHandle
 import platform.Foundation.NSFileManager
-import platform.Foundation.NSFileSize
 import platform.Foundation.closeFile
 import platform.Foundation.create
 import platform.Foundation.fileHandleForWritingAtPath

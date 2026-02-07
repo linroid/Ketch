@@ -8,7 +8,6 @@ import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
@@ -55,7 +54,7 @@ class KtorHttpEngine(
         }
       }.execute { response ->
         val status = response.status
-        if (!status.isSuccess() && status != HttpStatusCode.PartialContent) {
+        if (!status.isSuccess()) {
           throw KDownError.Http(status.value, status.description)
         }
 
