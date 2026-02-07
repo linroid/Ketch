@@ -15,6 +15,7 @@ subprojects {
     compilerOptions {
       allWarningsAsErrors.set(true)
       freeCompilerArgs.add("-Xexpect-actual-classes")
+      optIn.addAll("kotlin.uuid.ExperimentalUuidApi", "kotlin.time.ExperimentalTime")
     }
   }
 }
