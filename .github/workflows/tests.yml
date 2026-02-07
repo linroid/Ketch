@@ -24,20 +24,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Run library core tests
-        run: ./gradlew :library:core:jvmTest
-
-      - name: Run library ktor tests
-        run: ./gradlew :library:ktor:jvmTest
+      - name: Run JVM tests
+        run: ./gradlew jvmTest
 
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: jvm-test-reports
-          path: |
-            library/core/build/reports/tests/jvmTest/
-            library/ktor/build/reports/tests/jvmTest/
+          path: '**/build/reports/tests/jvmTest/'
 
   android-tests:
     name: Android Unit Tests
@@ -52,17 +47,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Run library core Android unit tests
-        run: ./gradlew :library:core:testDebugUnitTest
-
-      - name: Run library ktor Android unit tests
-        run: ./gradlew :library:ktor:testDebugUnitTest
+      - name: Run Android unit tests
+        run: ./gradlew testDebugUnitTest
 
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: android-test-reports
-          path: |
-            library/core/build/reports/tests/testDebugUnitTest/
-            library/ktor/build/reports/tests/testDebugUnitTest/
+          path: '**/build/reports/tests/testDebugUnitTest/'
