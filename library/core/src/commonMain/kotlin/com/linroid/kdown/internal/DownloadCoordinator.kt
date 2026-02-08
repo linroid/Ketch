@@ -42,7 +42,8 @@ internal class DownloadCoordinator(
     val job: Job,
     val stateFlow: MutableStateFlow<DownloadState>,
     var metadata: DownloadMetadata?,
-    var fileAccessor: FileAccessor?
+    var fileAccessor: FileAccessor?,
+    var segmentProgress: MutableList<Long>? = null
   )
 
   suspend fun start(
@@ -69,7 +70,9 @@ internal class DownloadCoordinator(
       try {
         executeDownload(request, stateFlow)
       } catch (e: CancellationException) {
-        stateFlow.value = DownloadState.Canceled
+        if (stateFlow.value !is DownloadState.Paused) {
+          stateFlow.value = DownloadState.Canceled
+        }
         throw e
       } catch (e: Exception) {
         val error = when (e) {
@@ -222,6 +225,10 @@ internal class DownloadCoordinator(
     val segmentProgress = metadata.segments.map { it.downloadedBytes }.toMutableList()
     val segmentMutex = Mutex()
 
+    mutex.withLock {
+      activeDownloads[taskId]?.segmentProgress = segmentProgress
+    }
+
     var lastProgressUpdate = currentTimeMillis()
     val progressMutex = Mutex()
 
@@ -296,12 +303,21 @@ internal class DownloadCoordinator(
       active.metadata?.let { metadata ->
         KDownLogger.d("Coordinator") { "Saving pause state for taskId=$taskId" }
         val now = currentTimeMillis()
-        metadataStore.save(taskId, metadata.copy(updatedAt = now))
+        val progress = active.segmentProgress
+        val updatedMetadata = if (progress != null) {
+          val updatedSegments = metadata.segments.mapIndexed { i, seg ->
+            seg.copy(downloadedBytes = progress[i])
+          }
+          metadata.copy(segments = updatedSegments, updatedAt = now)
+        } else {
+          metadata.copy(updatedAt = now)
+        }
+        metadataStore.save(taskId, updatedMetadata)
 
         updateTaskRecord(taskId) {
           it.copy(
             state = TaskState.PAUSED,
-            downloadedBytes = metadata.downloadedBytes,
+            downloadedBytes = updatedMetadata.downloadedBytes,
             updatedAt = now
           )
         }
@@ -335,7 +351,9 @@ internal class DownloadCoordinator(
       try {
         resumeDownload(taskId, metadata, stateFlow)
       } catch (e: CancellationException) {
-        stateFlow.value = DownloadState.Canceled
+        if (stateFlow.value !is DownloadState.Paused) {
+          stateFlow.value = DownloadState.Canceled
+        }
         throw e
       } catch (e: Exception) {
         val error = when (e) {
