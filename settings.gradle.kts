@@ -36,6 +36,7 @@ plugins {
 include(":library:core")
 include(":library:ktor")
 include(":library:kermit")
+include(":library:sqlite")
 
 // Example modules
 include(":examples:app")
