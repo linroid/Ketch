@@ -206,6 +206,7 @@ fun App() {
               onCancel = {
                 scope.launch {
                   activeTasks[record.taskId]?.cancel()
+                  activeTasks.remove(record.taskId)
                   refreshRecords()
                 }
               },
