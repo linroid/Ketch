@@ -1,6 +1,7 @@
 package com.linroid.kdown.examples
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,18 +17,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -380,10 +378,23 @@ private fun DownloadTaskItem(
     ?.collectAsState(DownloadState.Idle)?.value
   val displayState = liveState ?: recordToDisplayState(record)
   val fileName = record.destPath.name
+  val isDownloading = displayState is DownloadState.Downloading ||
+    displayState is DownloadState.Pending
+  val isPaused = displayState is DownloadState.Paused
 
   Card(
     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    modifier = Modifier.fillMaxWidth()
+    modifier = Modifier
+      .fillMaxWidth()
+      .then(
+        if (isDownloading || isPaused) {
+          Modifier.clickable {
+            if (isDownloading) onPause() else onResume()
+          }
+        } else {
+          Modifier
+        }
+      )
   ) {
     Column(
       modifier = Modifier.padding(16.dp),
@@ -504,8 +515,6 @@ private fun DownloadTaskItem(
 
       TaskActionButtons(
         state = displayState,
-        onPause = onPause,
-        onResume = onResume,
         onCancel = onCancel,
         onRetry = onRetry,
         onRemove = onRemove
@@ -560,8 +569,6 @@ private fun StatusIndicator(state: DownloadState) {
 @Composable
 private fun TaskActionButtons(
   state: DownloadState,
-  onPause: () -> Unit,
-  onResume: () -> Unit,
   onCancel: () -> Unit,
   onRetry: () -> Unit,
   onRemove: () -> Unit
@@ -571,6 +578,7 @@ private fun TaskActionButtons(
     verticalAlignment = Alignment.CenterVertically
   ) {
     when (state) {
+      is DownloadState.Downloading,
       is DownloadState.Pending -> {
         IconButton(
           onClick = onCancel,
@@ -581,10 +589,7 @@ private fun TaskActionButtons(
           Icon(Icons.Filled.Close, contentDescription = "Cancel")
         }
       }
-      is DownloadState.Downloading -> {
-        FilledTonalIconButton(onClick = onPause) {
-          Icon(Icons.Filled.Pause, contentDescription = "Pause")
-        }
+      is DownloadState.Paused -> {
         IconButton(
           onClick = onCancel,
           colors = IconButtonDefaults.iconButtonColors(
@@ -592,14 +597,6 @@ private fun TaskActionButtons(
           )
         ) {
           Icon(Icons.Filled.Close, contentDescription = "Cancel")
-        }
-      }
-      is DownloadState.Paused -> {
-        FilledIconButton(onClick = onResume) {
-          Icon(
-            Icons.Filled.PlayArrow,
-            contentDescription = "Resume"
-          )
         }
         IconButton(
           onClick = onRemove,
@@ -620,19 +617,7 @@ private fun TaskActionButtons(
           Icon(Icons.Filled.Delete, contentDescription = "Remove")
         }
       }
-      is DownloadState.Failed -> {
-        FilledTonalIconButton(onClick = onRetry) {
-          Icon(Icons.Filled.Refresh, contentDescription = "Retry")
-        }
-        IconButton(
-          onClick = onRemove,
-          colors = IconButtonDefaults.iconButtonColors(
-            contentColor = MaterialTheme.colorScheme.error
-          )
-        ) {
-          Icon(Icons.Filled.Delete, contentDescription = "Remove")
-        }
-      }
+      is DownloadState.Failed,
       is DownloadState.Canceled -> {
         FilledTonalIconButton(onClick = onRetry) {
           Icon(Icons.Filled.Refresh, contentDescription = "Retry")
