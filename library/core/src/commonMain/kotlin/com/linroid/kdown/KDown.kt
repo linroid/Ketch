@@ -124,7 +124,7 @@ class KDown(
    * Removes a task record from the [TaskStore]. Does not cancel an active
    * download — call [cancel] first if the task is still running.
    */
-  suspend fun removeTask(taskId: String) {
+  suspend fun removeTask(taskId: String): Unit {
     taskStore.remove(taskId)
   }
 

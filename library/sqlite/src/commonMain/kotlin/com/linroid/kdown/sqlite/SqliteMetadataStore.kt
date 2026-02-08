@@ -23,11 +23,19 @@ class SqliteMetadataStore(driver: SqlDriver) : MetadataStore {
     ignoreUnknownKeys = true
   }
 
+  /**
+   * Saves [DownloadMetadata] for the given task ID. Serializes the metadata
+   * to JSON and stores it in the SQLite database.
+   */
   override suspend fun save(taskId: String, metadata: DownloadMetadata): Unit = mutex.withLock {
     val metadataJson = json.encodeToString(DownloadMetadata.serializer(), metadata)
     queries.save(task_id = taskId, metadata_json = metadataJson)
   }
 
+  /**
+   * Loads [DownloadMetadata] for the given task ID. Returns `null` if not
+   * found or if deserialization fails.
+   */
   override suspend fun load(taskId: String): DownloadMetadata? = mutex.withLock {
     val row = queries.load(taskId).executeAsOneOrNull() ?: return@withLock null
     try {
@@ -37,6 +45,9 @@ class SqliteMetadataStore(driver: SqlDriver) : MetadataStore {
     }
   }
 
+  /**
+   * Removes the metadata record for the given task ID from the database.
+   */
   override suspend fun clear(taskId: String): Unit = mutex.withLock {
     queries.remove(taskId)
   }

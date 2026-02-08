@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.withLock
  * process exits. Suitable for testing or ephemeral downloads where
  * cross-restart persistence is not needed.
  */
-class InMemoryTaskStore : TaskStore {
+internal class InMemoryTaskStore : TaskStore {
   private val mutex = Mutex()
   private val storage = mutableMapOf<String, TaskRecord>()
 

@@ -24,6 +24,10 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
   private val json = Json { ignoreUnknownKeys = true }
   private val headersSerializer = MapSerializer(String.serializer(), String.serializer())
 
+  /**
+   * Saves a [TaskRecord] to the SQLite database. If a record with the same
+   * task ID already exists, it will be replaced.
+   */
   override suspend fun save(record: TaskRecord): Unit = mutex.withLock {
     queries.save(
       task_id = record.taskId,
@@ -40,14 +44,23 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
     )
   }
 
+  /**
+   * Loads a [TaskRecord] for the given task ID. Returns `null` if not found.
+   */
   override suspend fun load(taskId: String): TaskRecord? = mutex.withLock {
     queries.load(taskId).executeAsOneOrNull()?.toTaskRecord()
   }
 
+  /**
+   * Loads all [TaskRecord]s from the database.
+   */
   override suspend fun loadAll(): List<TaskRecord> = mutex.withLock {
     queries.loadAll().executeAsList().map { it.toTaskRecord() }
   }
 
+  /**
+   * Removes the task record for the given task ID from the database.
+   */
   override suspend fun remove(taskId: String): Unit = mutex.withLock {
     queries.remove(taskId)
   }
