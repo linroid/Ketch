@@ -9,6 +9,10 @@ plugins {
 }
 
 kotlin {
+  compilerOptions {
+    optIn.add("kotlin.uuid.ExperimentalUuidApi")
+  }
+
   androidLibrary {
     namespace = "com.linroid.kdown.core"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
