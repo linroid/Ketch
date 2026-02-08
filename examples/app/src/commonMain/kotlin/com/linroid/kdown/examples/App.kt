@@ -573,7 +573,6 @@ private fun TaskActionButtons(
       }
       is DownloadState.Paused -> {
         FilledTonalButton(onClick = onResume) { Text("Resume") }
-        OutlinedButton(onClick = onCancel) { Text("Cancel") }
         TextButton(onClick = onRemove) { Text("Remove") }
       }
       is DownloadState.Completed -> {
