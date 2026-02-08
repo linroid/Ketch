@@ -28,10 +28,21 @@ fun main(args: Array<String>) {
   }
 
   val url = args[0]
-  val destination = Path(args.getOrNull(1) ?: url.substringAfterLast("/"))
+  val dest = args.getOrNull(1)
+  val directory: Path
+  val fileName: String?
+  if (dest != null) {
+    val destPath = Path(dest)
+    directory = destPath.parent ?: Path(".")
+    fileName = destPath.name
+  } else {
+    directory = Path(".")
+    fileName = null
+  }
 
   println("Downloading: $url")
-  println("Destination: $destination")
+  println("Directory: $directory")
+  if (fileName != null) println("File name: $fileName")
   println()
 
   val config = DownloadConfig(
@@ -49,7 +60,8 @@ fun main(args: Array<String>) {
   runBlocking {
     val request = DownloadRequest(
       url = url,
-      destPath = destination,
+      directory = directory,
+      fileName = fileName,
       connections = config.maxConnections
     )
 

@@ -35,12 +35,15 @@ class KtorHttpEngine(
       val etag = response.headers[HttpHeaders.ETag]
       val lastModified = response.headers[HttpHeaders.LastModified]
       val contentLength = response.contentLength()
+      val contentDisposition =
+        response.headers[HttpHeaders.ContentDisposition]
 
       return ServerInfo(
         contentLength = contentLength,
         acceptRanges = acceptRanges?.contains("bytes", ignoreCase = true) == true,
         etag = etag,
-        lastModified = lastModified
+        lastModified = lastModified,
+        contentDisposition = contentDisposition
       )
     } catch (e: KDownError) {
       throw e

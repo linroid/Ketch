@@ -1,5 +1,6 @@
 package com.linroid.kdown
 
+import com.linroid.kdown.internal.DefaultFileNameResolver
 import com.linroid.kdown.internal.DownloadCoordinator
 import com.linroid.kdown.internal.InMemoryMetadataStore
 import com.linroid.kdown.internal.InMemoryTaskStore
@@ -9,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.io.files.Path
+import kotlin.uuid.Uuid
 
 class KDown(
   private val httpEngine: HttpEngine,
@@ -16,6 +18,7 @@ class KDown(
   private val taskStore: TaskStore = InMemoryTaskStore(),
   private val config: DownloadConfig = DownloadConfig.Default,
   private val fileAccessorFactory: (Path) -> FileAccessor = { path -> FileAccessor(path) },
+  private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
   logger: Logger = Logger.None
 ) {
   init {
@@ -30,21 +33,24 @@ class KDown(
     metadataStore = metadataStore,
     taskStore = taskStore,
     config = config,
-    fileAccessorFactory = fileAccessorFactory
+    fileAccessorFactory = fileAccessorFactory,
+    fileNameResolver = fileNameResolver
   )
 
   suspend fun download(request: DownloadRequest): DownloadTask {
+    val taskId = Uuid.random().toString()
     KDownLogger.i("KDown") {
-      "Starting download: taskId=${request.taskId}, url=${request.url}, connections=${request.connections}"
+      "Starting download: taskId=$taskId, url=${request.url}, " +
+        "connections=${request.connections}"
     }
-    val stateFlow = coordinator.start(request, scope)
+    val stateFlow = coordinator.start(taskId, request, scope)
 
     return DownloadTask(
-      taskId = request.taskId,
+      taskId = taskId,
       state = stateFlow,
-      pauseAction = { coordinator.pause(request.taskId) },
-      resumeAction = { resume(request.taskId) },
-      cancelAction = { coordinator.cancel(request.taskId) }
+      pauseAction = { coordinator.pause(taskId) },
+      resumeAction = { resume(taskId) },
+      cancelAction = { coordinator.cancel(taskId) }
     )
   }
 
@@ -106,12 +112,14 @@ class KDown(
         resume(record.taskId)
       } else {
         KDownLogger.d("KDown") {
-          "Restarting task ${record.taskId} from scratch (no segment metadata found)"
+          "Restarting task ${record.taskId} from scratch " +
+            "(no segment metadata found)"
         }
+        val destPath = record.destPath
         val request = DownloadRequest(
           url = record.url,
-          destPath = record.destPath,
-          taskId = record.taskId,
+          directory = destPath.parent ?: Path("."),
+          fileName = destPath.name,
           connections = record.connections,
           headers = record.headers
         )

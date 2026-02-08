@@ -214,9 +214,11 @@ fun App() {
                 scope.launch {
                   activeTasks.remove(record.taskId)
                   kdown.removeTask(record.taskId)
+                  val destPath = record.destPath
                   val request = DownloadRequest(
                     url = record.url,
-                    destPath = record.destPath,
+                    directory = destPath.parent ?: Path("."),
+                    fileName = destPath.name,
                     connections = record.connections,
                     headers = record.headers
                   )
@@ -250,7 +252,8 @@ fun App() {
             kdown = kdown,
             activeTasks = activeTasks,
             url = url,
-            destPath = buildDestPath(fileName),
+            directory = Path("downloads"),
+            fileName = fileName.ifBlank { null },
             onRefresh = { scope.launch { refreshRecords() } },
             onError = { errorMessage = it }
           )
@@ -347,11 +350,7 @@ private fun AddDownloadDialog(
         onClick = {
           val trimmed = url.trim()
           if (trimmed.isNotEmpty()) {
-            val name = fileName.ifBlank {
-              extractFilename(trimmed)
-                .ifBlank { "download.bin" }
-            }
-            onDownload(trimmed, name)
+            onDownload(trimmed, fileName.trim())
           }
         },
         enabled = url.isNotBlank() && isValidUrl
@@ -678,17 +677,13 @@ private fun extractFilename(url: String): String {
   return path.ifBlank { "" }
 }
 
-private fun buildDestPath(fileName: String): Path {
-  val safeName = fileName.ifBlank { "download.bin" }
-  return Path("downloads/$safeName")
-}
-
 private fun startDownload(
   scope: CoroutineScope,
   kdown: KDown,
   activeTasks: MutableMap<String, DownloadTask>,
   url: String,
-  destPath: Path,
+  directory: Path,
+  fileName: String?,
   onRefresh: () -> Unit,
   onError: (String) -> Unit = {}
 ) {
@@ -696,7 +691,8 @@ private fun startDownload(
     runCatching {
       val request = DownloadRequest(
         url = url,
-        destPath = destPath,
+        directory = directory,
+        fileName = fileName,
         connections = 4
       )
       kdown.download(request)
