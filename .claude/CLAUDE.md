@@ -6,6 +6,8 @@ Multiplatform downloader library.
 The library is **substantially complete** with all core features implemented and working across
 Android, JVM/Desktop, iOS, and WebAssembly platforms.
 
+**Note:** The library has not been published yet, so public API breaking changes are allowed.
+
 ## Core Features (All Implemented ✅)
 
 1. ✅ Download with progress callbacks (bytes downloaded, total bytes, speed)
@@ -49,6 +51,9 @@ Android, JVM/Desktop, iOS, and WebAssembly platforms.
 - Pause: stops all segment jobs, persists offsets, transitions to `Paused` state
 - Resume: loads metadata, validates server identity (ETag/Last-Modified), continues from last offsets
 - Resume validation prevents corrupted downloads
+- Local file integrity check on resume: verifies file size matches claimed progress, resets if truncated
+- Duplicate download guards: `start()`, `startFromRecord()`, `resume()` check `activeDownloads` to prevent concurrent writes
+- State transition guards in `KDown` action lambdas prevent invalid operations (e.g., pause on completed)
 
 ### 5. Metadata Persistence (✅ `MetadataStore` interface)
 - Interface implemented with two storage backends:
@@ -60,6 +65,7 @@ Android, JVM/Desktop, iOS, and WebAssembly platforms.
 - Types: `Network`, `Http(code)`, `Disk`, `Unsupported`, `ValidationFailed`, `Canceled`, `Unknown`
 - Smart retry: only for transient errors (network issues, 5xx HTTP codes)
 - Exponential backoff with configurable retry count and base delay
+- I/O exceptions from `FileAccessor` (`writeAt`, `flush`, `preallocate`) classified as `KDownError.Disk`
 
 ### 7. Progress Tracking (✅ StateFlow-based)
 - Aggregates progress across all segments
@@ -99,13 +105,25 @@ Android, JVM/Desktop, iOS, and WebAssembly platforms.
 - CLI example: demonstrates pause/resume functionality
 - Multiple platform examples: Compose Multiplatform, Desktop, Android, iOS, WebAssembly
 
-## Current Limitations & Future Enhancements
+## Current Limitations
 
-Known limitations (documented in README.md):
-1. ❌ No download queue/scheduler (one `download()` call = one task at a time)
-2. ❌ No bandwidth throttling
-3. ⚠️ WebAssembly file writes limited by browser APIs (basic support only)
-4. ⚠️ iOS support is best-effort via expect/actual (functional but not extensively tested)
+1. ⚠️ WebAssembly file writes limited by browser APIs (basic support only)
+2. ⚠️ iOS support is best-effort via expect/actual (functional but not extensively tested)
+
+## Roadmap
+
+Planned features that should be considered in architecture decisions:
+
+1. **Speed Limit** - Bandwidth throttling per task or globally
+2. **Queue Management** - Download queue with priority, concurrency limits, and scheduling
+3. **Scheduled Downloads** - Timer-based or condition-based download scheduling
+4. **Web App** - Browser-based download manager UI
+5. **Torrent Support** - BitTorrent protocol as a pluggable download source
+6. **Media Downloads** - Download web media (like yt-dlp), with a pluggable downloader
+   architecture to support different media sources and extractors
+7. **Daemon Server** - Run KDown as a background service/daemon with an API, supporting
+   switching between local and remote backends (e.g., control a remote KDown instance
+   from a mobile app or web UI)
 
 ## Usage Examples
 
