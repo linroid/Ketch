@@ -1,5 +1,15 @@
 package com.linroid.kdown
 
+/**
+ * Download configuration.
+ *
+ * @property maxConnections Maximum number of concurrent segment downloads
+ * @property retryCount Maximum number of retry attempts for failed requests
+ * @property retryDelayMs Base delay in milliseconds between retry attempts (uses exponential backoff)
+ * @property progressUpdateIntervalMs Interval for throttling progress updates to prevent UI spam
+ * @property segmentSaveIntervalMs Interval for persisting segment progress during downloads
+ * @property bufferSize Size of the download buffer in bytes
+ */
 data class DownloadConfig(
   val maxConnections: Int = 4,
   val retryCount: Int = 3,

@@ -110,8 +110,20 @@ class KDown(
     val records = taskStore.loadAll()
     KDownLogger.i("KDown") { "Found ${records.size} task(s)" }
 
-    val loaded = records.map { record -> createTaskFromRecord(record) }
-    tasksMutex.withLock { _tasks.value = loaded }
+    tasksMutex.withLock {
+      val currentTasks = _tasks.value
+      val currentTaskIds = currentTasks.map { it.taskId }.toSet()
+
+      val loaded = records.mapNotNull { record ->
+        if (currentTaskIds.contains(record.taskId)) {
+          currentTasks.find { it.taskId == record.taskId }
+        } else {
+          createTaskFromRecord(record)
+        }
+      }
+
+      _tasks.value = loaded
+    }
   }
 
   private fun createTaskFromRecord(record: TaskRecord): DownloadTask {
@@ -130,9 +142,8 @@ class KDown(
           record.taskId, scope, stateFlow, segmentsFlow
         )
         if (!resumed) {
-          coordinator.start(
-            record.taskId, record.request, scope,
-            stateFlow, segmentsFlow
+          coordinator.startFromRecord(
+            record, scope, stateFlow, segmentsFlow
           )
         }
       },

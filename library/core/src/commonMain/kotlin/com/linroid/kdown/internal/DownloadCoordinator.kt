@@ -72,27 +72,70 @@ internal class DownloadCoordinator(
       )
     )
 
-    val job = scope.launch {
-      try {
-        executeDownload(taskId, request, stateFlow, segmentsFlow)
-      } catch (e: CancellationException) {
-        if (stateFlow.value !is DownloadState.Paused) {
-          stateFlow.value = DownloadState.Canceled
+    mutex.withLock {
+      val job = scope.launch {
+        try {
+          executeDownload(taskId, request, stateFlow, segmentsFlow)
+        } catch (e: CancellationException) {
+          if (stateFlow.value !is DownloadState.Paused) {
+            stateFlow.value = DownloadState.Canceled
+          }
+          throw e
+        } catch (e: Exception) {
+          if (e is CancellationException) throw e
+          val error = when (e) {
+            is KDownError -> e
+            else -> KDownError.Unknown(e)
+          }
+          updateTaskState(taskId, TaskState.FAILED, error.message)
+          stateFlow.value = DownloadState.Failed(error)
         }
-        throw e
-      } catch (e: Exception) {
-        if (e is CancellationException) throw e
-        val error = when (e) {
-          is KDownError -> e
-          else -> KDownError.Unknown(e)
-        }
-        updateTaskState(taskId, TaskState.FAILED, error.message)
-        stateFlow.value = DownloadState.Failed(error)
       }
+
+      activeDownloads[taskId] = ActiveDownload(
+        job = job,
+        stateFlow = stateFlow,
+        segmentsFlow = segmentsFlow,
+        segments = null,
+        fileAccessor = null
+      )
+    }
+  }
+
+  suspend fun startFromRecord(
+    record: TaskRecord,
+    scope: CoroutineScope,
+    stateFlow: MutableStateFlow<DownloadState>,
+    segmentsFlow: MutableStateFlow<List<Segment>>
+  ) {
+    updateTaskRecord(record.taskId) {
+      it.copy(
+        state = TaskState.PENDING,
+        updatedAt = currentTimeMillis()
+      )
     }
 
     mutex.withLock {
-      activeDownloads[taskId] = ActiveDownload(
+      val job = scope.launch {
+        try {
+          executeDownload(record.taskId, record.request, stateFlow, segmentsFlow)
+        } catch (e: CancellationException) {
+          if (stateFlow.value !is DownloadState.Paused) {
+            stateFlow.value = DownloadState.Canceled
+          }
+          throw e
+        } catch (e: Exception) {
+          if (e is CancellationException) throw e
+          val error = when (e) {
+            is KDownError -> e
+            else -> KDownError.Unknown(e)
+          }
+          updateTaskState(record.taskId, TaskState.FAILED, error.message)
+          stateFlow.value = DownloadState.Failed(error)
+        }
+      }
+
+      activeDownloads[record.taskId] = ActiveDownload(
         job = job,
         stateFlow = stateFlow,
         segmentsFlow = segmentsFlow,
@@ -441,26 +484,26 @@ internal class DownloadCoordinator(
       )
     }
 
-    val job = scope.launch {
-      try {
-        resumeDownload(taskId, taskRecord, segments, stateFlow, segmentsFlow)
-      } catch (e: CancellationException) {
-        if (stateFlow.value !is DownloadState.Paused) {
-          stateFlow.value = DownloadState.Canceled
-        }
-        throw e
-      } catch (e: Exception) {
-        if (e is CancellationException) throw e
-        val error = when (e) {
-          is KDownError -> e
-          else -> KDownError.Unknown(e)
-        }
-        updateTaskState(taskId, TaskState.FAILED, error.message)
-        stateFlow.value = DownloadState.Failed(error)
-      }
-    }
-
     mutex.withLock {
+      val job = scope.launch {
+        try {
+          resumeDownload(taskId, taskRecord, segments, stateFlow, segmentsFlow)
+        } catch (e: CancellationException) {
+          if (stateFlow.value !is DownloadState.Paused) {
+            stateFlow.value = DownloadState.Canceled
+          }
+          throw e
+        } catch (e: Exception) {
+          if (e is CancellationException) throw e
+          val error = when (e) {
+            is KDownError -> e
+            else -> KDownError.Unknown(e)
+          }
+          updateTaskState(taskId, TaskState.FAILED, error.message)
+          stateFlow.value = DownloadState.Failed(error)
+        }
+      }
+
       activeDownloads[taskId] = ActiveDownload(
         job = job,
         stateFlow = stateFlow,

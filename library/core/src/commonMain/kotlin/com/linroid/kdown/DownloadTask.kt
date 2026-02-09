@@ -7,6 +7,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.io.files.Path
 
+/**
+ * Represents a download task with reactive state and control methods.
+ *
+ * @property taskId Unique identifier for this download task
+ * @property request The download request configuration
+ * @property createdAt Timestamp when the task was created (milliseconds since epoch)
+ * @property state Observable download state (Pending, Downloading, Paused, Completed, Failed, Canceled)
+ * @property segments Observable list of download segments with their progress
+ */
 class DownloadTask internal constructor(
   val taskId: String,
   val request: DownloadRequest,
@@ -30,6 +39,9 @@ class DownloadTask internal constructor(
     cancelAction()
   }
 
+  /**
+   * Cancels the download and removes it from the task store and tasks list.
+   */
   suspend fun remove() {
     removeAction()
   }
