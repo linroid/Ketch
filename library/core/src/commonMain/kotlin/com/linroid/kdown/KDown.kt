@@ -74,18 +74,42 @@ class KDown(
       createdAt = now,
       state = stateFlow.asStateFlow(),
       segments = segmentsFlow.asStateFlow(),
-      pauseAction = { coordinator.pause(taskId) },
-      resumeAction = {
-        val resumed = coordinator.resume(
-          taskId, scope, stateFlow, segmentsFlow
-        )
-        if (!resumed) {
-          coordinator.start(
-            taskId, request, scope, stateFlow, segmentsFlow
-          )
+      pauseAction = {
+        if (stateFlow.value.isActive) {
+          coordinator.pause(taskId)
+        } else {
+          KDownLogger.d("KDown") {
+            "Ignoring pause for taskId=$taskId in state ${stateFlow.value}"
+          }
         }
       },
-      cancelAction = { coordinator.cancel(taskId) },
+      resumeAction = {
+        val state = stateFlow.value
+        if (state is DownloadState.Paused || state is DownloadState.Failed) {
+          val resumed = coordinator.resume(
+            taskId, scope, stateFlow, segmentsFlow
+          )
+          if (!resumed) {
+            coordinator.start(
+              taskId, request, scope, stateFlow, segmentsFlow
+            )
+          }
+        } else {
+          KDownLogger.d("KDown") {
+            "Ignoring resume for taskId=$taskId in state $state"
+          }
+        }
+      },
+      cancelAction = {
+        if (!stateFlow.value.isTerminal) {
+          coordinator.cancel(taskId)
+        } else {
+          KDownLogger.d("KDown") {
+            "Ignoring cancel for taskId=$taskId in state " +
+              "${stateFlow.value}"
+          }
+        }
+      },
       removeAction = { removeTaskInternal(taskId) }
     )
 
@@ -136,18 +160,44 @@ class KDown(
       createdAt = record.createdAt,
       state = stateFlow.asStateFlow(),
       segments = segmentsFlow.asStateFlow(),
-      pauseAction = { coordinator.pause(record.taskId) },
-      resumeAction = {
-        val resumed = coordinator.resume(
-          record.taskId, scope, stateFlow, segmentsFlow
-        )
-        if (!resumed) {
-          coordinator.startFromRecord(
-            record, scope, stateFlow, segmentsFlow
-          )
+      pauseAction = {
+        if (stateFlow.value.isActive) {
+          coordinator.pause(record.taskId)
+        } else {
+          KDownLogger.d("KDown") {
+            "Ignoring pause for taskId=${record.taskId} " +
+              "in state ${stateFlow.value}"
+          }
         }
       },
-      cancelAction = { coordinator.cancel(record.taskId) },
+      resumeAction = {
+        val state = stateFlow.value
+        if (state is DownloadState.Paused || state is DownloadState.Failed) {
+          val resumed = coordinator.resume(
+            record.taskId, scope, stateFlow, segmentsFlow
+          )
+          if (!resumed) {
+            coordinator.startFromRecord(
+              record, scope, stateFlow, segmentsFlow
+            )
+          }
+        } else {
+          KDownLogger.d("KDown") {
+            "Ignoring resume for taskId=${record.taskId} " +
+              "in state $state"
+          }
+        }
+      },
+      cancelAction = {
+        if (!stateFlow.value.isTerminal) {
+          coordinator.cancel(record.taskId)
+        } else {
+          KDownLogger.d("KDown") {
+            "Ignoring cancel for taskId=${record.taskId} " +
+              "in state ${stateFlow.value}"
+          }
+        }
+      },
       removeAction = { removeTaskInternal(record.taskId) }
     )
   }

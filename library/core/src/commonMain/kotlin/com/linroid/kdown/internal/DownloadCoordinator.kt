@@ -73,6 +73,13 @@ internal class DownloadCoordinator(
     )
 
     mutex.withLock {
+      if (activeDownloads.containsKey(taskId)) {
+        KDownLogger.d("Coordinator") {
+          "Download already active for taskId=$taskId, skipping start"
+        }
+        return
+      }
+
       val job = scope.launch {
         try {
           executeDownload(taskId, request, stateFlow, segmentsFlow)
@@ -116,6 +123,14 @@ internal class DownloadCoordinator(
     }
 
     mutex.withLock {
+      if (activeDownloads.containsKey(record.taskId)) {
+        KDownLogger.d("Coordinator") {
+          "Download already active for taskId=${record.taskId}, " +
+            "skipping startFromRecord"
+        }
+        return
+      }
+
       val job = scope.launch {
         try {
           executeDownload(record.taskId, record.request, stateFlow, segmentsFlow)
@@ -207,7 +222,13 @@ internal class DownloadCoordinator(
       KDownLogger.d("Coordinator") {
         "Preallocating $totalBytes bytes for taskId=$taskId"
       }
-      fileAccessor.preallocate(totalBytes)
+      try {
+        fileAccessor.preallocate(totalBytes)
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        if (e is KDownError) throw e
+        throw KDownError.Disk(e)
+      }
 
       val taskRecord = taskStore.load(taskId)
         ?: throw KDownError.Unknown(
@@ -217,7 +238,13 @@ internal class DownloadCoordinator(
         taskId, taskRecord, segments, fileAccessor, stateFlow, segmentsFlow
       )
 
-      fileAccessor.flush()
+      try {
+        fileAccessor.flush()
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        if (e is KDownError) throw e
+        throw KDownError.Disk(e)
+      }
 
       updateTaskRecord(taskId) {
         it.copy(
@@ -444,7 +471,10 @@ internal class DownloadCoordinator(
       active.fileAccessor?.let { accessor ->
         try {
           accessor.flush()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+          KDownLogger.w("Coordinator", e) {
+            "Failed to flush file during pause for taskId=$taskId"
+          }
         }
       }
 
@@ -471,6 +501,16 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>
   ): Boolean {
+    mutex.withLock {
+      if (activeDownloads.containsKey(taskId)) {
+        KDownLogger.d("Coordinator") {
+          "Download already active for taskId=$taskId, " +
+            "skipping resume"
+        }
+        return true
+      }
+    }
+
     val taskRecord = taskStore.load(taskId) ?: return false
     val segments = taskRecord.segments ?: return false
 
@@ -559,20 +599,42 @@ internal class DownloadCoordinator(
 
     val fileAccessor = fileAccessorFactory(taskRecord.destPath)
 
+    val validatedSegments = validateLocalFile(
+      taskId, fileAccessor, segments, taskRecord.totalBytes
+    )
+
     mutex.withLock {
       activeDownloads[taskId]?.let {
-        it.segments = segments
+        it.segments = validatedSegments
         it.fileAccessor = fileAccessor
         it.totalBytes = taskRecord.totalBytes
       }
     }
 
+    if (validatedSegments !== segments) {
+      segmentsFlow.value = validatedSegments
+      updateTaskRecord(taskId) {
+        it.copy(
+          segments = validatedSegments,
+          downloadedBytes = validatedSegments.sumOf { s -> s.downloadedBytes },
+          updatedAt = currentTimeMillis()
+        )
+      }
+    }
+
     try {
       downloadWithRetry(
-        taskId, taskRecord, segments, fileAccessor, stateFlow, segmentsFlow
+        taskId, taskRecord, validatedSegments, fileAccessor,
+        stateFlow, segmentsFlow
       )
 
-      fileAccessor.flush()
+      try {
+        fileAccessor.flush()
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        if (e is KDownError) throw e
+        throw KDownError.Disk(e)
+      }
 
       updateTaskRecord(taskId) {
         it.copy(
@@ -592,6 +654,45 @@ internal class DownloadCoordinator(
         }
       }
     }
+  }
+
+  private suspend fun validateLocalFile(
+    taskId: String,
+    fileAccessor: FileAccessor,
+    segments: List<Segment>,
+    totalBytes: Long
+  ): List<Segment> {
+    val fileSize = try {
+      fileAccessor.size()
+    } catch (e: Exception) {
+      if (e is CancellationException) throw e
+      KDownLogger.w("Coordinator") {
+        "Cannot read file size for taskId=$taskId, resetting segments"
+      }
+      0L
+    }
+
+    val claimedProgress = segments.sumOf { it.downloadedBytes }
+    if (fileSize < claimedProgress || fileSize < totalBytes) {
+      KDownLogger.w("Coordinator") {
+        "Local file integrity check failed for taskId=$taskId: " +
+          "fileSize=$fileSize, claimedProgress=$claimedProgress, " +
+          "totalBytes=$totalBytes. Resetting segments."
+      }
+      try {
+        fileAccessor.preallocate(totalBytes)
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        if (e is KDownError) throw e
+        throw KDownError.Disk(e)
+      }
+      return segments.map { it.copy(downloadedBytes = 0) }
+    }
+    KDownLogger.d("Coordinator") {
+      "Local file integrity check passed for taskId=$taskId: " +
+        "fileSize=$fileSize, claimedProgress=$claimedProgress"
+    }
+    return segments
   }
 
   suspend fun cancel(taskId: String) {
@@ -637,7 +738,13 @@ internal class DownloadCoordinator(
     taskId: String,
     update: (TaskRecord) -> TaskRecord
   ) {
-    val existing = taskStore.load(taskId) ?: return
+    val existing = taskStore.load(taskId)
+    if (existing == null) {
+      KDownLogger.w("Coordinator") {
+        "TaskRecord not found for taskId=$taskId, skipping update"
+      }
+      return
+    }
     taskStore.save(update(existing))
   }
 
