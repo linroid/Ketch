@@ -226,10 +226,18 @@ All errors are modeled as a sealed class `KDownError`:
 
 ## Current Limitations
 
-- No download queue/scheduler (one `download()` call = one task)
-- No bandwidth throttling
 - WebAssembly file writes are limited by browser APIs
 - iOS support is best-effort via expect/actual
+
+## Roadmap
+
+- **Speed Limit** - Bandwidth throttling per task or globally
+- **Queue Management** - Download queue with priority and concurrency limits
+- **Scheduled Downloads** - Timer-based or condition-based download scheduling
+- **Web App** - Browser-based download manager UI
+- **Torrent Support** - BitTorrent protocol as a pluggable download source
+- **Media Downloads** - Download web media (like yt-dlp) with pluggable extractors
+- **Daemon Server** - Background service with API, supporting local and remote backends
 
 ## Building
 
