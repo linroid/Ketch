@@ -44,7 +44,6 @@ internal class DownloadCoordinator(
     val segmentsFlow: MutableStateFlow<List<Segment>>,
     var segments: List<Segment>?,
     var fileAccessor: FileAccessor?,
-    var segmentProgress: MutableList<Long>? = null,
     var totalBytes: Long = 0,
     val taskLimiter: DelegatingSpeedLimiter = DelegatingSpeedLimiter()
   )
@@ -269,28 +268,25 @@ internal class DownloadCoordinator(
       }
       active.job.cancel()
 
-      active.segments?.let { segments ->
+      // Use segmentsFlow as the source of truth — it is
+      // continuously updated by the download source with the
+      // latest per-segment progress.
+      val currentSegments = active.segmentsFlow.value
+        .ifEmpty { null }
+        ?: active.segments
+
+      currentSegments?.let { segments ->
         KDownLogger.d("Coordinator") {
           "Saving pause state for taskId=$taskId"
         }
-        val now = Clock.System.now()
-        val progress = active.segmentProgress
-        val updatedSegments = if (progress != null) {
-          segments.mapIndexed { i, seg ->
-            seg.copy(downloadedBytes = progress[i])
-          }
-        } else {
-          segments
-        }
-
         val downloadedBytes =
-          updatedSegments.sumOf { it.downloadedBytes }
+          segments.sumOf { it.downloadedBytes }
         updateTaskRecord(taskId) {
           it.copy(
             state = TaskState.PAUSED,
             downloadedBytes = downloadedBytes,
-            segments = updatedSegments,
-            updatedAt = now
+            segments = segments,
+            updatedAt = Clock.System.now()
           )
         }
       }
@@ -305,16 +301,8 @@ internal class DownloadCoordinator(
         }
       }
 
-      val pausedDownloaded = active.segments?.let { segs ->
-        val prog = active.segmentProgress
-        if (prog != null) {
-          segs.mapIndexed { i, seg ->
-            seg.copy(downloadedBytes = prog[i])
-          }.sumOf { it.downloadedBytes }
-        } else {
-          segs.sumOf { it.downloadedBytes }
-        }
-      } ?: 0L
+      val pausedDownloaded =
+        currentSegments?.sumOf { it.downloadedBytes } ?: 0L
       active.stateFlow.value = DownloadState.Paused(
         DownloadProgress(pausedDownloaded, active.totalBytes)
       )
