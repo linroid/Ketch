@@ -3,8 +3,11 @@ package com.linroid.kdown
 import com.linroid.kdown.engine.DelegatingSpeedLimiter
 import com.linroid.kdown.engine.DownloadCoordinator
 import com.linroid.kdown.engine.DownloadScheduler
+import com.linroid.kdown.engine.DownloadSource
+import com.linroid.kdown.engine.HttpDownloadSource
 import com.linroid.kdown.engine.HttpEngine
 import com.linroid.kdown.engine.ScheduleManager
+import com.linroid.kdown.engine.SourceResolver
 import com.linroid.kdown.engine.SpeedLimiter
 import com.linroid.kdown.engine.TokenBucket
 import com.linroid.kdown.error.KDownError
@@ -35,6 +38,18 @@ import kotlinx.io.files.Path
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+/**
+ * Main entry point for the KDown download library.
+ *
+ * @param httpEngine the HTTP engine for HTTP/HTTPS downloads
+ * @param taskStore persistent storage for task records
+ * @param config global download configuration
+ * @param fileAccessorFactory factory for creating platform file writers
+ * @param fileNameResolver strategy for resolving download file names
+ * @param additionalSources extra [DownloadSource] implementations
+ *   (e.g., torrent, media). HTTP is always included as a fallback.
+ * @param logger logging backend
+ */
 class KDown(
   private val httpEngine: HttpEngine,
   private val taskStore: TaskStore = InMemoryTaskStore(),
@@ -42,7 +57,9 @@ class KDown(
   private val fileAccessorFactory: (Path) -> FileAccessor = { path ->
     FileAccessor(path)
   },
-  private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
+  private val fileNameResolver: FileNameResolver =
+    DefaultFileNameResolver(),
+  additionalSources: List<DownloadSource> = emptyList(),
   logger: Logger = Logger.None
 ) {
   private val globalLimiter = DelegatingSpeedLimiter(
@@ -53,20 +70,39 @@ class KDown(
     }
   )
 
+  private val httpSource = HttpDownloadSource(
+    httpEngine = httpEngine,
+    fileNameResolver = fileNameResolver,
+    progressUpdateIntervalMs = config.progressUpdateIntervalMs,
+    segmentSaveIntervalMs = config.segmentSaveIntervalMs
+  )
+
+  private val sourceResolver = SourceResolver(
+    additionalSources + httpSource
+  )
+
   init {
     KDownLogger.setLogger(logger)
     KDownLogger.i("KDown") { "KDown v$VERSION initialized" }
     if (!config.speedLimit.isUnlimited) {
       KDownLogger.i("KDown") {
-        "Global speed limit: ${config.speedLimit.bytesPerSecond} bytes/sec"
+        "Global speed limit: " +
+          "${config.speedLimit.bytesPerSecond} bytes/sec"
+      }
+    }
+    if (additionalSources.isNotEmpty()) {
+      KDownLogger.i("KDown") {
+        "Additional sources: " +
+          additionalSources.joinToString { it.type }
       }
     }
   }
 
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+  private val scope =
+    CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
   private val coordinator = DownloadCoordinator(
-    httpEngine = httpEngine,
+    sourceResolver = sourceResolver,
     taskStore = taskStore,
     config = config,
     fileAccessorFactory = fileAccessorFactory,
@@ -86,7 +122,8 @@ class KDown(
   )
 
   private val tasksMutex = Mutex()
-  private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+  private val _tasks =
+    MutableStateFlow<List<DownloadTask>>(emptyList())
 
   /** Observable list of all download tasks. */
   val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
@@ -99,23 +136,28 @@ class KDown(
   suspend fun download(request: DownloadRequest): DownloadTask {
     val taskId = Uuid.random().toString()
     val now = Clock.System.now()
-    val isScheduled = request.schedule !is DownloadSchedule.Immediate ||
-      request.conditions.isNotEmpty()
+    val isScheduled =
+      request.schedule !is DownloadSchedule.Immediate ||
+        request.conditions.isNotEmpty()
     KDownLogger.i("KDown") {
       "Downloading: taskId=$taskId, url=${request.url}, " +
         "connections=${request.connections}, " +
         "priority=${request.priority}" +
         if (isScheduled) ", schedule=${request.schedule}" else ""
     }
-    val stateFlow = MutableStateFlow<DownloadState>(DownloadState.Pending)
-    val segmentsFlow = MutableStateFlow<List<Segment>>(emptyList())
+    val stateFlow =
+      MutableStateFlow<DownloadState>(DownloadState.Pending)
+    val segmentsFlow =
+      MutableStateFlow<List<Segment>>(emptyList())
 
     if (isScheduled) {
       scheduleManager.schedule(
         taskId, request, now, stateFlow, segmentsFlow
       )
     } else {
-      scheduler.enqueue(taskId, request, now, stateFlow, segmentsFlow)
+      scheduler.enqueue(
+        taskId, request, now, stateFlow, segmentsFlow
+      )
     }
 
     val task = DownloadTask(
@@ -129,13 +171,16 @@ class KDown(
           coordinator.pause(taskId)
         } else {
           KDownLogger.d("KDown") {
-            "Ignoring pause for taskId=$taskId in state ${stateFlow.value}"
+            "Ignoring pause for taskId=$taskId " +
+              "in state ${stateFlow.value}"
           }
         }
       },
       resumeAction = {
         val state = stateFlow.value
-        if (state is DownloadState.Paused || state is DownloadState.Failed) {
+        if (state is DownloadState.Paused ||
+          state is DownloadState.Failed
+        ) {
           val resumed = coordinator.resume(
             taskId, scope, stateFlow, segmentsFlow
           )
@@ -204,26 +249,30 @@ class KDown(
 
   /**
    * Loads all task records from the [TaskStore] and populates the
-   * [tasks] flow. Does **not** auto-resume — call [DownloadTask.resume]
-   * on individual tasks to continue interrupted downloads.
+   * [tasks] flow. Does **not** auto-resume — call
+   * [DownloadTask.resume] on individual tasks to continue
+   * interrupted downloads.
    *
    * State mapping:
    * - `SCHEDULED` / `PENDING` / `QUEUED` / `DOWNLOADING` / `PAUSED`
-   *   → [DownloadState.Paused] (treat as paused, user decides when
+   *   -> [DownloadState.Paused] (treat as paused, user decides when
    *   to resume). `SCHEDULED` is mapped to Paused because conditions
    *   are transient and cannot be restored after deserialization.
-   * - `COMPLETED` → [DownloadState.Completed]
-   * - `FAILED` → [DownloadState.Failed]
-   * - `CANCELED` → [DownloadState.Canceled]
+   * - `COMPLETED` -> [DownloadState.Completed]
+   * - `FAILED` -> [DownloadState.Failed]
+   * - `CANCELED` -> [DownloadState.Canceled]
    */
   suspend fun loadTasks() {
-    KDownLogger.i("KDown") { "Loading tasks from persistent storage" }
+    KDownLogger.i("KDown") {
+      "Loading tasks from persistent storage"
+    }
     val records = taskStore.loadAll()
     KDownLogger.i("KDown") { "Found ${records.size} task(s)" }
 
     tasksMutex.withLock {
       val currentTasks = _tasks.value
-      val currentTaskIds = currentTasks.map { it.taskId }.toSet()
+      val currentTaskIds =
+        currentTasks.map { it.taskId }.toSet()
 
       val loaded = records.mapNotNull { record ->
         if (currentTaskIds.contains(record.taskId)) {
@@ -237,9 +286,12 @@ class KDown(
     }
   }
 
-  private fun createTaskFromRecord(record: TaskRecord): DownloadTask {
+  private fun createTaskFromRecord(
+    record: TaskRecord
+  ): DownloadTask {
     val stateFlow = MutableStateFlow(mapRecordState(record))
-    val segmentsFlow = MutableStateFlow(record.segments ?: emptyList())
+    val segmentsFlow =
+      MutableStateFlow(record.segments ?: emptyList())
 
     monitorTaskState(record.taskId, stateFlow)
 
@@ -261,7 +313,9 @@ class KDown(
       },
       resumeAction = {
         val state = stateFlow.value
-        if (state is DownloadState.Paused || state is DownloadState.Failed) {
+        if (state is DownloadState.Paused ||
+          state is DownloadState.Failed
+        ) {
           val resumed = coordinator.resume(
             record.taskId, scope, stateFlow, segmentsFlow
           )
@@ -336,12 +390,18 @@ class KDown(
       TaskState.QUEUED,
       TaskState.DOWNLOADING,
       TaskState.PAUSED -> DownloadState.Paused(
-        DownloadProgress(record.downloadedBytes, record.totalBytes)
+        DownloadProgress(
+          record.downloadedBytes, record.totalBytes
+        )
       )
-      TaskState.COMPLETED -> DownloadState.Completed(record.destPath)
+      TaskState.COMPLETED -> DownloadState.Completed(
+        record.destPath
+      )
       TaskState.FAILED -> DownloadState.Failed(
         KDownError.Unknown(
-          cause = Exception(record.errorMessage ?: "Unknown error")
+          cause = Exception(
+            record.errorMessage ?: "Unknown error"
+          )
         )
       )
       TaskState.CANCELED -> DownloadState.Canceled
@@ -353,12 +413,16 @@ class KDown(
     stateFlow: MutableStateFlow<DownloadState>
   ) {
     scope.launch {
-      val terminalState = stateFlow.filterIsInstance<DownloadState>()
-        .first { it.isTerminal }
+      val terminalState =
+        stateFlow.filterIsInstance<DownloadState>()
+          .first { it.isTerminal }
       when (terminalState) {
-        is DownloadState.Completed -> scheduler.onTaskCompleted(taskId)
-        is DownloadState.Failed -> scheduler.onTaskFailed(taskId)
-        is DownloadState.Canceled -> scheduler.onTaskCanceled(taskId)
+        is DownloadState.Completed ->
+          scheduler.onTaskCompleted(taskId)
+        is DownloadState.Failed ->
+          scheduler.onTaskFailed(taskId)
+        is DownloadState.Canceled ->
+          scheduler.onTaskCanceled(taskId)
         else -> {}
       }
     }
@@ -378,7 +442,8 @@ class KDown(
    * Updates the global speed limit applied across all downloads.
    * Takes effect immediately on all active downloads.
    *
-   * @param limit the new global speed limit, or [SpeedLimit.Unlimited]
+   * @param limit the new global speed limit, or
+   *   [SpeedLimit.Unlimited]
    */
   fun setSpeedLimit(limit: SpeedLimit) {
     val current = globalLimiter.delegate
@@ -390,7 +455,8 @@ class KDown(
       globalLimiter.delegate = TokenBucket(limit.bytesPerSecond)
     }
     KDownLogger.i("KDown") {
-      "Global speed limit updated: ${limit.bytesPerSecond} bytes/sec"
+      "Global speed limit updated: " +
+        "${limit.bytesPerSecond} bytes/sec"
     }
   }
 

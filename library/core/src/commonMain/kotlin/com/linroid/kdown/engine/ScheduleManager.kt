@@ -50,7 +50,9 @@ internal class ScheduleManager(
         KDownLogger.i("ScheduleManager") {
           "Schedule and conditions met for taskId=$taskId, enqueuing"
         }
-        scheduler.enqueue(taskId, request, createdAt, stateFlow, segmentsFlow)
+        scheduler.enqueue(
+          taskId, request, createdAt, stateFlow, segmentsFlow
+        )
 
         mutex.withLock { scheduledJobs.remove(taskId) }
       }

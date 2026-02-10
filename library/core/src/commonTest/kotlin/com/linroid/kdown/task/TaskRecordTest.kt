@@ -1,6 +1,8 @@
 package com.linroid.kdown.task
 
 import com.linroid.kdown.DownloadRequest
+import com.linroid.kdown.engine.HttpDownloadSource
+import com.linroid.kdown.engine.SourceResumeState
 import com.linroid.kdown.segment.Segment
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
@@ -43,6 +45,8 @@ class TaskRecordTest {
     assertNull(record.etag)
     assertNull(record.lastModified)
     assertNull(record.segments)
+    assertNull(record.sourceType)
+    assertNull(record.sourceResumeState)
   }
 
   @Test
@@ -224,6 +228,94 @@ class TaskRecordTest {
     """.trimIndent()
     val record = json.decodeFromString<TaskRecord>(jsonStr)
     assertNull(record.segments)
+  }
+
+  @Test
+  fun serialization_withSourceType() {
+    val record = TaskRecord(
+      taskId = "test-1",
+      request = defaultRequest(),
+      destPath = Path("/tmp/file.bin"),
+      state = TaskState.DOWNLOADING,
+      totalBytes = 2048,
+      sourceType = "http",
+      createdAt = Instant.fromEpochMilliseconds(1000),
+      updatedAt = Instant.fromEpochMilliseconds(2000)
+    )
+
+    val serialized = json.encodeToString(
+      TaskRecord.serializer(), record
+    )
+    val deserialized = json.decodeFromString(
+      TaskRecord.serializer(), serialized
+    )
+
+    assertEquals("http", deserialized.sourceType)
+  }
+
+  @Test
+  fun serialization_withSourceResumeState() {
+    val resumeState = HttpDownloadSource.buildResumeState(
+      etag = "\"abc123\"",
+      lastModified = "Wed, 21 Oct 2023 07:28:00 GMT",
+      totalBytes = 2048
+    )
+    val record = TaskRecord(
+      taskId = "test-1",
+      request = defaultRequest(),
+      destPath = Path("/tmp/file.bin"),
+      state = TaskState.COMPLETED,
+      totalBytes = 2048,
+      downloadedBytes = 2048,
+      sourceType = "http",
+      sourceResumeState = resumeState,
+      createdAt = Instant.fromEpochMilliseconds(1000),
+      updatedAt = Instant.fromEpochMilliseconds(2000)
+    )
+
+    val serialized = json.encodeToString(
+      TaskRecord.serializer(), record
+    )
+    val deserialized = json.decodeFromString(
+      TaskRecord.serializer(), serialized
+    )
+
+    assertEquals("http", deserialized.sourceResumeState?.sourceType)
+    val httpState = Json.decodeFromString<HttpDownloadSource.HttpResumeState>(
+      deserialized.sourceResumeState!!.data
+    )
+    assertEquals("\"abc123\"", httpState.etag)
+    assertEquals(
+      "Wed, 21 Oct 2023 07:28:00 GMT",
+      httpState.lastModified
+    )
+    assertEquals(2048, httpState.totalBytes)
+  }
+
+  @Test
+  fun deserialization_withoutSourceFields_defaultsToNull() {
+    val epoch = Instant.fromEpochMilliseconds(0)
+    val jsonStr = """
+      {
+        "taskId": "t1",
+        "request": {
+          "url": "https://example.com/f",
+          "directory": "/tmp",
+          "connections": 4,
+          "headers": {},
+          "properties": {}
+        },
+        "destPath": "/tmp/f",
+        "state": "COMPLETED",
+        "totalBytes": 1000,
+        "downloadedBytes": 1000,
+        "createdAt": "$epoch",
+        "updatedAt": "$epoch"
+      }
+    """.trimIndent()
+    val record = json.decodeFromString<TaskRecord>(jsonStr)
+    assertNull(record.sourceType)
+    assertNull(record.sourceResumeState)
   }
 
   @Test

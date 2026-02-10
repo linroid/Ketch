@@ -48,8 +48,12 @@ class ScheduleManagerTest {
     scope: CoroutineScope
   ): Pair<DownloadScheduler, ScheduleManager> {
     val engine = FakeHttpEngine()
-    val coordinator = DownloadCoordinator(
+    val source = HttpDownloadSource(
       httpEngine = engine,
+      fileNameResolver = DefaultFileNameResolver()
+    )
+    val coordinator = DownloadCoordinator(
+      sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileAccessorFactory = { throw UnsupportedOperationException() },

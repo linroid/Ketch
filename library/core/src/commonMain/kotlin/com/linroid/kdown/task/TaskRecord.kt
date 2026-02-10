@@ -1,6 +1,7 @@
 package com.linroid.kdown.task
 
 import com.linroid.kdown.DownloadRequest
+import com.linroid.kdown.engine.SourceResumeState
 import com.linroid.kdown.file.PathSerializer
 import com.linroid.kdown.segment.Segment
 import kotlinx.io.files.Path
@@ -28,6 +29,8 @@ data class TaskRecord(
   val etag: String? = null,
   val lastModified: String? = null,
   val segments: List<Segment>? = null,
+  val sourceType: String? = null,
+  val sourceResumeState: SourceResumeState? = null,
   val createdAt: Instant,
   val updatedAt: Instant
 )

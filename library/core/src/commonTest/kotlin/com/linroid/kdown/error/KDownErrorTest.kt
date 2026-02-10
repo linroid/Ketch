@@ -69,4 +69,15 @@ class KDownErrorTest {
   fun unknown_isNotRetryable() {
     assertFalse(KDownError.Unknown().isRetryable)
   }
+
+  @Test
+  fun sourceError_isNotRetryable() {
+    assertFalse(KDownError.SourceError("torrent").isRetryable)
+  }
+
+  @Test
+  fun sourceError_containsSourceType() {
+    val error = KDownError.SourceError("torrent")
+    assertTrue(error.message!!.contains("torrent"))
+  }
 }
