@@ -4,6 +4,7 @@ import com.linroid.kdown.engine.DelegatingSpeedLimiter
 import com.linroid.kdown.engine.DownloadCoordinator
 import com.linroid.kdown.engine.DownloadScheduler
 import com.linroid.kdown.engine.HttpEngine
+import com.linroid.kdown.engine.ScheduleManager
 import com.linroid.kdown.engine.SpeedLimiter
 import com.linroid.kdown.engine.TokenBucket
 import com.linroid.kdown.error.KDownError
@@ -79,6 +80,11 @@ class KDown(
     scope = scope
   )
 
+  private val scheduleManager = ScheduleManager(
+    scheduler = scheduler,
+    scope = scope
+  )
+
   private val tasksMutex = Mutex()
   private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
 
@@ -93,15 +99,24 @@ class KDown(
   suspend fun download(request: DownloadRequest): DownloadTask {
     val taskId = Uuid.random().toString()
     val now = Clock.System.now()
+    val isScheduled = request.schedule !is DownloadSchedule.Immediate ||
+      request.conditions.isNotEmpty()
     KDownLogger.i("KDown") {
       "Downloading: taskId=$taskId, url=${request.url}, " +
         "connections=${request.connections}, " +
-        "priority=${request.priority}"
+        "priority=${request.priority}" +
+        if (isScheduled) ", schedule=${request.schedule}" else ""
     }
     val stateFlow = MutableStateFlow<DownloadState>(DownloadState.Pending)
     val segmentsFlow = MutableStateFlow<List<Segment>>(emptyList())
 
-    scheduler.enqueue(taskId, request, now, stateFlow, segmentsFlow)
+    if (isScheduled) {
+      scheduleManager.schedule(
+        taskId, request, now, stateFlow, segmentsFlow
+      )
+    } else {
+      scheduler.enqueue(taskId, request, now, stateFlow, segmentsFlow)
+    }
 
     val task = DownloadTask(
       taskId = taskId,
@@ -136,13 +151,17 @@ class KDown(
         }
       },
       cancelAction = {
-        if (!stateFlow.value.isTerminal) {
+        val s = stateFlow.value
+        if (!s.isTerminal) {
+          scheduleManager.cancel(taskId)
           scheduler.dequeue(taskId)
           coordinator.cancel(taskId)
+          if (s is DownloadState.Scheduled) {
+            stateFlow.value = DownloadState.Canceled
+          }
         } else {
           KDownLogger.d("KDown") {
-            "Ignoring cancel for taskId=$taskId in state " +
-              "${stateFlow.value}"
+            "Ignoring cancel for taskId=$taskId in state $s"
           }
         }
       },
@@ -234,13 +253,18 @@ class KDown(
         }
       },
       cancelAction = {
-        if (!stateFlow.value.isTerminal) {
+        val s = stateFlow.value
+        if (!s.isTerminal) {
+          scheduleManager.cancel(record.taskId)
           scheduler.dequeue(record.taskId)
           coordinator.cancel(record.taskId)
+          if (s is DownloadState.Scheduled) {
+            stateFlow.value = DownloadState.Canceled
+          }
         } else {
           KDownLogger.d("KDown") {
             "Ignoring cancel for taskId=${record.taskId} " +
-              "in state ${stateFlow.value}"
+              "in state $s"
           }
         }
       },
@@ -256,6 +280,9 @@ class KDown(
 
   private fun mapRecordState(record: TaskRecord): DownloadState {
     return when (record.state) {
+      TaskState.SCHEDULED -> DownloadState.Scheduled(
+        record.request.schedule
+      )
       TaskState.PENDING,
       TaskState.QUEUED,
       TaskState.DOWNLOADING,
@@ -289,6 +316,7 @@ class KDown(
   }
 
   private suspend fun removeTaskInternal(taskId: String) {
+    scheduleManager.cancel(taskId)
     scheduler.dequeue(taskId)
     coordinator.cancel(taskId)
     taskStore.remove(taskId)

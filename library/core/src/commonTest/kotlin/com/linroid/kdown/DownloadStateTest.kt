@@ -19,6 +19,28 @@ class DownloadStateTest {
   }
 
   @Test
+  fun scheduled_isNotTerminal() {
+    val state = DownloadState.Scheduled(DownloadSchedule.Immediate)
+    assertFalse(state.isTerminal)
+  }
+
+  @Test
+  fun scheduled_isNotActive() {
+    val state = DownloadState.Scheduled(DownloadSchedule.Immediate)
+    assertFalse(state.isActive)
+  }
+
+  @Test
+  fun queued_isNotTerminal() {
+    assertFalse(DownloadState.Queued.isTerminal)
+  }
+
+  @Test
+  fun queued_isNotActive() {
+    assertFalse(DownloadState.Queued.isActive)
+  }
+
+  @Test
   fun pending_isNotTerminal() {
     assertFalse(DownloadState.Pending.isTerminal)
   }

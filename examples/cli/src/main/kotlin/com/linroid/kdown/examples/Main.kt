@@ -103,6 +103,8 @@ fun main(args: Array<String>) {
     val monitor = launch {
       task.state.collect { state ->
         when (state) {
+          is DownloadState.Scheduled ->
+            println("[Scheduled] Waiting for scheduled time...")
           is DownloadState.Queued ->
             println("[Queued] Waiting for download slot...")
           is DownloadState.Pending ->

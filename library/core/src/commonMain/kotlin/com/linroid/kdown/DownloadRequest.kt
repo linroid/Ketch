@@ -4,6 +4,7 @@ import com.linroid.kdown.file.FileNameResolver
 import com.linroid.kdown.file.PathSerializer
 import kotlinx.io.files.Path
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * Describes a file to download.
@@ -27,6 +28,10 @@ import kotlinx.serialization.Serializable
  * @property priority queue priority for this download. Higher-priority
  *   tasks are started before lower-priority ones when download slots
  *   become available. Defaults to [DownloadPriority.NORMAL].
+ * @property schedule when the download should start. Defaults to
+ *   [DownloadSchedule.Immediate].
+ * @property conditions list of [DownloadCondition]s that must all be
+ *   met before the download starts. Not persisted across restarts.
  */
 @Serializable
 data class DownloadRequest(
@@ -38,7 +43,10 @@ data class DownloadRequest(
   val headers: Map<String, String> = emptyMap(),
   val properties: Map<String, String> = emptyMap(),
   val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
-  val priority: DownloadPriority = DownloadPriority.NORMAL
+  val priority: DownloadPriority = DownloadPriority.NORMAL,
+  val schedule: DownloadSchedule = DownloadSchedule.Immediate,
+  @Transient
+  val conditions: List<DownloadCondition> = emptyList()
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }
