@@ -37,7 +37,8 @@ internal class DownloadScheduler(
     request: DownloadRequest,
     createdAt: Instant,
     stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>
+    segmentsFlow: MutableStateFlow<List<Segment>>,
+    preferResume: Boolean = false
   ) {
     mutex.withLock {
       val host = extractHost(request.url)
@@ -49,7 +50,8 @@ internal class DownloadScheduler(
         createdAt = createdAt,
         stateFlow = stateFlow,
         segmentsFlow = segmentsFlow,
-        priority = request.priority
+        priority = request.priority,
+        preempted = preferResume
       )
 
       if (queueConfig.autoStart &&

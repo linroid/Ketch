@@ -1,7 +1,9 @@
 package com.linroid.kdown.task
 
+import com.linroid.kdown.DownloadCondition
 import com.linroid.kdown.DownloadPriority
 import com.linroid.kdown.DownloadRequest
+import com.linroid.kdown.DownloadSchedule
 import com.linroid.kdown.DownloadState
 import com.linroid.kdown.SpeedLimit
 import com.linroid.kdown.error.KDownError
@@ -31,7 +33,8 @@ class DownloadTask internal constructor(
   private val cancelAction: suspend () -> Unit,
   private val removeAction: suspend () -> Unit,
   private val setSpeedLimitAction: suspend (SpeedLimit) -> Unit,
-  private val setPriorityAction: suspend (DownloadPriority) -> Unit
+  private val setPriorityAction: suspend (DownloadPriority) -> Unit,
+  private val rescheduleAction: suspend (DownloadSchedule, List<DownloadCondition>) -> Unit
 ) {
   suspend fun pause() {
     pauseAction()
@@ -63,6 +66,22 @@ class DownloadTask internal constructor(
    */
   suspend fun setPriority(priority: DownloadPriority) {
     setPriorityAction(priority)
+  }
+
+  /**
+   * Reschedules this download with a new schedule and optional conditions.
+   * Active downloads are paused (preserving progress) before rescheduling.
+   * Works from any non-terminal state.
+   *
+   * @param schedule the new schedule to apply
+   * @param conditions optional conditions that must be met before starting
+   * @throws KDownError if the task is in a terminal state
+   */
+  suspend fun reschedule(
+    schedule: DownloadSchedule,
+    conditions: List<DownloadCondition> = emptyList()
+  ) {
+    rescheduleAction(schedule, conditions)
   }
 
   /**

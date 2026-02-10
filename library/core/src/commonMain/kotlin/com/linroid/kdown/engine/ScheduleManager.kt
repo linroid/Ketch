@@ -58,6 +58,45 @@ internal class ScheduleManager(
     }
   }
 
+  suspend fun reschedule(
+    taskId: String,
+    request: DownloadRequest,
+    schedule: DownloadSchedule,
+    conditions: List<DownloadCondition>,
+    createdAt: Instant,
+    stateFlow: MutableStateFlow<DownloadState>,
+    segmentsFlow: MutableStateFlow<List<Segment>>
+  ) {
+    mutex.withLock {
+      scheduledJobs.remove(taskId)?.cancel()
+    }
+
+    stateFlow.value = DownloadState.Scheduled(schedule)
+    KDownLogger.i("ScheduleManager") {
+      "Rescheduling download: taskId=$taskId, schedule=$schedule, " +
+        "conditions=${conditions.size}"
+    }
+
+    mutex.withLock {
+      val job = scope.launch {
+        waitForSchedule(taskId, schedule)
+        waitForConditions(taskId, conditions)
+
+        KDownLogger.i("ScheduleManager") {
+          "Reschedule conditions met for taskId=$taskId, enqueuing " +
+            "with preferResume=true"
+        }
+        scheduler.enqueue(
+          taskId, request, createdAt, stateFlow, segmentsFlow,
+          preferResume = true
+        )
+
+        mutex.withLock { scheduledJobs.remove(taskId) }
+      }
+      scheduledJobs[taskId] = job
+    }
+  }
+
   suspend fun cancel(taskId: String) {
     mutex.withLock {
       scheduledJobs.remove(taskId)?.let { job ->

@@ -171,6 +171,29 @@ class KDown(
       },
       setPriorityAction = { priority ->
         scheduler.setPriority(taskId, priority)
+      },
+      rescheduleAction = { schedule, conditions ->
+        val s = stateFlow.value
+        if (s.isTerminal) {
+          KDownLogger.d("KDown") {
+            "Ignoring reschedule for taskId=$taskId in " +
+              "terminal state $s"
+          }
+          return@DownloadTask
+        }
+        KDownLogger.i("KDown") {
+          "Rescheduling taskId=$taskId, schedule=$schedule, " +
+            "conditions=${conditions.size}"
+        }
+        scheduleManager.cancel(taskId)
+        scheduler.dequeue(taskId)
+        if (s.isActive) {
+          coordinator.pause(taskId)
+        }
+        scheduleManager.reschedule(
+          taskId, request, schedule, conditions,
+          now, stateFlow, segmentsFlow
+        )
       }
     )
 
@@ -276,6 +299,30 @@ class KDown(
       },
       setPriorityAction = { priority ->
         scheduler.setPriority(record.taskId, priority)
+      },
+      rescheduleAction = { schedule, conditions ->
+        val s = stateFlow.value
+        if (s.isTerminal) {
+          KDownLogger.d("KDown") {
+            "Ignoring reschedule for taskId=${record.taskId} in " +
+              "terminal state $s"
+          }
+          return@DownloadTask
+        }
+        KDownLogger.i("KDown") {
+          "Rescheduling taskId=${record.taskId}, " +
+            "schedule=$schedule, " +
+            "conditions=${conditions.size}"
+        }
+        scheduleManager.cancel(record.taskId)
+        scheduler.dequeue(record.taskId)
+        if (s.isActive) {
+          coordinator.pause(record.taskId)
+        }
+        scheduleManager.reschedule(
+          record.taskId, record.request, schedule, conditions,
+          record.createdAt, stateFlow, segmentsFlow
+        )
       }
     )
   }
