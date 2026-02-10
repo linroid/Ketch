@@ -26,6 +26,11 @@ sealed class KDownError(
 
   data object Canceled : KDownError("Download was canceled")
 
+  data class SourceError(
+    val sourceType: String,
+    override val cause: Throwable? = null
+  ) : KDownError("Source '$sourceType' error", cause)
+
   data class Unknown(
     override val cause: Throwable? = null
   ) : KDownError("Unknown error occurred", cause)
@@ -38,6 +43,7 @@ sealed class KDownError(
       is Unsupported -> false
       is ValidationFailed -> false
       is Canceled -> false
+      is SourceError -> false
       is Unknown -> false
     }
 }

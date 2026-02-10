@@ -51,8 +51,12 @@ class ScheduleManagerTest {
           MutableStateFlow<List<Segment>>(emptyList())
 
         val engine = FakeHttpEngine()
-        val coordinator = DownloadCoordinator(
+        val source = HttpDownloadSource(
           httpEngine = engine,
+          fileNameResolver = com.linroid.kdown.file.DefaultFileNameResolver()
+        )
+        val coordinator = DownloadCoordinator(
+          sourceResolver = SourceResolver(listOf(source)),
           taskStore = com.linroid.kdown.task.InMemoryTaskStore(),
           config = com.linroid.kdown.DownloadConfig(),
           fileAccessorFactory = { throw UnsupportedOperationException() },
@@ -98,8 +102,12 @@ class ScheduleManagerTest {
         }
 
         val engine = FakeHttpEngine()
-        val coordinator = DownloadCoordinator(
+        val source = HttpDownloadSource(
           httpEngine = engine,
+          fileNameResolver = com.linroid.kdown.file.DefaultFileNameResolver()
+        )
+        val coordinator = DownloadCoordinator(
+          sourceResolver = SourceResolver(listOf(source)),
           taskStore = com.linroid.kdown.task.InMemoryTaskStore(),
           config = com.linroid.kdown.DownloadConfig(),
           fileAccessorFactory = { throw UnsupportedOperationException() },
@@ -158,8 +166,12 @@ class ScheduleManagerTest {
           MutableStateFlow<List<Segment>>(emptyList())
 
         val engine = FakeHttpEngine()
-        val coordinator = DownloadCoordinator(
+        val source = HttpDownloadSource(
           httpEngine = engine,
+          fileNameResolver = com.linroid.kdown.file.DefaultFileNameResolver()
+        )
+        val coordinator = DownloadCoordinator(
+          sourceResolver = SourceResolver(listOf(source)),
           taskStore = com.linroid.kdown.task.InMemoryTaskStore(),
           config = com.linroid.kdown.DownloadConfig(),
           fileAccessorFactory = { throw UnsupportedOperationException() },
