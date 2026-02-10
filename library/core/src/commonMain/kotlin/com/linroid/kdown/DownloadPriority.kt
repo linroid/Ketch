@@ -17,6 +17,11 @@ enum class DownloadPriority {
   NORMAL,
   /** Elevated priority. Started before [NORMAL] and [LOW] tasks. */
   HIGH,
-  /** Highest priority. Started as soon as a slot is available. */
+  /**
+   * Highest priority. When no slot is available, the scheduler
+   * pauses the lowest-priority running download to make room.
+   * The preempted task is re-queued and resumes automatically
+   * when a slot opens.
+   */
   URGENT
 }

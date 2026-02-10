@@ -18,7 +18,7 @@ internal class DownloadScheduler(
   private val scope: CoroutineScope
 ) {
   private val mutex = Mutex()
-  private val activeTaskIds = mutableSetOf<String>()
+  private val activeEntries = mutableMapOf<String, QueueEntry>()
   private val queuedEntries = mutableListOf<QueueEntry>()
   private val hostConnectionCount = mutableMapOf<String, Int>()
 
@@ -28,7 +28,8 @@ internal class DownloadScheduler(
     val createdAt: Instant,
     val stateFlow: MutableStateFlow<DownloadState>,
     val segmentsFlow: MutableStateFlow<List<Segment>>,
-    var priority: DownloadPriority = DownloadPriority.NORMAL
+    var priority: DownloadPriority = DownloadPriority.NORMAL,
+    var preempted: Boolean = false
   )
 
   suspend fun enqueue(
@@ -42,31 +43,95 @@ internal class DownloadScheduler(
       val host = extractHost(request.url)
       val hostCount = hostConnectionCount.getOrElse(host) { 0 }
 
+      val entry = QueueEntry(
+        taskId = taskId,
+        request = request,
+        createdAt = createdAt,
+        stateFlow = stateFlow,
+        segmentsFlow = segmentsFlow,
+        priority = request.priority
+      )
+
       if (queueConfig.autoStart &&
-        activeTaskIds.size < queueConfig.maxConcurrentDownloads &&
+        activeEntries.size < queueConfig.maxConcurrentDownloads &&
         hostCount < queueConfig.maxConnectionsPerHost
       ) {
         KDownLogger.i("Scheduler") {
           "Starting download immediately: taskId=$taskId, " +
-            "active=${activeTaskIds.size}/${queueConfig.maxConcurrentDownloads}"
+            "active=${activeEntries.size}/" +
+            "${queueConfig.maxConcurrentDownloads}"
         }
-        startTask(taskId, request, stateFlow, segmentsFlow, host)
+        startTask(entry, host)
+      } else if (request.priority == DownloadPriority.URGENT &&
+        queueConfig.autoStart
+      ) {
+        tryPreemptAndStart(entry, host)
       } else {
-        val entry = QueueEntry(
-          taskId = taskId,
-          request = request,
-          createdAt = createdAt,
-          stateFlow = stateFlow,
-          segmentsFlow = segmentsFlow,
-          priority = request.priority
-        )
         insertSorted(entry)
         stateFlow.value = DownloadState.Queued
         KDownLogger.i("Scheduler") {
-          "Download queued: taskId=$taskId, priority=${request.priority}, " +
-            "position=${queuedEntries.indexOfFirst { it.taskId == taskId } + 1}" +
-            "/${queuedEntries.size}"
+          "Download queued: taskId=$taskId, " +
+            "priority=${request.priority}, " +
+            "position=${queuedEntries.indexOfFirst {
+              it.taskId == taskId
+            } + 1}/${queuedEntries.size}"
         }
+      }
+    }
+  }
+
+  /**
+   * Preempts the lowest-priority active download to make room for
+   * an [DownloadPriority.URGENT] task. The preempted task is paused
+   * and re-queued so it resumes automatically when a slot opens.
+   */
+  private suspend fun tryPreemptAndStart(
+    entry: QueueEntry,
+    host: String
+  ) {
+    val victim = activeEntries.values
+      .filter { it.priority < DownloadPriority.URGENT }
+      .minByOrNull { it.priority.ordinal }
+
+    if (victim == null) {
+      insertSorted(entry)
+      entry.stateFlow.value = DownloadState.Queued
+      KDownLogger.i("Scheduler") {
+        "Cannot preempt: all active tasks are URGENT. " +
+          "Queuing taskId=${entry.taskId}"
+      }
+      return
+    }
+
+    KDownLogger.i("Scheduler") {
+      "Preempting taskId=${victim.taskId} " +
+        "(priority=${victim.priority}) for URGENT " +
+        "taskId=${entry.taskId}"
+    }
+
+    coordinator.pause(victim.taskId)
+    removeActive(victim.taskId)
+
+    victim.preempted = true
+    victim.stateFlow.value = DownloadState.Queued
+    insertSorted(victim)
+
+    val hostCount = hostConnectionCount.getOrElse(host) { 0 }
+    if (activeEntries.size < queueConfig.maxConcurrentDownloads &&
+      hostCount < queueConfig.maxConnectionsPerHost
+    ) {
+      KDownLogger.i("Scheduler") {
+        "Starting URGENT download: taskId=${entry.taskId}, " +
+          "active=${activeEntries.size + 1}/" +
+          "${queueConfig.maxConcurrentDownloads}"
+      }
+      startTask(entry, host)
+    } else {
+      insertSorted(entry)
+      entry.stateFlow.value = DownloadState.Queued
+      KDownLogger.i("Scheduler") {
+        "URGENT taskId=${entry.taskId} queued " +
+          "(host limit still exceeded)"
       }
     }
   }
@@ -76,7 +141,8 @@ internal class DownloadScheduler(
       removeActive(taskId)
       KDownLogger.d("Scheduler") {
         "Task completed: taskId=$taskId, " +
-          "active=${activeTaskIds.size}/${queueConfig.maxConcurrentDownloads}"
+          "active=${activeEntries.size}/" +
+          "${queueConfig.maxConcurrentDownloads}"
       }
       promoteNext()
     }
@@ -87,7 +153,8 @@ internal class DownloadScheduler(
       removeActive(taskId)
       KDownLogger.d("Scheduler") {
         "Task failed: taskId=$taskId, " +
-          "active=${activeTaskIds.size}/${queueConfig.maxConcurrentDownloads}"
+          "active=${activeEntries.size}/" +
+          "${queueConfig.maxConcurrentDownloads}"
       }
       promoteNext()
     }
@@ -98,7 +165,8 @@ internal class DownloadScheduler(
       removeActive(taskId)
       KDownLogger.d("Scheduler") {
         "Task canceled: taskId=$taskId, " +
-          "active=${activeTaskIds.size}/${queueConfig.maxConcurrentDownloads}"
+          "active=${activeEntries.size}/" +
+          "${queueConfig.maxConcurrentDownloads}"
       }
       promoteNext()
     }
@@ -109,7 +177,8 @@ internal class DownloadScheduler(
       val index = queuedEntries.indexOfFirst { it.taskId == taskId }
       if (index < 0) {
         KDownLogger.d("Scheduler") {
-          "setPriority: taskId=$taskId not in queue (may be active)"
+          "setPriority: taskId=$taskId not in queue " +
+            "(may be active)"
         }
         return
       }
@@ -117,9 +186,11 @@ internal class DownloadScheduler(
       entry.priority = priority
       insertSorted(entry)
       KDownLogger.i("Scheduler") {
-        "Priority updated: taskId=$taskId, priority=$priority, " +
-          "newPosition=${queuedEntries.indexOfFirst { it.taskId == taskId } + 1}" +
-          "/${queuedEntries.size}"
+        "Priority updated: taskId=$taskId, " +
+          "priority=$priority, " +
+          "newPosition=${queuedEntries.indexOfFirst {
+            it.taskId == taskId
+          } + 1}/${queuedEntries.size}"
       }
       promoteNext()
     }
@@ -132,7 +203,7 @@ internal class DownloadScheduler(
         KDownLogger.i("Scheduler") {
           "Dequeued: taskId=$taskId"
         }
-      } else if (activeTaskIds.contains(taskId)) {
+      } else if (activeEntries.containsKey(taskId)) {
         removeActive(taskId)
         coordinator.cancel(taskId)
         KDownLogger.i("Scheduler") {
@@ -144,14 +215,14 @@ internal class DownloadScheduler(
   }
 
   private fun removeActive(taskId: String) {
-    if (activeTaskIds.remove(taskId)) {
-      val record = findHostForTask(taskId)
-      if (record != null) {
-        val count = hostConnectionCount.getOrElse(record) { 0 }
+    if (activeEntries.remove(taskId) != null) {
+      val host = findHostForTask(taskId)
+      if (host != null) {
+        val count = hostConnectionCount.getOrElse(host) { 0 }
         if (count <= 1) {
-          hostConnectionCount.remove(record)
+          hostConnectionCount.remove(host)
         } else {
-          hostConnectionCount[record] = count - 1
+          hostConnectionCount[host] = count - 1
         }
       }
     }
@@ -164,34 +235,45 @@ internal class DownloadScheduler(
   }
 
   private suspend fun startTask(
-    taskId: String,
-    request: DownloadRequest,
-    stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>,
+    entry: QueueEntry,
     host: String
   ) {
-    activeTaskIds.add(taskId)
+    activeEntries[entry.taskId] = entry
     hostConnectionCount[host] = (hostConnectionCount[host] ?: 0) + 1
-    taskHostMap[taskId] = host
-    coordinator.start(taskId, request, scope, stateFlow, segmentsFlow)
+    taskHostMap[entry.taskId] = host
+    if (entry.preempted) {
+      entry.preempted = false
+      val resumed = coordinator.resume(
+        entry.taskId, scope, entry.stateFlow, entry.segmentsFlow
+      )
+      if (!resumed) {
+        coordinator.start(
+          entry.taskId, entry.request, scope,
+          entry.stateFlow, entry.segmentsFlow
+        )
+      }
+    } else {
+      coordinator.start(
+        entry.taskId, entry.request, scope,
+        entry.stateFlow, entry.segmentsFlow
+      )
+    }
   }
 
   private suspend fun promoteNext() {
     if (!queueConfig.autoStart) return
 
-    while (activeTaskIds.size < queueConfig.maxConcurrentDownloads) {
+    while (activeEntries.size < queueConfig.maxConcurrentDownloads) {
       val entry = findNextEligible() ?: break
       queuedEntries.remove(entry)
       val host = extractHost(entry.request.url)
       KDownLogger.i("Scheduler") {
         "Promoting queued task: taskId=${entry.taskId}, " +
           "priority=${entry.priority}, " +
-          "active=${activeTaskIds.size + 1}/${queueConfig.maxConcurrentDownloads}"
+          "active=${activeEntries.size + 1}/" +
+          "${queueConfig.maxConcurrentDownloads}"
       }
-      startTask(
-        entry.taskId, entry.request,
-        entry.stateFlow, entry.segmentsFlow, host
-      )
+      startTask(entry, host)
     }
   }
 
