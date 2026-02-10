@@ -32,7 +32,6 @@ import kotlinx.io.files.SystemFileSystem
 import kotlin.collections.sumOf
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Instant
 
 internal class DownloadCoordinator(
   private val httpEngine: HttpEngine,
