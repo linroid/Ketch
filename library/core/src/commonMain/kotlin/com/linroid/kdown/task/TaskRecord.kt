@@ -5,6 +5,7 @@ import com.linroid.kdown.file.PathSerializer
 import com.linroid.kdown.segment.Segment
 import kotlinx.io.files.Path
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 /**
  * A persistent record of a download task. Contains all information needed
@@ -27,6 +28,6 @@ data class TaskRecord(
   val etag: String? = null,
   val lastModified: String? = null,
   val segments: List<Segment>? = null,
-  val createdAt: Long,
-  val updatedAt: Long
+  val createdAt: Instant,
+  val updatedAt: Instant
 )

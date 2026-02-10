@@ -7,20 +7,21 @@ import com.linroid.kdown.segment.Segment
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.io.files.Path
+import kotlin.time.Instant
 
 /**
  * Represents a download task with reactive state and control methods.
  *
  * @property taskId Unique identifier for this download task
  * @property request The download request configuration
- * @property createdAt Timestamp when the task was created (milliseconds since epoch)
+ * @property createdAt Timestamp when the task was created
  * @property state Observable download state (Pending, Downloading, Paused, Completed, Failed, Canceled)
  * @property segments Observable list of download segments with their progress
  */
 class DownloadTask internal constructor(
   val taskId: String,
   val request: DownloadRequest,
-  val createdAt: Long,
+  val createdAt: Instant,
   val state: StateFlow<DownloadState>,
   val segments: StateFlow<List<Segment>>,
   private val pauseAction: suspend () -> Unit,

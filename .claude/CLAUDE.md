@@ -163,7 +163,7 @@ When working on this project:
 - Avoid platform-specific APIs in common code
 - Use dependency injection for pluggable components (HttpEngine, TaskStore, Logger)
 - Prefer composition over inheritance
-- Package structure: root (KDown, DownloadConfig, DownloadRequest, DownloadProgress, DownloadState), `task/` (DownloadTask, TaskStore, InMemoryTaskStore, TaskRecord, TaskState), `segment/` (Segment, SegmentCalculator, SegmentDownloader), `engine/` (HttpEngine, DownloadCoordinator, RangeSupportDetector, ServerInfo), `file/` (FileAccessor, FileNameResolver, DefaultFileNameResolver, PathSerializer), `download/` (TimeProvider), `log/` (Logger, KDownLogger), `error/` (KDownError)
+- Package structure: root (KDown, DownloadConfig, DownloadRequest, DownloadProgress, DownloadState), `task/` (DownloadTask, TaskStore, InMemoryTaskStore, TaskRecord, TaskState), `segment/` (Segment, SegmentCalculator, SegmentDownloader), `engine/` (HttpEngine, DownloadCoordinator, RangeSupportDetector, ServerInfo), `file/` (FileAccessor, FileNameResolver, DefaultFileNameResolver, PathSerializer), `log/` (Logger, KDownLogger), `error/` (KDownError)
 
 ### Testing
 - Add unit tests for new features in `commonTest`
