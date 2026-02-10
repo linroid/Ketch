@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class TaskState {
   PENDING,
+  QUEUED,
   DOWNLOADING,
   PAUSED,
   COMPLETED,
@@ -23,5 +24,5 @@ enum class TaskState {
 
   /** Whether the task can be restored/resumed after a process restart. */
   val isRestorable: Boolean
-    get() = this == PENDING || this == DOWNLOADING || this == PAUSED
+    get() = this == PENDING || this == QUEUED || this == DOWNLOADING || this == PAUSED
 }

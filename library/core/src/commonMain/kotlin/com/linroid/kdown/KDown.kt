@@ -2,16 +2,17 @@ package com.linroid.kdown
 
 import com.linroid.kdown.engine.DelegatingSpeedLimiter
 import com.linroid.kdown.engine.DownloadCoordinator
+import com.linroid.kdown.engine.DownloadScheduler
+import com.linroid.kdown.engine.HttpEngine
 import com.linroid.kdown.engine.SpeedLimiter
 import com.linroid.kdown.engine.TokenBucket
-import com.linroid.kdown.segment.Segment
-import com.linroid.kdown.engine.HttpEngine
 import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.file.DefaultFileNameResolver
 import com.linroid.kdown.file.FileAccessor
 import com.linroid.kdown.file.FileNameResolver
 import com.linroid.kdown.log.KDownLogger
 import com.linroid.kdown.log.Logger
+import com.linroid.kdown.segment.Segment
 import com.linroid.kdown.task.DownloadTask
 import com.linroid.kdown.task.InMemoryTaskStore
 import com.linroid.kdown.task.TaskRecord
@@ -24,6 +25,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.io.files.Path
@@ -69,6 +73,12 @@ class KDown(
     globalLimiter = globalLimiter
   )
 
+  private val scheduler = DownloadScheduler(
+    queueConfig = config.queueConfig,
+    coordinator = coordinator,
+    scope = scope
+  )
+
   private val tasksMutex = Mutex()
   private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
 
@@ -77,18 +87,21 @@ class KDown(
 
   /**
    * Starts a new download and adds it to the [tasks] flow.
+   * The task may be queued if the maximum number of concurrent
+   * downloads has been reached.
    */
   suspend fun download(request: DownloadRequest): DownloadTask {
     val taskId = Uuid.random().toString()
     val now = Clock.System.now()
     KDownLogger.i("KDown") {
-      "Starting download: taskId=$taskId, url=${request.url}, " +
-        "connections=${request.connections}"
+      "Downloading: taskId=$taskId, url=${request.url}, " +
+        "connections=${request.connections}, " +
+        "priority=${request.priority}"
     }
     val stateFlow = MutableStateFlow<DownloadState>(DownloadState.Pending)
     val segmentsFlow = MutableStateFlow<List<Segment>>(emptyList())
 
-    coordinator.start(taskId, request, scope, stateFlow, segmentsFlow)
+    scheduler.enqueue(taskId, request, now, stateFlow, segmentsFlow)
 
     val task = DownloadTask(
       taskId = taskId,
@@ -124,6 +137,7 @@ class KDown(
       },
       cancelAction = {
         if (!stateFlow.value.isTerminal) {
+          scheduler.dequeue(taskId)
           coordinator.cancel(taskId)
         } else {
           KDownLogger.d("KDown") {
@@ -135,9 +149,13 @@ class KDown(
       removeAction = { removeTaskInternal(taskId) },
       setSpeedLimitAction = { limit ->
         coordinator.setTaskSpeedLimit(taskId, limit)
+      },
+      setPriorityAction = { priority ->
+        scheduler.setPriority(taskId, priority)
       }
     )
 
+    monitorTaskState(taskId, stateFlow)
     tasksMutex.withLock { _tasks.value = _tasks.value + task }
     return task
   }
@@ -179,6 +197,8 @@ class KDown(
     val stateFlow = MutableStateFlow(mapRecordState(record))
     val segmentsFlow = MutableStateFlow(record.segments ?: emptyList())
 
+    monitorTaskState(record.taskId, stateFlow)
+
     return DownloadTask(
       taskId = record.taskId,
       request = record.request,
@@ -215,6 +235,7 @@ class KDown(
       },
       cancelAction = {
         if (!stateFlow.value.isTerminal) {
+          scheduler.dequeue(record.taskId)
           coordinator.cancel(record.taskId)
         } else {
           KDownLogger.d("KDown") {
@@ -226,6 +247,9 @@ class KDown(
       removeAction = { removeTaskInternal(record.taskId) },
       setSpeedLimitAction = { limit ->
         coordinator.setTaskSpeedLimit(record.taskId, limit)
+      },
+      setPriorityAction = { priority ->
+        scheduler.setPriority(record.taskId, priority)
       }
     )
   }
@@ -233,6 +257,7 @@ class KDown(
   private fun mapRecordState(record: TaskRecord): DownloadState {
     return when (record.state) {
       TaskState.PENDING,
+      TaskState.QUEUED,
       TaskState.DOWNLOADING,
       TaskState.PAUSED -> DownloadState.Paused(
         DownloadProgress(record.downloadedBytes, record.totalBytes)
@@ -247,7 +272,24 @@ class KDown(
     }
   }
 
+  private fun monitorTaskState(
+    taskId: String,
+    stateFlow: MutableStateFlow<DownloadState>
+  ) {
+    scope.launch {
+      val terminalState = stateFlow.filterIsInstance<DownloadState>()
+        .first { it.isTerminal }
+      when (terminalState) {
+        is DownloadState.Completed -> scheduler.onTaskCompleted(taskId)
+        is DownloadState.Failed -> scheduler.onTaskFailed(taskId)
+        is DownloadState.Canceled -> scheduler.onTaskCanceled(taskId)
+        else -> {}
+      }
+    }
+  }
+
   private suspend fun removeTaskInternal(taskId: String) {
+    scheduler.dequeue(taskId)
     coordinator.cancel(taskId)
     taskStore.remove(taskId)
     tasksMutex.withLock {

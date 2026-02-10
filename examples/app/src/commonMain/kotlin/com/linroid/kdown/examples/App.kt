@@ -435,6 +435,13 @@ private fun DownloadTaskItem(
           )
           SpeedLimitSlider(task = task, scope = scope)
         }
+        is DownloadState.Queued -> {
+          Text(
+            text = "Queued \u2014 waiting for download slot\u2026",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
         is DownloadState.Pending -> {
           LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
           Text(
@@ -582,6 +589,7 @@ private fun StatusIndicator(state: DownloadState) {
   }
   val label = when (state) {
     is DownloadState.Idle -> "--"
+    is DownloadState.Queued -> "Q"
     is DownloadState.Pending -> ".."
     is DownloadState.Downloading -> "DL"
     is DownloadState.Paused -> "||"
@@ -679,6 +687,16 @@ private fun TaskActionButtons(
           )
         ) {
           Icon(Icons.Filled.Delete, contentDescription = "Remove")
+        }
+      }
+      is DownloadState.Queued -> {
+        IconButton(
+          onClick = onCancel,
+          colors = IconButtonDefaults.iconButtonColors(
+            contentColor = MaterialTheme.colorScheme.error
+          )
+        ) {
+          Icon(Icons.Filled.Close, contentDescription = "Cancel")
         }
       }
       is DownloadState.Idle -> {}

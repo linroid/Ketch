@@ -1,5 +1,6 @@
 package com.linroid.kdown.task
 
+import com.linroid.kdown.DownloadPriority
 import com.linroid.kdown.DownloadRequest
 import com.linroid.kdown.DownloadState
 import com.linroid.kdown.SpeedLimit
@@ -29,7 +30,8 @@ class DownloadTask internal constructor(
   private val resumeAction: suspend () -> Unit,
   private val cancelAction: suspend () -> Unit,
   private val removeAction: suspend () -> Unit,
-  private val setSpeedLimitAction: suspend (SpeedLimit) -> Unit
+  private val setSpeedLimitAction: suspend (SpeedLimit) -> Unit,
+  private val setPriorityAction: suspend (DownloadPriority) -> Unit
 ) {
   suspend fun pause() {
     pauseAction()
@@ -51,6 +53,16 @@ class DownloadTask internal constructor(
    */
   suspend fun setSpeedLimit(limit: SpeedLimit) {
     setSpeedLimitAction(limit)
+  }
+
+  /**
+   * Updates the queue priority for this download task.
+   * If the task is currently queued, it may be re-ordered or promoted.
+   *
+   * @param priority the new priority level
+   */
+  suspend fun setPriority(priority: DownloadPriority) {
+    setPriorityAction(priority)
   }
 
   /**

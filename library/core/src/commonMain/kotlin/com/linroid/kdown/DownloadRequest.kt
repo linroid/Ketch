@@ -24,6 +24,9 @@ import kotlinx.serialization.Serializable
  * @property speedLimit per-task speed limit. Overrides the global
  *   [DownloadConfig.speedLimit] for this download. Defaults to
  *   [SpeedLimit.Unlimited] (use global limit).
+ * @property priority queue priority for this download. Higher-priority
+ *   tasks are started before lower-priority ones when download slots
+ *   become available. Defaults to [DownloadPriority.NORMAL].
  */
 @Serializable
 data class DownloadRequest(
@@ -34,7 +37,8 @@ data class DownloadRequest(
   val connections: Int = 1,
   val headers: Map<String, String> = emptyMap(),
   val properties: Map<String, String> = emptyMap(),
-  val speedLimit: SpeedLimit = SpeedLimit.Unlimited
+  val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
+  val priority: DownloadPriority = DownloadPriority.NORMAL
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }

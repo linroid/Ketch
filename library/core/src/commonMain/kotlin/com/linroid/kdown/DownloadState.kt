@@ -5,6 +5,7 @@ import kotlinx.io.files.Path
 
 sealed class DownloadState {
   data object Idle : DownloadState()
+  data object Queued : DownloadState()
   data object Pending : DownloadState()
   data class Downloading(val progress: DownloadProgress) : DownloadState()
   data class Paused(val progress: DownloadProgress) : DownloadState()
