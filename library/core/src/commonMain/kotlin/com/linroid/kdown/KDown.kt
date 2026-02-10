@@ -216,6 +216,29 @@ class KDown(
       },
       setPriorityAction = { priority ->
         scheduler.setPriority(taskId, priority)
+      },
+      rescheduleAction = { schedule, conditions ->
+        val s = stateFlow.value
+        if (s.isTerminal) {
+          KDownLogger.d("KDown") {
+            "Ignoring reschedule for taskId=$taskId in " +
+              "terminal state $s"
+          }
+          return@DownloadTask
+        }
+        KDownLogger.i("KDown") {
+          "Rescheduling taskId=$taskId, schedule=$schedule, " +
+            "conditions=${conditions.size}"
+        }
+        scheduleManager.cancel(taskId)
+        scheduler.dequeue(taskId)
+        if (s.isActive) {
+          coordinator.pause(taskId)
+        }
+        scheduleManager.reschedule(
+          taskId, request, schedule, conditions,
+          now, stateFlow, segmentsFlow
+        )
       }
     )
 
@@ -231,8 +254,10 @@ class KDown(
    * interrupted downloads.
    *
    * State mapping:
-   * - `PENDING` / `DOWNLOADING` / `PAUSED` ->
-   *   [DownloadState.Paused] (treat as paused, user decides)
+   * - `SCHEDULED` / `PENDING` / `QUEUED` / `DOWNLOADING` / `PAUSED`
+   *   -> [DownloadState.Paused] (treat as paused, user decides when
+   *   to resume). `SCHEDULED` is mapped to Paused because conditions
+   *   are transient and cannot be restored after deserialization.
    * - `COMPLETED` -> [DownloadState.Completed]
    * - `FAILED` -> [DownloadState.Failed]
    * - `CANCELED` -> [DownloadState.Canceled]
@@ -328,15 +353,39 @@ class KDown(
       },
       setPriorityAction = { priority ->
         scheduler.setPriority(record.taskId, priority)
+      },
+      rescheduleAction = { schedule, conditions ->
+        val s = stateFlow.value
+        if (s.isTerminal) {
+          KDownLogger.d("KDown") {
+            "Ignoring reschedule for taskId=${record.taskId} in " +
+              "terminal state $s"
+          }
+          return@DownloadTask
+        }
+        KDownLogger.i("KDown") {
+          "Rescheduling taskId=${record.taskId}, " +
+            "schedule=$schedule, " +
+            "conditions=${conditions.size}"
+        }
+        scheduleManager.cancel(record.taskId)
+        scheduler.dequeue(record.taskId)
+        if (s.isActive) {
+          coordinator.pause(record.taskId)
+        }
+        scheduleManager.reschedule(
+          record.taskId, record.request, schedule, conditions,
+          record.createdAt, stateFlow, segmentsFlow
+        )
       }
     )
   }
 
   private fun mapRecordState(record: TaskRecord): DownloadState {
     return when (record.state) {
-      TaskState.SCHEDULED -> DownloadState.Scheduled(
-        record.request.schedule
-      )
+      // SCHEDULED maps to Paused: conditions are @Transient and
+      // cannot be restored, so treat as interrupted download.
+      TaskState.SCHEDULED,
       TaskState.PENDING,
       TaskState.QUEUED,
       TaskState.DOWNLOADING,

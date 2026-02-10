@@ -84,7 +84,10 @@ internal class DownloadCoordinator(
         try {
           executeDownload(taskId, request, stateFlow, segmentsFlow)
         } catch (e: CancellationException) {
-          if (stateFlow.value !is DownloadState.Paused) {
+          val s = stateFlow.value
+          if (s !is DownloadState.Paused &&
+            s !is DownloadState.Queued
+          ) {
             stateFlow.value = DownloadState.Canceled
           }
           throw e
@@ -137,7 +140,10 @@ internal class DownloadCoordinator(
             record.taskId, record.request, stateFlow, segmentsFlow
           )
         } catch (e: CancellationException) {
-          if (stateFlow.value !is DownloadState.Paused) {
+          val s = stateFlow.value
+          if (s !is DownloadState.Paused &&
+            s !is DownloadState.Queued
+          ) {
             stateFlow.value = DownloadState.Canceled
           }
           throw e
@@ -352,7 +358,10 @@ internal class DownloadCoordinator(
             taskId, taskRecord, segments, stateFlow, segmentsFlow
           )
         } catch (e: CancellationException) {
-          if (stateFlow.value !is DownloadState.Paused) {
+          val s = stateFlow.value
+          if (s !is DownloadState.Paused &&
+            s !is DownloadState.Queued
+          ) {
             stateFlow.value = DownloadState.Canceled
           }
           throw e

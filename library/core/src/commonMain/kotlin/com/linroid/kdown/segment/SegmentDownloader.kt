@@ -51,8 +51,22 @@ internal class SegmentDownloader(
       onProgress(downloadedBytes)
     }
 
+    if (downloadedBytes < segment.totalBytes) {
+      KDownLogger.w("SegmentDownloader") {
+        "Incomplete segment ${segment.index}: " +
+          "downloaded $downloadedBytes/${segment.totalBytes} bytes"
+      }
+      throw KDownError.Network(
+        Exception(
+          "Connection closed prematurely: received " +
+            "$downloadedBytes of ${segment.totalBytes} bytes"
+        )
+      )
+    }
+
     KDownLogger.d("SegmentDownloader") {
-      "Completed segment ${segment.index}: downloaded ${downloadedBytes - initialBytes} bytes"
+      "Completed segment ${segment.index}: " +
+        "downloaded ${downloadedBytes - initialBytes} bytes"
     }
 
     return segment.copy(downloadedBytes = downloadedBytes)

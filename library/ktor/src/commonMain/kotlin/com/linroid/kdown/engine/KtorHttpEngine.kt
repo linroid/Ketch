@@ -3,6 +3,7 @@ package com.linroid.kdown.engine
 import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.log.KDownLogger
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.head
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
@@ -14,7 +15,7 @@ import io.ktor.utils.io.readAvailable
 import kotlin.coroutines.cancellation.CancellationException
 
 class KtorHttpEngine(
-  private val client: HttpClient = HttpClient()
+  private val client: HttpClient = defaultClient()
 ) : HttpEngine {
 
   override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
@@ -110,5 +111,12 @@ class KtorHttpEngine(
 
   companion object {
     private const val DEFAULT_BUFFER_SIZE = 8192
+
+    private fun defaultClient(): HttpClient = HttpClient {
+      install(HttpTimeout) {
+        socketTimeoutMillis = Long.MAX_VALUE
+        requestTimeoutMillis = Long.MAX_VALUE
+      }
+    }
   }
 }
