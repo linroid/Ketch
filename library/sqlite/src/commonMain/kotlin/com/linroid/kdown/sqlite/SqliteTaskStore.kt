@@ -9,6 +9,7 @@ import com.linroid.kdown.task.TaskStore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.io.files.Path
+import kotlin.time.Instant
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
@@ -46,8 +47,8 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       segments_json = record.segments?.let {
         json.encodeToString(segmentListSerializer, it)
       },
-      created_at = record.createdAt,
-      updated_at = record.updatedAt
+      created_at = record.createdAt.toEpochMilliseconds(),
+      updated_at = record.updatedAt.toEpochMilliseconds()
     )
   }
 
@@ -93,8 +94,8 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
           null
         }
       },
-      createdAt = created_at,
-      updatedAt = updated_at
+      createdAt = Instant.fromEpochMilliseconds(created_at),
+      updatedAt = Instant.fromEpochMilliseconds(updated_at)
     )
   }
 }

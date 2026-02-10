@@ -1,6 +1,5 @@
 package com.linroid.kdown
 
-import com.linroid.kdown.download.currentTimeMillis
 import com.linroid.kdown.engine.DownloadCoordinator
 import com.linroid.kdown.segment.Segment
 import com.linroid.kdown.engine.HttpEngine
@@ -25,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.io.files.Path
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 class KDown(
@@ -63,7 +63,7 @@ class KDown(
    */
   suspend fun download(request: DownloadRequest): DownloadTask {
     val taskId = Uuid.random().toString()
-    val now = currentTimeMillis()
+    val now = Clock.System.now()
     KDownLogger.i("KDown") {
       "Starting download: taskId=$taskId, url=${request.url}, " +
         "connections=${request.connections}"

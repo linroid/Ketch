@@ -4,6 +4,7 @@ import com.linroid.kdown.DownloadRequest
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.files.Path
 import kotlin.test.Test
+import kotlin.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -25,8 +26,8 @@ class InMemoryTaskStoreTest {
     state = state,
     totalBytes = 1000,
     downloadedBytes = 0,
-    createdAt = 1000L,
-    updatedAt = 1000L
+    createdAt = Instant.fromEpochMilliseconds(1000),
+    updatedAt = Instant.fromEpochMilliseconds(1000)
   )
 
   @Test

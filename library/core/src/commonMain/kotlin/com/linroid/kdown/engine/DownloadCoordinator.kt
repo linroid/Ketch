@@ -4,7 +4,6 @@ import com.linroid.kdown.DownloadConfig
 import com.linroid.kdown.DownloadProgress
 import com.linroid.kdown.DownloadRequest
 import com.linroid.kdown.DownloadState
-import com.linroid.kdown.download.currentTimeMillis
 import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.file.FileAccessor
 import com.linroid.kdown.file.FileNameResolver
@@ -31,6 +30,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlin.collections.sumOf
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 internal class DownloadCoordinator(
   private val httpEngine: HttpEngine,
@@ -63,7 +65,7 @@ internal class DownloadCoordinator(
       Path(request.directory, it)
     } ?: request.directory
 
-    val now = currentTimeMillis()
+    val now = Clock.System.now()
     taskStore.save(
       TaskRecord(
         taskId = taskId,
@@ -121,7 +123,7 @@ internal class DownloadCoordinator(
     updateTaskRecord(record.taskId) {
       it.copy(
         state = TaskState.PENDING,
-        updatedAt = currentTimeMillis()
+        updatedAt = Clock.System.now()
       )
     }
 
@@ -197,7 +199,7 @@ internal class DownloadCoordinator(
 
     segmentsFlow.value = segments
 
-    val now = currentTimeMillis()
+    val now = Clock.System.now()
     updateTaskRecord(taskId) {
       it.copy(
         destPath = destPath,
@@ -254,7 +256,7 @@ internal class DownloadCoordinator(
           state = TaskState.COMPLETED,
           downloadedBytes = totalBytes,
           segments = null,
-          updatedAt = currentTimeMillis()
+          updatedAt = Clock.System.now()
         )
       }
 
@@ -334,7 +336,7 @@ internal class DownloadCoordinator(
       activeDownloads[taskId]?.segmentProgress = segmentProgress
     }
 
-    var lastProgressUpdate = currentTimeMillis()
+    var lastProgressUpdate = Clock.System.now()
     val progressMutex = Mutex()
 
     val incompleteSegments = segments.filter { !it.isComplete }
@@ -349,9 +351,9 @@ internal class DownloadCoordinator(
     }
 
     suspend fun updateProgress() {
-      val now = currentTimeMillis()
+      val now = Clock.System.now()
       progressMutex.withLock {
-        if (now - lastProgressUpdate >= config.progressUpdateIntervalMs) {
+        if (now - lastProgressUpdate >= config.progressUpdateIntervalMs.milliseconds) {
           val snapshot = currentSegments()
           val downloaded = snapshot.sumOf { it.downloadedBytes }
           stateFlow.value = DownloadState.Downloading(
@@ -381,7 +383,7 @@ internal class DownloadCoordinator(
         it.copy(
           segments = snapshot,
           downloadedBytes = snapshot.sumOf { s -> s.downloadedBytes },
-          updatedAt = currentTimeMillis()
+          updatedAt = Clock.System.now()
         )
       }
     }
@@ -450,7 +452,7 @@ internal class DownloadCoordinator(
         KDownLogger.d("Coordinator") {
           "Saving pause state for taskId=$taskId"
         }
-        val now = currentTimeMillis()
+        val now = Clock.System.now()
         val progress = active.segmentProgress
         val updatedSegments = if (progress != null) {
           segments.mapIndexed { i, seg ->
@@ -523,7 +525,7 @@ internal class DownloadCoordinator(
     updateTaskRecord(taskId) {
       it.copy(
         state = TaskState.DOWNLOADING,
-        updatedAt = currentTimeMillis()
+        updatedAt = Clock.System.now()
       )
     }
 
@@ -620,7 +622,7 @@ internal class DownloadCoordinator(
         it.copy(
           segments = validatedSegments,
           downloadedBytes = validatedSegments.sumOf { s -> s.downloadedBytes },
-          updatedAt = currentTimeMillis()
+          updatedAt = Clock.System.now()
         )
       }
     }
@@ -644,7 +646,7 @@ internal class DownloadCoordinator(
           state = TaskState.COMPLETED,
           downloadedBytes = taskRecord.totalBytes,
           segments = null,
-          updatedAt = currentTimeMillis()
+          updatedAt = Clock.System.now()
         )
       }
 
@@ -712,7 +714,7 @@ internal class DownloadCoordinator(
       it.copy(
         state = TaskState.CANCELED,
         segments = null,
-        updatedAt = currentTimeMillis()
+        updatedAt = Clock.System.now()
       )
     }
   }
@@ -732,7 +734,7 @@ internal class DownloadCoordinator(
       it.copy(
         state = state,
         errorMessage = errorMessage,
-        updatedAt = currentTimeMillis()
+        updatedAt = Clock.System.now()
       )
     }
   }

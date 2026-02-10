@@ -7,6 +7,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Instant
 
 class TaskRecordTest {
 
@@ -29,8 +30,8 @@ class TaskRecordTest {
       taskId = "test-1",
       request = defaultRequest(),
       destPath = Path("/tmp/file.bin"),
-      createdAt = 1000L,
-      updatedAt = 1000L
+      createdAt = Instant.fromEpochMilliseconds(1000),
+      updatedAt = Instant.fromEpochMilliseconds(1000)
     )
     assertEquals(1, record.request.connections)
     assertEquals(emptyMap(), record.request.headers)
@@ -57,8 +58,8 @@ class TaskRecordTest {
       totalBytes = 2048,
       downloadedBytes = 1024,
       errorMessage = null,
-      createdAt = 1000L,
-      updatedAt = 2000L
+      createdAt = Instant.fromEpochMilliseconds(1000),
+      updatedAt = Instant.fromEpochMilliseconds(2000)
     )
 
     val serialized = json.encodeToString(
@@ -95,8 +96,8 @@ class TaskRecordTest {
       destPath = Path("/tmp/file.bin"),
       state = TaskState.FAILED,
       errorMessage = "Network timeout",
-      createdAt = 1000L,
-      updatedAt = 2000L
+      createdAt = Instant.fromEpochMilliseconds(1000),
+      updatedAt = Instant.fromEpochMilliseconds(2000)
     )
 
     val serialized = json.encodeToString(
@@ -112,6 +113,7 @@ class TaskRecordTest {
 
   @Test
   fun copy_preservesValues() {
+    val created = Instant.fromEpochMilliseconds(1000)
     val original = TaskRecord(
       taskId = "test-1",
       request = defaultRequest(),
@@ -119,22 +121,23 @@ class TaskRecordTest {
       state = TaskState.DOWNLOADING,
       totalBytes = 1000,
       downloadedBytes = 500,
-      createdAt = 1000L,
-      updatedAt = 1000L
+      createdAt = created,
+      updatedAt = Instant.fromEpochMilliseconds(1000)
     )
 
+    val newUpdated = Instant.fromEpochMilliseconds(2000)
     val updated = original.copy(
       state = TaskState.PAUSED,
       downloadedBytes = 600,
-      updatedAt = 2000L
+      updatedAt = newUpdated
     )
 
     assertEquals("test-1", updated.taskId)
     assertEquals("https://example.com/file.bin", updated.request.url)
     assertEquals(TaskState.PAUSED, updated.state)
     assertEquals(600, updated.downloadedBytes)
-    assertEquals(1000L, updated.createdAt)
-    assertEquals(2000L, updated.updatedAt)
+    assertEquals(created, updated.createdAt)
+    assertEquals(newUpdated, updated.updatedAt)
   }
 
   @Test
@@ -148,8 +151,8 @@ class TaskRecordTest {
       acceptRanges = true,
       etag = "\"abc123\"",
       lastModified = "Wed, 21 Oct 2023 07:28:00 GMT",
-      createdAt = 1000L,
-      updatedAt = 2000L
+      createdAt = Instant.fromEpochMilliseconds(1000),
+      updatedAt = Instant.fromEpochMilliseconds(2000)
     )
 
     val serialized = json.encodeToString(
@@ -181,8 +184,8 @@ class TaskRecordTest {
       totalBytes = 1000,
       downloadedBytes = 500,
       segments = segments,
-      createdAt = 1000L,
-      updatedAt = 2000L
+      createdAt = Instant.fromEpochMilliseconds(1000),
+      updatedAt = Instant.fromEpochMilliseconds(2000)
     )
 
     val serialized = json.encodeToString(
@@ -200,6 +203,7 @@ class TaskRecordTest {
 
   @Test
   fun deserialization_withoutSegments_defaultsToNull() {
+    val epoch = Instant.fromEpochMilliseconds(0)
     val jsonStr = """
       {
         "taskId": "t1",
@@ -214,8 +218,8 @@ class TaskRecordTest {
         "state": "COMPLETED",
         "totalBytes": 1000,
         "downloadedBytes": 1000,
-        "createdAt": 0,
-        "updatedAt": 0
+        "createdAt": "$epoch",
+        "updatedAt": "$epoch"
       }
     """.trimIndent()
     val record = json.decodeFromString<TaskRecord>(jsonStr)
@@ -224,6 +228,7 @@ class TaskRecordTest {
 
   @Test
   fun deserialization_withoutServerInfoFields_defaultsToNull() {
+    val epoch = Instant.fromEpochMilliseconds(0)
     val jsonStr = """
       {
         "taskId": "t1",
@@ -238,8 +243,8 @@ class TaskRecordTest {
         "state": "PENDING",
         "totalBytes": 100,
         "downloadedBytes": 0,
-        "createdAt": 0,
-        "updatedAt": 0
+        "createdAt": "$epoch",
+        "updatedAt": "$epoch"
       }
     """.trimIndent()
     val record = json.decodeFromString<TaskRecord>(jsonStr)
