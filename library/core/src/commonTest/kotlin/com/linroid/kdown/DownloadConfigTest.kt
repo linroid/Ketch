@@ -3,6 +3,7 @@ package com.linroid.kdown
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class DownloadConfigTest {
 
@@ -14,6 +15,7 @@ class DownloadConfigTest {
     assertEquals(1000, config.retryDelayMs)
     assertEquals(200, config.progressUpdateIntervalMs)
     assertEquals(8192, config.bufferSize)
+    assertTrue(config.speedLimit.isUnlimited)
   }
 
   @Test
@@ -30,6 +32,20 @@ class DownloadConfigTest {
     assertEquals(2000, config.retryDelayMs)
     assertEquals(500, config.progressUpdateIntervalMs)
     assertEquals(16384, config.bufferSize)
+  }
+
+  @Test
+  fun customSpeedLimit_preserved() {
+    val limit = SpeedLimit.kbps(512)
+    val config = DownloadConfig(speedLimit = limit)
+    assertEquals(limit, config.speedLimit)
+    assertEquals(512 * 1024L, config.speedLimit.bytesPerSecond)
+  }
+
+  @Test
+  fun defaultSpeedLimit_isUnlimited() {
+    val config = DownloadConfig()
+    assertEquals(SpeedLimit.Unlimited, config.speedLimit)
   }
 
   @Test

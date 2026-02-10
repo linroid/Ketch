@@ -1,6 +1,7 @@
 package com.linroid.kdown.segment
 
 import com.linroid.kdown.engine.HttpEngine
+import com.linroid.kdown.engine.SpeedLimiter
 import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.file.FileAccessor
 import com.linroid.kdown.log.KDownLogger
@@ -10,7 +11,9 @@ import kotlin.coroutines.coroutineContext
 
 internal class SegmentDownloader(
   private val httpEngine: HttpEngine,
-  private val fileAccessor: FileAccessor
+  private val fileAccessor: FileAccessor,
+  private val taskLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
+  private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited
 ) {
   suspend fun download(
     url: String,
@@ -33,6 +36,8 @@ internal class SegmentDownloader(
 
     httpEngine.download(url, range, headers) { data ->
       coroutineContext.ensureActive()
+      taskLimiter.acquire(data.size)
+      globalLimiter.acquire(data.size)
 
       val writeOffset = segment.start + downloadedBytes
       try {

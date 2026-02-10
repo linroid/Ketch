@@ -9,6 +9,7 @@ package com.linroid.kdown
  * @property progressUpdateIntervalMs Interval for throttling progress updates to prevent UI spam
  * @property segmentSaveIntervalMs Interval for persisting segment progress during downloads
  * @property bufferSize Size of the download buffer in bytes
+ * @property speedLimit Global speed limit applied across all downloads
  */
 data class DownloadConfig(
   val maxConnections: Int = 4,
@@ -16,7 +17,8 @@ data class DownloadConfig(
   val retryDelayMs: Long = 1000,
   val progressUpdateIntervalMs: Long = 200,
   val segmentSaveIntervalMs: Long = 5000,
-  val bufferSize: Int = 8192
+  val bufferSize: Int = 8192,
+  val speedLimit: SpeedLimit = SpeedLimit.Unlimited
 ) {
   init {
     require(maxConnections > 0) { "maxConnections must be greater than 0" }

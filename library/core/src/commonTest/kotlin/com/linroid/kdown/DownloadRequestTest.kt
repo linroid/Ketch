@@ -1,10 +1,13 @@
 package com.linroid.kdown
 
 import kotlinx.io.files.Path
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DownloadRequestTest {
 
@@ -91,5 +94,63 @@ class DownloadRequestTest {
     assertEquals(headers, request.headers)
     assertEquals("Bearer token123", request.headers["Authorization"])
     assertEquals("value", request.headers["X-Custom"])
+  }
+
+  @Test
+  fun defaultSpeedLimit_isUnlimited() {
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+      directory = Path("/tmp")
+    )
+    assertTrue(request.speedLimit.isUnlimited)
+  }
+
+  @Test
+  fun customSpeedLimit_preserved() {
+    val limit = SpeedLimit.mbps(10)
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+      directory = Path("/tmp"),
+      speedLimit = limit
+    )
+    assertEquals(limit, request.speedLimit)
+    assertFalse(request.speedLimit.isUnlimited)
+  }
+
+  @Test
+  fun serialization_withSpeedLimit_roundTrips() {
+    val json = Json { ignoreUnknownKeys = true }
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+      directory = Path("/tmp"),
+      speedLimit = SpeedLimit.kbps(512)
+    )
+    val serialized = json.encodeToString(
+      DownloadRequest.serializer(), request
+    )
+    val deserialized = json.decodeFromString(
+      DownloadRequest.serializer(), serialized
+    )
+    assertEquals(request.speedLimit, deserialized.speedLimit)
+    assertEquals(
+      512 * 1024L,
+      deserialized.speedLimit.bytesPerSecond
+    )
+  }
+
+  @Test
+  fun serialization_withUnlimitedSpeedLimit_roundTrips() {
+    val json = Json { ignoreUnknownKeys = true }
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+      directory = Path("/tmp")
+    )
+    val serialized = json.encodeToString(
+      DownloadRequest.serializer(), request
+    )
+    val deserialized = json.decodeFromString(
+      DownloadRequest.serializer(), serialized
+    )
+    assertTrue(deserialized.speedLimit.isUnlimited)
   }
 }

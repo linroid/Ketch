@@ -29,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +38,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -57,9 +59,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.kdown.DownloadConfig
 import com.linroid.kdown.DownloadRequest
-import com.linroid.kdown.KDown
-import com.linroid.kdown.engine.KtorHttpEngine
 import com.linroid.kdown.DownloadState
+import com.linroid.kdown.KDown
+import com.linroid.kdown.SpeedLimit
+import com.linroid.kdown.engine.KtorHttpEngine
 import com.linroid.kdown.log.Logger
 import com.linroid.kdown.task.DownloadTask
 import kotlinx.coroutines.CoroutineScope
@@ -177,6 +180,7 @@ fun App() {
           ) { task ->
             DownloadTaskItem(
               task = task,
+              scope = scope,
               onPause = { scope.launch { task.pause() } },
               onResume = { scope.launch { task.resume() } },
               onCancel = { scope.launch { task.cancel() } },
@@ -191,7 +195,7 @@ fun App() {
     if (showAddDialog) {
       AddDownloadDialog(
         onDismiss = { showAddDialog = false },
-        onDownload = { url, fileName ->
+        onDownload = { url, fileName, speedLimit ->
           showAddDialog = false
           errorMessage = null
           startDownload(
@@ -200,6 +204,7 @@ fun App() {
             url = url,
             directory = Path("downloads"),
             fileName = fileName.ifBlank { null },
+            speedLimit = speedLimit,
             onError = { errorMessage = it }
           )
         }
@@ -240,13 +245,27 @@ private fun EmptyState(
   }
 }
 
+private data class SpeedOption(
+  val label: String,
+  val limit: SpeedLimit
+)
+
+private val speedOptions = listOf(
+  SpeedOption("Unlimited", SpeedLimit.Unlimited),
+  SpeedOption("1 MB/s", SpeedLimit.mbps(1)),
+  SpeedOption("5 MB/s", SpeedLimit.mbps(5)),
+  SpeedOption("10 MB/s", SpeedLimit.mbps(10))
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddDownloadDialog(
   onDismiss: () -> Unit,
-  onDownload: (url: String, fileName: String) -> Unit
+  onDownload: (url: String, fileName: String, SpeedLimit) -> Unit
 ) {
   var url by remember { mutableStateOf("") }
   var fileName by remember { mutableStateOf("") }
+  var selectedSpeed by remember { mutableStateOf(SpeedLimit.Unlimited) }
   val isValidUrl = url.isBlank() ||
     url.trim().startsWith("http://") ||
     url.trim().startsWith("https://")
@@ -288,6 +307,22 @@ private fun AddDownloadDialog(
             null
           }
         )
+        Text(
+          text = "Speed limit",
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          speedOptions.forEach { option ->
+            FilterChip(
+              selected = selectedSpeed == option.limit,
+              onClick = { selectedSpeed = option.limit },
+              label = { Text(option.label) }
+            )
+          }
+        }
       }
     },
     confirmButton = {
@@ -295,7 +330,7 @@ private fun AddDownloadDialog(
         onClick = {
           val trimmed = url.trim()
           if (trimmed.isNotEmpty()) {
-            onDownload(trimmed, fileName.trim())
+            onDownload(trimmed, fileName.trim(), selectedSpeed)
           }
         },
         enabled = url.isNotBlank() && isValidUrl
@@ -314,6 +349,7 @@ private fun AddDownloadDialog(
 @Composable
 private fun DownloadTaskItem(
   task: DownloadTask,
+  scope: CoroutineScope,
   onPause: () -> Unit,
   onResume: () -> Unit,
   onCancel: () -> Unit,
@@ -326,6 +362,7 @@ private fun DownloadTaskItem(
   val isDownloading = state is DownloadState.Downloading ||
     state is DownloadState.Pending
   val isPaused = state is DownloadState.Paused
+  val speedLimit = task.request.speedLimit
 
   Card(
     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -386,10 +423,17 @@ private fun DownloadTaskItem(
                   " \u00b7 ${formatBytes(progress.bytesPerSecond)}/s"
                 )
               }
+              if (!speedLimit.isUnlimited) {
+                append(
+                  " (limit: " +
+                    "${formatBytes(speedLimit.bytesPerSecond)}/s)"
+                )
+              }
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
           )
+          SpeedLimitSlider(task = task, scope = scope)
         }
         is DownloadState.Pending -> {
           LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -463,6 +507,54 @@ private fun DownloadTaskItem(
         onCancel = onCancel,
         onRetry = onRetry,
         onRemove = onRemove
+      )
+    }
+  }
+}
+
+@Composable
+private fun SpeedLimitSlider(
+  task: DownloadTask,
+  scope: CoroutineScope
+) {
+  // Slider steps: 0=Unlimited, 1=512KB, 2=1MB, 3=2MB, 4=5MB, 5=10MB
+  val steps = listOf(0L, 512 * 1024L, 1_048_576L, 2_097_152L,
+    5_242_880L, 10_485_760L)
+  val initial = task.request.speedLimit.bytesPerSecond
+  val initialIndex = steps.indexOfLast { it <= initial }
+    .coerceAtLeast(0).toFloat()
+  var sliderValue by remember { mutableStateOf(initialIndex) }
+
+  Column {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+      Text(
+        text = "Limit:",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
+      Slider(
+        value = sliderValue,
+        onValueChange = { sliderValue = it },
+        onValueChangeFinished = {
+          val idx = sliderValue.toInt().coerceIn(0, steps.lastIndex)
+          val bps = steps[idx]
+          val limit = if (bps == 0L) SpeedLimit.Unlimited
+            else SpeedLimit.of(bps)
+          scope.launch { task.setSpeedLimit(limit) }
+        },
+        valueRange = 0f..steps.lastIndex.toFloat(),
+        steps = steps.size - 2,
+        modifier = Modifier.weight(1f)
+      )
+      val idx = sliderValue.toInt().coerceIn(0, steps.lastIndex)
+      Text(
+        text = if (steps[idx] == 0L) "Unlimited"
+          else "${formatBytes(steps[idx])}/s",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
       )
     }
   }
@@ -609,6 +701,7 @@ private fun startDownload(
   url: String,
   directory: Path,
   fileName: String?,
+  speedLimit: SpeedLimit = SpeedLimit.Unlimited,
   onError: (String) -> Unit = {}
 ) {
   scope.launch {
@@ -617,7 +710,8 @@ private fun startDownload(
         url = url,
         directory = directory,
         fileName = fileName,
-        connections = 4
+        connections = 4,
+        speedLimit = speedLimit
       )
       kdown.download(request)
     }.onFailure { e ->

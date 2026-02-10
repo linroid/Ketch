@@ -1,6 +1,9 @@
 package com.linroid.kdown
 
+import com.linroid.kdown.engine.DelegatingSpeedLimiter
 import com.linroid.kdown.engine.DownloadCoordinator
+import com.linroid.kdown.engine.SpeedLimiter
+import com.linroid.kdown.engine.TokenBucket
 import com.linroid.kdown.segment.Segment
 import com.linroid.kdown.engine.HttpEngine
 import com.linroid.kdown.error.KDownError
@@ -37,9 +40,22 @@ class KDown(
   private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
   logger: Logger = Logger.None
 ) {
+  private val globalLimiter = DelegatingSpeedLimiter(
+    if (config.speedLimit.isUnlimited) {
+      SpeedLimiter.Unlimited
+    } else {
+      TokenBucket(config.speedLimit.bytesPerSecond)
+    }
+  )
+
   init {
     KDownLogger.setLogger(logger)
     KDownLogger.i("KDown") { "KDown v$VERSION initialized" }
+    if (!config.speedLimit.isUnlimited) {
+      KDownLogger.i("KDown") {
+        "Global speed limit: ${config.speedLimit.bytesPerSecond} bytes/sec"
+      }
+    }
   }
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -49,7 +65,8 @@ class KDown(
     taskStore = taskStore,
     config = config,
     fileAccessorFactory = fileAccessorFactory,
-    fileNameResolver = fileNameResolver
+    fileNameResolver = fileNameResolver,
+    globalLimiter = globalLimiter
   )
 
   private val tasksMutex = Mutex()
@@ -115,7 +132,10 @@ class KDown(
           }
         }
       },
-      removeAction = { removeTaskInternal(taskId) }
+      removeAction = { removeTaskInternal(taskId) },
+      setSpeedLimitAction = { limit ->
+        coordinator.setTaskSpeedLimit(taskId, limit)
+      }
     )
 
     tasksMutex.withLock { _tasks.value = _tasks.value + task }
@@ -203,7 +223,10 @@ class KDown(
           }
         }
       },
-      removeAction = { removeTaskInternal(record.taskId) }
+      removeAction = { removeTaskInternal(record.taskId) },
+      setSpeedLimitAction = { limit ->
+        coordinator.setTaskSpeedLimit(record.taskId, limit)
+      }
     )
   }
 
@@ -229,6 +252,26 @@ class KDown(
     taskStore.remove(taskId)
     tasksMutex.withLock {
       _tasks.value = _tasks.value.filter { it.taskId != taskId }
+    }
+  }
+
+  /**
+   * Updates the global speed limit applied across all downloads.
+   * Takes effect immediately on all active downloads.
+   *
+   * @param limit the new global speed limit, or [SpeedLimit.Unlimited]
+   */
+  fun setSpeedLimit(limit: SpeedLimit) {
+    val current = globalLimiter.delegate
+    if (limit.isUnlimited) {
+      globalLimiter.delegate = SpeedLimiter.Unlimited
+    } else if (current is TokenBucket) {
+      current.updateRate(limit.bytesPerSecond)
+    } else {
+      globalLimiter.delegate = TokenBucket(limit.bytesPerSecond)
+    }
+    KDownLogger.i("KDown") {
+      "Global speed limit updated: ${limit.bytesPerSecond} bytes/sec"
     }
   }
 

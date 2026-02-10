@@ -2,6 +2,7 @@ package com.linroid.kdown.task
 
 import com.linroid.kdown.DownloadRequest
 import com.linroid.kdown.DownloadState
+import com.linroid.kdown.SpeedLimit
 import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.segment.Segment
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +28,8 @@ class DownloadTask internal constructor(
   private val pauseAction: suspend () -> Unit,
   private val resumeAction: suspend () -> Unit,
   private val cancelAction: suspend () -> Unit,
-  private val removeAction: suspend () -> Unit
+  private val removeAction: suspend () -> Unit,
+  private val setSpeedLimitAction: suspend (SpeedLimit) -> Unit
 ) {
   suspend fun pause() {
     pauseAction()
@@ -39,6 +41,16 @@ class DownloadTask internal constructor(
 
   suspend fun cancel() {
     cancelAction()
+  }
+
+  /**
+   * Updates the speed limit for this download task.
+   * Takes effect immediately on all active segments.
+   *
+   * @param limit the new speed limit, or [SpeedLimit.Unlimited] to remove
+   */
+  suspend fun setSpeedLimit(limit: SpeedLimit) {
+    setSpeedLimitAction(limit)
   }
 
   /**

@@ -4,6 +4,7 @@ import com.linroid.kdown.DownloadConfig
 import com.linroid.kdown.DownloadProgress
 import com.linroid.kdown.DownloadRequest
 import com.linroid.kdown.DownloadState
+import com.linroid.kdown.SpeedLimit
 import com.linroid.kdown.error.KDownError
 import com.linroid.kdown.file.FileAccessor
 import com.linroid.kdown.file.FileNameResolver
@@ -38,7 +39,8 @@ internal class DownloadCoordinator(
   private val taskStore: TaskStore,
   private val config: DownloadConfig,
   private val fileAccessorFactory: (Path) -> FileAccessor,
-  private val fileNameResolver: FileNameResolver
+  private val fileNameResolver: FileNameResolver,
+  private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited
 ) {
   private val mutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveDownload>()
@@ -50,7 +52,8 @@ internal class DownloadCoordinator(
     var segments: List<Segment>?,
     var fileAccessor: FileAccessor?,
     var segmentProgress: MutableList<Long>? = null,
-    var totalBytes: Long = 0
+    var totalBytes: Long = 0,
+    val taskLimiter: DelegatingSpeedLimiter = DelegatingSpeedLimiter()
   )
 
   suspend fun start(
@@ -214,12 +217,16 @@ internal class DownloadCoordinator(
 
     val fileAccessor = fileAccessorFactory(destPath)
 
-    mutex.withLock {
+    val taskLimiter = mutex.withLock {
       activeDownloads[taskId]?.let {
         it.segments = segments
         it.fileAccessor = fileAccessor
         it.totalBytes = totalBytes
-      }
+        it.taskLimiter.delegate = createLimiter(request.speedLimit)
+        it.taskLimiter
+      } ?: throw KDownError.Unknown(
+        IllegalStateException("ActiveDownload not found for $taskId")
+      )
     }
 
     try {
@@ -239,7 +246,8 @@ internal class DownloadCoordinator(
           IllegalStateException("TaskRecord not found for $taskId")
         )
       downloadWithRetry(
-        taskId, taskRecord, segments, fileAccessor, stateFlow, segmentsFlow
+        taskId, taskRecord, segments, fileAccessor,
+        taskLimiter, stateFlow, segmentsFlow
       )
 
       try {
@@ -278,6 +286,7 @@ internal class DownloadCoordinator(
     taskRecord: TaskRecord,
     initialSegments: List<Segment>,
     fileAccessor: FileAccessor,
+    taskLimiter: SpeedLimiter,
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>
   ) {
@@ -287,7 +296,8 @@ internal class DownloadCoordinator(
     while (true) {
       try {
         downloadSegments(
-          taskId, taskRecord, segments, fileAccessor, stateFlow, segmentsFlow
+          taskId, taskRecord, segments, fileAccessor,
+          taskLimiter, stateFlow, segmentsFlow
         )
         return
       } catch (e: CancellationException) {
@@ -323,6 +333,7 @@ internal class DownloadCoordinator(
     taskRecord: TaskRecord,
     segments: List<Segment>,
     fileAccessor: FileAccessor,
+    taskLimiter: SpeedLimiter,
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>
   ) {
@@ -401,7 +412,9 @@ internal class DownloadCoordinator(
       try {
         val results = incompleteSegments.map { segment ->
           async {
-            val downloader = SegmentDownloader(httpEngine, fileAccessor)
+            val downloader = SegmentDownloader(
+              httpEngine, fileAccessor, taskLimiter, globalLimiter
+            )
             val completed = downloader.download(
               taskRecord.request.url, segment, taskRecord.request.headers
             ) { bytesDownloaded ->
@@ -607,12 +620,17 @@ internal class DownloadCoordinator(
       taskId, fileAccessor, segments, taskRecord.totalBytes
     )
 
-    mutex.withLock {
+    val taskLimiter = mutex.withLock {
       activeDownloads[taskId]?.let {
         it.segments = validatedSegments
         it.fileAccessor = fileAccessor
         it.totalBytes = taskRecord.totalBytes
-      }
+        it.taskLimiter.delegate =
+          createLimiter(taskRecord.request.speedLimit)
+        it.taskLimiter
+      } ?: throw KDownError.Unknown(
+        IllegalStateException("ActiveDownload not found for $taskId")
+      )
     }
 
     if (validatedSegments !== segments) {
@@ -629,7 +647,7 @@ internal class DownloadCoordinator(
     try {
       downloadWithRetry(
         taskId, taskRecord, validatedSegments, fileAccessor,
-        stateFlow, segmentsFlow
+        taskLimiter, stateFlow, segmentsFlow
       )
 
       try {
@@ -750,6 +768,32 @@ internal class DownloadCoordinator(
       return
     }
     taskStore.save(update(existing))
+  }
+
+  suspend fun setTaskSpeedLimit(taskId: String, limit: SpeedLimit) {
+    mutex.withLock {
+      val active = activeDownloads[taskId] ?: return
+      val current = active.taskLimiter.delegate
+      if (limit.isUnlimited) {
+        active.taskLimiter.delegate = SpeedLimiter.Unlimited
+      } else if (current is TokenBucket) {
+        current.updateRate(limit.bytesPerSecond)
+      } else {
+        active.taskLimiter.delegate = TokenBucket(limit.bytesPerSecond)
+      }
+      KDownLogger.i("Coordinator") {
+        "Task speed limit updated for taskId=$taskId: " +
+          "${limit.bytesPerSecond} bytes/sec"
+      }
+    }
+  }
+
+  private fun createLimiter(speedLimit: SpeedLimit): SpeedLimiter {
+    return if (speedLimit.isUnlimited) {
+      SpeedLimiter.Unlimited
+    } else {
+      TokenBucket(speedLimit.bytesPerSecond)
+    }
   }
 
   companion object {

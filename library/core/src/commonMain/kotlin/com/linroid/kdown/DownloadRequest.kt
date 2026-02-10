@@ -21,6 +21,9 @@ import kotlinx.serialization.Serializable
  * @property properties arbitrary key-value pairs for use by custom
  *   [FileNameResolver] implementations or other extensions. KDown
  *   itself does not read these values.
+ * @property speedLimit per-task speed limit. Overrides the global
+ *   [DownloadConfig.speedLimit] for this download. Defaults to
+ *   [SpeedLimit.Unlimited] (use global limit).
  */
 @Serializable
 data class DownloadRequest(
@@ -30,7 +33,8 @@ data class DownloadRequest(
   val fileName: String? = null,
   val connections: Int = 1,
   val headers: Map<String, String> = emptyMap(),
-  val properties: Map<String, String> = emptyMap()
+  val properties: Map<String, String> = emptyMap(),
+  val speedLimit: SpeedLimit = SpeedLimit.Unlimited
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }
