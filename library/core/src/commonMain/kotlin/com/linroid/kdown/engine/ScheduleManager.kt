@@ -42,19 +42,20 @@ internal class ScheduleManager(
         "conditions=${conditions.size}"
     }
 
-    val job = scope.launch {
-      waitForSchedule(taskId, schedule)
-      waitForConditions(taskId, conditions)
+    mutex.withLock {
+      val job = scope.launch {
+        waitForSchedule(taskId, schedule)
+        waitForConditions(taskId, conditions)
 
-      KDownLogger.i("ScheduleManager") {
-        "Schedule and conditions met for taskId=$taskId, enqueuing"
+        KDownLogger.i("ScheduleManager") {
+          "Schedule and conditions met for taskId=$taskId, enqueuing"
+        }
+        scheduler.enqueue(taskId, request, createdAt, stateFlow, segmentsFlow)
+
+        mutex.withLock { scheduledJobs.remove(taskId) }
       }
-      scheduler.enqueue(taskId, request, createdAt, stateFlow, segmentsFlow)
-
-      mutex.withLock { scheduledJobs.remove(taskId) }
+      scheduledJobs[taskId] = job
     }
-
-    mutex.withLock { scheduledJobs[taskId] = job }
   }
 
   suspend fun cancel(taskId: String) {

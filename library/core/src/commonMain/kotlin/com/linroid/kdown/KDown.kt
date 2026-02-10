@@ -185,8 +185,10 @@ class KDown(
    * on individual tasks to continue interrupted downloads.
    *
    * State mapping:
-   * - `PENDING` / `DOWNLOADING` / `PAUSED` → [DownloadState.Paused]
-   *   (treat as paused, user decides when to resume)
+   * - `SCHEDULED` / `PENDING` / `QUEUED` / `DOWNLOADING` / `PAUSED`
+   *   → [DownloadState.Paused] (treat as paused, user decides when
+   *   to resume). `SCHEDULED` is mapped to Paused because conditions
+   *   are transient and cannot be restored after deserialization.
    * - `COMPLETED` → [DownloadState.Completed]
    * - `FAILED` → [DownloadState.Failed]
    * - `CANCELED` → [DownloadState.Canceled]
@@ -280,9 +282,9 @@ class KDown(
 
   private fun mapRecordState(record: TaskRecord): DownloadState {
     return when (record.state) {
-      TaskState.SCHEDULED -> DownloadState.Scheduled(
-        record.request.schedule
-      )
+      // SCHEDULED maps to Paused: conditions are @Transient and
+      // cannot be restored, so treat as interrupted download.
+      TaskState.SCHEDULED,
       TaskState.PENDING,
       TaskState.QUEUED,
       TaskState.DOWNLOADING,

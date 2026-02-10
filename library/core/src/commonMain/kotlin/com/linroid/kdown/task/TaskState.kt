@@ -23,8 +23,12 @@ enum class TaskState {
   val isTerminal: Boolean
     get() = this == COMPLETED || this == FAILED || this == CANCELED
 
-  /** Whether the task can be restored/resumed after a process restart. */
+  /**
+   * Whether the task can be restored/resumed after a process restart.
+   * [SCHEDULED] is excluded because conditions are transient and
+   * cannot be faithfully restored after serialization.
+   */
   val isRestorable: Boolean
-    get() = this == PENDING || this == SCHEDULED || this == QUEUED ||
+    get() = this == PENDING || this == QUEUED ||
       this == DOWNLOADING || this == PAUSED
 }
