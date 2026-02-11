@@ -281,7 +281,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WHHN7J96UQ;
+				DEVELOPMENT_TEAM = MJ7RE83LT9;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
@@ -303,7 +303,7 @@
 					KDownApp,
 					"-lsqlite3",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.linroid.kdown.app.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.linroid.kdown.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -340,7 +340,7 @@
 					KDownApp,
 					"-lsqlite3",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.linroid.kdown.app.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.linroid.kdown.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
