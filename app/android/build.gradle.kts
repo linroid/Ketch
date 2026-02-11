@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-  namespace = "com.linroid.kdown.app.android"
+  namespace = "com.linroid.kdown.android"
   compileSdk = libs.versions.android.compileSdk.get().toInt()
 
   defaultConfig {
