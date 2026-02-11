@@ -7,7 +7,6 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
-import kotlinx.io.files.Path
 import kotlin.time.Instant
 
 internal object WireMapper {
@@ -15,7 +14,7 @@ internal object WireMapper {
   fun toDownloadRequest(wire: WireTaskResponse): DownloadRequest {
     return DownloadRequest(
       url = wire.url,
-      directory = Path(wire.directory),
+      directory = wire.directory,
       fileName = wire.fileName,
       connections = 1,
       speedLimit = if (wire.speedLimitBytesPerSecond > 0) {
@@ -30,7 +29,7 @@ internal object WireMapper {
   fun toCreateWire(request: DownloadRequest): WireCreateDownloadRequest {
     return WireCreateDownloadRequest(
       url = request.url,
-      directory = request.directory.toString(),
+      directory = request.directory ?: "",
       fileName = request.fileName,
       connections = request.connections,
       headers = request.headers,
@@ -69,7 +68,7 @@ internal object WireMapper {
           ?: DownloadProgress(0, 0)
       )
       "completed" -> DownloadState.Completed(
-        Path(filePath ?: "")
+        filePath ?: ""
       )
       "failed" -> DownloadState.Failed(
         KDownError.Unknown(cause = Exception(error ?: "Unknown"))

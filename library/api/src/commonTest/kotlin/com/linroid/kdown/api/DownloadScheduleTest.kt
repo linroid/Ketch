@@ -1,6 +1,5 @@
 package com.linroid.kdown.api
 
-import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -16,7 +15,7 @@ class DownloadScheduleTest {
   fun immediate_isDefaultSchedule() {
     val request = DownloadRequest(
       url = "https://example.com/file.zip",
-      directory = Path("/tmp")
+      directory = "/tmp"
     )
     assertEquals(DownloadSchedule.Immediate, request.schedule)
   }

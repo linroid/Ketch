@@ -11,7 +11,6 @@ import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.DownloadTask
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.io.files.Path
 import kotlin.time.Instant
 
 internal class DownloadTaskImpl(
@@ -60,7 +59,7 @@ internal class DownloadTaskImpl(
     removeAction()
   }
 
-  override suspend fun await(): Result<Path> {
+  override suspend fun await(): Result<String> {
     val finalState = state.first { it.isTerminal }
     return when (finalState) {
       is DownloadState.Completed -> Result.success(finalState.filePath)

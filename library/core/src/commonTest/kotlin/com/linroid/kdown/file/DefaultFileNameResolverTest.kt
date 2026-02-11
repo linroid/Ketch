@@ -3,14 +3,13 @@ package com.linroid.kdown.file
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.core.engine.ServerInfo
 import com.linroid.kdown.core.file.DefaultFileNameResolver
-import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DefaultFileNameResolverTest {
 
   private val resolver = DefaultFileNameResolver()
-  private val dir = Path("/tmp")
+  private val dir = "/tmp"
 
   private fun serverInfo(contentDisposition: String? = null) = ServerInfo(
     contentLength = 1000,

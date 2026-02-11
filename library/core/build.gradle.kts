@@ -30,12 +30,7 @@ kotlin {
 
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs {
-    browser {
-      testTask {
-        // kotlinx.io.files.Path requires Node.js APIs unavailable in browser tests
-        enabled = false
-      }
-    }
+    nodejs()
   }
 
   sourceSets {
@@ -44,6 +39,7 @@ kotlin {
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.serialization.json)
       implementation(libs.kotlinx.datetime)
+      implementation(libs.kotlinx.io.core)
     }
     commonTest.dependencies {
       implementation(libs.kotlin.test)

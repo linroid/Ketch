@@ -1,6 +1,5 @@
 package com.linroid.kdown.api
 
-import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +14,7 @@ class DownloadRequestTest {
   fun defaultConnections_isOne() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp")
+      directory = "/tmp"
     )
     assertEquals(1, request.connections)
   }
@@ -24,7 +23,7 @@ class DownloadRequestTest {
   fun defaultFileName_isNull() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp")
+      directory = "/tmp"
     )
     assertNull(request.fileName)
   }
@@ -33,7 +32,7 @@ class DownloadRequestTest {
   fun customFileName_preserved() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp"),
+      directory = "/tmp",
       fileName = "custom.zip"
     )
     assertEquals("custom.zip", request.fileName)
@@ -42,10 +41,10 @@ class DownloadRequestTest {
   @Test
   fun blankUrl_throws() {
     assertFailsWith<IllegalArgumentException> {
-      DownloadRequest(url = "", directory = Path("/tmp"))
+      DownloadRequest(url = "", directory = "/tmp")
     }
     assertFailsWith<IllegalArgumentException> {
-      DownloadRequest(url = "   ", directory = Path("/tmp"))
+      DownloadRequest(url = "   ", directory = "/tmp")
     }
   }
 
@@ -54,7 +53,7 @@ class DownloadRequestTest {
     assertFailsWith<IllegalArgumentException> {
       DownloadRequest(
         url = "https://example.com/file",
-        directory = Path("/tmp"),
+        directory = "/tmp",
         connections = 0
       )
     }
@@ -65,7 +64,7 @@ class DownloadRequestTest {
     assertFailsWith<IllegalArgumentException> {
       DownloadRequest(
         url = "https://example.com/file",
-        directory = Path("/tmp"),
+        directory = "/tmp",
         connections = -1
       )
     }
@@ -75,7 +74,7 @@ class DownloadRequestTest {
   fun defaultHeaders_isEmpty() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp")
+      directory = "/tmp"
     )
     assertEquals(emptyMap(), request.headers)
   }
@@ -88,7 +87,7 @@ class DownloadRequestTest {
     )
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp"),
+      directory = "/tmp",
       headers = headers
     )
     assertEquals(headers, request.headers)
@@ -100,7 +99,7 @@ class DownloadRequestTest {
   fun defaultSpeedLimit_isUnlimited() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp")
+      directory = "/tmp"
     )
     assertTrue(request.speedLimit.isUnlimited)
   }
@@ -110,7 +109,7 @@ class DownloadRequestTest {
     val limit = SpeedLimit.mbps(10)
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp"),
+      directory = "/tmp",
       speedLimit = limit
     )
     assertEquals(limit, request.speedLimit)
@@ -122,7 +121,7 @@ class DownloadRequestTest {
     val json = Json { ignoreUnknownKeys = true }
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp"),
+      directory = "/tmp",
       speedLimit = SpeedLimit.kbps(512)
     )
     val serialized = json.encodeToString(
@@ -143,7 +142,7 @@ class DownloadRequestTest {
     val json = Json { ignoreUnknownKeys = true }
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = Path("/tmp")
+      directory = "/tmp"
     )
     val serialized = json.encodeToString(
       DownloadRequest.serializer(), request
@@ -152,5 +151,13 @@ class DownloadRequestTest {
       DownloadRequest.serializer(), serialized
     )
     assertTrue(deserialized.speedLimit.isUnlimited)
+  }
+
+  @Test
+  fun defaultDirectory_isNull() {
+    val request = DownloadRequest(
+      url = "https://example.com/file"
+    )
+    assertNull(request.directory)
   }
 }

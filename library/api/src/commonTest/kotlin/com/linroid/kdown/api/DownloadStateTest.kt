@@ -1,6 +1,5 @@
 package com.linroid.kdown.api
 
-import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -73,12 +72,12 @@ class DownloadStateTest {
 
   @Test
   fun completed_isTerminal() {
-    assertTrue(DownloadState.Completed(Path("/path/file")).isTerminal)
+    assertTrue(DownloadState.Completed("/path/file").isTerminal)
   }
 
   @Test
   fun completed_isNotActive() {
-    assertFalse(DownloadState.Completed(Path("/path/file")).isActive)
+    assertFalse(DownloadState.Completed("/path/file").isActive)
   }
 
   @Test

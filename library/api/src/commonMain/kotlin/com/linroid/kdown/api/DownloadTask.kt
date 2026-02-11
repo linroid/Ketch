@@ -2,7 +2,6 @@ package com.linroid.kdown.api
 
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.io.files.Path
 import kotlin.time.Instant
 
 /**
@@ -60,13 +59,13 @@ interface DownloadTask {
    */
   suspend fun remove()
 
-  suspend fun await(): Result<Path>
+  suspend fun await(): Result<String>
 }
 
 /**
  * Default [await] implementation for [DownloadTask].
  */
-suspend fun DownloadTask.awaitDefault(): Result<Path> {
+suspend fun DownloadTask.awaitDefault(): Result<String> {
   val finalState = state.first { it.isTerminal }
   return when (finalState) {
     is DownloadState.Completed -> Result.success(finalState.filePath)

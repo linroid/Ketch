@@ -98,8 +98,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: Run WasmJs browser tests
-        run: ./gradlew wasmJsBrowserTest
+      - name: Run WasmJs tests
+        run: ./gradlew wasmJsBrowserTest wasmJsNodeTest
 
       - name: Upload test results
         if: always()
