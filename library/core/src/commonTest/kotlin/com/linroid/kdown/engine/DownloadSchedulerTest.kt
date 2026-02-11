@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -35,7 +34,7 @@ class DownloadSchedulerTest {
     priority: DownloadPriority = DownloadPriority.NORMAL
   ) = DownloadRequest(
     url = "https://example.com/file.zip",
-    directory = Path("/tmp"),
+    directory = "/tmp",
     priority = priority
   )
 

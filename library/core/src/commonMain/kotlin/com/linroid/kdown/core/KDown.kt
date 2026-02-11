@@ -409,7 +409,7 @@ class KDown(
       )
 
       TaskState.COMPLETED -> DownloadState.Completed(
-        record.destPath
+        record.destPath.toString()
       )
 
       TaskState.FAILED -> DownloadState.Failed(

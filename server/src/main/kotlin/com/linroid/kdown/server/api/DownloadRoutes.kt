@@ -18,7 +18,6 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
-import kotlinx.io.files.Path
 
 /**
  * Installs the `/api/downloads` REST routes for managing tasks.
@@ -51,7 +50,7 @@ internal fun Route.downloadRoutes(kdown: KDownApi) {
       }
       val request = DownloadRequest(
         url = body.url,
-        directory = Path(body.directory),
+        directory = body.directory,
         fileName = body.fileName,
         connections = body.connections,
         headers = body.headers,

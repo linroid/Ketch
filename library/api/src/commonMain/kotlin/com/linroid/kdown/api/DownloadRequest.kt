@@ -1,6 +1,5 @@
 package com.linroid.kdown.api
 
-import kotlinx.io.files.Path
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -9,6 +8,7 @@ import kotlinx.serialization.Transient
  *
  * @property url the HTTP(S) URL to download from. Must not be blank.
  * @property directory the local directory where the file will be saved.
+ *   When `null`, the implementation chooses a default location.
  * @property fileName explicit file name to save as. When `null`, the
  *   file name is determined from the server response
  *   (Content-Disposition header, URL path, or a fallback).
@@ -33,8 +33,7 @@ import kotlinx.serialization.Transient
 @Serializable
 data class DownloadRequest(
   val url: String,
-  @Serializable(with = PathSerializer::class)
-  val directory: Path,
+  val directory: String? = null,
   val fileName: String? = null,
   val connections: Int = 1,
   val headers: Map<String, String> = emptyMap(),

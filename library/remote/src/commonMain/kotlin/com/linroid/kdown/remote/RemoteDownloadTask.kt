@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
@@ -127,7 +126,7 @@ internal class RemoteDownloadTask(
     )
   }
 
-  override suspend fun await(): Result<Path> {
+  override suspend fun await(): Result<String> {
     val finalState = state.first { it.isTerminal }
     return when (finalState) {
       is DownloadState.Completed ->

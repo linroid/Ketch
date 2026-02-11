@@ -22,7 +22,7 @@ class TaskRecordTest {
     headers: Map<String, String> = emptyMap()
   ) = DownloadRequest(
     url = url,
-    directory = Path("/tmp"),
+    directory = "/tmp",
     connections = connections,
     headers = headers
   )

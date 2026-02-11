@@ -55,9 +55,11 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>
   ) {
+    val directory = request.directory?.let { Path(it) }
+      ?: error("directory is required for download")
     val initialDestPath = request.fileName?.let {
-      Path(request.directory, it)
-    } ?: request.directory
+      Path(directory, it)
+    } ?: directory
 
     val now = Clock.System.now()
     taskStore.save(
@@ -186,7 +188,9 @@ internal class DownloadCoordinator(
 
     val fileName = sourceInfo.suggestedFileName
       ?: fileNameResolver.resolve(request, toServerInfo(sourceInfo))
-    val destPath = deduplicatePath(request.directory, fileName)
+    val dir = request.directory?.let { Path(it) }
+      ?: error("directory is required for download")
+    val destPath = deduplicatePath(dir, fileName)
 
     val now = Clock.System.now()
     updateTaskRecord(taskId) {
@@ -249,7 +253,8 @@ internal class DownloadCoordinator(
       KDownLogger.i("Coordinator") {
         "Download completed successfully for taskId=$taskId"
       }
-      stateFlow.value = DownloadState.Completed(destPath)
+      stateFlow.value =
+        DownloadState.Completed(destPath.toString())
     } finally {
       fileAccessor.close()
       withContext(NonCancellable) {
@@ -440,7 +445,8 @@ internal class DownloadCoordinator(
         )
       }
 
-      stateFlow.value = DownloadState.Completed(taskRecord.destPath)
+      stateFlow.value =
+        DownloadState.Completed(taskRecord.destPath.toString())
     } finally {
       fileAccessor.close()
       withContext(NonCancellable) {

@@ -17,7 +17,7 @@ internal object TaskMapper {
     return TaskResponse(
       taskId = task.taskId,
       url = task.request.url,
-      directory = task.request.directory.toString(),
+      directory = task.request.directory ?: "",
       fileName = task.request.fileName,
       state = stateToString(state),
       progress = extractProgress(state)?.let(::toProgressResponse),
@@ -100,7 +100,7 @@ internal object TaskMapper {
 
   private fun extractFilePath(state: DownloadState): String? {
     return when (state) {
-      is DownloadState.Completed -> state.filePath.toString()
+      is DownloadState.Completed -> state.filePath
       else -> null
     }
   }

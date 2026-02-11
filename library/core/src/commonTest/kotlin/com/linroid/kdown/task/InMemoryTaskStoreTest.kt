@@ -7,10 +7,10 @@ import com.linroid.kdown.core.task.TaskState
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.files.Path
 import kotlin.test.Test
-import kotlin.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 class InMemoryTaskStoreTest {
 
@@ -21,7 +21,7 @@ class InMemoryTaskStoreTest {
     taskId = taskId,
     request = DownloadRequest(
       url = "https://example.com/file.bin",
-      directory = Path("/tmp"),
+      directory = "/tmp",
       connections = 4,
       headers = mapOf("Authorization" to "Bearer token")
     ),

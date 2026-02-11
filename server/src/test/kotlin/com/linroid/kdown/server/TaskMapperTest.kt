@@ -5,7 +5,6 @@ import com.linroid.kdown.api.DownloadSchedule
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.Segment
-import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -36,7 +35,7 @@ class TaskMapperTest {
       DownloadState.Paused(DownloadProgress(500, 1000))
     ))
     assertEquals("completed", TaskMapper.stateToString(
-      DownloadState.Completed(Path("/tmp/file.zip"))
+      DownloadState.Completed("/tmp/file.zip")
     ))
     assertEquals("failed", TaskMapper.stateToString(
       DownloadState.Failed(
