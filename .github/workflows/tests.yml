@@ -101,6 +101,9 @@ jobs:
       - name: Run WasmJs browser tests
         run: ./gradlew wasmJsBrowserTest
 
+      - name: Run WasmJs Node.js tests
+        run: ./gradlew wasmJsNodeTest
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v6
