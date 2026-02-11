@@ -36,13 +36,13 @@
 			);
 			sourceTree = "<group>";
 		};
-		D002 /* iosApp */ = {
+		D002 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
 				B001 /* iOSApp.swift */,
 				B002 /* ContentView.swift */,
 			);
-			path = iosApp;
+			name = Sources;
 			sourceTree = "<group>";
 		};
 		D003 /* Products */ = {
