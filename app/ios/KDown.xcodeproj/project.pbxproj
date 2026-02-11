@@ -14,7 +14,7 @@
 /* Begin PBXFileReference section */
 		B001 /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
 		B002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		B003 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B003 /* KDown.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KDown.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -31,7 +31,7 @@
 		D001 = {
 			isa = PBXGroup;
 			children = (
-				D002 /* iosApp */,
+				D002 /* KDown */,
 				D003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -48,7 +48,7 @@
 		D003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B003 /* iosApp.app */,
+				B003 /* KDown.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -56,9 +56,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E001 /* iosApp */ = {
+		E001 /* KDown */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F003 /* Build configuration list for PBXNativeTarget "iosApp" */;
+			buildConfigurationList = F003 /* Build configuration list for PBXNativeTarget "KDown" */;
 			buildPhases = (
 				E002 /* Compile Kotlin Framework */,
 				E003 /* Sources */,
@@ -69,9 +69,9 @@
 			);
 			dependencies = (
 			);
-			name = iosApp;
-			productName = iosApp;
-			productReference = B003 /* iosApp.app */;
+			name = KDown;
+			productName = KDown;
+			productReference = B003 /* KDown.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -84,7 +84,7 @@
 				LastSwiftUpdateCheck = 1540;
 				LastUpgradeCheck = 1540;
 			};
-			buildConfigurationList = F002 /* Build configuration list for PBXProject "iosApp" */;
+			buildConfigurationList = F002 /* Build configuration list for PBXProject "KDown" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -97,7 +97,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E001 /* iosApp */,
+				E001 /* KDown */,
 			);
 		};
 /* End PBXProject section */
@@ -349,7 +349,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F002 /* Build configuration list for PBXProject "iosApp" */ = {
+		F002 /* Build configuration list for PBXProject "KDown" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				G001 /* Debug */,
@@ -358,7 +358,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F003 /* Build configuration list for PBXNativeTarget "iosApp" */ = {
+		F003 /* Build configuration list for PBXNativeTarget "KDown" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				G003 /* Debug */,
