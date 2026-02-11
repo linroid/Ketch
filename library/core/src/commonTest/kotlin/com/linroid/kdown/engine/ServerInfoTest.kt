@@ -1,4 +1,5 @@
 package com.linroid.kdown.engine
+import com.linroid.kdown.core.engine.ServerInfo
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

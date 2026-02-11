@@ -1,6 +1,6 @@
 package com.linroid.kdown.server
 
-import com.linroid.kdown.KDown
+import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.server.api.downloadRoutes
 import com.linroid.kdown.server.api.eventRoutes
 import com.linroid.kdown.server.api.serverRoutes
@@ -15,7 +15,6 @@ import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
-import io.ktor.server.engine.stop
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -28,7 +27,7 @@ import io.ktor.server.sse.SSE
 import kotlinx.serialization.json.Json
 
 /**
- * A daemon server that exposes a [KDown] instance via REST API and
+ * A daemon server that exposes a [KDownApi] instance via REST API and
  * real-time SSE events.
  *
  * Usage:
@@ -61,11 +60,11 @@ import kotlinx.serialization.json.Json
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
- * @param kdown the KDown instance to expose
+ * @param kdown the KDownApi instance to expose
  * @param config server configuration (host, port, auth, CORS)
  */
 class KDownServer(
-  private val kdown: KDown,
+  private val kdown: KDownApi,
   private val config: KDownServerConfig = KDownServerConfig.Default
 ) {
   private var engine:

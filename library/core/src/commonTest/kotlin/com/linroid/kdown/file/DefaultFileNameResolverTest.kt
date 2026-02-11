@@ -1,7 +1,8 @@
 package com.linroid.kdown.file
 
-import com.linroid.kdown.DownloadRequest
-import com.linroid.kdown.engine.ServerInfo
+import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.core.engine.ServerInfo
+import com.linroid.kdown.core.file.DefaultFileNameResolver
 import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals

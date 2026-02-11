@@ -1,10 +1,10 @@
 package com.linroid.kdown.server
 
-import com.linroid.kdown.DownloadProgress
-import com.linroid.kdown.DownloadSchedule
-import com.linroid.kdown.DownloadState
-import com.linroid.kdown.error.KDownError
-import com.linroid.kdown.segment.Segment
+import com.linroid.kdown.api.DownloadProgress
+import com.linroid.kdown.api.DownloadSchedule
+import com.linroid.kdown.api.DownloadState
+import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.Segment
 import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals

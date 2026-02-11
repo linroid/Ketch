@@ -1,6 +1,6 @@
 package com.linroid.kdown.server
 
-import com.linroid.kdown.KDown
+import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.server.model.CreateDownloadRequest
 import com.linroid.kdown.server.model.ErrorResponse
 import com.linroid.kdown.server.model.PriorityRequest
@@ -21,7 +21,6 @@ import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DownloadRoutesTest {
@@ -31,7 +30,7 @@ class DownloadRoutesTest {
     encodeDefaults = true
   }
 
-  private fun createKDown(): KDown = createTestKDown()
+  private fun createKDown(): KDownApi = createTestKDown()
 
   @Test
   fun `POST creates a download and returns 201`() =

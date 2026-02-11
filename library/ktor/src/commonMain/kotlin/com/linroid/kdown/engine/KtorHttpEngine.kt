@@ -1,7 +1,9 @@
 package com.linroid.kdown.engine
 
-import com.linroid.kdown.error.KDownError
-import com.linroid.kdown.log.KDownLogger
+import com.linroid.kdown.core.engine.HttpEngine
+import com.linroid.kdown.core.engine.ServerInfo
+import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.core.log.KDownLogger
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.head

@@ -1,5 +1,7 @@
 package com.linroid.kdown.segment
 
+import com.linroid.kdown.api.Segment
+import com.linroid.kdown.core.segment.SegmentCalculator
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

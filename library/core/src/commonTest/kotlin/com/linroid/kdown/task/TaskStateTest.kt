@@ -1,4 +1,5 @@
 package com.linroid.kdown.task
+import com.linroid.kdown.core.task.TaskState
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

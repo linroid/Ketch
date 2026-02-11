@@ -1,7 +1,8 @@
 package com.linroid.kdown.server.api
 
-import com.linroid.kdown.KDown
-import com.linroid.kdown.SpeedLimit
+import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.core.KDown
 import com.linroid.kdown.server.model.ServerStatus
 import com.linroid.kdown.server.model.SpeedLimitRequest
 import io.ktor.server.response.respond
@@ -15,7 +16,7 @@ import io.ktor.server.routing.route
  * Installs server-level endpoints: health check and global
  * speed limit management.
  */
-internal fun Route.serverRoutes(kdown: KDown) {
+internal fun Route.serverRoutes(kdown: KDownApi) {
   get("/api/status") {
     val tasks = kdown.tasks.value
     val active = tasks.count { it.state.value.isActive }
@@ -36,7 +37,7 @@ internal fun Route.serverRoutes(kdown: KDown) {
       } else {
         SpeedLimit.Unlimited
       }
-      kdown.setSpeedLimit(limit)
+      kdown.setGlobalSpeedLimit(limit)
       call.respond(body)
     }
   }

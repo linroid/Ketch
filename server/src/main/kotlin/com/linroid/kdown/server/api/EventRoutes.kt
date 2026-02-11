@@ -1,10 +1,10 @@
 package com.linroid.kdown.server.api
 
-import com.linroid.kdown.DownloadState
-import com.linroid.kdown.KDown
+import com.linroid.kdown.api.DownloadState
+import com.linroid.kdown.api.DownloadTask
+import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.server.TaskMapper
 import com.linroid.kdown.server.model.TaskEvent
-import com.linroid.kdown.task.DownloadTask
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.sse
 import io.ktor.sse.ServerSentEvent
@@ -25,7 +25,7 @@ private val json = Json { encodeDefaults = true }
  * - `task_removed`: a task is removed from the tasks list
  * - `state_changed`: a task's state changes (includes progress)
  */
-internal fun Route.eventRoutes(kdown: KDown) {
+internal fun Route.eventRoutes(kdown: KDownApi) {
   sse("/api/events") {
     coroutineScope {
       val activeJobs = mutableMapOf<String, Job>()

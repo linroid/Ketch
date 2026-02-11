@@ -1,7 +1,9 @@
 package com.linroid.kdown.segment
 
+import com.linroid.kdown.api.Segment
 import com.linroid.kdown.engine.FakeHttpEngine
-import com.linroid.kdown.engine.ServerInfo
+import com.linroid.kdown.core.engine.ServerInfo
+import com.linroid.kdown.core.segment.SegmentCalculator
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

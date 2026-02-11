@@ -1,5 +1,7 @@
 package com.linroid.kdown.engine
 
+import com.linroid.kdown.core.engine.HttpDownloadSource
+import com.linroid.kdown.core.engine.SourceResumeState
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals

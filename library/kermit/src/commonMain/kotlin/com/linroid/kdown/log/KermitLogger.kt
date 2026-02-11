@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger as KermitLib
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.platformLogWriter
+import com.linroid.kdown.core.log.Logger
 
 /**
  * Kermit-based logger implementation for KDown.

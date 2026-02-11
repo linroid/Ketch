@@ -1,11 +1,11 @@
 package com.linroid.kdown.sqlite
 
 import app.cash.sqldelight.db.SqlDriver
-import com.linroid.kdown.DownloadRequest
-import com.linroid.kdown.segment.Segment
-import com.linroid.kdown.task.TaskRecord
-import com.linroid.kdown.task.TaskState
-import com.linroid.kdown.task.TaskStore
+import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.api.Segment
+import com.linroid.kdown.core.task.TaskRecord
+import com.linroid.kdown.core.task.TaskState
+import com.linroid.kdown.core.task.TaskStore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.io.files.Path

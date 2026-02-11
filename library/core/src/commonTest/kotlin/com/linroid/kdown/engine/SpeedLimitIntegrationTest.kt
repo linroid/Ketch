@@ -1,5 +1,8 @@
 package com.linroid.kdown.engine
 
+import com.linroid.kdown.core.engine.ServerInfo
+import com.linroid.kdown.core.engine.SpeedLimiter
+import com.linroid.kdown.core.engine.TokenBucket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest

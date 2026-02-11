@@ -1,9 +1,10 @@
 package com.linroid.kdown.server
 
-import com.linroid.kdown.KDown
-import com.linroid.kdown.engine.HttpEngine
-import com.linroid.kdown.engine.ServerInfo
-import com.linroid.kdown.error.KDownError
+import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.core.KDown
+import com.linroid.kdown.core.engine.HttpEngine
+import com.linroid.kdown.core.engine.ServerInfo
 
 internal class NoOpHttpEngine : HttpEngine {
   override suspend fun head(
@@ -33,13 +34,13 @@ internal class NoOpHttpEngine : HttpEngine {
   override fun close() {}
 }
 
-internal fun createTestKDown(): KDown {
+internal fun createTestKDown(): KDownApi {
   return KDown(httpEngine = NoOpHttpEngine())
 }
 
 internal fun createTestServer(
   config: KDownServerConfig = KDownServerConfig.Default,
-  kdown: KDown = createTestKDown()
+  kdown: KDownApi = createTestKDown()
 ): KDownServer {
   return KDownServer(kdown, config)
 }

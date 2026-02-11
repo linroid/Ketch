@@ -1,9 +1,9 @@
 package com.linroid.kdown.server.api
 
-import com.linroid.kdown.DownloadPriority
-import com.linroid.kdown.DownloadRequest
-import com.linroid.kdown.KDown
-import com.linroid.kdown.SpeedLimit
+import com.linroid.kdown.api.DownloadPriority
+import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.server.TaskMapper
 import com.linroid.kdown.server.model.CreateDownloadRequest
 import com.linroid.kdown.server.model.ErrorResponse
@@ -23,7 +23,7 @@ import kotlinx.io.files.Path
 /**
  * Installs the `/api/downloads` REST routes for managing tasks.
  */
-internal fun Route.downloadRoutes(kdown: KDown) {
+internal fun Route.downloadRoutes(kdown: KDownApi) {
   route("/api/downloads") {
     get {
       val tasks = kdown.tasks.value

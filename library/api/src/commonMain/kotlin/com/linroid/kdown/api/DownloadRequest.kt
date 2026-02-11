@@ -1,0 +1,52 @@
+package com.linroid.kdown.api
+
+import kotlinx.io.files.Path
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+
+/**
+ * Describes a file to download.
+ *
+ * @property url the HTTP(S) URL to download from. Must not be blank.
+ * @property directory the local directory where the file will be saved.
+ * @property fileName explicit file name to save as. When `null`, the
+ *   file name is determined from the server response
+ *   (Content-Disposition header, URL path, or a fallback).
+ * @property connections number of concurrent connections (segments) to
+ *   use. Must be greater than 0. Falls back to a single connection if
+ *   the server does not support HTTP Range requests.
+ * @property headers custom HTTP headers to include in every request
+ *   (HEAD and GET) for this download.
+ * @property properties arbitrary key-value pairs for use by custom
+ *   extensions. KDown itself does not read these values.
+ * @property speedLimit per-task speed limit. Overrides the global
+ *   speed limit for this download. Defaults to
+ *   [SpeedLimit.Unlimited] (use global limit).
+ * @property priority queue priority for this download. Higher-priority
+ *   tasks are started before lower-priority ones when download slots
+ *   become available. Defaults to [DownloadPriority.NORMAL].
+ * @property schedule when the download should start. Defaults to
+ *   [DownloadSchedule.Immediate].
+ * @property conditions list of [DownloadCondition]s that must all be
+ *   met before the download starts. Not persisted across restarts.
+ */
+@Serializable
+data class DownloadRequest(
+  val url: String,
+  @Serializable(with = PathSerializer::class)
+  val directory: Path,
+  val fileName: String? = null,
+  val connections: Int = 1,
+  val headers: Map<String, String> = emptyMap(),
+  val properties: Map<String, String> = emptyMap(),
+  val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
+  val priority: DownloadPriority = DownloadPriority.NORMAL,
+  val schedule: DownloadSchedule = DownloadSchedule.Immediate,
+  @Transient
+  val conditions: List<DownloadCondition> = emptyList()
+) {
+  init {
+    require(url.isNotBlank()) { "URL must not be blank" }
+    require(connections > 0) { "Connections must be greater than 0" }
+  }
+}

@@ -1,5 +1,7 @@
 package com.linroid.kdown
 
+import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.core.DownloadConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

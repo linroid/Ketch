@@ -1,6 +1,9 @@
 package com.linroid.kdown.task
 
-import com.linroid.kdown.DownloadRequest
+import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.core.task.InMemoryTaskStore
+import com.linroid.kdown.core.task.TaskRecord
+import com.linroid.kdown.core.task.TaskState
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.files.Path
 import kotlin.test.Test

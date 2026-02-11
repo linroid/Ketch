@@ -1,10 +1,10 @@
 package com.linroid.kdown.server
 
-import com.linroid.kdown.DownloadConfig
-import com.linroid.kdown.KDown
-import com.linroid.kdown.SpeedLimit
+import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.core.DownloadConfig
+import com.linroid.kdown.core.KDown
+import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.engine.KtorHttpEngine
-import com.linroid.kdown.log.Logger
 import com.linroid.kdown.sqlite.DriverFactory
 import com.linroid.kdown.sqlite.SqliteTaskStore
 import java.io.File

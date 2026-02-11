@@ -1,5 +1,6 @@
 package com.linroid.kdown.engine
 
+import com.linroid.kdown.core.engine.SpeedLimiter
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
