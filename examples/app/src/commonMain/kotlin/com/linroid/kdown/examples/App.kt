@@ -58,9 +58,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.kdown.DownloadConfig
+import com.linroid.kdown.DownloadPriority
 import com.linroid.kdown.DownloadRequest
 import com.linroid.kdown.DownloadState
 import com.linroid.kdown.KDown
+import com.linroid.kdown.QueueConfig
 import com.linroid.kdown.SpeedLimit
 import com.linroid.kdown.engine.KtorHttpEngine
 import com.linroid.kdown.log.Logger
@@ -77,7 +79,11 @@ fun App() {
       maxConnections = 4,
       retryCount = 3,
       retryDelayMs = 1000,
-      progressUpdateIntervalMs = 200
+      progressUpdateIntervalMs = 200,
+      queueConfig = QueueConfig(
+        maxConcurrentDownloads = 3,
+        maxConnectionsPerHost = 4
+      )
     )
   }
   val kdown = remember {
@@ -195,7 +201,7 @@ fun App() {
     if (showAddDialog) {
       AddDownloadDialog(
         onDismiss = { showAddDialog = false },
-        onDownload = { url, fileName, speedLimit ->
+        onDownload = { url, fileName, speedLimit, priority ->
           showAddDialog = false
           errorMessage = null
           startDownload(
@@ -205,6 +211,7 @@ fun App() {
             directory = Path("downloads"),
             fileName = fileName.ifBlank { null },
             speedLimit = speedLimit,
+            priority = priority,
             onError = { errorMessage = it }
           )
         }
@@ -261,11 +268,19 @@ private val speedOptions = listOf(
 @Composable
 private fun AddDownloadDialog(
   onDismiss: () -> Unit,
-  onDownload: (url: String, fileName: String, SpeedLimit) -> Unit
+  onDownload: (
+    url: String,
+    fileName: String,
+    SpeedLimit,
+    DownloadPriority
+  ) -> Unit
 ) {
   var url by remember { mutableStateOf("") }
   var fileName by remember { mutableStateOf("") }
   var selectedSpeed by remember { mutableStateOf(SpeedLimit.Unlimited) }
+  var selectedPriority by remember {
+    mutableStateOf(DownloadPriority.NORMAL)
+  }
   val isValidUrl = url.isBlank() ||
     url.trim().startsWith("http://") ||
     url.trim().startsWith("https://")
@@ -301,12 +316,30 @@ private fun AddDownloadDialog(
           label = { Text("Save as") },
           singleLine = true,
           placeholder = { Text("Auto-detected from URL") },
-          supportingText = if (fileName.isBlank() && url.isNotBlank()) {
+          supportingText = if (fileName.isBlank() &&
+            url.isNotBlank()
+          ) {
             { Text("Will be extracted from URL") }
           } else {
             null
           }
         )
+        Text(
+          text = "Priority",
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          DownloadPriority.entries.forEach { priority ->
+            FilterChip(
+              selected = selectedPriority == priority,
+              onClick = { selectedPriority = priority },
+              label = { Text(priorityLabel(priority)) }
+            )
+          }
+        }
         Text(
           text = "Speed limit",
           style = MaterialTheme.typography.labelMedium,
@@ -330,7 +363,10 @@ private fun AddDownloadDialog(
         onClick = {
           val trimmed = url.trim()
           if (trimmed.isNotEmpty()) {
-            onDownload(trimmed, fileName.trim(), selectedSpeed)
+            onDownload(
+              trimmed, fileName.trim(),
+              selectedSpeed, selectedPriority
+            )
           }
         },
         enabled = url.isNotBlank() && isValidUrl
@@ -363,6 +399,7 @@ private fun DownloadTaskItem(
     state is DownloadState.Pending
   val isPaused = state is DownloadState.Paused
   val speedLimit = task.request.speedLimit
+  val priority = task.request.priority
 
   Card(
     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -388,13 +425,22 @@ private fun DownloadTaskItem(
       ) {
         StatusIndicator(state)
         Column(modifier = Modifier.weight(1f)) {
-          Text(
-            text = fileName,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            Text(
+              text = fileName,
+              style = MaterialTheme.typography.titleMedium,
+              fontWeight = FontWeight.SemiBold,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.weight(1f, fill = false)
+            )
+            if (priority != DownloadPriority.NORMAL) {
+              PriorityBadge(priority)
+            }
+          }
           Text(
             text = task.request.url,
             style = MaterialTheme.typography.bodySmall,
@@ -416,11 +462,14 @@ private fun DownloadTaskItem(
           Text(
             text = buildString {
               append("${pct.toInt()}%")
-              append(" \u00b7 ${formatBytes(progress.downloadedBytes)}")
+              append(
+                " \u00b7 ${formatBytes(progress.downloadedBytes)}"
+              )
               append(" / ${formatBytes(progress.totalBytes)}")
               if (progress.bytesPerSecond > 0) {
                 append(
-                  " \u00b7 ${formatBytes(progress.bytesPerSecond)}/s"
+                  " \u00b7 " +
+                    "${formatBytes(progress.bytesPerSecond)}/s"
                 )
               }
               if (!speedLimit.isUnlimited) {
@@ -448,6 +497,7 @@ private fun DownloadTaskItem(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
           )
+          PrioritySelector(task = task, scope = scope)
         }
         is DownloadState.Pending -> {
           LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -465,10 +515,12 @@ private fun DownloadTaskItem(
             LinearProgressIndicator(
               progress = { progress.percent },
               modifier = Modifier.fillMaxWidth(),
-              trackColor = MaterialTheme.colorScheme.surfaceVariant
+              trackColor =
+                MaterialTheme.colorScheme.surfaceVariant
             )
             Text(
-              text = "Paused \u00b7 ${pausedPct.toInt()}% \u00b7 " +
+              text = "Paused \u00b7 ${pausedPct.toInt()}%" +
+                " \u00b7 " +
                 "${formatBytes(progress.downloadedBytes)} / " +
                 formatBytes(progress.totalBytes),
               style = MaterialTheme.typography.bodySmall,
@@ -522,6 +574,79 @@ private fun DownloadTaskItem(
         onRetry = onRetry,
         onRemove = onRemove
       )
+    }
+  }
+}
+
+@Composable
+private fun PriorityBadge(priority: DownloadPriority) {
+  val color = when (priority) {
+    DownloadPriority.LOW ->
+      MaterialTheme.colorScheme.surfaceVariant
+    DownloadPriority.NORMAL ->
+      MaterialTheme.colorScheme.secondaryContainer
+    DownloadPriority.HIGH ->
+      MaterialTheme.colorScheme.tertiaryContainer
+    DownloadPriority.URGENT ->
+      MaterialTheme.colorScheme.errorContainer
+  }
+  val textColor = when (priority) {
+    DownloadPriority.LOW ->
+      MaterialTheme.colorScheme.onSurfaceVariant
+    DownloadPriority.NORMAL ->
+      MaterialTheme.colorScheme.onSecondaryContainer
+    DownloadPriority.HIGH ->
+      MaterialTheme.colorScheme.onTertiaryContainer
+    DownloadPriority.URGENT ->
+      MaterialTheme.colorScheme.onErrorContainer
+  }
+  Box(
+    modifier = Modifier
+      .background(
+        color = color,
+        shape = MaterialTheme.shapes.small
+      )
+      .padding(horizontal = 6.dp, vertical = 2.dp)
+  ) {
+    Text(
+      text = priorityLabel(priority),
+      style = MaterialTheme.typography.labelSmall,
+      color = textColor
+    )
+  }
+}
+
+@Composable
+private fun PrioritySelector(
+  task: DownloadTask,
+  scope: CoroutineScope
+) {
+  var currentPriority by remember {
+    mutableStateOf(task.request.priority)
+  }
+  Column {
+    Text(
+      text = "Change priority:",
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+      DownloadPriority.entries.forEach { priority ->
+        FilterChip(
+          selected = currentPriority == priority,
+          onClick = {
+            currentPriority = priority
+            scope.launch { task.setPriority(priority) }
+          },
+          label = {
+            Text(
+              text = priorityLabel(priority),
+              style = MaterialTheme.typography.labelSmall
+            )
+          }
+        )
+      }
     }
   }
 }
@@ -729,6 +854,7 @@ private fun startDownload(
   directory: Path,
   fileName: String?,
   speedLimit: SpeedLimit = SpeedLimit.Unlimited,
+  priority: DownloadPriority = DownloadPriority.NORMAL,
   onError: (String) -> Unit = {}
 ) {
   scope.launch {
@@ -738,12 +864,22 @@ private fun startDownload(
         directory = directory,
         fileName = fileName,
         connections = 4,
-        speedLimit = speedLimit
+        speedLimit = speedLimit,
+        priority = priority
       )
       kdown.download(request)
     }.onFailure { e ->
       onError(e.message ?: "Failed to start download")
     }
+  }
+}
+
+private fun priorityLabel(priority: DownloadPriority): String {
+  return when (priority) {
+    DownloadPriority.LOW -> "Low"
+    DownloadPriority.NORMAL -> "Normal"
+    DownloadPriority.HIGH -> "High"
+    DownloadPriority.URGENT -> "Urgent"
   }
 }
 

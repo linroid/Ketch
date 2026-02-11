@@ -1,11 +1,14 @@
 package com.linroid.kdown.examples
 
 import com.linroid.kdown.DownloadConfig
+import com.linroid.kdown.DownloadPriority
 import com.linroid.kdown.DownloadRequest
 import com.linroid.kdown.DownloadState
 import com.linroid.kdown.KDown
+import com.linroid.kdown.QueueConfig
 import com.linroid.kdown.SpeedLimit
 import com.linroid.kdown.engine.KtorHttpEngine
+import com.linroid.kdown.task.DownloadTask
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -20,9 +23,16 @@ fun main(args: Array<String>) {
     return
   }
 
+  if (args[0] == "--queue-demo") {
+    runQueueDemo(args.drop(1))
+    return
+  }
+
   var url: String? = null
   var dest: String? = null
   var speedLimit = SpeedLimit.Unlimited
+  var priority = DownloadPriority.NORMAL
+  var maxConcurrent = 3
 
   var i = 0
   while (i < args.size) {
@@ -38,6 +48,41 @@ fun main(args: Array<String>) {
           println("Error: invalid speed limit '${args[i + 1]}'")
           println()
           printUsage()
+          return
+        }
+        i += 2
+      }
+      "--priority" -> {
+        if (i + 1 >= args.size) {
+          println("Error: --priority requires a value")
+          println()
+          printUsage()
+          return
+        }
+        priority = parsePriority(args[i + 1]) ?: run {
+          println("Error: invalid priority '${args[i + 1]}'")
+          println("  Valid values: low, normal, high, urgent")
+          println()
+          printUsage()
+          return
+        }
+        i += 2
+      }
+      "--max-concurrent" -> {
+        if (i + 1 >= args.size) {
+          println("Error: --max-concurrent requires a value")
+          println()
+          printUsage()
+          return
+        }
+        maxConcurrent = args[i + 1].toIntOrNull() ?: run {
+          println("Error: invalid number '${args[i + 1]}'")
+          println()
+          printUsage()
+          return
+        }
+        if (maxConcurrent <= 0) {
+          println("Error: --max-concurrent must be > 0")
           return
         }
         i += 2
@@ -72,13 +117,20 @@ fun main(args: Array<String>) {
   if (!speedLimit.isUnlimited) {
     println("Speed limit: ${formatBytes(speedLimit.bytesPerSecond)}/s")
   }
+  if (priority != DownloadPriority.NORMAL) {
+    println("Priority: $priority")
+  }
+  println("Max concurrent: $maxConcurrent")
   println()
 
   val config = DownloadConfig(
     maxConnections = 4,
     retryCount = 3,
     retryDelayMs = 1000,
-    progressUpdateIntervalMs = 200
+    progressUpdateIntervalMs = 200,
+    queueConfig = QueueConfig(
+      maxConcurrentDownloads = maxConcurrent
+    )
   )
 
   val kdown = KDown(
@@ -92,12 +144,12 @@ fun main(args: Array<String>) {
       directory = directory,
       fileName = fileName,
       connections = config.maxConnections,
-      speedLimit = speedLimit
+      speedLimit = speedLimit,
+      priority = priority
     )
 
     val task = kdown.download(request)
 
-    // Monitor state changes in a separate coroutine
     val limitLabel = if (speedLimit.isUnlimited) ""
       else " [limit: ${formatBytes(speedLimit.bytesPerSecond)}/s]"
     val monitor = launch {
@@ -135,7 +187,7 @@ fun main(args: Array<String>) {
       }
     }
 
-    // Demonstrate pause/resume: pause after 2 seconds, resume after 1 more second
+    // Demonstrate pause/resume
     val pauseDemo = launch {
       delay(2000)
       println("\n\n--- Demonstrating pause ---")
@@ -145,7 +197,6 @@ fun main(args: Array<String>) {
       task.resume()
     }
 
-    // Wait for completion
     val result = task.await()
     monitor.cancel()
     pauseDemo.cancel()
@@ -161,23 +212,172 @@ fun main(args: Array<String>) {
   }
 }
 
+/**
+ * Demonstrates queue management with multiple downloads, priorities,
+ * and concurrency limits. Enqueues several downloads that exceed
+ * the max concurrent limit so some are queued automatically.
+ */
+private fun runQueueDemo(urls: List<String>) {
+  val demoUrls = urls.ifEmpty {
+    println("Usage: kdown-cli --queue-demo <url1> <url2> ...")
+    println()
+    println(
+      "Provide 4+ URLs to see queue behavior. " +
+        "Only 2 run at a time;"
+    )
+    println("the rest are queued by priority.")
+    return
+  }
+
+  println("=== Queue Management Demo ===")
+  println("Max concurrent downloads: 2")
+  println("Downloads: ${demoUrls.size}")
+  println()
+
+  val config = DownloadConfig(
+    maxConnections = 4,
+    retryCount = 3,
+    retryDelayMs = 1000,
+    progressUpdateIntervalMs = 500,
+    queueConfig = QueueConfig(
+      maxConcurrentDownloads = 2,
+      maxConnectionsPerHost = 4,
+      autoStart = true
+    )
+  )
+
+  val kdown = KDown(
+    httpEngine = KtorHttpEngine(),
+    config = config
+  )
+
+  // Assign ascending priorities to demonstrate ordering
+  val priorities = listOf(
+    DownloadPriority.LOW,
+    DownloadPriority.NORMAL,
+    DownloadPriority.HIGH,
+    DownloadPriority.URGENT
+  )
+
+  runBlocking {
+    val tasks = mutableListOf<DownloadTask>()
+
+    demoUrls.forEachIndexed { index, url ->
+      val priority = priorities[index % priorities.size]
+      val request = DownloadRequest(
+        url = url,
+        directory = Path("downloads"),
+        connections = 2,
+        priority = priority
+      )
+      val task = kdown.download(request)
+      tasks.add(task)
+      val name = extractFilename(url).ifBlank { "download-$index" }
+      println("  [$priority] $name -> ${task.state.value}")
+    }
+
+    println()
+    println("--- Monitoring downloads ---")
+    println()
+
+    // Monitor all tasks
+    val monitors = tasks.mapIndexed { index, task ->
+      val name = extractFilename(task.request.url)
+        .ifBlank { "download-$index" }
+      launch {
+        task.state.collect { state ->
+          val label = formatTaskState(state)
+          println("  [$name] $label")
+        }
+      }
+    }
+
+    // Demonstrate dynamic priority change after 3 seconds
+    if (tasks.size >= 3) {
+      launch {
+        delay(3000)
+        val target = tasks[0]
+        val name = extractFilename(target.request.url)
+          .ifBlank { "download-0" }
+        println()
+        println(
+          "--- Boosting priority of '$name' to URGENT ---"
+        )
+        target.setPriority(DownloadPriority.URGENT)
+      }
+    }
+
+    // Wait for all tasks to complete
+    for (task in tasks) {
+      task.await()
+    }
+    monitors.forEach { it.cancel() }
+
+    println()
+    println("=== All downloads finished ===")
+    kdown.close()
+  }
+}
+
+private fun formatTaskState(state: DownloadState): String {
+  return when (state) {
+    is DownloadState.Queued -> "Queued"
+    is DownloadState.Pending -> "Starting..."
+    is DownloadState.Scheduled -> "Scheduled"
+    is DownloadState.Downloading -> {
+      val p = state.progress
+      val pct = (p.percent * 100).toInt()
+      "$pct% (${formatBytes(p.downloadedBytes)}" +
+        " / ${formatBytes(p.totalBytes)})"
+    }
+    is DownloadState.Paused -> "Paused"
+    is DownloadState.Completed -> "Completed -> ${state.filePath}"
+    is DownloadState.Failed -> "Failed: ${state.error.message}"
+    is DownloadState.Canceled -> "Canceled"
+    is DownloadState.Idle -> "Idle"
+  }
+}
+
+private fun extractFilename(url: String): String {
+  return url.substringBefore("?")
+    .substringBefore("#")
+    .trimEnd('/')
+    .substringAfterLast("/")
+}
+
 private fun printUsage() {
   println("Usage: kdown-cli [options] <url> [destination]")
+  println("       kdown-cli --queue-demo <url1> <url2> ...")
   println()
   println("Options:")
-  println("  --speed-limit <value>  Limit download speed")
-  println("                         Examples: 500k, 1m, 10m, 1024000")
-  println("                         Suffixes: k = KB/s, m = MB/s")
-  println("                         No suffix = bytes/s")
+  println("  --speed-limit <value>    Limit download speed")
+  println("                           Examples: 500k, 1m, 10m")
+  println("                           Suffixes: k = KB/s, m = MB/s")
+  println("  --priority <level>       Set download priority")
+  println("                           Values: low, normal, high, urgent")
+  println("  --max-concurrent <n>     Max simultaneous downloads")
+  println("                           Default: 3")
+  println()
+  println("Queue Demo:")
+  println("  --queue-demo <urls...>   Run queue demo with multiple URLs")
+  println("                           Uses max 2 concurrent downloads")
+  println("                           to show queuing and priority")
   println()
   println("Examples:")
   println("  kdown-cli https://example.com/file.zip")
-  println("  kdown-cli --speed-limit 5m https://example.com/file.zip")
-  println("  kdown-cli --speed-limit 500k https://example.com/file.zip ./downloads/file.zip")
-  println()
-  println("Controls:")
-  println("  The download will automatically pause after 2 seconds,")
-  println("  then resume after 1 second to demonstrate pause/resume.")
+  println("  kdown-cli --priority high https://example.com/file.zip")
+  println("  kdown-cli --max-concurrent 2 https://example.com/file.zip")
+  println("  kdown-cli --queue-demo url1 url2 url3 url4")
+}
+
+private fun parsePriority(value: String): DownloadPriority? {
+  return when (value.trim().lowercase()) {
+    "low" -> DownloadPriority.LOW
+    "normal" -> DownloadPriority.NORMAL
+    "high" -> DownloadPriority.HIGH
+    "urgent" -> DownloadPriority.URGENT
+    else -> null
+  }
 }
 
 private fun parseSpeedLimit(value: String): SpeedLimit? {

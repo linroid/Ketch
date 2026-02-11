@@ -29,7 +29,7 @@ kotlin {
 
   sourceSets {
     commonMain.dependencies {
-      api(projects.library.core)
+      api(projects.library.embedded)
       implementation(libs.kermit)
     }
     commonTest.dependencies {

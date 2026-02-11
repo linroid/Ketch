@@ -33,7 +33,9 @@ plugins {
 }
 
 // Library modules
-include(":library:core")
+include(":library:embedded")
+include(":library:api")
+include(":library:remote")
 include(":library:ktor")
 include(":library:kermit")
 include(":library:sqlite")
