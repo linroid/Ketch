@@ -34,11 +34,12 @@ kotlin {
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs {
     browser()
-    binaries.executable()
   }
 
   sourceSets {
     commonMain.dependencies {
+      implementation(projects.library.core)
+      implementation(projects.library.remote)
       implementation(projects.library.ktor)
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.compose.runtime)
@@ -53,15 +54,18 @@ kotlin {
     }
     commonTest.dependencies {
       implementation(libs.kotlin.test)
+      implementation(libs.kotlinx.coroutines.test)
     }
     androidMain.dependencies {
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.ktor.client.okhttp)
     }
     iosMain.dependencies {
+      implementation(projects.library.sqlite)
       implementation(libs.ktor.client.darwin)
     }
     jvmMain.dependencies {
+      implementation(projects.library.sqlite)
       implementation(libs.kotlinx.coroutinesSwing)
       implementation(libs.ktor.client.cio)
     }

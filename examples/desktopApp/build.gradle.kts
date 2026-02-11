@@ -8,6 +8,9 @@ plugins {
 
 dependencies {
   implementation(projects.examples.app)
+  implementation(projects.server)
+  implementation(projects.library.ktor)
+  implementation(projects.library.sqlite)
   implementation(compose.desktop.currentOs)
   implementation(libs.kotlinx.coroutinesSwing)
 }

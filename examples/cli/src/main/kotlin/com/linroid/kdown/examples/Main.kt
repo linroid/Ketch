@@ -100,14 +100,14 @@ fun main(args: Array<String>) {
     return
   }
 
-  val directory: Path
+  val directory: String
   val fileName: String?
   if (dest != null) {
     val destPath = Path(dest)
-    directory = destPath.parent ?: Path(".")
+    directory = (destPath.parent ?: Path(".")).toString()
     fileName = destPath.name
   } else {
-    directory = Path(".")
+    directory = "."
     fileName = null
   }
 
@@ -266,7 +266,7 @@ private fun runQueueDemo(urls: List<String>) {
       val priority = priorities[index % priorities.size]
       val request = DownloadRequest(
         url = url,
-        directory = Path("downloads"),
+        directory = "downloads",
         connections = 2,
         priority = priority
       )

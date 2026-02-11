@@ -39,6 +39,8 @@ android {
 
 dependencies {
   implementation(projects.examples.app)
+  implementation(projects.library.sqlite)
+  implementation(projects.server)
   implementation(libs.androidx.activity.compose)
   debugImplementation(libs.compose.uiTooling)
 }
