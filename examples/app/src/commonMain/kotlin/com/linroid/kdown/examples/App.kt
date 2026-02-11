@@ -18,33 +18,41 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,55 +72,41 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.SpeedLimit
-import com.linroid.kdown.core.DownloadConfig
-import com.linroid.kdown.core.KDown
-import com.linroid.kdown.core.QueueConfig
-import com.linroid.kdown.core.log.Logger
-import com.linroid.kdown.engine.KtorHttpEngine
+import com.linroid.kdown.examples.backend.BackendConfig
+import com.linroid.kdown.examples.backend.BackendEntry
+import com.linroid.kdown.remote.ConnectionState
+import com.linroid.kdown.examples.backend.BackendManager
+import com.linroid.kdown.examples.backend.ServerState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.io.files.Path
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App() {
-  val config = remember {
-    DownloadConfig(
-      maxConnections = 4,
-      retryCount = 3,
-      retryDelayMs = 1000,
-      progressUpdateIntervalMs = 200,
-      queueConfig = QueueConfig(
-        maxConcurrentDownloads = 3,
-        maxConnectionsPerHost = 4
-      )
-    )
-  }
-  val kdown = remember {
-    KDown(
-      httpEngine = KtorHttpEngine(),
-      config = config,
-      logger = Logger.console()
-    )
-  }
+fun App(backendManager: BackendManager) {
+  val activeApi by backendManager.activeApi.collectAsState()
+  val activeBackend by backendManager.activeBackend.collectAsState()
+  val backends by backendManager.backends.collectAsState()
+  val connectionState by (
+    activeBackend?.connectionState
+      ?: MutableStateFlow(ConnectionState.Disconnected())
+    ).collectAsState()
   val scope = rememberCoroutineScope()
-  val tasks by kdown.tasks.collectAsState()
+  val tasks by activeApi.tasks.collectAsState()
+  val version by activeApi.version.collectAsState()
   var showAddDialog by remember { mutableStateOf(false) }
+  var showBackendSelector by remember { mutableStateOf(false) }
+  var showAddRemoteDialog by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
+  var switchingBackendId by remember { mutableStateOf<String?>(null) }
 
   DisposableEffect(Unit) {
-    onDispose { kdown.close() }
-  }
-
-  LaunchedEffect(Unit) {
-    kdown.loadTasks()
+    onDispose { backendManager.close() }
   }
 
   val sortedTasks = remember(tasks) {
     tasks.sortedByDescending { it.createdAt }
   }
-
-  val version by kdown.version.collectAsState()
 
   MaterialTheme {
     Scaffold(
@@ -123,11 +118,22 @@ fun App() {
                 text = "KDown",
                 fontWeight = FontWeight.SemiBold
               )
-              Text(
-                text = "v${version.backend} \u00b7 Downloader",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-              )
+              Row(
+                modifier = Modifier.clickable {
+                  showBackendSelector = true
+                },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+              ) {
+                Text(
+                  text = "v${version.backend} \u00b7 " +
+                    (activeBackend?.label ?: "Not connected"),
+                  style = MaterialTheme.typography.bodySmall,
+                  color =
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                ConnectionStatusDot(connectionState)
+              }
             }
           }
         )
@@ -209,7 +215,7 @@ fun App() {
           errorMessage = null
           startDownload(
             scope = scope,
-            kdown = kdown,
+            kdown = activeApi,
             url = url,
             directory = "downloads",
             fileName = fileName.ifBlank { null },
@@ -220,6 +226,62 @@ fun App() {
         }
       )
     }
+
+    if (showBackendSelector) {
+      BackendSelectorSheet(
+        backendManager = backendManager,
+        activeBackendId = activeBackend?.id,
+        switchingBackendId = switchingBackendId,
+        onSelectBackend = { entry ->
+          if (entry.id != activeBackend?.id &&
+            switchingBackendId == null
+          ) {
+            switchingBackendId = entry.id
+            scope.launch {
+              try {
+                backendManager.switchTo(entry.id)
+                showBackendSelector = false
+              } catch (e: Exception) {
+                errorMessage =
+                  "Failed to switch backend: ${e.message}"
+              } finally {
+                switchingBackendId = null
+              }
+            }
+          }
+        },
+        onRemoveBackend = { entry ->
+          scope.launch {
+            try {
+              backendManager.removeBackend(entry.id)
+            } catch (e: Exception) {
+              errorMessage =
+                "Failed to remove backend: ${e.message}"
+            }
+          }
+        },
+        onAddRemoteServer = {
+          showAddRemoteDialog = true
+        },
+        onDismiss = { showBackendSelector = false }
+      )
+    }
+
+    if (showAddRemoteDialog) {
+      AddRemoteServerDialog(
+        onDismiss = { showAddRemoteDialog = false },
+        onAdd = { host, port, token ->
+          showAddRemoteDialog = false
+          try {
+            backendManager.addRemote(host, port, token)
+          } catch (e: Exception) {
+            errorMessage =
+              "Failed to add remote server: ${e.message}"
+          }
+        }
+      )
+    }
+
   }
 }
 
@@ -864,6 +926,352 @@ private fun TaskActionButtons(
       is DownloadState.Idle -> {}
     }
   }
+}
+
+// -- Backend selector UI --
+
+@Composable
+private fun ConnectionStatusDot(state: ConnectionState) {
+  val color = when (state) {
+    is ConnectionState.Connected ->
+      MaterialTheme.colorScheme.tertiary
+    is ConnectionState.Connecting ->
+      MaterialTheme.colorScheme.secondary
+    is ConnectionState.Disconnected ->
+      MaterialTheme.colorScheme.error
+  }
+  Box(
+    modifier = Modifier
+      .size(8.dp)
+      .clip(CircleShape)
+      .background(color)
+  )
+}
+
+@Composable
+private fun ConnectionStatusChip(
+  state: ConnectionState,
+  isActive: Boolean = false
+) {
+  val (label, bgColor, textColor) = when (state) {
+    is ConnectionState.Connected -> Triple(
+      "Connected",
+      MaterialTheme.colorScheme.tertiaryContainer,
+      MaterialTheme.colorScheme.onTertiaryContainer
+    )
+    is ConnectionState.Connecting -> Triple(
+      "Connecting",
+      MaterialTheme.colorScheme.secondaryContainer,
+      MaterialTheme.colorScheme.onSecondaryContainer
+    )
+    is ConnectionState.Disconnected -> if (isActive) {
+      Triple(
+        "Disconnected",
+        MaterialTheme.colorScheme.errorContainer,
+        MaterialTheme.colorScheme.onErrorContainer
+      )
+    } else {
+      Triple(
+        "Not connected",
+        MaterialTheme.colorScheme.surfaceVariant,
+        MaterialTheme.colorScheme.onSurfaceVariant
+      )
+    }
+  }
+  Box(
+    modifier = Modifier
+      .background(
+        color = bgColor,
+        shape = MaterialTheme.shapes.small
+      )
+      .padding(horizontal = 6.dp, vertical = 2.dp)
+  ) {
+    Text(
+      text = label,
+      style = MaterialTheme.typography.labelSmall,
+      color = textColor
+    )
+  }
+}
+
+private fun backendConfigIcon(config: BackendConfig): ImageVector {
+  return when (config) {
+    is BackendConfig.Embedded -> Icons.Filled.PhoneAndroid
+    is BackendConfig.Remote -> Icons.Filled.Cloud
+  }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BackendSelectorSheet(
+  backendManager: BackendManager,
+  activeBackendId: String?,
+  switchingBackendId: String?,
+  onSelectBackend: (BackendEntry) -> Unit,
+  onRemoveBackend: (BackendEntry) -> Unit,
+  onAddRemoteServer: () -> Unit,
+  onDismiss: () -> Unit
+) {
+  val sheetState = rememberModalBottomSheetState()
+  val backends by backendManager.backends.collectAsState()
+  val serverState by backendManager.serverState.collectAsState()
+
+  ModalBottomSheet(
+    onDismissRequest = onDismiss,
+    sheetState = sheetState
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(bottom = 24.dp)
+    ) {
+      Text(
+        text = "Select Backend",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(
+          horizontal = 24.dp, vertical = 8.dp
+        )
+      )
+
+      backends.forEach { entry ->
+        val entryConnectionState by
+          entry.connectionState.collectAsState()
+        val isActive = entry.id == activeBackendId
+        val isSwitching = entry.id == switchingBackendId
+
+        ListItem(
+          modifier = Modifier.clickable(
+            enabled = !isSwitching && switchingBackendId == null
+          ) {
+            onSelectBackend(entry)
+          },
+          headlineContent = {
+            Text(
+              text = entry.label,
+              fontWeight = if (isActive) {
+                FontWeight.SemiBold
+              } else {
+                FontWeight.Normal
+              }
+            )
+          },
+          leadingContent = {
+            Icon(
+              imageVector = backendConfigIcon(entry.config),
+              contentDescription = entry.label,
+              tint = if (isActive) {
+                MaterialTheme.colorScheme.primary
+              } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+              }
+            )
+          },
+          supportingContent = {
+            Column {
+              ConnectionStatusChip(
+                state = entryConnectionState,
+                isActive = isActive
+              )
+              // Server controls inside the Embedded entry
+              if (entry.isEmbedded &&
+                backendManager.isLocalServerSupported
+              ) {
+                EmbeddedServerControls(
+                  serverState = serverState,
+                  onStartServer = { port, token ->
+                    backendManager.startServer(port, token)
+                  },
+                  onStopServer = { backendManager.stopServer() }
+                )
+              }
+            }
+          },
+          trailingContent = {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+              if (isSwitching) {
+                CircularProgressIndicator(
+                  modifier = Modifier.size(20.dp),
+                  strokeWidth = 2.dp
+                )
+              } else if (isActive) {
+                Icon(
+                  imageVector = Icons.Filled.Check,
+                  contentDescription = "Active",
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(20.dp)
+                )
+              }
+              if (!entry.isEmbedded) {
+                IconButton(
+                  onClick = { onRemoveBackend(entry) }
+                ) {
+                  Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Remove",
+                    tint =
+                      MaterialTheme.colorScheme.onSurfaceVariant
+                  )
+                }
+              }
+            }
+          }
+        )
+      }
+
+      HorizontalDivider(
+        modifier = Modifier.padding(vertical = 8.dp)
+      )
+
+      ListItem(
+        modifier = Modifier.clickable { onAddRemoteServer() },
+        headlineContent = { Text("Add Remote Server") },
+        leadingContent = {
+          Icon(
+            imageVector = Icons.Filled.Add,
+            contentDescription = "Add remote server",
+            tint = MaterialTheme.colorScheme.primary
+          )
+        }
+      )
+    }
+  }
+}
+
+@Composable
+private fun EmbeddedServerControls(
+  serverState: ServerState,
+  onStartServer: (port: Int, token: String?) -> Unit,
+  onStopServer: () -> Unit
+) {
+  when (serverState) {
+    is ServerState.Running -> {
+      Row(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        Text(
+          text = "Server on :${serverState.port}",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.primary
+        )
+        FilledTonalIconButton(
+          onClick = onStopServer,
+          modifier = Modifier.size(24.dp),
+          colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor =
+              MaterialTheme.colorScheme.errorContainer,
+            contentColor =
+              MaterialTheme.colorScheme.onErrorContainer
+          )
+        ) {
+          Icon(
+            imageVector = Icons.Filled.Close,
+            contentDescription = "Stop server",
+            modifier = Modifier.size(14.dp)
+          )
+        }
+      }
+    }
+    is ServerState.Stopped -> {
+      TextButton(
+        onClick = { onStartServer(8642, null) },
+        modifier = Modifier.padding(top = 2.dp),
+        contentPadding = PaddingValues(
+          horizontal = 8.dp, vertical = 0.dp
+        )
+      ) {
+        Icon(
+          imageVector = Icons.Filled.Computer,
+          contentDescription = null,
+          modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.size(4.dp))
+        Text(
+          text = "Start Server",
+          style = MaterialTheme.typography.labelSmall
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun AddRemoteServerDialog(
+  onDismiss: () -> Unit,
+  onAdd: (host: String, port: Int, token: String?) -> Unit
+) {
+  var host by remember { mutableStateOf("") }
+  var port by remember { mutableStateOf("8642") }
+  var token by remember { mutableStateOf("") }
+  val isValidHost = host.isNotBlank()
+  val isValidPort = port.toIntOrNull()?.let {
+    it in 1..65535
+  } ?: false
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Add Remote Server") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedTextField(
+          value = host,
+          onValueChange = { host = it },
+          modifier = Modifier.fillMaxWidth(),
+          label = { Text("Host") },
+          singleLine = true,
+          placeholder = { Text("192.168.1.5") }
+        )
+        OutlinedTextField(
+          value = port,
+          onValueChange = { port = it },
+          modifier = Modifier.fillMaxWidth(),
+          label = { Text("Port") },
+          singleLine = true,
+          placeholder = { Text("8642") },
+          isError = port.isNotBlank() && !isValidPort,
+          supportingText = if (port.isNotBlank() &&
+            !isValidPort
+          ) {
+            { Text("Port must be 1-65535") }
+          } else {
+            null
+          }
+        )
+        OutlinedTextField(
+          value = token,
+          onValueChange = { token = it },
+          modifier = Modifier.fillMaxWidth(),
+          label = { Text("API Token") },
+          singleLine = true,
+          placeholder = { Text("Optional") }
+        )
+      }
+    },
+    confirmButton = {
+      Button(
+        onClick = {
+          onAdd(
+            host.trim(),
+            port.toIntOrNull() ?: 8642,
+            token.trim().ifBlank { null }
+          )
+        },
+        enabled = isValidHost && isValidPort
+      ) {
+        Text("Add")
+      }
+    },
+    dismissButton = {
+      TextButton(onClick = onDismiss) {
+        Text("Cancel")
+      }
+    }
+  )
 }
 
 private fun extractFilename(url: String): String {
