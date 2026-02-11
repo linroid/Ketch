@@ -1,11 +1,17 @@
 plugins {
   alias(libs.plugins.kotlinJvm)
   alias(libs.plugins.kotlinx.serialization)
+  application
+}
+
+application {
+  mainClass.set("com.linroid.kdown.server.MainKt")
 }
 
 dependencies {
   api(projects.library.core)
   implementation(projects.library.ktor)
+  implementation(projects.library.sqlite)
 
   implementation(libs.ktor.serverCore)
   implementation(libs.ktor.serverNetty)
