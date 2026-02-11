@@ -1,68 +1,46 @@
 # KDown
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.0-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.10-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-4c8dec?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
 [![Ktor](https://img.shields.io/badge/Ktor-3.4.0-087CFA.svg?logo=ktor&logoColor=white)](https://ktor.io)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Android](https://img.shields.io/badge/Android-24+-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com)
+[![Android](https://img.shields.io/badge/Android-26+-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com)
 [![iOS](https://img.shields.io/badge/iOS-supported-000000.svg?logo=apple&logoColor=white)](https://developer.apple.com)
 [![JVM](https://img.shields.io/badge/JVM-11+-DB380E.svg?logo=openjdk&logoColor=white)](https://openjdk.org)
 [![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-6b48ff.svg?logo=anthropic&logoColor=white)](https://claude.ai/claude-code)
 
-A Kotlin Multiplatform download library with pause/resume, multi-threaded segmented downloads, and progress tracking.
+A Kotlin Multiplatform download manager with segmented downloads, pause/resume, queue management, speed limiting, and scheduling -- for Android, JVM, iOS, and WebAssembly.
 
-> **WIP:** This project is under active development. APIs may change and some features are not yet complete. Contributions and feedback are welcome!
+> **WIP:** This project is under active development. APIs may change. Contributions and feedback are welcome!
 
 ## Features
 
-- **Multi-platform** - Android, iOS, JVM/Desktop, and WebAssembly (Wasm)
-- **Segmented downloads** - Split files into N concurrent segments using HTTP Range requests for faster downloads
-- **Pause / Resume** - True resume using HTTP Range headers, not restart-from-zero
-- **Persistent resume** - Metadata is persisted so downloads survive app restarts
-- **Resume validation** - ETag / Last-Modified checks ensure the remote file hasn't changed
-- **Progress tracking** - Aggregated progress across all segments via `StateFlow`, with download speed
-- **Retry with backoff** - Configurable exponential backoff for transient network errors and 5xx responses
-- **Cancellation** - Robust coroutine-based cancellation
-- **Pluggable HTTP engine** - Ships with a Ktor adapter; bring your own `HttpEngine` if needed
-
-## Architecture
-
-```
-library/
-  core/       # Platform-agnostic download engine (commonMain)
-  ktor/       # Ktor-based HttpEngine implementation
-  kermit/     # Optional Kermit logging integration
-examples/
-  cli/        # JVM CLI sample
-  app/        # Compose Multiplatform app
-  desktopApp/ # Desktop (JVM) app
-  androidApp/ # Android app
-  webApp/     # Wasm browser app
-```
-
-Key internal components:
-
-| Class | Role |
-|---|---|
-| `KDown` | Main entry point |
-| `DownloadCoordinator` | Orchestrates segment jobs, manages state |
-| `SegmentDownloader` | Downloads a single byte-range segment |
-| `RangeSupportDetector` | Probes server for Range/ETag/content-length |
-| `FileAccessor` | expect/actual abstraction for random-access file writes |
-| `SqliteTaskStore` | SQLite-backed task record persistence (includes segments) |
+- **Multi-platform** -- Android, iOS, JVM/Desktop, and WebAssembly (WasmJs)
+- **Segmented downloads** -- Split files into N concurrent segments using HTTP Range requests
+- **Pause / Resume** -- True resume using byte ranges, with ETag/Last-Modified validation
+- **Queue management** -- Priority-based queue with configurable concurrency limits and per-host throttling
+- **Speed limiting** -- Global and per-task bandwidth throttling via token-bucket algorithm
+- **Scheduling** -- Start downloads at a specific time, after a delay, or when conditions are met
+- **Download conditions** -- User-defined conditions (e.g., WiFi-only) that gate download start
+- **Pluggable sources** -- Extensible `DownloadSource` interface for custom protocols (HTTP built-in)
+- **Persistent resume** -- Task metadata survives app restarts via pluggable `TaskStore`
+- **Progress tracking** -- Aggregated progress across segments via `StateFlow`, with download speed
+- **Retry with backoff** -- Configurable exponential backoff for transient errors
+- **Daemon server** -- Run KDown as a background service with REST API and SSE events
+- **Remote control** -- Control a daemon server from any client via `RemoteKDown`
+- **Pluggable HTTP engine** -- Ships with Ktor; bring your own `HttpEngine` if needed
 
 ## Quick Start
 
 ```kotlin
 // 1. Create a KDown instance
-val taskStore = createSqliteTaskStore(driverFactory)
 val kdown = KDown(
   httpEngine = KtorHttpEngine(),
-  taskStore = taskStore,
+  taskStore = createSqliteTaskStore(driverFactory),
   config = DownloadConfig(
     maxConnections = 4,
     retryCount = 3,
-    retryDelayMs = 1000
+    queueConfig = QueueConfig(maxConcurrentDownloads = 3)
   )
 )
 
@@ -70,7 +48,7 @@ val kdown = KDown(
 val task = kdown.download(
   DownloadRequest(
     url = "https://example.com/large-file.zip",
-    destPath = "/path/to/output.zip",
+    directory = "/path/to/downloads",
     connections = 4
   )
 )
@@ -90,116 +68,112 @@ launch {
   }
 }
 
-// 4. Pause / Resume / Cancel
+// 4. Control the download
 task.pause()
 task.resume()
 task.cancel()
 
 // 5. Or just await the result
-val result = task.await() // Result<Path>
-
-// 6. Observe all tasks (includes persisted tasks after loadTasks())
-kdown.loadTasks()
-kdown.tasks.collect { tasks ->
-  tasks.forEach { println("${it.taskId}: ${it.state.value}") }
-}
+val result: Result<String> = task.await()
 ```
-
-## Logging
-
-KDown provides pluggable logging support. By default, logging is disabled for zero overhead.
-
-### Built-in Console Logger
-
-Use the platform-specific console logger for quick debugging:
-
-```kotlin
-val kdown = KDown(
-  httpEngine = KtorHttpEngine(),
-  logger = Logger.console()  // Logs to Logcat (Android), NSLog (iOS), stdout/stderr (JVM)
-)
-```
-
-### Structured Logging with Kermit
-
-For production use, integrate with [Kermit](https://github.com/touchlab/Kermit) for structured, multi-platform logging:
-
-```kotlin
-// Add dependency: implementation("com.linroid.kdown:kermit:1.0.0")
-
-val kdown = KDown(
-  httpEngine = KtorHttpEngine(),
-  logger = KermitLogger(
-    minSeverity = Severity.Debug,
-    tag = "MyApp"
-  )
-)
-```
-
-### Custom Logger
-
-Implement the `Logger` interface to integrate with your own logging framework:
-
-```kotlin
-class MyLogger : Logger {
-  override fun v(message: () -> String) { /* verbose log */ }
-  override fun d(message: () -> String) { /* debug log */ }
-  override fun i(message: () -> String) { /* info log */ }
-  override fun w(message: () -> String, throwable: Throwable?) { /* warning log */ }
-  override fun e(message: () -> String, throwable: Throwable?) { /* error log */ }
-}
-
-val kdown = KDown(httpEngine = KtorHttpEngine(), logger = MyLogger())
-```
-
-**Log Levels:**
-- **Verbose**: Detailed diagnostics (segment-level progress)
-- **Debug**: Internal operations (server detection, metadata save/load)
-- **Info**: User-facing events (download start/complete, server capabilities)
-- **Warn**: Recoverable errors (retry attempts, validation warnings)
-- **Error**: Fatal failures (download failures, network errors)
-
-See [LOGGING.md](LOGGING.md) for detailed logging documentation.
 
 ## Modules
 
+KDown is split into published SDK modules that you add as dependencies:
+
+| Module | Description | Platforms |
+|---|---|---|
+| `library:api` | Public API interfaces and models (`KDownApi`, `DownloadTask`, `DownloadState`, etc.) | All |
+| `library:core` | In-process download engine -- embed downloads directly in your app | All |
+| `library:ktor` | Ktor-based `HttpEngine` implementation (required by `core`) | All |
+| `library:sqlite` | SQLite-backed `TaskStore` for persistent resume | Android, iOS, JVM |
+| `library:kermit` | Optional [Kermit](https://github.com/touchlab/Kermit) logging integration | All |
+| `library:remote` | Remote client -- control a KDown daemon server from any platform | All |
+| `server` | Daemon server with REST API and SSE events (not an SDK; standalone service) | JVM |
+
+Choose your backend: use **`core`** for in-process downloads, or **`remote`** to control a daemon server. Both implement the same `KDownApi` interface, so your UI code works identically.
+
+### `library:api`
+
+The public API surface. Both `library:core` and `library:remote` implement the `KDownApi` interface,
+so UI code works identically regardless of backend:
+
+```kotlin
+interface KDownApi {
+  val tasks: StateFlow<List<DownloadTask>>
+  suspend fun download(request: DownloadRequest): DownloadTask
+  suspend fun setGlobalSpeedLimit(limit: SpeedLimit)
+  fun close()
+  // ... plus backendLabel, version
+}
+```
+
 ### `library:core`
 
-The platform-agnostic download engine. No HTTP client dependency -- just the `HttpEngine` interface:
+The in-process download engine. Depends on an `HttpEngine` interface (no HTTP client dependency):
 
 ```kotlin
 interface HttpEngine {
-  suspend fun head(url: String): ServerInfo
-  suspend fun download(url: String, range: LongRange?, onData: suspend (ByteArray) -> Unit)
+  suspend fun head(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
+  suspend fun download(url: String, range: LongRange?, headers: Map<String, String> = emptyMap(), onData: suspend (ByteArray) -> Unit)
   fun close()
 }
 ```
 
 ### `library:ktor`
 
-A ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
+Ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
 
 | Platform | Ktor Engine |
 |---|---|
 | Android | OkHttp |
 | iOS | Darwin |
 | JVM | CIO |
-| Wasm/JS | Js |
-
-### `library:kermit`
-
-Optional [Kermit](https://github.com/touchlab/Kermit) integration for production-grade structured logging across all platforms.
+| WasmJs | Js |
 
 ## Configuration
 
 ```kotlin
 DownloadConfig(
-  maxConnections = 4,           // max concurrent segments
-  retryCount = 3,               // retries per segment
-  retryDelayMs = 1000,          // base delay (exponential backoff)
+  maxConnections = 4,             // max concurrent segments per task
+  retryCount = 3,                 // retries per segment
+  retryDelayMs = 1000,            // base delay (exponential backoff)
   progressUpdateIntervalMs = 200, // progress throttle
-  bufferSize = 8192             // read buffer size
+  bufferSize = 8192,              // read buffer size
+  speedLimit = SpeedLimit.kbps(500), // global speed limit
+  queueConfig = QueueConfig(
+    maxConcurrentDownloads = 3,   // max simultaneous downloads
+    maxConnectionsPerHost = 4,    // per-host limit
+    autoStart = true              // auto-start queued tasks
+  )
 )
+```
+
+### Priority & Scheduling
+
+```kotlin
+// High-priority download
+kdown.download(
+  DownloadRequest(
+    url = "https://example.com/urgent.zip",
+    directory = "/downloads",
+    priority = DownloadPriority.URGENT  // preempts lower-priority tasks
+  )
+)
+
+// Scheduled download
+kdown.download(
+  DownloadRequest(
+    url = "https://example.com/file.zip",
+    directory = "/downloads",
+    schedule = DownloadSchedule.AtTime(startAt),
+    conditions = listOf(wifiOnlyCondition)
+  )
+)
+
+// Speed limiting
+task.setSpeedLimit(SpeedLimit.mbps(1))        // per-task
+kdown.setGlobalSpeedLimit(SpeedLimit.kbps(500)) // global
 ```
 
 ## Error Handling
@@ -213,44 +187,82 @@ All errors are modeled as a sealed class `KDownError`:
 | `Disk` | No | File I/O failures |
 | `Unsupported` | No | Server doesn't support required features |
 | `ValidationFailed` | No | ETag / Last-Modified mismatch on resume |
+| `SourceError` | No | Error from a pluggable download source |
 | `Canceled` | No | Download was canceled |
 | `Unknown` | No | Unexpected errors |
 
+## Logging
+
+KDown provides pluggable logging with zero overhead when disabled (default).
+
+```kotlin
+// No logging (default)
+KDown(httpEngine = KtorHttpEngine())
+
+// Console logging (development)
+KDown(httpEngine = KtorHttpEngine(), logger = Logger.console())
+
+// Kermit structured logging (production)
+KDown(httpEngine = KtorHttpEngine(), logger = KermitLogger(minSeverity = Severity.Debug))
+```
+
+See [LOGGING.md](LOGGING.md) for detailed documentation.
+
 ## How It Works
 
-1. **Probe** -- HEAD request to get `Content-Length`, `Accept-Ranges`, `ETag`, `Last-Modified`
-2. **Plan** -- If ranges are supported, split the file into N segments; otherwise fall back to a single connection
-3. **Download** -- Each segment downloads its byte range concurrently and writes to the correct file offset
-4. **Persist** -- Segment progress is saved to `TaskStore` so pause/resume works across restarts
-5. **Resume** -- On resume, validates server identity (ETag/Last-Modified), then continues from last offsets
+1. **Resolve** -- Query the download source (HEAD request for HTTP) to get size, range support, identity headers
+2. **Plan** -- If ranges are supported, split the file into N segments; otherwise use a single connection
+3. **Queue** -- If max concurrent downloads reached, queue with priority ordering
+4. **Download** -- Each segment downloads its byte range concurrently and writes to the correct file offset
+5. **Throttle** -- Token-bucket speed limiter controls bandwidth per task and globally
+6. **Persist** -- Segment progress is saved to `TaskStore` so pause/resume works across restarts
+7. **Resume** -- On resume, validates server identity (ETag/Last-Modified) and file integrity, then continues
 
-## Current Limitations
+## Daemon Server
 
-- WebAssembly file writes are limited by browser APIs
-- iOS support is best-effort via expect/actual
+Run KDown as a background service and control it remotely:
 
-## Roadmap
+```kotlin
+// Server side (JVM)
+val kdown = KDown(httpEngine = KtorHttpEngine())
+val server = KDownServer(kdown)
+server.start()  // REST API + SSE on port 8642
 
-- **Speed Limit** - Bandwidth throttling per task or globally
-- **Queue Management** - Download queue with priority and concurrency limits
-- **Scheduled Downloads** - Timer-based or condition-based download scheduling
-- **Web App** - Browser-based download manager UI
-- **Torrent Support** - BitTorrent protocol as a pluggable download source
-- **Media Downloads** - Download web media (like yt-dlp) with pluggable extractors
-- **Daemon Server** - Background service with API, supporting local and remote backends
+// Client side (any platform)
+val remote = RemoteKDown(baseUrl = "http://localhost:8642")
+val task = remote.download(DownloadRequest(url = "...", directory = "..."))
+task.state.collect { /* real-time updates via SSE */ }
+```
+
+## Platform Support
+
+| Feature | Android | JVM | iOS | WasmJs |
+|---|---|---|---|---|
+| Segmented downloads | Yes | Yes | Yes | Remote only* |
+| Pause / Resume | Yes | Yes | Yes | Remote only* |
+| SQLite persistence | Yes | Yes | Yes | No |
+| Console logging | Logcat | stdout/stderr | NSLog | println |
+| Daemon server | -- | Yes | -- | -- |
+
+\*WasmJs: Local file I/O is not supported. Use `RemoteKDown` to control a daemon server from the browser.
 
 ## Building
 
 ```bash
-# Build all
+# Build all modules
 ./gradlew build
 
-# Run CLI example
-./gradlew :examples:cli:run --args="https://example.com/file.zip"
+# Run CLI
+./gradlew :cli:run --args="https://example.com/file.zip"
 
-# Run desktop example
-./gradlew :examples:desktopApp:run
+# Run desktop app
+./gradlew :app:desktop:run
 ```
+
+## Contributing
+
+Contributions are welcome! Please open an issue to discuss your idea before submitting a PR.
+See the [code style rules](.claude/rules/code-style.md) for formatting guidelines.
 
 ## License
 
@@ -258,4 +270,4 @@ Apache-2.0
 
 ---
 
-*This project was built with [Claude Code](https://claude.ai/claude-code) by Anthropic.*
+*Built with [Claude Code](https://claude.ai/claude-code) by Anthropic.*

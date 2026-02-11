@@ -20,8 +20,13 @@ interface DownloadTask {
   val state: StateFlow<DownloadState>
   val segments: StateFlow<List<Segment>>
 
+  /** Pauses the download, preserving segment progress for later resume. */
   suspend fun pause()
+
+  /** Resumes a paused or failed download from where it left off. */
   suspend fun resume()
+
+  /** Cancels the download. This is a terminal action. */
   suspend fun cancel()
 
   /**
@@ -59,6 +64,12 @@ interface DownloadTask {
    */
   suspend fun remove()
 
+  /**
+   * Suspends until the download reaches a terminal state.
+   *
+   * @return [Result.success] with the output file path on completion,
+   *   or [Result.failure] with a [KDownError] on failure or cancellation
+   */
   suspend fun await(): Result<String>
 }
 

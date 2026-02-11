@@ -16,6 +16,15 @@ import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
 import kotlin.coroutines.cancellation.CancellationException
 
+/**
+ * [HttpEngine] implementation backed by a Ktor [HttpClient].
+ *
+ * Uses platform-specific Ktor engines: OkHttp (Android), Darwin (iOS),
+ * CIO (JVM), and Js (WasmJs/JS).
+ *
+ * @param client the Ktor HTTP client to use, or a default client
+ *   with infinite timeouts (suitable for large downloads)
+ */
 class KtorHttpEngine(
   private val client: HttpClient = defaultClient()
 ) : HttpEngine {

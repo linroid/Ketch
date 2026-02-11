@@ -1,5 +1,5 @@
 You are a senior Kotlin Multiplatform library engineer working on "KDown", an open-source Kotlin
-Multiplatform downloader library.
+Multiplatform download manager library.
 
 ## Project Status
 
@@ -8,181 +8,162 @@ Android, JVM/Desktop, iOS, and WebAssembly platforms.
 
 **Note:** The library has not been published yet, so public API breaking changes are allowed.
 
-## Core Features (All Implemented ✅)
+## Module Structure
 
-1. ✅ Download with progress callbacks (bytes downloaded, total bytes, speed)
-2. ✅ Pause / Resume (true resume using HTTP Range; not "restart from 0")
-3. ✅ Multi-threaded segmented downloads (N segments using Range requests)
-4. ✅ Robust cancellation
-5. ✅ Retry with exponential backoff (configurable)
-6. ✅ Persist resumable metadata (app restart can resume)
-7. ✅ Comprehensive logging system with platform-specific implementations
-8. ✅ Kermit integration for structured logging
-
-## Architecture (Implemented ✅)
-
-- ✅ Ktor Client as default HTTP layer via `KtorHttpEngine` implementation
-- ✅ Pluggable architecture with `HttpEngine` interface for custom implementations
-- ✅ Kotlin coroutines throughout; no blocking IO in common code
-- ✅ `FileAccessor` expect/actual abstraction for platform-specific file operations
-  - Android/JVM: Uses `RandomAccessFile` with `Dispatchers.IO`
-  - iOS: Uses Foundation APIs (`NSFileHandle`, `NSFileManager`)
-  - All implementations are thread-safe with Mutex protection
-- ✅ Thread-safety ensured for pause/resume/cancel operations
-
-## Implemented Components
-
-### 1. Server Capability Detection (✅ `RangeSupportDetector`)
-- Performs HEAD request before downloading
-- Detects: content-length, accept-ranges, ETag, Last-Modified
-- Falls back to single-connection if ranges not supported
-
-### 2. Segmented Downloads (✅ `SegmentCalculator` + `SegmentDownloader`)
-- Splits files into N segments based on total size and connections
-- Each segment downloads concurrently using `Range: bytes=start-end`
-- Automatic fallback to single connection if server doesn't support ranges
-
-### 3. File Writing (✅ `FileAccessor` expect/actual)
-- Platform-specific random-access writes at offsets
-- Thread-safe with Mutex protection
-- Each segment writes to correct offset in same destination file
-
-### 4. Pause/Resume (✅ `DownloadCoordinator`)
-- Pause: stops all segment jobs, persists offsets, transitions to `Paused` state
-- Resume: loads metadata, validates server identity (ETag/Last-Modified), continues from last offsets
-- Resume validation prevents corrupted downloads
-- Local file integrity check on resume: verifies file size matches claimed progress, resets if truncated
-- Duplicate download guards: `start()`, `startFromRecord()`, `resume()` check `activeDownloads` to prevent concurrent writes
-- State transition guards in `KDown` action lambdas prevent invalid operations (e.g., pause on completed)
-
-### 5. Metadata Persistence (✅ `TaskStore` interface)
-- Interface implemented with two storage backends:
-  - `InMemoryTaskStore`: for testing and ephemeral downloads
-  - `SqliteTaskStore`: SQLite-based persistence (separate module)
-- Stores: url, destPath, totalBytes, acceptRanges, etag, lastModified, segment progress
-
-### 6. Error Handling (✅ Sealed `KDownError`)
-- Types: `Network`, `Http(code)`, `Disk`, `Unsupported`, `ValidationFailed`, `Canceled`, `Unknown`
-- Smart retry: only for transient errors (network issues, 5xx HTTP codes)
-- Exponential backoff with configurable retry count and base delay
-- I/O exceptions from `FileAccessor` (`writeAt`, `flush`, `preallocate`) classified as `KDownError.Disk`
-
-### 7. Progress Tracking (✅ StateFlow-based)
-- Aggregates progress across all segments
-- Throttled updates (default: 200ms) to prevent UI spam
-- Includes: downloadedBytes, totalBytes, percent, speed
-
-### 8. Logging System (✅ Pluggable `Logger` interface)
-- Three logging options:
-  1. `Logger.None` (default): Zero-overhead, no logging
-  2. `Logger.console()`: Platform-specific console output
-  3. `KermitLogger`: Optional Kermit integration (separate module)
-- Platform-specific console implementations:
-  - JVM: `println` / `System.err`
-  - Android: Android `Log` API with tag prefixing ("KDown.*")
-  - iOS: `NSLog`
-  - WebAssembly: `println` (browser dev tools)
-- Levels: verbose, debug, info, warn, error
-- Lazy evaluation via lambda parameters for zero cost when disabled
-- Internal `KDownLogger` wrapper for consistent tag formatting: `[Tag] message`
-- Comprehensive logging coverage:
-  - KDown lifecycle (init, start, pause, resume, cancel)
-  - Server detection and capabilities
-  - Segment operations (start, completion, progress)
-  - HTTP requests and errors
-  - Retry attempts
-- Kermit integration available via `library/kermit` module
-- See LOGGING.md for detailed usage examples
-
-### 9. Testing (✅ Comprehensive test suite)
-- Unit tests for: SegmentCalculator, SegmentDownloader, InMemoryMetadataStore
-- Model tests for all data classes
-- State transition tests
-
-### 10. Documentation (✅ Complete)
-- README.md: quickstart, features, configuration, error handling
-- LOGGING.md: detailed logging guide
-- CLI example: demonstrates pause/resume functionality
-- Multiple platform examples: Compose Multiplatform, Desktop, Android, iOS, WebAssembly
-
-## Current Limitations
-
-1. ⚠️ WebAssembly file writes limited by browser APIs (basic support only)
-2. ⚠️ iOS support is best-effort via expect/actual (functional but not extensively tested)
-
-## Roadmap
-
-Planned features that should be considered in architecture decisions:
-
-1. **Speed Limit** - Bandwidth throttling per task or globally
-2. **Queue Management** - Download queue with priority, concurrency limits, and scheduling
-3. **Scheduled Downloads** - Timer-based or condition-based download scheduling
-4. **Web App** - Browser-based download manager UI
-5. **Torrent Support** - BitTorrent protocol as a pluggable download source
-6. **Media Downloads** - Download web media (like yt-dlp), with a pluggable downloader
-   architecture to support different media sources and extractors
-7. **Daemon Server** - Run KDown as a background service/daemon with an API, supporting
-   switching between local and remote backends (e.g., control a remote KDown instance
-   from a mobile app or web UI)
-
-## Usage Examples
-
-### Basic Setup with Logging
-
-```kotlin
-// Option 1: No logging (default, zero overhead)
-val kdown = KDown(httpEngine = KtorHttpEngine())
-
-// Option 2: Console logging (development/debugging)
-val kdown = KDown(
-  httpEngine = KtorHttpEngine(),
-  logger = Logger.console()
-)
-
-// Option 3: Kermit structured logging (recommended for production)
-val kdown = KDown(
-  httpEngine = KtorHttpEngine(),
-  logger = KermitLogger(minSeverity = Severity.Info)
-)
+```
+library/
+  api/        # Public API interfaces and models -- published SDK module
+  core/       # In-process download engine -- published SDK module
+  ktor/       # Ktor-based HttpEngine implementation -- published SDK module
+  kermit/     # Optional Kermit logging integration -- published SDK module
+  sqlite/     # SQLite-backed TaskStore (Android, iOS, JVM only) -- published SDK module
+  remote/     # Remote KDownApi client (HTTP + SSE) -- published SDK module
+server/       # Ktor-based daemon server with REST API and SSE events
+app/
+  shared/     # Shared Compose Multiplatform UI (supports Core + Remote backends)
+  android/    # Android app
+  desktop/    # Desktop (JVM) app
+  web/        # Wasm browser app
+  ios/        # Native iOS app (Xcode project, consumes shared module)
+cli/          # JVM CLI entry point
 ```
 
-See LOGGING.md for detailed logging guide with example output.
+## Package Structure
+
+### `library:api` (public API)
+- `com.linroid.kdown.api` -- `KDownApi`, `DownloadTask`, `DownloadRequest`, `DownloadState`,
+  `DownloadProgress`, `Segment`, `KDownError`, `SpeedLimit`, `DownloadPriority`,
+  `DownloadSchedule`, `DownloadCondition`, `KDownVersion`
+
+### `library:core` (implementation)
+- `com.linroid.kdown.core` -- `KDown` (implements `KDownApi`), `DownloadConfig`, `QueueConfig`
+- `com.linroid.kdown.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `RangeSupportDetector`,
+  `ServerInfo`, `DownloadSource`, `HttpDownloadSource`, `SourceResolver`, `SourceInfo`,
+  `SourceResumeState`, `DownloadContext`, `DownloadScheduler`, `ScheduleManager`,
+  `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`
+- `com.linroid.kdown.core.segment` -- `SegmentCalculator`, `SegmentDownloader`
+- `com.linroid.kdown.core.file` -- `FileAccessor` (expect/actual), `FileNameResolver`,
+  `DefaultFileNameResolver`, `PathSerializer`
+- `com.linroid.kdown.core.log` -- `Logger`, `KDownLogger`
+- `com.linroid.kdown.core.task` -- `DownloadTaskImpl`, `TaskStore`, `InMemoryTaskStore`,
+  `TaskRecord`, `TaskState`
+
+### `library:remote`
+- `com.linroid.kdown.remote` -- `RemoteKDown` (implements `KDownApi`), `RemoteDownloadTask`,
+  `ConnectionState`, `WireModels`, `WireMapper`
+
+## Implemented Features
+
+### Core Download Engine
+- Multi-platform: Android (minSdk 26), JVM 11+, iOS (iosArm64, iosSimulatorArm64), WasmJs
+- Segmented downloads with concurrent HTTP Range requests
+- Pause / Resume with server identity validation (ETag, Last-Modified)
+- File integrity check on resume (validates local file size vs. claimed progress)
+- Retry with exponential backoff for transient errors
+- Persistent task metadata via `TaskStore` interface
+- Duplicate download guards in `start()`, `startFromRecord()`, `resume()`
+
+### Queue Management (`DownloadScheduler`)
+- Configurable concurrent download slots (`QueueConfig.maxConcurrentDownloads`)
+- Per-host connection limits (`QueueConfig.maxConnectionsPerHost`)
+- Priority-based ordering (`DownloadPriority`: LOW, NORMAL, HIGH, URGENT)
+- URGENT preemption: pauses lowest-priority active download to make room
+
+### Speed Limiting
+- Global speed limit via `DownloadConfig.speedLimit` or `KDownApi.setGlobalSpeedLimit()`
+- Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`
+- Token-bucket algorithm (`TokenBucket`) with delegating wrapper
+
+### Download Scheduling (`ScheduleManager`)
+- `DownloadSchedule.Immediate`, `AtTime(Instant)`, `AfterDelay(Duration)`
+- `DownloadCondition` interface for user-defined conditions (e.g., WiFi-only)
+- Reschedule support via `DownloadTask.reschedule()`
+
+### Pluggable Download Sources (`DownloadSource`)
+- `SourceResolver` routes URLs to the appropriate source
+- `HttpDownloadSource` is the built-in HTTP/HTTPS implementation
+- Additional sources registered via `KDown(additionalSources = listOf(...))`
+- Each source defines: `canHandle()`, `resolve()`, `download()`, `resume()`
+
+### Daemon Server (`server/`)
+- Ktor-based REST API: create, list, pause, resume, cancel downloads
+- SSE event stream for real-time state updates
+- Remote backend (`RemoteKDown`) communicates via HTTP + SSE
+- Auto-reconnection with exponential backoff
+
+### Logging System
+- `Logger.None` (default, zero overhead), `Logger.console()`, `KermitLogger`
+- Platform-specific console: Logcat (Android), NSLog (iOS), println/stderr (JVM), println (Wasm)
+- Lazy lambda evaluation for zero cost when disabled
+
+### Error Handling (sealed `KDownError`)
+- `Network` (retryable), `Http(code)` (5xx retryable), `Disk`, `Unsupported`,
+  `ValidationFailed`, `Canceled`, `SourceError`, `Unknown`
+- I/O exceptions from `FileAccessor` classified as `KDownError.Disk`
+
+## Architecture Patterns
+
+### Dual Backend via `KDownApi`
+- `KDownApi` is the service interface (in `library:api`)
+- `KDown` (core) is the in-process implementation
+- `RemoteKDown` (remote) communicates with a daemon server over HTTP + SSE
+- UI code works identically regardless of backend
+
+### Pluggable Components
+- `HttpEngine` interface for custom HTTP clients (default: Ktor)
+- `TaskStore` interface for persistence (InMemoryTaskStore, SqliteTaskStore)
+- `DownloadSource` interface for protocol-level extensibility
+- `Logger` interface for logging backends
+
+### Expect/Actual for Platform Code
+- `FileAccessor`: Android/JVM uses `RandomAccessFile`, iOS uses `NSFileHandle`
+- Console logger: platform-specific implementations
+- All implementations use Mutex for thread-safety
+
+### Coroutine-Based Concurrency
+- `supervisorScope` for segment downloads (one failure doesn't cancel others)
+- Structured concurrency for cleanup on cancel/pause
+- `Dispatchers.IO` for file operations
 
 ## Development Guidelines
 
-When working on this project:
-
 ### Code Quality
+- 2-space indentation, max 100 char lines (see `.editorconfig`)
+- No star imports, no trailing commas
 - Favor simple correctness over micro-optimizations
-- Keep public APIs minimal and well-documented with KDoc
-- Mark internal implementation details with `internal` modifier
-- Use sealed classes for closed type hierarchies
+- Keep public APIs minimal with KDoc
+- Mark internal implementation with `internal` modifier
 
-### Architecture Patterns
-- All core logic lives in `commonMain` using expect/actual for platform differences
-- Avoid platform-specific APIs in common code
-- Use dependency injection for pluggable components (HttpEngine, TaskStore, Logger)
+### Architecture
+- All core logic in `commonMain` using expect/actual for platform differences
+- Dependency injection for pluggable components
 - Prefer composition over inheritance
-- Package structure: root (KDown, DownloadConfig, DownloadRequest, DownloadProgress, DownloadState), `task/` (DownloadTask, TaskStore, InMemoryTaskStore, TaskRecord, TaskState), `segment/` (Segment, SegmentCalculator, SegmentDownloader), `engine/` (HttpEngine, DownloadCoordinator, RangeSupportDetector, ServerInfo), `file/` (FileAccessor, FileNameResolver, DefaultFileNameResolver, PathSerializer), `log/` (Logger, KDownLogger), `error/` (KDownError)
+- Public API types live in `library:api`, implementations in `library:core`
 
 ### Testing
-- Add unit tests for new features in `commonTest`
-- Test segment calculation edge cases (file sizes, connection counts)
-- Test metadata serialization/deserialization
-- Test state transitions (Idle → Downloading → Paused → Downloading → Completed)
-- Mock HTTP responses for testing resume logic
+- Unit tests in `commonTest` for segment math, state transitions, serialization
+- Mock `HttpEngine` for testing without network
+- Test edge cases: 0-byte files, 1-byte files, uneven segment splits
 
 ### Logging
-- Use `KDownLogger` for all internal logging (automatically prefixes tags)
-- Pass component tag as first parameter: `KDownLogger.i("KDown") { "message" }`
-- Log at appropriate levels:
-  - `verbose`: Detailed flow information (segment-level progress, byte details)
-  - `debug`: Important state changes (server detection, metadata operations, segment start/completion)
-  - `info`: User-facing events (download started/paused/resumed/completed, server capabilities)
-  - `warn`: Recoverable errors, retries, validation warnings
-  - `error`: Fatal errors (download failures, network errors)
-- Include context in log messages (task ID, segment index, URLs, byte ranges)
-- Use lazy lambdas for message construction: `logger.d { "expensive $computation" }`
-  - Messages are only computed if logging is enabled
-  - This ensures zero overhead when using `Logger.None` (default)
-- Common component tags: "KDown", "Coordinator", "SegmentDownloader", "RangeDetector", "KtorHttpEngine"
+- Use `KDownLogger` for all internal logging
+- Tags: "KDown", "Coordinator", "SegmentDownloader", "RangeDetector", "KtorHttpEngine",
+  "Scheduler", "ScheduleManager", "SourceResolver"
+- Levels: verbose (segment detail), debug (state changes), info (user events),
+  warn (retries), error (fatal)
+- Use lazy lambdas: `logger.d { "expensive $computation" }`
+
+## Current Limitations
+
+1. WasmJs: Local file I/O not supported (`FileAccessor` is a stub that throws
+   `UnsupportedOperationException`). Use `RemoteKDown` for browser-based downloads.
+2. iOS support is best-effort via expect/actual (iosArm64 + iosSimulatorArm64)
+3. `library:sqlite` does not support WasmJs -- use `InMemoryTaskStore` on that platform
+
+## Roadmap
+
+Planned features not yet implemented:
+
+1. **Web App** - Browser-based download manager UI
+2. **Torrent Support** - BitTorrent protocol as a pluggable `DownloadSource`
+3. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`
