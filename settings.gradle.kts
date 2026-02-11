@@ -41,9 +41,9 @@ include(":library:kermit")
 include(":library:sqlite")
 include(":server")
 
-// Example modules
-include(":examples:app")
-include(":examples:androidApp")
-include(":examples:desktopApp")
-include(":examples:webApp")
-include(":examples:cli")
+// App modules
+include(":app:shared")
+include(":app:android")
+include(":app:desktop")
+include(":app:web")
+include(":cli")
