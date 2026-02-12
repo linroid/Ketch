@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -16,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.window.core.layout.WindowSizeClass
 import com.linroid.kdown.api.DownloadState
 
 @Composable
@@ -25,7 +26,6 @@ fun TaskActionButtons(
   onResume: () -> Unit,
   onCancel: () -> Unit,
   onRetry: () -> Unit,
-  onRemove: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   Row(
@@ -62,20 +62,6 @@ fun TaskActionButtons(
           tint = MaterialTheme.colorScheme.error,
           onClick = onCancel
         )
-        ActionIcon(
-          icon = Icons.Filled.Delete,
-          description = "Remove",
-          tint = MaterialTheme.colorScheme.error,
-          onClick = onRemove
-        )
-      }
-      is DownloadState.Completed -> {
-        ActionIcon(
-          icon = Icons.Filled.Delete,
-          description = "Remove",
-          tint = MaterialTheme.colorScheme.error,
-          onClick = onRemove
-        )
       }
       is DownloadState.Failed,
       is DownloadState.Canceled -> {
@@ -85,22 +71,10 @@ fun TaskActionButtons(
           tint = MaterialTheme.colorScheme.primary,
           onClick = onRetry
         )
-        ActionIcon(
-          icon = Icons.Filled.Delete,
-          description = "Remove",
-          tint = MaterialTheme.colorScheme.error,
-          onClick = onRemove
-        )
       }
+      is DownloadState.Completed,
       is DownloadState.Scheduled,
-      is DownloadState.Queued -> {
-        ActionIcon(
-          icon = Icons.Filled.Close,
-          description = "Cancel",
-          tint = MaterialTheme.colorScheme.error,
-          onClick = onCancel
-        )
-      }
+      is DownloadState.Queued,
       is DownloadState.Idle -> {}
     }
   }
@@ -113,14 +87,22 @@ private fun ActionIcon(
   tint: androidx.compose.ui.graphics.Color,
   onClick: () -> Unit
 ) {
+  val windowSizeClass =
+    currentWindowAdaptiveInfo().windowSizeClass
+  val isCompact = !windowSizeClass
+    .isWidthAtLeastBreakpoint(
+      WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
+    )
+  val buttonSize = if (isCompact) 48.dp else 32.dp
+  val iconSize = if (isCompact) 22.dp else 18.dp
   IconButton(
     onClick = onClick,
-    modifier = Modifier.size(32.dp)
+    modifier = Modifier.size(buttonSize)
   ) {
     Icon(
       imageVector = icon,
       contentDescription = description,
-      modifier = Modifier.size(18.dp),
+      modifier = Modifier.size(iconSize),
       tint = tint
     )
   }

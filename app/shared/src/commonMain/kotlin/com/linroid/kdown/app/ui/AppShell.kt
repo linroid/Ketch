@@ -1,20 +1,33 @@
 package com.linroid.kdown.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -27,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.window.core.layout.WindowSizeClass
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.app.backend.BackendManager
 import com.linroid.kdown.app.state.AppState
@@ -37,6 +51,7 @@ import com.linroid.kdown.app.ui.dialog.BackendSelectorSheet
 import com.linroid.kdown.app.ui.list.DownloadList
 import com.linroid.kdown.app.ui.sidebar.SidebarNavigation
 import com.linroid.kdown.app.ui.sidebar.SpeedStatusBar
+import com.linroid.kdown.app.ui.sidebar.filterIcon
 import com.linroid.kdown.app.ui.toolbar.BatchActionBar
 import com.linroid.kdown.app.ui.toolbar.countTasksByFilter
 
@@ -62,8 +77,11 @@ fun AppShell(backendManager: BackendManager) {
     appState.serverState.collectAsState()
 
   // Collect all task states for filtering/counts
-  val taskStates = remember { mutableStateMapOf<String, DownloadState>() }
-  val currentTaskIds = sortedTasks.map { it.taskId }.toSet()
+  val taskStates = remember {
+    mutableStateMapOf<String, DownloadState>()
+  }
+  val currentTaskIds =
+    sortedTasks.map { it.taskId }.toSet()
   taskStates.keys.removeAll { it !in currentTaskIds }
   sortedTasks.forEach { task ->
     val state by task.state.collectAsState()
@@ -129,114 +147,193 @@ fun AppShell(backendManager: BackendManager) {
     }
   }
 
-  Column(modifier = Modifier.fillMaxSize()) {
-    // Main content: sidebar + list
-    Row(modifier = Modifier.weight(1f)) {
-      // Left sidebar
-      SidebarNavigation(
-        selectedFilter = appState.statusFilter,
-        taskCounts = taskCounts,
-        onFilterSelect = { appState.statusFilter = it },
-        onAddClick = {
-          appState.showAddDialog = true
-        }
-      )
+  // Determine layout type: None for Expanded (custom sidebar),
+  // scaffold handles Compact/Medium automatically.
+  val adaptiveInfo = currentWindowAdaptiveInfo()
+  val isExpanded = adaptiveInfo.windowSizeClass
+    .isWidthAtLeastBreakpoint(
+      WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND
+    )
+  val navLayoutType = if (isExpanded) {
+    NavigationSuiteType.None
+  } else {
+    NavigationSuiteScaffoldDefaults
+      .calculateFromAdaptiveInfo(adaptiveInfo)
+  }
 
-      VerticalDivider(
-        color = MaterialTheme.colorScheme.outlineVariant
-      )
-
-      // Right content area
-      Column(modifier = Modifier.weight(1f)) {
-        // Top bar with title and batch actions
-        TopAppBar(
-          title = {
-            Text(
-              text = appState.statusFilter.label,
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold
-            )
-          },
-          actions = {
-            BatchActionBar(
-              hasActiveDownloads = hasActive,
-              hasPausedDownloads = hasPaused,
-              hasCompletedDownloads = hasCompleted,
-              onPauseAll = { appState.pauseAll() },
-              onResumeAll = { appState.resumeAll() },
-              onClearCompleted = {
-                appState.clearCompleted()
+  NavigationSuiteScaffold(
+    navigationSuiteItems = {
+      StatusFilter.entries.forEach { filter ->
+        val count = taskCounts[filter] ?: 0
+        item(
+          selected = appState.statusFilter == filter,
+          onClick = { appState.statusFilter = filter },
+          icon = {
+            if (count > 0 &&
+              filter != StatusFilter.All
+            ) {
+              BadgedBox(
+                badge = {
+                  Badge { Text(count.toString()) }
+                }
+              ) {
+                Icon(
+                  imageVector = filterIcon(filter),
+                  contentDescription = filter.label,
+                  modifier = Modifier.size(24.dp)
+                )
+              }
+            } else {
+              Icon(
+                imageVector = filterIcon(filter),
+                contentDescription = filter.label,
+                modifier = Modifier.size(24.dp)
+              )
+            }
+          }
+        )
+      }
+    },
+    layoutType = navLayoutType
+  ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+      Column(modifier = Modifier.fillMaxSize()) {
+        // Expanded: sidebar + content side by side
+        Row(modifier = Modifier.weight(1f)) {
+          if (isExpanded) {
+            SidebarNavigation(
+              selectedFilter = appState.statusFilter,
+              taskCounts = taskCounts,
+              onFilterSelect = { selected ->
+                appState.statusFilter = selected
+              },
+              onAddClick = {
+                appState.showAddDialog = true
               }
             )
-          },
-          colors = TopAppBarDefaults.topAppBarColors(
-            containerColor =
-              MaterialTheme.colorScheme.surface
-          )
-        )
+            VerticalDivider(
+              color =
+                MaterialTheme.colorScheme.outlineVariant
+            )
+          }
 
-        // Error banner
-        if (appState.errorMessage != null) {
-          Card(
-            colors = CardDefaults.cardColors(
-              containerColor = MaterialTheme.colorScheme
-                .errorContainer
-            ),
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(horizontal = 16.dp)
-          ) {
-            Row(
-              modifier = Modifier.padding(16.dp),
-              verticalAlignment =
-                Alignment.CenterVertically,
-              horizontalArrangement =
-                Arrangement.spacedBy(12.dp)
-            ) {
-              Text(
-                text = appState.errorMessage ?: "",
-                style =
-                  MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme
-                  .onErrorContainer,
-                modifier = Modifier.weight(1f)
+          // Content area
+          Column(modifier = Modifier.weight(1f)) {
+            TopAppBar(
+              title = {
+                Text(
+                  text = appState.statusFilter.label,
+                  style =
+                    MaterialTheme.typography.titleMedium,
+                  fontWeight = FontWeight.SemiBold
+                )
+              },
+              actions = {
+                BatchActionBar(
+                  hasActiveDownloads = hasActive,
+                  hasPausedDownloads = hasPaused,
+                  hasCompletedDownloads = hasCompleted,
+                  onPauseAll = { appState.pauseAll() },
+                  onResumeAll = { appState.resumeAll() },
+                  onClearCompleted = {
+                    appState.clearCompleted()
+                  }
+                )
+              },
+              colors = TopAppBarDefaults.topAppBarColors(
+                containerColor =
+                  MaterialTheme.colorScheme.surface
               )
-              TextButton(
-                onClick = { appState.dismissError() }
+            )
+
+            // Error banner
+            if (appState.errorMessage != null) {
+              Card(
+                colors = CardDefaults.cardColors(
+                  containerColor =
+                    MaterialTheme.colorScheme
+                      .errorContainer
+                ),
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 16.dp)
               ) {
-                Text("Dismiss")
+                Row(
+                  modifier = Modifier.padding(16.dp),
+                  verticalAlignment =
+                    Alignment.CenterVertically,
+                  horizontalArrangement =
+                    Arrangement.spacedBy(12.dp)
+                ) {
+                  Text(
+                    text = appState.errorMessage ?: "",
+                    style =
+                      MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme
+                      .onErrorContainer,
+                    modifier = Modifier.weight(1f)
+                  )
+                  TextButton(
+                    onClick = {
+                      appState.dismissError()
+                    }
+                  ) {
+                    Text("Dismiss")
+                  }
+                }
               }
             }
+
+            // Download list
+            DownloadList(
+              tasks = filteredTasks,
+              isEmpty = sortedTasks.isEmpty() &&
+                appState.errorMessage == null,
+              isFilterEmpty = filteredTasks.isEmpty() &&
+                sortedTasks.isNotEmpty(),
+              selectedFilter = appState.statusFilter,
+              scope = scope,
+              onAddClick = {
+                appState.showAddDialog = true
+              },
+              modifier = Modifier.weight(1f)
+            )
           }
         }
 
-        // Download list
-        DownloadList(
-          tasks = filteredTasks,
-          isEmpty = sortedTasks.isEmpty() &&
-            appState.errorMessage == null,
-          isFilterEmpty = filteredTasks.isEmpty() &&
-            sortedTasks.isNotEmpty(),
-          selectedFilter = appState.statusFilter,
-          scope = scope,
-          onAddClick = {
-            appState.showAddDialog = true
-          },
-          modifier = Modifier.weight(1f)
+        // Bottom speed status bar
+        SpeedStatusBar(
+          activeDownloads = activeDownloadCount,
+          totalSpeed = totalSpeed,
+          backendLabel = activeBackend?.label,
+          connectionState = connectionState,
+          onBackendClick = {
+            appState.showBackendSelector = true
+          }
         )
       }
-    }
 
-    // Bottom speed status bar
-    SpeedStatusBar(
-      activeDownloads = activeDownloadCount,
-      totalSpeed = totalSpeed,
-      backendLabel = activeBackend?.label,
-      connectionState = connectionState,
-      onBackendClick = {
-        appState.showBackendSelector = true
+      // FAB for Compact/Medium layouts (sidebar has its
+      // own "New Task" button on Expanded)
+      if (!isExpanded) {
+        FloatingActionButton(
+          onClick = { appState.showAddDialog = true },
+          modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(end = 16.dp, bottom = 72.dp),
+          containerColor =
+            MaterialTheme.colorScheme.primary,
+          contentColor =
+            MaterialTheme.colorScheme.onPrimary,
+          shape = RoundedCornerShape(16.dp)
+        ) {
+          Icon(
+            Icons.Filled.Add,
+            contentDescription = "New Task"
+          )
+        }
       }
-    )
+    }
   }
 
   // Dialogs
