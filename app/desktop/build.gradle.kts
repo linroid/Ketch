@@ -9,7 +9,7 @@ plugins {
 
 dependencies {
   implementation(projects.app.shared)
-  implementation(projects.server)
+  implementation(projects.library.server)
   implementation(projects.library.ktor)
   implementation(projects.library.sqlite)
   implementation(compose.desktop.currentOs)

@@ -1,11 +1,6 @@
 plugins {
   alias(libs.plugins.kotlinJvm)
   alias(libs.plugins.kotlinx.serialization)
-  application
-}
-
-application {
-  mainClass.set("com.linroid.kdown.server.MainKt")
 }
 
 dependencies {

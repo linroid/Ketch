@@ -40,7 +40,7 @@ include(":library:endpoints")
 include(":library:ktor")
 include(":library:kermit")
 include(":library:sqlite")
-include(":server")
+include(":library:server")
 
 // App modules
 include(":app:shared")
