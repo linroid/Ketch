@@ -1,8 +1,8 @@
 package com.linroid.kdown.engine
 
+import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.core.engine.RangeSupportDetector
 import com.linroid.kdown.core.engine.ServerInfo
-import com.linroid.kdown.api.KDownError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

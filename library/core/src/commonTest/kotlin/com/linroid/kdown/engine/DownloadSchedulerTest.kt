@@ -1,16 +1,16 @@
 package com.linroid.kdown.engine
 
-import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
+import com.linroid.kdown.api.Segment
+import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.core.QueueConfig
 import com.linroid.kdown.core.engine.DownloadCoordinator
 import com.linroid.kdown.core.engine.DownloadScheduler
 import com.linroid.kdown.core.engine.HttpDownloadSource
 import com.linroid.kdown.core.engine.SourceResolver
 import com.linroid.kdown.core.file.DefaultFileNameResolver
-import com.linroid.kdown.api.Segment
 import com.linroid.kdown.core.task.InMemoryTaskStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,8 +23,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -78,7 +78,7 @@ class DownloadSchedulerTest {
 
         scheduler.enqueue(
           "task-1", createRequest(), Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         // Should have moved past Pending (to Downloading or failed
@@ -105,7 +105,7 @@ class DownloadSchedulerTest {
 
         scheduler.enqueue(
           "task-1", createRequest(), Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         assertIs<DownloadState.Queued>(stateFlow.value)
@@ -129,7 +129,7 @@ class DownloadSchedulerTest {
           MutableStateFlow<List<Segment>>(emptyList())
         scheduler.enqueue(
           "task-1", createRequest(), Clock.System.now(),
-          stateFlow1, segmentsFlow1
+          stateFlow1, segmentsFlow1,
         )
 
         // Second task should be queued
@@ -139,7 +139,7 @@ class DownloadSchedulerTest {
           MutableStateFlow<List<Segment>>(emptyList())
         scheduler.enqueue(
           "task-2", createRequest(), Clock.System.now(),
-          stateFlow2, segmentsFlow2
+          stateFlow2, segmentsFlow2,
         )
 
         assertIs<DownloadState.Queued>(stateFlow2.value)
@@ -192,7 +192,7 @@ class DownloadSchedulerTest {
           MutableStateFlow<List<Segment>>(emptyList())
         scheduler.enqueue(
           "task-1", createRequest(), Clock.System.now(),
-          stateFlow1, segmentsFlow1
+          stateFlow1, segmentsFlow1,
         )
 
         // Queue a second task
@@ -202,7 +202,7 @@ class DownloadSchedulerTest {
           MutableStateFlow<List<Segment>>(emptyList())
         scheduler.enqueue(
           "task-2", createRequest(), Clock.System.now(),
-          stateFlow2, segmentsFlow2
+          stateFlow2, segmentsFlow2,
         )
         assertIs<DownloadState.Queued>(stateFlow2.value)
 
@@ -222,22 +222,16 @@ class DownloadSchedulerTest {
   @Test
   fun extractHost_parsesCorrectly() {
     val host = DownloadScheduler.extractHost(
-      "https://cdn.example.com:8080/path/file.zip"
+      "https://cdn.example.com:8080/path/file.zip",
     )
-    assertTrue(
-      host == "cdn.example.com",
-      "Expected 'cdn.example.com', got '$host'"
-    )
+    assertEquals(host, "cdn.example.com", "Expected 'cdn.example.com', got '$host'")
   }
 
   @Test
   fun extractHost_simpleUrl() {
     val host = DownloadScheduler.extractHost(
-      "https://example.com/file.zip"
+      "https://example.com/file.zip",
     )
-    assertTrue(
-      host == "example.com",
-      "Expected 'example.com', got '$host'"
-    )
+    assertEquals(host, "example.com", "Expected 'example.com', got '$host'")
   }
 }

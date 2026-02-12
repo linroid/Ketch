@@ -66,11 +66,7 @@ fun ProgressSection(
               }
             }
             if (!speedLimit.isUnlimited) {
-              append(
-                " (limit: " +
-                  "${formatBytes(speedLimit.bytesPerSecond)}" +
-                  "/s)"
-              )
+              append(" (limit: " + formatBytes(speedLimit.bytesPerSecond) + "/s)")
             }
           },
           style = MaterialTheme.typography.bodySmall,
@@ -93,8 +89,7 @@ fun ProgressSection(
         )
         Text(
           text = "Paused \u00b7 ${pct.toInt()}%" +
-            " \u00b7 " +
-            "${formatBytes(progress.downloadedBytes)}" +
+            " \u00b7 " + formatBytes(progress.downloadedBytes) +
             " / ${formatBytes(progress.totalBytes)}",
           style = MaterialTheme.typography.bodySmall,
           color = colors.foreground,

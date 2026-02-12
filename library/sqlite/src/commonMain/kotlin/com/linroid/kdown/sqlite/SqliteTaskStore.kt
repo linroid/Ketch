@@ -9,9 +9,9 @@ import com.linroid.kdown.core.task.TaskStore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.io.files.Path
-import kotlin.time.Instant
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlin.time.Instant
 
 /**
  * A [TaskStore] backed by SQLite via SQLDelight. Persists [TaskRecord]s

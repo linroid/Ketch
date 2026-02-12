@@ -8,6 +8,7 @@ import com.linroid.kdown.app.backend.BackendManager
 import com.linroid.kdown.sqlite.DriverFactory
 import com.linroid.kdown.sqlite.createSqliteTaskStore
 
+@Suppress("unused", "FunctionName")
 fun MainViewController() = ComposeUIViewController {
   val backendManager = remember {
     val taskStore = createSqliteTaskStore(DriverFactory())

@@ -1,9 +1,9 @@
 package com.linroid.kdown.core.task
 
 import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.api.Segment
 import com.linroid.kdown.core.engine.SourceResumeState
 import com.linroid.kdown.core.file.PathSerializer
-import com.linroid.kdown.api.Segment
 import kotlinx.io.files.Path
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant

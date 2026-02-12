@@ -26,7 +26,6 @@ internal class InMemoryTaskStore : TaskStore {
 
   override suspend fun remove(taskId: String): Unit = mutex.withLock {
     storage.remove(taskId)
-    Unit
   }
 
   suspend fun clearAll(): Unit = mutex.withLock {

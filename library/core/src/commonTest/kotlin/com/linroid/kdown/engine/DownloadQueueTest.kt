@@ -1,16 +1,16 @@
 package com.linroid.kdown.engine
 
-import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
+import com.linroid.kdown.api.Segment
+import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.core.QueueConfig
 import com.linroid.kdown.core.engine.DownloadCoordinator
 import com.linroid.kdown.core.engine.DownloadScheduler
 import com.linroid.kdown.core.engine.HttpDownloadSource
 import com.linroid.kdown.core.engine.SourceResolver
 import com.linroid.kdown.core.file.DefaultFileNameResolver
-import com.linroid.kdown.api.Segment
 import com.linroid.kdown.core.task.InMemoryTaskStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

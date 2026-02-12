@@ -1,8 +1,8 @@
 package com.linroid.kdown.core.engine
 
 import com.linroid.kdown.api.DownloadRequest
-import com.linroid.kdown.core.file.FileAccessor
 import com.linroid.kdown.api.Segment
+import com.linroid.kdown.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**

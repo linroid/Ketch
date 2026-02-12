@@ -53,7 +53,7 @@ sealed class KDownError(
   data object Canceled : KDownError("Download was canceled")
 
   /**
-   * Error originating from a pluggable [DownloadSource][com.linroid.kdown.core.engine.DownloadSource].
+   * Error originating from a pluggable [com.linroid.kdown.core.engine.DownloadSource].
    *
    * @property sourceType identifier of the source that failed
    */

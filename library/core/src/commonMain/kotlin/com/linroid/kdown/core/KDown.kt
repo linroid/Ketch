@@ -4,8 +4,11 @@ import com.linroid.kdown.api.DownloadProgress
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadSchedule
 import com.linroid.kdown.api.DownloadState
+import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.core.engine.DelegatingSpeedLimiter
 import com.linroid.kdown.core.engine.DownloadCoordinator
@@ -27,9 +30,6 @@ import com.linroid.kdown.core.task.InMemoryTaskStore
 import com.linroid.kdown.core.task.TaskRecord
 import com.linroid.kdown.core.task.TaskState
 import com.linroid.kdown.core.task.TaskStore
-import com.linroid.kdown.api.KDownError
-import com.linroid.kdown.api.Segment
-import com.linroid.kdown.api.DownloadTask
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -75,7 +75,7 @@ class KDown(
       SpeedLimiter.Unlimited
     } else {
       TokenBucket(config.speedLimit.bytesPerSecond)
-    }
+    },
   )
 
   private val httpSource = HttpDownloadSource(
@@ -86,7 +86,7 @@ class KDown(
   )
 
   private val sourceResolver = SourceResolver(
-    additionalSources + httpSource
+    additionalSources + httpSource,
   )
 
   override val backendLabel: String = "Core"
@@ -165,11 +165,11 @@ class KDown(
 
     if (isScheduled) {
       scheduleManager.schedule(
-        taskId, request, now, stateFlow, segmentsFlow
+        taskId, request, now, stateFlow, segmentsFlow,
       )
     } else {
       scheduler.enqueue(
-        taskId, request, now, stateFlow, segmentsFlow
+        taskId, request, now, stateFlow, segmentsFlow,
       )
     }
 
@@ -185,7 +185,7 @@ class KDown(
         } else {
           KDownLogger.d("KDown") {
             "Ignoring pause for taskId=$taskId " +
-              "in state ${stateFlow.value}"
+                "in state ${stateFlow.value}"
           }
         }
       },
@@ -195,11 +195,11 @@ class KDown(
           state is DownloadState.Failed
         ) {
           val resumed = coordinator.resume(
-            taskId, scope, stateFlow, segmentsFlow
+            taskId, scope, stateFlow, segmentsFlow,
           )
           if (!resumed) {
             coordinator.start(
-              taskId, request, scope, stateFlow, segmentsFlow
+              taskId, request, scope, stateFlow, segmentsFlow,
             )
           }
         } else {
@@ -235,13 +235,13 @@ class KDown(
         if (s.isTerminal) {
           KDownLogger.d("KDown") {
             "Ignoring reschedule for taskId=$taskId in " +
-              "terminal state $s"
+                "terminal state $s"
           }
           return@DownloadTaskImpl
         }
         KDownLogger.i("KDown") {
           "Rescheduling taskId=$taskId, schedule=$schedule, " +
-            "conditions=${conditions.size}"
+              "conditions=${conditions.size}"
         }
         scheduleManager.cancel(taskId)
         scheduler.dequeue(taskId)
@@ -250,9 +250,9 @@ class KDown(
         }
         scheduleManager.reschedule(
           taskId, request, schedule, conditions,
-          now, stateFlow, segmentsFlow
+          now, stateFlow, segmentsFlow,
         )
-      }
+      },
     )
 
     monitorTaskState(taskId, stateFlow)
@@ -324,7 +324,7 @@ class KDown(
         } else {
           KDownLogger.d("KDown") {
             "Ignoring pause for taskId=${record.taskId} " +
-              "in state ${stateFlow.value}"
+                "in state ${stateFlow.value}"
           }
         }
       },
@@ -334,17 +334,17 @@ class KDown(
           state is DownloadState.Failed
         ) {
           val resumed = coordinator.resume(
-            record.taskId, scope, stateFlow, segmentsFlow
+            record.taskId, scope, stateFlow, segmentsFlow,
           )
           if (!resumed) {
             coordinator.startFromRecord(
-              record, scope, stateFlow, segmentsFlow
+              record, scope, stateFlow, segmentsFlow,
             )
           }
         } else {
           KDownLogger.d("KDown") {
             "Ignoring resume for taskId=${record.taskId} " +
-              "in state $state"
+                "in state $state"
           }
         }
       },
@@ -360,7 +360,7 @@ class KDown(
         } else {
           KDownLogger.d("KDown") {
             "Ignoring cancel for taskId=${record.taskId} " +
-              "in state $s"
+                "in state $s"
           }
         }
       },
@@ -376,14 +376,14 @@ class KDown(
         if (s.isTerminal) {
           KDownLogger.d("KDown") {
             "Ignoring reschedule for taskId=${record.taskId} in " +
-              "terminal state $s"
+                "terminal state $s"
           }
           return@DownloadTaskImpl
         }
         KDownLogger.i("KDown") {
           "Rescheduling taskId=${record.taskId}, " +
-            "schedule=$schedule, " +
-            "conditions=${conditions.size}"
+              "schedule=$schedule, " +
+              "conditions=${conditions.size}"
         }
         scheduleManager.cancel(record.taskId)
         scheduler.dequeue(record.taskId)
@@ -392,9 +392,9 @@ class KDown(
         }
         scheduleManager.reschedule(
           record.taskId, record.request, schedule, conditions,
-          record.createdAt, stateFlow, segmentsFlow
+          record.createdAt, stateFlow, segmentsFlow,
         )
-      }
+      },
     )
   }
 
@@ -408,20 +408,20 @@ class KDown(
       TaskState.DOWNLOADING,
       TaskState.PAUSED -> DownloadState.Paused(
         DownloadProgress(
-          record.downloadedBytes, record.totalBytes
-        )
+          record.downloadedBytes, record.totalBytes,
+        ),
       )
 
       TaskState.COMPLETED -> DownloadState.Completed(
-        record.destPath.toString()
+        record.destPath.toString(),
       )
 
       TaskState.FAILED -> DownloadState.Failed(
         KDownError.Unknown(
           cause = Exception(
-            record.errorMessage ?: "Unknown error"
-          )
-        )
+            record.errorMessage ?: "Unknown error",
+          ),
+        ),
       )
 
       TaskState.CANCELED -> DownloadState.Canceled
@@ -466,12 +466,12 @@ class KDown(
    * Takes effect immediately on all active downloads.
    *
    * @param limit the new global speed limit, or
-   *   [com.linroid.kdown.api.SpeedLimit.Companion.Unlimited]
+   *   [com.linroid.kdown.api.SpeedLimit.Unlimited]
    */
   override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {
     val current = globalLimiter.delegate
     if (limit.isUnlimited) {
-      globalLimiter.delegate = SpeedLimiter.Companion.Unlimited
+      globalLimiter.delegate = SpeedLimiter.Unlimited
     } else if (current is TokenBucket) {
       current.updateRate(limit.bytesPerSecond)
     } else {

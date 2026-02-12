@@ -1,7 +1,7 @@
 package com.linroid.kdown.core.engine
 
-import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.core.log.KDownLogger
 
 /**
  * Routes download URLs to the appropriate [DownloadSource].

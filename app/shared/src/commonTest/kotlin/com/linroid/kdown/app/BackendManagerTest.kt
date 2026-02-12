@@ -1,8 +1,8 @@
 package com.linroid.kdown.app
 
 import com.linroid.kdown.app.backend.BackendConfig
-import com.linroid.kdown.remote.ConnectionState
 import com.linroid.kdown.app.backend.BackendEntry
+import com.linroid.kdown.remote.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals

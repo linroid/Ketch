@@ -1,18 +1,18 @@
 package com.linroid.kdown.core.engine
 
-import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.api.DownloadProgress
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
+import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.core.file.FileAccessor
 import com.linroid.kdown.core.file.FileNameResolver
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.core.task.TaskRecord
 import com.linroid.kdown.core.task.TaskState
 import com.linroid.kdown.core.task.TaskStore
-import com.linroid.kdown.api.KDownError
-import com.linroid.kdown.api.Segment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

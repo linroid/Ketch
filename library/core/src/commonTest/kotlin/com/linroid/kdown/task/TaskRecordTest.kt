@@ -1,10 +1,10 @@
 package com.linroid.kdown.task
 
 import com.linroid.kdown.api.DownloadRequest
-import com.linroid.kdown.core.task.TaskRecord
-import com.linroid.kdown.core.engine.HttpDownloadSource
-import com.linroid.kdown.core.task.TaskState
 import com.linroid.kdown.api.Segment
+import com.linroid.kdown.core.engine.HttpDownloadSource
+import com.linroid.kdown.core.task.TaskRecord
+import com.linroid.kdown.core.task.TaskState
 import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 import kotlin.test.Test

@@ -5,12 +5,10 @@ import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadSchedule
 import com.linroid.kdown.api.DownloadState
-import com.linroid.kdown.api.SpeedLimit
-import com.linroid.kdown.api.KDownError
-import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.DownloadTask
+import com.linroid.kdown.api.Segment
+import com.linroid.kdown.api.SpeedLimit
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 
 internal class DownloadTaskImpl(
@@ -57,15 +55,5 @@ internal class DownloadTaskImpl(
 
   override suspend fun remove() {
     removeAction()
-  }
-
-  override suspend fun await(): Result<String> {
-    val finalState = state.first { it.isTerminal }
-    return when (finalState) {
-      is DownloadState.Completed -> Result.success(finalState.filePath)
-      is DownloadState.Failed -> Result.failure(finalState.error)
-      is DownloadState.Canceled -> Result.failure(KDownError.Canceled)
-      else -> Result.failure(KDownError.Unknown(null))
-    }
   }
 }

@@ -6,7 +6,6 @@ import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadSchedule
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
-import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.endpoints.Api
@@ -25,7 +24,6 @@ import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
@@ -122,19 +120,6 @@ internal class RemoteDownloadTask(
     throw UnsupportedOperationException(
       "Rescheduling is not supported for remote tasks"
     )
-  }
-
-  override suspend fun await(): Result<String> {
-    val finalState = state.first { it.isTerminal }
-    return when (finalState) {
-      is DownloadState.Completed ->
-        Result.success(finalState.filePath)
-      is DownloadState.Failed ->
-        Result.failure(finalState.error)
-      is DownloadState.Canceled ->
-        Result.failure(KDownError.Canceled)
-      else -> Result.failure(KDownError.Unknown(null))
-    }
   }
 
   private fun applyWireResponse(body: String) {

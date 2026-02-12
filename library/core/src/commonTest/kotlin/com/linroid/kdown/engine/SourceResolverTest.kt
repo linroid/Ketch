@@ -1,5 +1,6 @@
 package com.linroid.kdown.engine
 
+import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.core.engine.DownloadContext
 import com.linroid.kdown.core.engine.DownloadSource
 import com.linroid.kdown.core.engine.HttpDownloadSource
@@ -7,7 +8,6 @@ import com.linroid.kdown.core.engine.SourceInfo
 import com.linroid.kdown.core.engine.SourceResolver
 import com.linroid.kdown.core.engine.SourceResumeState
 import com.linroid.kdown.core.file.DefaultFileNameResolver
-import com.linroid.kdown.api.KDownError
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

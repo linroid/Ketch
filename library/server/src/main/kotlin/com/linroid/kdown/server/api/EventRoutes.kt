@@ -3,15 +3,14 @@ package com.linroid.kdown.server.api
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.server.TaskMapper
 import com.linroid.kdown.endpoints.model.TaskEvent
+import com.linroid.kdown.server.TaskMapper
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.sse
 import io.ktor.sse.ServerSentEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private val json = Json { encodeDefaults = true }

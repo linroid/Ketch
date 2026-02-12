@@ -1,5 +1,9 @@
 package com.linroid.kdown.api
 
+import com.linroid.kdown.api.SpeedLimit.Companion.Unlimited
+import com.linroid.kdown.api.SpeedLimit.Companion.kbps
+import com.linroid.kdown.api.SpeedLimit.Companion.mbps
+import com.linroid.kdown.api.SpeedLimit.Companion.of
 import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
 

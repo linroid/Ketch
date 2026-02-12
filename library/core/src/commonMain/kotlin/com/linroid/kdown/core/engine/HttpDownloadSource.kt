@@ -1,11 +1,11 @@
 package com.linroid.kdown.core.engine
 
+import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.Segment
 import com.linroid.kdown.core.file.FileNameResolver
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.core.segment.SegmentCalculator
 import com.linroid.kdown.core.segment.SegmentDownloader
-import com.linroid.kdown.api.KDownError
-import com.linroid.kdown.api.Segment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

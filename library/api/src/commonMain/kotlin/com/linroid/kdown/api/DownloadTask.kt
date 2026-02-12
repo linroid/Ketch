@@ -70,18 +70,13 @@ interface DownloadTask {
    * @return [Result.success] with the output file path on completion,
    *   or [Result.failure] with a [KDownError] on failure or cancellation
    */
-  suspend fun await(): Result<String>
-}
-
-/**
- * Default [await] implementation for [DownloadTask].
- */
-suspend fun DownloadTask.awaitDefault(): Result<String> {
-  val finalState = state.first { it.isTerminal }
-  return when (finalState) {
-    is DownloadState.Completed -> Result.success(finalState.filePath)
-    is DownloadState.Failed -> Result.failure(finalState.error)
-    is DownloadState.Canceled -> Result.failure(KDownError.Canceled)
-    else -> Result.failure(KDownError.Unknown(null))
+  suspend fun await(): Result<String> {
+    val finalState = state.first { it.isTerminal }
+    return when (finalState) {
+      is DownloadState.Completed -> Result.success(finalState.filePath)
+      is DownloadState.Failed -> Result.failure(finalState.error)
+      is DownloadState.Canceled -> Result.failure(KDownError.Canceled)
+      else -> Result.failure(KDownError.Unknown(null))
+    }
   }
 }

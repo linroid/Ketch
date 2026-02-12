@@ -21,7 +21,7 @@ data class DownloadConfig(
   val progressUpdateIntervalMs: Long = 200,
   val segmentSaveIntervalMs: Long = 5000,
   val bufferSize: Int = 8192,
-  val speedLimit: SpeedLimit = SpeedLimit.Companion.Unlimited,
+  val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
   val queueConfig: QueueConfig = QueueConfig(),
 ) {
   init {

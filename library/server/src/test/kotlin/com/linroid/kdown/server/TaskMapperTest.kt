@@ -7,7 +7,6 @@ import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.Segment
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TaskMapperTest {

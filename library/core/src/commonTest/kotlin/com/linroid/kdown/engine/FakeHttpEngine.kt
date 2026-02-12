@@ -1,8 +1,8 @@
 package com.linroid.kdown.engine
 
+import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.core.engine.HttpEngine
 import com.linroid.kdown.core.engine.ServerInfo
-import com.linroid.kdown.api.KDownError
 
 /**
  * A fake HttpEngine for unit testing. Simulates a server with configurable behavior
