@@ -55,7 +55,7 @@ private enum class ExpandedPanel {
 fun DownloadListItem(
   task: DownloadTask,
   scope: CoroutineScope,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   val state by task.state.collectAsState()
   val fileName = task.request.fileName
@@ -83,13 +83,13 @@ fun DownloadListItem(
       disabledContainerColor =
         MaterialTheme.colorScheme.surfaceContainer
     ),
-    modifier = modifier.fillMaxWidth()
+    modifier = modifier.fillMaxWidth(),
   ) {
     Column(
       modifier = Modifier.padding(
-        horizontal = 16.dp, vertical = 14.dp
+        horizontal = 16.dp, vertical = 14.dp,
       ),
-      verticalArrangement = Arrangement.spacedBy(10.dp)
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
       // Header: status icon + file info + actions
       Row(
@@ -116,7 +116,7 @@ fun DownloadListItem(
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
               modifier = Modifier.weight(
-                1f, fill = false
+                1f, fill = false,
               )
             )
             if (task.request.priority !=
@@ -131,7 +131,7 @@ fun DownloadListItem(
             color = MaterialTheme.colorScheme
               .onSurfaceVariant,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
           )
         }
         TaskActionButtons(
@@ -154,7 +154,7 @@ fun DownloadListItem(
       // State-specific content
       ProgressSection(
         state = state,
-        speedLimit = task.request.speedLimit
+        speedLimit = task.request.speedLimit,
       )
 
       // Toggle icon row + remove button
@@ -162,7 +162,7 @@ fun DownloadListItem(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement =
           Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
       ) {
         if (showToggles) {
           SpeedLimitIcon(
@@ -225,7 +225,7 @@ fun DownloadListItem(
         Spacer(modifier = Modifier.weight(1f))
         IconButton(
           onClick = { scope.launch { task.remove() } },
-          modifier = Modifier.size(32.dp)
+          modifier = Modifier.size(32.dp),
         ) {
           Icon(
             imageVector = Icons.Outlined.DeleteOutline,
@@ -247,10 +247,10 @@ fun DownloadListItem(
         ) { panel ->
           when (panel) {
             ExpandedPanel.SpeedLimit -> SpeedLimitPanel(
-              task = task, scope = scope
+              task = task, scope = scope,
             )
             ExpandedPanel.Priority -> PriorityPanel(
-              task = task, scope = scope
+              task = task, scope = scope,
             )
             ExpandedPanel.Schedule -> SchedulePanel(
               task = task,
@@ -260,7 +260,7 @@ fun DownloadListItem(
               }
             )
             ExpandedPanel.Settings -> TaskSettingsPanel(
-              task = task
+              task = task,
             )
             ExpandedPanel.None -> {}
           }

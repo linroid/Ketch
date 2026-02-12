@@ -26,12 +26,12 @@ fun TaskActionButtons(
   onResume: () -> Unit,
   onCancel: () -> Unit,
   onRetry: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier,
     horizontalArrangement = Arrangement.spacedBy(2.dp),
-    verticalAlignment = Alignment.CenterVertically
+    verticalAlignment = Alignment.CenterVertically,
   ) {
     when (state) {
       is DownloadState.Downloading,
@@ -40,13 +40,13 @@ fun TaskActionButtons(
           icon = Icons.Filled.Pause,
           description = "Pause",
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
-          onClick = onPause
+          onClick = onPause,
         )
         ActionIcon(
           icon = Icons.Filled.Close,
           description = "Cancel",
           tint = MaterialTheme.colorScheme.error,
-          onClick = onCancel
+          onClick = onCancel,
         )
       }
       is DownloadState.Paused -> {
@@ -54,13 +54,13 @@ fun TaskActionButtons(
           icon = Icons.Filled.PlayArrow,
           description = "Resume",
           tint = MaterialTheme.colorScheme.primary,
-          onClick = onResume
+          onClick = onResume,
         )
         ActionIcon(
           icon = Icons.Filled.Close,
           description = "Cancel",
           tint = MaterialTheme.colorScheme.error,
-          onClick = onCancel
+          onClick = onCancel,
         )
       }
       is DownloadState.Failed,
@@ -69,7 +69,7 @@ fun TaskActionButtons(
           icon = Icons.Filled.Refresh,
           description = "Retry",
           tint = MaterialTheme.colorScheme.primary,
-          onClick = onRetry
+          onClick = onRetry,
         )
       }
       is DownloadState.Completed,
@@ -85,7 +85,7 @@ private fun ActionIcon(
   icon: androidx.compose.ui.graphics.vector.ImageVector,
   description: String,
   tint: androidx.compose.ui.graphics.Color,
-  onClick: () -> Unit
+  onClick: () -> Unit,
 ) {
   val windowSizeClass =
     currentWindowAdaptiveInfo().windowSizeClass
@@ -97,13 +97,13 @@ private fun ActionIcon(
   val iconSize = if (isCompact) 22.dp else 18.dp
   IconButton(
     onClick = onClick,
-    modifier = Modifier.size(buttonSize)
+    modifier = Modifier.size(buttonSize),
   ) {
     Icon(
       imageVector = icon,
       contentDescription = description,
       modifier = Modifier.size(iconSize),
-      tint = tint
+      tint = tint,
     )
   }
 }

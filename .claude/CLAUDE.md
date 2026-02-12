@@ -129,7 +129,7 @@ cli/          # JVM CLI entry point
 
 ### Code Quality
 - 2-space indentation, max 100 char lines (see `.editorconfig`)
-- No star imports, no trailing commas
+- No star imports; trailing commas on multiline named parameters/arguments only (not positional)
 - Favor simple correctness over micro-optimizations
 - Keep public APIs minimal with KDoc
 - Mark internal implementation with `internal` modifier

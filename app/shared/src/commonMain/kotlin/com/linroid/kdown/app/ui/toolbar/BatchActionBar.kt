@@ -24,19 +24,19 @@ fun BatchActionBar(
   onPauseAll: () -> Unit,
   onResumeAll: () -> Unit,
   onClearCompleted: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier,
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(2.dp)
+    horizontalArrangement = Arrangement.spacedBy(2.dp),
   ) {
     if (hasActiveDownloads) {
       IconButton(onClick = onPauseAll) {
         Icon(
           Icons.Filled.Pause,
           contentDescription = "Pause all",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
     }
@@ -45,7 +45,7 @@ fun BatchActionBar(
         Icon(
           Icons.Filled.PlayArrow,
           contentDescription = "Resume all",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
     }
@@ -54,7 +54,7 @@ fun BatchActionBar(
         Icon(
           Icons.Filled.CleaningServices,
           contentDescription = "Clear completed",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
     }

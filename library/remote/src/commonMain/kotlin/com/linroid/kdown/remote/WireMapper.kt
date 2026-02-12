@@ -26,12 +26,12 @@ internal object WireMapper {
       } else {
         SpeedLimit.Unlimited
       },
-      priority = parsePriority(wire.priority)
+      priority = parsePriority(wire.priority),
     )
   }
 
   fun toCreateWire(
-    request: DownloadRequest
+    request: DownloadRequest,
   ): CreateDownloadRequest {
     return CreateDownloadRequest(
       url = request.url,
@@ -58,7 +58,7 @@ internal object WireMapper {
     state: String,
     progress: ProgressResponse?,
     error: String?,
-    filePath: String?
+    filePath: String?,
   ): DownloadState {
     return when (state) {
       "idle" -> DownloadState.Idle
@@ -77,7 +77,7 @@ internal object WireMapper {
         filePath ?: ""
       )
       "failed" -> DownloadState.Failed(
-        KDownError.Unknown(cause = Exception(error ?: "Unknown"))
+        KDownError.Unknown(cause = Exception(error ?: "Unknown")),
       )
       "canceled" -> DownloadState.Canceled
       else -> DownloadState.Pending
@@ -85,14 +85,14 @@ internal object WireMapper {
   }
 
   fun toSegments(
-    wireSegments: List<SegmentResponse>
+    wireSegments: List<SegmentResponse>,
   ): List<Segment> {
     return wireSegments.map { wire ->
       Segment(
         index = wire.index,
         start = wire.start,
         end = wire.end,
-        downloadedBytes = wire.downloadedBytes
+        downloadedBytes = wire.downloadedBytes,
       )
     }
   }
@@ -117,6 +117,6 @@ internal object WireMapper {
     DownloadProgress(
       downloadedBytes = downloadedBytes,
       totalBytes = totalBytes,
-      bytesPerSecond = bytesPerSecond
+      bytesPerSecond = bytesPerSecond,
     )
 }

@@ -33,7 +33,7 @@ import com.linroid.kdown.app.util.priorityLabel
 fun TaskSettingsIcon(
   selected: Boolean,
   onClick: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   IconButton(
     onClick = onClick,
@@ -49,7 +49,7 @@ fun TaskSettingsIcon(
     Icon(
       Icons.Filled.Info,
       contentDescription = "Task info",
-      modifier = Modifier.size(16.dp)
+      modifier = Modifier.size(16.dp),
     )
   }
 }
@@ -57,18 +57,18 @@ fun TaskSettingsIcon(
 @Composable
 fun TaskSettingsPanel(
   task: DownloadTask,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   val segments by task.segments.collectAsState()
 
   Surface(
     modifier = modifier.fillMaxWidth(),
     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    shape = RoundedCornerShape(8.dp)
+    shape = RoundedCornerShape(8.dp),
   ) {
     Column(
       modifier = Modifier.padding(12.dp),
-      verticalArrangement = Arrangement.spacedBy(6.dp)
+      verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
       CopyableInfoRow("URL", task.request.url)
       if (task.request.directory != null) {
@@ -107,19 +107,19 @@ fun TaskSettingsPanel(
 private fun CopyableInfoRow(
   label: String,
   value: String,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   val clipboardManager = LocalClipboardManager.current
   Row(
     modifier = modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.spacedBy(12.dp),
-    verticalAlignment = Alignment.CenterVertically
+    verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(
       text = label,
       style = MaterialTheme.typography.labelSmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.weight(0.3f)
+      modifier = Modifier.weight(0.3f),
     )
     Text(
       text = value,
@@ -127,19 +127,19 @@ private fun CopyableInfoRow(
       color = MaterialTheme.colorScheme.onSurface,
       maxLines = 2,
       overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.weight(0.7f)
+      modifier = Modifier.weight(0.7f),
     )
     IconButton(
       onClick = {
         clipboardManager.setText(AnnotatedString(value))
       },
-      modifier = Modifier.size(24.dp)
+      modifier = Modifier.size(24.dp),
     ) {
       Icon(
         Icons.Filled.ContentCopy,
         contentDescription = "Copy",
         modifier = Modifier.size(14.dp),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
   }
@@ -149,18 +149,18 @@ private fun CopyableInfoRow(
 private fun InfoRow(
   label: String,
   value: String,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.spacedBy(12.dp),
-    verticalAlignment = Alignment.Top
+    verticalAlignment = Alignment.Top,
   ) {
     Text(
       text = label,
       style = MaterialTheme.typography.labelSmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.weight(0.3f)
+      modifier = Modifier.weight(0.3f),
     )
     Text(
       text = value,
@@ -168,7 +168,7 @@ private fun InfoRow(
       color = MaterialTheme.colorScheme.onSurface,
       maxLines = 2,
       overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.weight(0.7f)
+      modifier = Modifier.weight(0.7f),
     )
   }
 }

@@ -25,7 +25,7 @@ import com.linroid.kdown.app.backend.ServerState
 fun EmbeddedServerControls(
   serverState: ServerState,
   onStartServer: (port: Int, token: String?) -> Unit,
-  onStopServer: () -> Unit
+  onStopServer: () -> Unit,
 ) {
   when (serverState) {
     is ServerState.Running -> {
@@ -38,7 +38,7 @@ fun EmbeddedServerControls(
         Text(
           text = "Server on :${serverState.port}",
           style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.primary
+          color = MaterialTheme.colorScheme.primary,
         )
         FilledTonalIconButton(
           onClick = onStopServer,
@@ -54,7 +54,7 @@ fun EmbeddedServerControls(
           Icon(
             imageVector = Icons.Filled.Close,
             contentDescription = "Stop server",
-            modifier = Modifier.size(14.dp)
+            modifier = Modifier.size(14.dp),
           )
         }
       }
@@ -64,18 +64,18 @@ fun EmbeddedServerControls(
         onClick = { onStartServer(8642, null) },
         modifier = Modifier.padding(top = 2.dp),
         contentPadding = PaddingValues(
-          horizontal = 8.dp, vertical = 0.dp
+          horizontal = 8.dp, vertical = 0.dp,
         )
       ) {
         Icon(
           imageVector = Icons.Filled.Computer,
           contentDescription = null,
-          modifier = Modifier.size(14.dp)
+          modifier = Modifier.size(14.dp),
         )
         Spacer(Modifier.size(4.dp))
         Text(
           text = "Start Server",
-          style = MaterialTheme.typography.labelSmall
+          style = MaterialTheme.typography.labelSmall,
         )
       }
     }

@@ -24,7 +24,7 @@ internal fun Route.serverRoutes(kdown: KDownApi) {
       ServerStatus(
         version = KDown.VERSION,
         activeTasks = active,
-        totalTasks = tasks.size
+        totalTasks = tasks.size,
       )
     )
   }

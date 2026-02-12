@@ -15,5 +15,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SourceResumeState(
   val sourceType: String,
-  val data: String
+  val data: String,
 )

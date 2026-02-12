@@ -54,7 +54,7 @@ internal fun Route.downloadRoutes(kdown: KDownApi) {
       connections = body.connections,
       headers = body.headers,
       priority = priority,
-      speedLimit = speedLimit
+      speedLimit = speedLimit,
     )
     val task = kdown.download(request)
     call.respond(

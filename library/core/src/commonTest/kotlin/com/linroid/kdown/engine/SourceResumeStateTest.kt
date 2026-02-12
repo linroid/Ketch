@@ -15,7 +15,7 @@ class SourceResumeStateTest {
   fun serialization_roundTrips() {
     val state = SourceResumeState(
       sourceType = "http",
-      data = """{"etag":"abc","totalBytes":1000}"""
+      data = """{"etag":"abc","totalBytes":1000}""",
     )
     val serialized = json.encodeToString(
       SourceResumeState.serializer(), state
@@ -43,7 +43,7 @@ class SourceResumeStateTest {
     val state = HttpDownloadSource.HttpResumeState(
       etag = "\"abc123\"",
       lastModified = "Wed, 21 Oct 2023 07:28:00 GMT",
-      totalBytes = 2048
+      totalBytes = 2048,
     )
     val serialized = Json.encodeToString(
       HttpDownloadSource.HttpResumeState.serializer(), state
@@ -59,7 +59,7 @@ class SourceResumeStateTest {
     val state = HttpDownloadSource.HttpResumeState(
       etag = null,
       lastModified = null,
-      totalBytes = 500
+      totalBytes = 500,
     )
     val serialized = Json.encodeToString(
       HttpDownloadSource.HttpResumeState.serializer(), state
@@ -77,7 +77,7 @@ class SourceResumeStateTest {
     val state = HttpDownloadSource.HttpResumeState(
       etag = "\"etag-only\"",
       lastModified = null,
-      totalBytes = 1024
+      totalBytes = 1024,
     )
     val serialized = Json.encodeToString(
       HttpDownloadSource.HttpResumeState.serializer(), state
@@ -95,7 +95,7 @@ class SourceResumeStateTest {
     val resumeState = HttpDownloadSource.buildResumeState(
       etag = "\"abc\"",
       lastModified = "Thu, 01 Jan 2024 00:00:00 GMT",
-      totalBytes = 4096
+      totalBytes = 4096,
     )
     assertEquals("http", resumeState.sourceType)
 
@@ -113,7 +113,7 @@ class SourceResumeStateTest {
     val resumeState = HttpDownloadSource.buildResumeState(
       etag = null,
       lastModified = null,
-      totalBytes = 0
+      totalBytes = 0,
     )
     assertEquals("http", resumeState.sourceType)
 

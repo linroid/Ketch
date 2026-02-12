@@ -20,13 +20,13 @@ class StatusFilterTest {
       DownloadProgress(
         downloadedBytes = 100,
         totalBytes = 1000,
-        bytesPerSecond = 50
+        bytesPerSecond = 50,
       )
     ),
     DownloadState.Paused(
       DownloadProgress(
         downloadedBytes = 100,
-        totalBytes = 1000
+        totalBytes = 1000,
       )
     ),
     DownloadState.Completed("/path/to/file"),

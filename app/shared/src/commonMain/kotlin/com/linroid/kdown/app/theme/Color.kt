@@ -76,7 +76,7 @@ val KDownLightOnErrorContainer = Color(0xFF8B0000)
 // State-specific color pairs
 data class StateColorPair(
   val foreground: Color,
-  val background: Color
+  val background: Color,
 )
 
 data class DownloadStateColors(
@@ -88,7 +88,7 @@ data class DownloadStateColors(
   val completed: StateColorPair,
   val failed: StateColorPair,
   val canceled: StateColorPair,
-  val idle: StateColorPair
+  val idle: StateColorPair,
 ) {
   fun forState(state: DownloadState): StateColorPair {
     return when (state) {

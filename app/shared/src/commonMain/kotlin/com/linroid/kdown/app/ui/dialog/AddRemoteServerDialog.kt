@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AddRemoteServerDialog(
   onDismiss: () -> Unit,
-  onAdd: (host: String, port: Int, token: String?) -> Unit
+  onAdd: (host: String, port: Int, token: String?) -> Unit,
 ) {
   var host by remember { mutableStateOf("") }
   var port by remember { mutableStateOf("8642") }
@@ -34,7 +34,7 @@ fun AddRemoteServerDialog(
     title = { Text("Add Remote Server") },
     text = {
       Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         OutlinedTextField(
           value = host,
@@ -42,7 +42,7 @@ fun AddRemoteServerDialog(
           modifier = Modifier.fillMaxWidth(),
           label = { Text("Host") },
           singleLine = true,
-          placeholder = { Text("192.168.1.5") }
+          placeholder = { Text("192.168.1.5") },
         )
         OutlinedTextField(
           value = port,
@@ -66,7 +66,7 @@ fun AddRemoteServerDialog(
           modifier = Modifier.fillMaxWidth(),
           label = { Text("API Token") },
           singleLine = true,
-          placeholder = { Text("Optional") }
+          placeholder = { Text("Optional") },
         )
       }
     },
@@ -79,7 +79,7 @@ fun AddRemoteServerDialog(
             token.trim().ifBlank { null }
           )
         },
-        enabled = isValidHost && isValidPort
+        enabled = isValidHost && isValidPort,
       ) {
         Text("Add")
       }

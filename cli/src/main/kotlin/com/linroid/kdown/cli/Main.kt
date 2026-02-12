@@ -129,13 +129,13 @@ fun main(args: Array<String>) {
     retryDelayMs = 1000,
     progressUpdateIntervalMs = 200,
     queueConfig = QueueConfig(
-      maxConcurrentDownloads = maxConcurrent
+      maxConcurrentDownloads = maxConcurrent,
     )
   )
 
   val kdown = KDown(
     httpEngine = KtorHttpEngine(),
-    config = config
+    config = config,
   )
 
   runBlocking {
@@ -145,7 +145,7 @@ fun main(args: Array<String>) {
       fileName = fileName,
       connections = config.maxConnections,
       speedLimit = speedLimit,
-      priority = priority
+      priority = priority,
     )
 
     val task = kdown.download(request)
@@ -242,13 +242,13 @@ private fun runQueueDemo(urls: List<String>) {
     queueConfig = QueueConfig(
       maxConcurrentDownloads = 2,
       maxConnectionsPerHost = 4,
-      autoStart = true
+      autoStart = true,
     )
   )
 
   val kdown = KDown(
     httpEngine = KtorHttpEngine(),
-    config = config
+    config = config,
   )
 
   // Assign ascending priorities to demonstrate ordering
@@ -268,7 +268,7 @@ private fun runQueueDemo(urls: List<String>) {
         url = url,
         directory = "downloads",
         connections = 2,
-        priority = priority
+        priority = priority,
       )
       val task = kdown.download(request)
       tasks.add(task)

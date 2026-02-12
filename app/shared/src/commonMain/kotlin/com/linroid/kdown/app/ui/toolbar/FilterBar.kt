@@ -20,13 +20,13 @@ fun FilterBar(
   selected: StatusFilter,
   taskCounts: Map<StatusFilter, Int>,
   onSelect: (StatusFilter) -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier
       .horizontalScroll(rememberScrollState())
       .padding(horizontal = 16.dp),
-    horizontalArrangement = Arrangement.spacedBy(8.dp)
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     StatusFilter.entries.forEach { filter ->
       val count = taskCounts[filter] ?: 0
@@ -41,7 +41,7 @@ fun FilterBar(
         label = {
           Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.labelMedium,
           )
         },
         colors = FilterChipDefaults.filterChipColors(
@@ -57,7 +57,7 @@ fun FilterBar(
 
 fun countTasksByFilter(
   filter: StatusFilter,
-  states: Map<String, DownloadState>
+  states: Map<String, DownloadState>,
 ): Int {
   if (filter == StatusFilter.All) return states.size
   return states.values.count { filter.matches(it) }

@@ -37,39 +37,39 @@ class DownloadQueueTest {
 
   private fun createRequest(
     url: String = "https://example.com/file.zip",
-    priority: DownloadPriority = DownloadPriority.NORMAL
+    priority: DownloadPriority = DownloadPriority.NORMAL,
   ) = DownloadRequest(
     url = url,
     directory = "/tmp",
-    priority = priority
+    priority = priority,
   )
 
   private fun createScheduler(
     scope: CoroutineScope,
     maxConcurrent: Int = 10,
     maxPerHost: Int = 4,
-    autoStart: Boolean = true
+    autoStart: Boolean = true,
   ): DownloadScheduler {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver()
+      fileNameResolver = DefaultFileNameResolver(),
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileAccessorFactory = { throw UnsupportedOperationException() },
-      fileNameResolver = DefaultFileNameResolver()
+      fileNameResolver = DefaultFileNameResolver(),
     )
     return DownloadScheduler(
       queueConfig = QueueConfig(
         maxConcurrentDownloads = maxConcurrent,
         maxConnectionsPerHost = maxPerHost,
-        autoStart = autoStart
+        autoStart = autoStart,
       ),
       coordinator = coordinator,
-      scope = scope
+      scope = scope,
     )
   }
 
@@ -325,7 +325,7 @@ class DownloadQueueTest {
       try {
         // Allow 10 concurrent but only 1 per host
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, maxPerHost = 1
+          scope, maxConcurrent = 10, maxPerHost = 1,
         )
 
         // First task from example.com — should start
@@ -369,7 +369,7 @@ class DownloadQueueTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, maxPerHost = 1
+          scope, maxConcurrent = 10, maxPerHost = 1,
         )
 
         val (sf1, seg1) = newFlows()
@@ -408,7 +408,7 @@ class DownloadQueueTest {
       try {
         // 1 per host, 10 overall
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, maxPerHost = 1
+          scope, maxConcurrent = 10, maxPerHost = 1,
         )
 
         // Start tasks from three different hosts
@@ -443,7 +443,7 @@ class DownloadQueueTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, autoStart = false
+          scope, maxConcurrent = 10, autoStart = false,
         )
 
         val (sf1, seg1) = newFlows()
@@ -471,7 +471,7 @@ class DownloadQueueTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, autoStart = false
+          scope, maxConcurrent = 10, autoStart = false,
         )
 
         val (sf1, seg1) = newFlows()
@@ -949,7 +949,7 @@ class DownloadQueueTest {
       try {
         // Global limit of 2, per-host limit of 2
         val scheduler = createScheduler(
-          scope, maxConcurrent = 2, maxPerHost = 2
+          scope, maxConcurrent = 2, maxPerHost = 2,
         )
 
         // Fill both global slots from the same host
@@ -988,7 +988,7 @@ class DownloadQueueTest {
       try {
         // 2 concurrent, 1 per host
         val scheduler = createScheduler(
-          scope, maxConcurrent = 2, maxPerHost = 1
+          scope, maxConcurrent = 2, maxPerHost = 1,
         )
 
         // Start one task from host-A

@@ -25,7 +25,7 @@ fun main() = application {
             KDownServerConfig(
               port = port,
               apiToken = apiToken,
-              corsAllowedHosts = listOf("*")
+              corsAllowedHosts = listOf("*"),
             )
           )
           server.start(wait = false)
@@ -43,7 +43,7 @@ fun main() = application {
   }
   Window(
     onCloseRequest = ::exitApplication,
-    title = "KDown"
+    title = "KDown",
   ) {
     App(backendManager)
   }

@@ -48,7 +48,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         json.encodeToString(segmentListSerializer, it)
       },
       created_at = record.createdAt.toEpochMilliseconds(),
-      updated_at = record.updatedAt.toEpochMilliseconds()
+      updated_at = record.updatedAt.toEpochMilliseconds(),
     )
   }
 
@@ -95,7 +95,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         }
       },
       createdAt = Instant.fromEpochMilliseconds(created_at),
-      updatedAt = Instant.fromEpochMilliseconds(updated_at)
+      updatedAt = Instant.fromEpochMilliseconds(updated_at),
     )
   }
 }

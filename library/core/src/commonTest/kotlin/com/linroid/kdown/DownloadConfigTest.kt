@@ -27,7 +27,7 @@ class DownloadConfigTest {
       retryCount = 5,
       retryDelayMs = 2000,
       progressUpdateIntervalMs = 500,
-      bufferSize = 16384
+      bufferSize = 16384,
     )
     assertEquals(8, config.maxConnections)
     assertEquals(5, config.retryCount)

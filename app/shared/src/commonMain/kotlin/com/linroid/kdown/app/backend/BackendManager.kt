@@ -33,7 +33,7 @@ import kotlin.uuid.Uuid
  * backends are available.
  */
 class BackendManager(
-  private val factory: BackendFactory
+  private val factory: BackendFactory,
 ) {
   private val scope = CoroutineScope(
     SupervisorJob() + Dispatchers.Default
@@ -165,7 +165,7 @@ class BackendManager(
   fun addRemote(
     host: String,
     port: Int = 8642,
-    token: String? = null
+    token: String? = null,
   ): BackendEntry {
     val config = BackendConfig.Remote(host, port, token)
     val entry = BackendEntry(
@@ -222,7 +222,7 @@ class BackendManager(
 
   private fun observeRemoteConnectionState(
     entry: BackendEntry,
-    remote: RemoteKDown
+    remote: RemoteKDown,
   ) {
     val entryState =
       entry.connectionState as? MutableStateFlow ?: return
@@ -246,7 +246,7 @@ private object DisconnectedApi : KDownApi {
   )
 
   override suspend fun download(
-    request: DownloadRequest
+    request: DownloadRequest,
   ): DownloadTask {
     throw IllegalStateException(
       "No backend connected. Add a remote server first."

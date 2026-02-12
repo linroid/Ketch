@@ -52,7 +52,7 @@ class TaskMapperTest {
     val progress = DownloadProgress(
       downloadedBytes = 500,
       totalBytes = 1000,
-      bytesPerSecond = 100
+      bytesPerSecond = 100,
     )
     val response = TaskMapper.toProgressResponse(progress)
     assertEquals(500L, response.downloadedBytes)
@@ -67,7 +67,7 @@ class TaskMapperTest {
       index = 0,
       start = 0,
       end = 499,
-      downloadedBytes = 250
+      downloadedBytes = 250,
     )
     val response = TaskMapper.toSegmentResponse(segment)
     assertEquals(0, response.index)
@@ -83,7 +83,7 @@ class TaskMapperTest {
       index = 1,
       start = 500,
       end = 999,
-      downloadedBytes = 500
+      downloadedBytes = 500,
     )
     val response = TaskMapper.toSegmentResponse(segment)
     assertTrue(response.isComplete)

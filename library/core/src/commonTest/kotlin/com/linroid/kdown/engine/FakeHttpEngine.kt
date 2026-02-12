@@ -13,13 +13,13 @@ class FakeHttpEngine(
     contentLength = 1000,
     acceptRanges = true,
     etag = "\"test-etag\"",
-    lastModified = "Wed, 01 Jan 2025 00:00:00 GMT"
+    lastModified = "Wed, 01 Jan 2025 00:00:00 GMT",
   ),
   var content: ByteArray = ByteArray(1000) { (it % 256).toByte() },
   var chunkSize: Int = 100,
   var failAfterBytes: Long = -1,
   var failOnHead: Boolean = false,
-  var httpErrorCode: Int = 0
+  var httpErrorCode: Int = 0,
 ) : HttpEngine {
 
   var headCallCount = 0
@@ -49,7 +49,7 @@ class FakeHttpEngine(
     url: String,
     range: LongRange?,
     headers: Map<String, String>,
-    onData: suspend (ByteArray) -> Unit
+    onData: suspend (ByteArray) -> Unit,
   ) {
     downloadCallCount++
     lastDownloadHeaders = headers

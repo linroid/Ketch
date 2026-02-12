@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
 
 private data class SpeedOption(
   val label: String,
-  val limit: SpeedLimit
+  val limit: SpeedLimit,
 )
 
 private val presetSpeedOptions = listOf(
@@ -53,7 +53,7 @@ fun SpeedLimitIcon(
   active: Boolean,
   selected: Boolean,
   onClick: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   IconButton(
     onClick = onClick,
@@ -69,7 +69,7 @@ fun SpeedLimitIcon(
     Icon(
       Icons.Filled.Speed,
       contentDescription = "Speed limit",
-      modifier = Modifier.size(16.dp)
+      modifier = Modifier.size(16.dp),
     )
   }
 }
@@ -79,7 +79,7 @@ fun SpeedLimitIcon(
 fun SpeedLimitSelector(
   value: SpeedLimit,
   onValueChange: (SpeedLimit) -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   val matchesPreset =
     presetSpeedOptions.any { it.limit == value }
@@ -115,7 +115,7 @@ fun SpeedLimitSelector(
 
   Column(
     modifier = modifier,
-    verticalArrangement = Arrangement.spacedBy(8.dp)
+    verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     FlowRow(
       horizontalArrangement =
@@ -131,13 +131,13 @@ fun SpeedLimitSelector(
             isCustom = false
             onValueChange(option.limit)
           },
-          label = { Text(option.label) }
+          label = { Text(option.label) },
         )
       }
       FilterChip(
         selected = isCustom,
         onClick = { isCustom = true },
-        label = { Text("Custom") }
+        label = { Text("Custom") },
       )
     }
     if (isCustom) {
@@ -164,7 +164,7 @@ fun SpeedLimitSelector(
           singleLine = true,
           placeholder = { Text("Speed") },
           keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number
+            keyboardType = KeyboardType.Number,
           )
         )
         FilterChip(
@@ -176,7 +176,7 @@ fun SpeedLimitSelector(
               onValueChange(SpeedLimit.kbps(number))
             }
           },
-          label = { Text("KB/s") }
+          label = { Text("KB/s") },
         )
         FilterChip(
           selected = customUnit == "MB/s",
@@ -187,7 +187,7 @@ fun SpeedLimitSelector(
               onValueChange(SpeedLimit.mbps(number))
             }
           },
-          label = { Text("MB/s") }
+          label = { Text("MB/s") },
         )
       }
     }
@@ -198,13 +198,13 @@ fun SpeedLimitSelector(
 fun SpeedLimitPanel(
   task: DownloadTask,
   scope: CoroutineScope,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   SpeedLimitSelector(
     value = task.request.speedLimit,
     onValueChange = { limit ->
       scope.launch { task.setSpeedLimit(limit) }
     },
-    modifier = modifier
+    modifier = modifier,
   )
 }

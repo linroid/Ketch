@@ -15,7 +15,7 @@ class AuthTest {
     testApplication {
       application {
         val server = createTestServer(
-          KDownServerConfig(apiToken = "secret-token")
+          KDownServerConfig(apiToken = "secret-token"),
         )
         with(server) { configureServer() }
       }
@@ -27,7 +27,7 @@ class AuthTest {
   fun `request with valid token succeeds`() = testApplication {
     application {
       val server = createTestServer(
-        KDownServerConfig(apiToken = "secret-token")
+        KDownServerConfig(apiToken = "secret-token"),
       )
       with(server) { configureServer() }
     }
@@ -41,7 +41,7 @@ class AuthTest {
   fun `request with wrong token is rejected`() = testApplication {
     application {
       val server = createTestServer(
-        KDownServerConfig(apiToken = "secret-token")
+        KDownServerConfig(apiToken = "secret-token"),
       )
       with(server) { configureServer() }
     }
@@ -56,7 +56,7 @@ class AuthTest {
     testApplication {
       application {
         val server = createTestServer(
-          KDownServerConfig(apiToken = null)
+          KDownServerConfig(apiToken = null),
         )
         with(server) { configureServer() }
       }

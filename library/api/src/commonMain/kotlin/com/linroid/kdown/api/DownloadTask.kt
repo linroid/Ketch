@@ -56,7 +56,7 @@ interface DownloadTask {
    */
   suspend fun reschedule(
     schedule: DownloadSchedule,
-    conditions: List<DownloadCondition> = emptyList()
+    conditions: List<DownloadCondition> = emptyList(),
   )
 
   /**

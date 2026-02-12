@@ -48,7 +48,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp/downloads"
+            directory = "/tmp/downloads",
           )
         )
       }
@@ -83,7 +83,7 @@ class DownloadRoutesTest {
             directory = "/tmp/downloads",
             connections = 4,
             priority = "HIGH",
-            speedLimitBytesPerSecond = 1024000
+            speedLimitBytesPerSecond = 1024000,
           )
         )
       }
@@ -111,7 +111,7 @@ class DownloadRoutesTest {
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
             directory = "/tmp/downloads",
-            priority = "INVALID"
+            priority = "INVALID",
           )
         )
       }
@@ -138,7 +138,7 @@ class DownloadRoutesTest {
       setBody(
         CreateDownloadRequest(
           url = "https://example.com/file.zip",
-          directory = "/tmp/downloads"
+          directory = "/tmp/downloads",
         )
       )
     }
@@ -175,7 +175,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/a.zip",
-            directory = "/tmp"
+            directory = "/tmp",
           )
         )
       }
@@ -184,7 +184,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/b.zip",
-            directory = "/tmp"
+            directory = "/tmp",
           )
         )
       }
@@ -213,7 +213,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp"
+            directory = "/tmp",
           )
         )
       }
@@ -252,7 +252,7 @@ class DownloadRoutesTest {
       setBody(
         CreateDownloadRequest(
           url = "https://example.com/file.zip",
-          directory = "/tmp"
+          directory = "/tmp",
         )
       )
     }
@@ -380,7 +380,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp"
+            directory = "/tmp",
           )
         )
       }
@@ -417,7 +417,7 @@ class DownloadRoutesTest {
         CreateDownloadRequest(
           url = "https://example.com/file.zip",
           directory = "/tmp",
-          fileName = "custom.zip"
+          fileName = "custom.zip",
         )
       )
     }

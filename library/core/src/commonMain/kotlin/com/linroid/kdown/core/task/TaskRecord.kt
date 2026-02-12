@@ -32,5 +32,5 @@ data class TaskRecord(
   val sourceType: String? = null,
   val sourceResumeState: SourceResumeState? = null,
   val createdAt: Instant,
-  val updatedAt: Instant
+  val updatedAt: Instant,
 )

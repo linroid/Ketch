@@ -14,13 +14,13 @@ internal class SegmentDownloader(
   private val httpEngine: HttpEngine,
   private val fileAccessor: FileAccessor,
   private val taskLimiter: SpeedLimiter = SpeedLimiter.Companion.Unlimited,
-  private val globalLimiter: SpeedLimiter = SpeedLimiter.Companion.Unlimited
+  private val globalLimiter: SpeedLimiter = SpeedLimiter.Companion.Unlimited,
 ) {
   suspend fun download(
     url: String,
     segment: Segment,
     headers: Map<String, String> = emptyMap(),
-    onProgress: suspend (bytesDownloaded: Long) -> Unit
+    onProgress: suspend (bytesDownloaded: Long) -> Unit,
   ): Segment {
     if (segment.isComplete) {
       return segment

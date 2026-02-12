@@ -18,5 +18,5 @@ data class SourceInfo(
   val supportsResume: Boolean,
   val suggestedFileName: String?,
   val maxSegments: Int,
-  val metadata: Map<String, String> = emptyMap()
+  val metadata: Map<String, String> = emptyMap(),
 )

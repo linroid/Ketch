@@ -34,7 +34,7 @@ internal class DownloadCoordinator(
   private val config: DownloadConfig,
   private val fileAccessorFactory: (Path) -> FileAccessor,
   private val fileNameResolver: FileNameResolver,
-  private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited
+  private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
 ) {
   private val mutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveDownload>()
@@ -46,7 +46,7 @@ internal class DownloadCoordinator(
     var segments: List<Segment>?,
     var fileAccessor: FileAccessor?,
     var totalBytes: Long = 0,
-    val taskLimiter: DelegatingSpeedLimiter = DelegatingSpeedLimiter()
+    val taskLimiter: DelegatingSpeedLimiter = DelegatingSpeedLimiter(),
   )
 
   suspend fun start(
@@ -54,7 +54,7 @@ internal class DownloadCoordinator(
     request: DownloadRequest,
     scope: CoroutineScope,
     stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>
+    segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
     val directory = request.directory?.let { Path(it) }
       ?: error("directory is required for download")
@@ -70,7 +70,7 @@ internal class DownloadCoordinator(
         destPath = initialDestPath,
         state = TaskState.PENDING,
         createdAt = now,
-        updatedAt = now
+        updatedAt = now,
       )
     )
 
@@ -109,7 +109,7 @@ internal class DownloadCoordinator(
         stateFlow = stateFlow,
         segmentsFlow = segmentsFlow,
         segments = null,
-        fileAccessor = null
+        fileAccessor = null,
       )
     }
   }
@@ -118,12 +118,12 @@ internal class DownloadCoordinator(
     record: TaskRecord,
     scope: CoroutineScope,
     stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>
+    segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
     updateTaskRecord(record.taskId) {
       it.copy(
         state = TaskState.PENDING,
-        updatedAt = Clock.System.now()
+        updatedAt = Clock.System.now(),
       )
     }
 
@@ -167,7 +167,7 @@ internal class DownloadCoordinator(
         stateFlow = stateFlow,
         segmentsFlow = segmentsFlow,
         segments = null,
-        fileAccessor = null
+        fileAccessor = null,
       )
     }
   }
@@ -176,7 +176,7 @@ internal class DownloadCoordinator(
     taskId: String,
     request: DownloadRequest,
     stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>
+    segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
     val source = sourceResolver.resolve(request.url)
     KDownLogger.d("Coordinator") {
@@ -205,7 +205,7 @@ internal class DownloadCoordinator(
           HttpDownloadSource.META_LAST_MODIFIED
         ],
         sourceType = source.type,
-        updatedAt = now
+        updatedAt = now,
       )
     }
 
@@ -247,7 +247,7 @@ internal class DownloadCoordinator(
           downloadedBytes = totalBytes,
           segments = null,
           sourceResumeState = resumeState,
-          updatedAt = Clock.System.now()
+          updatedAt = Clock.System.now(),
         )
       }
 
@@ -292,7 +292,7 @@ internal class DownloadCoordinator(
             state = TaskState.PAUSED,
             downloadedBytes = downloadedBytes,
             segments = segments,
-            updatedAt = Clock.System.now()
+            updatedAt = Clock.System.now(),
           )
         }
       }
@@ -320,7 +320,7 @@ internal class DownloadCoordinator(
     taskId: String,
     scope: CoroutineScope,
     stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>
+    segmentsFlow: MutableStateFlow<List<Segment>>,
   ): Boolean {
     mutex.withLock {
       if (activeDownloads.containsKey(taskId)) {
@@ -341,7 +341,7 @@ internal class DownloadCoordinator(
     updateTaskRecord(taskId) {
       it.copy(
         state = TaskState.DOWNLOADING,
-        updatedAt = Clock.System.now()
+        updatedAt = Clock.System.now(),
       )
     }
 
@@ -375,7 +375,7 @@ internal class DownloadCoordinator(
         stateFlow = stateFlow,
         segmentsFlow = segmentsFlow,
         segments = segments,
-        fileAccessor = null
+        fileAccessor = null,
       )
     }
 
@@ -387,7 +387,7 @@ internal class DownloadCoordinator(
     taskRecord: TaskRecord,
     segments: List<Segment>,
     stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>
+    segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
     val sourceType = taskRecord.sourceType ?: HttpDownloadSource.TYPE
     val source = sourceResolver.resolveByType(sourceType)
@@ -415,7 +415,7 @@ internal class DownloadCoordinator(
       ?: HttpDownloadSource.buildResumeState(
         etag = taskRecord.etag,
         lastModified = taskRecord.lastModified,
-        totalBytes = taskRecord.totalBytes
+        totalBytes = taskRecord.totalBytes,
       )
 
     val context = buildContext(
@@ -442,7 +442,7 @@ internal class DownloadCoordinator(
           state = TaskState.COMPLETED,
           downloadedBytes = taskRecord.totalBytes,
           segments = null,
-          updatedAt = Clock.System.now()
+          updatedAt = Clock.System.now(),
         )
       }
 
@@ -460,7 +460,7 @@ internal class DownloadCoordinator(
 
   private suspend fun downloadWithRetry(
     taskId: String,
-    block: suspend () -> Unit
+    block: suspend () -> Unit,
   ) {
     var retryCount = 0
     while (true) {
@@ -508,7 +508,7 @@ internal class DownloadCoordinator(
       it.copy(
         state = TaskState.CANCELED,
         segments = null,
-        updatedAt = Clock.System.now()
+        updatedAt = Clock.System.now(),
       )
     }
   }
@@ -522,20 +522,20 @@ internal class DownloadCoordinator(
   private suspend fun updateTaskState(
     taskId: String,
     state: TaskState,
-    errorMessage: String? = null
+    errorMessage: String? = null,
   ) {
     updateTaskRecord(taskId) {
       it.copy(
         state = state,
         errorMessage = errorMessage,
-        updatedAt = Clock.System.now()
+        updatedAt = Clock.System.now(),
       )
     }
   }
 
   private suspend fun updateTaskRecord(
     taskId: String,
-    update: (TaskRecord) -> TaskRecord
+    update: (TaskRecord) -> TaskRecord,
   ) {
     val existing = taskStore.load(taskId)
     if (existing == null) {
@@ -582,7 +582,7 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     taskLimiter: SpeedLimiter,
     totalBytes: Long,
-    headers: Map<String, String>
+    headers: Map<String, String>,
   ): DownloadContext {
     var lastBytes = 0L
     var lastMark = TimeSource.Monotonic.markNow()
@@ -611,7 +611,7 @@ internal class DownloadCoordinator(
           it.copy(
             segments = snapshot,
             downloadedBytes = downloaded,
-            updatedAt = Clock.System.now()
+            updatedAt = Clock.System.now(),
           )
         }
       },
@@ -619,18 +619,18 @@ internal class DownloadCoordinator(
         taskLimiter.acquire(bytes)
         globalLimiter.acquire(bytes)
       },
-      headers = headers
+      headers = headers,
     )
   }
 
   private suspend fun buildHttpResumeState(
-    taskId: String
+    taskId: String,
   ): SourceResumeState? {
     val record = taskStore.load(taskId) ?: return null
     return HttpDownloadSource.buildResumeState(
       etag = record.etag,
       lastModified = record.lastModified,
-      totalBytes = record.totalBytes
+      totalBytes = record.totalBytes,
     )
   }
 
@@ -648,7 +648,7 @@ internal class DownloadCoordinator(
   companion object {
     internal fun deduplicatePath(
       directory: Path,
-      fileName: String
+      fileName: String,
     ): Path {
       val candidate = Path(directory, fileName)
       if (!SystemFileSystem.exists(candidate)) return candidate

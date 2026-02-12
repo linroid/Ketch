@@ -17,7 +17,7 @@ class SegmentDownloaderTest {
     val engine = FakeHttpEngine(
       serverInfo = ServerInfo(500, true, null, null),
       content = content,
-      chunkSize = 100
+      chunkSize = 100,
     )
     val fileData = ByteArray(500)
     var bytesWritten = 0
@@ -42,7 +42,7 @@ class SegmentDownloaderTest {
     val engine = FakeHttpEngine(
       serverInfo = ServerInfo(500, true, null, null),
       content = content,
-      chunkSize = 100
+      chunkSize = 100,
     )
 
     // Segment that has already downloaded 200 bytes
@@ -72,7 +72,7 @@ class SegmentDownloaderTest {
     val engine = FakeHttpEngine(
       serverInfo = ServerInfo(totalBytes, true, null, null),
       content = content,
-      chunkSize = 50
+      chunkSize = 50,
     )
 
     val segments = SegmentCalculator.calculateSegments(totalBytes, connections = 4)
@@ -101,7 +101,7 @@ class SegmentDownloaderTest {
     val engine = FakeHttpEngine(
       serverInfo = ServerInfo(1000, true, null, null),
       content = content,
-      chunkSize = 200
+      chunkSize = 200,
     )
 
     val segment = Segment(index = 1, start = 250, end = 499, downloadedBytes = 0)

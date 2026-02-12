@@ -44,14 +44,14 @@ fun SidebarNavigation(
   taskCounts: Map<StatusFilter, Int>,
   onFilterSelect: (StatusFilter) -> Unit,
   onAddClick: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Column(
     modifier = modifier
       .width(SIDEBAR_WIDTH)
       .fillMaxHeight()
       .background(MaterialTheme.colorScheme.surfaceContainerLow)
-      .padding(vertical = 12.dp)
+      .padding(vertical = 12.dp),
   ) {
     // Add download button
     FloatingActionButton(
@@ -61,21 +61,21 @@ fun SidebarNavigation(
         .fillMaxWidth(),
       containerColor = MaterialTheme.colorScheme.primary,
       contentColor = MaterialTheme.colorScheme.onPrimary,
-      shape = RoundedCornerShape(12.dp)
+      shape = RoundedCornerShape(12.dp),
     ) {
       Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         Icon(
           Icons.Filled.Add,
           contentDescription = null,
-          modifier = Modifier.size(20.dp)
+          modifier = Modifier.size(20.dp),
         )
         Text(
           text = "New Task",
           style = MaterialTheme.typography.labelLarge,
-          fontWeight = FontWeight.SemiBold
+          fontWeight = FontWeight.SemiBold,
         )
       }
     }
@@ -83,7 +83,7 @@ fun SidebarNavigation(
     Spacer(modifier = Modifier.height(16.dp))
     HorizontalDivider(
       modifier = Modifier.padding(horizontal = 16.dp),
-      color = MaterialTheme.colorScheme.outlineVariant
+      color = MaterialTheme.colorScheme.outlineVariant,
     )
     Spacer(modifier = Modifier.height(8.dp))
 
@@ -94,7 +94,7 @@ fun SidebarNavigation(
       color = MaterialTheme.colorScheme.onSurfaceVariant,
       fontWeight = FontWeight.SemiBold,
       modifier = Modifier.padding(
-        horizontal = 20.dp, vertical = 8.dp
+        horizontal = 20.dp, vertical = 8.dp,
       )
     )
 
@@ -106,7 +106,7 @@ fun SidebarNavigation(
         label = filter.label,
         count = count,
         selected = selectedFilter == filter,
-        onClick = { onFilterSelect(filter) }
+        onClick = { onFilterSelect(filter) },
       )
     }
   }
@@ -118,7 +118,7 @@ private fun SidebarItem(
   label: String,
   count: Int,
   selected: Boolean,
-  onClick: () -> Unit
+  onClick: () -> Unit,
 ) {
   val bgColor = if (selected) {
     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -140,13 +140,13 @@ private fun SidebarItem(
       .clickable(onClick = onClick)
       .padding(horizontal = 12.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(12.dp)
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     Icon(
       imageVector = icon,
       contentDescription = label,
       modifier = Modifier.size(20.dp),
-      tint = contentColor
+      tint = contentColor,
     )
     Text(
       text = label,
@@ -161,7 +161,7 @@ private fun SidebarItem(
       } else {
         FontWeight.Normal
       },
-      modifier = Modifier.weight(1f)
+      modifier = Modifier.weight(1f),
     )
     if (count > 0) {
       Box(
@@ -172,16 +172,16 @@ private fun SidebarItem(
             } else {
               MaterialTheme.colorScheme.surfaceContainerHigh
             },
-            shape = CircleShape
+            shape = CircleShape,
           )
           .padding(horizontal = 8.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
       ) {
         Text(
           text = count.toString(),
           style = MaterialTheme.typography.labelSmall,
           color = contentColor,
-          fontWeight = FontWeight.SemiBold
+          fontWeight = FontWeight.SemiBold,
         )
       }
     }

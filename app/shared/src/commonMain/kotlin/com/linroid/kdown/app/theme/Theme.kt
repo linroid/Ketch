@@ -40,7 +40,7 @@ private val KDownDarkColorScheme = darkColorScheme(
   surfaceContainerHigh = KDownSurfaceContainerHigh,
   surfaceContainerHighest = KDownSurfaceVariant,
   outline = KDownOutline,
-  outlineVariant = KDownOutlineVariant
+  outlineVariant = KDownOutlineVariant,
 )
 
 private val KDownLightColorScheme = lightColorScheme(
@@ -72,13 +72,13 @@ private val KDownLightColorScheme = lightColorScheme(
   surfaceContainerHigh = KDownLightSurfaceContainerHigh,
   surfaceContainerHighest = KDownLightSurfaceVariant,
   outline = KDownLightOutline,
-  outlineVariant = KDownLightOutlineVariant
+  outlineVariant = KDownLightOutlineVariant,
 )
 
 @Composable
 fun KDownTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
-  content: @Composable () -> Unit
+  content: @Composable () -> Unit,
 ) {
   val colorScheme = if (darkTheme) {
     KDownDarkColorScheme
@@ -95,7 +95,7 @@ fun KDownTheme(
   ) {
     MaterialTheme(
       colorScheme = colorScheme,
-      content = content
+      content = content,
     )
   }
 }

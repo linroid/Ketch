@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
                 KDownServerConfig(
                   port = port,
                   apiToken = apiToken,
-                  corsAllowedHosts = listOf("*")
+                  corsAllowedHosts = listOf("*"),
                 )
               )
               server.start(wait = false)

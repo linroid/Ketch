@@ -39,34 +39,34 @@ class ScheduleManagerTest {
 
   private fun createRequest(
     schedule: DownloadSchedule = DownloadSchedule.Immediate,
-    conditions: List<DownloadCondition> = emptyList()
+    conditions: List<DownloadCondition> = emptyList(),
   ) = DownloadRequest(
     url = "https://example.com/file.zip",
     directory = "/tmp",
     schedule = schedule,
     conditions = conditions,
-    priority = DownloadPriority.NORMAL
+    priority = DownloadPriority.NORMAL,
   )
 
   private fun createTestComponents(
-    scope: CoroutineScope
+    scope: CoroutineScope,
   ): Pair<DownloadScheduler, ScheduleManager> {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver()
+      fileNameResolver = DefaultFileNameResolver(),
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileAccessorFactory = { throw UnsupportedOperationException() },
-      fileNameResolver = DefaultFileNameResolver()
+      fileNameResolver = DefaultFileNameResolver(),
     )
     val scheduler = DownloadScheduler(
       queueConfig = QueueConfig(maxConcurrentDownloads = 10),
       coordinator = coordinator,
-      scope = scope
+      scope = scope,
     )
     val manager = ScheduleManager(scheduler, scope)
     return scheduler to manager
@@ -85,7 +85,7 @@ class ScheduleManagerTest {
         val (_, manager) = createTestComponents(scope)
 
         val request = createRequest(
-          schedule = DownloadSchedule.AfterDelay(200.milliseconds)
+          schedule = DownloadSchedule.AfterDelay(200.milliseconds),
         )
 
         manager.schedule(
@@ -115,7 +115,7 @@ class ScheduleManagerTest {
 
         val futureTime = Clock.System.now() + 10.seconds
         val request = createRequest(
-          schedule = DownloadSchedule.AtTime(futureTime)
+          schedule = DownloadSchedule.AtTime(futureTime),
         )
 
         manager.schedule(
@@ -151,7 +151,7 @@ class ScheduleManagerTest {
         // Schedule in the past — should fire immediately
         val pastTime = Clock.System.now() - 1.seconds
         val request = createRequest(
-          schedule = DownloadSchedule.AtTime(pastTime)
+          schedule = DownloadSchedule.AtTime(pastTime),
         )
 
         manager.schedule(
@@ -188,7 +188,7 @@ class ScheduleManagerTest {
 
         val request = createRequest(
           schedule = DownloadSchedule.Immediate,
-          conditions = listOf(condition)
+          conditions = listOf(condition),
         )
 
         manager.schedule(
@@ -241,7 +241,7 @@ class ScheduleManagerTest {
         val (_, manager) = createTestComponents(scope)
 
         val request = createRequest(
-          conditions = listOf(cond1, cond2)
+          conditions = listOf(cond1, cond2),
         )
 
         manager.schedule(
@@ -282,7 +282,7 @@ class ScheduleManagerTest {
 
         // Schedule with long delay
         val request = createRequest(
-          schedule = DownloadSchedule.AfterDelay(10.seconds)
+          schedule = DownloadSchedule.AfterDelay(10.seconds),
         )
         manager.schedule(
           "task-1", request, Clock.System.now(),
@@ -377,7 +377,7 @@ class ScheduleManagerTest {
 
         val (_, manager) = createTestComponents(scope)
         val request = createRequest(
-          schedule = DownloadSchedule.AfterDelay(10.seconds)
+          schedule = DownloadSchedule.AfterDelay(10.seconds),
         )
 
         // Schedule with long delay
@@ -466,7 +466,7 @@ class ScheduleManagerTest {
         val (_, manager) = createTestComponents(scope)
 
         val request = createRequest(
-          schedule = DownloadSchedule.AfterDelay(100.milliseconds)
+          schedule = DownloadSchedule.AfterDelay(100.milliseconds),
         )
 
         manager.schedule(

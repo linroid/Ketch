@@ -107,7 +107,7 @@ class BackendManagerTest {
   fun fakeBackendFactory_create_embedded_usesLambda() {
     val embedded = FakeKDownApi("MyCore")
     val factory = FakeBackendFactory(
-      embeddedFactory = { embedded }
+      embeddedFactory = { embedded },
     )
     val result = factory.create(BackendConfig.Embedded)
     assertEquals("MyCore", result.backendLabel)
@@ -177,7 +177,7 @@ class BackendManagerTest {
   fun remoteConfig_baseUrl_combinesHostAndPort() {
     val config = BackendConfig.Remote(
       host = "192.168.1.5",
-      port = 9000
+      port = 9000,
     )
     assertEquals("http://192.168.1.5:9000", config.baseUrl)
   }
@@ -333,13 +333,13 @@ class BackendManagerTest {
       id = "test",
       label = "Test",
       config = BackendConfig.Embedded,
-      connectionState = connState
+      connectionState = connState,
     )
     val b = BackendEntry(
       id = "test",
       label = "Test",
       config = BackendConfig.Embedded,
-      connectionState = connState
+      connectionState = connState,
     )
     assertEquals(a, b)
   }
@@ -353,13 +353,13 @@ class BackendManagerTest {
       id = "a",
       label = "Test",
       config = BackendConfig.Embedded,
-      connectionState = connState
+      connectionState = connState,
     )
     val b = BackendEntry(
       id = "b",
       label = "Test",
       config = BackendConfig.Embedded,
-      connectionState = connState
+      connectionState = connState,
     )
     assertNotEquals(a, b)
   }

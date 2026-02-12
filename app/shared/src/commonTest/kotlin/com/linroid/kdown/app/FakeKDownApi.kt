@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Tracks lifecycle calls and exposes configurable state.
  */
 class FakeKDownApi(
-  override val backendLabel: String = "Fake"
+  override val backendLabel: String = "Fake",
 ) : KDownApi {
 
   private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
@@ -35,7 +35,7 @@ class FakeKDownApi(
     private set
 
   override suspend fun download(
-    request: DownloadRequest
+    request: DownloadRequest,
   ): DownloadTask {
     downloadCallCount++
     throw UnsupportedOperationException(

@@ -31,7 +31,7 @@ class BackendFactory(
     { createDefaultEmbeddedKDown(ts) }
   },
   private val localServerFactory:
-    ((port: Int, apiToken: String?, KDownApi) -> LocalServerHandle)? = null
+    ((port: Int, apiToken: String?, KDownApi) -> LocalServerHandle)? = null,
 ) {
   /** Whether an embedded backend is available. */
   val hasEmbedded: Boolean get() = embeddedFactory != null
@@ -61,7 +61,7 @@ class BackendFactory(
   fun startServer(
     port: Int,
     apiToken: String?,
-    api: KDownApi
+    api: KDownApi,
   ) {
     val factory = localServerFactory
       ?: throw UnsupportedOperationException(
@@ -78,7 +78,7 @@ class BackendFactory(
 }
 
 private fun createDefaultEmbeddedKDown(
-  taskStore: TaskStore
+  taskStore: TaskStore,
 ): KDownApi {
   return KDown(
     httpEngine = KtorHttpEngine(),
@@ -90,9 +90,9 @@ private fun createDefaultEmbeddedKDown(
       progressUpdateIntervalMs = 200,
       queueConfig = QueueConfig(
         maxConcurrentDownloads = 3,
-        maxConnectionsPerHost = 4
+        maxConnectionsPerHost = 4,
       )
     ),
-    logger = Logger.console()
+    logger = Logger.console(),
   )
 }

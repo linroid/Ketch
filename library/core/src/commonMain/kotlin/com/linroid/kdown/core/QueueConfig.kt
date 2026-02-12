@@ -15,7 +15,7 @@ package com.linroid.kdown.core
 data class QueueConfig(
   val maxConcurrentDownloads: Int = 3,
   val maxConnectionsPerHost: Int = 4,
-  val autoStart: Boolean = true
+  val autoStart: Boolean = true,
 ) {
   init {
     require(maxConcurrentDownloads > 0) {

@@ -6,7 +6,7 @@ sealed class BackendConfig {
   data class Remote(
     val host: String,
     val port: Int = 8642,
-    val apiToken: String? = null
+    val apiToken: String? = null,
   ) : BackendConfig() {
     val baseUrl: String get() = "http://$host:$port"
   }

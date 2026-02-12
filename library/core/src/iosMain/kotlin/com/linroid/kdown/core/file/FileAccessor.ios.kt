@@ -50,7 +50,7 @@ actual class FileAccessor actual constructor(private val path: Path) {
         data.usePinned { pinned ->
           val nsData = NSData.create(
             bytes = pinned.addressOf(0),
-            length = data.size.toULong()
+            length = data.size.toULong(),
           )
           handle.writeData(nsData)
         }

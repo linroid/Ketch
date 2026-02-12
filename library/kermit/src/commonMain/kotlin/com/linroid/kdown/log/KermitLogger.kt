@@ -31,15 +31,15 @@ import com.linroid.kdown.core.log.Logger
 class KermitLogger(
   minSeverity: Severity = Severity.Info,
   private val tag: String = "KDown",
-  config: StaticConfig? = null
+  config: StaticConfig? = null,
 ) : Logger {
 
   private val kermit = KermitLib(
     config = config ?: StaticConfig(
       minSeverity = minSeverity,
-      logWriterList = listOf(platformLogWriter())
+      logWriterList = listOf(platformLogWriter()),
     ),
-    tag = tag
+    tag = tag,
   )
 
   override fun v(message: () -> String) {

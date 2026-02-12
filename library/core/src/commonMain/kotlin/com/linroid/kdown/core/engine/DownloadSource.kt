@@ -25,7 +25,7 @@ interface DownloadSource {
    */
   suspend fun resolve(
     url: String,
-    headers: Map<String, String> = emptyMap()
+    headers: Map<String, String> = emptyMap(),
   ): SourceInfo
 
   /**

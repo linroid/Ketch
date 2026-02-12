@@ -9,7 +9,7 @@ import com.linroid.kdown.core.engine.ServerInfo
 internal class NoOpHttpEngine : HttpEngine {
   override suspend fun head(
     url: String,
-    headers: Map<String, String>
+    headers: Map<String, String>,
   ): ServerInfo {
     throw KDownError.Network(
       RuntimeException(
@@ -22,7 +22,7 @@ internal class NoOpHttpEngine : HttpEngine {
     url: String,
     range: LongRange?,
     headers: Map<String, String>,
-    onData: suspend (ByteArray) -> Unit
+    onData: suspend (ByteArray) -> Unit,
   ) {
     throw KDownError.Network(
       RuntimeException(
@@ -40,7 +40,7 @@ internal fun createTestKDown(): KDownApi {
 
 internal fun createTestServer(
   config: KDownServerConfig = KDownServerConfig.Default,
-  kdown: KDownApi = createTestKDown()
+  kdown: KDownApi = createTestKDown(),
 ): KDownServer {
   return KDownServer(kdown, config)
 }

@@ -12,7 +12,7 @@ class ServerInfoTest {
       contentLength = 1000,
       acceptRanges = true,
       etag = null,
-      lastModified = null
+      lastModified = null,
     )
     assertTrue(info.supportsResume)
   }
@@ -23,7 +23,7 @@ class ServerInfoTest {
       contentLength = 1000,
       acceptRanges = false,
       etag = null,
-      lastModified = null
+      lastModified = null,
     )
     assertFalse(info.supportsResume)
   }
@@ -34,7 +34,7 @@ class ServerInfoTest {
       contentLength = null,
       acceptRanges = true,
       etag = null,
-      lastModified = null
+      lastModified = null,
     )
     assertFalse(info.supportsResume)
   }
@@ -45,7 +45,7 @@ class ServerInfoTest {
       contentLength = 0,
       acceptRanges = true,
       etag = null,
-      lastModified = null
+      lastModified = null,
     )
     assertFalse(info.supportsResume)
   }

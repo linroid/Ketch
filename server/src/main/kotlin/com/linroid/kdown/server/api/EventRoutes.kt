@@ -40,12 +40,12 @@ internal fun Route.eventRoutes(kdown: KDownApi) {
           val event = TaskEvent(
             taskId = removedId,
             type = "task_removed",
-            state = "removed"
+            state = "removed",
           )
           send(ServerSentEvent(
             data = json.encodeToString(event),
             event = "task_removed",
-            id = removedId
+            id = removedId,
           ))
         }
 
@@ -70,11 +70,11 @@ internal fun Route.eventRoutes(kdown: KDownApi) {
       val errorEvent = TaskEvent(
         taskId = taskId,
         type = "error",
-        state = "not_found"
+        state = "not_found",
       )
       send(ServerSentEvent(
         data = json.encodeToString(errorEvent),
-        event = "error"
+        event = "error",
       ))
       return@sse
     }
@@ -84,7 +84,7 @@ internal fun Route.eventRoutes(kdown: KDownApi) {
 }
 
 private suspend fun io.ktor.server.sse.ServerSSESession.trackTaskState(
-  task: DownloadTask
+  task: DownloadTask,
 ) {
   task.state.collect { state ->
     val eventType = when (state) {
@@ -97,12 +97,12 @@ private suspend fun io.ktor.server.sse.ServerSSESession.trackTaskState(
 
 private suspend fun io.ktor.server.sse.ServerSSESession.sendTaskEvent(
   task: DownloadTask,
-  eventType: String
+  eventType: String,
 ) {
   val event = TaskMapper.toEvent(task, eventType)
   send(ServerSentEvent(
     data = json.encodeToString(event),
     event = eventType,
-    id = task.taskId
+    id = task.taskId,
   ))
 }

@@ -29,7 +29,7 @@ fun PriorityIcon(
   active: Boolean,
   selected: Boolean,
   onClick: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   IconButton(
     onClick = onClick,
@@ -45,7 +45,7 @@ fun PriorityIcon(
     Icon(
       Icons.Filled.LowPriority,
       contentDescription = "Priority",
-      modifier = Modifier.size(16.dp)
+      modifier = Modifier.size(16.dp),
     )
   }
 }
@@ -54,11 +54,11 @@ fun PriorityIcon(
 fun PrioritySelector(
   value: DownloadPriority,
   onValueChange: (DownloadPriority) -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(6.dp)
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
   ) {
     DownloadPriority.entries.forEach { priority ->
       FilterChip(
@@ -80,7 +80,7 @@ fun PrioritySelector(
 fun PriorityPanel(
   task: DownloadTask,
   scope: CoroutineScope,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   var currentPriority by remember {
     mutableStateOf(task.request.priority)
@@ -91,6 +91,6 @@ fun PriorityPanel(
       currentPriority = priority
       scope.launch { task.setPriority(priority) }
     },
-    modifier = modifier
+    modifier = modifier,
   )
 }

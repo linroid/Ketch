@@ -42,7 +42,7 @@ data class DownloadRequest(
   val priority: DownloadPriority = DownloadPriority.NORMAL,
   val schedule: DownloadSchedule = DownloadSchedule.Immediate,
   @Transient
-  val conditions: List<DownloadCondition> = emptyList()
+  val conditions: List<DownloadCondition> = emptyList(),
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }

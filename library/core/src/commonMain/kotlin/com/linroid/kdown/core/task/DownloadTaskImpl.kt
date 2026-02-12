@@ -25,7 +25,7 @@ internal class DownloadTaskImpl(
   private val removeAction: suspend () -> Unit,
   private val setSpeedLimitAction: suspend (SpeedLimit) -> Unit,
   private val setPriorityAction: suspend (DownloadPriority) -> Unit,
-  private val rescheduleAction: suspend (DownloadSchedule, List<DownloadCondition>) -> Unit
+  private val rescheduleAction: suspend (DownloadSchedule, List<DownloadCondition>) -> Unit,
 ) : DownloadTask {
 
   override suspend fun pause() {
@@ -50,7 +50,7 @@ internal class DownloadTaskImpl(
 
   override suspend fun reschedule(
     schedule: DownloadSchedule,
-    conditions: List<DownloadCondition>
+    conditions: List<DownloadCondition>,
   ) {
     rescheduleAction(schedule, conditions)
   }

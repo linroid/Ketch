@@ -17,7 +17,7 @@ data class ServerInfo(
   val acceptRanges: Boolean,
   val etag: String?,
   val lastModified: String?,
-  val contentDisposition: String? = null
+  val contentDisposition: String? = null,
 ) {
   /** `true` when the server supports byte-range requests and reports a content length. */
   val supportsResume: Boolean

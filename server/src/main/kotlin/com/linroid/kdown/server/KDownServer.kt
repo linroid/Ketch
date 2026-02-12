@@ -66,7 +66,7 @@ import kotlinx.serialization.json.Json
  */
 class KDownServer(
   private val kdown: KDownApi,
-  private val config: KDownServerConfig = KDownServerConfig.Default
+  private val config: KDownServerConfig = KDownServerConfig.Default,
 ) {
   private var engine:
     EmbeddedServer<NettyApplicationEngine, *>? = null
@@ -82,7 +82,7 @@ class KDownServer(
       Netty,
       host = config.host,
       port = config.port,
-      module = { configureServer() }
+      module = { configureServer() },
     ).also { it.start(wait = wait) }
   }
 
@@ -90,7 +90,7 @@ class KDownServer(
   fun stop() {
     engine?.stop(
       gracePeriodMillis = 1000,
-      timeoutMillis = 5000
+      timeoutMillis = 5000,
     )
     engine = null
   }

@@ -180,21 +180,21 @@ fun AppShell(backendManager: BackendManager) {
                 Icon(
                   imageVector = filterIcon(filter),
                   contentDescription = filter.label,
-                  modifier = Modifier.size(24.dp)
+                  modifier = Modifier.size(24.dp),
                 )
               }
             } else {
               Icon(
                 imageVector = filterIcon(filter),
                 contentDescription = filter.label,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
               )
             }
           }
         )
       }
     },
-    layoutType = navLayoutType
+    layoutType = navLayoutType,
   ) {
     Box(modifier = Modifier.fillMaxSize()) {
       Column(modifier = Modifier.fillMaxSize()) {
@@ -225,7 +225,7 @@ fun AppShell(backendManager: BackendManager) {
                   text = appState.statusFilter.label,
                   style =
                     MaterialTheme.typography.titleMedium,
-                  fontWeight = FontWeight.SemiBold
+                  fontWeight = FontWeight.SemiBold,
                 )
               },
               actions = {
@@ -256,7 +256,7 @@ fun AppShell(backendManager: BackendManager) {
                 ),
                 modifier = Modifier
                   .fillMaxWidth()
-                  .padding(horizontal = 16.dp)
+                  .padding(horizontal = 16.dp),
               ) {
                 Row(
                   modifier = Modifier.padding(16.dp),
@@ -271,7 +271,7 @@ fun AppShell(backendManager: BackendManager) {
                       MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme
                       .onErrorContainer,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                   )
                   TextButton(
                     onClick = {
@@ -296,7 +296,7 @@ fun AppShell(backendManager: BackendManager) {
               onAddClick = {
                 appState.showAddDialog = true
               },
-              modifier = Modifier.weight(1f)
+              modifier = Modifier.weight(1f),
             )
           }
         }
@@ -325,11 +325,11 @@ fun AppShell(backendManager: BackendManager) {
             MaterialTheme.colorScheme.primary,
           contentColor =
             MaterialTheme.colorScheme.onPrimary,
-          shape = RoundedCornerShape(16.dp)
+          shape = RoundedCornerShape(16.dp),
         ) {
           Icon(
             Icons.Filled.Add,
-            contentDescription = "New Task"
+            contentDescription = "New Task",
           )
         }
       }

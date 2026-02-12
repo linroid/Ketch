@@ -18,7 +18,7 @@ class SourceResolverTest {
 
   private val httpSource = HttpDownloadSource(
     httpEngine = FakeHttpEngine(),
-    fileNameResolver = DefaultFileNameResolver()
+    fileNameResolver = DefaultFileNameResolver(),
   )
 
   private val fakeSource = object : DownloadSource {
@@ -27,17 +27,17 @@ class SourceResolverTest {
       url.startsWith("magnet:")
     override suspend fun resolve(
       url: String,
-      headers: Map<String, String>
+      headers: Map<String, String>,
     ) = SourceInfo(
       totalBytes = 1000,
       supportsResume = false,
       suggestedFileName = null,
-      maxSegments = 1
+      maxSegments = 1,
     )
     override suspend fun download(context: DownloadContext) {}
     override suspend fun resume(
       context: DownloadContext,
-      resumeState: SourceResumeState
+      resumeState: SourceResumeState,
     ) {}
   }
 

@@ -37,7 +37,7 @@ internal class RemoteDownloadTask(
   initialSegments: List<Segment>,
   private val httpClient: HttpClient,
   private val json: Json,
-  private val onRemoved: (String) -> Unit
+  private val onRemoved: (String) -> Unit,
 ) : DownloadTask {
 
   private val _state = MutableStateFlow(initialState)
@@ -59,7 +59,7 @@ internal class RemoteDownloadTask(
 
   override suspend fun pause() {
     val response = httpClient.post(
-      Api.Tasks.ById.Pause(parent = byId)
+      Api.Tasks.ById.Pause(parent = byId),
     )
     checkSuccess(response)
     applyWireResponse(response.bodyAsText())
@@ -67,7 +67,7 @@ internal class RemoteDownloadTask(
 
   override suspend fun resume() {
     val response = httpClient.post(
-      Api.Tasks.ById.Resume(parent = byId)
+      Api.Tasks.ById.Resume(parent = byId),
     )
     checkSuccess(response)
     applyWireResponse(response.bodyAsText())
@@ -75,7 +75,7 @@ internal class RemoteDownloadTask(
 
   override suspend fun cancel() {
     val response = httpClient.post(
-      Api.Tasks.ById.Cancel(parent = byId)
+      Api.Tasks.ById.Cancel(parent = byId),
     )
     checkSuccess(response)
     applyWireResponse(response.bodyAsText())
@@ -89,7 +89,7 @@ internal class RemoteDownloadTask(
 
   override suspend fun setSpeedLimit(limit: SpeedLimit) {
     val response = httpClient.put(
-      Api.Tasks.ById.SpeedLimit(parent = byId)
+      Api.Tasks.ById.SpeedLimit(parent = byId),
     ) {
       contentType(ContentType.Application.Json)
       setBody(json.encodeToString(
@@ -103,7 +103,7 @@ internal class RemoteDownloadTask(
 
   override suspend fun setPriority(priority: DownloadPriority) {
     val response = httpClient.put(
-      Api.Tasks.ById.Priority(parent = byId)
+      Api.Tasks.ById.Priority(parent = byId),
     ) {
       contentType(ContentType.Application.Json)
       setBody(json.encodeToString(
@@ -117,7 +117,7 @@ internal class RemoteDownloadTask(
 
   override suspend fun reschedule(
     schedule: DownloadSchedule,
-    conditions: List<DownloadCondition>
+    conditions: List<DownloadCondition>,
   ) {
     throw UnsupportedOperationException(
       "Rescheduling is not supported for remote tasks"
@@ -144,7 +144,7 @@ internal class RemoteDownloadTask(
   }
 
   private fun checkSuccess(
-    response: io.ktor.client.statement.HttpResponse
+    response: io.ktor.client.statement.HttpResponse,
   ) {
     if (!response.status.isSuccess()) {
       throw IllegalStateException(

@@ -16,21 +16,21 @@ class InMemoryTaskStoreTest {
 
   private fun createRecord(
     taskId: String = "task-1",
-    state: TaskState = TaskState.PENDING
+    state: TaskState = TaskState.PENDING,
   ) = TaskRecord(
     taskId = taskId,
     request = DownloadRequest(
       url = "https://example.com/file.bin",
       directory = "/tmp",
       connections = 4,
-      headers = mapOf("Authorization" to "Bearer token")
+      headers = mapOf("Authorization" to "Bearer token"),
     ),
     destPath = Path("/tmp/file.bin"),
     state = state,
     totalBytes = 1000,
     downloadedBytes = 0,
     createdAt = Instant.fromEpochMilliseconds(1000),
-    updatedAt = Instant.fromEpochMilliseconds(1000)
+    updatedAt = Instant.fromEpochMilliseconds(1000),
   )
 
   @Test

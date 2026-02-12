@@ -21,7 +21,7 @@ data class CreateDownloadRequest(
   val connections: Int = 1,
   val headers: Map<String, String> = emptyMap(),
   val priority: String = "NORMAL",
-  val speedLimitBytesPerSecond: Long = 0
+  val speedLimitBytesPerSecond: Long = 0,
 )
 
 /**
@@ -40,7 +40,7 @@ data class TaskResponse(
   val segments: List<SegmentResponse> = emptyList(),
   val createdAt: String,
   val priority: String,
-  val speedLimitBytesPerSecond: Long = 0
+  val speedLimitBytesPerSecond: Long = 0,
 )
 
 /**
@@ -51,7 +51,7 @@ data class ProgressResponse(
   val downloadedBytes: Long,
   val totalBytes: Long,
   val percent: Float,
-  val bytesPerSecond: Long
+  val bytesPerSecond: Long,
 )
 
 /**
@@ -63,7 +63,7 @@ data class SegmentResponse(
   val start: Long,
   val end: Long,
   val downloadedBytes: Long,
-  val isComplete: Boolean
+  val isComplete: Boolean,
 )
 
 /**
@@ -73,7 +73,7 @@ data class SegmentResponse(
  */
 @Serializable
 data class SpeedLimitRequest(
-  val bytesPerSecond: Long
+  val bytesPerSecond: Long,
 )
 
 /**
@@ -83,7 +83,7 @@ data class SpeedLimitRequest(
  */
 @Serializable
 data class PriorityRequest(
-  val priority: String
+  val priority: String,
 )
 
 /**
@@ -92,7 +92,7 @@ data class PriorityRequest(
 @Serializable
 data class ErrorResponse(
   val error: String,
-  val message: String
+  val message: String,
 )
 
 /**
@@ -102,7 +102,7 @@ data class ErrorResponse(
 data class ServerStatus(
   val version: String,
   val activeTasks: Int,
-  val totalTasks: Int
+  val totalTasks: Int,
 )
 
 /**
@@ -115,5 +115,5 @@ data class TaskEvent(
   val state: String,
   val progress: ProgressResponse? = null,
   val error: String? = null,
-  val filePath: String? = null
+  val filePath: String? = null,
 )

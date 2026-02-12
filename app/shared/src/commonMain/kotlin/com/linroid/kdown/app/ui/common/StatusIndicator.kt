@@ -27,7 +27,7 @@ import com.linroid.kdown.app.theme.LocalDownloadStateColors
 @Composable
 fun StatusIndicator(
   state: DownloadState,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   val stateColors = LocalDownloadStateColors.current
   val colors = stateColors.forState(state)
@@ -38,13 +38,13 @@ fun StatusIndicator(
       .size(36.dp)
       .clip(CircleShape)
       .background(colors.background),
-    contentAlignment = Alignment.Center
+    contentAlignment = Alignment.Center,
   ) {
     Icon(
       imageVector = icon,
       contentDescription = stateLabel(state),
       tint = colors.foreground,
-      modifier = Modifier.size(20.dp)
+      modifier = Modifier.size(20.dp),
     )
   }
 }

@@ -58,7 +58,7 @@ class ServerRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp"
+            directory = "/tmp",
           )
         )
       }
@@ -87,7 +87,7 @@ class ServerRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp"
+            directory = "/tmp",
           )
         )
       }

@@ -15,7 +15,7 @@ data class KDownServerConfig(
   val host: String = "0.0.0.0",
   val port: Int = 8642,
   val apiToken: String? = null,
-  val corsAllowedHosts: List<String> = emptyList()
+  val corsAllowedHosts: List<String> = emptyList(),
 ) {
   init {
     require(port in 1..65535) {

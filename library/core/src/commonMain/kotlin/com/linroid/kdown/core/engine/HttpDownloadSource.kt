@@ -30,7 +30,7 @@ internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
   private val fileNameResolver: FileNameResolver,
   private val progressUpdateIntervalMs: Long = 200,
-  private val segmentSaveIntervalMs: Long = 5000
+  private val segmentSaveIntervalMs: Long = 5000,
 ) : DownloadSource {
 
   override val type: String = TYPE
@@ -42,7 +42,7 @@ internal class HttpDownloadSource(
 
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>
+    headers: Map<String, String>,
   ): SourceInfo {
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(url, headers)
@@ -99,7 +99,7 @@ internal class HttpDownloadSource(
 
   override suspend fun resume(
     context: DownloadContext,
-    resumeState: SourceResumeState
+    resumeState: SourceResumeState,
   ) {
     val state = Json.decodeFromString<HttpResumeState>(resumeState.data)
 
@@ -147,7 +147,7 @@ internal class HttpDownloadSource(
   private suspend fun validateLocalFile(
     context: DownloadContext,
     segments: List<Segment>,
-    totalBytes: Long
+    totalBytes: Long,
   ): List<Segment> {
     val fileSize = try {
       context.fileAccessor.size()
@@ -188,7 +188,7 @@ internal class HttpDownloadSource(
   private suspend fun downloadSegments(
     context: DownloadContext,
     segments: List<Segment>,
-    totalBytes: Long
+    totalBytes: Long,
   ) {
     val segmentProgress =
       segments.map { it.downloadedBytes }.toMutableList()
@@ -283,7 +283,7 @@ internal class HttpDownloadSource(
   }
 
   private fun extractDispositionFileName(
-    contentDisposition: String
+    contentDisposition: String,
   ): String? {
     val regex = Regex("""filename\*?=(?:UTF-8''|"?)([^";]+)"?""")
     return regex.find(contentDisposition)?.groupValues?.get(1)
@@ -298,16 +298,16 @@ internal class HttpDownloadSource(
     fun buildResumeState(
       etag: String?,
       lastModified: String?,
-      totalBytes: Long
+      totalBytes: Long,
     ): SourceResumeState {
       val state = HttpResumeState(
         etag = etag,
         lastModified = lastModified,
-        totalBytes = totalBytes
+        totalBytes = totalBytes,
       )
       return SourceResumeState(
         sourceType = TYPE,
-        data = Json.encodeToString(state)
+        data = Json.encodeToString(state),
       )
     }
   }
@@ -316,6 +316,6 @@ internal class HttpDownloadSource(
   internal data class HttpResumeState(
     val etag: String?,
     val lastModified: String?,
-    val totalBytes: Long
+    val totalBytes: Long,
   )
 }

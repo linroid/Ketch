@@ -33,7 +33,7 @@ internal object TaskMapper {
 
   fun toEvent(
     task: DownloadTask,
-    eventType: String
+    eventType: String,
   ): TaskEvent {
     val state = task.state.value
     return TaskEvent(
@@ -42,18 +42,18 @@ internal object TaskMapper {
       state = stateToString(state),
       progress = extractProgress(state)?.let(::toProgressResponse),
       error = extractError(state),
-      filePath = extractFilePath(state)
+      filePath = extractFilePath(state),
     )
   }
 
   fun toProgressResponse(
-    progress: DownloadProgress
+    progress: DownloadProgress,
   ): ProgressResponse {
     return ProgressResponse(
       downloadedBytes = progress.downloadedBytes,
       totalBytes = progress.totalBytes,
       percent = progress.percent,
-      bytesPerSecond = progress.bytesPerSecond
+      bytesPerSecond = progress.bytesPerSecond,
     )
   }
 
@@ -63,7 +63,7 @@ internal object TaskMapper {
       start = segment.start,
       end = segment.end,
       downloadedBytes = segment.downloadedBytes,
-      isComplete = segment.isComplete
+      isComplete = segment.isComplete,
     )
   }
 
@@ -82,7 +82,7 @@ internal object TaskMapper {
   }
 
   private fun extractProgress(
-    state: DownloadState
+    state: DownloadState,
   ): DownloadProgress? {
     return when (state) {
       is DownloadState.Downloading -> state.progress

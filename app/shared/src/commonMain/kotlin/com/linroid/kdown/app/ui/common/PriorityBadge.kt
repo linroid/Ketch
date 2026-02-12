@@ -37,14 +37,14 @@ fun PriorityBadge(priority: DownloadPriority) {
     modifier = Modifier
       .background(
         color = color,
-        shape = MaterialTheme.shapes.small
+        shape = MaterialTheme.shapes.small,
       )
-      .padding(horizontal = 6.dp, vertical = 2.dp)
+      .padding(horizontal = 6.dp, vertical = 2.dp),
   ) {
     Text(
       text = priorityLabel(priority),
       style = MaterialTheme.typography.labelSmall,
-      color = textColor
+      color = textColor,
     )
   }
 }

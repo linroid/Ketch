@@ -19,12 +19,12 @@ class TaskRecordTest {
   private fun defaultRequest(
     url: String = "https://example.com/file.bin",
     connections: Int = 1,
-    headers: Map<String, String> = emptyMap()
+    headers: Map<String, String> = emptyMap(),
   ) = DownloadRequest(
     url = url,
     directory = "/tmp",
     connections = connections,
-    headers = headers
+    headers = headers,
   )
 
   @Test
@@ -34,7 +34,7 @@ class TaskRecordTest {
       request = defaultRequest(),
       destPath = Path("/tmp/file.bin"),
       createdAt = Instant.fromEpochMilliseconds(1000),
-      updatedAt = Instant.fromEpochMilliseconds(1000)
+      updatedAt = Instant.fromEpochMilliseconds(1000),
     )
     assertEquals(1, record.request.connections)
     assertEquals(emptyMap(), record.request.headers)
@@ -56,7 +56,7 @@ class TaskRecordTest {
       taskId = "test-1",
       request = defaultRequest(
         connections = 8,
-        headers = mapOf("X-Custom" to "value")
+        headers = mapOf("X-Custom" to "value"),
       ),
       destPath = Path("/tmp/file.bin"),
       state = TaskState.PAUSED,
@@ -64,7 +64,7 @@ class TaskRecordTest {
       downloadedBytes = 1024,
       errorMessage = null,
       createdAt = Instant.fromEpochMilliseconds(1000),
-      updatedAt = Instant.fromEpochMilliseconds(2000)
+      updatedAt = Instant.fromEpochMilliseconds(2000),
     )
 
     val serialized = json.encodeToString(
@@ -102,7 +102,7 @@ class TaskRecordTest {
       state = TaskState.FAILED,
       errorMessage = "Network timeout",
       createdAt = Instant.fromEpochMilliseconds(1000),
-      updatedAt = Instant.fromEpochMilliseconds(2000)
+      updatedAt = Instant.fromEpochMilliseconds(2000),
     )
 
     val serialized = json.encodeToString(
@@ -127,14 +127,14 @@ class TaskRecordTest {
       totalBytes = 1000,
       downloadedBytes = 500,
       createdAt = created,
-      updatedAt = Instant.fromEpochMilliseconds(1000)
+      updatedAt = Instant.fromEpochMilliseconds(1000),
     )
 
     val newUpdated = Instant.fromEpochMilliseconds(2000)
     val updated = original.copy(
       state = TaskState.PAUSED,
       downloadedBytes = 600,
-      updatedAt = newUpdated
+      updatedAt = newUpdated,
     )
 
     assertEquals("test-1", updated.taskId)
@@ -157,7 +157,7 @@ class TaskRecordTest {
       etag = "\"abc123\"",
       lastModified = "Wed, 21 Oct 2023 07:28:00 GMT",
       createdAt = Instant.fromEpochMilliseconds(1000),
-      updatedAt = Instant.fromEpochMilliseconds(2000)
+      updatedAt = Instant.fromEpochMilliseconds(2000),
     )
 
     val serialized = json.encodeToString(
@@ -179,7 +179,7 @@ class TaskRecordTest {
   fun serialization_withSegments() {
     val segments = listOf(
       Segment(index = 0, start = 0, end = 499, downloadedBytes = 200),
-      Segment(index = 1, start = 500, end = 999, downloadedBytes = 300)
+      Segment(index = 1, start = 500, end = 999, downloadedBytes = 300),
     )
     val record = TaskRecord(
       taskId = "test-1",
@@ -190,7 +190,7 @@ class TaskRecordTest {
       downloadedBytes = 500,
       segments = segments,
       createdAt = Instant.fromEpochMilliseconds(1000),
-      updatedAt = Instant.fromEpochMilliseconds(2000)
+      updatedAt = Instant.fromEpochMilliseconds(2000),
     )
 
     val serialized = json.encodeToString(
@@ -241,7 +241,7 @@ class TaskRecordTest {
       totalBytes = 2048,
       sourceType = "http",
       createdAt = Instant.fromEpochMilliseconds(1000),
-      updatedAt = Instant.fromEpochMilliseconds(2000)
+      updatedAt = Instant.fromEpochMilliseconds(2000),
     )
 
     val serialized = json.encodeToString(
@@ -259,7 +259,7 @@ class TaskRecordTest {
     val resumeState = HttpDownloadSource.buildResumeState(
       etag = "\"abc123\"",
       lastModified = "Wed, 21 Oct 2023 07:28:00 GMT",
-      totalBytes = 2048
+      totalBytes = 2048,
     )
     val record = TaskRecord(
       taskId = "test-1",
@@ -271,7 +271,7 @@ class TaskRecordTest {
       sourceType = "http",
       sourceResumeState = resumeState,
       createdAt = Instant.fromEpochMilliseconds(1000),
-      updatedAt = Instant.fromEpochMilliseconds(2000)
+      updatedAt = Instant.fromEpochMilliseconds(2000),
     )
 
     val serialized = json.encodeToString(

@@ -14,7 +14,7 @@ internal class DefaultFileNameResolver : FileNameResolver {
 
   override fun resolve(
     request: DownloadRequest,
-    serverInfo: ServerInfo
+    serverInfo: ServerInfo,
   ): String {
     return request.fileName
       ?: fromContentDisposition(serverInfo.contentDisposition)

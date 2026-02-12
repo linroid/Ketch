@@ -68,7 +68,7 @@ class KDown(
   private val fileNameResolver: FileNameResolver =
     DefaultFileNameResolver(),
   additionalSources: List<DownloadSource> = emptyList(),
-  logger: Logger = Logger.None
+  logger: Logger = Logger.None,
 ) : KDownApi {
   private val globalLimiter = DelegatingSpeedLimiter(
     if (config.speedLimit.isUnlimited) {
@@ -82,7 +82,7 @@ class KDown(
     httpEngine = httpEngine,
     fileNameResolver = fileNameResolver,
     progressUpdateIntervalMs = config.progressUpdateIntervalMs,
-    segmentSaveIntervalMs = config.segmentSaveIntervalMs
+    segmentSaveIntervalMs = config.segmentSaveIntervalMs,
   )
 
   private val sourceResolver = SourceResolver(
@@ -117,18 +117,18 @@ class KDown(
     config = config,
     fileAccessorFactory = fileAccessorFactory,
     fileNameResolver = fileNameResolver,
-    globalLimiter = globalLimiter
+    globalLimiter = globalLimiter,
   )
 
   private val scheduler = DownloadScheduler(
     queueConfig = config.queueConfig,
     coordinator = coordinator,
-    scope = scope
+    scope = scope,
   )
 
   private val scheduleManager = ScheduleManager(
     scheduler = scheduler,
-    scope = scope
+    scope = scope,
   )
 
   private val tasksMutex = Mutex()
@@ -304,7 +304,7 @@ class KDown(
   }
 
   private fun createTaskFromRecord(
-    record: TaskRecord
+    record: TaskRecord,
   ): DownloadTask {
     val stateFlow = MutableStateFlow(mapRecordState(record))
     val segmentsFlow =
@@ -430,7 +430,7 @@ class KDown(
 
   private fun monitorTaskState(
     taskId: String,
-    stateFlow: MutableStateFlow<DownloadState>
+    stateFlow: MutableStateFlow<DownloadState>,
   ) {
     scope.launch {
       val terminalState =

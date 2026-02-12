@@ -49,7 +49,7 @@ class KDownServerConfigTest {
       host = "127.0.0.1",
       port = 9000,
       apiToken = "my-token",
-      corsAllowedHosts = listOf("localhost:3000")
+      corsAllowedHosts = listOf("localhost:3000"),
     )
     assertEquals("127.0.0.1", config.host)
     assertEquals(9000, config.port)

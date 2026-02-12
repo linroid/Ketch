@@ -19,7 +19,7 @@ class RangeSupportDetectorTest {
         contentLength = 5000,
         acceptRanges = true,
         etag = "\"etag-value\"",
-        lastModified = "Mon, 01 Jan 2024 00:00:00 GMT"
+        lastModified = "Mon, 01 Jan 2024 00:00:00 GMT",
       )
     )
     val detector = RangeSupportDetector(engine)
@@ -38,7 +38,7 @@ class RangeSupportDetectorTest {
         contentLength = 3000,
         acceptRanges = false,
         etag = null,
-        lastModified = null
+        lastModified = null,
       )
     )
     val detector = RangeSupportDetector(engine)

@@ -34,7 +34,7 @@ fun ConnectionStatusDot(state: ConnectionState) {
 @Composable
 fun ConnectionStatusChip(
   state: ConnectionState,
-  isActive: Boolean = false
+  isActive: Boolean = false,
 ) {
   val (label, bgColor, textColor) = when (state) {
     is ConnectionState.Connected -> Triple(
@@ -65,14 +65,14 @@ fun ConnectionStatusChip(
     modifier = Modifier
       .background(
         color = bgColor,
-        shape = MaterialTheme.shapes.small
+        shape = MaterialTheme.shapes.small,
       )
-      .padding(horizontal = 6.dp, vertical = 2.dp)
+      .padding(horizontal = 6.dp, vertical = 2.dp),
   ) {
     Text(
       text = label,
       style = MaterialTheme.typography.labelSmall,
-      color = textColor
+      color = textColor,
     )
   }
 }

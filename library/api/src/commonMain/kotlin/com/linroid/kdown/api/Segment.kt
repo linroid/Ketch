@@ -18,7 +18,7 @@ data class Segment(
   val index: Int,
   val start: Long,
   val end: Long,
-  val downloadedBytes: Long = 0
+  val downloadedBytes: Long = 0,
 ) {
   /** Total number of bytes this segment is responsible for. */
   val totalBytes: Long

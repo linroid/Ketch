@@ -35,19 +35,19 @@ fun DownloadList(
   selectedFilter: StatusFilter,
   scope: CoroutineScope,
   onAddClick: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   when {
     isEmpty -> {
       EmptyState(
         modifier = modifier.fillMaxSize(),
-        onAddClick = onAddClick
+        onAddClick = onAddClick,
       )
     }
     isFilterEmpty -> {
       EmptyFilterState(
         filter = selectedFilter,
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
       )
     }
     else -> {
@@ -57,17 +57,17 @@ fun DownloadList(
           start = 16.dp,
           end = 16.dp,
           top = 8.dp,
-          bottom = 16.dp
+          bottom = 16.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         items(
           items = tasks,
-          key = { it.taskId }
+          key = { it.taskId },
         ) { task ->
           DownloadListItem(
             task = task,
-            scope = scope
+            scope = scope,
           )
         }
       }
@@ -78,35 +78,35 @@ fun DownloadList(
 @Composable
 private fun EmptyState(
   modifier: Modifier = Modifier,
-  onAddClick: () -> Unit
+  onAddClick: () -> Unit,
 ) {
   Box(
     modifier = modifier,
-    contentAlignment = Alignment.Center
+    contentAlignment = Alignment.Center,
   ) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(4.dp)
+      verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
       Icon(
         imageVector = Icons.Outlined.CloudDownload,
         contentDescription = null,
         modifier = Modifier.size(64.dp),
         tint = MaterialTheme.colorScheme.primary
-          .copy(alpha = 0.6f)
+          .copy(alpha = 0.6f),
       )
       Spacer(modifier = Modifier.height(8.dp))
       Text(
         text = "No downloads yet",
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface
+        color = MaterialTheme.colorScheme.onSurface,
       )
       Text(
         text = "Click \"New Task\" to start downloading",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center
+        textAlign = TextAlign.Center,
       )
       Spacer(modifier = Modifier.height(16.dp))
       Button(onClick = onAddClick) {
@@ -119,33 +119,33 @@ private fun EmptyState(
 @Composable
 private fun EmptyFilterState(
   filter: StatusFilter,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Box(
     modifier = modifier,
-    contentAlignment = Alignment.Center
+    contentAlignment = Alignment.Center,
   ) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(4.dp)
+      verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
       Icon(
         imageVector = Icons.Outlined.FilterList,
         contentDescription = null,
         modifier = Modifier.size(48.dp),
         tint = MaterialTheme.colorScheme.onSurfaceVariant
-          .copy(alpha = 0.4f)
+          .copy(alpha = 0.4f),
       )
       Spacer(modifier = Modifier.height(4.dp))
       Text(
         text = "No ${filter.label.lowercase()} downloads",
         style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
       Text(
         text = "Try a different category",
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.outline
+        color = MaterialTheme.colorScheme.outline,
       )
     }
   }

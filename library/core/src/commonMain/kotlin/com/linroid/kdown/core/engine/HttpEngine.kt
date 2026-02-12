@@ -32,7 +32,7 @@ interface HttpEngine {
     url: String,
     range: LongRange?,
     headers: Map<String, String> = emptyMap(),
-    onData: suspend (ByteArray) -> Unit
+    onData: suspend (ByteArray) -> Unit,
   )
 
   /** Releases underlying resources (e.g., the HTTP client). */

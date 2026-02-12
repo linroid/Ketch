@@ -18,7 +18,7 @@ import com.linroid.kdown.app.util.formatEta
 @Composable
 fun ProgressSection(
   state: DownloadState,
-  speedLimit: SpeedLimit
+  speedLimit: SpeedLimit,
 ) {
   val stateColors = LocalDownloadStateColors.current
 
@@ -31,11 +31,11 @@ fun ProgressSection(
         progress = { progress.percent },
         modifier = Modifier.fillMaxWidth(),
         color = colors.foreground,
-        trackColor = MaterialTheme.colorScheme.surfaceVariant
+        trackColor = MaterialTheme.colorScheme.surfaceVariant,
       )
       Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
       ) {
         Text(
           text = buildString {
@@ -46,7 +46,7 @@ fun ProgressSection(
             append(" / ${formatBytes(progress.totalBytes)}")
           },
           style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
           text = buildString {
@@ -74,7 +74,7 @@ fun ProgressSection(
             }
           },
           style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
     }
@@ -97,13 +97,13 @@ fun ProgressSection(
             "${formatBytes(progress.downloadedBytes)}" +
             " / ${formatBytes(progress.totalBytes)}",
           style = MaterialTheme.typography.bodySmall,
-          color = colors.foreground
+          color = colors.foreground,
         )
       } else {
         Text(
           text = "Paused",
           style = MaterialTheme.typography.bodySmall,
-          color = colors.foreground
+          color = colors.foreground,
         )
       }
     }
@@ -112,33 +112,33 @@ fun ProgressSection(
       LinearProgressIndicator(
         modifier = Modifier.fillMaxWidth(),
         color = colors.foreground,
-        trackColor = MaterialTheme.colorScheme.surfaceVariant
+        trackColor = MaterialTheme.colorScheme.surfaceVariant,
       )
       Text(
         text = "Preparing download\u2026",
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
     is DownloadState.Queued -> {
       Text(
         text = "Queued \u2014 waiting for download slot\u2026",
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
     is DownloadState.Scheduled -> {
       Text(
         text = "Scheduled \u2014 waiting for start time\u2026",
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
     is DownloadState.Completed -> {
       Text(
         text = "Download complete",
         style = MaterialTheme.typography.bodySmall,
-        color = stateColors.completed.foreground
+        color = stateColors.completed.foreground,
       )
     }
     is DownloadState.Failed -> {
@@ -147,14 +147,14 @@ fun ProgressSection(
         style = MaterialTheme.typography.bodySmall,
         color = stateColors.failed.foreground,
         maxLines = 2,
-        overflow = TextOverflow.Ellipsis
+        overflow = TextOverflow.Ellipsis,
       )
     }
     is DownloadState.Canceled -> {
       Text(
         text = "Canceled",
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
     is DownloadState.Idle -> {}

@@ -14,7 +14,7 @@ class DownloadRequestTest {
   fun defaultConnections_isOne() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp"
+      directory = "/tmp",
     )
     assertEquals(1, request.connections)
   }
@@ -23,7 +23,7 @@ class DownloadRequestTest {
   fun defaultFileName_isNull() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp"
+      directory = "/tmp",
     )
     assertNull(request.fileName)
   }
@@ -33,7 +33,7 @@ class DownloadRequestTest {
     val request = DownloadRequest(
       url = "https://example.com/file",
       directory = "/tmp",
-      fileName = "custom.zip"
+      fileName = "custom.zip",
     )
     assertEquals("custom.zip", request.fileName)
   }
@@ -54,7 +54,7 @@ class DownloadRequestTest {
       DownloadRequest(
         url = "https://example.com/file",
         directory = "/tmp",
-        connections = 0
+        connections = 0,
       )
     }
   }
@@ -65,7 +65,7 @@ class DownloadRequestTest {
       DownloadRequest(
         url = "https://example.com/file",
         directory = "/tmp",
-        connections = -1
+        connections = -1,
       )
     }
   }
@@ -74,7 +74,7 @@ class DownloadRequestTest {
   fun defaultHeaders_isEmpty() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp"
+      directory = "/tmp",
     )
     assertEquals(emptyMap(), request.headers)
   }
@@ -88,7 +88,7 @@ class DownloadRequestTest {
     val request = DownloadRequest(
       url = "https://example.com/file",
       directory = "/tmp",
-      headers = headers
+      headers = headers,
     )
     assertEquals(headers, request.headers)
     assertEquals("Bearer token123", request.headers["Authorization"])
@@ -99,7 +99,7 @@ class DownloadRequestTest {
   fun defaultSpeedLimit_isUnlimited() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp"
+      directory = "/tmp",
     )
     assertTrue(request.speedLimit.isUnlimited)
   }
@@ -110,7 +110,7 @@ class DownloadRequestTest {
     val request = DownloadRequest(
       url = "https://example.com/file",
       directory = "/tmp",
-      speedLimit = limit
+      speedLimit = limit,
     )
     assertEquals(limit, request.speedLimit)
     assertFalse(request.speedLimit.isUnlimited)
@@ -122,7 +122,7 @@ class DownloadRequestTest {
     val request = DownloadRequest(
       url = "https://example.com/file",
       directory = "/tmp",
-      speedLimit = SpeedLimit.kbps(512)
+      speedLimit = SpeedLimit.kbps(512),
     )
     val serialized = json.encodeToString(
       DownloadRequest.serializer(), request
@@ -142,7 +142,7 @@ class DownloadRequestTest {
     val json = Json { ignoreUnknownKeys = true }
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp"
+      directory = "/tmp",
     )
     val serialized = json.encodeToString(
       DownloadRequest.serializer(), request
@@ -156,7 +156,7 @@ class DownloadRequestTest {
   @Test
   fun defaultDirectory_isNull() {
     val request = DownloadRequest(
-      url = "https://example.com/file"
+      url = "https://example.com/file",
     )
     assertNull(request.directory)
   }

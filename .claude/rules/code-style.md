@@ -38,7 +38,10 @@ Follow the formatting rules defined in `.editorconfig`:
 - Call parameters: off (no wrapping by default)
 - Method call chains: off (no wrapping by default)
 - Extends list: off
-- No trailing commas
+- Trailing commas: yes, but only for **named** parameters/arguments spanning multiple lines
+  - Named parameter declarations (`name: Type`): add trailing comma
+  - Named arguments (`name = value`): add trailing comma
+  - Positional arguments (no name): **no** trailing comma
 
 ### Alignment
 - Align multiline parameters in declarations: yes

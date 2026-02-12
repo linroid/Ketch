@@ -25,7 +25,7 @@ class SpeedLimitIntegrationTest {
     withContext(Dispatchers.Default) {
       val limiter = TokenBucket(
         bytesPerSecond = 1000,
-        burstSize = 200
+        burstSize = 200,
       )
 
       val totalBytes = 2000
@@ -34,7 +34,7 @@ class SpeedLimitIntegrationTest {
           totalBytes.toLong(), true, null, null
         ),
         content = ByteArray(totalBytes),
-        chunkSize = 100
+        chunkSize = 100,
       )
 
       val elapsed = measureTime {
@@ -59,13 +59,13 @@ class SpeedLimitIntegrationTest {
     withContext(Dispatchers.Default) {
       val globalLimiter = TokenBucket(
         bytesPerSecond = 2000,
-        burstSize = 200
+        burstSize = 200,
       )
 
       val engine = FakeHttpEngine(
         serverInfo = ServerInfo(1000, true, null, null),
         content = ByteArray(1000),
-        chunkSize = 100
+        chunkSize = 100,
       )
 
       val elapsed = measureTime {
@@ -102,17 +102,17 @@ class SpeedLimitIntegrationTest {
     withContext(Dispatchers.Default) {
       val taskLimiter = TokenBucket(
         bytesPerSecond = 5000,
-        burstSize = 100
+        burstSize = 100,
       )
       val globalLimiter = TokenBucket(
         bytesPerSecond = 500,
-        burstSize = 100
+        burstSize = 100,
       )
 
       val engine = FakeHttpEngine(
         serverInfo = ServerInfo(500, true, null, null),
         content = ByteArray(500),
-        chunkSize = 100
+        chunkSize = 100,
       )
 
       val elapsed = measureTime {
@@ -140,7 +140,7 @@ class SpeedLimitIntegrationTest {
     val engine = FakeHttpEngine(
       serverInfo = ServerInfo(10000, true, null, null),
       content = ByteArray(10000),
-      chunkSize = 1000
+      chunkSize = 1000,
     )
 
     val elapsed = measureTime {
@@ -163,13 +163,13 @@ class SpeedLimitIntegrationTest {
     withContext(Dispatchers.Default) {
       val limiter = TokenBucket(
         bytesPerSecond = 200,
-        burstSize = 50
+        burstSize = 50,
       )
 
       val engine = FakeHttpEngine(
         serverInfo = ServerInfo(500, true, null, null),
         content = ByteArray(500),
-        chunkSize = 50
+        chunkSize = 50,
       )
 
       var chunksReceived = 0
@@ -199,13 +199,13 @@ class SpeedLimitIntegrationTest {
     withContext(Dispatchers.Default) {
       val limiter = TokenBucket(
         bytesPerSecond = 1_000_000,
-        burstSize = 100
+        burstSize = 100,
       )
 
       val engine = FakeHttpEngine(
         serverInfo = ServerInfo(500, true, null, null),
         content = ByteArray(500),
-        chunkSize = 50
+        chunkSize = 50,
       )
 
       var chunksReceived = 0

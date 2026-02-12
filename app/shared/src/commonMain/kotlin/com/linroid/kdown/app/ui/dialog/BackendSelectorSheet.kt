@@ -47,26 +47,26 @@ fun BackendSelectorSheet(
   onSelectBackend: (BackendEntry) -> Unit,
   onRemoveBackend: (BackendEntry) -> Unit,
   onAddRemoteServer: () -> Unit,
-  onDismiss: () -> Unit
+  onDismiss: () -> Unit,
 ) {
   val sheetState = rememberModalBottomSheetState()
   val backends by backendManager.backends.collectAsState()
 
   ModalBottomSheet(
     onDismissRequest = onDismiss,
-    sheetState = sheetState
+    sheetState = sheetState,
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(bottom = 24.dp)
+        .padding(bottom = 24.dp),
     ) {
       Text(
         text = "Select Backend",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(
-          horizontal = 24.dp, vertical = 8.dp
+          horizontal = 24.dp, vertical = 8.dp,
         )
       )
 
@@ -79,7 +79,7 @@ fun BackendSelectorSheet(
         ListItem(
           modifier = Modifier.clickable(
             enabled = !isSwitching &&
-              switchingBackendId == null
+              switchingBackendId == null,
           ) {
             onSelectBackend(entry)
           },
@@ -111,7 +111,7 @@ fun BackendSelectorSheet(
             Column {
               ConnectionStatusChip(
                 state = entryConnectionState,
-                isActive = isActive
+                isActive = isActive,
               )
               if (entry.isEmbedded &&
                 backendManager.isLocalServerSupported
@@ -140,7 +140,7 @@ fun BackendSelectorSheet(
               if (isSwitching) {
                 CircularProgressIndicator(
                   modifier = Modifier.size(20.dp),
-                  strokeWidth = 2.dp
+                  strokeWidth = 2.dp,
                 )
               } else if (isActive) {
                 Icon(
@@ -148,7 +148,7 @@ fun BackendSelectorSheet(
                   contentDescription = "Active",
                   tint =
                     MaterialTheme.colorScheme.primary,
-                  modifier = Modifier.size(20.dp)
+                  modifier = Modifier.size(20.dp),
                 )
               }
               if (!entry.isEmbedded) {
@@ -171,7 +171,7 @@ fun BackendSelectorSheet(
       }
 
       HorizontalDivider(
-        modifier = Modifier.padding(vertical = 8.dp)
+        modifier = Modifier.padding(vertical = 8.dp),
       )
 
       ListItem(
@@ -185,7 +185,7 @@ fun BackendSelectorSheet(
           Icon(
             imageVector = Icons.Filled.Add,
             contentDescription = "Add remote server",
-            tint = MaterialTheme.colorScheme.primary
+            tint = MaterialTheme.colorScheme.primary,
           )
         }
       )
@@ -194,7 +194,7 @@ fun BackendSelectorSheet(
 }
 
 private fun backendConfigIcon(
-  config: BackendConfig
+  config: BackendConfig,
 ): ImageVector {
   return when (config) {
     is BackendConfig.Embedded ->

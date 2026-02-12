@@ -15,7 +15,7 @@ import kotlin.time.Instant
 internal class DownloadScheduler(
   private val queueConfig: QueueConfig,
   private val coordinator: DownloadCoordinator,
-  private val scope: CoroutineScope
+  private val scope: CoroutineScope,
 ) {
   private val mutex = Mutex()
   private val activeEntries = mutableMapOf<String, QueueEntry>()
@@ -29,7 +29,7 @@ internal class DownloadScheduler(
     val stateFlow: MutableStateFlow<DownloadState>,
     val segmentsFlow: MutableStateFlow<List<Segment>>,
     var priority: DownloadPriority = DownloadPriority.NORMAL,
-    var preempted: Boolean = false
+    var preempted: Boolean = false,
   )
 
   suspend fun enqueue(
@@ -38,7 +38,7 @@ internal class DownloadScheduler(
     createdAt: Instant,
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
-    preferResume: Boolean = false
+    preferResume: Boolean = false,
   ) {
     mutex.withLock {
       val host = extractHost(request.url)
@@ -51,7 +51,7 @@ internal class DownloadScheduler(
         stateFlow = stateFlow,
         segmentsFlow = segmentsFlow,
         priority = request.priority,
-        preempted = preferResume
+        preempted = preferResume,
       )
 
       if (queueConfig.autoStart &&
@@ -89,7 +89,7 @@ internal class DownloadScheduler(
    */
   private suspend fun tryPreemptAndStart(
     entry: QueueEntry,
-    host: String
+    host: String,
   ) {
     val victim = activeEntries.values
       .filter { it.priority < DownloadPriority.URGENT }
@@ -238,7 +238,7 @@ internal class DownloadScheduler(
 
   private suspend fun startTask(
     entry: QueueEntry,
-    host: String
+    host: String,
   ) {
     activeEntries[entry.taskId] = entry
     hostConnectionCount[host] = (hostConnectionCount[host] ?: 0) + 1

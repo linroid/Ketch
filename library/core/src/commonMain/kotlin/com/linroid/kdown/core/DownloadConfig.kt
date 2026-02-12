@@ -22,7 +22,7 @@ data class DownloadConfig(
   val segmentSaveIntervalMs: Long = 5000,
   val bufferSize: Int = 8192,
   val speedLimit: SpeedLimit = SpeedLimit.Companion.Unlimited,
-  val queueConfig: QueueConfig = QueueConfig()
+  val queueConfig: QueueConfig = QueueConfig(),
 ) {
   init {
     require(maxConnections > 0) { "maxConnections must be greater than 0" }

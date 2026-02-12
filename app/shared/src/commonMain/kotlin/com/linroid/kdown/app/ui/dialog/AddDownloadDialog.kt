@@ -227,7 +227,7 @@ fun AddDownloadDialog(
             )
           }
         },
-        enabled = url.isNotBlank() && isValidUrl
+        enabled = url.isNotBlank() && isValidUrl,
       ) {
         Text("Download")
       }

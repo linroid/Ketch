@@ -31,37 +31,37 @@ import kotlin.time.Duration.Companion.seconds
 class DownloadSchedulerTest {
 
   private fun createRequest(
-    priority: DownloadPriority = DownloadPriority.NORMAL
+    priority: DownloadPriority = DownloadPriority.NORMAL,
   ) = DownloadRequest(
     url = "https://example.com/file.zip",
     directory = "/tmp",
-    priority = priority
+    priority = priority,
   )
 
   private fun createScheduler(
     scope: CoroutineScope,
     maxConcurrent: Int = 10,
-    autoStart: Boolean = true
+    autoStart: Boolean = true,
   ): DownloadScheduler {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver()
+      fileNameResolver = DefaultFileNameResolver(),
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileAccessorFactory = { throw UnsupportedOperationException() },
-      fileNameResolver = DefaultFileNameResolver()
+      fileNameResolver = DefaultFileNameResolver(),
     )
     return DownloadScheduler(
       queueConfig = QueueConfig(
         maxConcurrentDownloads = maxConcurrent,
-        autoStart = autoStart
+        autoStart = autoStart,
       ),
       coordinator = coordinator,
-      scope = scope
+      scope = scope,
     )
   }
 
@@ -165,7 +165,7 @@ class DownloadSchedulerTest {
         // exists), then fall back to start()
         scheduler.enqueue(
           "task-1", createRequest(), Clock.System.now(),
-          stateFlow, segmentsFlow, preferResume = true
+          stateFlow, segmentsFlow, preferResume = true,
         )
 
         // Should have attempted to start (moved past Pending)

@@ -9,7 +9,7 @@ import kotlin.time.Instant
 
 internal class TokenBucket(
   bytesPerSecond: Long,
-  private val burstSize: Long = 65536
+  private val burstSize: Long = 65536,
 ) : SpeedLimiter {
   private val mutex = Mutex()
   private var tokens: Long = burstSize

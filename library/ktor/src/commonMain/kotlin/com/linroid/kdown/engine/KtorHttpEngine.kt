@@ -26,7 +26,7 @@ import kotlin.coroutines.cancellation.CancellationException
  *   with infinite timeouts (suitable for large downloads)
  */
 class KtorHttpEngine(
-  private val client: HttpClient = defaultClient()
+  private val client: HttpClient = defaultClient(),
 ) : HttpEngine {
 
   override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
@@ -56,7 +56,7 @@ class KtorHttpEngine(
         acceptRanges = acceptRanges?.contains("bytes", ignoreCase = true) == true,
         etag = etag,
         lastModified = lastModified,
-        contentDisposition = contentDisposition
+        contentDisposition = contentDisposition,
       )
     } catch (e: CancellationException) {
       throw e
@@ -72,7 +72,7 @@ class KtorHttpEngine(
     url: String,
     range: LongRange?,
     headers: Map<String, String>,
-    onData: suspend (ByteArray) -> Unit
+    onData: suspend (ByteArray) -> Unit,
   ) {
     try {
       if (range != null) {

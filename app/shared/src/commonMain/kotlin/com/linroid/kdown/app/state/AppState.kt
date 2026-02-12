@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppState(
   val backendManager: BackendManager,
-  private val scope: CoroutineScope
+  private val scope: CoroutineScope,
 ) {
   val activeApi: StateFlow<KDownApi> =
     backendManager.activeApi
@@ -88,7 +88,7 @@ class AppState(
     fileName: String,
     speedLimit: SpeedLimit,
     priority: DownloadPriority,
-    schedule: DownloadSchedule = DownloadSchedule.Immediate
+    schedule: DownloadSchedule = DownloadSchedule.Immediate,
   ) {
     scope.launch {
       runCatching {
@@ -99,7 +99,7 @@ class AppState(
           connections = 4,
           speedLimit = speedLimit,
           priority = priority,
-          schedule = schedule
+          schedule = schedule,
         )
         activeApi.value.download(request)
       }.onFailure { e ->
@@ -130,7 +130,7 @@ class AppState(
   fun addRemoteServer(
     host: String,
     port: Int,
-    token: String?
+    token: String?,
   ) {
     try {
       backendManager.addRemote(host, port, token)

@@ -20,7 +20,7 @@ import kotlin.time.Instant
 
 internal class ScheduleManager(
   private val scheduler: DownloadScheduler,
-  private val scope: CoroutineScope
+  private val scope: CoroutineScope,
 ) {
   private val mutex = Mutex()
   private val scheduledJobs = mutableMapOf<String, Job>()
@@ -30,7 +30,7 @@ internal class ScheduleManager(
     request: DownloadRequest,
     createdAt: Instant,
     stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>
+    segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
     val schedule = request.schedule
     val conditions = request.conditions
@@ -66,7 +66,7 @@ internal class ScheduleManager(
     conditions: List<DownloadCondition>,
     createdAt: Instant,
     stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>
+    segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
     mutex.withLock {
       scheduledJobs.remove(taskId)?.cancel()
@@ -89,7 +89,7 @@ internal class ScheduleManager(
         }
         scheduler.enqueue(
           taskId, request, createdAt, stateFlow, segmentsFlow,
-          preferResume = true
+          preferResume = true,
         )
 
         mutex.withLock { scheduledJobs.remove(taskId) }
@@ -111,7 +111,7 @@ internal class ScheduleManager(
 
   private suspend fun waitForSchedule(
     taskId: String,
-    schedule: DownloadSchedule
+    schedule: DownloadSchedule,
   ) {
     when (schedule) {
       is DownloadSchedule.Immediate -> return
@@ -138,7 +138,7 @@ internal class ScheduleManager(
 
   private suspend fun waitForConditions(
     taskId: String,
-    conditions: List<DownloadCondition>
+    conditions: List<DownloadCondition>,
   ) {
     if (conditions.isEmpty()) return
 

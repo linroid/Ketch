@@ -21,7 +21,7 @@ internal object SegmentCalculator {
         index = index,
         start = start,
         end = end,
-        downloadedBytes = 0
+        downloadedBytes = 0,
       )
     }
   }
@@ -32,7 +32,7 @@ internal object SegmentCalculator {
         index = 0,
         start = 0,
         end = if (totalBytes > 0) totalBytes - 1 else 0,
-        downloadedBytes = 0
+        downloadedBytes = 0,
       )
     )
   }

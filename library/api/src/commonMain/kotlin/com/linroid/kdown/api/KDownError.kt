@@ -12,12 +12,12 @@ package com.linroid.kdown.api
  */
 sealed class KDownError(
   override val message: String?,
-  override val cause: Throwable? = null
+  override val cause: Throwable? = null,
 ) : Exception(message, cause) {
 
   /** Connection or timeout failure. Always retryable. */
   data class Network(
-    override val cause: Throwable? = null
+    override val cause: Throwable? = null,
   ) : KDownError("Network error occurred", cause)
 
   /**
@@ -29,12 +29,12 @@ sealed class KDownError(
    */
   data class Http(
     val code: Int,
-    val statusMessage: String? = null
+    val statusMessage: String? = null,
   ) : KDownError("HTTP error $code: $statusMessage")
 
   /** File I/O failure (write, flush, preallocate). Not retryable. */
   data class Disk(
-    override val cause: Throwable? = null
+    override val cause: Throwable? = null,
   ) : KDownError("Disk I/O error", cause)
 
   /** Server does not support a required feature (e.g., byte ranges). */
@@ -46,7 +46,7 @@ sealed class KDownError(
    * @property reason description of what failed validation
    */
   data class ValidationFailed(
-    val reason: String
+    val reason: String,
   ) : KDownError("Validation failed: $reason")
 
   /** Download was explicitly canceled by the user. */
@@ -59,12 +59,12 @@ sealed class KDownError(
    */
   data class SourceError(
     val sourceType: String,
-    override val cause: Throwable? = null
+    override val cause: Throwable? = null,
   ) : KDownError("Source '$sourceType' error", cause)
 
   /** Catch-all for unexpected errors. Not retryable. */
   data class Unknown(
-    override val cause: Throwable? = null
+    override val cause: Throwable? = null,
   ) : KDownError("Unknown error occurred", cause)
 
   /**

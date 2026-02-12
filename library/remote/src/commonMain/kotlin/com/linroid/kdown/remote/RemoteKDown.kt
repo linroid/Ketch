@@ -48,7 +48,7 @@ import kotlinx.serialization.json.Json
  */
 class RemoteKDown(
   private val baseUrl: String,
-  private val apiToken: String? = null
+  private val apiToken: String? = null,
 ) : KDownApi {
 
   private val scope = CoroutineScope(
@@ -103,7 +103,7 @@ class RemoteKDown(
   private var sseJob: Job? = null
 
   override suspend fun download(
-    request: DownloadRequest
+    request: DownloadRequest,
   ): DownloadTask {
     val wireRequest = WireMapper.toCreateWire(request)
     val response = httpClient.post(Api.Tasks()) {
@@ -158,7 +158,7 @@ class RemoteKDown(
         reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS
 
         httpClient.sse(
-          urlString = "/api/events"
+          urlString = "/api/events",
         ) {
           incoming.collect { event ->
             val data = event.data ?: return@collect
@@ -204,7 +204,7 @@ class RemoteKDown(
       "task_added" -> {
         try {
           val response = httpClient.get(
-            Api.Tasks.ById(id = event.taskId)
+            Api.Tasks.ById(id = event.taskId),
           )
           if (response.status.isSuccess()) {
             val wire: TaskResponse =
@@ -240,7 +240,7 @@ class RemoteKDown(
 
   private fun createRemoteTask(
     wire: TaskResponse,
-    request: DownloadRequest
+    request: DownloadRequest,
   ): RemoteDownloadTask {
     return RemoteDownloadTask(
       taskId = wire.taskId,
@@ -265,7 +265,7 @@ class RemoteKDown(
   }
 
   private fun checkSuccess(
-    response: io.ktor.client.statement.HttpResponse
+    response: io.ktor.client.statement.HttpResponse,
   ) {
     if (!response.status.isSuccess()) {
       throw IllegalStateException(

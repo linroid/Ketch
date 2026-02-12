@@ -16,12 +16,12 @@ class DefaultFileNameResolverTest {
     acceptRanges = true,
     etag = null,
     lastModified = null,
-    contentDisposition = contentDisposition
+    contentDisposition = contentDisposition,
   )
 
   private fun request(url: String) = DownloadRequest(
     url = url,
-    directory = dir
+    directory = dir,
   )
 
   // --- Content-Disposition: filename*=UTF-8'' ---
@@ -162,7 +162,7 @@ class DefaultFileNameResolverTest {
     val req = DownloadRequest(
       url = "https://example.com/url-name.zip",
       directory = dir,
-      fileName = "explicit.zip"
+      fileName = "explicit.zip",
     )
     assertEquals("explicit.zip", resolver.resolve(req, info))
   }

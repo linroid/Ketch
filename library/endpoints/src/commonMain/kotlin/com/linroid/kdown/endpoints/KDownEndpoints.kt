@@ -50,7 +50,7 @@ class Api {
     @Resource("{id}")
     data class ById(
       val parent: Tasks = Tasks(),
-      val id: String
+      val id: String,
     ) {
 
       @Serializable
@@ -83,7 +83,7 @@ class Api {
     @Resource("{id}")
     data class ById(
       val parent: Events = Events(),
-      val id: String
+      val id: String,
     )
   }
 }

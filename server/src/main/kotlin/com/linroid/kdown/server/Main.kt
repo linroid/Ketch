@@ -106,21 +106,21 @@ fun main(args: Array<String>) {
   val taskStore = SqliteTaskStore(driver)
 
   val config = DownloadConfig(
-    speedLimit = speedLimit
+    speedLimit = speedLimit,
   )
 
   val kdown = KDown(
     httpEngine = KtorHttpEngine(),
     taskStore = taskStore,
     config = config,
-    logger = Logger.console()
+    logger = Logger.console(),
   )
 
   val serverConfig = KDownServerConfig(
     host = host,
     port = port,
     apiToken = token,
-    corsAllowedHosts = corsOrigins
+    corsAllowedHosts = corsOrigins,
   )
 
   val server = KDownServer(kdown, serverConfig)

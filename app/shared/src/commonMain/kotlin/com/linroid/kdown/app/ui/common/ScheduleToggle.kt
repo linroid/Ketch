@@ -23,7 +23,7 @@ import kotlin.time.Duration.Companion.minutes
 
 private data class ScheduleOption(
   val label: String,
-  val schedule: DownloadSchedule
+  val schedule: DownloadSchedule,
 )
 
 private val scheduleOptions = listOf(
@@ -54,7 +54,7 @@ private val scheduleOptions = listOf(
 fun ScheduleIcon(
   selected: Boolean,
   onClick: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   IconButton(
     onClick = onClick,
@@ -70,7 +70,7 @@ fun ScheduleIcon(
     Icon(
       Icons.Filled.Schedule,
       contentDescription = "Schedule",
-      modifier = Modifier.size(16.dp)
+      modifier = Modifier.size(16.dp),
     )
   }
 }
@@ -79,11 +79,11 @@ fun ScheduleIcon(
 fun ScheduleSelector(
   value: DownloadSchedule,
   onValueChange: (DownloadSchedule) -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(6.dp)
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
   ) {
     scheduleOptions.forEach { option ->
       FilterChip(
@@ -106,11 +106,11 @@ fun SchedulePanel(
   task: DownloadTask,
   scope: CoroutineScope,
   onScheduled: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Row(
     modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(6.dp)
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
   ) {
     scheduleOptions.forEach { option ->
       FilterChip(

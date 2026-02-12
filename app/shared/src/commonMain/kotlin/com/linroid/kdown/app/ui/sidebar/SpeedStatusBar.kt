@@ -31,14 +31,14 @@ fun SpeedStatusBar(
   backendLabel: String?,
   connectionState: ConnectionState,
   onBackendClick: () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
 ) {
   Surface(
     color = MaterialTheme.colorScheme.surfaceContainerLow,
-    modifier = modifier.fillMaxWidth()
+    modifier = modifier.fillMaxWidth(),
   ) {
     HorizontalDivider(
-      color = MaterialTheme.colorScheme.outlineVariant
+      color = MaterialTheme.colorScheme.outlineVariant,
     )
     val windowSizeClass =
       currentWindowAdaptiveInfo().windowSizeClass
@@ -52,53 +52,53 @@ fun SpeedStatusBar(
         .fillMaxWidth()
         .padding(horizontal = 16.dp, vertical = verticalPad),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.SpaceBetween
+      horizontalArrangement = Arrangement.SpaceBetween,
     ) {
       // Left side: backend info
       Row(
         modifier = Modifier.clickable { onBackendClick() },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
         ConnectionStatusDot(connectionState)
         Text(
           text = backendLabel ?: "Not connected",
           style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
       // Right side: speed info
       Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         if (activeDownloads > 0) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
           ) {
             Icon(
               Icons.Filled.ArrowDownward,
               contentDescription = "Download speed",
               modifier = Modifier.size(14.dp),
-              tint = MaterialTheme.colorScheme.primary
+              tint = MaterialTheme.colorScheme.primary,
             )
             Text(
               text = "${formatBytes(totalSpeed)}/s",
               style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.primary
+              color = MaterialTheme.colorScheme.primary,
             )
           }
         }
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(4.dp)
+          horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
           Icon(
             Icons.Filled.Speed,
             contentDescription = null,
             modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
           )
           Text(
             text = if (activeDownloads > 0) {
@@ -107,7 +107,7 @@ fun SpeedStatusBar(
               "Idle"
             },
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
       }

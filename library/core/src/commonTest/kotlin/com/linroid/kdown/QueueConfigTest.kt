@@ -22,7 +22,7 @@ class QueueConfigTest {
     val config = QueueConfig(
       maxConcurrentDownloads = 5,
       maxConnectionsPerHost = 2,
-      autoStart = false
+      autoStart = false,
     )
     assertEquals(5, config.maxConcurrentDownloads)
     assertEquals(2, config.maxConnectionsPerHost)
@@ -74,12 +74,12 @@ class QueueConfigTest {
     val a = QueueConfig(
       maxConcurrentDownloads = 5,
       maxConnectionsPerHost = 3,
-      autoStart = true
+      autoStart = true,
     )
     val b = QueueConfig(
       maxConcurrentDownloads = 5,
       maxConnectionsPerHost = 3,
-      autoStart = true
+      autoStart = true,
     )
     assertEquals(a, b)
   }
@@ -89,7 +89,7 @@ class QueueConfigTest {
     val original = QueueConfig(
       maxConcurrentDownloads = 5,
       maxConnectionsPerHost = 3,
-      autoStart = false
+      autoStart = false,
     )
     val copy = original.copy(maxConcurrentDownloads = 10)
     assertEquals(10, copy.maxConcurrentDownloads)
@@ -101,7 +101,7 @@ class QueueConfigTest {
   fun downloadConfig_includesQueueConfig() {
     val queueConfig = QueueConfig(
       maxConcurrentDownloads = 2,
-      maxConnectionsPerHost = 1
+      maxConnectionsPerHost = 1,
     )
     val config = DownloadConfig(queueConfig = queueConfig)
     assertEquals(queueConfig, config.queueConfig)

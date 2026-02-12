@@ -30,5 +30,5 @@ class DownloadContext(
   val segments: MutableStateFlow<List<Segment>>,
   val onProgress: suspend (downloaded: Long, total: Long) -> Unit,
   val throttle: suspend (bytes: Int) -> Unit,
-  val headers: Map<String, String>
+  val headers: Map<String, String>,
 )

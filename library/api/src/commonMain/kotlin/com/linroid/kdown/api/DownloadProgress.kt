@@ -10,7 +10,7 @@ package com.linroid.kdown.api
 data class DownloadProgress(
   val downloadedBytes: Long,
   val totalBytes: Long,
-  val bytesPerSecond: Long = 0
+  val bytesPerSecond: Long = 0,
 ) {
   /** Fraction complete in the range `0f..1f`, or `0f` if [totalBytes] is unknown. */
   val percent: Float
