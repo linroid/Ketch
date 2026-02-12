@@ -10,12 +10,14 @@ application {
 
 dependencies {
   api(projects.library.core)
+  api(projects.library.endpoints)
   implementation(projects.library.ktor)
   implementation(projects.library.sqlite)
 
   implementation(libs.ktor.serverCore)
   implementation(libs.ktor.serverNetty)
   implementation(libs.ktor.serverContentNegotiation)
+  implementation(libs.ktor.serverResources)
   implementation(libs.ktor.serverSse)
   implementation(libs.ktor.serverCors)
   implementation(libs.ktor.serverStatusPages)

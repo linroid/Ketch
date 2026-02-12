@@ -1,6 +1,6 @@
 package com.linroid.kdown.server
 
-import com.linroid.kdown.server.model.ServerStatus
+import com.linroid.kdown.endpoints.model.ServerStatus
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
@@ -30,13 +30,13 @@ class KDownServerTest {
     }
 
   @Test
-  fun `downloads endpoint returns empty list`() =
+  fun `tasks endpoint returns empty list`() =
     testApplication {
       application {
         val server = createTestServer()
         with(server) { configureServer() }
       }
-      val response = client.get("/api/downloads")
+      val response = client.get("/api/tasks")
       assertEquals(HttpStatusCode.OK, response.status)
       assertEquals("[]", response.bodyAsText())
     }
@@ -47,7 +47,7 @@ class KDownServerTest {
       val server = createTestServer()
       with(server) { configureServer() }
     }
-    val response = client.get("/api/downloads/nonexistent")
+    val response = client.get("/api/tasks/nonexistent")
     assertEquals(HttpStatusCode.NotFound, response.status)
   }
 }

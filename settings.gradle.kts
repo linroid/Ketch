@@ -36,6 +36,7 @@ plugins {
 include(":library:core")
 include(":library:api")
 include(":library:remote")
+include(":library:endpoints")
 include(":library:ktor")
 include(":library:kermit")
 include(":library:sqlite")

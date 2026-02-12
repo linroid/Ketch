@@ -27,11 +27,13 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.library.api)
+      api(projects.library.endpoints)
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.serialization.json)
       implementation(libs.kotlinx.datetime)
       implementation(libs.ktor.client.core)
       implementation(libs.ktor.client.contentNegotiation)
+      implementation(libs.ktor.client.resources)
       implementation(libs.ktor.serialization.json.common)
     }
     androidMain.dependencies {

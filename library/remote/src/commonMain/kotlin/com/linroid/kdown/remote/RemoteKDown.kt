@@ -5,14 +5,21 @@ import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.endpoints.Api
+import com.linroid.kdown.endpoints.model.CreateDownloadRequest
+import com.linroid.kdown.endpoints.model.SpeedLimitRequest
+import com.linroid.kdown.endpoints.model.TaskEvent
+import com.linroid.kdown.endpoints.model.TaskResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.resources.Resources
+import io.ktor.client.plugins.resources.get
+import io.ktor.client.plugins.resources.post
+import io.ktor.client.plugins.resources.put
 import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.plugins.sse.sse
-import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -53,11 +60,20 @@ class RemoteKDown(
     encodeDefaults = true
   }
 
-  private val httpClient = HttpClient {
+  internal val httpClient = HttpClient {
     install(ContentNegotiation) {
       json(this@RemoteKDown.json)
     }
     install(SSE)
+    install(Resources)
+    defaultRequest {
+      url(baseUrl)
+      if (apiToken != null) {
+        header(
+          HttpHeaders.Authorization, "Bearer $apiToken"
+        )
+      }
+    }
   }
 
   private val _connectionState = MutableStateFlow<ConnectionState>(
@@ -94,17 +110,16 @@ class RemoteKDown(
     request: DownloadRequest
   ): DownloadTask {
     val wireRequest = WireMapper.toCreateWire(request)
-    val response = httpClient.post("$baseUrl/api/downloads") {
-      applyAuth()
+    val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(
         json.encodeToString(
-          WireCreateDownloadRequest.serializer(), wireRequest
+          CreateDownloadRequest.serializer(), wireRequest
         )
       )
     }
     checkSuccess(response)
-    val wire: WireTaskResponse = json.decodeFromString(
+    val wire: TaskResponse = json.decodeFromString(
       response.bodyAsText()
     )
     val task = createRemoteTask(wire, request)
@@ -113,13 +128,12 @@ class RemoteKDown(
   }
 
   override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {
-    val response = httpClient.put("$baseUrl/api/speed-limit") {
-      applyAuth()
+    val response = httpClient.put(Api.SpeedLimit()) {
       contentType(ContentType.Application.Json)
       setBody(
         json.encodeToString(
-          WireSpeedLimitBody.serializer(),
-          WireSpeedLimitBody(limit.bytesPerSecond)
+          SpeedLimitRequest.serializer(),
+          SpeedLimitRequest(limit.bytesPerSecond)
         )
       )
     }
@@ -142,13 +156,12 @@ class RemoteKDown(
         reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS
 
         httpClient.sse(
-          urlString = "$baseUrl/api/events",
-          request = { applyAuth() }
+          urlString = "/api/events"
         ) {
           incoming.collect { event ->
             val data = event.data ?: return@collect
             try {
-              val wireEvent: WireTaskEvent =
+              val wireEvent: TaskEvent =
                 json.decodeFromString(data)
               handleEvent(wireEvent)
             } catch (_: Exception) {
@@ -170,11 +183,9 @@ class RemoteKDown(
   }
 
   private suspend fun fetchAllTasks() {
-    val response = httpClient.get("$baseUrl/api/downloads") {
-      applyAuth()
-    }
+    val response = httpClient.get(Api.Tasks())
     if (response.status.isSuccess()) {
-      val wireTasks: List<WireTaskResponse> =
+      val wireTasks: List<TaskResponse> =
         json.decodeFromString(response.bodyAsText())
       taskMap.clear()
       val tasks = wireTasks.map { wire ->
@@ -186,15 +197,15 @@ class RemoteKDown(
     }
   }
 
-  private suspend fun handleEvent(event: WireTaskEvent) {
+  private suspend fun handleEvent(event: TaskEvent) {
     when (event.type) {
       "task_added" -> {
         try {
           val response = httpClient.get(
-            "$baseUrl/api/downloads/${event.taskId}"
-          ) { applyAuth() }
+            Api.Tasks.ById(id = event.taskId)
+          )
           if (response.status.isSuccess()) {
-            val wire: WireTaskResponse =
+            val wire: TaskResponse =
               json.decodeFromString(response.bodyAsText())
             val request = WireMapper.toDownloadRequest(wire)
             val task = createRemoteTask(wire, request)
@@ -226,7 +237,7 @@ class RemoteKDown(
   }
 
   private fun createRemoteTask(
-    wire: WireTaskResponse,
+    wire: TaskResponse,
     request: DownloadRequest
   ): RemoteDownloadTask {
     return RemoteDownloadTask(
@@ -236,8 +247,6 @@ class RemoteKDown(
       initialState = WireMapper.toDownloadState(wire),
       initialSegments = WireMapper.toSegments(wire.segments),
       httpClient = httpClient,
-      baseUrl = baseUrl,
-      apiToken = apiToken,
       json = json,
       onRemoved = { id ->
         taskMap.remove(id)
@@ -251,12 +260,6 @@ class RemoteKDown(
   private fun addTask(task: RemoteDownloadTask) {
     taskMap[task.taskId] = task
     _tasks.value += task
-  }
-
-  private fun io.ktor.client.request.HttpRequestBuilder.applyAuth() {
-    if (apiToken != null) {
-      header(HttpHeaders.Authorization, "Bearer $apiToken")
-    }
   }
 
   private fun checkSuccess(

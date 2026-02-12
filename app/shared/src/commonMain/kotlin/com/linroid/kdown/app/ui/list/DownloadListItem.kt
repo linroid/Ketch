@@ -238,7 +238,6 @@ fun DownloadListItem(
       }
 
       if (showToggles) {
-
         // Expanded panel below icons
         AnimatedContent(
           targetState = expanded,

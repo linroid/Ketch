@@ -1,11 +1,11 @@
 package com.linroid.kdown.server
 
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.server.model.CreateDownloadRequest
-import com.linroid.kdown.server.model.ErrorResponse
-import com.linroid.kdown.server.model.PriorityRequest
-import com.linroid.kdown.server.model.SpeedLimitRequest
-import com.linroid.kdown.server.model.TaskResponse
+import com.linroid.kdown.endpoints.model.CreateDownloadRequest
+import com.linroid.kdown.endpoints.model.ErrorResponse
+import com.linroid.kdown.endpoints.model.PriorityRequest
+import com.linroid.kdown.endpoints.model.SpeedLimitRequest
+import com.linroid.kdown.endpoints.model.TaskResponse
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -43,7 +43,7 @@ class DownloadRoutesTest {
       val client = createClient {
         install(ContentNegotiation) { json(json) }
       }
-      val response = client.post("/api/downloads") {
+      val response = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
           CreateDownloadRequest(
@@ -75,7 +75,7 @@ class DownloadRoutesTest {
       val client = createClient {
         install(ContentNegotiation) { json(json) }
       }
-      val response = client.post("/api/downloads") {
+      val response = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
           CreateDownloadRequest(
@@ -105,7 +105,7 @@ class DownloadRoutesTest {
       val client = createClient {
         install(ContentNegotiation) { json(json) }
       }
-      val response = client.post("/api/downloads") {
+      val response = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
           CreateDownloadRequest(
@@ -133,7 +133,7 @@ class DownloadRoutesTest {
       install(ContentNegotiation) { json(json) }
     }
     // Create a task
-    val createResponse = client.post("/api/downloads") {
+    val createResponse = client.post("/api/tasks") {
       contentType(ContentType.Application.Json)
       setBody(
         CreateDownloadRequest(
@@ -148,7 +148,7 @@ class DownloadRoutesTest {
 
     // Fetch by ID
     val getResponse = client.get(
-      "/api/downloads/${created.taskId}"
+      "/api/tasks/${created.taskId}"
     )
     assertEquals(HttpStatusCode.OK, getResponse.status)
     val fetched = json.decodeFromString<TaskResponse>(
@@ -170,7 +170,7 @@ class DownloadRoutesTest {
         install(ContentNegotiation) { json(json) }
       }
       // Create two tasks
-      client.post("/api/downloads") {
+      client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
           CreateDownloadRequest(
@@ -179,7 +179,7 @@ class DownloadRoutesTest {
           )
         )
       }
-      client.post("/api/downloads") {
+      client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
           CreateDownloadRequest(
@@ -189,7 +189,7 @@ class DownloadRoutesTest {
         )
       }
 
-      val listResponse = client.get("/api/downloads")
+      val listResponse = client.get("/api/tasks")
       assertEquals(HttpStatusCode.OK, listResponse.status)
       val tasks = json.decodeFromString<List<TaskResponse>>(
         listResponse.bodyAsText()
@@ -208,7 +208,7 @@ class DownloadRoutesTest {
       val client = createClient {
         install(ContentNegotiation) { json(json) }
       }
-      val createResponse = client.post("/api/downloads") {
+      val createResponse = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
           CreateDownloadRequest(
@@ -222,7 +222,7 @@ class DownloadRoutesTest {
       )
 
       val cancelResponse = client.post(
-        "/api/downloads/${created.taskId}/cancel"
+        "/api/tasks/${created.taskId}/cancel"
       )
       assertEquals(HttpStatusCode.OK, cancelResponse.status)
       val result = json.decodeFromString<TaskResponse>(
@@ -247,7 +247,7 @@ class DownloadRoutesTest {
     val client = createClient {
       install(ContentNegotiation) { json(json) }
     }
-    val createResponse = client.post("/api/downloads") {
+    val createResponse = client.post("/api/tasks") {
       contentType(ContentType.Application.Json)
       setBody(
         CreateDownloadRequest(
@@ -261,7 +261,7 @@ class DownloadRoutesTest {
     )
 
     val deleteResponse = client.delete(
-      "/api/downloads/${created.taskId}"
+      "/api/tasks/${created.taskId}"
     )
     assertEquals(
       HttpStatusCode.NoContent, deleteResponse.status
@@ -269,7 +269,7 @@ class DownloadRoutesTest {
 
     // Verify it's gone
     val getResponse = client.get(
-      "/api/downloads/${created.taskId}"
+      "/api/tasks/${created.taskId}"
     )
     assertEquals(HttpStatusCode.NotFound, getResponse.status)
   }
@@ -282,7 +282,7 @@ class DownloadRoutesTest {
         with(server) { configureServer() }
       }
       val response = client.post(
-        "/api/downloads/nonexistent/pause"
+        "/api/tasks/nonexistent/pause"
       )
       assertEquals(HttpStatusCode.NotFound, response.status)
     }
@@ -295,7 +295,7 @@ class DownloadRoutesTest {
         with(server) { configureServer() }
       }
       val response = client.post(
-        "/api/downloads/nonexistent/resume"
+        "/api/tasks/nonexistent/resume"
       )
       assertEquals(HttpStatusCode.NotFound, response.status)
     }
@@ -308,7 +308,7 @@ class DownloadRoutesTest {
         with(server) { configureServer() }
       }
       val response = client.post(
-        "/api/downloads/nonexistent/cancel"
+        "/api/tasks/nonexistent/cancel"
       )
       assertEquals(HttpStatusCode.NotFound, response.status)
     }
@@ -321,7 +321,7 @@ class DownloadRoutesTest {
         with(server) { configureServer() }
       }
       val response = client.delete(
-        "/api/downloads/nonexistent"
+        "/api/tasks/nonexistent"
       )
       assertEquals(HttpStatusCode.NotFound, response.status)
     }
@@ -337,7 +337,7 @@ class DownloadRoutesTest {
         install(ContentNegotiation) { json(json) }
       }
       val response = client.put(
-        "/api/downloads/nonexistent/speed-limit"
+        "/api/tasks/nonexistent/speed-limit"
       ) {
         contentType(ContentType.Application.Json)
         setBody(SpeedLimitRequest(bytesPerSecond = 1024))
@@ -356,7 +356,7 @@ class DownloadRoutesTest {
         install(ContentNegotiation) { json(json) }
       }
       val response = client.put(
-        "/api/downloads/nonexistent/priority"
+        "/api/tasks/nonexistent/priority"
       ) {
         contentType(ContentType.Application.Json)
         setBody(PriorityRequest(priority = "HIGH"))
@@ -375,7 +375,7 @@ class DownloadRoutesTest {
       val client = createClient {
         install(ContentNegotiation) { json(json) }
       }
-      val createResponse = client.post("/api/downloads") {
+      val createResponse = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
           CreateDownloadRequest(
@@ -389,7 +389,7 @@ class DownloadRoutesTest {
       )
 
       val response = client.put(
-        "/api/downloads/${created.taskId}/priority"
+        "/api/tasks/${created.taskId}/priority"
       ) {
         contentType(ContentType.Application.Json)
         setBody(PriorityRequest(priority = "BOGUS"))
@@ -411,7 +411,7 @@ class DownloadRoutesTest {
     val client = createClient {
       install(ContentNegotiation) { json(json) }
     }
-    val response = client.post("/api/downloads") {
+    val response = client.post("/api/tasks") {
       contentType(ContentType.Application.Json)
       setBody(
         CreateDownloadRequest(

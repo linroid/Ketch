@@ -1,4 +1,4 @@
-package com.linroid.kdown.server.model
+package com.linroid.kdown.endpoints.model
 
 import kotlinx.serialization.Serializable
 
@@ -67,7 +67,7 @@ data class SegmentResponse(
 )
 
 /**
- * Request body for updating the global speed limit.
+ * Request body for updating speed limits.
  *
  * @property bytesPerSecond the speed limit. 0 means unlimited.
  */

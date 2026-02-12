@@ -4,7 +4,7 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.server.TaskMapper
-import com.linroid.kdown.server.model.TaskEvent
+import com.linroid.kdown.endpoints.model.TaskEvent
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.sse
 import io.ktor.sse.ServerSentEvent

@@ -1,10 +1,10 @@
 package com.linroid.kdown.server
 
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.endpoints.model.ErrorResponse
 import com.linroid.kdown.server.api.downloadRoutes
 import com.linroid.kdown.server.api.eventRoutes
 import com.linroid.kdown.server.api.serverRoutes
-import com.linroid.kdown.server.model.ErrorResponse
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -21,6 +21,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.header
+import io.ktor.server.resources.Resources
 import io.ktor.server.response.respond
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
@@ -41,16 +42,16 @@ import kotlinx.serialization.json.Json
  *
  * ## API Endpoints
  *
- * ### Downloads
- * - `GET    /api/downloads`            — list all tasks
- * - `POST   /api/downloads`            — create a new download
- * - `GET    /api/downloads/{id}`       — get task by ID
- * - `POST   /api/downloads/{id}/pause` — pause a download
- * - `POST   /api/downloads/{id}/resume`— resume a download
- * - `POST   /api/downloads/{id}/cancel`— cancel a download
- * - `DELETE /api/downloads/{id}`       — remove a task
- * - `PUT    /api/downloads/{id}/speed-limit` — set task speed limit
- * - `PUT    /api/downloads/{id}/priority`    — set task priority
+ * ### Tasks
+ * - `GET    /api/tasks`            — list all tasks
+ * - `POST   /api/tasks`            — create a new download
+ * - `GET    /api/tasks/{id}`       — get task by ID
+ * - `POST   /api/tasks/{id}/pause` — pause a download
+ * - `POST   /api/tasks/{id}/resume`— resume a download
+ * - `POST   /api/tasks/{id}/cancel`— cancel a download
+ * - `DELETE /api/tasks/{id}`       — remove a task
+ * - `PUT    /api/tasks/{id}/speed-limit` — set task speed limit
+ * - `PUT    /api/tasks/{id}/priority`    — set task priority
  *
  * ### Server
  * - `GET /api/status`       — server health and task counts
@@ -101,6 +102,8 @@ class KDownServer(
         ignoreUnknownKeys = true
       })
     }
+
+    install(Resources)
 
     install(SSE)
 

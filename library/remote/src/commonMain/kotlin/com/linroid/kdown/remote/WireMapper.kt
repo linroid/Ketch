@@ -7,11 +7,15 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.endpoints.model.CreateDownloadRequest
+import com.linroid.kdown.endpoints.model.ProgressResponse
+import com.linroid.kdown.endpoints.model.SegmentResponse
+import com.linroid.kdown.endpoints.model.TaskResponse
 import kotlin.time.Instant
 
 internal object WireMapper {
 
-  fun toDownloadRequest(wire: WireTaskResponse): DownloadRequest {
+  fun toDownloadRequest(wire: TaskResponse): DownloadRequest {
     return DownloadRequest(
       url = wire.url,
       directory = wire.directory,
@@ -26,8 +30,10 @@ internal object WireMapper {
     )
   }
 
-  fun toCreateWire(request: DownloadRequest): WireCreateDownloadRequest {
-    return WireCreateDownloadRequest(
+  fun toCreateWire(
+    request: DownloadRequest
+  ): CreateDownloadRequest {
+    return CreateDownloadRequest(
       url = request.url,
       directory = request.directory ?: "",
       fileName = request.fileName,
@@ -39,7 +45,7 @@ internal object WireMapper {
     )
   }
 
-  fun toDownloadState(wire: WireTaskResponse): DownloadState {
+  fun toDownloadState(wire: TaskResponse): DownloadState {
     return toDownloadState(
       wire.state,
       wire.progress,
@@ -50,7 +56,7 @@ internal object WireMapper {
 
   fun toDownloadState(
     state: String,
-    progress: WireProgressResponse?,
+    progress: ProgressResponse?,
     error: String?,
     filePath: String?
   ): DownloadState {
@@ -79,7 +85,7 @@ internal object WireMapper {
   }
 
   fun toSegments(
-    wireSegments: List<WireSegmentResponse>
+    wireSegments: List<SegmentResponse>
   ): List<Segment> {
     return wireSegments.map { wire ->
       Segment(
@@ -107,7 +113,7 @@ internal object WireMapper {
     }
   }
 
-  private fun WireProgressResponse.toDownloadProgress() =
+  private fun ProgressResponse.toDownloadProgress() =
     DownloadProgress(
       downloadedBytes = downloadedBytes,
       totalBytes = totalBytes,

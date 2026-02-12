@@ -4,10 +4,10 @@ import com.linroid.kdown.api.DownloadProgress
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.Segment
-import com.linroid.kdown.server.model.ProgressResponse
-import com.linroid.kdown.server.model.SegmentResponse
-import com.linroid.kdown.server.model.TaskEvent
-import com.linroid.kdown.server.model.TaskResponse
+import com.linroid.kdown.endpoints.model.ProgressResponse
+import com.linroid.kdown.endpoints.model.SegmentResponse
+import com.linroid.kdown.endpoints.model.TaskEvent
+import com.linroid.kdown.endpoints.model.TaskResponse
 
 internal object TaskMapper {
 

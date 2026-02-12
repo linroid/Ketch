@@ -9,15 +9,17 @@ import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.endpoints.Api
+import com.linroid.kdown.endpoints.model.PriorityRequest
+import com.linroid.kdown.endpoints.model.SpeedLimitRequest
+import com.linroid.kdown.endpoints.model.TaskResponse
 import io.ktor.client.HttpClient
-import io.ktor.client.request.delete
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.put
+import io.ktor.client.plugins.resources.delete
+import io.ktor.client.plugins.resources.post
+import io.ktor.client.plugins.resources.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,8 +36,6 @@ internal class RemoteDownloadTask(
   initialState: DownloadState,
   initialSegments: List<Segment>,
   private val httpClient: HttpClient,
-  private val baseUrl: String,
-  private val apiToken: String?,
   private val json: Json,
   private val onRemoved: (String) -> Unit
 ) : DownloadTask {
@@ -55,47 +55,46 @@ internal class RemoteDownloadTask(
     _segments.value = newSegments
   }
 
+  private val byId get() = Api.Tasks.ById(id = taskId)
+
   override suspend fun pause() {
     val response = httpClient.post(
-      "$baseUrl/api/downloads/$taskId/pause"
-    ) { applyAuth() }
+      Api.Tasks.ById.Pause(parent = byId)
+    )
     checkSuccess(response)
     applyWireResponse(response.bodyAsText())
   }
 
   override suspend fun resume() {
     val response = httpClient.post(
-      "$baseUrl/api/downloads/$taskId/resume"
-    ) { applyAuth() }
+      Api.Tasks.ById.Resume(parent = byId)
+    )
     checkSuccess(response)
     applyWireResponse(response.bodyAsText())
   }
 
   override suspend fun cancel() {
     val response = httpClient.post(
-      "$baseUrl/api/downloads/$taskId/cancel"
-    ) { applyAuth() }
+      Api.Tasks.ById.Cancel(parent = byId)
+    )
     checkSuccess(response)
     applyWireResponse(response.bodyAsText())
   }
 
   override suspend fun remove() {
-    val response = httpClient.delete(
-      "$baseUrl/api/downloads/$taskId"
-    ) { applyAuth() }
+    val response = httpClient.delete(byId)
     checkSuccess(response)
     onRemoved(taskId)
   }
 
   override suspend fun setSpeedLimit(limit: SpeedLimit) {
     val response = httpClient.put(
-      "$baseUrl/api/downloads/$taskId/speed-limit"
+      Api.Tasks.ById.SpeedLimit(parent = byId)
     ) {
-      applyAuth()
       contentType(ContentType.Application.Json)
       setBody(json.encodeToString(
-        WireSpeedLimitBody.serializer(),
-        WireSpeedLimitBody(limit.bytesPerSecond)
+        SpeedLimitRequest.serializer(),
+        SpeedLimitRequest(limit.bytesPerSecond)
       ))
     }
     checkSuccess(response)
@@ -104,13 +103,12 @@ internal class RemoteDownloadTask(
 
   override suspend fun setPriority(priority: DownloadPriority) {
     val response = httpClient.put(
-      "$baseUrl/api/downloads/$taskId/priority"
+      Api.Tasks.ById.Priority(parent = byId)
     ) {
-      applyAuth()
       contentType(ContentType.Application.Json)
       setBody(json.encodeToString(
-        WirePriorityBody.serializer(),
-        WirePriorityBody(priority.name)
+        PriorityRequest.serializer(),
+        PriorityRequest(priority.name)
       ))
     }
     checkSuccess(response)
@@ -140,15 +138,9 @@ internal class RemoteDownloadTask(
   }
 
   private fun applyWireResponse(body: String) {
-    val wire: WireTaskResponse = json.decodeFromString(body)
+    val wire: TaskResponse = json.decodeFromString(body)
     _state.value = WireMapper.toDownloadState(wire)
     _segments.value = WireMapper.toSegments(wire.segments)
-  }
-
-  private fun io.ktor.client.request.HttpRequestBuilder.applyAuth() {
-    if (apiToken != null) {
-      header(HttpHeaders.Authorization, "Bearer $apiToken")
-    }
   }
 
   private fun checkSuccess(
