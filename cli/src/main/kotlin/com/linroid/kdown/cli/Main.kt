@@ -8,11 +8,17 @@ import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.core.QueueConfig
+import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.engine.KtorHttpEngine
+import com.linroid.kdown.server.KDownServer
+import com.linroid.kdown.server.KDownServerConfig
+import com.linroid.kdown.sqlite.DriverFactory
+import com.linroid.kdown.sqlite.SqliteTaskStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
+import java.io.File
 
 fun main(args: Array<String>) {
   println("KDown CLI Example - Version ${KDown.VERSION}")
@@ -23,9 +29,15 @@ fun main(args: Array<String>) {
     return
   }
 
-  if (args[0] == "--queue-demo") {
-    runQueueDemo(args.drop(1))
-    return
+  when (args[0]) {
+    "server" -> {
+      runServer(args.drop(1).toTypedArray())
+      return
+    }
+    "--queue-demo" -> {
+      runQueueDemo(args.drop(1))
+      return
+    }
   }
 
   var url: String? = null
@@ -212,6 +224,136 @@ fun main(args: Array<String>) {
   }
 }
 
+private fun runServer(args: Array<String>) {
+  var host = "0.0.0.0"
+  var port = 8642
+  var token: String? = null
+  var corsOrigins: List<String> = emptyList()
+  var downloadDir = "downloads"
+  var speedLimit = SpeedLimit.Unlimited
+
+  var i = 0
+  while (i < args.size) {
+    when (args[i]) {
+      "--help", "-h" -> {
+        printServerUsage()
+        return
+      }
+      "--host" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --host requires a value")
+          printServerUsage()
+          return
+        }
+        host = args[++i]
+      }
+      "--port" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --port requires a value")
+          printServerUsage()
+          return
+        }
+        val value = args[++i].toIntOrNull()
+        if (value == null || value !in 1..65535) {
+          System.err.println("Error: invalid port '${args[i]}'")
+          return
+        }
+        port = value
+      }
+      "--token" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --token requires a value")
+          printServerUsage()
+          return
+        }
+        token = args[++i]
+      }
+      "--cors" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --cors requires a value")
+          printServerUsage()
+          return
+        }
+        corsOrigins = args[++i].split(",").map { it.trim() }
+      }
+      "--dir" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --dir requires a value")
+          printServerUsage()
+          return
+        }
+        downloadDir = args[++i]
+      }
+      "--speed-limit" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --speed-limit requires a value")
+          printServerUsage()
+          return
+        }
+        speedLimit = parseSpeedLimit(args[++i]) ?: run {
+          System.err.println("Error: invalid speed limit '${args[i]}'")
+          printServerUsage()
+          return
+        }
+      }
+      else -> {
+        System.err.println("Error: unknown option '${args[i]}'")
+        printServerUsage()
+        return
+      }
+    }
+    i++
+  }
+
+  File(downloadDir).mkdirs()
+
+  val dbPath = File(downloadDir, "kdown.db").absolutePath
+  val driver = DriverFactory(dbPath).createDriver()
+  val taskStore = SqliteTaskStore(driver)
+  val config = DownloadConfig(speedLimit = speedLimit)
+
+  val kdown = KDown(
+    httpEngine = KtorHttpEngine(),
+    taskStore = taskStore,
+    config = config,
+    logger = Logger.console(),
+  )
+  val serverConfig = KDownServerConfig(
+    host = host,
+    port = port,
+    apiToken = token,
+    corsAllowedHosts = corsOrigins,
+  )
+  val server = KDownServer(kdown, serverConfig)
+
+  Runtime.getRuntime().addShutdownHook(Thread {
+    println("Shutting down KDown server...")
+    server.stop()
+    kdown.close()
+  })
+
+  println("KDown Server v${KDown.VERSION}")
+  println("  Host:          $host")
+  println("  Port:          $port")
+  println("  Download dir:  $downloadDir")
+  println("  Database:      $dbPath")
+  if (token != null) {
+    println("  Auth:          enabled")
+  }
+  if (corsOrigins.isNotEmpty()) {
+    println("  CORS origins:  ${corsOrigins.joinToString(", ")}")
+  }
+  if (!speedLimit.isUnlimited) {
+    println(
+      "  Speed limit:   " +
+        "${speedLimit.bytesPerSecond / 1024} KB/s"
+    )
+  }
+  println()
+
+  server.start(wait = true)
+}
+
 /**
  * Demonstrates queue management with multiple downloads, priorities,
  * and concurrency limits. Enqueues several downloads that exceed
@@ -348,6 +490,7 @@ private fun extractFilename(url: String): String {
 private fun printUsage() {
   println("Usage: kdown-cli [options] <url> [destination]")
   println("       kdown-cli --queue-demo <url1> <url2> ...")
+  println("       kdown-cli server [options]")
   println()
   println("Options:")
   println("  --speed-limit <value>    Limit download speed")
@@ -363,11 +506,39 @@ private fun printUsage() {
   println("                           Uses max 2 concurrent downloads")
   println("                           to show queuing and priority")
   println()
+  println("Server:")
+  println("  server [options]         Start KDown daemon server")
+  println("                           Run `kdown-cli server --help`")
+  println("                           for server options")
+  println()
   println("Examples:")
   println("  kdown-cli https://example.com/file.zip")
   println("  kdown-cli --priority high https://example.com/file.zip")
   println("  kdown-cli --max-concurrent 2 https://example.com/file.zip")
   println("  kdown-cli --queue-demo url1 url2 url3 url4")
+  println("  kdown-cli server --port 9000 --dir /tmp/downloads")
+}
+
+private fun printServerUsage() {
+  println("Usage: kdown-cli server [options]")
+  println()
+  println("Options:")
+  println("  --host <address>       Bind address (default: 0.0.0.0)")
+  println("  --port <number>        Port number (default: 8642)")
+  println("  --token <string>       API bearer token (optional)")
+  println("  --cors <origins>       CORS allowed origins,")
+  println("                         comma-separated (optional)")
+  println("  --dir <path>           Download directory")
+  println("                         (default: ./downloads)")
+  println("  --speed-limit <value>  Global speed limit")
+  println("                         (e.g., 10m, 500k)")
+  println("  --help, -h             Show this help message")
+  println()
+  println("Examples:")
+  println("  kdown-cli server")
+  println("  kdown-cli server --port 9000 --dir /tmp/downloads")
+  println("  kdown-cli server --token my-secret --cors '*'")
+  println("  kdown-cli server --speed-limit 10m")
 }
 
 private fun parsePriority(value: String): DownloadPriority? {

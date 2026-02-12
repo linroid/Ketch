@@ -46,7 +46,7 @@ android {
 dependencies {
   implementation(projects.app.shared)
   implementation(projects.library.sqlite)
-  implementation(projects.server)
+  implementation(projects.library.server)
   implementation(libs.androidx.activity.compose)
   debugImplementation(libs.compose.uiTooling)
 }
