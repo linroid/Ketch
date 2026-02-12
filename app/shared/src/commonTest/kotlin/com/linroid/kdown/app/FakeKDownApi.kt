@@ -47,6 +47,8 @@ class FakeKDownApi(
     lastSpeedLimit = limit
   }
 
+  override suspend fun start() {}
+
   override fun close() {
     closed = true
     closeCallCount++

@@ -77,7 +77,7 @@ class RemoteKDown(
   }
 
   private val _connectionState = MutableStateFlow<ConnectionState>(
-    ConnectionState.Connecting
+    ConnectionState.Disconnected("Not started")
   )
 
   private val _version = MutableStateFlow(KDownVersion(KDownVersion.DEFAULT, "unknown"))
@@ -102,10 +102,6 @@ class RemoteKDown(
 
   private var sseJob: Job? = null
 
-  init {
-    sseJob = scope.launch { connectSse() }
-  }
-
   override suspend fun download(
     request: DownloadRequest
   ): DownloadTask {
@@ -125,6 +121,12 @@ class RemoteKDown(
     val task = createRemoteTask(wire, request)
     addTask(task)
     return task
+  }
+
+  override suspend fun start() {
+    if (sseJob?.isActive == true) return
+    _connectionState.value = ConnectionState.Connecting
+    sseJob = scope.launch { connectSse() }
   }
 
   override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {

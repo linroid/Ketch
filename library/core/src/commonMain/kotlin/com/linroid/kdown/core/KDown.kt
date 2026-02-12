@@ -260,6 +260,10 @@ class KDown(
     return task
   }
 
+  override suspend fun start() {
+    loadTasks()
+  }
+
   /**
    * Loads all task records from the [TaskStore] and populates the
    * [tasks] flow. Does **not** auto-resume — call

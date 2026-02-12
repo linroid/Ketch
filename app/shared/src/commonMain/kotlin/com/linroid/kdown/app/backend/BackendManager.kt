@@ -5,7 +5,6 @@ import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.SpeedLimit
-import com.linroid.kdown.core.KDown
 import com.linroid.kdown.remote.ConnectionState
 import com.linroid.kdown.remote.RemoteKDown
 import kotlinx.coroutines.CoroutineScope
@@ -82,8 +81,8 @@ class BackendManager(
     _serverState.asStateFlow()
 
   init {
-    if (embeddedApi is KDown) {
-      scope.launch { embeddedApi.loadTasks() }
+    embeddedApi?.let { api ->
+      scope.launch { api.start() }
     }
   }
 
@@ -130,7 +129,9 @@ class BackendManager(
     val newApi = _activeApi.value
     if (newApi is RemoteKDown) {
       observeRemoteConnectionState(entry, newApi)
-    } else {
+    }
+    newApi.start()
+    if (newApi !is RemoteKDown) {
       (entry.connectionState as? MutableStateFlow)?.value =
         ConnectionState.Connected
     }
@@ -253,5 +254,6 @@ private object DisconnectedApi : KDownApi {
   }
 
   override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {}
+  override suspend fun start() {}
   override fun close() {}
 }

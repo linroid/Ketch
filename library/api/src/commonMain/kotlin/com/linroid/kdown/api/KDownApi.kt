@@ -20,6 +20,14 @@ interface KDownApi {
   /** Create a new download and return the task handle. */
   suspend fun download(request: DownloadRequest): DownloadTask
 
+  /**
+   * Initialize backend runtime state.
+   *
+   * - Core backend restores persisted tasks.
+   * - Remote backend establishes connection and syncs tasks.
+   */
+  suspend fun start()
+
   /** Set global speed limit (use [SpeedLimit.Unlimited] to remove). */
   suspend fun setGlobalSpeedLimit(limit: SpeedLimit)
 
