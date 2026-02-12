@@ -180,14 +180,14 @@ fun AppShell(backendManager: BackendManager) {
                 Icon(
                   imageVector = filterIcon(filter),
                   contentDescription = filter.label,
-                  modifier = Modifier.size(32.dp)
+                  modifier = Modifier.size(24.dp)
                 )
               }
             } else {
               Icon(
                 imageVector = filterIcon(filter),
                 contentDescription = filter.label,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(24.dp)
               )
             }
           }
