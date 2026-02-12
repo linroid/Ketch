@@ -225,13 +225,14 @@ fun main(args: Array<String>) {
 }
 
 private fun runServer(args: Array<String>) {
-  var host = "0.0.0.0"
-  var port = 8642
-  var token: String? = null
-  var corsOrigins: List<String> = emptyList()
-  var downloadDir = System.getProperty("user.home") +
-    File.separator + "Downloads"
-  var speedLimit = SpeedLimit.Unlimited
+  // Track which CLI flags are explicitly set
+  var cliHost: String? = null
+  var cliPort: Int? = null
+  var cliToken: String? = null
+  var cliCorsOrigins: List<String>? = null
+  var cliDownloadDir: String? = null
+  var cliSpeedLimit: SpeedLimit? = null
+  var configPath: String? = null
 
   var i = 0
   while (i < args.size) {
@@ -240,13 +241,34 @@ private fun runServer(args: Array<String>) {
         printServerUsage()
         return
       }
+      "--generate-config" -> {
+        val path = defaultConfigPath()
+        if (File(path).exists()) {
+          System.err.println("Config file already exists: $path")
+          System.err.println(
+            "Delete it first if you want to regenerate."
+          )
+          return
+        }
+        generateConfig(path)
+        println("Generated default config at: $path")
+        return
+      }
+      "--config" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --config requires a value")
+          printServerUsage()
+          return
+        }
+        configPath = args[++i]
+      }
       "--host" -> {
         if (i + 1 >= args.size) {
           System.err.println("Error: --host requires a value")
           printServerUsage()
           return
         }
-        host = args[++i]
+        cliHost = args[++i]
       }
       "--port" -> {
         if (i + 1 >= args.size) {
@@ -259,7 +281,7 @@ private fun runServer(args: Array<String>) {
           System.err.println("Error: invalid port '${args[i]}'")
           return
         }
-        port = value
+        cliPort = value
       }
       "--token" -> {
         if (i + 1 >= args.size) {
@@ -267,7 +289,7 @@ private fun runServer(args: Array<String>) {
           printServerUsage()
           return
         }
-        token = args[++i]
+        cliToken = args[++i]
       }
       "--cors" -> {
         if (i + 1 >= args.size) {
@@ -275,7 +297,7 @@ private fun runServer(args: Array<String>) {
           printServerUsage()
           return
         }
-        corsOrigins = args[++i].split(",").map { it.trim() }
+        cliCorsOrigins = args[++i].split(",").map { it.trim() }
       }
       "--dir" -> {
         if (i + 1 >= args.size) {
@@ -283,7 +305,7 @@ private fun runServer(args: Array<String>) {
           printServerUsage()
           return
         }
-        downloadDir = args[++i]
+        cliDownloadDir = args[++i]
       }
       "--speed-limit" -> {
         if (i + 1 >= args.size) {
@@ -291,7 +313,7 @@ private fun runServer(args: Array<String>) {
           printServerUsage()
           return
         }
-        speedLimit = parseSpeedLimit(args[++i]) ?: run {
+        cliSpeedLimit = parseSpeedLimit(args[++i]) ?: run {
           System.err.println("Error: invalid speed limit '${args[i]}'")
           printServerUsage()
           return
@@ -306,27 +328,66 @@ private fun runServer(args: Array<String>) {
     i++
   }
 
-  File(downloadDir).mkdirs()
+  // Load config: explicit --config path, or default path if exists,
+  // or empty defaults
+  val fileConfig = if (configPath != null) {
+    try {
+      loadConfig(configPath)
+    } catch (e: Exception) {
+      System.err.println("Error loading config: ${e.message}")
+      return
+    }
+  } else {
+    val defaultPath = defaultConfigPath()
+    if (File(defaultPath).exists()) {
+      try {
+        println("Loading config from $defaultPath")
+        loadConfig(defaultPath)
+      } catch (e: Exception) {
+        System.err.println(
+          "Error loading config from $defaultPath: ${e.message}"
+        )
+        return
+      }
+    } else {
+      CliConfig()
+    }
+  }
+
+  // CLI flags override config file values
+  val mergedConfig = fileConfig.copy(
+    server = fileConfig.server.copy(
+      host = cliHost ?: fileConfig.server.host,
+      port = cliPort ?: fileConfig.server.port,
+      apiToken = cliToken ?: fileConfig.server.apiToken,
+      corsAllowedHosts = cliCorsOrigins
+        ?: fileConfig.server.corsAllowedHosts,
+    ),
+    download = fileConfig.download.copy(
+      directory = cliDownloadDir ?: fileConfig.download.directory,
+      speedLimit = cliSpeedLimit?.let { limit ->
+        if (limit.isUnlimited) null
+        else "${limit.bytesPerSecond}"
+      } ?: fileConfig.download.speedLimit,
+    ),
+  )
+
+  val defaultDownloadDir = System.getProperty("user.home") +
+    File.separator + "Downloads"
+  val downloadConfig = mergedConfig.toDownloadConfig(defaultDownloadDir)
+  val serverConfig = mergedConfig.toServerConfig()
+
+  File(downloadConfig.defaultDirectory).mkdirs()
 
   val dbPath = defaultDbPath()
   val driver = DriverFactory(dbPath).createDriver()
   val taskStore = SqliteTaskStore(driver)
-  val config = DownloadConfig(
-    defaultDirectory = downloadDir,
-    speedLimit = speedLimit,
-  )
 
   val kdown = KDown(
     httpEngine = KtorHttpEngine(),
     taskStore = taskStore,
-    config = config,
+    config = downloadConfig,
     logger = Logger.console(),
-  )
-  val serverConfig = KDownServerConfig(
-    host = host,
-    port = port,
-    apiToken = token,
-    corsAllowedHosts = corsOrigins,
   )
   val server = KDownServer(kdown, serverConfig)
 
@@ -337,20 +398,26 @@ private fun runServer(args: Array<String>) {
   })
 
   println("KDown Server v${KDown.VERSION}")
-  println("  Host:          $host")
-  println("  Port:          $port")
-  println("  Download dir:  $downloadDir")
+  println("  Host:          ${serverConfig.host}")
+  println("  Port:          ${serverConfig.port}")
+  println("  Download dir:  ${downloadConfig.defaultDirectory}")
   println("  Database:      $dbPath")
-  if (token != null) {
+  if (configPath != null) {
+    println("  Config:        $configPath")
+  }
+  if (serverConfig.apiToken != null) {
     println("  Auth:          enabled")
   }
-  if (corsOrigins.isNotEmpty()) {
-    println("  CORS origins:  ${corsOrigins.joinToString(", ")}")
+  if (serverConfig.corsAllowedHosts.isNotEmpty()) {
+    println(
+      "  CORS origins:  " +
+        serverConfig.corsAllowedHosts.joinToString(", ")
+    )
   }
-  if (!speedLimit.isUnlimited) {
+  if (!downloadConfig.speedLimit.isUnlimited) {
     println(
       "  Speed limit:   " +
-        "${speedLimit.bytesPerSecond / 1024} KB/s"
+        "${downloadConfig.speedLimit.bytesPerSecond / 1024} KB/s"
     )
   }
   println()
@@ -527,6 +594,8 @@ private fun printServerUsage() {
   println("Usage: kdown-cli server [options]")
   println()
   println("Options:")
+  println("  --config <path>        Path to TOML config file")
+  println("  --generate-config      Generate default config and exit")
   println("  --host <address>       Bind address (default: 0.0.0.0)")
   println("  --port <number>        Port number (default: 8642)")
   println("  --token <string>       API bearer token (optional)")
@@ -538,11 +607,18 @@ private fun printServerUsage() {
   println("                         (e.g., 10m, 500k)")
   println("  --help, -h             Show this help message")
   println()
+  println("Config file:")
+  println("  Default location: ${defaultConfigPath()}")
+  println("  CLI flags override config file values.")
+  println("  Use --generate-config to create a default file.")
+  println()
   println("Examples:")
   println("  kdown-cli server")
   println("  kdown-cli server --port 9000 --dir /tmp/downloads")
   println("  kdown-cli server --token my-secret --cors '*'")
   println("  kdown-cli server --speed-limit 10m")
+  println("  kdown-cli server --config /path/to/config.toml")
+  println("  kdown-cli server --generate-config")
 }
 
 private fun defaultDbPath(): String {
@@ -578,7 +654,7 @@ private fun parsePriority(value: String): DownloadPriority? {
   }
 }
 
-private fun parseSpeedLimit(value: String): SpeedLimit? {
+internal fun parseSpeedLimit(value: String): SpeedLimit? {
   val trimmed = value.trim().lowercase()
   return when {
     trimmed.endsWith("m") -> {
