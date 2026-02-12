@@ -5,6 +5,9 @@ import com.linroid.kdown.api.SpeedLimit
 /**
  * Download configuration.
  *
+ * @property defaultDirectory Default directory for saving downloaded files when
+ *   [DownloadRequest.directory][com.linroid.kdown.api.DownloadRequest.directory] is `null`.
+ *   Should be set to a platform-appropriate path by the app layer.
  * @property maxConnections Maximum number of concurrent segment downloads
  * @property retryCount Maximum number of retry attempts for failed requests
  * @property retryDelayMs Base delay in milliseconds between retry attempts (uses exponential backoff)
@@ -15,6 +18,7 @@ import com.linroid.kdown.api.SpeedLimit
  * @property queueConfig Configuration for the download queue
  */
 data class DownloadConfig(
+  val defaultDirectory: String = "downloads",
   val maxConnections: Int = 4,
   val retryCount: Int = 3,
   val retryDelayMs: Long = 1000,

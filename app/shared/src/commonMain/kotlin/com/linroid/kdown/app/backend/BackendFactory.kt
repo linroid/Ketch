@@ -27,8 +27,9 @@ import com.linroid.kdown.remote.RemoteKDown
  */
 class BackendFactory(
   taskStore: TaskStore? = null,
+  defaultDirectory: String = "downloads",
   private val embeddedFactory: (() -> KDownApi)? = taskStore?.let { ts ->
-    { createDefaultEmbeddedKDown(ts) }
+    { createDefaultEmbeddedKDown(ts, defaultDirectory) }
   },
   private val localServerFactory:
     ((port: Int, apiToken: String?, KDownApi) -> LocalServerHandle)? = null,
@@ -79,11 +80,13 @@ class BackendFactory(
 
 private fun createDefaultEmbeddedKDown(
   taskStore: TaskStore,
+  defaultDirectory: String,
 ): KDownApi {
   return KDown(
     httpEngine = KtorHttpEngine(),
     taskStore = taskStore,
     config = DownloadConfig(
+      defaultDirectory = defaultDirectory,
       maxConnections = 4,
       retryCount = 3,
       retryDelayMs = 1000,

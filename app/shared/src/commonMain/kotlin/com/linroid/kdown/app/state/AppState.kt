@@ -138,7 +138,7 @@ class AppState(
         }
         val request = DownloadRequest(
           url = url,
-          directory = "downloads",
+          directory = null,
           fileName = fileName.ifBlank { null },
           connections = connections,
           speedLimit = speedLimit,

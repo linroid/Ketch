@@ -58,7 +58,7 @@ internal class DownloadCoordinator(
     segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
     val directory = request.directory?.let { Path(it) }
-      ?: error("directory is required for download")
+      ?: Path(config.defaultDirectory)
     val initialDestPath = request.fileName?.let {
       Path(directory, it)
     } ?: directory
@@ -206,7 +206,7 @@ internal class DownloadCoordinator(
         request, toServerInfo(resolvedUrl),
       )
     val dir = request.directory?.let { Path(it) }
-      ?: error("directory is required for download")
+      ?: Path(config.defaultDirectory)
     val destPath = deduplicatePath(dir, fileName)
 
     val now = Clock.System.now()

@@ -229,7 +229,8 @@ private fun runServer(args: Array<String>) {
   var port = 8642
   var token: String? = null
   var corsOrigins: List<String> = emptyList()
-  var downloadDir = "downloads"
+  var downloadDir = System.getProperty("user.home") +
+    File.separator + "Downloads"
   var speedLimit = SpeedLimit.Unlimited
 
   var i = 0
@@ -307,10 +308,13 @@ private fun runServer(args: Array<String>) {
 
   File(downloadDir).mkdirs()
 
-  val dbPath = File(downloadDir, "kdown.db").absolutePath
+  val dbPath = defaultDbPath()
   val driver = DriverFactory(dbPath).createDriver()
   val taskStore = SqliteTaskStore(driver)
-  val config = DownloadConfig(speedLimit = speedLimit)
+  val config = DownloadConfig(
+    defaultDirectory = downloadDir,
+    speedLimit = speedLimit,
+  )
 
   val kdown = KDown(
     httpEngine = KtorHttpEngine(),
@@ -529,7 +533,7 @@ private fun printServerUsage() {
   println("  --cors <origins>       CORS allowed origins,")
   println("                         comma-separated (optional)")
   println("  --dir <path>           Download directory")
-  println("                         (default: ./downloads)")
+  println("                         (default: ~/Downloads)")
   println("  --speed-limit <value>  Global speed limit")
   println("                         (e.g., 10m, 500k)")
   println("  --help, -h             Show this help message")
@@ -539,6 +543,29 @@ private fun printServerUsage() {
   println("  kdown-cli server --port 9000 --dir /tmp/downloads")
   println("  kdown-cli server --token my-secret --cors '*'")
   println("  kdown-cli server --speed-limit 10m")
+}
+
+private fun defaultDbPath(): String {
+  val os = System.getProperty("os.name", "").lowercase()
+  val home = System.getProperty("user.home")
+  val configDir = when {
+    os.contains("mac") ->
+      "$home${File.separator}Library${File.separator}" +
+        "Application Support${File.separator}kdown"
+    os.contains("win") -> {
+      val appData = System.getenv("APPDATA")
+        ?: "$home${File.separator}AppData${File.separator}Roaming"
+      "$appData${File.separator}kdown"
+    }
+    else -> {
+      val xdg = System.getenv("XDG_CONFIG_HOME")
+        ?: "$home${File.separator}.config"
+      "$xdg${File.separator}kdown"
+    }
+  }
+  val dir = File(configDir)
+  dir.mkdirs()
+  return File(dir, "kdown.db").absolutePath
 }
 
 private fun parsePriority(value: String): DownloadPriority? {

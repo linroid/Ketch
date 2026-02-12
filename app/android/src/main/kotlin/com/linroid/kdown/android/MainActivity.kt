@@ -1,6 +1,7 @@
 package com.linroid.kdown.android
 
 import android.os.Bundle
+import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,9 +25,14 @@ class MainActivity : ComponentActivity() {
         val taskStore = createSqliteTaskStore(
           DriverFactory(applicationContext)
         )
+        val downloadsDir = Environment
+          .getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_DOWNLOADS
+          ).absolutePath
         BackendManager(
           BackendFactory(
             taskStore = taskStore,
+            defaultDirectory = downloadsDir,
             localServerFactory = { port, apiToken, kdownApi ->
               val server = KDownServer(
                 kdownApi,
