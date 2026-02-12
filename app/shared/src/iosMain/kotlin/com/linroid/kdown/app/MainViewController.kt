@@ -7,9 +7,10 @@ import com.linroid.kdown.app.backend.BackendFactory
 import com.linroid.kdown.app.backend.BackendManager
 import com.linroid.kdown.sqlite.DriverFactory
 import com.linroid.kdown.sqlite.createSqliteTaskStore
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSDocumentDirectory
-import platform.Foundation.NSFileManager
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
 
@@ -41,8 +42,9 @@ private fun appSupportDbPath(): String {
     NSApplicationSupportDirectory, NSUserDomainMask, true,
   ) as List<String>
   val dir = "${paths.first()}/kdown"
-  NSFileManager.defaultManager.createDirectoryAtPath(
-    dir, withIntermediateDirectories = true, attributes = null,
-  )
+  val dirPath = Path(dir)
+  if (!SystemFileSystem.exists(dirPath)) {
+    SystemFileSystem.createDirectories(dirPath)
+  }
   return "$dir/kdown.db"
 }
