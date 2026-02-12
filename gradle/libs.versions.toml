@@ -18,6 +18,7 @@ kotlinx-serialization = "1.10.0"
 kotlinx-io = "0.8.2"
 kotlinx-datetime = "0.7.1"
 kermit = "2.0.8"
+ktoml = "0.7.1"
 ktor = "3.4.0"
 sqldelight = "2.2.1"
 logback = "1.5.29"
@@ -72,6 +73,7 @@ ktor-serverResources = { module = "io.ktor:ktor-server-resources-jvm", version.r
 ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
 ktor-serialization-json-common = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-serverTestHost = { module = "io.ktor:ktor-server-test-host-jvm", version.ref = "ktor" }
+ktoml-core = { module = "com.akuleshov7:ktoml-core", version.ref = "ktoml" }
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
 sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
