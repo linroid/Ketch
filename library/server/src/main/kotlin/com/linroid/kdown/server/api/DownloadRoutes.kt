@@ -2,7 +2,10 @@ package com.linroid.kdown.server.api
 
 import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.api.FileSelectionMode
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.ResolvedSource
+import com.linroid.kdown.api.SourceFile
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.CreateDownloadRequest
@@ -47,6 +50,26 @@ internal fun Route.downloadRoutes(kdown: KDownApi) {
     } else {
       SpeedLimit.Unlimited
     }
+    val resolvedUrl = body.resolvedUrl?.let { wire ->
+      ResolvedSource(
+        url = wire.url,
+        sourceType = wire.sourceType,
+        totalBytes = wire.totalBytes,
+        supportsResume = wire.supportsResume,
+        suggestedFileName = wire.suggestedFileName,
+        maxSegments = wire.maxSegments,
+        metadata = wire.metadata,
+        files = wire.files.map { f ->
+          SourceFile(
+            id = f.id,
+            name = f.name,
+            size = f.size,
+            metadata = f.metadata,
+          )
+        },
+        selectionMode = parseSelectionMode(wire.selectionMode),
+      )
+    }
     val request = DownloadRequest(
       url = body.url,
       directory = body.directory,
@@ -55,6 +78,8 @@ internal fun Route.downloadRoutes(kdown: KDownApi) {
       headers = body.headers,
       priority = priority,
       speedLimit = speedLimit,
+      selectedFileIds = body.selectedFileIds,
+      resolvedUrl = resolvedUrl,
     )
     val task = kdown.download(request)
     call.respond(
@@ -201,5 +226,13 @@ private fun parsePriority(value: String): DownloadPriority? {
     DownloadPriority.valueOf(value.uppercase())
   } catch (_: IllegalArgumentException) {
     null
+  }
+}
+
+private fun parseSelectionMode(value: String): FileSelectionMode {
+  return try {
+    FileSelectionMode.valueOf(value.uppercase())
+  } catch (_: IllegalArgumentException) {
+    FileSelectionMode.MULTIPLE
   }
 }

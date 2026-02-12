@@ -4,6 +4,7 @@ import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,15 @@ class FakeKDownApi(
     downloadCallCount++
     throw UnsupportedOperationException(
       "FakeKDownApi does not support downloads"
+    )
+  }
+
+  override suspend fun resolve(
+    url: String,
+    headers: Map<String, String>,
+  ): ResolvedSource {
+    throw UnsupportedOperationException(
+      "FakeKDownApi does not support resolve"
     )
   }
 

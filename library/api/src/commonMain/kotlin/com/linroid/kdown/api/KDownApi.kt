@@ -21,6 +21,23 @@ interface KDownApi {
   suspend fun download(request: DownloadRequest): DownloadTask
 
   /**
+   * Resolves metadata for the given URL without downloading.
+   *
+   * Probes the URL (e.g., via an HTTP HEAD request) and returns
+   * file size, resume support, suggested file name, and other
+   * source-specific metadata. The returned [ResolvedSource] can be
+   * passed in [DownloadRequest.resolvedUrl] to skip the probe
+   * during [download].
+   *
+   * @param url the URL to resolve
+   * @param headers optional HTTP headers to include in the probe
+   */
+  suspend fun resolve(
+    url: String,
+    headers: Map<String, String> = emptyMap(),
+  ): ResolvedSource
+
+  /**
    * Initialize backend runtime state.
    *
    * - Core backend restores persisted tasks.

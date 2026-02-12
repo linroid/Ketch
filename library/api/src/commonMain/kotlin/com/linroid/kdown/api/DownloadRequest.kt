@@ -29,6 +29,14 @@ import kotlinx.serialization.Transient
  *   [DownloadSchedule.Immediate].
  * @property conditions list of [DownloadCondition]s that must all be
  *   met before the download starts. Not persisted across restarts.
+ * @property selectedFileIds IDs of files selected from
+ *   [ResolvedSource.files]. Empty means download all/default.
+ *   Sources read this via the download context to determine
+ *   which files to download.
+ * @property resolvedUrl pre-resolved URL metadata from
+ *   [KDownApi.resolve]. When present, the download engine skips
+ *   its own probe and uses this information directly. Not persisted
+ *   across restarts.
  */
 @Serializable
 data class DownloadRequest(
@@ -41,8 +49,11 @@ data class DownloadRequest(
   val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
   val priority: DownloadPriority = DownloadPriority.NORMAL,
   val schedule: DownloadSchedule = DownloadSchedule.Immediate,
+  val selectedFileIds: Set<String> = emptySet(),
   @Transient
   val conditions: List<DownloadCondition> = emptyList(),
+  @Transient
+  val resolvedUrl: ResolvedSource? = null,
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }

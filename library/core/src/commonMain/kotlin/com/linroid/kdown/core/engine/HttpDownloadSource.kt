@@ -1,7 +1,9 @@
 package com.linroid.kdown.core.engine
 
 import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
+import com.linroid.kdown.core.file.DefaultFileNameResolver
 import com.linroid.kdown.core.file.FileNameResolver
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.core.segment.SegmentCalculator
@@ -29,6 +31,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
   private val fileNameResolver: FileNameResolver,
+  private val maxConnections: Int = 4,
   private val progressUpdateIntervalMs: Long = 200,
   private val segmentSaveIntervalMs: Long = 5000,
 ) : DownloadSource {
@@ -43,32 +46,35 @@ internal class HttpDownloadSource(
   override suspend fun resolve(
     url: String,
     headers: Map<String, String>,
-  ): SourceInfo {
+  ): ResolvedSource {
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(url, headers)
     val fileName = serverInfo.contentDisposition?.let {
       extractDispositionFileName(it)
-    }
-    return SourceInfo(
+    } ?: DefaultFileNameResolver.fromUrl(url)
+    return ResolvedSource(
+      url = url,
+      sourceType = TYPE,
       totalBytes = serverInfo.contentLength ?: -1,
       supportsResume = serverInfo.supportsResume,
       suggestedFileName = fileName,
-      maxSegments = if (serverInfo.supportsResume) Int.MAX_VALUE else 1,
+      maxSegments = if (serverInfo.supportsResume) maxConnections else 1,
       metadata = buildMap {
         serverInfo.etag?.let { put(META_ETAG, it) }
         serverInfo.lastModified?.let { put(META_LAST_MODIFIED, it) }
         if (serverInfo.acceptRanges) put(META_ACCEPT_RANGES, "true")
-      }
+      },
     )
   }
 
   override suspend fun download(context: DownloadContext) {
-    val sourceInfo = resolve(context.url, context.headers)
-    val totalBytes = sourceInfo.totalBytes
+    val resolved = context.preResolved
+      ?: resolve(context.url, context.headers)
+    val totalBytes = resolved.totalBytes
     if (totalBytes < 0) throw KDownError.Unsupported
 
     val segments = if (
-      sourceInfo.supportsResume && context.request.connections > 1
+      resolved.supportsResume && context.request.connections > 1
     ) {
       KDownLogger.i("HttpSource") {
         "Server supports ranges. Using ${context.request.connections} " +

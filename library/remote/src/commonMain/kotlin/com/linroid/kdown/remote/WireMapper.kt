@@ -4,12 +4,17 @@ import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadProgress
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
+import com.linroid.kdown.api.FileSelectionMode
 import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
+import com.linroid.kdown.api.SourceFile
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.endpoints.model.CreateDownloadRequest
 import com.linroid.kdown.endpoints.model.ProgressResponse
+import com.linroid.kdown.endpoints.model.ResolveUrlResponse
 import com.linroid.kdown.endpoints.model.SegmentResponse
+import com.linroid.kdown.endpoints.model.SourceFileResponse
 import com.linroid.kdown.endpoints.model.TaskResponse
 import kotlin.time.Instant
 
@@ -41,7 +46,11 @@ internal object WireMapper {
       headers = request.headers,
       priority = request.priority.name,
       speedLimitBytesPerSecond =
-        request.speedLimit.bytesPerSecond
+        request.speedLimit.bytesPerSecond,
+      selectedFileIds = request.selectedFileIds,
+      resolvedUrl = request.resolvedUrl?.let {
+        toResolveUrlResponse(it)
+      },
     )
   }
 
@@ -102,6 +111,60 @@ internal object WireMapper {
       Instant.parse(createdAt)
     } catch (_: Exception) {
       Instant.fromEpochMilliseconds(0)
+    }
+  }
+
+  fun toResolvedSource(wire: ResolveUrlResponse): ResolvedSource {
+    return ResolvedSource(
+      url = wire.url,
+      sourceType = wire.sourceType,
+      totalBytes = wire.totalBytes,
+      supportsResume = wire.supportsResume,
+      suggestedFileName = wire.suggestedFileName,
+      maxSegments = wire.maxSegments,
+      metadata = wire.metadata,
+      files = wire.files.map(::toSourceFile),
+      selectionMode = parseSelectionMode(wire.selectionMode),
+    )
+  }
+
+  fun toResolveUrlResponse(resolved: ResolvedSource): ResolveUrlResponse {
+    return ResolveUrlResponse(
+      url = resolved.url,
+      sourceType = resolved.sourceType,
+      totalBytes = resolved.totalBytes,
+      supportsResume = resolved.supportsResume,
+      suggestedFileName = resolved.suggestedFileName,
+      maxSegments = resolved.maxSegments,
+      metadata = resolved.metadata,
+      files = resolved.files.map(::toSourceFileResponse),
+      selectionMode = resolved.selectionMode.name,
+    )
+  }
+
+  fun toSourceFile(wire: SourceFileResponse): SourceFile {
+    return SourceFile(
+      id = wire.id,
+      name = wire.name,
+      size = wire.size,
+      metadata = wire.metadata,
+    )
+  }
+
+  fun toSourceFileResponse(file: SourceFile): SourceFileResponse {
+    return SourceFileResponse(
+      id = file.id,
+      name = file.name,
+      size = file.size,
+      metadata = file.metadata,
+    )
+  }
+
+  private fun parseSelectionMode(value: String): FileSelectionMode {
+    return try {
+      FileSelectionMode.valueOf(value.uppercase())
+    } catch (_: IllegalArgumentException) {
+      FileSelectionMode.MULTIPLE
     }
   }
 

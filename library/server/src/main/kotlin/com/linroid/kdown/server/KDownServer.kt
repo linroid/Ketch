@@ -54,8 +54,9 @@ import kotlinx.serialization.json.Json
  * - `PUT    /api/tasks/{id}/priority`    — set task priority
  *
  * ### Server
- * - `GET /api/status`       — server health and task counts
- * - `PUT /api/speed-limit`  — set global speed limit
+ * - `GET  /api/status`       — server health and task counts
+ * - `PUT  /api/speed-limit`  — set global speed limit
+ * - `POST /api/resolve`      — resolve URL metadata without downloading
  *
  * ### Events
  * - `GET /api/events`       — SSE stream of all task events

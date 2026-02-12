@@ -4,9 +4,12 @@ import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.CreateDownloadRequest
+import com.linroid.kdown.endpoints.model.ResolveUrlRequest
+import com.linroid.kdown.endpoints.model.ResolveUrlResponse
 import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import com.linroid.kdown.endpoints.model.TaskEvent
 import com.linroid.kdown.endpoints.model.TaskResponse
@@ -121,6 +124,26 @@ class RemoteKDown(
     val task = createRemoteTask(wire, request)
     addTask(task)
     return task
+  }
+
+  override suspend fun resolve(
+    url: String,
+    headers: Map<String, String>,
+  ): ResolvedSource {
+    val wireRequest = ResolveUrlRequest(url, headers)
+    val response = httpClient.post(Api.Resolve()) {
+      contentType(ContentType.Application.Json)
+      setBody(
+        json.encodeToString(
+          ResolveUrlRequest.serializer(), wireRequest
+        )
+      )
+    }
+    checkSuccess(response)
+    val wire: ResolveUrlResponse = json.decodeFromString(
+      response.bodyAsText()
+    )
+    return WireMapper.toResolvedSource(wire)
   }
 
   override suspend fun start() {

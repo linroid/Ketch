@@ -4,6 +4,7 @@ import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.remote.ConnectionState
 import com.linroid.kdown.remote.RemoteKDown
@@ -248,6 +249,15 @@ private object DisconnectedApi : KDownApi {
   override suspend fun download(
     request: DownloadRequest,
   ): DownloadTask {
+    throw IllegalStateException(
+      "No backend connected. Add a remote server first."
+    )
+  }
+
+  override suspend fun resolve(
+    url: String,
+    headers: Map<String, String>,
+  ): ResolvedSource {
     throw IllegalStateException(
       "No backend connected. Add a remote server first."
     )

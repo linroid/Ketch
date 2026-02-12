@@ -339,14 +339,18 @@ fun AppShell(backendManager: BackendManager) {
   // Dialogs
   if (appState.showAddDialog) {
     AddDownloadDialog(
+      resolveState = appState.resolveState,
+      onResolveUrl = { appState.resolveUrl(it) },
+      onResetResolve = { appState.resetResolveState() },
       onDismiss = { appState.showAddDialog = false },
       onDownload = { url, fileName, speedLimit,
-                     priority, schedule ->
+                     priority, schedule,
+                     resolvedUrl ->
         appState.showAddDialog = false
         appState.dismissError()
         appState.startDownload(
           url, fileName, speedLimit, priority,
-          schedule
+          schedule, resolvedUrl
         )
       }
     )

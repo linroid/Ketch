@@ -1,10 +1,10 @@
 package com.linroid.kdown.engine
 
 import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.core.engine.DownloadContext
 import com.linroid.kdown.core.engine.DownloadSource
 import com.linroid.kdown.core.engine.HttpDownloadSource
-import com.linroid.kdown.core.engine.SourceInfo
 import com.linroid.kdown.core.engine.SourceResolver
 import com.linroid.kdown.core.engine.SourceResumeState
 import com.linroid.kdown.core.file.DefaultFileNameResolver
@@ -28,7 +28,9 @@ class SourceResolverTest {
     override suspend fun resolve(
       url: String,
       headers: Map<String, String>,
-    ) = SourceInfo(
+    ) = ResolvedSource(
+      url = url,
+      sourceType = "magnet",
       totalBytes = 1000,
       supportsResume = false,
       suggestedFileName = null,

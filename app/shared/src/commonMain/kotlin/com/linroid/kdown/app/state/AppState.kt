@@ -10,6 +10,7 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.app.backend.BackendEntry
 import com.linroid.kdown.app.backend.BackendManager
@@ -23,6 +24,13 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+sealed interface ResolveState {
+  data object Idle : ResolveState
+  data object Resolving : ResolveState
+  data class Resolved(val result: ResolvedSource) : ResolveState
+  data class Error(val message: String) : ResolveState
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppState(
@@ -82,6 +90,36 @@ class AppState(
   var showBackendSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
   var switchingBackendId by mutableStateOf<String?>(null)
+  var resolveState by mutableStateOf<ResolveState>(
+    ResolveState.Idle
+  )
+    private set
+  private var resolvingUrl: String? = null
+
+  fun resolveUrl(url: String) {
+    resolvingUrl = url
+    resolveState = ResolveState.Resolving
+    scope.launch {
+      runCatching {
+        activeApi.value.resolve(url)
+      }.onSuccess { result ->
+        if (resolvingUrl == url) {
+          resolveState = ResolveState.Resolved(result)
+        }
+      }.onFailure { e ->
+        if (resolvingUrl == url) {
+          resolveState = ResolveState.Error(
+            e.message ?: "Failed to resolve URL"
+          )
+        }
+      }
+    }
+  }
+
+  fun resetResolveState() {
+    resolvingUrl = null
+    resolveState = ResolveState.Idle
+  }
 
   fun startDownload(
     url: String,
@@ -89,17 +127,24 @@ class AppState(
     speedLimit: SpeedLimit,
     priority: DownloadPriority,
     schedule: DownloadSchedule = DownloadSchedule.Immediate,
+    resolvedUrl: ResolvedSource? = null,
   ) {
     scope.launch {
       runCatching {
+        val connections = if (resolvedUrl != null) {
+          resolvedUrl.maxSegments.coerceAtLeast(1)
+        } else {
+          4
+        }
         val request = DownloadRequest(
           url = url,
           directory = "downloads",
           fileName = fileName.ifBlank { null },
-          connections = 4,
+          connections = connections,
           speedLimit = speedLimit,
           priority = priority,
           schedule = schedule,
+          resolvedUrl = resolvedUrl,
         )
         activeApi.value.download(request)
       }.onFailure { e ->

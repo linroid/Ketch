@@ -160,4 +160,58 @@ class DownloadRequestTest {
     )
     assertNull(request.directory)
   }
+
+  // -- selectedFileIds --
+
+  @Test
+  fun defaultSelectedFileIds_isEmpty() {
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+    )
+    assertEquals(emptySet(), request.selectedFileIds)
+  }
+
+  @Test
+  fun selectedFileIds_preserved() {
+    val ids = setOf("f1", "f3")
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+      selectedFileIds = ids,
+    )
+    assertEquals(ids, request.selectedFileIds)
+  }
+
+  @Test
+  fun serialization_withSelectedFileIds_roundTrips() {
+    val json = Json { ignoreUnknownKeys = true }
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+      selectedFileIds = setOf("a", "b", "c"),
+    )
+    val serialized = json.encodeToString(
+      DownloadRequest.serializer(), request,
+    )
+    val deserialized = json.decodeFromString(
+      DownloadRequest.serializer(), serialized,
+    )
+    assertEquals(
+      setOf("a", "b", "c"),
+      deserialized.selectedFileIds,
+    )
+  }
+
+  @Test
+  fun serialization_emptySelectedFileIds_roundTrips() {
+    val json = Json { ignoreUnknownKeys = true }
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+    )
+    val serialized = json.encodeToString(
+      DownloadRequest.serializer(), request,
+    )
+    val deserialized = json.decodeFromString(
+      DownloadRequest.serializer(), serialized,
+    )
+    assertEquals(emptySet(), deserialized.selectedFileIds)
+  }
 }

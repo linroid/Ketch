@@ -1,5 +1,7 @@
 package com.linroid.kdown.core.engine
 
+import com.linroid.kdown.api.ResolvedSource
+
 /**
  * Abstraction for pluggable download source types.
  *
@@ -26,7 +28,7 @@ interface DownloadSource {
   suspend fun resolve(
     url: String,
     headers: Map<String, String> = emptyMap(),
-  ): SourceInfo
+  ): ResolvedSource
 
   /**
    * Executes a fresh download. The source is responsible for writing

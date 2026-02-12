@@ -12,6 +12,8 @@ import kotlinx.serialization.Serializable
  * @property headers custom HTTP headers
  * @property priority task priority level
  * @property speedLimitBytesPerSecond per-task speed limit (0 = unlimited)
+ * @property selectedFileIds IDs of files selected from a multi-file
+ *   source. Empty means download all/default.
  */
 @Serializable
 data class CreateDownloadRequest(
@@ -22,6 +24,8 @@ data class CreateDownloadRequest(
   val headers: Map<String, String> = emptyMap(),
   val priority: String = "NORMAL",
   val speedLimitBytesPerSecond: Long = 0,
+  val selectedFileIds: Set<String> = emptySet(),
+  val resolvedUrl: ResolveUrlResponse? = null,
 )
 
 /**
@@ -84,6 +88,60 @@ data class SpeedLimitRequest(
 @Serializable
 data class PriorityRequest(
   val priority: String,
+)
+
+/**
+ * Request body for resolving a URL without downloading.
+ *
+ * @property url the URL to resolve
+ * @property headers optional HTTP headers to include in the probe
+ */
+@Serializable
+data class ResolveUrlRequest(
+  val url: String,
+  val headers: Map<String, String> = emptyMap(),
+)
+
+/**
+ * Response body for a resolved URL.
+ *
+ * @property url the resolved download URL
+ * @property sourceType identifier of the source that handled it
+ * @property totalBytes total content size in bytes, or -1 if unknown
+ * @property supportsResume whether resume is supported
+ * @property suggestedFileName file name suggested by the source
+ * @property maxSegments maximum concurrent segments supported
+ * @property metadata source-specific key-value pairs
+ * @property files selectable files within this source
+ * @property selectionMode how files should be selected
+ */
+@Serializable
+data class ResolveUrlResponse(
+  val url: String,
+  val sourceType: String,
+  val totalBytes: Long,
+  val supportsResume: Boolean,
+  val suggestedFileName: String? = null,
+  val maxSegments: Int,
+  val metadata: Map<String, String> = emptyMap(),
+  val files: List<SourceFileResponse> = emptyList(),
+  val selectionMode: String = "MULTIPLE",
+)
+
+/**
+ * Wire representation of a selectable file within a source.
+ *
+ * @property id unique identifier for this file
+ * @property name human-readable display name
+ * @property size file size in bytes, or -1 if unknown
+ * @property metadata source-specific key-value pairs
+ */
+@Serializable
+data class SourceFileResponse(
+  val id: String,
+  val name: String,
+  val size: Long = -1,
+  val metadata: Map<String, String> = emptyMap(),
 )
 
 /**

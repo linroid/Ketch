@@ -1,6 +1,7 @@
 package com.linroid.kdown.core.engine
 
 import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   This replaces direct [SpeedLimiter] access to avoid cross-module
  *   visibility issues with internal types.
  * @property headers HTTP headers or source-specific metadata headers
+ * @property preResolved pre-resolved URL metadata, allowing the
+ *   download source to skip its own probe/HEAD request
  */
 class DownloadContext(
   val taskId: String,
@@ -31,4 +34,5 @@ class DownloadContext(
   val onProgress: suspend (downloaded: Long, total: Long) -> Unit,
   val throttle: suspend (bytes: Int) -> Unit,
   val headers: Map<String, String>,
+  val preResolved: ResolvedSource? = null,
 )

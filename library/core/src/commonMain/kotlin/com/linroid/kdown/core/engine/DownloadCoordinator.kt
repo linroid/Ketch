@@ -4,6 +4,7 @@ import com.linroid.kdown.api.DownloadProgress
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.core.DownloadConfig
@@ -178,17 +179,32 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
-    val source = sourceResolver.resolve(request.url)
-    KDownLogger.d("Coordinator") {
-      "Resolved source '${source.type}' for ${request.url}"
+    val resolved = request.resolvedUrl
+    val source: DownloadSource
+    val resolvedUrl: ResolvedSource
+
+    if (resolved != null) {
+      KDownLogger.d("Coordinator") {
+        "Using pre-resolved info for ${request.url} " +
+          "(source=${resolved.sourceType})"
+      }
+      source = sourceResolver.resolveByType(resolved.sourceType)
+      resolvedUrl = resolved
+    } else {
+      source = sourceResolver.resolve(request.url)
+      KDownLogger.d("Coordinator") {
+        "Resolved source '${source.type}' for ${request.url}"
+      }
+      resolvedUrl = source.resolve(request.url, request.headers)
     }
 
-    val sourceInfo = source.resolve(request.url, request.headers)
-    val totalBytes = sourceInfo.totalBytes
+    val totalBytes = resolvedUrl.totalBytes
     if (totalBytes < 0) throw KDownError.Unsupported
 
-    val fileName = sourceInfo.suggestedFileName
-      ?: fileNameResolver.resolve(request, toServerInfo(sourceInfo))
+    val fileName = resolvedUrl.suggestedFileName
+      ?: fileNameResolver.resolve(
+        request, toServerInfo(resolvedUrl),
+      )
     val dir = request.directory?.let { Path(it) }
       ?: error("directory is required for download")
     val destPath = deduplicatePath(dir, fileName)
@@ -199,9 +215,9 @@ internal class DownloadCoordinator(
         destPath = destPath,
         state = TaskState.DOWNLOADING,
         totalBytes = totalBytes,
-        acceptRanges = sourceInfo.supportsResume,
-        etag = sourceInfo.metadata[HttpDownloadSource.META_ETAG],
-        lastModified = sourceInfo.metadata[
+        acceptRanges = resolvedUrl.supportsResume,
+        etag = resolvedUrl.metadata[HttpDownloadSource.META_ETAG],
+        lastModified = resolvedUrl.metadata[
           HttpDownloadSource.META_LAST_MODIFIED
         ],
         sourceType = source.type,
@@ -226,7 +242,8 @@ internal class DownloadCoordinator(
       val context = buildContext(
         taskId, request.url, request, fileAccessor,
         segmentsFlow, stateFlow, taskLimiter, totalBytes,
-        request.headers
+        request.headers,
+        preResolved = if (resolved != null) resolvedUrl else null,
       )
 
       downloadWithRetry(taskId) { source.download(context) }
@@ -583,6 +600,7 @@ internal class DownloadCoordinator(
     taskLimiter: SpeedLimiter,
     totalBytes: Long,
     headers: Map<String, String>,
+    preResolved: ResolvedSource? = null,
   ): DownloadContext {
     var lastBytes = 0L
     var lastMark = TimeSource.Monotonic.markNow()
@@ -620,6 +638,7 @@ internal class DownloadCoordinator(
         globalLimiter.acquire(bytes)
       },
       headers = headers,
+      preResolved = preResolved,
     )
   }
 
@@ -634,14 +653,14 @@ internal class DownloadCoordinator(
     )
   }
 
-  private fun toServerInfo(sourceInfo: SourceInfo): ServerInfo {
+  private fun toServerInfo(resolved: ResolvedSource): ServerInfo {
     return ServerInfo(
-      contentLength = sourceInfo.totalBytes,
-      acceptRanges = sourceInfo.supportsResume,
-      etag = sourceInfo.metadata[HttpDownloadSource.META_ETAG],
-      lastModified = sourceInfo.metadata[
+      contentLength = resolved.totalBytes,
+      acceptRanges = resolved.supportsResume,
+      etag = resolved.metadata[HttpDownloadSource.META_ETAG],
+      lastModified = resolved.metadata[
         HttpDownloadSource.META_LAST_MODIFIED
-      ]
+      ],
     )
   }
 
