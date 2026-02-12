@@ -187,5 +187,5 @@ val kdown = KDown(
 
 ## See Also
 
-- [Kermit Logger Documentation](library/kermit/README.md)
-- [Main README](README.md)
+- [Kermit Logger Documentation](../library/kermit/README.md)
+- [Main README](../README.md)
