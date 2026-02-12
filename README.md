@@ -16,32 +16,29 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Control it remotely** — Manage a daemon from any client (mobile app, web UI, CLI, or AI agent)
 - **Extend it** — Pluggable architecture for custom protocols (FTP, BitTorrent, HLS, and more on the roadmap)
 
-> **WIP:** This project is under active development. APIs may change. Contributions and feedback are welcome!
+> [!WARNING]
+> 🚧 **Work in Progress** — This project is under active development. APIs may change. Contributions and feedback are welcome!
 
 ## Features
 
-- **Multi-platform** `✅` -- Android, iOS, JVM/Desktop, and WebAssembly (WasmJs)
-- **Segmented downloads** `✅` -- Split files into N concurrent segments using HTTP Range requests
-- **Pause / Resume** `✅` -- True resume using byte ranges, with ETag/Last-Modified validation
-- **Queue management** `✅` -- Priority-based queue with configurable concurrency limits and per-host throttling
-- **Speed limiting** `✅` -- Global and per-task bandwidth throttling via token-bucket algorithm
-- **Scheduling** `✅` -- Start downloads at a specific time, after a delay, or when conditions are met
-- **Download conditions** `✅` -- User-defined conditions (e.g., WiFi-only) that gate download start
-- **Pluggable sources** `✅` -- Extensible `DownloadSource` interface for custom protocols (HTTP built-in)
-- **Persistent resume** `✅` -- Task metadata survives app restarts via pluggable `TaskStore`
-- **Progress tracking** `✅` -- Aggregated progress across segments via `StateFlow`, with download speed
-- **Retry with backoff** `✅` -- Configurable exponential backoff for transient errors
-- **Daemon server** `✅` -- Run KDown as a background service with REST API and SSE events
-- **Remote control** `✅` -- Control a daemon server from any client via `RemoteKDown`
-- **Pluggable HTTP engine** `✅` -- Ships with Ktor; bring your own `HttpEngine` if needed
-- **FTP/FTPS** `🔜` -- FTP/FTPS protocol as a pluggable download source
-- **BitTorrent** `🔜` -- Segmented piece downloading and peer-to-peer transfers
-- **Magnet links** `🔜` -- Magnet URI scheme with DHT/tracker-based metadata resolution
-- **HLS streaming** `🔜` -- Download and merge `.m3u8` playlist segments
-- **Resource sniffer** `🔜` -- Detect downloadable resources from web pages
-- **Media downloads** `🔜` -- Web media extraction (like yt-dlp) with pluggable extractors
-- **Browser extension** `🔜` -- Intercept and manage downloads via the daemon server
-- **AI integration** `🔜` -- MCP server for AI agent tool access and skill-based automation
+- **Multi-platform** `✅` -- Works on Android, iOS, Desktop, and Web
+- **Segmented downloads** `✅` -- Accelerate downloads by splitting files into multiple parallel connections
+- **Pause / Resume** `✅` -- Pause and pick up where you left off, even after restarting your app
+- **Queue management** `✅` -- Manage multiple downloads with priorities and concurrency limits
+- **Speed limiting** `✅` -- Control bandwidth usage per task or globally
+- **Scheduling** `✅` -- Schedule downloads for a specific time, after a delay, or based on conditions
+- **Automatic retry** `✅` -- Automatically retry failed downloads with smart backoff
+- **Daemon server** `✅` -- Run as a background service with REST API and real-time events
+- **Remote control** `✅` -- Manage a remote server from any client (mobile, desktop, web, or CLI)
+- **Pluggable architecture** `✅` -- Swap out HTTP engines, storage backends, and download sources
+- **FTP/FTPS** `🔜` -- Download from FTP servers
+- **BitTorrent** `🔜` -- Peer-to-peer file sharing
+- **Magnet links** `🔜` -- Start BitTorrent downloads from magnet links
+- **HLS streaming** `🔜` -- Download and save HTTP Live Streaming videos
+- **Resource sniffer** `🔜` -- Detect downloadable files from web pages
+- **Media downloads** `🔜` -- Extract and download media from websites (like yt-dlp)
+- **Browser extension** `🔜` -- Intercept and manage downloads directly from your browser
+- **AI integration** `🔜` -- Control downloads via AI agents using MCP
 
 ## Quick Start
 
