@@ -94,23 +94,30 @@ class AppState(
     ResolveState.Idle
   )
     private set
+  private var resolvingUrl: String? = null
 
   fun resolveUrl(url: String) {
+    resolvingUrl = url
     resolveState = ResolveState.Resolving
     scope.launch {
       runCatching {
         activeApi.value.resolve(url)
       }.onSuccess { result ->
-        resolveState = ResolveState.Resolved(result)
+        if (resolvingUrl == url) {
+          resolveState = ResolveState.Resolved(result)
+        }
       }.onFailure { e ->
-        resolveState = ResolveState.Error(
-          e.message ?: "Failed to resolve URL"
-        )
+        if (resolvingUrl == url) {
+          resolveState = ResolveState.Error(
+            e.message ?: "Failed to resolve URL"
+          )
+        }
       }
     }
   }
 
   fun resetResolveState() {
+    resolvingUrl = null
     resolveState = ResolveState.Idle
   }
 
