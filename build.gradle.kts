@@ -10,6 +10,7 @@ plugins {
   alias(libs.plugins.kotlinMultiplatform) apply false
   alias(libs.plugins.composeHotReload) apply false
   alias(libs.plugins.sqldelight) apply false
+  alias(libs.plugins.graalvmNative) apply false
 }
 
 subprojects {
