@@ -3,6 +3,7 @@ package com.linroid.kdown.core.engine
 import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
+import com.linroid.kdown.core.file.DefaultFileNameResolver
 import com.linroid.kdown.core.file.FileNameResolver
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.core.segment.SegmentCalculator
@@ -49,7 +50,7 @@ internal class HttpDownloadSource(
     val serverInfo = detector.detect(url, headers)
     val fileName = serverInfo.contentDisposition?.let {
       extractDispositionFileName(it)
-    }
+    } ?: DefaultFileNameResolver.fromUrl(url)
     return ResolvedSource(
       url = url,
       sourceType = TYPE,

@@ -154,7 +154,7 @@ class ResolveUrlTest {
   }
 
   @Test
-  fun resolve_noContentDisposition_nullFileName() = runTest {
+  fun resolve_noContentDisposition_fallsBackToUrlPath() = runTest {
     val engine = FakeHttpEngine(
       serverInfo = ServerInfo(
         contentLength = 1000,
@@ -169,7 +169,7 @@ class ResolveUrlTest {
       fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/file.zip")
-    assertNull(resolved.suggestedFileName)
+    assertEquals("file.zip", resolved.suggestedFileName)
   }
 
   @Test
