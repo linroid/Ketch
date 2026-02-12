@@ -217,7 +217,7 @@ KDown(httpEngine = KtorHttpEngine(), logger = Logger.console())
 KDown(httpEngine = KtorHttpEngine(), logger = KermitLogger(minSeverity = Severity.Debug))
 ```
 
-See [LOGGING.md](LOGGING.md) for detailed documentation.
+See [Logging](docs/logging.md) for detailed documentation.
 
 ## How It Works
 
