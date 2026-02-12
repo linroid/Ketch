@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
@@ -189,7 +188,7 @@ private fun SidebarItem(
   }
 }
 
-private fun filterIcon(filter: StatusFilter): ImageVector {
+internal fun filterIcon(filter: StatusFilter): ImageVector {
   return when (filter) {
     StatusFilter.All -> Icons.Filled.Folder
     StatusFilter.Downloading -> Icons.Filled.ArrowDownward

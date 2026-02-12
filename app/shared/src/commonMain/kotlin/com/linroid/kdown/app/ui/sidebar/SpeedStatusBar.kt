@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.window.core.layout.WindowSizeClass
 import com.linroid.kdown.app.ui.common.ConnectionStatusDot
 import com.linroid.kdown.app.util.formatBytes
 import com.linroid.kdown.remote.ConnectionState
@@ -38,10 +40,17 @@ fun SpeedStatusBar(
     HorizontalDivider(
       color = MaterialTheme.colorScheme.outlineVariant
     )
+    val windowSizeClass =
+      currentWindowAdaptiveInfo().windowSizeClass
+    val isCompact = !windowSizeClass
+      .isWidthAtLeastBreakpoint(
+        WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
+      )
+    val verticalPad = if (isCompact) 12.dp else 6.dp
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 6.dp),
+        .padding(horizontal = 16.dp, vertical = verticalPad),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.SpaceBetween
     ) {

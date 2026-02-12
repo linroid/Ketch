@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.window.core.layout.WindowSizeClass
 import com.linroid.kdown.api.DownloadState
 
 @Composable
@@ -113,14 +115,22 @@ private fun ActionIcon(
   tint: androidx.compose.ui.graphics.Color,
   onClick: () -> Unit
 ) {
+  val windowSizeClass =
+    currentWindowAdaptiveInfo().windowSizeClass
+  val isCompact = !windowSizeClass
+    .isWidthAtLeastBreakpoint(
+      WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
+    )
+  val buttonSize = if (isCompact) 48.dp else 32.dp
+  val iconSize = if (isCompact) 22.dp else 18.dp
   IconButton(
     onClick = onClick,
-    modifier = Modifier.size(32.dp)
+    modifier = Modifier.size(buttonSize)
   ) {
     Icon(
       imageVector = icon,
       contentDescription = description,
-      modifier = Modifier.size(18.dp),
+      modifier = Modifier.size(iconSize),
       tint = tint
     )
   }
