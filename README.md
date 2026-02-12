@@ -101,6 +101,7 @@ KDown is split into published SDK modules that you add as dependencies:
 | `library:kermit` | Optional [Kermit](https://github.com/touchlab/Kermit) logging integration | All |
 | `library:remote` | Remote client -- control a KDown daemon server from any platform | All |
 | `server` | Daemon server with REST API and SSE events (not an SDK; standalone service) | Desktop |
+| [`cli`](cli/README.md) | Command-line interface for downloads and running the daemon | Desktop |
 
 Choose your backend: use **`core`** for in-process downloads, or **`remote`** to control a daemon server. Both implement the same `KDownApi` interface, so your UI code works identically.
 
@@ -245,6 +246,21 @@ val task = remote.download(DownloadRequest(url = "...", directory = "..."))
 task.state.collect { /* real-time updates via SSE */ }
 ```
 
+Or start the daemon from the CLI:
+
+```bash
+# Start with defaults
+kdown server
+
+# With a TOML config file
+kdown server --config /path/to/config.toml
+
+# Generate a default config file
+kdown server --generate-config
+```
+
+See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.
+
 ## Platform Support
 
 | Feature | Android | Desktop | iOS | WasmJs |
@@ -257,16 +273,18 @@ task.state.collect { /* real-time updates via SSE */ }
 
 \*WasmJs: Local file I/O is not supported. Use `RemoteKDown` to control a daemon server from the browser.
 
-## Building
+## CLI
+
+KDown includes a CLI for downloading files and running the daemon server. See the [CLI documentation](cli/README.md) for full usage.
 
 ```bash
-# Build all modules
-./gradlew build
-
-# Run CLI
+# Download a file
 ./gradlew :cli:run --args="https://example.com/file.zip"
 
-# Run desktop app
+# Start the daemon server
+./gradlew :cli:run --args="server"
+
+# Run the desktop app
 ./gradlew :app:desktop:run
 ```
 
