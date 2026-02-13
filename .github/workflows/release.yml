@@ -10,6 +10,10 @@ permissions:
 env:
   KDOWN_VERSION: ${{ github.ref_name }}
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build-cli:
     name: CLI (${{ matrix.name }})
@@ -58,10 +62,9 @@ jobs:
 
       - name: Package (Windows)
         if: matrix.os == 'windows'
-        shell: pwsh
         run: |
           cd cli/build/native/nativeCompile
-          Compress-Archive -Path kdown.exe -DestinationPath kdown-${{ matrix.os }}-${{ matrix.arch }}.zip
+          7z a kdown-${{ matrix.os }}-${{ matrix.arch }}.zip kdown.exe
 
       - uses: actions/upload-artifact@v6
         with:
