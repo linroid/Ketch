@@ -20,13 +20,34 @@ android {
     applicationId = "com.linroid.kdown.app"
     minSdk = libs.versions.android.minSdk.get().toInt()
     targetSdk = libs.versions.android.targetSdk.get().toInt()
-    versionCode = 1
-    versionName = "1.0"
+    versionName = providers.gradleProperty("kdown.version").get()
+    versionCode = providers.environmentVariable("GITHUB_RUN_NUMBER")
+      .orElse("1").get().toInt()
+  }
+
+  signingConfigs {
+    val keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+    if (keystoreFile != null) {
+      create("release") {
+        storeFile = file(keystoreFile)
+        storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+        keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+      }
+    }
   }
 
   buildTypes {
     release {
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(
+        getDefaultProguardFile("proguard-android-optimize.txt"),
+        rootProject.file("proguard-rules.pro"),
+      )
+      signingConfigs.findByName("release")?.let {
+        signingConfig = it
+      }
     }
   }
 
@@ -41,7 +62,18 @@ android {
 
   packaging {
     resources {
-      excludes += "/META-INF/{INDEX.LIST,io.netty.versions.properties}"
+      excludes += setOf(
+        "META-INF/{INDEX.LIST,io.netty.versions.properties}",
+        "META-INF/*.version",
+        "META-INF/native-image/**",
+        "META-INF/version-control-info.textproto",
+        "META-INF/com/android/build/gradle/app-metadata.properties",
+        "META-INF/androidx/**",
+        "kotlin/**",
+        "DebugProbesKt.bin",
+        "org/fusesource/**",
+        "**/*.properties",
+      )
     }
   }
 }

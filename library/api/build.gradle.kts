@@ -7,6 +7,34 @@ plugins {
   alias(libs.plugins.kotlinx.serialization)
 }
 
+val kdownVersion = providers.gradleProperty("kdown.version").get()
+val gitRevision: String by lazy {
+  providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+  }.standardOutput.asText.get().trim()
+}
+
+val generateVersion by tasks.registering {
+  val outputDir = layout.buildDirectory.dir("generated/version")
+  val version = kdownVersion
+  val revision = gitRevision
+  inputs.property("version", version)
+  inputs.property("revision", revision)
+  outputs.dir(outputDir)
+  doLast {
+    val dir = outputDir.get().dir("com/linroid/kdown/api").asFile
+    dir.mkdirs()
+    dir.resolve("KDownBuildVersion.kt").writeText(
+      """
+      |package com.linroid.kdown.api
+      |
+      |internal const val KDOWN_BUILD_VERSION = "$version"
+      |internal const val KDOWN_BUILD_REVISION = "$revision"
+      |""".trimMargin()
+    )
+  }
+}
+
 kotlin {
   androidLibrary {
     namespace = "com.linroid.kdown.api"
@@ -25,10 +53,13 @@ kotlin {
   wasmJs { browser() }
 
   sourceSets {
-    commonMain.dependencies {
-      implementation(libs.kotlinx.coroutines.core)
-      implementation(libs.kotlinx.serialization.json)
-      implementation(libs.kotlinx.datetime)
+    commonMain {
+      kotlin.srcDir(generateVersion)
+      dependencies {
+        implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.kotlinx.serialization.json)
+        implementation(libs.kotlinx.datetime)
+      }
     }
     commonTest.dependencies {
       implementation(libs.kotlin.test)

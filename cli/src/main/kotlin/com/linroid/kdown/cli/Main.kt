@@ -4,6 +4,7 @@ import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
+import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.core.KDown
@@ -21,7 +22,7 @@ import kotlinx.io.files.Path
 import java.io.File
 
 fun main(args: Array<String>) {
-  println("KDown CLI - Version ${KDown.VERSION}")
+  println("KDown CLI - Version ${KDownVersion.DEFAULT} (${KDownVersion.REVISION})")
   println()
 
   if (args.isEmpty()) {
@@ -397,7 +398,7 @@ private fun runServer(args: Array<String>) {
     kdown.close()
   })
 
-  println("KDown Server v${KDown.VERSION}")
+  println("KDown Server v${KDownVersion.DEFAULT}")
   println("  Host:          ${serverConfig.host}")
   println("  Port:          ${serverConfig.port}")
   println("  Download dir:  ${downloadConfig.defaultDirectory}")

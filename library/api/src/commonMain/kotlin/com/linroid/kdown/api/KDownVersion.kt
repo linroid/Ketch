@@ -14,6 +14,7 @@ data class KDownVersion(
   val backend: String,
 ) {
   companion object {
-    const val DEFAULT = "1.0.0"
+    val DEFAULT: String = KDOWN_BUILD_VERSION
+    val REVISION: String = KDOWN_BUILD_REVISION
   }
 }

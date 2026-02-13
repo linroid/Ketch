@@ -1,8 +1,8 @@
 package com.linroid.kdown.server.api
 
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.SpeedLimit
-import com.linroid.kdown.core.KDown
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.ResolveUrlRequest
 import com.linroid.kdown.endpoints.model.ResolveUrlResponse
@@ -26,7 +26,7 @@ internal fun Route.serverRoutes(kdown: KDownApi) {
     val active = tasks.count { it.state.value.isActive }
     call.respond(
       ServerStatus(
-        version = KDown.VERSION,
+        version = KDownVersion.DEFAULT,
         activeTasks = active,
         totalTasks = tasks.size,
       )
