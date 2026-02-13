@@ -7,9 +7,6 @@ import com.linroid.kdown.app.backend.BackendFactory
 import com.linroid.kdown.app.backend.BackendManager
 import com.linroid.kdown.sqlite.DriverFactory
 import com.linroid.kdown.sqlite.createSqliteTaskStore
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
-import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
@@ -17,8 +14,7 @@ import platform.Foundation.NSUserDomainMask
 @Suppress("unused", "FunctionName")
 fun MainViewController() = ComposeUIViewController {
   val backendManager = remember {
-    val dbPath = appSupportDbPath()
-    val taskStore = createSqliteTaskStore(DriverFactory(dbPath))
+    val taskStore = createSqliteTaskStore(DriverFactory())
     @Suppress("UNCHECKED_CAST")
     val downloadsDir = (NSSearchPathForDirectoriesInDomains(
       NSDocumentDirectory, NSUserDomainMask, true,
@@ -36,15 +32,3 @@ fun MainViewController() = ComposeUIViewController {
   App(backendManager)
 }
 
-@Suppress("UNCHECKED_CAST")
-private fun appSupportDbPath(): String {
-  val paths = NSSearchPathForDirectoriesInDomains(
-    NSApplicationSupportDirectory, NSUserDomainMask, true,
-  ) as List<String>
-  val dir = "${paths.first()}/kdown"
-  val dirPath = Path(dir)
-  if (!SystemFileSystem.exists(dirPath)) {
-    SystemFileSystem.createDirectories(dirPath)
-  }
-  return "$dir/kdown.db"
-}
