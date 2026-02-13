@@ -24,9 +24,24 @@ android {
     versionName = "1.0"
   }
 
+  signingConfigs {
+    val keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+    if (keystoreFile != null) {
+      create("release") {
+        storeFile = file(keystoreFile)
+        storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+        keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+      }
+    }
+  }
+
   buildTypes {
     release {
       isMinifyEnabled = false
+      signingConfigs.findByName("release")?.let {
+        signingConfig = it
+      }
     }
   }
 
