@@ -20,8 +20,9 @@ android {
     applicationId = "com.linroid.kdown.app"
     minSdk = libs.versions.android.minSdk.get().toInt()
     targetSdk = libs.versions.android.targetSdk.get().toInt()
-    versionCode = 1
     versionName = providers.gradleProperty("kdown.version").get()
+    versionCode = providers.environmentVariable("GITHUB_RUN_NUMBER")
+      .orElse("1").get().toInt()
   }
 
   signingConfigs {
@@ -42,7 +43,7 @@ android {
       isShrinkResources = true
       proguardFiles(
         getDefaultProguardFile("proguard-android-optimize.txt"),
-        "proguard-rules.pro",
+        rootProject.file("proguard-rules.pro"),
       )
       signingConfigs.findByName("release")?.let {
         signingConfig = it
@@ -61,7 +62,18 @@ android {
 
   packaging {
     resources {
-      excludes += "/META-INF/{INDEX.LIST,io.netty.versions.properties}"
+      excludes += setOf(
+        "META-INF/{INDEX.LIST,io.netty.versions.properties}",
+        "META-INF/*.version",
+        "META-INF/native-image/**",
+        "META-INF/version-control-info.textproto",
+        "META-INF/com/android/build/gradle/app-metadata.properties",
+        "META-INF/androidx/**",
+        "kotlin/**",
+        "DebugProbesKt.bin",
+        "org/fusesource/**",
+        "**/*.properties",
+      )
     }
   }
 }

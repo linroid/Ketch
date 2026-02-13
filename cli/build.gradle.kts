@@ -40,4 +40,5 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.ktoml.core)
   implementation(libs.ktor.client.cio)
+  implementation(libs.logback)
 }
