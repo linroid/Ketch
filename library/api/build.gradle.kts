@@ -8,11 +8,18 @@ plugins {
 }
 
 val kdownVersion = providers.gradleProperty("kdown.version").get()
+val gitRevision: String by lazy {
+  providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+  }.standardOutput.asText.get().trim()
+}
 
 val generateVersion by tasks.registering {
   val outputDir = layout.buildDirectory.dir("generated/version")
   val version = kdownVersion
+  val revision = gitRevision
   inputs.property("version", version)
+  inputs.property("revision", revision)
   outputs.dir(outputDir)
   doLast {
     val dir = outputDir.get().dir("com/linroid/kdown/api").asFile
@@ -22,6 +29,7 @@ val generateVersion by tasks.registering {
       |package com.linroid.kdown.api
       |
       |internal const val KDOWN_BUILD_VERSION = "$version"
+      |internal const val KDOWN_BUILD_REVISION = "$revision"
       |""".trimMargin()
     )
   }

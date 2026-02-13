@@ -15,5 +15,6 @@ data class KDownVersion(
 ) {
   companion object {
     val DEFAULT: String = KDOWN_BUILD_VERSION
+    val REVISION: String = KDOWN_BUILD_REVISION
   }
 }
