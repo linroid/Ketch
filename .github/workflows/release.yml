@@ -42,11 +42,6 @@ jobs:
             os: windows
             arch: x64
             ext: zip
-          - name: Windows-arm64
-            runner: windows-11-arm
-            os: windows
-            arch: aarch64
-            ext: zip
     steps:
       - uses: actions/checkout@v6
 
@@ -148,7 +143,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - uses: gradle/actions/setup-gradle@v5
 
