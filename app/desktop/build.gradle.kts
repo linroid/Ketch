@@ -30,6 +30,7 @@ compose.desktop {
 
     nativeDistributions {
       targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+      modules("java.sql")
       packageName = "KDown"
       packageVersion = providers.gradleProperty("kdown.version").get()
         .substringBefore("-")
