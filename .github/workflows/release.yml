@@ -117,23 +117,23 @@ jobs:
         include:
           - name: macOS
             runner: macos-latest
-            task: packageDmg
+            task: packageReleaseDmg
             artifact: "*.dmg"
           - name: Linux-x64
             runner: ubuntu-latest
-            task: packageDeb
+            task: packageReleaseDeb
             artifact: "*.deb"
           - name: Linux-arm64
             runner: ubuntu-24.04-arm
-            task: packageDeb
+            task: packageReleaseDeb
             artifact: "*.deb"
           - name: Windows-x64
             runner: windows-latest
-            task: packageMsi
+            task: packageReleaseMsi
             artifact: "*.msi"
           - name: Windows-arm64
             runner: windows-11-arm
-            task: packageMsi
+            task: packageReleaseMsi
             artifact: "*.msi"
     steps:
       - uses: actions/checkout@v6
@@ -151,7 +151,7 @@ jobs:
       - uses: actions/upload-artifact@v6
         with:
           name: kdown-desktop-${{ matrix.name }}
-          path: app/desktop/build/compose/binaries/main/**/${{ matrix.artifact }}
+          path: app/desktop/build/compose/binaries/main-release/**/${{ matrix.artifact }}
 
   build-web:
     name: Web (WasmJs)
