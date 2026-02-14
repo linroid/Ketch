@@ -323,18 +323,40 @@ See the [CLI documentation](cli/README.md) for all commands, flags, and config f
 
 ## CLI
 
-KDown includes a CLI for downloading files and running the daemon server. See the [CLI documentation](cli/README.md) for full usage.
+KDown includes a native CLI for downloading files and running the daemon server.
+
+### Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | bash
+```
+
+Options via environment variables:
+
+```bash
+# Install a specific version
+curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | KDOWN_VERSION=0.1.0 bash
+
+# Install to a custom directory
+curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | KDOWN_INSTALL=~/.local/bin bash
+```
+
+Supported platforms: **macOS** (arm64), **Linux** (x64, arm64), **Windows** (x64).
+
+### Usage
 
 ```bash
 # Download a file
-./gradlew :cli:run --args="https://example.com/file.zip"
+kdown https://example.com/file.zip
 
 # Start the daemon server
-./gradlew :cli:run --args="server"
+kdown server
 
-# Run the desktop app
-./gradlew :app:desktop:run
+# Run from source (for development)
+./gradlew :cli:run --args="https://example.com/file.zip"
 ```
+
+See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.
 
 ## Contributing
 
