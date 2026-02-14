@@ -26,6 +26,24 @@ app/android          (Android entry point, depends on shared)
 app/web              (WasmJs entry point, depends on shared)
 ```
 
+## Modules
+
+KDown is split into published SDK modules that you add as dependencies:
+
+| Module | Description | Platforms |
+|---|---|---|
+| `library:api` | Public API interfaces and models (`KDownApi`, `DownloadTask`, `DownloadState`, etc.) | All |
+| `library:core` | In-process download engine -- embed downloads directly in your app | All |
+| `library:ktor` | Ktor-based `HttpEngine` implementation (required by `core`) | All |
+| `library:sqlite` | SQLite-backed `TaskStore` for persistent resume | Android, iOS, Desktop |
+| `library:kermit` | Optional [Kermit](https://github.com/touchlab/Kermit) logging integration | All |
+| `library:remote` | Remote client -- control a KDown daemon server from any platform | All |
+| `server` | Daemon server with REST API and SSE events (not an SDK; standalone service) | Desktop |
+| [`cli`](../cli/README.md) | Command-line interface for downloads and running the daemon | Desktop |
+
+Choose your backend: use **`core`** for in-process downloads, or **`remote`** to control a daemon
+server. Both implement the same `KDownApi` interface, so your UI code works identically.
+
 ## Core Abstractions
 
 ### KDownApi
