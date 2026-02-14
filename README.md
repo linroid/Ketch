@@ -1,5 +1,6 @@
 # KDown
 
+[![Maven Central](https://img.shields.io/maven-central/v/com.linroid.kdown/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.kdown)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.10-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-4c8dec?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
 [![Ktor](https://img.shields.io/badge/Ktor-3.4.0-087CFA.svg?logo=ktor&logoColor=white)](https://ktor.io)
@@ -40,6 +41,53 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Media downloads** `🔜` -- Extract and download media from websites (like yt-dlp)
 - **Browser extension** `🔜` -- Intercept and manage downloads directly from your browser
 - **AI integration** `🔜` -- Control downloads via AI agents using MCP
+
+## Installation
+
+Add the dependencies to your `build.gradle.kts`:
+
+```kotlin
+// Version catalog (gradle/libs.versions.toml)
+[versions]
+kdown = "<latest-version>"
+
+[libraries]
+kdown-core = { module = "com.linroid.kdown:core", version.ref = "kdown" }
+kdown-ktor = { module = "com.linroid.kdown:ktor", version.ref = "kdown" }
+kdown-sqlite = { module = "com.linroid.kdown:sqlite", version.ref = "kdown" }
+kdown-kermit = { module = "com.linroid.kdown:kermit", version.ref = "kdown" }
+kdown-remote = { module = "com.linroid.kdown:remote", version.ref = "kdown" }
+```
+
+```kotlin
+// build.gradle.kts
+kotlin {
+  sourceSets {
+    commonMain.dependencies {
+      implementation(libs.kdown.core)  // Download engine
+      implementation(libs.kdown.ktor)  // HTTP engine (required by core)
+    }
+    // Optional modules
+    commonMain.dependencies {
+      implementation(libs.kdown.kermit)  // Kermit logging
+      implementation(libs.kdown.remote)  // Remote client for daemon server
+    }
+    // SQLite persistence (not available on WasmJs)
+    androidMain.dependencies { implementation(libs.kdown.sqlite) }
+    iosMain.dependencies { implementation(libs.kdown.sqlite) }
+    jvmMain.dependencies { implementation(libs.kdown.sqlite) }
+  }
+}
+```
+
+Or without a version catalog:
+
+```kotlin
+dependencies {
+  implementation("com.linroid.kdown:core:<latest-version>")
+  implementation("com.linroid.kdown:ktor:<latest-version>")
+}
+```
 
 ## Quick Start
 
