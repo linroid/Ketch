@@ -42,12 +42,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.linroid.kdown.api.DownloadState
-import com.linroid.kdown.app.backend.BackendManager
+import com.linroid.kdown.app.instance.InstanceManager
 import com.linroid.kdown.app.state.AppState
 import com.linroid.kdown.app.state.StatusFilter
 import com.linroid.kdown.app.ui.dialog.AddDownloadDialog
 import com.linroid.kdown.app.ui.dialog.AddRemoteServerDialog
-import com.linroid.kdown.app.ui.dialog.BackendSelectorSheet
+import com.linroid.kdown.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.kdown.app.ui.list.DownloadList
 import com.linroid.kdown.app.ui.sidebar.SidebarNavigation
 import com.linroid.kdown.app.ui.sidebar.SpeedStatusBar
@@ -57,20 +57,20 @@ import com.linroid.kdown.app.ui.toolbar.countTasksByFilter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppShell(backendManager: BackendManager) {
+fun AppShell(instanceManager: InstanceManager) {
   val scope = rememberCoroutineScope()
-  val appState = remember(backendManager) {
-    AppState(backendManager, scope)
+  val appState = remember(instanceManager) {
+    AppState(instanceManager, scope)
   }
 
   DisposableEffect(Unit) {
-    onDispose { backendManager.close() }
+    onDispose { instanceManager.close() }
   }
 
   val sortedTasks by appState.sortedTasks.collectAsState()
   val version by appState.version.collectAsState()
-  val activeBackend by
-    appState.activeBackend.collectAsState()
+  val activeInstance by
+    appState.activeInstance.collectAsState()
   val connectionState by
     appState.connectionState.collectAsState()
   val serverState by
@@ -305,10 +305,10 @@ fun AppShell(backendManager: BackendManager) {
         SpeedStatusBar(
           activeDownloads = activeDownloadCount,
           totalSpeed = totalSpeed,
-          backendLabel = activeBackend?.label,
+          instanceLabel = activeInstance?.label,
           connectionState = connectionState,
-          onBackendClick = {
-            appState.showBackendSelector = true
+          onInstanceClick = {
+            appState.showInstanceSelector = true
           }
         )
       }
@@ -356,23 +356,23 @@ fun AppShell(backendManager: BackendManager) {
     )
   }
 
-  if (appState.showBackendSelector) {
-    BackendSelectorSheet(
-      backendManager = backendManager,
-      activeBackendId = activeBackend?.id,
-      switchingBackendId = appState.switchingBackendId,
+  if (appState.showInstanceSelector) {
+    InstanceSelectorSheet(
+      instanceManager = instanceManager,
+      activeInstance = activeInstance,
+      switchingInstance = appState.switchingInstance,
       serverState = serverState,
-      onSelectBackend = { entry ->
-        appState.switchBackend(entry.id)
+      onSelectInstance = { instance ->
+        appState.switchInstance(instance)
       },
-      onRemoveBackend = { entry ->
-        appState.removeBackend(entry.id)
+      onRemoveInstance = { instance ->
+        appState.removeInstance(instance)
       },
       onAddRemoteServer = {
         appState.showAddRemoteDialog = true
       },
       onDismiss = {
-        appState.showBackendSelector = false
+        appState.showInstanceSelector = false
       }
     )
   }

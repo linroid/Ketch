@@ -5,25 +5,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.linroid.kdown.app.App
-import com.linroid.kdown.app.backend.BackendFactory
-import com.linroid.kdown.app.backend.BackendManager
-import com.linroid.kdown.app.backend.LocalServerHandle
+import com.linroid.kdown.app.instance.InstanceFactory
+import com.linroid.kdown.app.instance.InstanceManager
+import com.linroid.kdown.app.instance.LocalServerHandle
 import com.linroid.kdown.server.KDownServer
 import com.linroid.kdown.server.KDownServerConfig
 import com.linroid.kdown.sqlite.DriverFactory
 import com.linroid.kdown.sqlite.createSqliteTaskStore
 import java.io.File
+import java.net.InetAddress
 
 fun main() = application {
-  val backendManager = remember {
+  val instanceManager = remember {
     val dbPath = appConfigDir() + File.separator + "kdown.db"
     val taskStore = createSqliteTaskStore(DriverFactory(dbPath))
     val downloadsDir = System.getProperty("user.home") +
       File.separator + "Downloads"
-    BackendManager(
-      BackendFactory(
+    InstanceManager(
+      InstanceFactory(
         taskStore = taskStore,
         defaultDirectory = downloadsDir,
+        deviceName = InetAddress.getLocalHost().hostName,
         localServerFactory = { port, apiToken, kdownApi ->
           val server = KDownServer(
             kdownApi,
@@ -44,13 +46,13 @@ fun main() = application {
     )
   }
   DisposableEffect(Unit) {
-    onDispose { backendManager.close() }
+    onDispose { instanceManager.close() }
   }
   Window(
     onCloseRequest = ::exitApplication,
     title = "KDown",
   ) {
-    App(backendManager)
+    App(instanceManager)
   }
 }
 

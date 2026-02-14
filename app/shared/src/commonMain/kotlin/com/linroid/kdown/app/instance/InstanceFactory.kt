@@ -1,4 +1,4 @@
-package com.linroid.kdown.app.backend
+package com.linroid.kdown.app.instance
 
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.core.DownloadConfig
@@ -10,31 +10,34 @@ import com.linroid.kdown.engine.KtorHttpEngine
 import com.linroid.kdown.remote.RemoteKDown
 
 /**
- * Creates [KDownApi] instances for each backend type.
+ * Creates [KDownApi] instances for each instance type.
  *
  * @param taskStore persistent storage for download task records.
- *   Required when using the default embedded backend. Pass `null`
+ *   Required when using the default embedded instance. Pass `null`
  *   for remote-only mode (e.g. wasmJs/web).
+ * @param deviceName label for the embedded instance (e.g. device
+ *   model on Android, hostname on desktop).
  * @param embeddedFactory factory for creating the embedded KDown
- *   instance. When `null`, no embedded backend is available and
- *   [BackendManager] starts in remote-only mode.
+ *   instance. When `null`, no embedded instance is available and
+ *   [InstanceManager] starts in remote-only mode.
  *   Override in tests to inject fakes.
  * @param localServerFactory optional factory that starts an HTTP
  *   server exposing the embedded [KDownApi]. Receives port,
  *   optional API token, and the embedded KDownApi instance.
  *   When non-null, server controls appear in the Embedded
- *   backend entry. Provided by Android and JVM/Desktop.
+ *   instance entry. Provided by Android and JVM/Desktop.
  */
-class BackendFactory(
+class InstanceFactory(
   taskStore: TaskStore? = null,
   defaultDirectory: String = "downloads",
-  private val embeddedFactory: (() -> KDownApi)? = taskStore?.let { ts ->
+  val deviceName: String = "Embedded",
+  private val embeddedFactory: (() -> KDown)? = taskStore?.let { ts ->
     { createDefaultEmbeddedKDown(ts, defaultDirectory) }
   },
   private val localServerFactory:
     ((port: Int, apiToken: String?, KDownApi) -> LocalServerHandle)? = null,
 ) {
-  /** Whether an embedded backend is available. */
+  /** Whether an embedded instance is available. */
   val hasEmbedded: Boolean get() = embeddedFactory != null
 
   /** Whether this platform supports starting a local server. */
@@ -44,20 +47,33 @@ class BackendFactory(
   private var localServer: LocalServerHandle? = null
 
   /** Create the embedded KDown instance. */
-  fun createEmbedded(): KDownApi {
-    return embeddedFactory?.invoke()
+  fun createEmbedded(): EmbeddedInstance {
+    val kdown = embeddedFactory?.invoke()
       ?: throw UnsupportedOperationException(
-        "No embedded backend available"
+        "No embedded instance available"
       )
+    return EmbeddedInstance(
+      instance = kdown,
+      label = deviceName,
+    )
   }
 
-  /** Create a remote client for the given config. */
-  fun createRemote(config: BackendConfig.Remote): KDownApi =
-    RemoteKDown(config.baseUrl, config.apiToken)
+  /** Create a remote instance for the given host/port/token. */
+  fun createRemote(
+    host: String,
+    port: Int = 8642,
+    token: String? = null,
+  ): RemoteInstance {
+    val baseUrl = "http://$host:$port"
+    return RemoteInstance(
+      instance = RemoteKDown(baseUrl, token),
+      label = "$host:$port",
+    )
+  }
 
   /**
    * Start a local HTTP server exposing [api].
-   * Does not change the active backend.
+   * Does not change the active instance.
    */
   fun startServer(
     port: Int,
@@ -81,7 +97,7 @@ class BackendFactory(
 private fun createDefaultEmbeddedKDown(
   taskStore: TaskStore,
   defaultDirectory: String,
-): KDownApi {
+): KDown {
   return KDown(
     httpEngine = KtorHttpEngine(),
     taskStore = taskStore,

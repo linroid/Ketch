@@ -9,7 +9,7 @@
     android:supportsRtl="true"
     android:theme="@android:style/Theme.Material.Light.NoActionBar">
     <activity
-      android:name="com.linroid.kdown.android.MainActivity"
+      android:name="com.linroid.kdown.app.android.MainActivity"
       android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />

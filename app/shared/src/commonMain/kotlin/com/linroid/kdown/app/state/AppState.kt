@@ -12,12 +12,14 @@ import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
-import com.linroid.kdown.app.backend.BackendEntry
-import com.linroid.kdown.app.backend.BackendManager
-import com.linroid.kdown.app.backend.ServerState
+import com.linroid.kdown.app.instance.InstanceEntry
+import com.linroid.kdown.app.instance.InstanceManager
+import com.linroid.kdown.app.instance.RemoteInstance
+import com.linroid.kdown.app.instance.ServerState
 import com.linroid.kdown.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -34,28 +36,28 @@ sealed interface ResolveState {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppState(
-  val backendManager: BackendManager,
+  val instanceManager: InstanceManager,
   private val scope: CoroutineScope,
 ) {
   val activeApi: StateFlow<KDownApi> =
-    backendManager.activeApi
-  val activeBackend: StateFlow<BackendEntry?> =
-    backendManager.activeBackend
-  val backends: StateFlow<List<BackendEntry>> =
-    backendManager.backends
+    instanceManager.activeApi
+  val activeInstance: StateFlow<InstanceEntry?> =
+    instanceManager.activeInstance
+  val instances: StateFlow<List<InstanceEntry>> =
+    instanceManager.instances
   val serverState: StateFlow<ServerState> =
-    backendManager.serverState
+    instanceManager.serverState
 
-  val connectionState: StateFlow<ConnectionState> =
-    activeBackend.flatMapLatest { entry ->
-      entry?.connectionState
-        ?: kotlinx.coroutines.flow.MutableStateFlow(
-          ConnectionState.Disconnected()
-        )
+  val connectionState: StateFlow<ConnectionState?> =
+    activeInstance.flatMapLatest { instance ->
+      when (instance) {
+        is RemoteInstance -> instance.connectionState
+        else -> MutableStateFlow(null)
+      }
     }.stateIn(
       scope,
       SharingStarted.WhileSubscribed(5000),
-      ConnectionState.Disconnected()
+      null
     )
 
   val tasks: StateFlow<List<DownloadTask>> =
@@ -87,9 +89,10 @@ class AppState(
   var statusFilter by mutableStateOf(StatusFilter.All)
   var errorMessage by mutableStateOf<String?>(null)
   var showAddDialog by mutableStateOf(false)
-  var showBackendSelector by mutableStateOf(false)
+  var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
-  var switchingBackendId by mutableStateOf<String?>(null)
+  var switchingInstance by
+    mutableStateOf<InstanceEntry?>(null)
   var resolveState by mutableStateOf<ResolveState>(
     ResolveState.Idle
   )
@@ -154,20 +157,20 @@ class AppState(
     }
   }
 
-  fun switchBackend(id: String) {
-    if (id == activeBackend.value?.id ||
-      switchingBackendId != null
+  fun switchInstance(instance: InstanceEntry) {
+    if (instance == activeInstance.value ||
+      switchingInstance != null
     ) return
-    switchingBackendId = id
+    switchingInstance = instance
     scope.launch {
       try {
-        backendManager.switchTo(id)
-        showBackendSelector = false
+        instanceManager.switchTo(instance)
+        showInstanceSelector = false
       } catch (e: Exception) {
         errorMessage =
-          "Failed to switch backend: ${e.message}"
+          "Failed to switch instance: ${e.message}"
       } finally {
-        switchingBackendId = null
+        switchingInstance = null
       }
     }
   }
@@ -178,20 +181,20 @@ class AppState(
     token: String?,
   ) {
     try {
-      backendManager.addRemote(host, port, token)
+      instanceManager.addRemote(host, port, token)
     } catch (e: Exception) {
       errorMessage =
         "Failed to add remote server: ${e.message}"
     }
   }
 
-  fun removeBackend(id: String) {
+  fun removeInstance(instance: InstanceEntry) {
     scope.launch {
       try {
-        backendManager.removeBackend(id)
+        instanceManager.removeInstance(instance)
       } catch (e: Exception) {
         errorMessage =
-          "Failed to remove backend: ${e.message}"
+          "Failed to remove instance: ${e.message}"
       }
     }
   }
