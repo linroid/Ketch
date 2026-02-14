@@ -42,105 +42,86 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Browser extension** `🔜` -- Intercept and manage downloads directly from your browser
 - **AI integration** `🔜` -- Control downloads via AI agents using MCP
 
-## Installation
+## Getting Started
 
-Add the dependencies to your `build.gradle.kts`:
+### Embed in Your App
 
-```kotlin
-// Version catalog (gradle/libs.versions.toml)
-[versions]
-kdown = "<latest-version>"
-
-[libraries]
-kdown-core = { module = "com.linroid.kdown:core", version.ref = "kdown" }
-kdown-ktor = { module = "com.linroid.kdown:ktor", version.ref = "kdown" }
-kdown-sqlite = { module = "com.linroid.kdown:sqlite", version.ref = "kdown" }
-kdown-kermit = { module = "com.linroid.kdown:kermit", version.ref = "kdown" }
-kdown-remote = { module = "com.linroid.kdown:remote", version.ref = "kdown" }
-```
+Add the SDK to your Kotlin Multiplatform project:
 
 ```kotlin
 // build.gradle.kts
-kotlin {
-  sourceSets {
-    commonMain.dependencies {
-      implementation(libs.kdown.core)  // Download engine
-      implementation(libs.kdown.ktor)  // HTTP engine (required by core)
-    }
-    // Optional modules
-    commonMain.dependencies {
-      implementation(libs.kdown.kermit)  // Kermit logging
-      implementation(libs.kdown.remote)  // Remote client for daemon server
-    }
-    // SQLite persistence (not available on WasmJs)
-    androidMain.dependencies { implementation(libs.kdown.sqlite) }
-    iosMain.dependencies { implementation(libs.kdown.sqlite) }
-    jvmMain.dependencies { implementation(libs.kdown.sqlite) }
-  }
-}
-```
-
-Or without a version catalog:
-
-```kotlin
 dependencies {
   implementation("com.linroid.kdown:core:<latest-version>")
   implementation("com.linroid.kdown:ktor:<latest-version>")
 }
 ```
 
-## Quick Start
+Start downloading:
 
 ```kotlin
-// 1. Create a KDown instance
 val kdown = KDown(
   httpEngine = KtorHttpEngine(),
-  taskStore = createSqliteTaskStore(driverFactory),
   config = DownloadConfig(
     maxConnections = 4,
-    retryCount = 3,
     queueConfig = QueueConfig(maxConcurrentDownloads = 3)
   )
 )
 
-// 2. Start a download
 val task = kdown.download(
   DownloadRequest(
     url = "https://example.com/large-file.zip",
     directory = "/path/to/downloads",
-    connections = 4
   )
 )
 
-// 3. Observe progress
-launch {
-  task.state.collect { state ->
-    when (state) {
-      is DownloadState.Downloading -> {
-        val p = state.progress
-        println("${(p.percent * 100).toInt()}%  ${p.bytesPerSecond / 1024} KB/s")
-      }
-      is DownloadState.Completed -> println("Done: ${state.filePath}")
-      is DownloadState.Failed -> println("Error: ${state.error}")
-      else -> {}
+// Observe progress
+task.state.collect { state ->
+  when (state) {
+    is DownloadState.Downloading -> {
+      val p = state.progress
+      println("${(p.percent * 100).toInt()}%  ${p.bytesPerSecond / 1024} KB/s")
     }
+    is DownloadState.Completed -> println("Done: ${state.filePath}")
+    is DownloadState.Failed -> println("Error: ${state.error}")
+    else -> {}
   }
 }
-
-// 4. Control the download
-task.pause()
-task.resume()
-task.cancel()
-
-// 5. Or just await the result
-val result: Result<String> = task.await()
 ```
 
-## Documentation
+See [Installation](docs/api.md) for version catalog setup, optional modules (SQLite persistence, Kermit logging, remote client), and the full API reference.
 
-- [Architecture](docs/architecture.md) -- Modules, dependency graph, download pipeline, and multi-backend design
-- [API Reference](docs/api.md) -- Module interfaces, configuration options, error handling, and logging
-- [CLI](cli/README.md) -- Command-line interface for downloads and running the daemon
+### Desktop App
+
+Download the latest desktop app from [GitHub Releases](https://github.com/linroid/KDown/releases/latest):
+
+| Platform | Format |
+|---|---|
+| macOS (arm64) | `.dmg` |
+| Linux (x64, arm64) | `.deb` |
+| Windows (x64, arm64) | `.msi` |
+
+### CLI / Server
+
+Install the native CLI to run KDown as a daemon on your server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | bash
+```
+
+Then start the daemon:
+
+```bash
+# Start the server with REST API + web UI on port 8642
+kdown server
+
+# Download a file directly
+kdown https://example.com/file.zip
+
+# Use a TOML config file
+kdown server --config /path/to/config.toml
+```
+
+Supported platforms: **macOS** (arm64), **Linux** (x64, arm64), **Windows** (x64). See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.
 
 ## How It Works
 
@@ -152,85 +133,12 @@ val result: Result<String> = task.await()
 6. **Persist** -- Segment progress is saved to `TaskStore` so pause/resume works across restarts
 7. **Resume** -- On resume, validates server identity (ETag/Last-Modified) and file integrity, then continues
 
-## Daemon Server
+## Documentation
 
-Run KDown as a background service and control it remotely:
-
-```kotlin
-// Server side (Desktop)
-val kdown = KDown(httpEngine = KtorHttpEngine())
-val server = KDownServer(kdown)
-server.start()  // REST API + SSE on port 8642
-
-// Client side (any platform)
-val remote = RemoteKDown(baseUrl = "http://localhost:8642")
-val task = remote.download(DownloadRequest(url = "...", directory = "..."))
-task.state.collect { /* real-time updates via SSE */ }
-```
-
-Or start the daemon from the CLI:
-
-```bash
-# Start with defaults
-kdown server
-
-# With a TOML config file
-kdown server --config /path/to/config.toml
-
-# Generate a default config file
-kdown server --generate-config
-```
-
-See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.
-
-## Platform Support
-
-| Feature | Android | Desktop | iOS | WasmJs |
-|---|---|---|---|---|
-| Segmented downloads | Yes | Yes | Yes | Remote only* |
-| Pause / Resume | Yes | Yes | Yes | Remote only* |
-| SQLite persistence | Yes | Yes | Yes | No |
-| Console logging | Logcat | stdout/stderr | NSLog | println |
-| Daemon server | -- | Yes | -- | -- |
-
-\*WasmJs: Local file I/O is not supported. Use `RemoteKDown` to control a daemon server from the browser.
-
-## CLI
-
-KDown includes a native CLI for downloading files and running the daemon server.
-
-### Install
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | bash
-```
-
-Options via environment variables:
-
-```bash
-# Install a specific version
-curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | KDOWN_VERSION=0.1.0 bash
-
-# Install to a custom directory
-curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | KDOWN_INSTALL=~/.local/bin bash
-```
-
-Supported platforms: **macOS** (arm64), **Linux** (x64, arm64), **Windows** (x64).
-
-### Usage
-
-```bash
-# Download a file
-kdown https://example.com/file.zip
-
-# Start the daemon server
-kdown server
-
-# Run from source (for development)
-./gradlew :cli:run --args="https://example.com/file.zip"
-```
-
-See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.
+- [Architecture](docs/architecture.md) -- Modules, dependency graph, download pipeline, and multi-backend design
+- [API Reference](docs/api.md) -- Installation, module interfaces, configuration, error handling, and logging
+- [Logging](docs/logging.md) -- Logging system and configuration
+- [CLI](cli/README.md) -- Command-line interface for downloads and running the daemon
 
 ## Contributing
 

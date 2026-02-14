@@ -1,5 +1,52 @@
 # API Reference
 
+## Installation
+
+Add the dependencies to your `build.gradle.kts`:
+
+```kotlin
+// Version catalog (gradle/libs.versions.toml)
+[versions]
+kdown = "<latest-version>"
+
+[libraries]
+kdown-core = { module = "com.linroid.kdown:core", version.ref = "kdown" }
+kdown-ktor = { module = "com.linroid.kdown:ktor", version.ref = "kdown" }
+kdown-sqlite = { module = "com.linroid.kdown:sqlite", version.ref = "kdown" }
+kdown-kermit = { module = "com.linroid.kdown:kermit", version.ref = "kdown" }
+kdown-remote = { module = "com.linroid.kdown:remote", version.ref = "kdown" }
+```
+
+```kotlin
+// build.gradle.kts
+kotlin {
+  sourceSets {
+    commonMain.dependencies {
+      implementation(libs.kdown.core)  // Download engine
+      implementation(libs.kdown.ktor)  // HTTP engine (required by core)
+    }
+    // Optional modules
+    commonMain.dependencies {
+      implementation(libs.kdown.kermit)  // Kermit logging
+      implementation(libs.kdown.remote)  // Remote client for daemon server
+    }
+    // SQLite persistence (not available on WasmJs)
+    androidMain.dependencies { implementation(libs.kdown.sqlite) }
+    iosMain.dependencies { implementation(libs.kdown.sqlite) }
+    jvmMain.dependencies { implementation(libs.kdown.sqlite) }
+  }
+}
+```
+
+Or without a version catalog:
+
+```kotlin
+dependencies {
+  implementation("com.linroid.kdown:core:<latest-version>")
+  implementation("com.linroid.kdown:ktor:<latest-version>")
+}
+```
+
 ## Modules
 
 ### `library:api`
