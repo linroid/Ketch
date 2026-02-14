@@ -28,9 +28,9 @@ import com.linroid.kdown.remote.ConnectionState
 fun SpeedStatusBar(
   activeDownloads: Int,
   totalSpeed: Long,
-  instanceLabel: String?,
-  connectionState: ConnectionState?,
-  onInstanceClick: () -> Unit,
+  backendLabel: String?,
+  connectionState: ConnectionState,
+  onBackendClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   Surface(
@@ -54,17 +54,15 @@ fun SpeedStatusBar(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-      // Left side: instance info
+      // Left side: backend info
       Row(
-        modifier = Modifier.clickable { onInstanceClick() },
+        modifier = Modifier.clickable { onBackendClick() },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        if (connectionState != null) {
-          ConnectionStatusDot(connectionState)
-        }
+        ConnectionStatusDot(connectionState)
         Text(
-          text = instanceLabel ?: "Not connected",
+          text = backendLabel ?: "Not connected",
           style = MaterialTheme.typography.labelSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

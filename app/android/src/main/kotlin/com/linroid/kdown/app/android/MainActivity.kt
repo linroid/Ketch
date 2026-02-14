@@ -8,9 +8,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import com.linroid.kdown.app.App
-import com.linroid.kdown.app.instance.InstanceFactory
-import com.linroid.kdown.app.instance.InstanceManager
-import com.linroid.kdown.app.instance.LocalServerHandle
+import com.linroid.kdown.app.backend.BackendFactory
+import com.linroid.kdown.app.backend.BackendManager
+import com.linroid.kdown.app.backend.LocalServerHandle
 import com.linroid.kdown.server.KDownServer
 import com.linroid.kdown.server.KDownServerConfig
 import com.linroid.kdown.sqlite.DriverFactory
@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     setContent {
-      val instanceManager = remember {
+      val backendManager = remember {
         val taskStore = createSqliteTaskStore(
           DriverFactory(applicationContext)
         )
@@ -29,11 +29,10 @@ class MainActivity : ComponentActivity() {
           .getExternalStoragePublicDirectory(
             Environment.DIRECTORY_DOWNLOADS
           ).absolutePath
-        InstanceManager(
-          InstanceFactory(
+        BackendManager(
+          BackendFactory(
             taskStore = taskStore,
             defaultDirectory = downloadsDir,
-            deviceName = android.os.Build.MODEL,
             localServerFactory = { port, apiToken, kdownApi ->
               val server = KDownServer(
                 kdownApi,
@@ -54,9 +53,9 @@ class MainActivity : ComponentActivity() {
         )
       }
       DisposableEffect(Unit) {
-        onDispose { instanceManager.close() }
+        onDispose { backendManager.close() }
       }
-      App(instanceManager)
+      App(backendManager)
     }
   }
 }

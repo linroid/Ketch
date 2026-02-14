@@ -28,29 +28,29 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.linroid.kdown.app.instance.EmbeddedInstance
-import com.linroid.kdown.app.instance.InstanceEntry
-import com.linroid.kdown.app.instance.InstanceManager
-import com.linroid.kdown.app.instance.RemoteInstance
-import com.linroid.kdown.app.instance.ServerState
+import com.linroid.kdown.app.backend.BackendConfig
+import com.linroid.kdown.app.backend.BackendEntry
+import com.linroid.kdown.app.backend.BackendManager
+import com.linroid.kdown.app.backend.ServerState
 import com.linroid.kdown.app.ui.common.ConnectionStatusChip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InstanceSelectorSheet(
-  instanceManager: InstanceManager,
-  activeInstance: InstanceEntry?,
-  switchingInstance: InstanceEntry?,
+fun BackendSelectorSheet(
+  backendManager: BackendManager,
+  activeBackendId: String?,
+  switchingBackendId: String?,
   serverState: ServerState,
-  onSelectInstance: (InstanceEntry) -> Unit,
-  onRemoveInstance: (InstanceEntry) -> Unit,
+  onSelectBackend: (BackendEntry) -> Unit,
+  onRemoveBackend: (BackendEntry) -> Unit,
   onAddRemoteServer: () -> Unit,
   onDismiss: () -> Unit,
 ) {
   val sheetState = rememberModalBottomSheetState()
-  val instances by instanceManager.instances.collectAsState()
+  val backends by backendManager.backends.collectAsState()
 
   ModalBottomSheet(
     onDismissRequest = onDismiss,
@@ -62,7 +62,7 @@ fun InstanceSelectorSheet(
         .padding(bottom = 24.dp),
     ) {
       Text(
-        text = "Select Instance",
+        text = "Select Backend",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(
@@ -70,16 +70,18 @@ fun InstanceSelectorSheet(
         )
       )
 
-      instances.forEach { entry ->
-        val isActive = entry == activeInstance
-        val isSwitching = entry == switchingInstance
+      backends.forEach { entry ->
+        val entryConnectionState by
+          entry.connectionState.collectAsState()
+        val isActive = entry.id == activeBackendId
+        val isSwitching = entry.id == switchingBackendId
 
         ListItem(
           modifier = Modifier.clickable(
             enabled = !isSwitching &&
-              switchingInstance == null,
+              switchingBackendId == null,
           ) {
-            onSelectInstance(entry)
+            onSelectBackend(entry)
           },
           headlineContent = {
             Text(
@@ -93,11 +95,9 @@ fun InstanceSelectorSheet(
           },
           leadingContent = {
             Icon(
-              imageVector = if (entry is EmbeddedInstance) {
-                Icons.Filled.PhoneAndroid
-              } else {
-                Icons.Filled.Cloud
-              },
+              imageVector = backendConfigIcon(
+                entry.config
+              ),
               contentDescription = entry.label,
               tint = if (isActive) {
                 MaterialTheme.colorScheme.primary
@@ -109,26 +109,22 @@ fun InstanceSelectorSheet(
           },
           supportingContent = {
             Column {
-              if (entry is RemoteInstance) {
-                val entryConnectionState by
-                  entry.connectionState.collectAsState()
-                ConnectionStatusChip(
-                  state = entryConnectionState,
-                  isActive = isActive,
-                )
-              }
-              if (entry is EmbeddedInstance &&
-                instanceManager.isLocalServerSupported
+              ConnectionStatusChip(
+                state = entryConnectionState,
+                isActive = isActive,
+              )
+              if (entry.isEmbedded &&
+                backendManager.isLocalServerSupported
               ) {
                 EmbeddedServerControls(
                   serverState = serverState,
                   onStartServer = { port, token ->
-                    instanceManager.startServer(
+                    backendManager.startServer(
                       port, token
                     )
                   },
                   onStopServer = {
-                    instanceManager.stopServer()
+                    backendManager.stopServer()
                   }
                 )
               }
@@ -155,10 +151,10 @@ fun InstanceSelectorSheet(
                   modifier = Modifier.size(20.dp),
                 )
               }
-              if (entry !is EmbeddedInstance) {
+              if (!entry.isEmbedded) {
                 IconButton(
                   onClick = {
-                    onRemoveInstance(entry)
+                    onRemoveBackend(entry)
                   }
                 ) {
                   Icon(
@@ -194,5 +190,15 @@ fun InstanceSelectorSheet(
         }
       )
     }
+  }
+}
+
+private fun backendConfigIcon(
+  config: BackendConfig,
+): ImageVector {
+  return when (config) {
+    is BackendConfig.Embedded ->
+      Icons.Filled.PhoneAndroid
+    is BackendConfig.Remote -> Icons.Filled.Cloud
   }
 }
