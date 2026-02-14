@@ -11,6 +11,7 @@ plugins {
   alias(libs.plugins.composeHotReload) apply false
   alias(libs.plugins.sqldelight) apply false
   alias(libs.plugins.graalvmNative) apply false
+  alias(libs.plugins.mavenPublish) apply false
 }
 
 subprojects {

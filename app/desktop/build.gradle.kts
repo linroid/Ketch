@@ -32,7 +32,7 @@ compose.desktop {
       targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
       modules("java.sql")
       packageName = "KDown"
-      packageVersion = providers.gradleProperty("kdown.version").get()
+      packageVersion = providers.gradleProperty("VERSION_NAME").get()
         .substringBefore("-")
         .let { semver ->
           // DMG/MSI require MAJOR > 0; default to 1.0.0 for dev builds

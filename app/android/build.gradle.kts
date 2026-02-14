@@ -20,7 +20,7 @@ android {
     applicationId = "com.linroid.kdown.app"
     minSdk = libs.versions.android.minSdk.get().toInt()
     targetSdk = libs.versions.android.targetSdk.get().toInt()
-    versionName = providers.gradleProperty("kdown.version").get()
+    versionName = providers.gradleProperty("VERSION_NAME").get()
     versionCode = providers.environmentVariable("GITHUB_RUN_NUMBER")
       .orElse("1").get().toInt()
   }

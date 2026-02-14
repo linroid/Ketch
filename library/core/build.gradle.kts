@@ -6,6 +6,7 @@ plugins {
   alias(libs.plugins.kotlinMultiplatform)
   alias(libs.plugins.androidKmpLibrary)
   alias(libs.plugins.kotlinx.serialization)
+  alias(libs.plugins.mavenPublish)
 }
 
 kotlin {

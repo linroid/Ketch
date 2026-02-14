@@ -4,6 +4,7 @@ plugins {
   alias(libs.plugins.kotlinMultiplatform)
   alias(libs.plugins.androidKmpLibrary)
   alias(libs.plugins.sqldelight)
+  alias(libs.plugins.mavenPublish)
 }
 
 kotlin {
