@@ -23,6 +23,7 @@ import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.header
 import io.ktor.server.resources.Resources
 import io.ktor.server.response.respond
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import kotlinx.serialization.json.Json
@@ -169,6 +170,7 @@ class KDownServer(
       serverRoutes(kdown)
       downloadRoutes(kdown)
       eventRoutes(kdown)
+      staticResources("/", "web")
     }
   }
 }

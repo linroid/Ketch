@@ -26,9 +26,21 @@ graalvmNative {
         "-H:+ReportExceptionStackTraces",
         "--initialize-at-build-time=kotlin",
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",
+        "-H:IncludeResources=web/.*",
       )
     }
   }
+}
+
+val bundleWebApp by tasks.registering(Copy::class) {
+  dependsOn(":app:web:wasmJsBrowserDistribution")
+  from(project(":app:web").layout.buildDirectory.dir("dist/wasmJs/productionExecutable"))
+  exclude("*.map", "*.LICENSE.txt")
+  into(layout.buildDirectory.dir("generated/resources/web"))
+}
+
+sourceSets.main {
+  resources.srcDir(bundleWebApp.map { layout.buildDirectory.dir("generated/resources") })
 }
 
 dependencies {
