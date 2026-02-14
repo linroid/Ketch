@@ -1,4 +1,4 @@
-package com.linroid.kdown.android
+package com.linroid.kdown.app
 
 import android.os.Bundle
 import android.os.Environment

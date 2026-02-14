@@ -306,7 +306,7 @@
 					KDownApp,
 					"-lsqlite3",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.linroid.kdown.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.linroid.kdown.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -344,7 +344,7 @@
 					KDownApp,
 					"-lsqlite3",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.linroid.kdown.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.linroid.kdown.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

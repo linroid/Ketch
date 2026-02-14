@@ -13,7 +13,7 @@ kotlin {
 }
 
 android {
-  namespace = "com.linroid.kdown.android"
+  namespace = "com.linroid.kdown.app"
   compileSdk = libs.versions.android.compileSdk.get().toInt()
 
   defaultConfig {
