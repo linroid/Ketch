@@ -58,18 +58,18 @@ jobs:
         if: matrix.os != 'windows'
         run: |
           cd cli/build/native/nativeCompile
-          tar -czf kdown-${{ matrix.os }}-${{ matrix.arch }}.tar.gz kdown
+          tar -czf kdown-cli-${KDOWN_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz kdown
 
       - name: Package (Windows)
         if: matrix.os == 'windows'
         run: |
           cd cli/build/native/nativeCompile
-          7z a kdown-${{ matrix.os }}-${{ matrix.arch }}.zip kdown.exe
+          7z a kdown-cli-${KDOWN_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.zip kdown.exe
 
       - uses: actions/upload-artifact@v6
         with:
-          name: kdown-${{ matrix.os }}-${{ matrix.arch }}
-          path: cli/build/native/nativeCompile/kdown-${{ matrix.os }}-${{ matrix.arch }}.${{ matrix.ext }}
+          name: kdown-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: cli/build/native/nativeCompile/kdown-cli-*.${{ matrix.ext }}
 
   build-android:
     name: Android APK
@@ -102,12 +102,12 @@ jobs:
       - name: Rename APK
         run: |
           APK=$(find app/android/build/outputs/apk/release -name '*.apk' | head -1)
-          cp "$APK" app/android/build/outputs/apk/release/kdown-android.apk
+          cp "$APK" app/android/build/outputs/apk/release/kdown-android-${KDOWN_VERSION#v}.apk
 
       - uses: actions/upload-artifact@v6
         with:
           name: kdown-android
-          path: app/android/build/outputs/apk/release/kdown-android.apk
+          path: app/android/build/outputs/apk/release/kdown-android-*.apk
 
   build-desktop:
     name: Desktop (${{ matrix.name }})
@@ -115,26 +115,36 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: macOS
+          - name: macOS-arm64
             runner: macos-latest
             task: packageReleaseDmg
-            artifact: "*.dmg"
+            os: macos
+            arch: arm64
+            ext: dmg
           - name: Linux-x64
             runner: ubuntu-latest
             task: packageReleaseDeb
-            artifact: "*.deb"
+            os: linux
+            arch: x64
+            ext: deb
           - name: Linux-arm64
             runner: ubuntu-24.04-arm
             task: packageReleaseDeb
-            artifact: "*.deb"
+            os: linux
+            arch: arm64
+            ext: deb
           - name: Windows-x64
             runner: windows-latest
             task: packageReleaseMsi
-            artifact: "*.msi"
+            os: windows
+            arch: x64
+            ext: msi
           - name: Windows-arm64
             runner: windows-11-arm
             task: packageReleaseMsi
-            artifact: "*.msi"
+            os: windows
+            arch: arm64
+            ext: msi
     steps:
       - uses: actions/checkout@v6
 
@@ -148,10 +158,16 @@ jobs:
       - name: Build desktop package
         run: ./gradlew :app:desktop:${{ matrix.task }} -PVERSION_NAME=${KDOWN_VERSION#v}
 
+      - name: Rename artifact
+        run: |
+          SRC=$(find app/desktop/build/compose/binaries/main-release -name "*.${{ matrix.ext }}")
+          DEST="app/desktop/build/kdown-desktop-${KDOWN_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.${{ matrix.ext }}"
+          cp "$SRC" "$DEST"
+
       - uses: actions/upload-artifact@v6
         with:
           name: kdown-desktop-${{ matrix.name }}
-          path: app/desktop/build/compose/binaries/main-release/**/${{ matrix.artifact }}
+          path: app/desktop/build/kdown-desktop-*.${{ matrix.ext }}
 
   build-web:
     name: Web (WasmJs)
@@ -172,12 +188,12 @@ jobs:
       - name: Package web distribution
         run: |
           cd app/web/build/dist/wasmJs/productionExecutable
-          zip -r /tmp/kdown-web.zip .
+          zip -r /tmp/kdown-web-${KDOWN_VERSION#v}.zip .
 
       - uses: actions/upload-artifact@v6
         with:
           name: kdown-web
-          path: /tmp/kdown-web.zip
+          path: /tmp/kdown-web-*.zip
 
   publish-maven-central:
     name: Publish to Maven Central
@@ -226,4 +242,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: artifacts/*
+          files: artifacts/**
