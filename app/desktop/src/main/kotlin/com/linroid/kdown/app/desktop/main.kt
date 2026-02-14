@@ -1,4 +1,4 @@
-package com.linroid.kdown.desktop
+package com.linroid.kdown.app.desktop
 
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember

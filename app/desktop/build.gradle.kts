@@ -19,7 +19,7 @@ dependencies {
 
 compose.desktop {
   application {
-    mainClass = "com.linroid.kdown.desktop.MainKt"
+    mainClass = "com.linroid.kdown.app.desktop.MainKt"
 
     buildTypes.release.proguard {
       configurationFiles.from(rootProject.file("proguard-rules.pro"))
