@@ -80,8 +80,10 @@ android {
 
 dependencies {
   implementation(projects.app.shared)
+  implementation(projects.library.core)
   implementation(projects.library.sqlite)
   implementation(projects.library.server)
+  implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.activity.compose)
   debugImplementation(libs.compose.uiTooling)
 }
