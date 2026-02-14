@@ -23,8 +23,7 @@ graalvmNative {
       )
       buildArgs.addAll(
         "--no-fallback",
-        "-Os",
-        "-H:+StripDebugInfo",
+        "-Ob",
         "-H:+ReportExceptionStackTraces",
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io",
         "--initialize-at-build-time=ch.qos.logback",
@@ -34,6 +33,12 @@ graalvmNative {
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",
       )
+      if (!Os.isFamily(
+          org.apache.tools.ant.taskdefs.condition.Os.FAMILY_MAC
+        )
+      ) {
+        buildArgs.add("-H:+StripDebugInfo")
+      }
     }
   }
 }
