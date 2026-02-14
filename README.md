@@ -90,15 +90,17 @@ task.state.collect { state ->
 
 See [Installation](docs/api.md) for version catalog setup, optional modules (SQLite persistence, Kermit logging, remote client), and the full API reference.
 
-### Desktop App
+### Download the App
 
-Download the latest desktop app from [GitHub Releases](https://github.com/linroid/KDown/releases/latest):
+Download the latest apps from [GitHub Releases](https://github.com/linroid/KDown/releases/latest):
 
 | Platform | Format |
 |---|---|
+| Android | `.apk` |
 | macOS (arm64) | `.dmg` |
 | Linux (x64, arm64) | `.deb` |
 | Windows (x64, arm64) | `.msi` |
+| iOS | Build from [source](app/ios/) via Xcode |
 
 ### CLI / Server
 
