@@ -24,7 +24,10 @@ graalvmNative {
       buildArgs.addAll(
         "--no-fallback",
         "-H:+ReportExceptionStackTraces",
-        "--initialize-at-build-time=kotlin",
+        "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io",
+        "--initialize-at-build-time=ch.qos.logback",
+        "--initialize-at-build-time=org.slf4j.LoggerFactory",
+        "--initialize-at-build-time=org.slf4j.helpers.Reporter",
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",

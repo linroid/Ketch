@@ -118,5 +118,15 @@
   {
     "name": "com.linroid.kdown.endpoints.model.TaskEvent$Companion",
     "allDeclaredMethods": true
+  },
+  {
+    "name": "kotlin.internal.jdk8.JDK8PlatformImplementations",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.ktor.utils.io.pool.DefaultPool",
+    "fields": [{"name": "top", "allowUnsafeAccess": true}]
   }
 ]
