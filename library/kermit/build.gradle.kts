@@ -4,11 +4,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
   alias(libs.plugins.kotlinMultiplatform)
   alias(libs.plugins.androidKmpLibrary)
-  id("maven-publish")
 }
 
-group = "com.linroid.kdown"
-version = providers.gradleProperty("kdown.version").get()
+apply(from = "${rootProject.projectDir}/gradle/publish.gradle.kts")
 
 kotlin {
   androidLibrary {

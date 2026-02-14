@@ -5,11 +5,9 @@ plugins {
   alias(libs.plugins.kotlinMultiplatform)
   alias(libs.plugins.androidKmpLibrary)
   alias(libs.plugins.kotlinx.serialization)
-  id("maven-publish")
 }
 
-group = "com.linroid.kdown"
-version = providers.gradleProperty("kdown.version").get()
+apply(from = "${rootProject.projectDir}/gradle/publish.gradle.kts")
 
 val gitRevision: String by lazy {
   providers.exec {
