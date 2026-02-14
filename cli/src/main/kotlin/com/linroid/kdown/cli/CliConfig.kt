@@ -19,28 +19,40 @@ data class CliConfig(
 data class ServerSection(
   val host: String = "0.0.0.0",
   val port: Int = 8642,
-  @SerialName("api-token") val apiToken: String? = null,
-  @SerialName("cors-allowed-hosts") val corsAllowedHosts: List<String> = emptyList(),
+  @SerialName("api-token")
+  val apiToken: String? = null,
+  @SerialName("cors-allowed-hosts")
+  val corsAllowedHosts: List<String> = emptyList(),
 )
 
 @Serializable
 data class DownloadSection(
   val directory: String? = null,
-  @SerialName("max-connections") val maxConnections: Int = 4,
-  @SerialName("retry-count") val retryCount: Int = 3,
-  @SerialName("retry-delay-ms") val retryDelayMs: Long = 1000,
-  @SerialName("progress-update-interval-ms") val progressUpdateIntervalMs: Long = 200,
-  @SerialName("segment-save-interval-ms") val segmentSaveIntervalMs: Long = 5000,
-  @SerialName("buffer-size") val bufferSize: Int = 8192,
-  @SerialName("speed-limit") val speedLimit: String? = null,
+  @SerialName("max-connections")
+  val maxConnections: Int = 4,
+  @SerialName("retry-count")
+  val retryCount: Int = 3,
+  @SerialName("retry-delay-ms")
+  val retryDelayMs: Long = 1000,
+  @SerialName("progress-update-interval-ms")
+  val progressUpdateIntervalMs: Long = 200,
+  @SerialName("segment-save-interval-ms")
+  val segmentSaveIntervalMs: Long = 5000,
+  @SerialName("buffer-size")
+  val bufferSize: Int = 8192,
+  @SerialName("speed-limit")
+  val speedLimit: String? = null,
   val queue: QueueSection = QueueSection(),
 )
 
 @Serializable
 data class QueueSection(
-  @SerialName("max-concurrent-downloads") val maxConcurrentDownloads: Int = 3,
-  @SerialName("max-connections-per-host") val maxConnectionsPerHost: Int = 4,
-  @SerialName("auto-start") val autoStart: Boolean = true,
+  @SerialName("max-concurrent-downloads")
+  val maxConcurrentDownloads: Int = 3,
+  @SerialName("max-connections-per-host")
+  val maxConnectionsPerHost: Int = 4,
+  @SerialName("auto-start")
+  val autoStart: Boolean = true,
 )
 
 fun CliConfig.toDownloadConfig(fallbackDir: String): DownloadConfig {
