@@ -1,42 +1,45 @@
 package com.linroid.kdown.cli
 
+import ch.qos.logback.classic.Level
 import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
-import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.core.DownloadConfig
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.core.QueueConfig
+import com.linroid.kdown.core.log.LogLevel
 import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.engine.KtorHttpEngine
 import com.linroid.kdown.server.KDownServer
-import com.linroid.kdown.server.KDownServerConfig
 import com.linroid.kdown.sqlite.DriverFactory
 import com.linroid.kdown.sqlite.SqliteTaskStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
+import org.slf4j.LoggerFactory
 import java.io.File
 
+/** KDown library log level, derived from CLI flags. */
+private var kdownLogLevel = LogLevel.INFO
+
 fun main(args: Array<String>) {
+  // Parse global flags before subcommand dispatch
+  val remaining = applyGlobalFlags(args.toMutableList())
+
   println("KDown CLI - Version ${KDownVersion.DEFAULT} (${KDownVersion.REVISION})")
   println()
 
-  if (args.isEmpty()) {
+  if (remaining.isEmpty()) {
     printUsage()
     return
   }
 
-  when (args[0]) {
+  when (remaining[0]) {
     "server" -> {
-      runServer(args.drop(1).toTypedArray())
-      return
-    }
-    "--queue-demo" -> {
-      runQueueDemo(args.drop(1))
+      runServer(remaining.drop(1).toTypedArray())
       return
     }
   }
@@ -48,17 +51,17 @@ fun main(args: Array<String>) {
   var maxConcurrent = 3
 
   var i = 0
-  while (i < args.size) {
-    when (args[i]) {
+  while (i < remaining.size) {
+    when (remaining[i]) {
       "--speed-limit" -> {
-        if (i + 1 >= args.size) {
+        if (i + 1 >= remaining.size) {
           println("Error: --speed-limit requires a value")
           println()
           printUsage()
           return
         }
-        speedLimit = parseSpeedLimit(args[i + 1]) ?: run {
-          println("Error: invalid speed limit '${args[i + 1]}'")
+        speedLimit = parseSpeedLimit(remaining[i + 1]) ?: run {
+          println("Error: invalid speed limit '${remaining[i + 1]}'")
           println()
           printUsage()
           return
@@ -66,14 +69,14 @@ fun main(args: Array<String>) {
         i += 2
       }
       "--priority" -> {
-        if (i + 1 >= args.size) {
+        if (i + 1 >= remaining.size) {
           println("Error: --priority requires a value")
           println()
           printUsage()
           return
         }
-        priority = parsePriority(args[i + 1]) ?: run {
-          println("Error: invalid priority '${args[i + 1]}'")
+        priority = parsePriority(remaining[i + 1]) ?: run {
+          println("Error: invalid priority '${remaining[i + 1]}'")
           println("  Valid values: low, normal, high, urgent")
           println()
           printUsage()
@@ -82,14 +85,14 @@ fun main(args: Array<String>) {
         i += 2
       }
       "--max-concurrent" -> {
-        if (i + 1 >= args.size) {
+        if (i + 1 >= remaining.size) {
           println("Error: --max-concurrent requires a value")
           println()
           printUsage()
           return
         }
-        maxConcurrent = args[i + 1].toIntOrNull() ?: run {
-          println("Error: invalid number '${args[i + 1]}'")
+        maxConcurrent = remaining[i + 1].toIntOrNull() ?: run {
+          println("Error: invalid number '${remaining[i + 1]}'")
           println()
           printUsage()
           return
@@ -101,8 +104,8 @@ fun main(args: Array<String>) {
         i += 2
       }
       else -> {
-        if (url == null) url = args[i]
-        else if (dest == null) dest = args[i]
+        if (url == null) url = remaining[i]
+        else if (dest == null) dest = remaining[i]
         i++
       }
     }
@@ -223,6 +226,36 @@ fun main(args: Array<String>) {
 
     kdown.close()
   }
+}
+
+/**
+ * Extracts global flags (`-v`/`--verbose`, `--debug`) from [args],
+ * applies them (sets logback root level and KDown log level),
+ * and returns the remaining arguments.
+ */
+private fun applyGlobalFlags(args: MutableList<String>): List<String> {
+  var logbackLevel: Level? = null
+  val remaining = mutableListOf<String>()
+  for (arg in args) {
+    when (arg) {
+      "-v", "--verbose" -> {
+        logbackLevel = Level.DEBUG
+        kdownLogLevel = LogLevel.DEBUG
+      }
+      "--debug" -> {
+        logbackLevel = Level.TRACE
+        kdownLogLevel = LogLevel.VERBOSE
+      }
+      else -> remaining.add(arg)
+    }
+  }
+  if (logbackLevel != null) {
+    val root = LoggerFactory.getLogger(
+      org.slf4j.Logger.ROOT_LOGGER_NAME
+    ) as ch.qos.logback.classic.Logger
+    root.level = logbackLevel
+  }
+  return remaining
 }
 
 private fun runServer(args: Array<String>) {
@@ -388,7 +421,7 @@ private fun runServer(args: Array<String>) {
     httpEngine = KtorHttpEngine(),
     taskStore = taskStore,
     config = downloadConfig,
-    logger = Logger.console(),
+    logger = Logger.console(kdownLogLevel),
   )
   val server = KDownServer(kdown, serverConfig)
 
@@ -426,145 +459,15 @@ private fun runServer(args: Array<String>) {
   server.start(wait = true)
 }
 
-/**
- * Demonstrates queue management with multiple downloads, priorities,
- * and concurrency limits. Enqueues several downloads that exceed
- * the max concurrent limit so some are queued automatically.
- */
-private fun runQueueDemo(urls: List<String>) {
-  val demoUrls = urls.ifEmpty {
-    println("Usage: kdown --queue-demo <url1> <url2> ...")
-    println()
-    println(
-      "Provide 4+ URLs to see queue behavior. " +
-        "Only 2 run at a time;"
-    )
-    println("the rest are queued by priority.")
-    return
-  }
-
-  println("=== Queue Management Demo ===")
-  println("Max concurrent downloads: 2")
-  println("Downloads: ${demoUrls.size}")
-  println()
-
-  val config = DownloadConfig(
-    maxConnections = 4,
-    retryCount = 3,
-    retryDelayMs = 1000,
-    progressUpdateIntervalMs = 500,
-    queueConfig = QueueConfig(
-      maxConcurrentDownloads = 2,
-      maxConnectionsPerHost = 4,
-      autoStart = true,
-    )
-  )
-
-  val kdown = KDown(
-    httpEngine = KtorHttpEngine(),
-    config = config,
-  )
-
-  // Assign ascending priorities to demonstrate ordering
-  val priorities = listOf(
-    DownloadPriority.LOW,
-    DownloadPriority.NORMAL,
-    DownloadPriority.HIGH,
-    DownloadPriority.URGENT
-  )
-
-  runBlocking {
-    val tasks = mutableListOf<DownloadTask>()
-
-    demoUrls.forEachIndexed { index, url ->
-      val priority = priorities[index % priorities.size]
-      val request = DownloadRequest(
-        url = url,
-        directory = "downloads",
-        connections = 2,
-        priority = priority,
-      )
-      val task = kdown.download(request)
-      tasks.add(task)
-      val name = extractFilename(url).ifBlank { "download-$index" }
-      println("  [$priority] $name -> ${task.state.value}")
-    }
-
-    println()
-    println("--- Monitoring downloads ---")
-    println()
-
-    // Monitor all tasks
-    val monitors = tasks.mapIndexed { index, task ->
-      val name = extractFilename(task.request.url)
-        .ifBlank { "download-$index" }
-      launch {
-        task.state.collect { state ->
-          val label = formatTaskState(state)
-          println("  [$name] $label")
-        }
-      }
-    }
-
-    // Demonstrate dynamic priority change after 3 seconds
-    if (tasks.size >= 3) {
-      launch {
-        delay(3000)
-        val target = tasks[0]
-        val name = extractFilename(target.request.url)
-          .ifBlank { "download-0" }
-        println()
-        println(
-          "--- Boosting priority of '$name' to URGENT ---"
-        )
-        target.setPriority(DownloadPriority.URGENT)
-      }
-    }
-
-    // Wait for all tasks to complete
-    for (task in tasks) {
-      task.await()
-    }
-    monitors.forEach { it.cancel() }
-
-    println()
-    println("=== All downloads finished ===")
-    kdown.close()
-  }
-}
-
-private fun formatTaskState(state: DownloadState): String {
-  return when (state) {
-    is DownloadState.Queued -> "Queued"
-    is DownloadState.Pending -> "Starting..."
-    is DownloadState.Scheduled -> "Scheduled"
-    is DownloadState.Downloading -> {
-      val p = state.progress
-      val pct = (p.percent * 100).toInt()
-      "$pct% (${formatBytes(p.downloadedBytes)}" +
-        " / ${formatBytes(p.totalBytes)})"
-    }
-    is DownloadState.Paused -> "Paused"
-    is DownloadState.Completed -> "Completed -> ${state.filePath}"
-    is DownloadState.Failed -> "Failed: ${state.error.message}"
-    is DownloadState.Canceled -> "Canceled"
-    is DownloadState.Idle -> "Idle"
-  }
-}
-
-private fun extractFilename(url: String): String {
-  return url.substringBefore("?")
-    .substringBefore("#")
-    .trimEnd('/')
-    .substringAfterLast("/")
-}
-
 private fun printUsage() {
   println("Usage: kdown [options] <url> [destination]")
-  println("       kdown --queue-demo <url1> <url2> ...")
   println("       kdown server [options]")
   println()
-  println("Options:")
+  println("Global Options:")
+  println("  -v, --verbose            Enable verbose logging (DEBUG)")
+  println("  --debug                  Enable debug logging (TRACE)")
+  println()
+  println("Download Options:")
   println("  --speed-limit <value>    Limit download speed")
   println("                           Examples: 500k, 1m, 10m")
   println("                           Suffixes: k = KB/s, m = MB/s")
@@ -573,11 +476,6 @@ private fun printUsage() {
   println("  --max-concurrent <n>     Max simultaneous downloads")
   println("                           Default: 3")
   println()
-  println("Queue Demo:")
-  println("  --queue-demo <urls...>   Run queue demo with multiple URLs")
-  println("                           Uses max 2 concurrent downloads")
-  println("                           to show queuing and priority")
-  println()
   println("Server:")
   println("  server [options]         Start KDown daemon server")
   println("                           Run `kdown server --help`")
@@ -585,9 +483,8 @@ private fun printUsage() {
   println()
   println("Examples:")
   println("  kdown https://example.com/file.zip")
+  println("  kdown -v https://example.com/file.zip")
   println("  kdown --priority high https://example.com/file.zip")
-  println("  kdown --max-concurrent 2 https://example.com/file.zip")
-  println("  kdown --queue-demo url1 url2 url3 url4")
   println("  kdown server --port 9000 --dir /tmp/downloads")
 }
 

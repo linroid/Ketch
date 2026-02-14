@@ -1,6 +1,16 @@
 package com.linroid.kdown.core.log
 
 /**
+ * Log level for filtering log output.
+ *
+ * Messages at or above the configured level are emitted;
+ * messages below are discarded without evaluating the lambda.
+ */
+enum class LogLevel {
+  VERBOSE, DEBUG, INFO, WARN, ERROR
+}
+
+/**
  * Logger abstraction for KDown.
  *
  * KDown supports pluggable logging with zero overhead when disabled (default).
@@ -18,6 +28,14 @@ package com.linroid.kdown.core.log
  * val kdown = KDown(
  *   httpEngine = KtorHttpEngine(),
  *   logger = Logger.console()  // Platform-specific console output
+ * )
+ * ```
+ *
+ * ### Console Logging with Level Filter
+ * ```kotlin
+ * val kdown = KDown(
+ *   httpEngine = KtorHttpEngine(),
+ *   logger = Logger.console(LogLevel.INFO)  // Only INFO and above
  * )
  * ```
  *
@@ -103,15 +121,18 @@ interface Logger {
     }
 
     /**
-     * Simple console logger that prints all messages to stdout/stderr.
+     * Simple console logger that prints messages to stdout/stderr.
      * Useful for quick debugging or CLI applications.
      * Platform-specific implementation.
+     *
+     * @param minLevel minimum log level to emit (default: [LogLevel.VERBOSE])
      */
-    fun console(): Logger = consoleLogger()
+    fun console(minLevel: LogLevel = LogLevel.VERBOSE): Logger =
+      consoleLogger(minLevel)
   }
 }
 
 /**
  * Platform-specific console logger implementation.
  */
-internal expect fun consoleLogger(): Logger
+internal expect fun consoleLogger(minLevel: LogLevel): Logger
