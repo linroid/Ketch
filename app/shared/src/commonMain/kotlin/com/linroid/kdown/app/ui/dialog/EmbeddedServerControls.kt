@@ -19,7 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.linroid.kdown.app.backend.ServerState
+import com.linroid.kdown.app.instance.ServerState
 
 @Composable
 fun EmbeddedServerControls(

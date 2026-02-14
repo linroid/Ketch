@@ -5,8 +5,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
-import com.linroid.kdown.app.backend.BackendFactory
-import com.linroid.kdown.app.backend.BackendManager
+import com.linroid.kdown.app.instance.InstanceFactory
+import com.linroid.kdown.app.instance.InstanceManager
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
@@ -15,20 +15,20 @@ import kotlinx.coroutines.launch
 fun main() {
   val body = document.body ?: return
   ComposeViewport(body) {
-    val backendManager = remember {
-      BackendManager(BackendFactory())
+    val instanceManager = remember {
+      InstanceManager(InstanceFactory())
     }
     val scope = rememberCoroutineScope()
     DisposableEffect(Unit) {
       if (shouldAutoConnect()) {
         val host = window.location.hostname
         val port = window.location.port.toIntOrNull() ?: 80
-        val entry = backendManager.addRemote(host, port)
-        scope.launch { backendManager.switchTo(entry.id) }
+        val entry = instanceManager.addRemote(host, port)
+        scope.launch { instanceManager.switchTo(entry) }
       }
-      onDispose { backendManager.close() }
+      onDispose { instanceManager.close() }
     }
-    App(backendManager)
+    App(instanceManager)
   }
 }
 
