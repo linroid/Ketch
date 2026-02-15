@@ -31,6 +31,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import kotlinx.serialization.json.Json
+import javax.jmdns.JmDNS
+import javax.jmdns.ServiceInfo
 
 /**
  * A daemon server that exposes a [KDownApi] instance via REST API and
@@ -76,6 +78,7 @@ class KDownServer(
 ) {
   private var engine:
     EmbeddedServer<CIOApplicationEngine, *>? = null
+  @Volatile private var mdnsRegistration: MdnsRegistration? = null
 
   /**
    * Starts the daemon server.
@@ -90,15 +93,44 @@ class KDownServer(
       port = config.port,
       module = { configureServer() },
     ).also { it.start(wait = wait) }
+    startMdnsRegistration()
   }
 
   /** Stops the daemon server gracefully. */
   fun stop() {
+    stopMdnsRegistration()
     engine?.stop(
       gracePeriodMillis = 1000,
       timeoutMillis = 5000,
     )
     engine = null
+  }
+
+  private fun startMdnsRegistration() {
+    if (!config.mdnsEnabled) return
+    stopMdnsRegistration()
+    Thread({
+      mdnsRegistration = runCatching {
+        val info = ServiceInfo.create(
+          config.mdnsServiceType,
+          config.mdnsServiceName,
+          config.port,
+          "token=${if (config.apiToken.isNullOrBlank()) "none" else "required"}",
+        )
+        val jmDNS = JmDNS.create()
+        jmDNS.registerService(info)
+        MdnsRegistration(jmDNS, info)
+      }.onFailure { e ->
+        System.err.println("mDNS registration failed: ${e.message}")
+      }.getOrNull()
+    }, "kdown-mdns").apply { isDaemon = true }.start()
+  }
+
+  private fun stopMdnsRegistration() {
+    val registration = mdnsRegistration ?: return
+    runCatching { registration.jmDNS.unregisterService(registration.info) }
+    runCatching { registration.jmDNS.close() }
+    mdnsRegistration = null
   }
 
   internal fun Application.configureServer() {
@@ -178,6 +210,11 @@ class KDownServer(
     }
   }
 }
+
+private data class MdnsRegistration(
+  val jmDNS: JmDNS,
+  val info: ServiceInfo,
+)
 
 /**
  * Serves bundled web UI resources from the classpath.

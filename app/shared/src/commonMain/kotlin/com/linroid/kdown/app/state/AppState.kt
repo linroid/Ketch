@@ -14,10 +14,13 @@ import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.app.instance.InstanceEntry
 import com.linroid.kdown.app.instance.InstanceManager
+import com.linroid.kdown.app.instance.LanServerDiscovery
 import com.linroid.kdown.app.instance.RemoteInstance
 import com.linroid.kdown.app.instance.ServerState
+import com.linroid.kdown.app.instance.DiscoveredServer
 import com.linroid.kdown.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +29,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface ResolveState {
   data object Idle : ResolveState
@@ -39,6 +43,8 @@ class AppState(
   val instanceManager: InstanceManager,
   private val scope: CoroutineScope,
 ) {
+  private val lanServerDiscovery = LanServerDiscovery()
+
   val activeApi: StateFlow<KDownApi> =
     instanceManager.activeApi
   val activeInstance: StateFlow<InstanceEntry?> =
@@ -91,6 +97,10 @@ class AppState(
   var showAddDialog by mutableStateOf(false)
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
+  var discoveringRemoteServers by mutableStateOf(false)
+    private set
+  var discoveredRemoteServers by mutableStateOf<List<DiscoveredServer>>(emptyList())
+    private set
   var switchingInstance by
     mutableStateOf<InstanceEntry?>(null)
   var resolveState by mutableStateOf<ResolveState>(
@@ -185,6 +195,26 @@ class AppState(
     } catch (e: Exception) {
       errorMessage =
         "Failed to add remote server: ${e.message}"
+    }
+  }
+
+  fun discoverRemoteServers(port: Int = 8642) {
+    if (discoveringRemoteServers) return
+    discoveringRemoteServers = true
+    discoveredRemoteServers = emptyList()
+    scope.launch {
+      try {
+        discoveredRemoteServers = withContext(Dispatchers.Default) {
+          lanServerDiscovery.discover(port)
+        }
+        if (discoveredRemoteServers.isEmpty()) {
+          errorMessage = "No KDown server found in LAN."
+        }
+      } catch (e: Exception) {
+        errorMessage = e.message ?: "Failed to discover LAN servers"
+      } finally {
+        discoveringRemoteServers = false
+      }
     }
   }
 

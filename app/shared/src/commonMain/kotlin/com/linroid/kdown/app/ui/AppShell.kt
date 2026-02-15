@@ -382,6 +382,11 @@ fun AppShell(instanceManager: InstanceManager) {
       onDismiss = {
         appState.showAddRemoteDialog = false
       },
+      discovering = appState.discoveringRemoteServers,
+      discoveredServers = appState.discoveredRemoteServers,
+      onDiscover = { port ->
+        appState.discoverRemoteServers(port)
+      },
       onAdd = { host, port, token ->
         appState.showAddRemoteDialog = false
         appState.addRemoteServer(host, port, token)

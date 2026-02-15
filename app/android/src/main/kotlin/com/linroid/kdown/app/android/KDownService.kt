@@ -65,6 +65,7 @@ class KDownService : Service() {
             KDownServerConfig(
               port = port,
               apiToken = apiToken,
+              mdnsServiceName = android.os.Build.MODEL,
               corsAllowedHosts = listOf("*"),
             ),
           )

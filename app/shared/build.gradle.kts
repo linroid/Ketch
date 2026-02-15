@@ -61,6 +61,7 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.ktor.client.okhttp)
+      implementation(libs.jmdns)
     }
     iosMain.dependencies {
       implementation(projects.library.sqlite)
@@ -70,6 +71,7 @@ kotlin {
       implementation(projects.library.sqlite)
       implementation(libs.kotlinx.coroutinesSwing)
       implementation(libs.ktor.client.cio)
+      implementation(libs.jmdns)
     }
     wasmJsMain.dependencies {
       implementation(libs.ktor.client.js)
