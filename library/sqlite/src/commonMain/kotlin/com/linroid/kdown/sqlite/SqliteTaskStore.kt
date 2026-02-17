@@ -8,7 +8,6 @@ import com.linroid.kdown.core.task.TaskState
 import com.linroid.kdown.core.task.TaskStore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.io.files.Path
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
@@ -36,7 +35,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       request_json = json.encodeToString(
         DownloadRequest.serializer(), record.request
       ),
-      dest_path = record.destPath.toString(),
+      dest_path = record.destPath,
       state = record.state.name,
       total_bytes = record.totalBytes,
       downloaded_bytes = record.downloadedBytes,
@@ -79,7 +78,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       request = json.decodeFromString(
         DownloadRequest.serializer(), request_json
       ),
-      destPath = Path(dest_path),
+      destPath = dest_path,
       state = TaskState.valueOf(state),
       totalBytes = total_bytes,
       downloadedBytes = downloaded_bytes,

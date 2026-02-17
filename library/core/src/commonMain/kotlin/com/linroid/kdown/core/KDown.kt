@@ -43,7 +43,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.io.files.Path
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -63,7 +62,7 @@ class KDown(
   private val httpEngine: HttpEngine,
   private val taskStore: TaskStore = InMemoryTaskStore(),
   private val config: DownloadConfig = DownloadConfig.Default,
-  private val fileAccessorFactory: (Path) -> FileAccessor = { path ->
+  private val fileAccessorFactory: (String) -> FileAccessor = { path ->
     FileAccessor(path)
   },
   private val fileNameResolver: FileNameResolver =
@@ -81,7 +80,6 @@ class KDown(
 
   private val httpSource = HttpDownloadSource(
     httpEngine = httpEngine,
-    fileNameResolver = fileNameResolver,
     maxConnections = config.maxConnections,
     progressUpdateIntervalMs = config.progressUpdateIntervalMs,
     segmentSaveIntervalMs = config.segmentSaveIntervalMs,
@@ -197,7 +195,7 @@ class KDown(
           state is DownloadState.Failed
         ) {
           val resumed = coordinator.resume(
-            taskId, scope, stateFlow, segmentsFlow,
+            taskId, scope, stateFlow, segmentsFlow, it,
           )
           if (!resumed) {
             coordinator.start(
@@ -345,7 +343,7 @@ class KDown(
           state is DownloadState.Failed
         ) {
           val resumed = coordinator.resume(
-            record.taskId, scope, stateFlow, segmentsFlow,
+            record.taskId, scope, stateFlow, segmentsFlow, it,
           )
           if (!resumed) {
             coordinator.startFromRecord(
@@ -424,7 +422,7 @@ class KDown(
       )
 
       TaskState.COMPLETED -> DownloadState.Completed(
-        record.destPath.toString(),
+        record.destPath,
       )
 
       TaskState.FAILED -> DownloadState.Failed(

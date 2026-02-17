@@ -1,7 +1,5 @@
 package com.linroid.kdown.core.file
 
-import kotlinx.io.files.Path
-
 /**
  * Platform-specific random-access file writer.
  *
@@ -14,7 +12,7 @@ import kotlinx.io.files.Path
  *
  * @param path the file system path to write to
  */
-expect class FileAccessor(path: Path) {
+expect class FileAccessor(path: String) {
   /** Writes [data] starting at the given byte [offset]. */
   suspend fun writeAt(offset: Long, data: ByteArray)
 
@@ -32,4 +30,6 @@ expect class FileAccessor(path: Path) {
 
   /** Pre-allocates [size] bytes on disk to avoid fragmentation. */
   suspend fun preallocate(size: Long)
+
+  suspend fun canSegment(): Boolean
 }

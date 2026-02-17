@@ -22,23 +22,24 @@ import platform.Foundation.truncateFileAtOffset
 import platform.Foundation.writeData
 
 @OptIn(ExperimentalForeignApi::class)
-actual class FileAccessor actual constructor(private val path: Path) {
+actual class FileAccessor actual constructor(path: String) {
   private val fileManager = NSFileManager.defaultManager
   private var fileHandle: NSFileHandle? = null
   private val mutex = Mutex()
+  private val realPath = Path(path)
 
   private suspend fun getOrCreateHandle(): NSFileHandle = mutex.withLock {
     fileHandle ?: run {
-      val parent = path.parent
+      val parent = realPath.parent
       if (parent != null && !SystemFileSystem.exists(parent)) {
         SystemFileSystem.createDirectories(parent)
       }
-      val pathStr = path.toString()
+      val pathStr = realPath.toString()
       if (!fileManager.fileExistsAtPath(pathStr)) {
         fileManager.createFileAtPath(pathStr, null, null)
       }
       NSFileHandle.fileHandleForWritingAtPath(pathStr)?.also { fileHandle = it }
-        ?: throw IllegalStateException("Cannot open file for writing: $path")
+        ?: throw IllegalStateException("Cannot open file for writing: $realPath")
     }
   }
 
@@ -74,14 +75,14 @@ actual class FileAccessor actual constructor(private val path: Path) {
   actual suspend fun delete() {
     withContext(Dispatchers.IO) {
       close()
-      if (SystemFileSystem.exists(path)) {
-        SystemFileSystem.delete(path)
+      if (SystemFileSystem.exists(realPath)) {
+        SystemFileSystem.delete(realPath)
       }
     }
   }
 
   actual suspend fun size(): Long = withContext(Dispatchers.IO) {
-    SystemFileSystem.metadataOrNull(path)?.size ?: 0L
+    SystemFileSystem.metadataOrNull(realPath)?.size ?: 0L
   }
 
   actual suspend fun preallocate(size: Long) {
@@ -92,4 +93,6 @@ actual class FileAccessor actual constructor(private val path: Path) {
       }
     }
   }
+
+  actual suspend fun canSegment() = true
 }

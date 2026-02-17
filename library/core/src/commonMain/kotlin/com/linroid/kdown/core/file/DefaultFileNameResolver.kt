@@ -1,6 +1,7 @@
 package com.linroid.kdown.core.file
 
 import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.api.Output
 import com.linroid.kdown.core.engine.ServerInfo
 
 /**
@@ -16,7 +17,7 @@ internal class DefaultFileNameResolver : FileNameResolver {
     request: DownloadRequest,
     serverInfo: ServerInfo,
   ): String {
-    return request.fileName
+    return (request.output as? Output.DirectoryAndFile)?.fileName
       ?: fromContentDisposition(serverInfo.contentDisposition)
       ?: fromUrl(request.url)
       ?: FALLBACK

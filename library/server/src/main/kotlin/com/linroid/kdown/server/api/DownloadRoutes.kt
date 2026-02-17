@@ -4,6 +4,7 @@ import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.FileSelectionMode
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.Output
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SourceFile
 import com.linroid.kdown.api.SpeedLimit
@@ -70,10 +71,20 @@ internal fun Route.downloadRoutes(kdown: KDownApi) {
         selectionMode = parseSelectionMode(wire.selectionMode),
       )
     }
+    val output = when {
+      body.directory != null -> {
+        Output.DirectoryAndFile(body.directory, body.fileName)
+      }
+      body.pathOrUri != null -> {
+        Output.PathOrUri(body.pathOrUri!!)
+      }
+      else -> {
+        throw IllegalStateException("Either directory or pathOrUri must be specified!")
+      }
+    }
     val request = DownloadRequest(
       url = body.url,
-      directory = body.directory,
-      fileName = body.fileName,
+      output = output,
       connections = body.connections,
       headers = body.headers,
       priority = priority,
@@ -132,7 +143,7 @@ internal fun Route.downloadRoutes(kdown: KDownApi) {
       )
       return@post
     }
-    task.resume()
+    task.resume(resource.destPathOverride)
     call.respond(TaskMapper.toResponse(task))
   }
 

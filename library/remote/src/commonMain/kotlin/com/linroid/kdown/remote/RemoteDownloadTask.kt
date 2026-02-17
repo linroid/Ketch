@@ -63,9 +63,12 @@ internal class RemoteDownloadTask(
     applyWireResponse(response.bodyAsText())
   }
 
-  override suspend fun resume() {
+  override suspend fun resume(destPathOverride: String?) {
     val response = httpClient.post(
-      Api.Tasks.ById.Resume(parent = byId),
+      Api.Tasks.ById.Resume(
+        parent = byId,
+        destPathOverride = destPathOverride,
+      ),
     )
     checkSuccess(response)
     applyWireResponse(response.bodyAsText())

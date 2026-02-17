@@ -7,7 +7,6 @@ import com.linroid.kdown.core.engine.DownloadSource
 import com.linroid.kdown.core.engine.HttpDownloadSource
 import com.linroid.kdown.core.engine.SourceResolver
 import com.linroid.kdown.core.engine.SourceResumeState
-import com.linroid.kdown.core.file.DefaultFileNameResolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -18,7 +17,6 @@ class SourceResolverTest {
 
   private val httpSource = HttpDownloadSource(
     httpEngine = FakeHttpEngine(),
-    fileNameResolver = DefaultFileNameResolver(),
   )
 
   private val fakeSource = object : DownloadSource {

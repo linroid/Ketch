@@ -33,7 +33,7 @@ internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
   private val taskStore: TaskStore,
   private val config: DownloadConfig,
-  private val fileAccessorFactory: (Path) -> FileAccessor,
+  private val fileAccessorFactory: (String) -> FileAccessor,
   private val fileNameResolver: FileNameResolver,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
 ) {
@@ -57,11 +57,11 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
-    val directory = request.directory?.let { Path(it) }
-      ?: Path(config.defaultDirectory)
-    val initialDestPath = request.fileName?.let {
-      Path(directory, it)
-    } ?: directory
+    val initialDestPath = request.output.toDestPath(
+      defaultDirectory = config.defaultDirectory,
+      defaultFileName = null,
+      deduplicate = false,
+    )
 
     val now = Clock.System.now()
     taskStore.save(
@@ -205,9 +205,11 @@ internal class DownloadCoordinator(
       ?: fileNameResolver.resolve(
         request, toServerInfo(resolvedUrl),
       )
-    val dir = request.directory?.let { Path(it) }
-      ?: Path(config.defaultDirectory)
-    val destPath = deduplicatePath(dir, fileName)
+    val destPath = request.output.toDestPath(
+      defaultDirectory = config.defaultDirectory,
+      defaultFileName = fileName,
+      deduplicate = true,
+    )
 
     val now = Clock.System.now()
     updateTaskRecord(taskId) {
@@ -272,7 +274,7 @@ internal class DownloadCoordinator(
         "Download completed successfully for taskId=$taskId"
       }
       stateFlow.value =
-        DownloadState.Completed(destPath.toString())
+        DownloadState.Completed(destPath)
     } finally {
       fileAccessor.close()
       withContext(NonCancellable) {
@@ -343,6 +345,7 @@ internal class DownloadCoordinator(
     scope: CoroutineScope,
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
+    destPathOverride: String? = null,
   ): Boolean {
     mutex.withLock {
       if (activeDownloads.containsKey(taskId)) {
@@ -364,6 +367,7 @@ internal class DownloadCoordinator(
       it.copy(
         state = TaskState.DOWNLOADING,
         updatedAt = Clock.System.now(),
+        destPath = destPathOverride ?: it.destPath,
       )
     }
 
@@ -469,7 +473,7 @@ internal class DownloadCoordinator(
       }
 
       stateFlow.value =
-        DownloadState.Completed(taskRecord.destPath.toString())
+        DownloadState.Completed(taskRecord.destPath)
     } finally {
       fileAccessor.close()
       withContext(NonCancellable) {
@@ -498,7 +502,7 @@ internal class DownloadCoordinator(
         }
 
         if (!error.isRetryable || retryCount >= config.retryCount) {
-          KDownLogger.e("Coordinator") {
+          KDownLogger.e("Coordinator", error) {
             "Download failed after $retryCount retries: " +
               "${error.message}"
           }
@@ -667,33 +671,5 @@ internal class DownloadCoordinator(
         HttpDownloadSource.META_LAST_MODIFIED
       ],
     )
-  }
-
-  companion object {
-    internal fun deduplicatePath(
-      directory: Path,
-      fileName: String,
-    ): Path {
-      val candidate = Path(directory, fileName)
-      if (!SystemFileSystem.exists(candidate)) return candidate
-
-      val dotIndex = fileName.lastIndexOf('.')
-      val baseName: String
-      val extension: String
-      if (dotIndex > 0) {
-        baseName = fileName.take(dotIndex)
-        extension = fileName.substring(dotIndex)
-      } else {
-        baseName = fileName
-        extension = ""
-      }
-
-      var seq = 1
-      while (true) {
-        val path = Path(directory, "$baseName ($seq)$extension")
-        if (!SystemFileSystem.exists(path)) return path
-        seq++
-      }
-    }
   }
 }

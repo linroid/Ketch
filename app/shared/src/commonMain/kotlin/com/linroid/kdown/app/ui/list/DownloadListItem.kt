@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
+import com.linroid.kdown.api.Output
 import com.linroid.kdown.app.ui.common.PriorityBadge
 import com.linroid.kdown.app.ui.common.PriorityIcon
 import com.linroid.kdown.app.ui.common.PriorityPanel
@@ -58,8 +59,11 @@ fun DownloadListItem(
   modifier: Modifier = Modifier,
 ) {
   val state by task.state.collectAsState()
-  val fileName = task.request.fileName
-    ?: extractFilename(task.request.url)
+  val baseName = when (val output = task.request.output) {
+    is Output.DirectoryAndFile -> output.fileName
+    is Output.PathOrUri -> output.displayName
+  }
+  val fileName = baseName ?: extractFilename(task.request.url)
       .ifBlank { "download" }
   val isDownloading = state is DownloadState.Downloading ||
     state is DownloadState.Pending

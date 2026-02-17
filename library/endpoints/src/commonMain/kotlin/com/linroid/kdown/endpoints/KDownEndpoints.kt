@@ -64,7 +64,7 @@ class Api {
 
       @Serializable
       @Resource("resume")
-      data class Resume(val parent: ById)
+      data class Resume(val parent: ById, val destPathOverride: String?)
 
       @Serializable
       @Resource("cancel")

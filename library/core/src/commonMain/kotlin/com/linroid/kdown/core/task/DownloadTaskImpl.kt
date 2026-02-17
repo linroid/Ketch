@@ -18,7 +18,7 @@ internal class DownloadTaskImpl(
   override val state: StateFlow<DownloadState>,
   override val segments: StateFlow<List<Segment>>,
   private val pauseAction: suspend () -> Unit,
-  private val resumeAction: suspend () -> Unit,
+  private val resumeAction: suspend (String?) -> Unit,
   private val cancelAction: suspend () -> Unit,
   private val removeAction: suspend () -> Unit,
   private val setSpeedLimitAction: suspend (SpeedLimit) -> Unit,
@@ -30,8 +30,8 @@ internal class DownloadTaskImpl(
     pauseAction()
   }
 
-  override suspend fun resume() {
-    resumeAction()
+  override suspend fun resume(destPathOverride: String?) {
+    resumeAction(destPathOverride)
   }
 
   override suspend fun cancel() {

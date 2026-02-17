@@ -3,6 +3,7 @@ package com.linroid.kdown.server
 import com.linroid.kdown.api.DownloadProgress
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
+import com.linroid.kdown.api.Output
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.endpoints.model.ProgressResponse
 import com.linroid.kdown.endpoints.model.SegmentResponse
@@ -14,11 +15,15 @@ internal object TaskMapper {
   fun toResponse(task: DownloadTask): TaskResponse {
     val state = task.state.value
     val segments = task.segments.value
+
+    val output = task.request.output
+
     return TaskResponse(
       taskId = task.taskId,
       url = task.request.url,
-      directory = task.request.directory ?: "",
-      fileName = task.request.fileName,
+      directory = if (output is Output.DirectoryAndFile) output.directory ?: "" else null,
+      fileName = if (output is Output.DirectoryAndFile) output.fileName else null,
+      pathOrUri = if (output is Output.PathOrUri) output.path else null,
       state = stateToString(state),
       progress = extractProgress(state)?.let(::toProgressResponse),
       error = extractError(state),

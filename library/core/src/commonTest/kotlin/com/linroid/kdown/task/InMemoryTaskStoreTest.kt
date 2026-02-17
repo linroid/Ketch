@@ -5,7 +5,6 @@ import com.linroid.kdown.core.task.InMemoryTaskStore
 import com.linroid.kdown.core.task.TaskRecord
 import com.linroid.kdown.core.task.TaskState
 import kotlinx.coroutines.test.runTest
-import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -25,7 +24,7 @@ class InMemoryTaskStoreTest {
       connections = 4,
       headers = mapOf("Authorization" to "Bearer token"),
     ),
-    destPath = Path("/tmp/file.bin"),
+    destPath = "/tmp/file.bin",
     state = state,
     totalBytes = 1000,
     downloadedBytes = 0,

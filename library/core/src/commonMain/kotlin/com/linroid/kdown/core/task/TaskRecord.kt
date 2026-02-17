@@ -3,8 +3,6 @@ package com.linroid.kdown.core.task
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.core.engine.SourceResumeState
-import com.linroid.kdown.core.file.PathSerializer
-import kotlinx.io.files.Path
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
@@ -13,14 +11,13 @@ import kotlin.time.Instant
  * to restore a download after a process restart, including server info
  * fields used for resume validation and segment-level progress.
  *
- * This is the data model used by [com.linroid.kdown.TaskStore].
+ * This is the data model used by [com.linroid.kdown.core.task.TaskStore].
  */
 @Serializable
 data class TaskRecord(
   val taskId: String,
   val request: DownloadRequest,
-  @Serializable(with = PathSerializer::class)
-  val destPath: Path,
+  val destPath: String,
   val state: TaskState = TaskState.PENDING,
   val totalBytes: Long = -1,
   val downloadedBytes: Long = 0,

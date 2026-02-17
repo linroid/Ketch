@@ -18,8 +18,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CreateDownloadRequest(
   val url: String,
-  val directory: String,
+  val directory: String? = null,
   val fileName: String? = null,
+  val pathOrUri: String? = null,
   val connections: Int = 1,
   val headers: Map<String, String> = emptyMap(),
   val priority: String = "NORMAL",

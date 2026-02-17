@@ -23,8 +23,15 @@ interface DownloadTask {
   /** Pauses the download, preserving segment progress for later resume. */
   suspend fun pause()
 
-  /** Resumes a paused or failed download from where it left off. */
-  suspend fun resume()
+  /**
+   * Resumes a paused or failed download from where it left off.
+   *
+   * @param destPathOverride optionally update the destination task's path.
+   *   This can be useful if the destination is obtained through Android's
+   *   document provider framework, since the returned Uri can change
+   *   even when it's pointing to the same file.
+   */
+  suspend fun resume(destPathOverride: String? = null)
 
   /** Cancels the download. This is a terminal action. */
   suspend fun cancel()

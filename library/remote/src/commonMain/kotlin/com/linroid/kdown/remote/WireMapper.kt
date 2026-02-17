@@ -6,6 +6,7 @@ import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.FileSelectionMode
 import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.Output
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SourceFile
@@ -21,10 +22,21 @@ import kotlin.time.Instant
 internal object WireMapper {
 
   fun toDownloadRequest(wire: TaskResponse): DownloadRequest {
+    val output = when {
+        wire.directory != null -> {
+            Output.DirectoryAndFile(wire.directory, wire.fileName)
+        }
+        wire.pathOrUri != null -> {
+            Output.PathOrUri(wire.pathOrUri!!)
+        }
+        else -> {
+            throw IllegalStateException("Either directory or pathOrUri must be specified!")
+        }
+    }
+
     return DownloadRequest(
       url = wire.url,
-      directory = wire.directory,
-      fileName = wire.fileName,
+      output = output,
       connections = 1,
       speedLimit = if (wire.speedLimitBytesPerSecond > 0) {
         SpeedLimit.of(wire.speedLimitBytesPerSecond)
@@ -38,10 +50,13 @@ internal object WireMapper {
   fun toCreateWire(
     request: DownloadRequest,
   ): CreateDownloadRequest {
+    val output = request.output
+
     return CreateDownloadRequest(
       url = request.url,
-      directory = request.directory ?: "",
-      fileName = request.fileName,
+      directory = if (output is Output.DirectoryAndFile) output.directory ?: "" else null,
+      fileName = if (output is Output.DirectoryAndFile) output.fileName else null,
+      pathOrUri = if (output is Output.PathOrUri) output.path else null,
       connections = request.connections,
       headers = request.headers,
       priority = request.priority.name,

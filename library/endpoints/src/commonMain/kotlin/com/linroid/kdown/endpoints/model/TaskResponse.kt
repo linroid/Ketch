@@ -9,8 +9,9 @@ import kotlinx.serialization.Serializable
 data class TaskResponse(
   val taskId: String,
   val url: String,
-  val directory: String,
+  val directory: String? = null,
   val fileName: String? = null,
+  val pathOrUri: String? = null,
   val state: String,
   val progress: ProgressResponse? = null,
   val error: String? = null,

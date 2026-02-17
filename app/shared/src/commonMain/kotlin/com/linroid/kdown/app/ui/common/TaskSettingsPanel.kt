@@ -26,6 +26,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.kdown.api.DownloadTask
+import com.linroid.kdown.api.Output
 import com.linroid.kdown.app.util.formatBytes
 import com.linroid.kdown.app.util.priorityLabel
 
@@ -71,12 +72,21 @@ fun TaskSettingsPanel(
       verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
       CopyableInfoRow("URL", task.request.url)
-      if (task.request.directory != null) {
-        InfoRow("Directory", task.request.directory!!)
+
+      when (val output = task.request.output) {
+        is Output.DirectoryAndFile -> {
+          if (output.directory != null) {
+            InfoRow("Directory", output.directory!!)
+          }
+          if (output.fileName != null) {
+            InfoRow("File name", output.fileName!!)
+          }
+        }
+        is Output.PathOrUri -> {
+          InfoRow("Path or Uri", output.path)
+        }
       }
-      if (task.request.fileName != null) {
-        InfoRow("File name", task.request.fileName!!)
-      }
+
       InfoRow(
         "Connections",
         task.request.connections.toString()

@@ -1,6 +1,7 @@
 package com.linroid.kdown.core.file
 
 import com.linroid.kdown.api.DownloadRequest
+import com.linroid.kdown.api.Output
 import com.linroid.kdown.core.engine.ServerInfo
 
 /**
@@ -8,7 +9,7 @@ import com.linroid.kdown.core.engine.ServerInfo
  *
  * Implement this interface to customize how file names are determined from
  * the download request and server response headers. Implementations should
- * check [DownloadRequest.fileName] first and honour it when set.
+ * check [Output.DirectoryAndFile.fileName] first and honour it when set.
  */
 fun interface FileNameResolver {
   /**

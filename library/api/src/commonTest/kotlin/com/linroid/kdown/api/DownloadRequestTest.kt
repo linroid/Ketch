@@ -25,7 +25,9 @@ class DownloadRequestTest {
       url = "https://example.com/file",
       directory = "/tmp",
     )
-    assertNull(request.fileName)
+
+    assertTrue(request.output is Output.DirectoryAndFile)
+    assertNull(request.output.fileName)
   }
 
   @Test
@@ -35,7 +37,8 @@ class DownloadRequestTest {
       directory = "/tmp",
       fileName = "custom.zip",
     )
-    assertEquals("custom.zip", request.fileName)
+    assertTrue(request.output is Output.DirectoryAndFile)
+    assertEquals("custom.zip", request.output.fileName)
   }
 
   @Test
@@ -158,7 +161,8 @@ class DownloadRequestTest {
     val request = DownloadRequest(
       url = "https://example.com/file",
     )
-    assertNull(request.directory)
+    assertTrue(request.output is Output.DirectoryAndFile)
+    assertNull(request.output.directory)
   }
 
   // -- selectedFileIds --
