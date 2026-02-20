@@ -161,7 +161,6 @@ fun main(args: Array<String>) {
       url = url,
       directory = directory,
       fileName = fileName,
-      connections = config.maxConnections,
       speedLimit = speedLimit,
       priority = priority,
     )

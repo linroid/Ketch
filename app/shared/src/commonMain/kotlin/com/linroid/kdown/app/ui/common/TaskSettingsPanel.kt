@@ -79,7 +79,11 @@ fun TaskSettingsPanel(
       }
       InfoRow(
         "Connections",
-        task.request.connections.toString()
+        if (task.request.connections > 0) {
+          task.request.connections.toString()
+        } else {
+          "Auto"
+        }
       )
       if (segments.isNotEmpty()) {
         val completed = segments.count { it.isComplete }

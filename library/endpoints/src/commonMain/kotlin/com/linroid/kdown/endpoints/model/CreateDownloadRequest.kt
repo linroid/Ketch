@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
  * @property url the URL to download
  * @property directory the target directory path
  * @property fileName optional explicit file name
- * @property connections number of concurrent segments
+ * @property connections number of concurrent segments (0 = use config default)
  * @property headers custom HTTP headers
  * @property priority task priority level
  * @property speedLimitBytesPerSecond per-task speed limit (0 = unlimited)
@@ -20,7 +20,7 @@ data class CreateDownloadRequest(
   val url: String,
   val directory: String,
   val fileName: String? = null,
-  val connections: Int = 4,
+  val connections: Int = 0,
   val headers: Map<String, String> = emptyMap(),
   val priority: String = "NORMAL",
   val speedLimitBytesPerSecond: Long = 0,

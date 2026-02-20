@@ -175,16 +175,10 @@ class AppState(
   ) {
     scope.launch {
       runCatching {
-        val connections = if (resolvedUrl != null) {
-          resolvedUrl.maxSegments.coerceAtLeast(1)
-        } else {
-          4
-        }
         val request = DownloadRequest(
           url = url,
           directory = null,
           fileName = fileName.ifBlank { null },
-          connections = connections,
           speedLimit = speedLimit,
           priority = priority,
           schedule = schedule,

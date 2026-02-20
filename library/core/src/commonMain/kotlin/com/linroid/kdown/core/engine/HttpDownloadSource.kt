@@ -73,16 +73,19 @@ internal class HttpDownloadSource(
     val totalBytes = resolved.totalBytes
     if (totalBytes < 0) throw KDownError.Unsupported
 
+    val connections = if (context.request.connections > 0) {
+      context.request.connections
+    } else {
+      maxConnections
+    }
     val segments = if (
-      resolved.supportsResume && context.request.connections > 1
+      resolved.supportsResume && connections > 1
     ) {
       KDownLogger.i("HttpSource") {
-        "Server supports ranges. Using ${context.request.connections} " +
+        "Server supports ranges. Using $connections " +
           "connections, totalBytes=$totalBytes"
       }
-      SegmentCalculator.calculateSegments(
-        totalBytes, context.request.connections
-      )
+      SegmentCalculator.calculateSegments(totalBytes, connections)
     } else {
       KDownLogger.i("HttpSource") {
         "Single connection, totalBytes=$totalBytes"
