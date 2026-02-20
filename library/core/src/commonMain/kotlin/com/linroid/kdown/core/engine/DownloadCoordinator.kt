@@ -48,6 +48,7 @@ internal class DownloadCoordinator(
     var fileAccessor: FileAccessor?,
     var totalBytes: Long = 0,
     val taskLimiter: DelegatingSpeedLimiter = DelegatingSpeedLimiter(),
+    var context: DownloadContext? = null,
   )
 
   suspend fun start(
@@ -245,6 +246,9 @@ internal class DownloadCoordinator(
         request.headers,
         preResolved = if (resolved != null) resolvedUrl else null,
       )
+      mutex.withLock {
+        activeDownloads[taskId]?.context = context
+      }
 
       downloadWithRetry(taskId, context) {
         source.download(context)
@@ -447,6 +451,9 @@ internal class DownloadCoordinator(
       fileAccessor, segmentsFlow, stateFlow, taskLimiter,
       taskRecord.totalBytes, taskRecord.request.headers
     )
+    mutex.withLock {
+      activeDownloads[taskId]?.context = context
+    }
 
     try {
       downloadWithRetry(taskId, context) {
@@ -520,7 +527,7 @@ internal class DownloadCoordinator(
           KDownLogger.w("Coordinator") {
             "Rate limited (429). Retry attempt $retryCount " +
               "after ${delayMs}ms delay, connections=" +
-              "${context.maxConnections}"
+              "${context.maxConnections.value}"
           }
         } else {
           delayMs = config.retryDelayMs * (1 shl (retryCount - 1))
@@ -537,18 +544,21 @@ internal class DownloadCoordinator(
   /**
    * Halves the number of concurrent connections for a download task
    * that received HTTP 429 (Too Many Requests), with a minimum of 1.
+   * Emits the new value to [DownloadContext.maxConnections], triggering
+   * live resegmentation in [HttpDownloadSource].
    */
   private fun reduceConnections(
     taskId: String,
     context: DownloadContext,
   ) {
     val current = when {
-      context.maxConnections > 0 -> context.maxConnections
+      context.maxConnections.value > 0 ->
+        context.maxConnections.value
       context.request.connections > 0 -> context.request.connections
       else -> config.maxConnections
     }
     val reduced = (current / 2).coerceAtLeast(1)
-    context.maxConnections = reduced
+    context.maxConnections.value = reduced
     KDownLogger.w("Coordinator") {
       "Reducing connections for taskId=$taskId: " +
         "$current -> $reduced"
@@ -615,6 +625,11 @@ internal class DownloadCoordinator(
         request = it.request.copy(connections = connections),
         updatedAt = Clock.System.now(),
       )
+    }
+    // Live update — triggers resegmentation in HttpDownloadSource
+    mutex.withLock {
+      activeDownloads[taskId]?.context
+        ?.maxConnections?.value = connections
     }
     KDownLogger.i("Coordinator") {
       "Task connections updated for taskId=$taskId: $connections"
@@ -696,6 +711,9 @@ internal class DownloadCoordinator(
       },
       headers = headers,
       preResolved = preResolved,
+      maxConnections = MutableStateFlow(
+        request.connections.takeIf { it > 0 } ?: 0
+      ),
     )
   }
 

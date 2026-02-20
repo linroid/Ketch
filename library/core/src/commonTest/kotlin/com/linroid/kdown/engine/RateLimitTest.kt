@@ -108,4 +108,63 @@ class RateLimitTest {
       assertEquals(exp, connections)
     }
   }
+
+  @Test
+  fun resegmentOnConnectionReduction_mergesIncompleteSegments() {
+    // Simulate: 4 segments, 2 fully complete, 2 with some progress
+    // When reduced to 2 connections, should merge remaining incomplete bytes
+    val segments = listOf(
+      com.linroid.kdown.api.Segment(0, 0, 249, downloadedBytes = 250),
+      com.linroid.kdown.api.Segment(1, 250, 499, downloadedBytes = 250),
+      com.linroid.kdown.api.Segment(2, 500, 749, downloadedBytes = 0),
+      com.linroid.kdown.api.Segment(3, 750, 999, downloadedBytes = 0),
+    )
+
+    val newConnections = 2
+    val result = com.linroid.kdown.core.segment.SegmentCalculator.resegment(
+      segments, newConnections
+    )
+
+    // Should have 2 incomplete segments (merged remaining 500 bytes)
+    val incomplete = result.count { !it.isComplete }
+    assertEquals(2, incomplete, "Should have 2 incomplete segments after reduction to 2 connections")
+
+    // All progress should be preserved (500 bytes completed)
+    val completedBytes = result.filter { it.isComplete }
+      .sumOf { it.downloadedBytes }
+    assertEquals(500L, completedBytes, "Should preserve completed 500 bytes")
+
+    // Full file coverage maintained
+    val totalCovered = result.sumOf { it.totalBytes }
+    assertEquals(1000L, totalCovered, "Should cover full 1000 bytes")
+  }
+
+  @Test
+  fun resegmentOnConnectionReduction_preservesDownloadProgress() {
+    // 4 segments, each with partial progress -> reduce to 1 connection
+    // Should merge all incomplete ranges while preserving completed portions
+    val segments = listOf(
+      com.linroid.kdown.api.Segment(0, 0, 249, downloadedBytes = 250),
+      com.linroid.kdown.api.Segment(1, 250, 499, downloadedBytes = 0),
+      com.linroid.kdown.api.Segment(2, 500, 749, downloadedBytes = 0),
+      com.linroid.kdown.api.Segment(3, 750, 999, downloadedBytes = 0),
+    )
+
+    val result = com.linroid.kdown.core.segment.SegmentCalculator.resegment(
+      segments, 1
+    )
+
+    // One incomplete segment for remaining 750 bytes
+    val incomplete = result.count { !it.isComplete }
+    assertEquals(1, incomplete, "Should have 1 incomplete segment")
+
+    // All progress preserved: 250 bytes
+    val completedBytes = result.filter { it.isComplete }
+      .sumOf { it.downloadedBytes }
+    assertEquals(250L, completedBytes, "Should preserve 250 bytes of progress")
+
+    // Full coverage
+    val totalCovered = result.sumOf { it.totalBytes }
+    assertEquals(1000L, totalCovered, "Should cover full 1000 bytes")
+  }
 }

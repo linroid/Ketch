@@ -47,8 +47,9 @@ interface DownloadTask {
 
   /**
    * Updates the number of concurrent connections (segments) for this
-   * download task. Takes effect on the next resume or restart — the
-   * download is not re-segmented while actively running.
+   * download task. Takes effect immediately on active downloads —
+   * segments are dynamically merged or split to match the new
+   * connection count while preserving completed progress.
    *
    * @param connections the new connection count, must be greater than 0
    */
