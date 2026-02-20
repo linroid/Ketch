@@ -4,7 +4,6 @@ import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.api.config.DownloadConfig
-import com.linroid.kdown.api.config.ServerConfig
 import com.linroid.kdown.api.config.QueueConfig
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
@@ -90,35 +89,6 @@ class ServerRoutesTest {
     assertEquals(
       2,
       status.config.queueConfig.maxConnectionsPerHost,
-    )
-  }
-
-  @Test
-  fun `status includes server config`() = testApplication {
-    val serverConfig = ServerConfig(
-      host = "127.0.0.1",
-      port = 9090,
-      apiToken = null,
-      mdnsEnabled = false,
-      corsAllowedHosts = listOf("http://localhost:3000"),
-    )
-    application {
-      val server = createTestServer(config = serverConfig)
-      with(server) { configureServer() }
-    }
-    val response = client.get("/api/status")
-    val status = json.decodeFromString<KDownStatus>(
-      response.bodyAsText()
-    )
-    val srv = status.server
-    assertNotNull(srv)
-    assertEquals("127.0.0.1", srv.host)
-    assertEquals(9090, srv.port)
-    assertEquals(false, srv.authEnabled)
-    assertEquals(false, srv.mdnsEnabled)
-    assertEquals(
-      listOf("http://localhost:3000"),
-      srv.corsAllowedHosts,
     )
   }
 

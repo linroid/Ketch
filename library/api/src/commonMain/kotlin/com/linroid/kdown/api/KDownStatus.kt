@@ -12,7 +12,6 @@ import kotlinx.serialization.Serializable
  * @property revision build revision (git short hash)
  * @property uptime seconds since the instance started
  * @property config current download configuration (with runtime speed limit)
- * @property server server network configuration (null for embedded-only)
  * @property system host system and storage information
  */
 @Serializable
@@ -22,26 +21,7 @@ data class KDownStatus(
   val revision: String,
   val uptime: Long,
   val config: DownloadConfig,
-  val server: ServerStatus? = null,
   val system: SystemInfo,
-)
-
-/**
- * Sanitized server status (no secrets exposed).
- *
- * @property host bind address
- * @property port listen port
- * @property authEnabled whether bearer-token auth is active
- * @property corsAllowedHosts allowed CORS origins
- * @property mdnsEnabled whether mDNS/DNS-SD registration is active
- */
-@Serializable
-data class ServerStatus(
-  val host: String,
-  val port: Int,
-  val authEnabled: Boolean,
-  val corsAllowedHosts: List<String>,
-  val mdnsEnabled: Boolean,
 )
 
 /**

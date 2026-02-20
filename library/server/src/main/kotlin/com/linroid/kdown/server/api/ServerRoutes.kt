@@ -1,9 +1,7 @@
 package com.linroid.kdown.server.api
 
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.ServerStatus
 import com.linroid.kdown.api.config.DownloadConfig
-import com.linroid.kdown.api.config.ServerConfig
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.ResolveUrlRequest
 import com.linroid.kdown.endpoints.model.ResolveUrlResponse
@@ -19,22 +17,9 @@ import io.ktor.server.routing.Route
  * Installs server-level endpoints: status, global speed limit,
  * and URL resolution.
  */
-internal fun Route.serverRoutes(
-  kdown: KDownApi,
-  serverConfig: ServerConfig,
-) {
+internal fun Route.serverRoutes(kdown: KDownApi) {
   get<Api.Status> {
-    val base = kdown.status()
-    val withServer = base.copy(
-      server = ServerStatus(
-        host = serverConfig.host,
-        port = serverConfig.port,
-        authEnabled = serverConfig.apiToken != null,
-        corsAllowedHosts = serverConfig.corsAllowedHosts,
-        mdnsEnabled = serverConfig.mdnsEnabled,
-      ),
-    )
-    call.respond(withServer)
+    call.respond(kdown.status())
   }
 
   put<Api.Config> {

@@ -100,16 +100,6 @@
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.kdown.api.ServerStatus",
-    "allDeclaredFields": true,
-    "allDeclaredMethods": true,
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "com.linroid.kdown.api.ServerStatus$Companion",
-    "allDeclaredMethods": true
-  },
-  {
     "name": "com.linroid.kdown.api.SystemInfo",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,

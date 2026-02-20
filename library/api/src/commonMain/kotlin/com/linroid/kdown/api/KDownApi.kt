@@ -44,12 +44,8 @@ interface KDownApi {
   suspend fun start()
 
   /**
-   * Returns a point-in-time status snapshot including task counts,
+   * Returns a point-in-time status snapshot including
    * configuration, system information, and storage details.
-   *
-   * For embedded backends, [KDownStatus.server] is `null` unless
-   * a daemon server is attached. Remote backends return the full
-   * status from the server.
    */
   suspend fun status(): KDownStatus
 
