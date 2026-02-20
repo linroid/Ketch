@@ -317,7 +317,7 @@ internal class HttpDownloadSource(
 
         // Watcher: detect connection count changes and trigger
         // resegmentation by canceling the scope
-        launch {
+        val watcherJob = launch {
           val currentCount = incompleteSegments.size
           context.maxConnections.first { count ->
             count > 0 && count != currentCount
@@ -366,6 +366,7 @@ internal class HttpDownloadSource(
           }
           results.awaitAll()
         } finally {
+          watcherJob.cancel()
           saveJob.cancel()
         }
 
