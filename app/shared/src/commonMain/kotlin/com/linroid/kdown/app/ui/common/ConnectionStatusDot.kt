@@ -22,6 +22,8 @@ fun ConnectionStatusDot(state: ConnectionState) {
       MaterialTheme.colorScheme.secondary
     is ConnectionState.Disconnected ->
       MaterialTheme.colorScheme.error
+    is ConnectionState.Unauthorized ->
+      MaterialTheme.colorScheme.error
   }
   Box(
     modifier = Modifier
@@ -60,6 +62,11 @@ fun ConnectionStatusChip(
         MaterialTheme.colorScheme.onSurfaceVariant
       )
     }
+    is ConnectionState.Unauthorized -> Triple(
+      "Unauthorized",
+      MaterialTheme.colorScheme.errorContainer,
+      MaterialTheme.colorScheme.onErrorContainer
+    )
   }
   Box(
     modifier = Modifier

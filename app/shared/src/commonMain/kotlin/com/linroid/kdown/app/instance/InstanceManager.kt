@@ -125,6 +125,30 @@ class InstanceManager(
   }
 
   /**
+   * Replace [old] with a new remote instance that uses
+   * [token] for authentication, then start the connection.
+   */
+  suspend fun reconnectWithToken(
+    old: RemoteInstance,
+    token: String,
+  ) {
+    old.instance.close()
+    val replacement = factory.createRemote(
+      host = old.host,
+      port = old.port,
+      token = token,
+    )
+    _instances.value = _instances.value.map {
+      if (it === old) replacement else it
+    }
+    if (_activeInstance.value === old) {
+      _activeApi.value = replacement.instance
+      _activeInstance.value = replacement
+      replacement.instance.start()
+    }
+  }
+
+  /**
    * Add a remote server to the instance list.
    * Does NOT activate it -- call [switchTo] afterward.
    */

@@ -116,11 +116,28 @@ class AppState(
   private var discoveryJob: Job? = null
   var switchingInstance by
     mutableStateOf<InstanceEntry?>(null)
+  var unauthorizedInstance by
+    mutableStateOf<RemoteInstance?>(null)
   var resolveState by mutableStateOf<ResolveState>(
     ResolveState.Idle
   )
     private set
   private var resolvingUrl: String? = null
+
+  init {
+    scope.launch {
+      connectionState.collect { state ->
+        if (state is ConnectionState.Unauthorized) {
+          val instance =
+            activeInstance.value as? RemoteInstance
+          if (instance != null) {
+            unauthorizedInstance = instance
+            showAddRemoteDialog = true
+          }
+        }
+      }
+    }
+  }
 
   fun resolveUrl(url: String) {
     resolvingUrl = url
@@ -282,6 +299,21 @@ class AppState(
         if (task.state.value is DownloadState.Completed) {
           task.remove()
         }
+      }
+    }
+  }
+
+  fun reconnectWithToken(
+    instance: RemoteInstance,
+    token: String,
+  ) {
+    unauthorizedInstance = null
+    scope.launch {
+      try {
+        instanceManager.reconnectWithToken(instance, token)
+      } catch (e: Exception) {
+        errorMessage =
+          "Failed to reconnect: ${e.message}"
       }
     }
   }

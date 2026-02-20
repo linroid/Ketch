@@ -40,9 +40,11 @@ fun AddRemoteServerDialog(
   onDiscover: (port: Int) -> Unit,
   onStopDiscovery: () -> Unit,
   onAdd: (host: String, port: Int, token: String?) -> Unit,
+  initialHost: String = "",
+  initialPort: String = "8642",
 ) {
-  var host by remember { mutableStateOf("") }
-  var port by remember { mutableStateOf("8642") }
+  var host by remember { mutableStateOf(initialHost) }
+  var port by remember { mutableStateOf(initialPort) }
   var token by remember { mutableStateOf("") }
   val isValidHost = host.isNotBlank()
   val isValidPort = port.toIntOrNull()?.let {
