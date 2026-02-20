@@ -91,6 +91,7 @@ class KDownService : Service() {
         },
       ),
       initialRemotes = config.remote,
+      configStore = configStore,
     )
     createNotificationChannel()
     startForegroundMonitor()

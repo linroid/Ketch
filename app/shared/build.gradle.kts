@@ -42,6 +42,8 @@ kotlin {
       implementation(projects.library.remote)
       implementation(projects.library.ktor)
       implementation(libs.kotlinx.coroutines.core)
+      implementation(libs.kotlinx.io.core)
+      implementation(libs.ktoml.core)
       implementation(libs.compose.runtime)
       implementation(libs.compose.foundation)
       implementation(libs.compose.material3)

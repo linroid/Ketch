@@ -1,5 +1,6 @@
 package com.linroid.kdown.cli
 
+import com.akuleshov7.ktoml.Toml
 import com.linroid.kdown.api.config.KDownConfig
 import com.linroid.kdown.server.KDownServerConfig
 import java.io.File
@@ -18,7 +19,7 @@ fun loadConfig(path: String): KDownConfig {
   if (!file.exists()) {
     throw IllegalArgumentException("Config file not found: $path")
   }
-  return KDownConfig.fromToml(file.readText())
+  return Toml.decodeFromString(KDownConfig.serializer(), file.readText())
 }
 
 fun defaultConfigPath(): String {

@@ -1,6 +1,7 @@
 package com.linroid.kdown.app.instance
 
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.config.RemoteConfig
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.remote.ConnectionState
 import com.linroid.kdown.remote.RemoteKDown
@@ -19,6 +20,7 @@ data class EmbeddedInstance(
 data class RemoteInstance(
   override val instance: RemoteKDown,
   override val label: String,
+  val remoteConfig: RemoteConfig,
 ) : InstanceEntry {
   val host: String get() = instance.host
   val port: Int get() = instance.port

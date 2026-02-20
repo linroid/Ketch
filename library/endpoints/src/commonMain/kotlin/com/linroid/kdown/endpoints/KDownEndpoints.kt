@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  *
  * ### Server
  * - `GET  /api/status`       — server health and task counts
- * - `PUT  /api/speed-limit`  — set global speed limit
+ * - `PUT  /api/config`       — update download configuration
  * - `POST /api/resolve`      — resolve URL metadata without downloading
  *
  * ### Tasks
@@ -40,8 +40,8 @@ class Api {
   data class Status(val parent: Api = Api())
 
   @Serializable
-  @Resource("speed-limit")
-  data class SpeedLimit(val parent: Api = Api())
+  @Resource("config")
+  data class Config(val parent: Api = Api())
 
   @Serializable
   @Resource("resolve")

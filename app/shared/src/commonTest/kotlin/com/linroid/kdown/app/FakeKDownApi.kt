@@ -5,7 +5,7 @@ import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.ResolvedSource
-import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.api.config.DownloadConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +27,7 @@ class FakeKDownApi(
     private set
   var downloadCallCount = 0
     private set
-  var lastSpeedLimit: SpeedLimit? = null
+  var lastConfig: DownloadConfig? = null
     private set
 
   override suspend fun download(
@@ -54,8 +54,8 @@ class FakeKDownApi(
     )
   }
 
-  override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {
-    lastSpeedLimit = limit
+  override suspend fun updateConfig(config: DownloadConfig) {
+    lastConfig = config
   }
 
   override suspend fun start() {}

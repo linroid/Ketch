@@ -22,6 +22,7 @@ fun main() {
       InstanceManager(
         factory = InstanceFactory(),
         initialRemotes = config.remote,
+        configStore = configStore,
       )
     }
     val scope = rememberCoroutineScope()

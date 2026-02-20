@@ -10,7 +10,6 @@ import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.KDownStatus
-import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.api.TaskStats
 import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.core.engine.DelegatingSpeedLimiter
@@ -76,7 +75,7 @@ class KDown(
 ) : KDownApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
-  private var currentSpeedLimit: SpeedLimit = config.speedLimit
+  private var currentConfig: DownloadConfig = config
 
   private val globalLimiter = DelegatingSpeedLimiter(
     if (config.speedLimit.isUnlimited) {
@@ -313,7 +312,7 @@ class KDown(
           it.state.value is DownloadState.Canceled
         },
       ),
-      config = config.copy(speedLimit = currentSpeedLimit),
+      config = currentConfig,
       system = currentSystemInfo(),
       storage = currentStorageInfo(config.defaultDirectory),
     )
@@ -516,15 +515,11 @@ class KDown(
     }
   }
 
-  /**
-   * Updates the global speed limit applied across all downloads.
-   * Takes effect immediately on all active downloads.
-   *
-   * @param limit the new global speed limit, or
-   *   [SpeedLimit.Unlimited]
-   */
-  override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {
-    currentSpeedLimit = limit
+  override suspend fun updateConfig(config: DownloadConfig) {
+    currentConfig = config
+
+    // Apply speed limit
+    val limit = config.speedLimit
     val current = globalLimiter.delegate
     if (limit.isUnlimited) {
       globalLimiter.delegate = SpeedLimiter.Unlimited
@@ -533,10 +528,11 @@ class KDown(
     } else {
       globalLimiter.delegate = TokenBucket(limit.bytesPerSecond)
     }
-    KDownLogger.i("KDown") {
-      "Global speed limit updated: " +
-        "${limit.bytesPerSecond} bytes/sec"
-    }
+
+    // Apply queue config
+    scheduler.queueConfig = config.queueConfig
+
+    KDownLogger.i("KDown") { "Config updated: $config" }
   }
 
   override fun close() {

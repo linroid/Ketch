@@ -2,10 +2,10 @@ package com.linroid.kdown.server
 
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownStatus
+import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.endpoints.model.CreateDownloadRequest
-import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import com.linroid.kdown.endpoints.model.TaskResponse
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
@@ -219,7 +219,7 @@ class ServerRoutesTest {
   }
 
   @Test
-  fun `PUT global speed-limit succeeds`() = testApplication {
+  fun `PUT config updates speed limit`() = testApplication {
     application {
       val server = createTestServer()
       with(server) { configureServer() }
@@ -227,19 +227,22 @@ class ServerRoutesTest {
     val client = createClient {
       install(ContentNegotiation) { json(json) }
     }
-    val response = client.put("/api/speed-limit") {
+    val newConfig = DownloadConfig(
+      speedLimit = SpeedLimit.of(512000),
+    )
+    val response = client.put("/api/config") {
       contentType(ContentType.Application.Json)
-      setBody(SpeedLimitRequest(bytesPerSecond = 512000))
+      setBody(newConfig)
     }
     assertEquals(HttpStatusCode.OK, response.status)
-    val body = json.decodeFromString<SpeedLimitRequest>(
+    val body = json.decodeFromString<DownloadConfig>(
       response.bodyAsText()
     )
-    assertEquals(512000L, body.bytesPerSecond)
+    assertEquals(512000L, body.speedLimit.bytesPerSecond)
   }
 
   @Test
-  fun `PUT global speed-limit with zero means unlimited`() =
+  fun `PUT config with unlimited speed limit`() =
     testApplication {
       application {
         val server = createTestServer()
@@ -248,9 +251,12 @@ class ServerRoutesTest {
       val client = createClient {
         install(ContentNegotiation) { json(json) }
       }
-      val response = client.put("/api/speed-limit") {
+      val newConfig = DownloadConfig(
+        speedLimit = SpeedLimit.Unlimited,
+      )
+      val response = client.put("/api/config") {
         contentType(ContentType.Application.Json)
-        setBody(SpeedLimitRequest(bytesPerSecond = 0))
+        setBody(newConfig)
       }
       assertEquals(HttpStatusCode.OK, response.status)
     }

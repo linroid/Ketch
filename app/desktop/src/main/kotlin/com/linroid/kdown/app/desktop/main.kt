@@ -56,6 +56,7 @@ fun main() = application {
         }
       ),
       initialRemotes = config.remote,
+      configStore = configStore,
     )
   }
   DisposableEffect(Unit) {

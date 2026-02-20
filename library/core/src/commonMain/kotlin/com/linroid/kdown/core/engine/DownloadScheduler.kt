@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
 
 internal class DownloadScheduler(
-  private val queueConfig: QueueConfig,
+  internal var queueConfig: QueueConfig,
   private val coordinator: DownloadCoordinator,
   private val scope: CoroutineScope,
 ) {

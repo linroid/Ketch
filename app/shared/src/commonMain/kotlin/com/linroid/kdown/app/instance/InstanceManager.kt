@@ -5,8 +5,9 @@ import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.ResolvedSource
-import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.api.config.RemoteConfig
+import com.linroid.kdown.app.config.ConfigStore
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.remote.RemoteKDown
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +35,7 @@ import kotlinx.coroutines.launch
 class InstanceManager(
   private val factory: InstanceFactory,
   initialRemotes: List<RemoteConfig> = emptyList(),
+  private val configStore: ConfigStore? = null,
 ) {
   private val scope = CoroutineScope(
     SupervisorJob() + Dispatchers.Default,
@@ -155,6 +157,7 @@ class InstanceManager(
       _activeInstance.value = replacement
       replacement.instance.start()
     }
+    persistRemotes()
   }
 
   /**
@@ -168,6 +171,7 @@ class InstanceManager(
   ): RemoteInstance {
     val instance = factory.createRemote(host, port, token)
     _instances.value += instance
+    persistRemotes()
     return instance
   }
 
@@ -194,6 +198,7 @@ class InstanceManager(
       }
     }
     _instances.value = _instances.value.filter { it != instance }
+    persistRemotes()
   }
 
   /** Close the active instance and release all resources. */
@@ -207,6 +212,15 @@ class InstanceManager(
     factory.stopServer()
     embeddedInstance?.instance?.close()
     scope.cancel()
+  }
+
+  private fun persistRemotes() {
+    val store = configStore ?: return
+    val remotes = _instances.value
+      .filterIsInstance<RemoteInstance>()
+      .map { it.remoteConfig }
+    val current = store.load()
+    store.save(current.copy(remote = remotes))
   }
 }
 
@@ -243,7 +257,7 @@ private object DisconnectedApi : KDownApi {
     )
   }
 
-  override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {}
+  override suspend fun updateConfig(config: DownloadConfig) {}
   override suspend fun start() {}
   override fun close() {}
 }

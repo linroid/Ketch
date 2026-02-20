@@ -2,12 +2,11 @@ package com.linroid.kdown.server.api
 
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.ServerConfig
-import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.ResolveUrlRequest
 import com.linroid.kdown.endpoints.model.ResolveUrlResponse
 import com.linroid.kdown.endpoints.model.SourceFileResponse
-import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import com.linroid.kdown.server.KDownServerConfig
 import io.ktor.server.request.receive
 import io.ktor.server.resources.get
@@ -38,14 +37,9 @@ internal fun Route.serverRoutes(
     call.respond(withServer)
   }
 
-  put<Api.SpeedLimit> {
-    val body = call.receive<SpeedLimitRequest>()
-    val limit = if (body.bytesPerSecond > 0) {
-      SpeedLimit.of(body.bytesPerSecond)
-    } else {
-      SpeedLimit.Unlimited
-    }
-    kdown.setGlobalSpeedLimit(limit)
+  put<Api.Config> {
+    val body = call.receive<DownloadConfig>()
+    kdown.updateConfig(body)
     call.respond(body)
   }
 

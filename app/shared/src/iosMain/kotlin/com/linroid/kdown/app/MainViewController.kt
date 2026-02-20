@@ -16,13 +16,14 @@ import platform.UIKit.UIDevice
 @Suppress("unused", "FunctionName")
 fun MainViewController() = ComposeUIViewController {
   val instanceManager = remember {
-    val configStore = FileConfigStore()
-    val config = configStore.load()
-    val taskStore = createSqliteTaskStore(DriverFactory())
     @Suppress("UNCHECKED_CAST")
-    val downloadsDir = (NSSearchPathForDirectoriesInDomains(
+    val docsDir = (NSSearchPathForDirectoriesInDomains(
       NSDocumentDirectory, NSUserDomainMask, true,
     ) as List<String>).first()
+    val configStore = FileConfigStore("$docsDir/config.toml")
+    val config = configStore.load()
+    val taskStore = createSqliteTaskStore(DriverFactory())
+    val downloadsDir = docsDir
     val downloadConfig = config.download.copy(
       defaultDirectory = config.download.defaultDirectory
         .takeIf { it != "downloads" }
@@ -35,6 +36,7 @@ fun MainViewController() = ComposeUIViewController {
         deviceName = UIDevice.currentDevice.name,
       ),
       initialRemotes = config.remote,
+      configStore = configStore,
     )
   }
   DisposableEffect(Unit) {

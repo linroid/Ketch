@@ -2,6 +2,7 @@ package com.linroid.kdown.app.instance
 
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.config.DownloadConfig
+import com.linroid.kdown.api.config.RemoteConfig
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.core.task.TaskStore
@@ -60,15 +61,25 @@ class InstanceFactory(
     )
   }
 
+  /** Create a remote instance from a [RemoteConfig]. */
+  fun createRemote(config: RemoteConfig): RemoteInstance {
+    return RemoteInstance(
+      instance = RemoteKDown(
+        config.host, config.port, config.apiToken, config.secure,
+      ),
+      label = "${config.host}:${config.port}",
+      remoteConfig = config,
+    )
+  }
+
   /** Create a remote instance for the given host/port/token. */
   fun createRemote(
     host: String,
     port: Int = 8642,
     token: String? = null,
   ): RemoteInstance {
-    return RemoteInstance(
-      instance = RemoteKDown(host, port, token),
-      label = "$host:$port",
+    return createRemote(
+      RemoteConfig(host = host, port = port, apiToken = token),
     )
   }
 

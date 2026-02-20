@@ -5,12 +5,11 @@ import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.KDownStatus
-import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.CreateDownloadRequest
 import com.linroid.kdown.endpoints.model.ResolveUrlRequest
 import com.linroid.kdown.endpoints.model.ResolveUrlResponse
-import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import com.linroid.kdown.endpoints.model.TaskEvent
 import com.linroid.kdown.endpoints.model.TaskResponse
 import io.ktor.client.HttpClient
@@ -158,13 +157,12 @@ class RemoteKDown(
     return json.decodeFromString(response.bodyAsText())
   }
 
-  override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {
-    val response = httpClient.put(Api.SpeedLimit()) {
+  override suspend fun updateConfig(config: DownloadConfig) {
+    val response = httpClient.put(Api.Config()) {
       contentType(ContentType.Application.Json)
       setBody(
         json.encodeToString(
-          SpeedLimitRequest.serializer(),
-          SpeedLimitRequest(limit.bytesPerSecond)
+          DownloadConfig.serializer(), config
         )
       )
     }
