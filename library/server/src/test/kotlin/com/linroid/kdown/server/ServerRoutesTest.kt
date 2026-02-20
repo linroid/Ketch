@@ -1,9 +1,10 @@
 package com.linroid.kdown.server
 
+import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.endpoints.model.CreateDownloadRequest
-import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import com.linroid.kdown.endpoints.model.TaskResponse
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -41,7 +42,7 @@ class ServerRoutesTest {
     val status = json.decodeFromString<KDownStatus>(
       response.bodyAsText()
     )
-    assertEquals("1.0.0", status.version)
+    assertEquals(KDownApi.VERSION, status.version)
     assertNotNull(status.revision)
   }
 

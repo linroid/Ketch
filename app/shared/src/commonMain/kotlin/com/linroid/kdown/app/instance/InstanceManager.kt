@@ -4,7 +4,6 @@ import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownStatus
-import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.core.KDown
@@ -204,16 +203,13 @@ class InstanceManager(
 
 /**
  * Placeholder [KDownApi] used when no instance is connected.
- * Returns empty tasks and a default version. Download requests
- * throw -- the UI should prompt to add a remote server first.
+ * Returns empty tasks. Download requests throw -- the UI should
+ * prompt to add a remote server first.
  */
 private object DisconnectedApi : KDownApi {
   override val backendLabel = "Not connected"
   override val tasks =
     MutableStateFlow(emptyList<DownloadTask>())
-  override val version = MutableStateFlow(
-    KDownVersion(KDownVersion.DEFAULT, KDownVersion.DEFAULT),
-  )
 
   override suspend fun download(
     request: DownloadRequest,
@@ -232,13 +228,13 @@ private object DisconnectedApi : KDownApi {
     )
   }
 
-  override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {}
-  override suspend fun start() {}
   override suspend fun status(): KDownStatus {
     throw IllegalStateException(
       "No instance connected. Add a remote server first.",
     )
   }
 
+  override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {}
+  override suspend fun start() {}
   override fun close() {}
 }

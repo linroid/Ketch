@@ -3,7 +3,6 @@ package com.linroid.kdown.remote
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.SpeedLimit
@@ -90,10 +89,6 @@ class RemoteKDown(
   private val _connectionState = MutableStateFlow<ConnectionState>(
     ConnectionState.Disconnected("Not started")
   )
-
-  private val _version = MutableStateFlow(KDownVersion(KDownVersion.DEFAULT, "unknown"))
-
-  override val version: StateFlow<KDownVersion> = _version.asStateFlow()
 
   val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 

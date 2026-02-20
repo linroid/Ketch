@@ -3,7 +3,7 @@ package com.linroid.kdown.app
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,11 +20,6 @@ class FakeKDownApi(
 
   private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
   override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
-
-  private val _version = MutableStateFlow(
-    KDownVersion(KDownVersion.DEFAULT, KDownVersion.DEFAULT)
-  )
-  override val version: StateFlow<KDownVersion> = _version.asStateFlow()
 
   var closed = false
     private set
@@ -50,6 +45,12 @@ class FakeKDownApi(
   ): ResolvedSource {
     throw UnsupportedOperationException(
       "FakeKDownApi does not support resolve"
+    )
+  }
+
+  override suspend fun status(): KDownStatus {
+    throw UnsupportedOperationException(
+      "FakeKDownApi does not support status"
     )
   }
 

@@ -7,7 +7,6 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownError
-import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.KDownStatus
@@ -103,7 +102,7 @@ class KDown(
 
   init {
     KDownLogger.setLogger(logger)
-    KDownLogger.i("KDown") { "KDown v${KDownVersion.DEFAULT} initialized" }
+    KDownLogger.i("KDown") { "KDown v${KDownApi.VERSION} initialized" }
     if (!config.speedLimit.isUnlimited) {
       KDownLogger.i("KDown") {
         "Global speed limit: " +
@@ -147,9 +146,6 @@ class KDown(
 
   /** Observable list of all download tasks. */
   override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
-
-  override val version: StateFlow<KDownVersion> =
-    MutableStateFlow(KDownVersion(KDownVersion.DEFAULT, KDownVersion.DEFAULT))
 
   /**
    * Starts a new download and adds it to the [tasks] flow.
@@ -286,8 +282,8 @@ class KDown(
   override suspend fun status(): KDownStatus {
     val taskList = tasks.value
     return KDownStatus(
-      version = KDownVersion.DEFAULT,
-      revision = KDownVersion.REVISION,
+      version = KDownApi.VERSION,
+      revision = KDownApi.REVISION,
       uptime = startMark.elapsedNow().inWholeSeconds,
       tasks = TaskStats(
         total = taskList.size,
