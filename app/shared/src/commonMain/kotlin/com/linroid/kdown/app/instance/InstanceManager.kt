@@ -3,6 +3,7 @@ package com.linroid.kdown.app.instance
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
@@ -233,5 +234,11 @@ private object DisconnectedApi : KDownApi {
 
   override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {}
   override suspend fun start() {}
+  override suspend fun status(): KDownStatus {
+    throw IllegalStateException(
+      "No instance connected. Add a remote server first.",
+    )
+  }
+
   override fun close() {}
 }

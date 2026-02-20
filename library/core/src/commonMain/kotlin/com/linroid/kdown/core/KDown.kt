@@ -525,7 +525,7 @@ class KDown(
    * Takes effect immediately on all active downloads.
    *
    * @param limit the new global speed limit, or
-   *   [com.linroid.kdown.api.SpeedLimit.Unlimited]
+   *   [SpeedLimit.Unlimited]
    */
   override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {
     currentSpeedLimit = limit
