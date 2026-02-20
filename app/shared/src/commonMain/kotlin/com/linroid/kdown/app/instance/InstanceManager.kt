@@ -6,6 +6,7 @@ import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.api.config.RemoteConfig
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.remote.RemoteKDown
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,7 @@ import kotlinx.coroutines.launch
  */
 class InstanceManager(
   private val factory: InstanceFactory,
+  initialRemotes: List<RemoteConfig> = emptyList(),
 ) {
   private val scope = CoroutineScope(
     SupervisorJob() + Dispatchers.Default,
@@ -71,6 +73,13 @@ class InstanceManager(
     _serverState.asStateFlow()
 
   init {
+    for (remote in initialRemotes) {
+      addRemote(
+        host = remote.host,
+        port = remote.port,
+        token = remote.apiToken,
+      )
+    }
     embeddedInstance?.instance?.let { kdown ->
       scope.launch { kdown.start() }
     }

@@ -11,6 +11,7 @@ import android.os.Environment
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.linroid.kdown.app.config.FileConfigStore
 import com.linroid.kdown.app.instance.InstanceFactory
 import com.linroid.kdown.app.instance.InstanceManager
 import com.linroid.kdown.app.instance.LocalServerHandle
@@ -49,14 +50,23 @@ class KDownService : Service() {
 
   override fun onCreate() {
     super.onCreate()
+    val configStore = FileConfigStore(
+      filesDir.resolve("config.toml").absolutePath,
+    )
+    val config = configStore.load()
     val taskStore = createSqliteTaskStore(DriverFactory(this))
     val downloadsDir = Environment
       .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
       .absolutePath
+    val downloadConfig = config.download.copy(
+      defaultDirectory = config.download.defaultDirectory
+        .takeIf { it != "downloads" }
+        ?: downloadsDir,
+    )
     instanceManager = InstanceManager(
-      InstanceFactory(
+      factory = InstanceFactory(
         taskStore = taskStore,
-        defaultDirectory = downloadsDir,
+        downloadConfig = downloadConfig,
         deviceName = android.os.Build.MODEL,
         localServerFactory = { port, apiToken, kdownApi ->
           KDownLogger.i(TAG) { "Starting local server on port $port" }
@@ -80,6 +90,7 @@ class KDownService : Service() {
           }
         },
       ),
+      initialRemotes = config.remote,
     )
     createNotificationChannel()
     startForegroundMonitor()

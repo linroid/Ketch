@@ -2,7 +2,6 @@ package com.linroid.kdown.app.instance
 
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.config.DownloadConfig
-import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.core.task.TaskStore
@@ -30,9 +29,12 @@ import com.linroid.kdown.remote.RemoteKDown
 class InstanceFactory(
   taskStore: TaskStore? = null,
   defaultDirectory: String = "downloads",
+  downloadConfig: DownloadConfig = DownloadConfig(
+    defaultDirectory = defaultDirectory,
+  ),
   val deviceName: String = "Embedded",
   private val embeddedFactory: (() -> KDown)? = taskStore?.let { ts ->
-    { createDefaultEmbeddedKDown(ts, defaultDirectory) }
+    { createDefaultEmbeddedKDown(ts, downloadConfig) }
   },
   private val localServerFactory:
     ((port: Int, apiToken: String?, KDownApi) -> LocalServerHandle)? = null,
@@ -95,22 +97,12 @@ class InstanceFactory(
 
 private fun createDefaultEmbeddedKDown(
   taskStore: TaskStore,
-  defaultDirectory: String,
+  config: DownloadConfig,
 ): KDown {
   return KDown(
     httpEngine = KtorHttpEngine(),
     taskStore = taskStore,
-    config = DownloadConfig(
-      defaultDirectory = defaultDirectory,
-      maxConnections = 4,
-      retryCount = 3,
-      retryDelayMs = 1000,
-      progressUpdateIntervalMs = 200,
-      queueConfig = QueueConfig(
-        maxConcurrentDownloads = 3,
-        maxConnectionsPerHost = 4,
-      )
-    ),
+    config = config,
     logger = Logger.console(),
   )
 }

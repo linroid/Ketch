@@ -7,6 +7,7 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.api.config.DownloadConfig
+import com.linroid.kdown.api.config.KDownConfig
 import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.core.log.LogLevel
@@ -21,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.files.Path
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.util.Locale
 
 /** KDown library log level, derived from CLI flags. */
 private var kdownLogLevel = LogLevel.INFO
@@ -60,7 +62,7 @@ fun main(args: Array<String>) {
           printUsage()
           return
         }
-        speedLimit = parseSpeedLimit(remaining[i + 1]) ?: run {
+        speedLimit = SpeedLimit.parse(remaining[i + 1]) ?: run {
           println("Error: invalid speed limit '${remaining[i + 1]}'")
           println()
           printUsage()
@@ -347,7 +349,7 @@ private fun runServer(args: Array<String>) {
           printServerUsage()
           return
         }
-        cliSpeedLimit = parseSpeedLimit(args[++i]) ?: run {
+        cliSpeedLimit = SpeedLimit.parse(args[++i]) ?: run {
           System.err.println("Error: invalid speed limit '${args[i]}'")
           printServerUsage()
           return
@@ -384,11 +386,13 @@ private fun runServer(args: Array<String>) {
         return
       }
     } else {
-      CliConfig()
+      KDownConfig()
     }
   }
 
   // CLI flags override config file values
+  val defaultDownloadDir = System.getProperty("user.home") +
+    File.separator + "Downloads"
   val mergedConfig = fileConfig.copy(
     server = fileConfig.server.copy(
       host = cliHost ?: fileConfig.server.host,
@@ -398,17 +402,16 @@ private fun runServer(args: Array<String>) {
         ?: fileConfig.server.corsAllowedHosts,
     ),
     download = fileConfig.download.copy(
-      directory = cliDownloadDir ?: fileConfig.download.directory,
-      speedLimit = cliSpeedLimit?.let { limit ->
-        if (limit.isUnlimited) null
-        else "${limit.bytesPerSecond}"
-      } ?: fileConfig.download.speedLimit,
+      defaultDirectory = cliDownloadDir
+        ?: fileConfig.download.defaultDirectory
+          .takeIf { it != "downloads" }
+        ?: defaultDownloadDir,
+      speedLimit = cliSpeedLimit
+        ?: fileConfig.download.speedLimit,
     ),
   )
 
-  val defaultDownloadDir = System.getProperty("user.home") +
-    File.separator + "Downloads"
-  val downloadConfig = mergedConfig.toDownloadConfig(defaultDownloadDir)
+  val downloadConfig = mergedConfig.download
   val serverConfig = mergedConfig.toServerConfig()
 
   File(downloadConfig.defaultDirectory).mkdirs()
@@ -552,35 +555,14 @@ private fun parsePriority(value: String): DownloadPriority? {
   }
 }
 
-internal fun parseSpeedLimit(value: String): SpeedLimit? {
-  val trimmed = value.trim().lowercase()
-  return when {
-    trimmed.endsWith("m") -> {
-      val num = trimmed.dropLast(1).toLongOrNull() ?: return null
-      if (num <= 0) return null
-      SpeedLimit.mbps(num)
-    }
-    trimmed.endsWith("k") -> {
-      val num = trimmed.dropLast(1).toLongOrNull() ?: return null
-      if (num <= 0) return null
-      SpeedLimit.kbps(num)
-    }
-    else -> {
-      val num = trimmed.toLongOrNull() ?: return null
-      if (num <= 0) return null
-      SpeedLimit.of(num)
-    }
-  }
-}
-
 private fun formatBytes(bytes: Long): String {
   return when {
     bytes < 1024 -> "$bytes B"
     bytes < 1024 * 1024 ->
-      String.format("%.1f KB", bytes / 1024.0)
+      String.format(Locale.getDefault(), "%.1f KB", bytes / 1024.0)
     bytes < 1024 * 1024 * 1024 ->
-      String.format("%.1f MB", bytes / (1024.0 * 1024))
+      String.format(Locale.getDefault(), "%.1f MB", bytes / (1024.0 * 1024))
     else ->
-      String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024))
+      String.format(Locale.getDefault(), "%.2f GB", bytes / (1024.0 * 1024 * 1024))
   }
 }

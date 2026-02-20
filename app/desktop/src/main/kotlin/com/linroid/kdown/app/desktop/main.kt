@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.linroid.kdown.app.App
+import com.linroid.kdown.app.config.FileConfigStore
 import com.linroid.kdown.app.instance.InstanceFactory
 import com.linroid.kdown.app.instance.InstanceManager
 import com.linroid.kdown.app.instance.LocalServerHandle
@@ -17,14 +18,24 @@ import java.net.InetAddress
 
 fun main() = application {
   val instanceManager = remember {
-    val dbPath = appConfigDir() + File.separator + "kdown.db"
+    val configDir = appConfigDir()
+    val configStore = FileConfigStore(
+      configDir + File.separator + "config.toml",
+    )
+    val config = configStore.load()
+    val dbPath = configDir + File.separator + "kdown.db"
     val taskStore = createSqliteTaskStore(DriverFactory(dbPath))
-    val downloadsDir = System.getProperty("user.home") +
+    val defaultDownloadsDir = System.getProperty("user.home") +
       File.separator + "Downloads"
+    val downloadConfig = config.download.copy(
+      defaultDirectory = config.download.defaultDirectory
+        .takeIf { it != "downloads" }
+        ?: defaultDownloadsDir,
+    )
     InstanceManager(
-      InstanceFactory(
+      factory = InstanceFactory(
         taskStore = taskStore,
-        defaultDirectory = downloadsDir,
+        downloadConfig = downloadConfig,
         deviceName = InetAddress.getLocalHost().hostName,
         localServerFactory = { port, apiToken, kdownApi ->
           val server = KDownServer(
@@ -43,7 +54,8 @@ fun main() = application {
             }
           }
         }
-      )
+      ),
+      initialRemotes = config.remote,
     )
   }
   DisposableEffect(Unit) {
