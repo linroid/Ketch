@@ -21,6 +21,7 @@ class FakeHttpEngine(
   var failOnHead: Boolean = false,
   var httpErrorCode: Int = 0,
   var retryAfterSeconds: Long? = null,
+  var rateLimitRemaining: Long? = null,
 ) : HttpEngine {
 
   var headCallCount = 0
@@ -42,7 +43,8 @@ class FakeHttpEngine(
     }
     if (httpErrorCode > 0) {
       throw KDownError.Http(
-        httpErrorCode, "Simulated HTTP error", retryAfterSeconds,
+        httpErrorCode, "Simulated HTTP error",
+        retryAfterSeconds, rateLimitRemaining,
       )
     }
     return serverInfo
@@ -59,7 +61,8 @@ class FakeHttpEngine(
 
     if (httpErrorCode > 0) {
       throw KDownError.Http(
-        httpErrorCode, "Simulated HTTP error", retryAfterSeconds,
+        httpErrorCode, "Simulated HTTP error",
+        retryAfterSeconds, rateLimitRemaining,
       )
     }
 

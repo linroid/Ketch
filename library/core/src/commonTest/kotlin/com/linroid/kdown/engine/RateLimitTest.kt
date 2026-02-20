@@ -224,6 +224,90 @@ class RateLimitTest {
     assertEquals("30", resolved.metadata["rateLimitReset"])
   }
 
+  // -- 429 + RateLimit-Remaining tests --
+
+  @Test
+  fun fakeEngine_429_includesRateLimitRemaining() = runTest {
+    val engine = FakeHttpEngine(
+      httpErrorCode = 429,
+      retryAfterSeconds = 10,
+      rateLimitRemaining = 0,
+    )
+    val error = assertFailsWith<KDownError.Http> {
+      engine.download("https://example.com/file", null) {}
+    }
+    assertEquals(429, error.code)
+    assertEquals(10L, error.retryAfterSeconds)
+    assertEquals(0L, error.rateLimitRemaining)
+  }
+
+  @Test
+  fun fakeEngine_429Head_includesRateLimitRemaining() = runTest {
+    val engine = FakeHttpEngine(
+      httpErrorCode = 429,
+      rateLimitRemaining = 2,
+    )
+    val error = assertFailsWith<KDownError.Http> {
+      engine.head("https://example.com/file")
+    }
+    assertEquals(429, error.code)
+    assertEquals(2L, error.rateLimitRemaining)
+  }
+
+  @Test
+  fun connectionReduction_usesRateLimitRemaining_whenLessThanCurrent() {
+    // When RateLimit-Remaining=2 and current=4, reduce to 2
+    val current = 4
+    val rateLimitRemaining = 2L
+    val reduced = if (rateLimitRemaining < current) {
+      rateLimitRemaining.toInt().coerceAtLeast(1)
+    } else {
+      (current / 2).coerceAtLeast(1)
+    }
+    assertEquals(2, reduced)
+  }
+
+  @Test
+  fun connectionReduction_usesRateLimitRemaining_zeroMeansOne() {
+    // When RateLimit-Remaining=0, reduce to minimum of 1
+    val current = 4
+    val rateLimitRemaining = 0L
+    val reduced = if (rateLimitRemaining < current) {
+      rateLimitRemaining.toInt().coerceAtLeast(1)
+    } else {
+      (current / 2).coerceAtLeast(1)
+    }
+    assertEquals(1, reduced)
+  }
+
+  @Test
+  fun connectionReduction_fallsBackToHalving_whenRemainingNull() {
+    // When RateLimit-Remaining is absent, halve as before
+    val current = 4
+    val rateLimitRemaining: Long? = null
+    val reduced = if (rateLimitRemaining != null &&
+      rateLimitRemaining < current
+    ) {
+      rateLimitRemaining.toInt().coerceAtLeast(1)
+    } else {
+      (current / 2).coerceAtLeast(1)
+    }
+    assertEquals(2, reduced)
+  }
+
+  @Test
+  fun connectionReduction_fallsBackToHalving_whenRemainingHigher() {
+    // RateLimit-Remaining >= current → fall back to halving
+    val current = 4
+    val rateLimitRemaining = 10L
+    val reduced = if (rateLimitRemaining < current) {
+      rateLimitRemaining.toInt().coerceAtLeast(1)
+    } else {
+      (current / 2).coerceAtLeast(1)
+    }
+    assertEquals(2, reduced)
+  }
+
   @Test
   fun resegmentOnConnectionReduction_preservesDownloadProgress() {
     // 4 segments, each with partial progress -> reduce to 1 connection

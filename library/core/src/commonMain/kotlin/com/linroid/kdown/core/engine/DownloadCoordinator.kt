@@ -521,7 +521,9 @@ internal class DownloadCoordinator(
         if (error is KDownError.Http && error.code == 429 &&
           context != null
         ) {
-          reduceConnections(taskId, context)
+          reduceConnections(
+            taskId, context, error.rateLimitRemaining,
+          )
           delayMs = error.retryAfterSeconds?.let { it * 1000L }
             ?: (config.retryDelayMs * (1 shl (retryCount - 1)))
           KDownLogger.w("Coordinator") {
@@ -542,14 +544,19 @@ internal class DownloadCoordinator(
   }
 
   /**
-   * Halves the number of concurrent connections for a download task
-   * that received HTTP 429 (Too Many Requests), with a minimum of 1.
-   * Emits the new value to [DownloadContext.maxConnections], triggering
-   * live resegmentation in [HttpDownloadSource].
+   * Reduces the number of concurrent connections for a download task
+   * that received HTTP 429 (Too Many Requests).
+   *
+   * When [rateLimitRemaining] is available, uses it directly as the
+   * new connection count (minimum 1). Otherwise falls back to halving
+   * the current count. Emits the new value to
+   * [DownloadContext.maxConnections], triggering live resegmentation
+   * in [HttpDownloadSource].
    */
   private fun reduceConnections(
     taskId: String,
     context: DownloadContext,
+    rateLimitRemaining: Long? = null,
   ) {
     val current = when {
       context.maxConnections.value > 0 ->
@@ -557,11 +564,20 @@ internal class DownloadCoordinator(
       context.request.connections > 0 -> context.request.connections
       else -> config.maxConnections
     }
-    val reduced = (current / 2).coerceAtLeast(1)
+    val reduced = if (rateLimitRemaining != null &&
+      rateLimitRemaining < current
+    ) {
+      rateLimitRemaining.toInt().coerceAtLeast(1)
+    } else {
+      (current / 2).coerceAtLeast(1)
+    }
     context.maxConnections.value = reduced
     KDownLogger.w("Coordinator") {
       "Reducing connections for taskId=$taskId: " +
-        "$current -> $reduced"
+        "$current -> $reduced" +
+        (rateLimitRemaining?.let {
+          " (RateLimit-Remaining=$it)"
+        } ?: "")
     }
   }
 

@@ -41,14 +41,19 @@ class KtorHttpEngine(
         KDownLogger.e("KtorHttpEngine") {
           "HTTP error ${response.status.value}: ${response.status.description}"
         }
-        val retryAfter = if (response.status.value == 429) {
+        val is429 = response.status.value == 429
+        val retryAfter = if (is429) {
           parseRetryAfter(response.headers["Retry-After"])
             ?: parseRateLimitLong(response.headers["RateLimit-Reset"])
+        } else null
+        val remaining = if (is429) {
+          parseRateLimitLong(response.headers["RateLimit-Remaining"])
         } else null
         throw KDownError.Http(
           response.status.value,
           response.status.description,
           retryAfter,
+          remaining,
         )
       }
 
@@ -108,12 +113,16 @@ class KtorHttpEngine(
           KDownLogger.e("KtorHttpEngine") {
             "HTTP error ${status.value}: ${status.description}"
           }
-          val retryAfter = if (status.value == 429) {
+          val is429 = status.value == 429
+          val retryAfter = if (is429) {
             parseRetryAfter(response.headers["Retry-After"])
               ?: parseRateLimitLong(response.headers["RateLimit-Reset"])
           } else null
+          val remaining = if (is429) {
+            parseRateLimitLong(response.headers["RateLimit-Remaining"])
+          } else null
           throw KDownError.Http(
-            status.value, status.description, retryAfter,
+            status.value, status.description, retryAfter, remaining,
           )
         }
 

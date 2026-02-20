@@ -28,12 +28,17 @@ sealed class KDownError(
    * @property code the HTTP status code
    * @property statusMessage optional reason phrase from the server
    * @property retryAfterSeconds value of the `Retry-After` header in
-   *   seconds, if the server provided one (typically on 429 responses)
+   *   seconds, if the server provided one (typically on 429 responses).
+   *   Falls back to `RateLimit-Reset` when `Retry-After` is absent.
+   * @property rateLimitRemaining value of the `RateLimit-Remaining`
+   *   header, indicating how many requests remain in the current
+   *   rate limit window. Used on 429 to inform connection reduction.
    */
   data class Http(
     val code: Int,
     val statusMessage: String? = null,
     val retryAfterSeconds: Long? = null,
+    val rateLimitRemaining: Long? = null,
   ) : KDownError("HTTP error $code: $statusMessage")
 
   /** File I/O failure (write, flush, preallocate). Not retryable. */
