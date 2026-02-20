@@ -10,6 +10,7 @@ import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.CreateDownloadRequest
 import com.linroid.kdown.endpoints.model.ErrorResponse
+import com.linroid.kdown.endpoints.model.ConnectionsRequest
 import com.linroid.kdown.endpoints.model.PriorityRequest
 import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import com.linroid.kdown.server.TaskMapper
@@ -217,6 +218,33 @@ internal fun Route.downloadRoutes(kdown: KDownApi) {
       return@put
     }
     task.setPriority(priority)
+    call.respond(TaskMapper.toResponse(task))
+  }
+
+  put<Api.Tasks.ById.Connections> { resource ->
+    val taskId = resource.parent.id
+    val task = kdown.tasks.value.find {
+      it.taskId == taskId
+    }
+    if (task == null) {
+      call.respond(
+        HttpStatusCode.NotFound,
+        ErrorResponse("not_found", "Task not found: $taskId")
+      )
+      return@put
+    }
+    val body = call.receive<ConnectionsRequest>()
+    if (body.connections < 1) {
+      call.respond(
+        HttpStatusCode.BadRequest,
+        ErrorResponse(
+          "invalid_connections",
+          "Connections must be greater than 0"
+        )
+      )
+      return@put
+    }
+    task.setConnections(body.connections)
     call.respond(TaskMapper.toResponse(task))
   }
 }

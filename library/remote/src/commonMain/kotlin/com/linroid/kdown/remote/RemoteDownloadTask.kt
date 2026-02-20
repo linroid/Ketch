@@ -9,6 +9,7 @@ import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.endpoints.Api
+import com.linroid.kdown.endpoints.model.ConnectionsRequest
 import com.linroid.kdown.endpoints.model.PriorityRequest
 import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import com.linroid.kdown.endpoints.model.TaskResponse
@@ -107,6 +108,20 @@ internal class RemoteDownloadTask(
       setBody(json.encodeToString(
         PriorityRequest.serializer(),
         PriorityRequest(priority.name)
+      ))
+    }
+    checkSuccess(response)
+    applyWireResponse(response.bodyAsText())
+  }
+
+  override suspend fun setConnections(connections: Int) {
+    val response = httpClient.put(
+      Api.Tasks.ById.Connections(parent = byId),
+    ) {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(
+        ConnectionsRequest.serializer(),
+        ConnectionsRequest(connections)
       ))
     }
     checkSuccess(response)

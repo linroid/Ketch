@@ -569,6 +569,19 @@ internal class DownloadCoordinator(
     taskStore.save(update(existing))
   }
 
+  suspend fun setTaskConnections(taskId: String, connections: Int) {
+    require(connections > 0) { "Connections must be greater than 0" }
+    updateTaskRecord(taskId) {
+      it.copy(
+        request = it.request.copy(connections = connections),
+        updatedAt = Clock.System.now(),
+      )
+    }
+    KDownLogger.i("Coordinator") {
+      "Task connections updated for taskId=$taskId: $connections"
+    }
+  }
+
   suspend fun setTaskSpeedLimit(taskId: String, limit: SpeedLimit) {
     mutex.withLock {
       val active = activeDownloads[taskId] ?: return

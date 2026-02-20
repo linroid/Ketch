@@ -236,6 +236,9 @@ class KDown(
       setPriorityAction = { priority ->
         scheduler.setPriority(taskId, priority)
       },
+      setConnectionsAction = { connections ->
+        coordinator.setTaskConnections(taskId, connections)
+      },
       rescheduleAction = { schedule, conditions ->
         val s = stateFlow.value
         if (s.isTerminal) {
@@ -396,6 +399,9 @@ class KDown(
       },
       setPriorityAction = { priority ->
         scheduler.setPriority(record.taskId, priority)
+      },
+      setConnectionsAction = { connections ->
+        coordinator.setTaskConnections(record.taskId, connections)
       },
       rescheduleAction = { schedule, conditions ->
         val s = stateFlow.value

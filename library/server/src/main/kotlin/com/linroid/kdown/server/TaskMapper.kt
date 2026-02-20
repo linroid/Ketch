@@ -27,7 +27,8 @@ internal object TaskMapper {
       createdAt = task.createdAt.toString(),
       priority = task.request.priority.name,
       speedLimitBytesPerSecond =
-        task.request.speedLimit.bytesPerSecond
+        task.request.speedLimit.bytesPerSecond,
+      connections = task.request.connections,
     )
   }
 

@@ -25,7 +25,7 @@ internal object WireMapper {
       url = wire.url,
       directory = wire.directory,
       fileName = wire.fileName,
-      connections = 1,
+      connections = wire.connections,
       speedLimit = if (wire.speedLimitBytesPerSecond > 0) {
         SpeedLimit.of(wire.speedLimitBytesPerSecond)
       } else {

@@ -24,8 +24,9 @@ import kotlinx.serialization.Serializable
  * - `POST   /api/tasks/{id}/resume`      — resume a download
  * - `POST   /api/tasks/{id}/cancel`      — cancel a download
  * - `DELETE /api/tasks/{id}`             — remove a task
- * - `PUT    /api/tasks/{id}/speed-limit` — set task speed limit
- * - `PUT    /api/tasks/{id}/priority`    — set task priority
+ * - `PUT    /api/tasks/{id}/speed-limit`  — set task speed limit
+ * - `PUT    /api/tasks/{id}/priority`     — set task priority
+ * - `PUT    /api/tasks/{id}/connections`  — set task connections
  *
  * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
@@ -77,6 +78,10 @@ class Api {
       @Serializable
       @Resource("priority")
       data class Priority(val parent: ById)
+
+      @Serializable
+      @Resource("connections")
+      data class Connections(val parent: ById)
     }
   }
 

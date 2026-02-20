@@ -19,4 +19,5 @@ data class TaskResponse(
   val createdAt: String,
   val priority: String,
   val speedLimitBytesPerSecond: Long = 0,
+  val connections: Int = 0,
 )
