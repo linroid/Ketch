@@ -1,5 +1,6 @@
 package com.linroid.kdown.api
 
+import com.linroid.kdown.api.config.DownloadConfig
 import kotlinx.serialization.Serializable
 
 /**
@@ -13,7 +14,8 @@ import kotlinx.serialization.Serializable
  * @property revision build revision (git short hash)
  * @property uptime seconds since the instance started
  * @property tasks task count breakdown by state
- * @property config current download and (optionally) server configuration
+ * @property config current download configuration (with runtime speed limit)
+ * @property server server network configuration (null for embedded-only)
  * @property system host system information
  * @property storage download directory storage information
  */
@@ -23,9 +25,10 @@ data class ServerStatus(
   val revision: String,
   val uptime: Long,
   val tasks: TaskStats,
-  val config: ConfigStatus,
-  val system: SystemStatus,
-  val storage: StorageStatus,
+  val config: DownloadConfig,
+  val server: ServerConfig? = null,
+  val system: SystemInfo,
+  val storage: StorageInfo,
 )
 
 /**
@@ -46,53 +49,6 @@ data class TaskStats(
 )
 
 /**
- * Current download and (optionally) server configuration.
- *
- * [server] is `null` for a pure embedded instance that is
- * not backed by a daemon server.
- */
-@Serializable
-data class ConfigStatus(
-  val download: DownloadConfigStatus,
-  val queue: QueueConfigStatus,
-  val server: ServerConfigStatus? = null,
-)
-
-/**
- * Download engine configuration.
- *
- * @property defaultDirectory default directory for saved files
- * @property maxConnections max concurrent segment downloads per task
- * @property retryCount max retry attempts for failed requests
- * @property retryDelayMs base delay between retries in milliseconds
- * @property bufferSize download buffer size in bytes
- * @property speedLimit global speed limit in bytes/sec (0 = unlimited)
- */
-@Serializable
-data class DownloadConfigStatus(
-  val defaultDirectory: String,
-  val maxConnections: Int,
-  val retryCount: Int,
-  val retryDelayMs: Long,
-  val bufferSize: Int,
-  val speedLimit: Long,
-)
-
-/**
- * Download queue configuration.
- *
- * @property maxConcurrentDownloads max simultaneous downloads
- * @property maxConnectionsPerHost max concurrent downloads per host
- * @property autoStart whether queued tasks start automatically
- */
-@Serializable
-data class QueueConfigStatus(
-  val maxConcurrentDownloads: Int,
-  val maxConnectionsPerHost: Int,
-  val autoStart: Boolean,
-)
-
-/**
  * Server network configuration (sanitized — no secrets).
  *
  * @property host bind address
@@ -102,7 +58,7 @@ data class QueueConfigStatus(
  * @property mdnsEnabled whether mDNS/DNS-SD registration is active
  */
 @Serializable
-data class ServerConfigStatus(
+data class ServerConfig(
   val host: String,
   val port: Int,
   val authEnabled: Boolean,
@@ -122,7 +78,7 @@ data class ServerConfigStatus(
  * @property freeMemory free memory in bytes (0 when unavailable)
  */
 @Serializable
-data class SystemStatus(
+data class SystemInfo(
   val os: String,
   val arch: String,
   val javaVersion: String,
@@ -141,7 +97,7 @@ data class SystemStatus(
  * @property usableSpace usable disk space in bytes
  */
 @Serializable
-data class StorageStatus(
+data class StorageInfo(
   val downloadDirectory: String,
   val totalSpace: Long,
   val freeSpace: Long,

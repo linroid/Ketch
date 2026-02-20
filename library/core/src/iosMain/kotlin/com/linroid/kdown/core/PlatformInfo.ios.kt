@@ -1,15 +1,15 @@
 package com.linroid.kdown.core
 
-import com.linroid.kdown.api.StorageStatus
-import com.linroid.kdown.api.SystemStatus
+import com.linroid.kdown.api.StorageInfo
+import com.linroid.kdown.api.SystemInfo
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSFileSystemFreeSize
 import platform.Foundation.NSFileSystemSize
 import platform.Foundation.NSProcessInfo
 
-internal actual fun currentSystemStatus(): SystemStatus {
+internal actual fun currentSystemInfo(): SystemInfo {
   val info = NSProcessInfo.processInfo
-  return SystemStatus(
+  return SystemInfo(
     os = "iOS ${info.operatingSystemVersionString}",
     arch = "arm64",
     javaVersion = "N/A",
@@ -20,14 +20,14 @@ internal actual fun currentSystemStatus(): SystemStatus {
   )
 }
 
-internal actual fun currentStorageStatus(directory: String): StorageStatus {
+internal actual fun currentStorageInfo(directory: String): StorageInfo {
   val fm = NSFileManager.defaultManager
   val attrs = fm.attributesOfFileSystemForPath(directory, null)
   val totalSpace = (attrs?.get(NSFileSystemSize) as? Number)
     ?.toLong() ?: 0L
   val freeSpace = (attrs?.get(NSFileSystemFreeSize) as? Number)
     ?.toLong() ?: 0L
-  return StorageStatus(
+  return StorageInfo(
     downloadDirectory = directory,
     totalSpace = totalSpace,
     freeSpace = freeSpace,

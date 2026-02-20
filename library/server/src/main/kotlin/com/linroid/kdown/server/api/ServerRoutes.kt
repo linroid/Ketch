@@ -1,7 +1,7 @@
 package com.linroid.kdown.server.api
 
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.ServerConfigStatus
+import com.linroid.kdown.api.ServerConfig
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.ResolveUrlRequest
@@ -27,14 +27,12 @@ internal fun Route.serverRoutes(
   get<Api.Status> {
     val base = kdown.status()
     val withServer = base.copy(
-      config = base.config.copy(
-        server = ServerConfigStatus(
-          host = serverConfig.host,
-          port = serverConfig.port,
-          authEnabled = serverConfig.apiToken != null,
-          corsAllowedHosts = serverConfig.corsAllowedHosts,
-          mdnsEnabled = serverConfig.mdnsEnabled,
-        ),
+      server = ServerConfig(
+        host = serverConfig.host,
+        port = serverConfig.port,
+        authEnabled = serverConfig.apiToken != null,
+        corsAllowedHosts = serverConfig.corsAllowedHosts,
+        mdnsEnabled = serverConfig.mdnsEnabled,
       ),
     )
     call.respond(withServer)

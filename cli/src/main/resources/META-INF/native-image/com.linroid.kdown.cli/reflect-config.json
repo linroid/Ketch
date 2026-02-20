@@ -90,63 +90,53 @@
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.kdown.api.ConfigStatus",
+    "name": "com.linroid.kdown.api.config.DownloadConfig",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "com.linroid.kdown.api.ConfigStatus$Companion",
+    "name": "com.linroid.kdown.api.config.DownloadConfig$Companion",
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.kdown.api.DownloadConfigStatus",
+    "name": "com.linroid.kdown.api.config.QueueConfig",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "com.linroid.kdown.api.DownloadConfigStatus$Companion",
+    "name": "com.linroid.kdown.api.config.QueueConfig$Companion",
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.kdown.api.QueueConfigStatus",
+    "name": "com.linroid.kdown.api.ServerConfig",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "com.linroid.kdown.api.QueueConfigStatus$Companion",
+    "name": "com.linroid.kdown.api.ServerConfig$Companion",
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.kdown.api.ServerConfigStatus",
+    "name": "com.linroid.kdown.api.SystemInfo",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "com.linroid.kdown.api.ServerConfigStatus$Companion",
+    "name": "com.linroid.kdown.api.SystemInfo$Companion",
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.kdown.api.SystemStatus",
+    "name": "com.linroid.kdown.api.StorageInfo",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "com.linroid.kdown.api.SystemStatus$Companion",
-    "allDeclaredMethods": true
-  },
-  {
-    "name": "com.linroid.kdown.api.StorageStatus",
-    "allDeclaredFields": true,
-    "allDeclaredMethods": true,
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "com.linroid.kdown.api.StorageStatus$Companion",
+    "name": "com.linroid.kdown.api.StorageInfo$Companion",
     "allDeclaredMethods": true
   },
   {

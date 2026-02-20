@@ -1,10 +1,10 @@
 package com.linroid.kdown.core
 
-import com.linroid.kdown.api.StorageStatus
-import com.linroid.kdown.api.SystemStatus
+import com.linroid.kdown.api.StorageInfo
+import com.linroid.kdown.api.SystemInfo
 
-internal actual fun currentSystemStatus(): SystemStatus {
-  return SystemStatus(
+internal actual fun currentSystemInfo(): SystemInfo {
+  return SystemInfo(
     os = "Browser",
     arch = "wasm",
     javaVersion = "N/A",
@@ -15,8 +15,8 @@ internal actual fun currentSystemStatus(): SystemStatus {
   )
 }
 
-internal actual fun currentStorageStatus(directory: String): StorageStatus {
-  return StorageStatus(
+internal actual fun currentStorageInfo(directory: String): StorageInfo {
+  return StorageInfo(
     downloadDirectory = directory,
     totalSpace = 0L,
     freeSpace = 0L,

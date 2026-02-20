@@ -1,7 +1,5 @@
 package com.linroid.kdown.core
 
-import com.linroid.kdown.api.ConfigStatus
-import com.linroid.kdown.api.DownloadConfigStatus
 import com.linroid.kdown.api.DownloadProgress
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadSchedule
@@ -10,12 +8,12 @@ import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.KDownVersion
-import com.linroid.kdown.api.QueueConfigStatus
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.ServerStatus
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.api.TaskStats
+import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.core.engine.DelegatingSpeedLimiter
 import com.linroid.kdown.core.engine.DownloadCoordinator
 import com.linroid.kdown.core.engine.DownloadScheduler
@@ -319,25 +317,9 @@ class KDown(
           it.state.value is DownloadState.Canceled
         },
       ),
-      config = ConfigStatus(
-        download = DownloadConfigStatus(
-          defaultDirectory = config.defaultDirectory,
-          maxConnections = config.maxConnections,
-          retryCount = config.retryCount,
-          retryDelayMs = config.retryDelayMs,
-          bufferSize = config.bufferSize,
-          speedLimit = currentSpeedLimit.bytesPerSecond,
-        ),
-        queue = QueueConfigStatus(
-          maxConcurrentDownloads =
-            config.queueConfig.maxConcurrentDownloads,
-          maxConnectionsPerHost =
-            config.queueConfig.maxConnectionsPerHost,
-          autoStart = config.queueConfig.autoStart,
-        ),
-      ),
-      system = currentSystemStatus(),
-      storage = currentStorageStatus(config.defaultDirectory),
+      config = config.copy(speedLimit = currentSpeedLimit),
+      system = currentSystemInfo(),
+      storage = currentStorageInfo(config.defaultDirectory),
     )
   }
 

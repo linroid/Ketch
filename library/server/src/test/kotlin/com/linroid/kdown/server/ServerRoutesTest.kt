@@ -144,12 +144,18 @@ class ServerRoutesTest {
     )
     assertEquals(
       "/tmp/test-downloads",
-      status.config.download.defaultDirectory,
+      status.config.defaultDirectory,
     )
-    assertEquals(8, status.config.download.maxConnections)
-    assertEquals(5, status.config.download.retryCount)
-    assertEquals(6, status.config.queue.maxConcurrentDownloads)
-    assertEquals(2, status.config.queue.maxConnectionsPerHost)
+    assertEquals(8, status.config.maxConnections)
+    assertEquals(5, status.config.retryCount)
+    assertEquals(
+      6,
+      status.config.queueConfig.maxConcurrentDownloads,
+    )
+    assertEquals(
+      2,
+      status.config.queueConfig.maxConnectionsPerHost,
+    )
   }
 
   @Test
@@ -169,7 +175,7 @@ class ServerRoutesTest {
     val status = json.decodeFromString<ServerStatus>(
       response.bodyAsText()
     )
-    val srv = status.config.server
+    val srv = status.server
     assertNotNull(srv)
     assertEquals("127.0.0.1", srv.host)
     assertEquals(9090, srv.port)

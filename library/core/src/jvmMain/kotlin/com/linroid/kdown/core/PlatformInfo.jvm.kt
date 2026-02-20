@@ -1,12 +1,12 @@
 package com.linroid.kdown.core
 
-import com.linroid.kdown.api.StorageStatus
-import com.linroid.kdown.api.SystemStatus
+import com.linroid.kdown.api.StorageInfo
+import com.linroid.kdown.api.SystemInfo
 import java.io.File
 
-internal actual fun currentSystemStatus(): SystemStatus {
+internal actual fun currentSystemInfo(): SystemInfo {
   val runtime = Runtime.getRuntime()
-  return SystemStatus(
+  return SystemInfo(
     os = System.getProperty("os.name", "unknown"),
     arch = System.getProperty("os.arch", "unknown"),
     javaVersion = System.getProperty("java.version", "unknown"),
@@ -17,9 +17,9 @@ internal actual fun currentSystemStatus(): SystemStatus {
   )
 }
 
-internal actual fun currentStorageStatus(directory: String): StorageStatus {
+internal actual fun currentStorageInfo(directory: String): StorageInfo {
   val dir = File(directory)
-  return StorageStatus(
+  return StorageInfo(
     downloadDirectory = dir.absolutePath,
     totalSpace = dir.totalSpace,
     freeSpace = dir.freeSpace,

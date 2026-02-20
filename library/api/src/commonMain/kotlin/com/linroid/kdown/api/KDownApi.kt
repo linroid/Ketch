@@ -49,7 +49,7 @@ interface KDownApi {
    * Returns a point-in-time status snapshot including task counts,
    * configuration, system information, and storage details.
    *
-   * For embedded backends, [ConfigStatus.server] is `null` unless
+   * For embedded backends, [ServerStatus.server] is `null` unless
    * a daemon server is attached. Remote backends return the full
    * status from the server.
    */
