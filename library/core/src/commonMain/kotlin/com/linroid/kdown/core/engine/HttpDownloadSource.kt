@@ -331,18 +331,20 @@ internal class HttpDownloadSource(
         }
 
         // Watcher: detect connection count changes and trigger
-        // resegmentation by canceling the scope
+        // resegmentation by canceling the scope. Compares against the
+        // last-seen flow value (not segment count) to avoid an infinite
+        // loop when fewer segments can be created than requested.
         val watcherJob = launch {
-          val currentCount = incompleteSegments.size
+          val lastSeen = context.maxConnections.value
           context.maxConnections.first { count ->
-            count > 0 && count != currentCount
+            count > 0 && count != lastSeen
           }
           context.pendingResegment =
             context.maxConnections.value
           KDownLogger.i("HttpSource") {
             "Connection change detected for " +
               "taskId=${context.taskId}: " +
-              "$currentCount -> ${context.pendingResegment}"
+              "$lastSeen -> ${context.pendingResegment}"
           }
           throw CancellationException("Resegmenting")
         }
