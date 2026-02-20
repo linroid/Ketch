@@ -61,15 +61,18 @@ kotlin {
     androidMain.dependencies {
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.ktor.client.okhttp)
+      implementation(libs.dnssd)
     }
     iosMain.dependencies {
       implementation(projects.library.sqlite)
       implementation(libs.ktor.client.darwin)
+      implementation(libs.dnssd)
     }
     jvmMain.dependencies {
       implementation(projects.library.sqlite)
       implementation(libs.kotlinx.coroutinesSwing)
       implementation(libs.ktor.client.cio)
+      implementation(libs.dnssd)
     }
     wasmJsMain.dependencies {
       implementation(libs.ktor.client.js)

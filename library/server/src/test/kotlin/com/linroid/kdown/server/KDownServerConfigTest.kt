@@ -13,6 +13,9 @@ class KDownServerConfigTest {
     assertEquals("0.0.0.0", config.host)
     assertEquals(8642, config.port)
     assertNull(config.apiToken)
+    assertEquals(true, config.mdnsEnabled)
+    assertEquals("KDown", config.mdnsServiceName)
+    assertEquals("_kdown._tcp", config.mdnsServiceType)
     assertEquals(emptyList(), config.corsAllowedHosts)
   }
 
@@ -49,11 +52,17 @@ class KDownServerConfigTest {
       host = "127.0.0.1",
       port = 9000,
       apiToken = "my-token",
+      mdnsEnabled = false,
+      mdnsServiceName = "My Server",
+      mdnsServiceType = "_myserver._tcp.local.",
       corsAllowedHosts = listOf("localhost:3000"),
     )
     assertEquals("127.0.0.1", config.host)
     assertEquals(9000, config.port)
     assertEquals("my-token", config.apiToken)
+    assertEquals(false, config.mdnsEnabled)
+    assertEquals("My Server", config.mdnsServiceName)
+    assertEquals("_myserver._tcp.local.", config.mdnsServiceType)
     assertEquals(
       listOf("localhost:3000"), config.corsAllowedHosts
     )
