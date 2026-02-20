@@ -79,6 +79,8 @@ class KDown(
 ) : KDownApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
+  private var currentSpeedLimit: SpeedLimit = config.speedLimit
+
   private val globalLimiter = DelegatingSpeedLimiter(
     if (config.speedLimit.isUnlimited) {
       SpeedLimiter.Unlimited
@@ -324,7 +326,7 @@ class KDown(
           retryCount = config.retryCount,
           retryDelayMs = config.retryDelayMs,
           bufferSize = config.bufferSize,
-          speedLimit = config.speedLimit.bytesPerSecond,
+          speedLimit = currentSpeedLimit.bytesPerSecond,
         ),
         queue = QueueConfigStatus(
           maxConcurrentDownloads =
@@ -544,6 +546,7 @@ class KDown(
    *   [com.linroid.kdown.api.SpeedLimit.Unlimited]
    */
   override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {
+    currentSpeedLimit = limit
     val current = globalLimiter.delegate
     if (limit.isUnlimited) {
       globalLimiter.delegate = SpeedLimiter.Unlimited
