@@ -139,8 +139,25 @@ internal class HttpDownloadSource(
       )
     }
 
-    val segments = context.segments.value
+    var segments = context.segments.value
     val totalBytes = state.totalBytes
+
+    val connections = if (context.request.connections > 0) {
+      context.request.connections
+    } else {
+      maxConnections
+    }
+    val incompleteCount = segments.count { !it.isComplete }
+    if (incompleteCount > 0 && connections != incompleteCount) {
+      KDownLogger.i("HttpSource") {
+        "Resegmenting for taskId=${context.taskId}: " +
+          "$incompleteCount -> $connections connections"
+      }
+      segments = SegmentCalculator.resegment(
+        segments, connections,
+      )
+      context.segments.value = segments
+    }
 
     val validatedSegments = validateLocalFile(
       context, segments, totalBytes
