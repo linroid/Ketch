@@ -9,7 +9,6 @@ import com.linroid.kdown.api.DownloadSchedule
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.app.instance.DiscoveredServer
@@ -83,16 +82,6 @@ class AppState(
       scope,
       SharingStarted.WhileSubscribed(5000),
       emptyList()
-    )
-
-  val version: StateFlow<KDownVersion> =
-    activeApi.flatMapLatest { it.version }.stateIn(
-      scope,
-      SharingStarted.WhileSubscribed(5000),
-      KDownVersion(
-        KDownVersion.DEFAULT,
-        KDownVersion.DEFAULT
-      )
     )
 
   val sortedTasks: StateFlow<List<DownloadTask>> =

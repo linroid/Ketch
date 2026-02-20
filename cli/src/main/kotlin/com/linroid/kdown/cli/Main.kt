@@ -4,11 +4,11 @@ import ch.qos.logback.classic.Level
 import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
-import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.SpeedLimit
-import com.linroid.kdown.core.DownloadConfig
+import com.linroid.kdown.api.config.DownloadConfig
+import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.core.KDown
-import com.linroid.kdown.core.QueueConfig
 import com.linroid.kdown.core.log.LogLevel
 import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.engine.KtorHttpEngine
@@ -29,7 +29,7 @@ fun main(args: Array<String>) {
   // Parse global flags before subcommand dispatch
   val remaining = applyGlobalFlags(args.toMutableList())
 
-  println("KDown CLI - Version ${KDownVersion.DEFAULT} (${KDownVersion.REVISION})")
+  println("KDown CLI - Version ${KDownApi.VERSION} (${KDownApi.REVISION})")
   println()
 
   if (remaining.isEmpty()) {
@@ -431,7 +431,7 @@ private fun runServer(args: Array<String>) {
     kdown.close()
   })
 
-  println("KDown Server v${KDownVersion.DEFAULT}")
+  println("KDown Server v${KDownApi.VERSION}")
   println("  Host:          ${serverConfig.host}")
   println("  Port:          ${serverConfig.port}")
   println("  Download dir:  ${downloadConfig.defaultDirectory}")

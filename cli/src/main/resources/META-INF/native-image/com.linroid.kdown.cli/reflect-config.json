@@ -70,13 +70,73 @@
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.kdown.endpoints.model.ServerStatus",
+    "name": "com.linroid.kdown.api.KDownStatus",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "com.linroid.kdown.endpoints.model.ServerStatus$Companion",
+    "name": "com.linroid.kdown.api.KDownStatus$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.kdown.api.TaskStats",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.kdown.api.TaskStats$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.kdown.api.config.DownloadConfig",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.kdown.api.config.DownloadConfig$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.kdown.api.config.QueueConfig",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.kdown.api.config.QueueConfig$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.kdown.api.ServerConfig",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.kdown.api.ServerConfig$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.kdown.api.SystemInfo",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.kdown.api.SystemInfo$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.kdown.api.StorageInfo",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.kdown.api.StorageInfo$Companion",
     "allDeclaredMethods": true
   },
   {

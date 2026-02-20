@@ -230,10 +230,10 @@ class KDownServer(
     routing {
       if (config.apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(kdown)
+          apiRoutes(kdown, config)
         }
       } else {
-        apiRoutes(kdown)
+        apiRoutes(kdown, config)
       }
       webResources()
     }
@@ -245,8 +245,11 @@ class KDownServer(
   }
 }
 
-private fun Route.apiRoutes(kdown: KDownApi) {
-  serverRoutes(kdown)
+private fun Route.apiRoutes(
+  kdown: KDownApi,
+  serverConfig: KDownServerConfig,
+) {
+  serverRoutes(kdown, serverConfig)
   downloadRoutes(kdown)
   eventRoutes(kdown)
 }

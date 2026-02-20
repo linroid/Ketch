@@ -1,9 +1,9 @@
 package com.linroid.kdown.app.instance
 
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.core.DownloadConfig
+import com.linroid.kdown.api.config.DownloadConfig
+import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.core.KDown
-import com.linroid.kdown.core.QueueConfig
 import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.core.task.TaskStore
 import com.linroid.kdown.engine.KtorHttpEngine

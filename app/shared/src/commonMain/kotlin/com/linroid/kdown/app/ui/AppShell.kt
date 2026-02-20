@@ -78,7 +78,6 @@ fun AppShell(instanceManager: InstanceManager) {
   }
 
   val sortedTasks by appState.sortedTasks.collectAsState()
-  val version by appState.version.collectAsState()
   val activeInstance by
     appState.activeInstance.collectAsState()
   val connectionState by

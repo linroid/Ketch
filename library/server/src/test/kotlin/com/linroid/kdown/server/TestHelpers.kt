@@ -2,6 +2,7 @@ package com.linroid.kdown.server
 
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.core.engine.HttpEngine
 import com.linroid.kdown.core.engine.ServerInfo
@@ -34,8 +35,10 @@ internal class NoOpHttpEngine : HttpEngine {
   override fun close() {}
 }
 
-internal fun createTestKDown(): KDownApi {
-  return KDown(httpEngine = NoOpHttpEngine())
+internal fun createTestKDown(
+  config: DownloadConfig = DownloadConfig.Default,
+): KDownApi {
+  return KDown(httpEngine = NoOpHttpEngine(), config = config)
 }
 
 internal fun createTestServer(

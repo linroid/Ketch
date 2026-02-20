@@ -2,8 +2,8 @@ package com.linroid.kdown.cli
 
 import com.akuleshov7.ktoml.Toml
 import com.linroid.kdown.api.SpeedLimit
-import com.linroid.kdown.core.DownloadConfig
-import com.linroid.kdown.core.QueueConfig
+import com.linroid.kdown.api.config.DownloadConfig
+import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.server.KDownServerConfig
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

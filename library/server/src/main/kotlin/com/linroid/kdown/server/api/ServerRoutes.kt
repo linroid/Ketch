@@ -1,14 +1,14 @@
 package com.linroid.kdown.server.api
 
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.ServerConfig
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.ResolveUrlRequest
 import com.linroid.kdown.endpoints.model.ResolveUrlResponse
-import com.linroid.kdown.endpoints.model.ServerStatus
 import com.linroid.kdown.endpoints.model.SourceFileResponse
 import com.linroid.kdown.endpoints.model.SpeedLimitRequest
+import com.linroid.kdown.server.KDownServerConfig
 import io.ktor.server.request.receive
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
@@ -17,20 +17,25 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 
 /**
- * Installs server-level endpoints: health check and global
- * speed limit management.
+ * Installs server-level endpoints: status, global speed limit,
+ * and URL resolution.
  */
-internal fun Route.serverRoutes(kdown: KDownApi) {
+internal fun Route.serverRoutes(
+  kdown: KDownApi,
+  serverConfig: KDownServerConfig,
+) {
   get<Api.Status> {
-    val tasks = kdown.tasks.value
-    val active = tasks.count { it.state.value.isActive }
-    call.respond(
-      ServerStatus(
-        version = KDownVersion.DEFAULT,
-        activeTasks = active,
-        totalTasks = tasks.size,
-      )
+    val base = kdown.status()
+    val withServer = base.copy(
+      server = ServerConfig(
+        host = serverConfig.host,
+        port = serverConfig.port,
+        authEnabled = serverConfig.apiToken != null,
+        corsAllowedHosts = serverConfig.corsAllowedHosts,
+        mdnsEnabled = serverConfig.mdnsEnabled,
+      ),
     )
+    call.respond(withServer)
   }
 
   put<Api.SpeedLimit> {

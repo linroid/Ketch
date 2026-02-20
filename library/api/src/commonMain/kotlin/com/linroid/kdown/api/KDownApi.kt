@@ -9,13 +9,19 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface KDownApi {
 
+  companion object {
+    /** Library version string (e.g., "0.0.1-dev"). */
+    val VERSION: String = KDOWN_BUILD_VERSION
+
+    /** Build revision (git short hash). */
+    val REVISION: String = KDOWN_BUILD_REVISION
+  }
+
   /** Human-readable label: "Core" or "Remote · host:port". */
   val backendLabel: String
 
   /** Reactive task list updated on any state change. */
   val tasks: StateFlow<List<DownloadTask>>
-
-  val version: StateFlow<KDownVersion>
 
   /** Create a new download and return the task handle. */
   suspend fun download(request: DownloadRequest): DownloadTask
@@ -44,6 +50,16 @@ interface KDownApi {
    * - Remote backend establishes connection and syncs tasks.
    */
   suspend fun start()
+
+  /**
+   * Returns a point-in-time status snapshot including task counts,
+   * configuration, system information, and storage details.
+   *
+   * For embedded backends, [KDownStatus.server] is `null` unless
+   * a daemon server is attached. Remote backends return the full
+   * status from the server.
+   */
+  suspend fun status(): KDownStatus
 
   /** Set global speed limit (use [SpeedLimit.Unlimited] to remove). */
   suspend fun setGlobalSpeedLimit(limit: SpeedLimit)
