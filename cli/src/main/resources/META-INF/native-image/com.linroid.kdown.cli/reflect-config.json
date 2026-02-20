@@ -70,13 +70,13 @@
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.kdown.api.ServerStatus",
+    "name": "com.linroid.kdown.api.KDownStatus",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "com.linroid.kdown.api.ServerStatus$Companion",
+    "name": "com.linroid.kdown.api.KDownStatus$Companion",
     "allDeclaredMethods": true
   },
   {

@@ -4,11 +4,8 @@ import com.linroid.kdown.api.config.DownloadConfig
 import kotlinx.serialization.Serializable
 
 /**
- * Comprehensive status snapshot of a KDown instance.
- *
- * Both [KDown][com.linroid.kdown.core.KDown] (embedded) and
- * [RemoteKDown][com.linroid.kdown.remote.RemoteKDown] (HTTP)
- * return this same type from [KDownApi.status].
+ * Comprehensive status snapshot of a KDown instance, returned
+ * by [KDownApi.status].
  *
  * @property version library version string
  * @property revision build revision (git short hash)
@@ -20,7 +17,7 @@ import kotlinx.serialization.Serializable
  * @property storage download directory storage information
  */
 @Serializable
-data class ServerStatus(
+data class KDownStatus(
   val version: String,
   val revision: String,
   val uptime: Long,

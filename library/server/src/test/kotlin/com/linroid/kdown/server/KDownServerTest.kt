@@ -1,6 +1,6 @@
 package com.linroid.kdown.server
 
-import com.linroid.kdown.api.ServerStatus
+import com.linroid.kdown.api.KDownStatus
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
@@ -22,7 +22,7 @@ class KDownServerTest {
       }
       val response = client.get("/api/status")
       assertEquals(HttpStatusCode.OK, response.status)
-      val status = json.decodeFromString<ServerStatus>(
+      val status = json.decodeFromString<KDownStatus>(
         response.bodyAsText()
       )
       assertEquals(0, status.tasks.total)

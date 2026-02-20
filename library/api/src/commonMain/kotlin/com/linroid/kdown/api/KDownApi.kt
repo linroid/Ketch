@@ -49,11 +49,11 @@ interface KDownApi {
    * Returns a point-in-time status snapshot including task counts,
    * configuration, system information, and storage details.
    *
-   * For embedded backends, [ServerStatus.server] is `null` unless
+   * For embedded backends, [KDownStatus.server] is `null` unless
    * a daemon server is attached. Remote backends return the full
    * status from the server.
    */
-  suspend fun status(): ServerStatus
+  suspend fun status(): KDownStatus
 
   /** Set global speed limit (use [SpeedLimit.Unlimited] to remove). */
   suspend fun setGlobalSpeedLimit(limit: SpeedLimit)

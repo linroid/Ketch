@@ -3,7 +3,7 @@ package com.linroid.kdown.server
 import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.endpoints.model.CreateDownloadRequest
-import com.linroid.kdown.api.ServerStatus
+import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import com.linroid.kdown.endpoints.model.TaskResponse
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -38,7 +38,7 @@ class ServerRoutesTest {
     }
     val response = client.get("/api/status")
     assertEquals(HttpStatusCode.OK, response.status)
-    val status = json.decodeFromString<ServerStatus>(
+    val status = json.decodeFromString<KDownStatus>(
       response.bodyAsText()
     )
     assertEquals("1.0.0", status.version)
@@ -52,7 +52,7 @@ class ServerRoutesTest {
       with(server) { configureServer() }
     }
     val response = client.get("/api/status")
-    val status = json.decodeFromString<ServerStatus>(
+    val status = json.decodeFromString<KDownStatus>(
       response.bodyAsText()
     )
     assertTrue(status.uptime >= 0)
@@ -81,7 +81,7 @@ class ServerRoutesTest {
       }
 
       val response = client.get("/api/status")
-      val status = json.decodeFromString<ServerStatus>(
+      val status = json.decodeFromString<KDownStatus>(
         response.bodyAsText()
       )
       assertEquals(1, status.tasks.total)
@@ -114,7 +114,7 @@ class ServerRoutesTest {
       client.post("/api/tasks/${task.taskId}/cancel")
 
       val response = client.get("/api/status")
-      val status = json.decodeFromString<ServerStatus>(
+      val status = json.decodeFromString<KDownStatus>(
         response.bodyAsText()
       )
       assertEquals(1, status.tasks.total)
@@ -139,7 +139,7 @@ class ServerRoutesTest {
       with(server) { configureServer() }
     }
     val response = client.get("/api/status")
-    val status = json.decodeFromString<ServerStatus>(
+    val status = json.decodeFromString<KDownStatus>(
       response.bodyAsText()
     )
     assertEquals(
@@ -172,7 +172,7 @@ class ServerRoutesTest {
       with(server) { configureServer() }
     }
     val response = client.get("/api/status")
-    val status = json.decodeFromString<ServerStatus>(
+    val status = json.decodeFromString<KDownStatus>(
       response.bodyAsText()
     )
     val srv = status.server
@@ -194,7 +194,7 @@ class ServerRoutesTest {
       with(server) { configureServer() }
     }
     val response = client.get("/api/status")
-    val status = json.decodeFromString<ServerStatus>(
+    val status = json.decodeFromString<KDownStatus>(
       response.bodyAsText()
     )
     assertTrue(status.system.os.isNotBlank())
@@ -211,7 +211,7 @@ class ServerRoutesTest {
       with(server) { configureServer() }
     }
     val response = client.get("/api/status")
-    val status = json.decodeFromString<ServerStatus>(
+    val status = json.decodeFromString<KDownStatus>(
       response.bodyAsText()
     )
     assertTrue(status.storage.downloadDirectory.isNotBlank())

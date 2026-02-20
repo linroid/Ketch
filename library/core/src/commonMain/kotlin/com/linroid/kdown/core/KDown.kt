@@ -10,7 +10,7 @@ import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
-import com.linroid.kdown.api.ServerStatus
+import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.api.TaskStats
 import com.linroid.kdown.api.config.DownloadConfig
@@ -283,9 +283,9 @@ class KDown(
     loadTasks()
   }
 
-  override suspend fun status(): ServerStatus {
+  override suspend fun status(): KDownStatus {
     val taskList = tasks.value
-    return ServerStatus(
+    return KDownStatus(
       version = KDownVersion.DEFAULT,
       revision = KDownVersion.REVISION,
       uptime = startMark.elapsedNow().inWholeSeconds,
