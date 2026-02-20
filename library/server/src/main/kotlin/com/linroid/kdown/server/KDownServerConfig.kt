@@ -1,5 +1,7 @@
 package com.linroid.kdown.server
 
+import com.linroid.kdown.api.MDNS_SERVICE_TYPE
+
 /**
  * Configuration for the KDown daemon server.
  *
@@ -8,6 +10,9 @@ package com.linroid.kdown.server
  * @property apiToken optional bearer token for authentication.
  *   When non-null, all requests must include an
  *   `Authorization: Bearer <token>` header.
+ * @property mdnsEnabled whether to register this server via mDNS/DNS-SD.
+ * @property mdnsServiceName instance name for mDNS discovery.
+ * @property mdnsServiceType service type for mDNS discovery.
  * @property corsAllowedHosts allowed CORS origins. Empty list
  *   disables CORS. Use `["*"]` to allow all origins.
  */
@@ -15,6 +20,9 @@ data class KDownServerConfig(
   val host: String = "0.0.0.0",
   val port: Int = 8642,
   val apiToken: String? = null,
+  val mdnsEnabled: Boolean = true,
+  val mdnsServiceName: String = "KDown",
+  val mdnsServiceType: String = MDNS_SERVICE_TYPE,
   val corsAllowedHosts: List<String> = emptyList(),
 ) {
   init {

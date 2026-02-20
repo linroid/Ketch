@@ -32,6 +32,7 @@ fun main() = application {
             KDownServerConfig(
               port = port,
               apiToken = apiToken,
+              mdnsServiceName = InetAddress.getLocalHost().hostName,
               corsAllowedHosts = listOf("*"),
             )
           )

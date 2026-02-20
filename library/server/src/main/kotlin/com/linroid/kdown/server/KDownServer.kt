@@ -1,10 +1,13 @@
 package com.linroid.kdown.server
 
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.endpoints.model.ErrorResponse
 import com.linroid.kdown.server.api.downloadRoutes
 import com.linroid.kdown.server.api.eventRoutes
 import com.linroid.kdown.server.api.serverRoutes
+import com.linroid.kdown.server.mdns.MdnsRegistrar
+import com.linroid.kdown.server.mdns.defaultMdnsRegistrar
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -15,10 +18,10 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.application.install
-import io.ktor.server.engine.EmbeddedServer
-import io.ktor.server.engine.embeddedServer
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
+import io.ktor.server.engine.EmbeddedServer
+import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
@@ -30,7 +33,15 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * A daemon server that exposes a [KDownApi] instance via REST API and
@@ -69,13 +80,20 @@ import kotlinx.serialization.json.Json
  *
  * @param kdown the KDownApi instance to expose
  * @param config server configuration (host, port, auth, CORS)
+ * @param mdnsRegistrar mDNS service registrar for LAN discovery
  */
 class KDownServer(
   private val kdown: KDownApi,
   private val config: KDownServerConfig = KDownServerConfig.Default,
+  private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
 ) {
-  private var engine:
-    EmbeddedServer<CIOApplicationEngine, *>? = null
+  private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+  private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
+    CIO,
+    host = config.host,
+    port = config.port,
+    module = { configureServer() },
+  )
 
   /**
    * Starts the daemon server.
@@ -84,29 +102,71 @@ class KDownServer(
    *   until the server is stopped. Set to `false` for non-blocking.
    */
   fun start(wait: Boolean = true) {
-    engine = embeddedServer(
-      CIO,
-      host = config.host,
-      port = config.port,
-      module = { configureServer() },
-    ).also { it.start(wait = wait) }
+    check(scope.isActive) { "Server has been stopped" }
+    engine.start(wait = wait)
+    startMdnsRegistration()
   }
 
   /** Stops the daemon server gracefully. */
   fun stop() {
-    engine?.stop(
+    scope.cancel()
+    engine.stop(
       gracePeriodMillis = 1000,
       timeoutMillis = 5000,
     )
-    engine = null
+  }
+
+  private fun startMdnsRegistration() {
+    if (!config.mdnsEnabled) return
+    scope.launch {
+      val tokenValue =
+        if (config.apiToken.isNullOrBlank()) "none"
+        else "required"
+      KDownLogger.d(TAG) {
+        "Registering mDNS service:" +
+          " name=${config.mdnsServiceName}," +
+          " type=${config.mdnsServiceType}," +
+          " port=${config.port}," +
+          " token=$tokenValue"
+      }
+      try {
+        mdnsRegistrar.register(
+          serviceType = config.mdnsServiceType,
+          serviceName = config.mdnsServiceName,
+          port = config.port,
+          metadata = mapOf("token" to tokenValue),
+        )
+        KDownLogger.i(TAG) {
+          "mDNS registered: ${config.mdnsServiceName}" +
+            " (${config.mdnsServiceType})"
+        }
+        awaitCancellation()
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        KDownLogger.w(TAG, throwable = e) {
+          "mDNS registration failed: ${e.message}"
+        }
+      } finally {
+        runCatching {
+          mdnsRegistrar.unregister()
+        }.onFailure { e ->
+          KDownLogger.w(TAG, throwable = e) {
+            "mDNS unregister failed: ${e.message}"
+          }
+        }
+      }
+    }
   }
 
   internal fun Application.configureServer() {
     install(ContentNegotiation) {
-      json(Json {
-        encodeDefaults = true
-        ignoreUnknownKeys = true
-      })
+      json(
+        Json {
+          encodeDefaults = true
+          ignoreUnknownKeys = true
+        },
+      )
     }
 
     install(Resources)
@@ -137,8 +197,8 @@ class KDownServer(
           HttpStatusCode.BadRequest,
           ErrorResponse(
             "bad_request",
-            cause.message ?: "Bad request"
-          )
+            cause.message ?: "Bad request",
+          ),
         )
       }
       exception<Throwable> { call, cause ->
@@ -146,8 +206,8 @@ class KDownServer(
           HttpStatusCode.InternalServerError,
           ErrorResponse(
             "internal_error",
-            cause.message ?: "Internal server error"
-          )
+            cause.message ?: "Internal server error",
+          ),
         )
       }
     }
@@ -155,15 +215,15 @@ class KDownServer(
     if (config.apiToken != null) {
       intercept(ApplicationCallPipeline.Call) {
         val token = call.request.header(
-          HttpHeaders.Authorization
+          HttpHeaders.Authorization,
         )
         if (token != "Bearer ${config.apiToken}") {
           call.respond(
             HttpStatusCode.Unauthorized,
             ErrorResponse(
               "unauthorized",
-              "Invalid or missing authorization token"
-            )
+              "Invalid or missing authorization token",
+            ),
           )
           finish()
         }
@@ -176,6 +236,10 @@ class KDownServer(
       eventRoutes(kdown)
       webResources()
     }
+  }
+
+  companion object {
+    private const val TAG = "KDownServer"
   }
 }
 
