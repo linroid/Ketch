@@ -16,7 +16,10 @@ import io.ktor.http.defaultForFileExtension
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.application.createRouteScopedPlugin
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.UserIdPrincipal
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.bearer
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
@@ -24,8 +27,6 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.request.header
-import io.ktor.server.request.uri
 import io.ktor.server.resources.Resources
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
@@ -212,20 +213,42 @@ class KDownServer(
       }
     }
 
-    routing {
-      config.apiToken?.let { apiToken ->
-        install(BearerAuth) { token = apiToken }
+    config.apiToken?.let { expectedToken ->
+      install(Authentication) {
+        bearer(AUTH_API) {
+          authenticate { credential ->
+            if (credential.token == expectedToken) {
+              UserIdPrincipal("api")
+            } else {
+              null
+            }
+          }
+        }
       }
-      serverRoutes(kdown)
-      downloadRoutes(kdown)
-      eventRoutes(kdown)
+    }
+
+    routing {
+      if (config.apiToken != null) {
+        authenticate(AUTH_API) {
+          apiRoutes(kdown)
+        }
+      } else {
+        apiRoutes(kdown)
+      }
       webResources()
     }
   }
 
   companion object {
     private const val TAG = "KDownServer"
+    private const val AUTH_API = "api-bearer"
   }
+}
+
+private fun Route.apiRoutes(kdown: KDownApi) {
+  serverRoutes(kdown)
+  downloadRoutes(kdown)
+  eventRoutes(kdown)
 }
 
 /**
@@ -254,31 +277,3 @@ private fun Route.webResources() {
   }
 }
 
-private class BearerAuthConfig {
-  var token: String = ""
-}
-
-/**
- * Route-scoped plugin that enforces Bearer token authentication
- * on `/api/` requests. Non-API requests (e.g. static web resources)
- * are passed through without authentication.
- */
-private val BearerAuth = createRouteScopedPlugin(
-  name = "BearerAuth",
-  createConfiguration = ::BearerAuthConfig,
-) {
-  val expectedToken = pluginConfig.token
-  onCall { call ->
-    if (!call.request.uri.startsWith("/api/")) return@onCall
-    val header = call.request.header(HttpHeaders.Authorization)
-    if (header != "Bearer $expectedToken") {
-      call.respond(
-        HttpStatusCode.Unauthorized,
-        ErrorResponse(
-          "unauthorized",
-          "Invalid or missing authorization token",
-        ),
-      )
-    }
-  }
-}
