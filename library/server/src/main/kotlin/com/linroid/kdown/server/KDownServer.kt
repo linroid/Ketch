@@ -15,9 +15,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.defaultForFileExtension
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
-import io.ktor.server.application.ApplicationCallPipeline
-import io.ktor.server.application.call
 import io.ktor.server.application.install
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.UserIdPrincipal
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.bearer
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
@@ -25,7 +27,6 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.request.header
 import io.ktor.server.resources.Resources
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
@@ -212,35 +213,42 @@ class KDownServer(
       }
     }
 
-    if (config.apiToken != null) {
-      intercept(ApplicationCallPipeline.Call) {
-        val token = call.request.header(
-          HttpHeaders.Authorization,
-        )
-        if (token != "Bearer ${config.apiToken}") {
-          call.respond(
-            HttpStatusCode.Unauthorized,
-            ErrorResponse(
-              "unauthorized",
-              "Invalid or missing authorization token",
-            ),
-          )
-          finish()
+    config.apiToken?.let { expectedToken ->
+      install(Authentication) {
+        bearer(AUTH_API) {
+          authenticate { credential ->
+            if (credential.token == expectedToken) {
+              UserIdPrincipal("api")
+            } else {
+              null
+            }
+          }
         }
       }
     }
 
     routing {
-      serverRoutes(kdown)
-      downloadRoutes(kdown)
-      eventRoutes(kdown)
+      if (config.apiToken != null) {
+        authenticate(AUTH_API) {
+          apiRoutes(kdown)
+        }
+      } else {
+        apiRoutes(kdown)
+      }
       webResources()
     }
   }
 
   companion object {
     private const val TAG = "KDownServer"
+    private const val AUTH_API = "api-bearer"
   }
+}
+
+private fun Route.apiRoutes(kdown: KDownApi) {
+  serverRoutes(kdown)
+  downloadRoutes(kdown)
+  eventRoutes(kdown)
 }
 
 /**
@@ -268,3 +276,4 @@ private fun Route.webResources() {
     }
   }
 }
+

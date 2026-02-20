@@ -8,4 +8,5 @@ sealed class ConnectionState {
   data object Connecting : ConnectionState()
   data class Disconnected(val reason: String? = null) :
     ConnectionState()
+  data object Unauthorized : ConnectionState()
 }

@@ -388,10 +388,12 @@ fun AppShell(instanceManager: InstanceManager) {
   }
 
   if (appState.showAddRemoteDialog) {
+    val unauthorized = appState.unauthorizedInstance
     AddRemoteServerDialog(
       onDismiss = {
         appState.resetDiscovery()
         appState.showAddRemoteDialog = false
+        appState.unauthorizedInstance = null
       },
       discoveryState = appState.discoveryState,
       onDiscover = { port ->
@@ -403,8 +405,18 @@ fun AppShell(instanceManager: InstanceManager) {
       onAdd = { host, port, token ->
         appState.resetDiscovery()
         appState.showAddRemoteDialog = false
-        appState.addRemoteServer(host, port, token)
-      }
+        if (unauthorized != null) {
+          appState.reconnectWithToken(
+            unauthorized, token ?: ""
+          )
+        } else {
+          appState.addRemoteServer(host, port, token)
+        }
+      },
+      initialHost = unauthorized?.host ?: "",
+      initialPort = unauthorized?.port?.toString()
+        ?: "8642",
+      authRequired = unauthorized != null,
     )
   }
 }

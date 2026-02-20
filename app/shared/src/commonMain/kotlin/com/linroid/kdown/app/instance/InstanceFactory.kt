@@ -64,9 +64,8 @@ class InstanceFactory(
     port: Int = 8642,
     token: String? = null,
   ): RemoteInstance {
-    val baseUrl = "http://$host:$port"
     return RemoteInstance(
-      instance = RemoteKDown(baseUrl, token),
+      instance = RemoteKDown(host, port, token),
       label = "$host:$port",
     )
   }

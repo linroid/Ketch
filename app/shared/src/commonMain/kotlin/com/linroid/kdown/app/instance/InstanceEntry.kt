@@ -20,6 +20,8 @@ data class RemoteInstance(
   override val instance: RemoteKDown,
   override val label: String,
 ) : InstanceEntry {
+  val host: String get() = instance.host
+  val port: Int get() = instance.port
   val connectionState: StateFlow<ConnectionState>
     get() = instance.connectionState
 }
