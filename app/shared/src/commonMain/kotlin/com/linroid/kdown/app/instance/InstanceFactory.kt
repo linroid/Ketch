@@ -1,9 +1,9 @@
 package com.linroid.kdown.app.instance
 
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.core.DownloadConfig
+import com.linroid.kdown.api.config.DownloadConfig
+import com.linroid.kdown.api.config.RemoteConfig
 import com.linroid.kdown.core.KDown
-import com.linroid.kdown.core.QueueConfig
 import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.core.task.TaskStore
 import com.linroid.kdown.engine.KtorHttpEngine
@@ -30,9 +30,12 @@ import com.linroid.kdown.remote.RemoteKDown
 class InstanceFactory(
   taskStore: TaskStore? = null,
   defaultDirectory: String = "downloads",
+  downloadConfig: DownloadConfig = DownloadConfig(
+    defaultDirectory = defaultDirectory,
+  ),
   val deviceName: String = "Embedded",
   private val embeddedFactory: (() -> KDown)? = taskStore?.let { ts ->
-    { createDefaultEmbeddedKDown(ts, defaultDirectory) }
+    { createDefaultEmbeddedKDown(ts, downloadConfig, deviceName) }
   },
   private val localServerFactory:
     ((port: Int, apiToken: String?, KDownApi) -> LocalServerHandle)? = null,
@@ -58,16 +61,25 @@ class InstanceFactory(
     )
   }
 
+  /** Create a remote instance from a [RemoteConfig]. */
+  fun createRemote(config: RemoteConfig): RemoteInstance {
+    return RemoteInstance(
+      instance = RemoteKDown(
+        config.host, config.port, config.apiToken, config.secure,
+      ),
+      label = "${config.host}:${config.port}",
+      remoteConfig = config,
+    )
+  }
+
   /** Create a remote instance for the given host/port/token. */
   fun createRemote(
     host: String,
     port: Int = 8642,
     token: String? = null,
   ): RemoteInstance {
-    val baseUrl = "http://$host:$port"
-    return RemoteInstance(
-      instance = RemoteKDown(baseUrl, token),
-      label = "$host:$port",
+    return createRemote(
+      RemoteConfig(host = host, port = port, apiToken = token),
     )
   }
 
@@ -96,22 +108,14 @@ class InstanceFactory(
 
 private fun createDefaultEmbeddedKDown(
   taskStore: TaskStore,
-  defaultDirectory: String,
+  config: DownloadConfig,
+  name: String,
 ): KDown {
   return KDown(
     httpEngine = KtorHttpEngine(),
     taskStore = taskStore,
-    config = DownloadConfig(
-      defaultDirectory = defaultDirectory,
-      maxConnections = 4,
-      retryCount = 3,
-      retryDelayMs = 1000,
-      progressUpdateIntervalMs = 200,
-      queueConfig = QueueConfig(
-        maxConcurrentDownloads = 3,
-        maxConnectionsPerHost = 4,
-      )
-    ),
+    config = config,
+    name = name,
     logger = Logger.console(),
   )
 }

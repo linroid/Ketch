@@ -5,11 +5,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.linroid.kdown.app.App
+import com.linroid.kdown.app.config.FileConfigStore
 import com.linroid.kdown.app.instance.InstanceFactory
 import com.linroid.kdown.app.instance.InstanceManager
 import com.linroid.kdown.app.instance.LocalServerHandle
+import com.linroid.kdown.api.config.ServerConfig
 import com.linroid.kdown.server.KDownServer
-import com.linroid.kdown.server.KDownServerConfig
 import com.linroid.kdown.sqlite.DriverFactory
 import com.linroid.kdown.sqlite.createSqliteTaskStore
 import java.io.File
@@ -17,24 +18,36 @@ import java.net.InetAddress
 
 fun main() = application {
   val instanceManager = remember {
-    val dbPath = appConfigDir() + File.separator + "kdown.db"
+    val configDir = appConfigDir()
+    val configStore = FileConfigStore(
+      configDir + File.separator + "config.toml",
+    )
+    val config = configStore.load()
+    val dbPath = configDir + File.separator + "kdown.db"
     val taskStore = createSqliteTaskStore(DriverFactory(dbPath))
-    val downloadsDir = System.getProperty("user.home") +
+    val defaultDownloadsDir = System.getProperty("user.home") +
       File.separator + "Downloads"
+    val downloadConfig = config.download.copy(
+      defaultDirectory = config.download.defaultDirectory
+        .takeIf { it != "downloads" }
+        ?: defaultDownloadsDir,
+    )
+    val instanceName = config.name
+      ?: InetAddress.getLocalHost().hostName
     InstanceManager(
-      InstanceFactory(
+      factory = InstanceFactory(
         taskStore = taskStore,
-        defaultDirectory = downloadsDir,
-        deviceName = InetAddress.getLocalHost().hostName,
+        downloadConfig = downloadConfig,
+        deviceName = instanceName,
         localServerFactory = { port, apiToken, kdownApi ->
           val server = KDownServer(
             kdownApi,
-            KDownServerConfig(
+            ServerConfig(
               port = port,
               apiToken = apiToken,
-              mdnsServiceName = InetAddress.getLocalHost().hostName,
               corsAllowedHosts = listOf("*"),
-            )
+            ),
+            mdnsServiceName = instanceName,
           )
           server.start(wait = false)
           object : LocalServerHandle {
@@ -43,7 +56,9 @@ fun main() = application {
             }
           }
         }
-      )
+      ),
+      initialRemotes = config.remote,
+      configStore = configStore,
     )
   }
   DisposableEffect(Unit) {

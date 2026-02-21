@@ -1,6 +1,7 @@
 package com.linroid.kdown.app
 
 import com.linroid.kdown.api.KDownApi
+import com.linroid.kdown.api.config.RemoteConfig
 import com.linroid.kdown.app.instance.EmbeddedInstance
 import com.linroid.kdown.app.instance.RemoteInstance
 import com.linroid.kdown.core.KDown
@@ -77,6 +78,9 @@ class FakeInstanceFactory(
     return RemoteInstance(
       instance = api as RemoteKDown,
       label = "$host:$port",
+      remoteConfig = RemoteConfig(
+        host = host, port = port, apiToken = token,
+      ),
     )
   }
 

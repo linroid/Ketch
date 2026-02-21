@@ -53,6 +53,16 @@ interface DownloadTask {
   suspend fun setPriority(priority: DownloadPriority)
 
   /**
+   * Updates the number of concurrent connections (segments) for this
+   * download task. Takes effect immediately on active downloads —
+   * segments are dynamically merged or split to match the new
+   * connection count while preserving completed progress.
+   *
+   * @param connections the new connection count, must be greater than 0
+   */
+  suspend fun setConnections(connections: Int)
+
+  /**
    * Reschedules this download with a new schedule and optional conditions.
    * Active downloads are paused (preserving progress) before rescheduling.
    * Works from any non-terminal state.

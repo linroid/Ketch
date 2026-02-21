@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  *
  * ### Server
  * - `GET  /api/status`       — server health and task counts
- * - `PUT  /api/speed-limit`  — set global speed limit
+ * - `PUT  /api/config`       — update download configuration
  * - `POST /api/resolve`      — resolve URL metadata without downloading
  *
  * ### Tasks
@@ -24,8 +24,9 @@ import kotlinx.serialization.Serializable
  * - `POST   /api/tasks/{id}/resume`      — resume a download
  * - `POST   /api/tasks/{id}/cancel`      — cancel a download
  * - `DELETE /api/tasks/{id}`             — remove a task
- * - `PUT    /api/tasks/{id}/speed-limit` — set task speed limit
- * - `PUT    /api/tasks/{id}/priority`    — set task priority
+ * - `PUT    /api/tasks/{id}/speed-limit`  — set task speed limit
+ * - `PUT    /api/tasks/{id}/priority`     — set task priority
+ * - `PUT    /api/tasks/{id}/connections`  — set task connections
  *
  * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
@@ -40,8 +41,8 @@ class Api {
   data class Status(val parent: Api = Api())
 
   @Serializable
-  @Resource("speed-limit")
-  data class SpeedLimit(val parent: Api = Api())
+  @Resource("config")
+  data class Config(val parent: Api = Api())
 
   @Serializable
   @Resource("resolve")
@@ -77,6 +78,10 @@ class Api {
       @Serializable
       @Resource("priority")
       data class Priority(val parent: ById)
+
+      @Serializable
+      @Resource("connections")
+      data class Connections(val parent: ById)
     }
   }
 

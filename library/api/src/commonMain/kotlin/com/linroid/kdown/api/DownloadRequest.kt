@@ -11,8 +11,10 @@ import kotlinx.serialization.Transient
  * @property url the HTTP(S) URL to download from. Must not be blank.
  * @property output where the file should be saved. See [Output].
  * @property connections number of concurrent connections (segments) to
- *   use. Must be greater than 0. Falls back to a single connection if
- *   the server does not support HTTP Range requests.
+ *   use. Must be non-negative. When `0` (the default), the engine uses
+ *   [DownloadConfig.maxConnections][com.linroid.kdown.api.config.DownloadConfig.maxConnections].
+ *   Falls back to a single connection if the server does not support
+ *   HTTP Range requests.
  * @property headers custom HTTP headers to include in every request
  *   (HEAD and GET) for this download.
  * @property properties arbitrary key-value pairs for use by custom
@@ -40,7 +42,7 @@ import kotlinx.serialization.Transient
 data class DownloadRequest(
   val url: String,
   val output: Output = Output.DirectoryAndFile(),
-  val connections: Int = 1,
+  val connections: Int = 0,
   val headers: Map<String, String> = emptyMap(),
   val properties: Map<String, String> = emptyMap(),
   val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
@@ -81,7 +83,7 @@ data class DownloadRequest(
 
   init {
     require(url.isNotBlank()) { "URL must not be blank" }
-    require(connections > 0) { "Connections must be greater than 0" }
+    require(connections >= 0) { "Connections must be non-negative" }
   }
 }
 

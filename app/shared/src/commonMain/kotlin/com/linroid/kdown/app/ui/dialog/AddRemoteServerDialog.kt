@@ -40,9 +40,12 @@ fun AddRemoteServerDialog(
   onDiscover: (port: Int) -> Unit,
   onStopDiscovery: () -> Unit,
   onAdd: (host: String, port: Int, token: String?) -> Unit,
+  initialHost: String = "",
+  initialPort: String = "8642",
+  authRequired: Boolean = false,
 ) {
-  var host by remember { mutableStateOf("") }
-  var port by remember { mutableStateOf("8642") }
+  var host by remember { mutableStateOf(initialHost) }
+  var port by remember { mutableStateOf(initialPort) }
   var token by remember { mutableStateOf("") }
   val isValidHost = host.isNotBlank()
   val isValidPort = port.toIntOrNull()?.let {
@@ -59,7 +62,12 @@ fun AddRemoteServerDialog(
 
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text("Add Remote Server") },
+    title = {
+      Text(
+        if (authRequired) "Authentication Required"
+        else "Add Remote Server"
+      )
+    },
     text = {
       Column(
         modifier = Modifier.verticalScroll(
@@ -67,6 +75,14 @@ fun AddRemoteServerDialog(
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
+        if (authRequired) {
+          Text(
+            text = "The server requires an API token" +
+              " to connect. Please enter the token below.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+          )
+        }
         OutlinedTextField(
           value = host,
           onValueChange = { host = it },
@@ -193,7 +209,7 @@ fun AddRemoteServerDialog(
         },
         enabled = isValidHost && isValidPort,
       ) {
-        Text("Add")
+        Text(if (authRequired) "Connect" else "Add")
       }
     },
     dismissButton = {

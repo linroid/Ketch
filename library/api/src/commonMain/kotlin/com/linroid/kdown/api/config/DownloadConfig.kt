@@ -1,6 +1,7 @@
-package com.linroid.kdown.core
+package com.linroid.kdown.api.config
 
 import com.linroid.kdown.api.SpeedLimit
+import kotlinx.serialization.Serializable
 
 /**
  * Download configuration.
@@ -17,6 +18,7 @@ import com.linroid.kdown.api.SpeedLimit
  * @property speedLimit Global speed limit applied across all downloads
  * @property queueConfig Configuration for the download queue
  */
+@Serializable
 data class DownloadConfig(
   val defaultDirectory: String = "downloads",
   val maxConnections: Int = 4,

@@ -1,5 +1,6 @@
 package com.linroid.kdown.server
 
+import com.linroid.kdown.api.config.ServerConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -9,62 +10,57 @@ class KDownServerConfigTest {
 
   @Test
   fun `default config has expected values`() {
-    val config = KDownServerConfig.Default
+    val config = ServerConfig()
     assertEquals("0.0.0.0", config.host)
     assertEquals(8642, config.port)
     assertNull(config.apiToken)
     assertEquals(true, config.mdnsEnabled)
-    assertEquals("KDown", config.mdnsServiceName)
-    assertEquals("_kdown._tcp", config.mdnsServiceType)
+    assertEquals("_kdown._tcp", ServerConfig.MDNS_SERVICE_TYPE)
     assertEquals(emptyList(), config.corsAllowedHosts)
   }
 
   @Test
   fun `port 0 is rejected`() {
     assertFailsWith<IllegalArgumentException> {
-      KDownServerConfig(port = 0)
+      ServerConfig(port = 0)
     }
   }
 
   @Test
   fun `port 65536 is rejected`() {
     assertFailsWith<IllegalArgumentException> {
-      KDownServerConfig(port = 65536)
+      ServerConfig(port = 65536)
     }
   }
 
   @Test
   fun `negative port is rejected`() {
     assertFailsWith<IllegalArgumentException> {
-      KDownServerConfig(port = -1)
+      ServerConfig(port = -1)
     }
   }
 
   @Test
   fun `valid port range boundaries`() {
-    KDownServerConfig(port = 1)
-    KDownServerConfig(port = 65535)
+    ServerConfig(port = 1)
+    ServerConfig(port = 65535)
   }
 
   @Test
   fun `custom config values`() {
-    val config = KDownServerConfig(
+    val config = ServerConfig(
       host = "127.0.0.1",
       port = 9000,
       apiToken = "my-token",
       mdnsEnabled = false,
-      mdnsServiceName = "My Server",
-      mdnsServiceType = "_myserver._tcp.local.",
       corsAllowedHosts = listOf("localhost:3000"),
     )
     assertEquals("127.0.0.1", config.host)
     assertEquals(9000, config.port)
     assertEquals("my-token", config.apiToken)
     assertEquals(false, config.mdnsEnabled)
-    assertEquals("My Server", config.mdnsServiceName)
-    assertEquals("_myserver._tcp.local.", config.mdnsServiceType)
     assertEquals(
-      listOf("localhost:3000"), config.corsAllowedHosts
+      listOf("localhost:3000"), config.corsAllowedHosts,
     )
   }
 }

@@ -7,10 +7,10 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownError
-import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
-import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.api.KDownStatus
+import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.core.engine.DelegatingSpeedLimiter
 import com.linroid.kdown.core.engine.DownloadCoordinator
 import com.linroid.kdown.core.engine.DownloadScheduler
@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
+import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
 /**
@@ -52,6 +53,7 @@ import kotlin.uuid.Uuid
  * @param httpEngine the HTTP engine for HTTP/HTTPS downloads
  * @param taskStore persistent storage for task records
  * @param config global download configuration
+ * @param name user-visible instance name included in [status]
  * @param fileAccessorFactory factory for creating platform file writers
  * @param fileNameResolver strategy for resolving download file names
  * @param additionalSources extra [DownloadSource] implementations
@@ -62,6 +64,7 @@ class KDown(
   private val httpEngine: HttpEngine,
   private val taskStore: TaskStore = InMemoryTaskStore(),
   private val config: DownloadConfig = DownloadConfig.Default,
+  private val name: String = "KDown",
   private val fileAccessorFactory: (String) -> FileAccessor = { path ->
     FileAccessor(path)
   },
@@ -70,6 +73,10 @@ class KDown(
   additionalSources: List<DownloadSource> = emptyList(),
   logger: Logger = Logger.None,
 ) : KDownApi {
+  private val startMark = TimeSource.Monotonic.markNow()
+
+  private var currentConfig: DownloadConfig = config
+
   private val globalLimiter = DelegatingSpeedLimiter(
     if (config.speedLimit.isUnlimited) {
       SpeedLimiter.Unlimited
@@ -93,7 +100,7 @@ class KDown(
 
   init {
     KDownLogger.setLogger(logger)
-    KDownLogger.i("KDown") { "KDown v${KDownVersion.DEFAULT} initialized" }
+    KDownLogger.i("KDown") { "KDown v${KDownApi.VERSION} initialized" }
     if (!config.speedLimit.isUnlimited) {
       KDownLogger.i("KDown") {
         "Global speed limit: " +
@@ -137,9 +144,6 @@ class KDown(
 
   /** Observable list of all download tasks. */
   override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
-
-  override val version: StateFlow<KDownVersion> =
-    MutableStateFlow(KDownVersion(KDownVersion.DEFAULT, KDownVersion.DEFAULT))
 
   /**
    * Starts a new download and adds it to the [tasks] flow.
@@ -230,6 +234,9 @@ class KDown(
       setPriorityAction = { priority ->
         scheduler.setPriority(taskId, priority)
       },
+      setConnectionsAction = { connections ->
+        coordinator.setTaskConnections(taskId, connections)
+      },
       rescheduleAction = { schedule, conditions ->
         val s = stateFlow.value
         if (s.isTerminal) {
@@ -271,6 +278,17 @@ class KDown(
 
   override suspend fun start() {
     loadTasks()
+  }
+
+  override suspend fun status(): KDownStatus {
+    return KDownStatus(
+      name = name,
+      version = KDownApi.VERSION,
+      revision = KDownApi.REVISION,
+      uptime = startMark.elapsedNow().inWholeSeconds,
+      config = currentConfig,
+      system = currentSystemInfo(config.defaultDirectory),
+    )
   }
 
   /**
@@ -380,6 +398,9 @@ class KDown(
       setPriorityAction = { priority ->
         scheduler.setPriority(record.taskId, priority)
       },
+      setConnectionsAction = { connections ->
+        coordinator.setTaskConnections(record.taskId, connections)
+      },
       rescheduleAction = { schedule, conditions ->
         val s = stateFlow.value
         if (s.isTerminal) {
@@ -470,14 +491,11 @@ class KDown(
     }
   }
 
-  /**
-   * Updates the global speed limit applied across all downloads.
-   * Takes effect immediately on all active downloads.
-   *
-   * @param limit the new global speed limit, or
-   *   [com.linroid.kdown.api.SpeedLimit.Unlimited]
-   */
-  override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {
+  override suspend fun updateConfig(config: DownloadConfig) {
+    currentConfig = config
+
+    // Apply speed limit
+    val limit = config.speedLimit
     val current = globalLimiter.delegate
     if (limit.isUnlimited) {
       globalLimiter.delegate = SpeedLimiter.Unlimited
@@ -486,10 +504,11 @@ class KDown(
     } else {
       globalLimiter.delegate = TokenBucket(limit.bytesPerSecond)
     }
-    KDownLogger.i("KDown") {
-      "Global speed limit updated: " +
-        "${limit.bytesPerSecond} bytes/sec"
-    }
+
+    // Apply queue config
+    scheduler.queueConfig = config.queueConfig
+
+    KDownLogger.i("KDown") { "Config updated: $config" }
   }
 
   override fun close() {

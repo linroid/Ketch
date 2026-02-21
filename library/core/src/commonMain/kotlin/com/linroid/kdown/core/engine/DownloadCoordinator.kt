@@ -7,7 +7,7 @@ import com.linroid.kdown.api.KDownError
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
 import com.linroid.kdown.api.SpeedLimit
-import com.linroid.kdown.core.DownloadConfig
+import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.core.file.FileAccessor
 import com.linroid.kdown.core.file.FileNameResolver
 import com.linroid.kdown.core.log.KDownLogger
@@ -48,6 +48,7 @@ internal class DownloadCoordinator(
     var fileAccessor: FileAccessor?,
     var totalBytes: Long = 0,
     val taskLimiter: DelegatingSpeedLimiter = DelegatingSpeedLimiter(),
+    var context: DownloadContext? = null,
   )
 
   suspend fun start(
@@ -247,8 +248,13 @@ internal class DownloadCoordinator(
         request.headers,
         preResolved = if (resolved != null) resolvedUrl else null,
       )
+      mutex.withLock {
+        activeDownloads[taskId]?.context = context
+      }
 
-      downloadWithRetry(taskId) { source.download(context) }
+      downloadWithRetry(taskId, context) {
+        source.download(context)
+      }
 
       try {
         fileAccessor.flush()
@@ -449,9 +455,12 @@ internal class DownloadCoordinator(
       fileAccessor, segmentsFlow, stateFlow, taskLimiter,
       taskRecord.totalBytes, taskRecord.request.headers
     )
+    mutex.withLock {
+      activeDownloads[taskId]?.context = context
+    }
 
     try {
-      downloadWithRetry(taskId) {
+      downloadWithRetry(taskId, context) {
         source.resume(context, resumeState)
       }
 
@@ -486,6 +495,7 @@ internal class DownloadCoordinator(
 
   private suspend fun downloadWithRetry(
     taskId: String,
+    context: DownloadContext? = null,
     block: suspend () -> Unit,
   ) {
     var retryCount = 0
@@ -510,13 +520,68 @@ internal class DownloadCoordinator(
         }
 
         retryCount++
-        val delayMs = config.retryDelayMs * (1 shl (retryCount - 1))
-        KDownLogger.w("Coordinator") {
-          "Retry attempt $retryCount after ${delayMs}ms delay: " +
-            "${error.message}"
+
+        val delayMs: Long
+        if (error is KDownError.Http && error.code == 429 &&
+          context != null
+        ) {
+          reduceConnections(
+            taskId, context, error.rateLimitRemaining,
+          )
+          delayMs = error.retryAfterSeconds?.let { it * 1000L }
+            ?: (config.retryDelayMs * (1 shl (retryCount - 1)))
+          KDownLogger.w("Coordinator") {
+            "Rate limited (429). Retry attempt $retryCount " +
+              "after ${delayMs}ms delay, connections=" +
+              "${context.maxConnections.value}"
+          }
+        } else {
+          delayMs = config.retryDelayMs * (1 shl (retryCount - 1))
+          KDownLogger.w("Coordinator") {
+            "Retry attempt $retryCount after ${delayMs}ms " +
+              "delay: ${error.message}"
+          }
         }
         delay(delayMs)
       }
+    }
+  }
+
+  /**
+   * Reduces the number of concurrent connections for a download task
+   * that received HTTP 429 (Too Many Requests).
+   *
+   * When [rateLimitRemaining] is available, uses it directly as the
+   * new connection count (minimum 1). Otherwise falls back to halving
+   * the current count. Emits the new value to
+   * [DownloadContext.maxConnections], triggering live resegmentation
+   * in [HttpDownloadSource].
+   */
+  private fun reduceConnections(
+    taskId: String,
+    context: DownloadContext,
+    rateLimitRemaining: Long? = null,
+  ) {
+    val current = when {
+      context.maxConnections.value > 0 ->
+        context.maxConnections.value
+      context.request.connections > 0 -> context.request.connections
+      else -> config.maxConnections
+    }
+    val reduced = if (rateLimitRemaining != null &&
+      rateLimitRemaining < current
+    ) {
+      rateLimitRemaining.toInt().coerceAtLeast(1)
+    } else {
+      (current / 2).coerceAtLeast(1)
+    }
+    context.maxConnections.value = reduced
+    KDownLogger.w("Coordinator") {
+      "Reducing connections for taskId=$taskId: " +
+        "$current -> $reduced" +
+        (rateLimitRemaining?.let {
+          " (RateLimit-Remaining=$it)"
+        } ?: "")
     }
   }
 
@@ -571,6 +636,24 @@ internal class DownloadCoordinator(
       return
     }
     taskStore.save(update(existing))
+  }
+
+  suspend fun setTaskConnections(taskId: String, connections: Int) {
+    require(connections > 0) { "Connections must be greater than 0" }
+    updateTaskRecord(taskId) {
+      it.copy(
+        request = it.request.copy(connections = connections),
+        updatedAt = Clock.System.now(),
+      )
+    }
+    // Live update — triggers resegmentation in HttpDownloadSource
+    mutex.withLock {
+      activeDownloads[taskId]?.context
+        ?.maxConnections?.value = connections
+    }
+    KDownLogger.i("Coordinator") {
+      "Task connections updated for taskId=$taskId: $connections"
+    }
   }
 
   suspend fun setTaskSpeedLimit(taskId: String, limit: SpeedLimit) {
@@ -648,6 +731,9 @@ internal class DownloadCoordinator(
       },
       headers = headers,
       preResolved = preResolved,
+      maxConnections = MutableStateFlow(
+        request.connections.takeIf { it > 0 } ?: 0
+      ),
     )
   }
 

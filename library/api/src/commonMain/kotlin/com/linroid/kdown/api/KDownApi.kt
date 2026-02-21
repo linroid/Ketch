@@ -1,5 +1,6 @@
 package com.linroid.kdown.api
 
+import com.linroid.kdown.api.config.DownloadConfig
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -8,14 +9,11 @@ import kotlinx.coroutines.flow.StateFlow
  * the UI to work identically regardless of backend mode.
  */
 interface KDownApi {
-
   /** Human-readable label: "Core" or "Remote · host:port". */
   val backendLabel: String
 
   /** Reactive task list updated on any state change. */
   val tasks: StateFlow<List<DownloadTask>>
-
-  val version: StateFlow<KDownVersion>
 
   /** Create a new download and return the task handle. */
   suspend fun download(request: DownloadRequest): DownloadTask
@@ -45,9 +43,31 @@ interface KDownApi {
    */
   suspend fun start()
 
-  /** Set global speed limit (use [SpeedLimit.Unlimited] to remove). */
-  suspend fun setGlobalSpeedLimit(limit: SpeedLimit)
+  /**
+   * Returns a point-in-time status snapshot including
+   * configuration, system information, and storage details.
+   */
+  suspend fun status(): KDownStatus
+
+  /**
+   * Updates the runtime download configuration.
+   *
+   * Changes take effect immediately on all active downloads.
+   * For example, updating [DownloadConfig.speedLimit] adjusts
+   * the global speed limit, and updating
+   * [DownloadConfig.queueConfig] adjusts concurrency settings.
+   */
+  suspend fun updateConfig(config: DownloadConfig)
 
   /** Release resources (HTTP client, SSE connection, etc.). */
   fun close()
+
+
+  companion object {
+    /** Library version string (e.g., "0.0.1-dev"). */
+    const val VERSION: String = KDOWN_BUILD_VERSION
+
+    /** Build revision (git short hash). */
+    const val REVISION: String = KDOWN_BUILD_REVISION
+  }
 }

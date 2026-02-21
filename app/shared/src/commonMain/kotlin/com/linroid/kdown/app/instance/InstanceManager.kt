@@ -3,9 +3,11 @@ package com.linroid.kdown.app.instance
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.KDownVersion
+import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.ResolvedSource
-import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.api.config.DownloadConfig
+import com.linroid.kdown.api.config.RemoteConfig
+import com.linroid.kdown.app.config.ConfigStore
 import com.linroid.kdown.core.KDown
 import com.linroid.kdown.remote.RemoteKDown
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +34,8 @@ import kotlinx.coroutines.launch
  */
 class InstanceManager(
   private val factory: InstanceFactory,
+  initialRemotes: List<RemoteConfig> = emptyList(),
+  private val configStore: ConfigStore? = null,
 ) {
   private val scope = CoroutineScope(
     SupervisorJob() + Dispatchers.Default,
@@ -71,6 +75,13 @@ class InstanceManager(
     _serverState.asStateFlow()
 
   init {
+    for (remote in initialRemotes) {
+      addRemote(
+        host = remote.host,
+        port = remote.port,
+        token = remote.apiToken,
+      )
+    }
     embeddedInstance?.instance?.let { kdown ->
       scope.launch { kdown.start() }
     }
@@ -125,6 +136,31 @@ class InstanceManager(
   }
 
   /**
+   * Replace [old] with a new remote instance that uses
+   * [token] for authentication, then start the connection.
+   */
+  suspend fun reconnectWithToken(
+    old: RemoteInstance,
+    token: String,
+  ) {
+    old.instance.close()
+    val replacement = factory.createRemote(
+      host = old.host,
+      port = old.port,
+      token = token,
+    )
+    _instances.value = _instances.value.map {
+      if (it === old) replacement else it
+    }
+    if (_activeInstance.value === old) {
+      _activeApi.value = replacement.instance
+      _activeInstance.value = replacement
+      replacement.instance.start()
+    }
+    persistRemotes()
+  }
+
+  /**
    * Add a remote server to the instance list.
    * Does NOT activate it -- call [switchTo] afterward.
    */
@@ -135,6 +171,7 @@ class InstanceManager(
   ): RemoteInstance {
     val instance = factory.createRemote(host, port, token)
     _instances.value += instance
+    persistRemotes()
     return instance
   }
 
@@ -161,6 +198,7 @@ class InstanceManager(
       }
     }
     _instances.value = _instances.value.filter { it != instance }
+    persistRemotes()
   }
 
   /** Close the active instance and release all resources. */
@@ -175,20 +213,26 @@ class InstanceManager(
     embeddedInstance?.instance?.close()
     scope.cancel()
   }
+
+  private fun persistRemotes() {
+    val store = configStore ?: return
+    val remotes = _instances.value
+      .filterIsInstance<RemoteInstance>()
+      .map { it.remoteConfig }
+    val current = store.load()
+    store.save(current.copy(remote = remotes))
+  }
 }
 
 /**
  * Placeholder [KDownApi] used when no instance is connected.
- * Returns empty tasks and a default version. Download requests
- * throw -- the UI should prompt to add a remote server first.
+ * Returns empty tasks. Download requests throw -- the UI should
+ * prompt to add a remote server first.
  */
 private object DisconnectedApi : KDownApi {
   override val backendLabel = "Not connected"
   override val tasks =
     MutableStateFlow(emptyList<DownloadTask>())
-  override val version = MutableStateFlow(
-    KDownVersion(KDownVersion.DEFAULT, KDownVersion.DEFAULT),
-  )
 
   override suspend fun download(
     request: DownloadRequest,
@@ -207,7 +251,13 @@ private object DisconnectedApi : KDownApi {
     )
   }
 
-  override suspend fun setGlobalSpeedLimit(limit: SpeedLimit) {}
+  override suspend fun status(): KDownStatus {
+    throw IllegalStateException(
+      "No instance connected. Add a remote server first.",
+    )
+  }
+
+  override suspend fun updateConfig(config: DownloadConfig) {}
   override suspend fun start() {}
   override fun close() {}
 }

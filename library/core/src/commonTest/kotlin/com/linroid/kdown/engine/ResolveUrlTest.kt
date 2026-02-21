@@ -197,6 +197,67 @@ class ResolveUrlTest {
     assertFalse(resolved.metadata.containsKey("lastModified"))
   }
 
+  @Test
+  fun resolve_rateLimitHeaders_propagatedToMetadata() = runTest {
+    val engine = FakeHttpEngine(
+      serverInfo = ServerInfo(
+        contentLength = 5000,
+        acceptRanges = true,
+        etag = null,
+        lastModified = null,
+        rateLimitRemaining = 10,
+        rateLimitReset = 60,
+      ),
+    )
+    val source = HttpDownloadSource(
+      httpEngine = engine,
+      fileNameResolver = DefaultFileNameResolver(),
+    )
+    val resolved = source.resolve("https://example.com/file.zip")
+    assertEquals("10", resolved.metadata["rateLimitRemaining"])
+    assertEquals("60", resolved.metadata["rateLimitReset"])
+  }
+
+  @Test
+  fun resolve_rateLimitZeroRemaining_propagatedToMetadata() = runTest {
+    val engine = FakeHttpEngine(
+      serverInfo = ServerInfo(
+        contentLength = 5000,
+        acceptRanges = true,
+        etag = null,
+        lastModified = null,
+        rateLimitRemaining = 0,
+        rateLimitReset = 5,
+      ),
+    )
+    val source = HttpDownloadSource(
+      httpEngine = engine,
+      fileNameResolver = DefaultFileNameResolver(),
+    )
+    val resolved = source.resolve("https://example.com/file.zip")
+    assertEquals("0", resolved.metadata["rateLimitRemaining"])
+    assertEquals("5", resolved.metadata["rateLimitReset"])
+  }
+
+  @Test
+  fun resolve_noRateLimitHeaders_absentFromMetadata() = runTest {
+    val engine = FakeHttpEngine(
+      serverInfo = ServerInfo(
+        contentLength = 5000,
+        acceptRanges = true,
+        etag = null,
+        lastModified = null,
+      ),
+    )
+    val source = HttpDownloadSource(
+      httpEngine = engine,
+      fileNameResolver = DefaultFileNameResolver(),
+    )
+    val resolved = source.resolve("https://example.com/file.zip")
+    assertFalse(resolved.metadata.containsKey("rateLimitRemaining"))
+    assertFalse(resolved.metadata.containsKey("rateLimitReset"))
+  }
+
   // -- SourceResolver.resolve() for unsupported URLs --
 
   @Test

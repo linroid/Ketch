@@ -9,7 +9,6 @@ import com.linroid.kdown.api.DownloadSchedule
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.KDownVersion
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.SpeedLimit
 import com.linroid.kdown.app.instance.DiscoveredServer
@@ -85,16 +84,6 @@ class AppState(
       emptyList()
     )
 
-  val version: StateFlow<KDownVersion> =
-    activeApi.flatMapLatest { it.version }.stateIn(
-      scope,
-      SharingStarted.WhileSubscribed(5000),
-      KDownVersion(
-        KDownVersion.DEFAULT,
-        KDownVersion.DEFAULT
-      )
-    )
-
   val sortedTasks: StateFlow<List<DownloadTask>> =
     tasks.map { it.sortedByDescending { t -> t.createdAt } }
       .stateIn(
@@ -109,6 +98,18 @@ class AppState(
   var showAddDialog by mutableStateOf(false)
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
+
+  /**
+   * Handle "New Task" action. If no backend is available,
+   * show the add-remote-server dialog instead.
+   */
+  fun requestAddDownload() {
+    if (activeInstance.value == null) {
+      showAddRemoteDialog = true
+    } else {
+      showAddDialog = true
+    }
+  }
   var discoveryState by mutableStateOf<DiscoveryState>(
     DiscoveryState.Idle
   )
@@ -116,11 +117,28 @@ class AppState(
   private var discoveryJob: Job? = null
   var switchingInstance by
     mutableStateOf<InstanceEntry?>(null)
+  var unauthorizedInstance by
+    mutableStateOf<RemoteInstance?>(null)
   var resolveState by mutableStateOf<ResolveState>(
     ResolveState.Idle
   )
     private set
   private var resolvingUrl: String? = null
+
+  init {
+    scope.launch {
+      connectionState.collect { state ->
+        if (state is ConnectionState.Unauthorized) {
+          val instance =
+            activeInstance.value as? RemoteInstance
+          if (instance != null) {
+            unauthorizedInstance = instance
+            showAddRemoteDialog = true
+          }
+        }
+      }
+    }
+  }
 
   fun resolveUrl(url: String) {
     resolvingUrl = url
@@ -157,16 +175,10 @@ class AppState(
   ) {
     scope.launch {
       runCatching {
-        val connections = if (resolvedUrl != null) {
-          resolvedUrl.maxSegments.coerceAtLeast(1)
-        } else {
-          4
-        }
         val request = DownloadRequest(
           url = url,
           directory = null,
           fileName = fileName.ifBlank { null },
-          connections = connections,
           speedLimit = speedLimit,
           priority = priority,
           schedule = schedule,
@@ -282,6 +294,21 @@ class AppState(
         if (task.state.value is DownloadState.Completed) {
           task.remove()
         }
+      }
+    }
+  }
+
+  fun reconnectWithToken(
+    instance: RemoteInstance,
+    token: String,
+  ) {
+    unauthorizedInstance = null
+    scope.launch {
+      try {
+        instanceManager.reconnectWithToken(instance, token)
+      } catch (e: Exception) {
+        errorMessage =
+          "Failed to reconnect: ${e.message}"
       }
     }
   }

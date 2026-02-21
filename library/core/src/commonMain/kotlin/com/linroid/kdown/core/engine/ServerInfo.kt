@@ -11,6 +11,10 @@ package com.linroid.kdown.core.engine
  * @property etag the `ETag` header value, used for resume validation
  * @property lastModified the `Last-Modified` header value, used for resume validation
  * @property contentDisposition the `Content-Disposition` header, used for file name resolution
+ * @property rateLimitRemaining number of requests remaining in the current rate limit window
+ *   (`RateLimit-Remaining` header), or `null` if absent
+ * @property rateLimitReset seconds until the rate limit window resets
+ *   (`RateLimit-Reset` header), or `null` if absent
  */
 data class ServerInfo(
   val contentLength: Long?,
@@ -18,6 +22,8 @@ data class ServerInfo(
   val etag: String?,
   val lastModified: String?,
   val contentDisposition: String? = null,
+  val rateLimitRemaining: Long? = null,
+  val rateLimitReset: Long? = null,
 ) {
   /** `true` when the server supports byte-range requests and reports a content length. */
   val supportsResume: Boolean

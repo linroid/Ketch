@@ -1,4 +1,6 @@
-package com.linroid.kdown.core
+package com.linroid.kdown.api.config
+
+import kotlinx.serialization.Serializable
 
 /**
  * Configuration for the download queue.
@@ -12,6 +14,7 @@ package com.linroid.kdown.core
  *   automatically when slots are available. When `false`, tasks remain
  *   queued until explicitly resumed.
  */
+@Serializable
 data class QueueConfig(
   val maxConcurrentDownloads: Int = 3,
   val maxConnectionsPerHost: Int = 4,

@@ -30,6 +30,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -67,8 +68,16 @@ fun AppShell(instanceManager: InstanceManager) {
     onDispose { instanceManager.close() }
   }
 
+  val instances by appState.instances.collectAsState()
+  // Auto-show add-remote-server dialog when no instances
+  // are configured (remote-only mode without auto-connect).
+  LaunchedEffect(instances) {
+    if (instances.isEmpty()) {
+      appState.showAddRemoteDialog = true
+    }
+  }
+
   val sortedTasks by appState.sortedTasks.collectAsState()
-  val version by appState.version.collectAsState()
   val activeInstance by
     appState.activeInstance.collectAsState()
   val connectionState by
@@ -208,7 +217,7 @@ fun AppShell(instanceManager: InstanceManager) {
                 appState.statusFilter = selected
               },
               onAddClick = {
-                appState.showAddDialog = true
+                appState.requestAddDownload()
               }
             )
             VerticalDivider(
@@ -294,7 +303,7 @@ fun AppShell(instanceManager: InstanceManager) {
               selectedFilter = appState.statusFilter,
               scope = scope,
               onAddClick = {
-                appState.showAddDialog = true
+                appState.requestAddDownload()
               },
               modifier = Modifier.weight(1f),
             )
@@ -317,7 +326,7 @@ fun AppShell(instanceManager: InstanceManager) {
       // own "New Task" button on Expanded)
       if (!isExpanded) {
         FloatingActionButton(
-          onClick = { appState.showAddDialog = true },
+          onClick = { appState.requestAddDownload() },
           modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(end = 16.dp, bottom = 72.dp),
@@ -378,10 +387,12 @@ fun AppShell(instanceManager: InstanceManager) {
   }
 
   if (appState.showAddRemoteDialog) {
+    val unauthorized = appState.unauthorizedInstance
     AddRemoteServerDialog(
       onDismiss = {
         appState.resetDiscovery()
         appState.showAddRemoteDialog = false
+        appState.unauthorizedInstance = null
       },
       discoveryState = appState.discoveryState,
       onDiscover = { port ->
@@ -393,8 +404,18 @@ fun AppShell(instanceManager: InstanceManager) {
       onAdd = { host, port, token ->
         appState.resetDiscovery()
         appState.showAddRemoteDialog = false
-        appState.addRemoteServer(host, port, token)
-      }
+        if (unauthorized != null) {
+          appState.reconnectWithToken(
+            unauthorized, token ?: ""
+          )
+        } else {
+          appState.addRemoteServer(host, port, token)
+        }
+      },
+      initialHost = unauthorized?.host ?: "",
+      initialPort = unauthorized?.port?.toString()
+        ?: "8642",
+      authRequired = unauthorized != null,
     )
   }
 }

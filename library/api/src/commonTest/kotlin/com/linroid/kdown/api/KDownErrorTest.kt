@@ -1,5 +1,6 @@
 package com.linroid.kdown.api
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -28,6 +29,18 @@ class KDownErrorTest {
   @Test
   fun http599_isRetryable() {
     assertTrue(KDownError.Http(599).isRetryable)
+  }
+
+  @Test
+  fun http429_isRetryable() {
+    assertTrue(KDownError.Http(429).isRetryable)
+  }
+
+  @Test
+  fun http429_retryAfterSeconds() {
+    val error = KDownError.Http(429, "Too Many Requests", 30)
+    assertTrue(error.isRetryable)
+    assertEquals(30L, error.retryAfterSeconds)
   }
 
   @Test

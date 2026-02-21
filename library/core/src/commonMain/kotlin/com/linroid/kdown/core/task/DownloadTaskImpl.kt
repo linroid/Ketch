@@ -23,6 +23,7 @@ internal class DownloadTaskImpl(
   private val removeAction: suspend () -> Unit,
   private val setSpeedLimitAction: suspend (SpeedLimit) -> Unit,
   private val setPriorityAction: suspend (DownloadPriority) -> Unit,
+  private val setConnectionsAction: suspend (Int) -> Unit,
   private val rescheduleAction: suspend (DownloadSchedule, List<DownloadCondition>) -> Unit,
 ) : DownloadTask {
 
@@ -44,6 +45,10 @@ internal class DownloadTaskImpl(
 
   override suspend fun setPriority(priority: DownloadPriority) {
     setPriorityAction(priority)
+  }
+
+  override suspend fun setConnections(connections: Int) {
+    setConnectionsAction(connections)
   }
 
   override suspend fun reschedule(

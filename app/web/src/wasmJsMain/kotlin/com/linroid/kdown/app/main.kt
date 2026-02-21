@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
+import com.linroid.kdown.app.config.WebConfigStore
 import com.linroid.kdown.app.instance.InstanceFactory
 import com.linroid.kdown.app.instance.InstanceManager
 import kotlinx.browser.document
@@ -15,16 +16,29 @@ import kotlinx.coroutines.launch
 fun main() {
   val body = document.body ?: return
   ComposeViewport(body) {
+    val configStore = remember { WebConfigStore() }
+    val config = remember { configStore.load() }
     val instanceManager = remember {
-      InstanceManager(InstanceFactory())
+      InstanceManager(
+        factory = InstanceFactory(),
+        initialRemotes = config.remote,
+        configStore = configStore,
+      )
     }
     val scope = rememberCoroutineScope()
     DisposableEffect(Unit) {
-      if (shouldAutoConnect()) {
+      // Auto-connect from config remotes or meta tag
+      if (config.remote.isEmpty() && shouldAutoConnect()) {
         val host = window.location.hostname
         val port = window.location.port.toIntOrNull() ?: 80
         val entry = instanceManager.addRemote(host, port)
         scope.launch { instanceManager.switchTo(entry) }
+      } else if (config.remote.isNotEmpty()) {
+        val first = instanceManager.instances.value
+          .drop(1).firstOrNull() // skip embedded (null), take first remote
+        if (first != null) {
+          scope.launch { instanceManager.switchTo(first) }
+        }
       }
       onDispose { instanceManager.close() }
     }

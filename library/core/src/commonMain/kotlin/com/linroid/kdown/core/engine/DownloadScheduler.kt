@@ -4,7 +4,7 @@ import com.linroid.kdown.api.DownloadPriority
 import com.linroid.kdown.api.DownloadRequest
 import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.Segment
-import com.linroid.kdown.core.QueueConfig
+import com.linroid.kdown.api.config.QueueConfig
 import com.linroid.kdown.core.log.KDownLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
 
 internal class DownloadScheduler(
-  private val queueConfig: QueueConfig,
+  internal var queueConfig: QueueConfig,
   private val coordinator: DownloadCoordinator,
   private val scope: CoroutineScope,
 ) {

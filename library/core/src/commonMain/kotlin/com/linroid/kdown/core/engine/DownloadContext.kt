@@ -24,6 +24,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * @property headers HTTP headers or source-specific metadata headers
  * @property preResolved pre-resolved URL metadata, allowing the
  *   download source to skip its own probe/HEAD request
+ * @property maxConnections observable override for the number of
+ *   concurrent segment connections. When positive, takes precedence
+ *   over [DownloadRequest.connections]. Emitting a new value triggers
+ *   live resegmentation in [HttpDownloadSource]. Reduced automatically
+ *   on HTTP 429 (Too Many Requests) responses.
+ * @property pendingResegment target connection count for a pending
+ *   resegmentation. Set by the connection-change watcher before
+ *   canceling the download batch scope. Read by [HttpDownloadSource]
+ *   to distinguish resegment-cancel from external cancel.
  */
 class DownloadContext(
   val taskId: String,
@@ -35,4 +44,6 @@ class DownloadContext(
   val throttle: suspend (bytes: Int) -> Unit,
   val headers: Map<String, String>,
   val preResolved: ResolvedSource? = null,
+  val maxConnections: MutableStateFlow<Int> = MutableStateFlow(0),
+  var pendingResegment: Int = 0,
 )

@@ -11,12 +11,12 @@ import kotlin.test.assertTrue
 class DownloadRequestTest {
 
   @Test
-  fun defaultConnections_isOne() {
+  fun defaultConnections_isZero() {
     val request = DownloadRequest(
       url = "https://example.com/file",
       directory = "/tmp",
     )
-    assertEquals(1, request.connections)
+    assertEquals(0, request.connections)
   }
 
   @Test
@@ -52,14 +52,13 @@ class DownloadRequestTest {
   }
 
   @Test
-  fun zeroConnections_throws() {
-    assertFailsWith<IllegalArgumentException> {
-      DownloadRequest(
-        url = "https://example.com/file",
-        directory = "/tmp",
-        connections = 0,
-      )
-    }
+  fun zeroConnections_meansUseConfigDefault() {
+    val request = DownloadRequest(
+      url = "https://example.com/file",
+      directory = "/tmp",
+      connections = 0,
+    )
+    assertEquals(0, request.connections)
   }
 
   @Test

@@ -20,6 +20,8 @@ class FakeHttpEngine(
   var failAfterBytes: Long = -1,
   var failOnHead: Boolean = false,
   var httpErrorCode: Int = 0,
+  var retryAfterSeconds: Long? = null,
+  var rateLimitRemaining: Long? = null,
 ) : HttpEngine {
 
   var headCallCount = 0
@@ -40,7 +42,10 @@ class FakeHttpEngine(
       throw KDownError.Network(RuntimeException("Simulated network failure"))
     }
     if (httpErrorCode > 0) {
-      throw KDownError.Http(httpErrorCode, "Simulated HTTP error")
+      throw KDownError.Http(
+        httpErrorCode, "Simulated HTTP error",
+        retryAfterSeconds, rateLimitRemaining,
+      )
     }
     return serverInfo
   }
@@ -55,7 +60,10 @@ class FakeHttpEngine(
     lastDownloadHeaders = headers
 
     if (httpErrorCode > 0) {
-      throw KDownError.Http(httpErrorCode, "Simulated HTTP error")
+      throw KDownError.Http(
+        httpErrorCode, "Simulated HTTP error",
+        retryAfterSeconds, rateLimitRemaining,
+      )
     }
 
     val start = range?.first?.toInt() ?: 0

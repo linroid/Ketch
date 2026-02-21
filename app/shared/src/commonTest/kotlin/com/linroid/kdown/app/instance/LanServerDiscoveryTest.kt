@@ -1,6 +1,6 @@
 package com.linroid.kdown.app.instance
 
-import com.linroid.kdown.api.MDNS_SERVICE_TYPE
+import com.linroid.kdown.api.config.ServerConfig
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,7 +43,7 @@ class LanServerDiscoveryTest {
     val fake = FakeMdnsDiscoverer()
     val discovery = LanServerDiscovery(fake)
     discovery.discover()
-    assertEquals(MDNS_SERVICE_TYPE, fake.lastServiceType)
+    assertEquals(ServerConfig.MDNS_SERVICE_TYPE, fake.lastServiceType)
   }
 
   @Test

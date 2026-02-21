@@ -158,12 +158,58 @@ class SpeedLimitTest {
   }
 
   @Test
-  fun serialization_serializesAsLong() {
+  fun serialization_serializesAsString() {
     val json = Json
-    val serialized = json.encodeToString(
-      SpeedLimit.serializer(), SpeedLimit.of(42)
+    // Whole MB/s uses compact "m" suffix
+    assertEquals(
+      "\"10m\"",
+      json.encodeToString(SpeedLimit.serializer(), SpeedLimit.mbps(10)),
     )
-    // Value class serializes as its underlying type
-    assertEquals("42", serialized)
+    // Whole KB/s uses compact "k" suffix
+    assertEquals(
+      "\"500k\"",
+      json.encodeToString(SpeedLimit.serializer(), SpeedLimit.kbps(500)),
+    )
+    // Non-aligned value uses raw bytes
+    assertEquals(
+      "\"42\"",
+      json.encodeToString(SpeedLimit.serializer(), SpeedLimit.of(42)),
+    )
+    // Unlimited
+    assertEquals(
+      "\"unlimited\"",
+      json.encodeToString(SpeedLimit.serializer(), SpeedLimit.Unlimited),
+    )
+  }
+
+  @Test
+  fun parse_mbps() {
+    assertEquals(SpeedLimit.mbps(10), SpeedLimit.parse("10m"))
+    assertEquals(SpeedLimit.mbps(10), SpeedLimit.parse("10M"))
+    assertEquals(SpeedLimit.mbps(10), SpeedLimit.parse(" 10m "))
+  }
+
+  @Test
+  fun parse_kbps() {
+    assertEquals(SpeedLimit.kbps(500), SpeedLimit.parse("500k"))
+    assertEquals(SpeedLimit.kbps(500), SpeedLimit.parse("500K"))
+  }
+
+  @Test
+  fun parse_rawBytes() {
+    assertEquals(SpeedLimit.of(42), SpeedLimit.parse("42"))
+  }
+
+  @Test
+  fun parse_unlimited() {
+    assertEquals(SpeedLimit.Unlimited, SpeedLimit.parse("unlimited"))
+  }
+
+  @Test
+  fun parse_invalid_returnsNull() {
+    assertEquals(null, SpeedLimit.parse("abc"))
+    assertEquals(null, SpeedLimit.parse("0m"))
+    assertEquals(null, SpeedLimit.parse("-1k"))
+    assertEquals(null, SpeedLimit.parse(""))
   }
 }

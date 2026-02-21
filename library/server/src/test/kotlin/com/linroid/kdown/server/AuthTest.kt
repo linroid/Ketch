@@ -1,5 +1,6 @@
 package com.linroid.kdown.server
 
+import com.linroid.kdown.api.config.ServerConfig
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.http.HttpHeaders
@@ -15,7 +16,7 @@ class AuthTest {
     testApplication {
       application {
         val server = createTestServer(
-          KDownServerConfig(apiToken = "secret-token"),
+          ServerConfig(apiToken = "secret-token"),
         )
         with(server) { configureServer() }
       }
@@ -27,7 +28,7 @@ class AuthTest {
   fun `request with valid token succeeds`() = testApplication {
     application {
       val server = createTestServer(
-        KDownServerConfig(apiToken = "secret-token"),
+        ServerConfig(apiToken = "secret-token"),
       )
       with(server) { configureServer() }
     }
@@ -41,7 +42,7 @@ class AuthTest {
   fun `request with wrong token is rejected`() = testApplication {
     application {
       val server = createTestServer(
-        KDownServerConfig(apiToken = "secret-token"),
+        ServerConfig(apiToken = "secret-token"),
       )
       with(server) { configureServer() }
     }
@@ -56,7 +57,7 @@ class AuthTest {
     testApplication {
       application {
         val server = createTestServer(
-          KDownServerConfig(apiToken = null),
+          ServerConfig(apiToken = null),
         )
         with(server) { configureServer() }
       }

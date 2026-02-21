@@ -37,7 +37,7 @@ internal object WireMapper {
     return DownloadRequest(
       url = wire.url,
       output = output,
-      connections = 1,
+      connections = wire.connections,
       speedLimit = if (wire.speedLimitBytesPerSecond > 0) {
         SpeedLimit.of(wire.speedLimitBytesPerSecond)
       } else {

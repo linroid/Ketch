@@ -1,6 +1,6 @@
 package com.linroid.kdown.server
 
-import com.linroid.kdown.api.MDNS_SERVICE_TYPE
+import com.linroid.kdown.api.config.ServerConfig
 import com.linroid.kdown.server.mdns.MdnsRegistrar
 import java.net.ServerSocket
 import java.util.concurrent.CountDownLatch
@@ -63,12 +63,14 @@ private fun findFreePort(): Int {
 class MdnsRegistrationTest {
 
   private fun createServer(
-    config: KDownServerConfig,
+    config: ServerConfig,
+    mdnsServiceName: String = "KDown",
     registrar: FakeMdnsRegistrar = FakeMdnsRegistrar(),
   ): Pair<KDownServer, FakeMdnsRegistrar> {
     val server = KDownServer(
       kdown = createTestKDown(),
       config = config,
+      mdnsServiceName = mdnsServiceName,
       mdnsRegistrar = registrar,
     )
     return server to registrar
@@ -83,7 +85,7 @@ class MdnsRegistrationTest {
     val registrar = FakeMdnsRegistrar()
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(
+      config = ServerConfig(
         port = port,
         mdnsEnabled = true,
       ),
@@ -104,7 +106,7 @@ class MdnsRegistrationTest {
     val registrar = FakeMdnsRegistrar()
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(
+      config = ServerConfig(
         port = port,
         mdnsEnabled = false,
       ),
@@ -125,17 +127,17 @@ class MdnsRegistrationTest {
     val registrar = FakeMdnsRegistrar()
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(
-        port = port,
-        mdnsServiceName = "My Server",
-        mdnsServiceType = MDNS_SERVICE_TYPE,
-      ),
+      config = ServerConfig(port = port),
+      mdnsServiceName = "My Server",
       registrar = registrar,
     )
     server.start(wait = false)
     try {
       registrar.awaitRegister()
-      assertEquals(MDNS_SERVICE_TYPE, registrar.lastServiceType)
+      assertEquals(
+        ServerConfig.MDNS_SERVICE_TYPE,
+        registrar.lastServiceType,
+      )
       assertEquals("My Server", registrar.lastServiceName)
     } finally {
       server.stop()
@@ -147,7 +149,7 @@ class MdnsRegistrationTest {
     val registrar = FakeMdnsRegistrar()
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(port = port),
+      config = ServerConfig(port = port),
       registrar = registrar,
     )
     server.start(wait = false)
@@ -164,7 +166,7 @@ class MdnsRegistrationTest {
     val registrar = FakeMdnsRegistrar()
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(port = port, apiToken = null),
+      config = ServerConfig(port = port, apiToken = null),
       registrar = registrar,
     )
     server.start(wait = false)
@@ -184,7 +186,7 @@ class MdnsRegistrationTest {
     val registrar = FakeMdnsRegistrar()
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(port = port, apiToken = ""),
+      config = ServerConfig(port = port, apiToken = ""),
       registrar = registrar,
     )
     server.start(wait = false)
@@ -204,7 +206,7 @@ class MdnsRegistrationTest {
     val registrar = FakeMdnsRegistrar()
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(
+      config = ServerConfig(
         port = port,
         apiToken = "my-secret",
       ),
@@ -227,7 +229,7 @@ class MdnsRegistrationTest {
     val registrar = FakeMdnsRegistrar()
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(port = port),
+      config = ServerConfig(port = port),
       registrar = registrar,
     )
     server.start(wait = false)
@@ -242,7 +244,7 @@ class MdnsRegistrationTest {
     registrar.failOnRegister = true
     val port = findFreePort()
     val (server, _) = createServer(
-      config = KDownServerConfig(port = port),
+      config = ServerConfig(port = port),
       registrar = registrar,
     )
     // Should not throw
@@ -254,31 +256,5 @@ class MdnsRegistrationTest {
     } finally {
       server.stop()
     }
-  }
-
-  @Test
-  fun `custom service type is used`() {
-    val registrar = FakeMdnsRegistrar()
-    val port = findFreePort()
-    val (server, _) = createServer(
-      config = KDownServerConfig(
-        port = port,
-        mdnsServiceType = "_custom._tcp",
-      ),
-      registrar = registrar,
-    )
-    server.start(wait = false)
-    try {
-      registrar.awaitRegister()
-      assertEquals("_custom._tcp", registrar.lastServiceType)
-    } finally {
-      server.stop()
-    }
-  }
-
-  @Test
-  fun `default config uses MDNS_SERVICE_TYPE constant`() {
-    val config = KDownServerConfig.Default
-    assertEquals(MDNS_SERVICE_TYPE, config.mdnsServiceType)
   }
 }

@@ -11,13 +11,14 @@ import android.os.Environment
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.linroid.kdown.app.config.FileConfigStore
 import com.linroid.kdown.app.instance.InstanceFactory
 import com.linroid.kdown.app.instance.InstanceManager
 import com.linroid.kdown.app.instance.LocalServerHandle
 import com.linroid.kdown.app.instance.ServerState
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.server.KDownServer
-import com.linroid.kdown.server.KDownServerConfig
+import com.linroid.kdown.api.config.ServerConfig
 import com.linroid.kdown.sqlite.DriverFactory
 import com.linroid.kdown.sqlite.createSqliteTaskStore
 import kotlinx.coroutines.CoroutineScope
@@ -49,25 +50,36 @@ class KDownService : Service() {
 
   override fun onCreate() {
     super.onCreate()
+    val configStore = FileConfigStore(
+      filesDir.resolve("config.toml").absolutePath,
+    )
+    val config = configStore.load()
     val taskStore = createSqliteTaskStore(DriverFactory(this))
     val downloadsDir = Environment
       .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
       .absolutePath
+    val downloadConfig = config.download.copy(
+      defaultDirectory = config.download.defaultDirectory
+        .takeIf { it != "downloads" }
+        ?: downloadsDir,
+    )
+    val instanceName = config.name
+      ?: android.os.Build.MODEL
     instanceManager = InstanceManager(
-      InstanceFactory(
+      factory = InstanceFactory(
         taskStore = taskStore,
-        defaultDirectory = downloadsDir,
-        deviceName = android.os.Build.MODEL,
+        downloadConfig = downloadConfig,
+        deviceName = instanceName,
         localServerFactory = { port, apiToken, kdownApi ->
           KDownLogger.i(TAG) { "Starting local server on port $port" }
           val server = KDownServer(
             kdownApi,
-            KDownServerConfig(
+            ServerConfig(
               port = port,
               apiToken = apiToken,
-              mdnsServiceName = android.os.Build.MODEL,
               corsAllowedHosts = listOf("*"),
             ),
+            mdnsServiceName = instanceName,
           )
           server.start(wait = false)
           KDownLogger.i(TAG) { "Local server started on port $port" }
@@ -80,6 +92,8 @@ class KDownService : Service() {
           }
         },
       ),
+      initialRemotes = config.remote,
+      configStore = configStore,
     )
     createNotificationChannel()
     startForegroundMonitor()

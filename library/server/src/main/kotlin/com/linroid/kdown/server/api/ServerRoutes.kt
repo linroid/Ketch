@@ -1,14 +1,11 @@
 package com.linroid.kdown.server.api
 
 import com.linroid.kdown.api.KDownApi
-import com.linroid.kdown.api.KDownVersion
-import com.linroid.kdown.api.SpeedLimit
+import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.endpoints.Api
 import com.linroid.kdown.endpoints.model.ResolveUrlRequest
 import com.linroid.kdown.endpoints.model.ResolveUrlResponse
-import com.linroid.kdown.endpoints.model.ServerStatus
 import com.linroid.kdown.endpoints.model.SourceFileResponse
-import com.linroid.kdown.endpoints.model.SpeedLimitRequest
 import io.ktor.server.request.receive
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
@@ -17,30 +14,17 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 
 /**
- * Installs server-level endpoints: health check and global
- * speed limit management.
+ * Installs server-level endpoints: status, global speed limit,
+ * and URL resolution.
  */
 internal fun Route.serverRoutes(kdown: KDownApi) {
   get<Api.Status> {
-    val tasks = kdown.tasks.value
-    val active = tasks.count { it.state.value.isActive }
-    call.respond(
-      ServerStatus(
-        version = KDownVersion.DEFAULT,
-        activeTasks = active,
-        totalTasks = tasks.size,
-      )
-    )
+    call.respond(kdown.status())
   }
 
-  put<Api.SpeedLimit> {
-    val body = call.receive<SpeedLimitRequest>()
-    val limit = if (body.bytesPerSecond > 0) {
-      SpeedLimit.of(body.bytesPerSecond)
-    } else {
-      SpeedLimit.Unlimited
-    }
-    kdown.setGlobalSpeedLimit(limit)
+  put<Api.Config> {
+    val body = call.receive<DownloadConfig>()
+    kdown.updateConfig(body)
     call.respond(body)
   }
 
