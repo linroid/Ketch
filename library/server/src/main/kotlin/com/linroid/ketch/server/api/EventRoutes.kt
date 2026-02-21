@@ -11,6 +11,7 @@ import io.ktor.server.sse.sse
 import io.ktor.sse.ServerSentEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -88,19 +89,21 @@ internal fun Route.eventRoutes(ketch: KetchApi) {
 private suspend fun ServerSSESession.trackTaskState(
   task: DownloadTask,
 ) {
-  task.state.collect { state ->
-    val event = when (state) {
-      is DownloadState.Downloading -> TaskEvent.Progress(
-        taskId = task.taskId,
-        state = state,
-      )
-      else -> TaskEvent.StateChanged(
-        taskId = task.taskId,
-        state = state,
-      )
+  task.state.drop(1)
+    .collect { state ->
+      val event = when (state) {
+        is DownloadState.Downloading -> TaskEvent.Progress(
+          taskId = task.taskId,
+          state = state,
+        )
+
+        else -> TaskEvent.StateChanged(
+          taskId = task.taskId,
+          state = state,
+        )
+      }
+      sendEvent(event)
     }
-    sendEvent(event)
-  }
 }
 
 private suspend fun ServerSSESession.sendEvent(event: TaskEvent) {

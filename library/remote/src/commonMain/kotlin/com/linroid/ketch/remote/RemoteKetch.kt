@@ -14,6 +14,7 @@ import com.linroid.ketch.endpoints.model.TaskSnapshot
 import com.linroid.ketch.endpoints.model.TasksResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.resources.Resources
@@ -74,6 +75,10 @@ class RemoteKetch(
   }
 
   internal val httpClient = HttpClient {
+    install(HttpTimeout) {
+      socketTimeoutMillis = Long.MAX_VALUE
+      requestTimeoutMillis = Long.MAX_VALUE
+    }
     install(ContentNegotiation) {
       json(this@RemoteKetch.json)
     }
