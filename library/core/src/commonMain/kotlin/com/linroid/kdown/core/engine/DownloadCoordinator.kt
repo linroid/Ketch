@@ -15,6 +15,7 @@ import com.linroid.kdown.api.isName
 import com.linroid.kdown.core.file.FileAccessor
 import com.linroid.kdown.core.file.FileNameResolver
 import com.linroid.kdown.core.file.createFileAccessor
+import com.linroid.kdown.core.file.resolveChildPath
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.core.task.TaskRecord
 import com.linroid.kdown.core.task.TaskState
@@ -785,11 +786,13 @@ internal class DownloadCoordinator(
       else -> serverFileName
     }
     if (fileName == null) return directory
-    val combined = Path(directory, fileName)
-    return if (deduplicate) {
-      deduplicatePath(combined).toString()
+    // resolveChildPath handles content URIs on Android
+    // (DocumentsContract.createDocument auto-deduplicates)
+    val outputPath = resolveChildPath(directory, fileName)
+    return if (deduplicate && !directory.contains("://")) {
+      deduplicatePath(Path(outputPath)).toString()
     } else {
-      combined.toString()
+      outputPath
     }
   }
 
