@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Main sail (taller, forward) -->
+  <polygon points="168,72 168,338 308,338" fill="#FFFFFF"/>
+  <!-- Mizzen sail (shorter, aft) -->
+  <polygon points="316,168 316,338 404,338" fill="#FFFFFF" fill-opacity="0.65"/>
+  <!-- Hull -->
+  <path d="M88,346 Q256,432 424,346 Z" fill="#FFFFFF"/>
+</svg>

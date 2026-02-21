@@ -29,6 +29,16 @@ compose.desktop {
       targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
       modules("java.sql")
       packageName = "Ketch"
+
+      macOS {
+        iconFile.set(rootProject.file("art/icon.icns"))
+      }
+      windows {
+        iconFile.set(rootProject.file("art/icon.ico"))
+      }
+      linux {
+        iconFile.set(rootProject.file("art/icon.png"))
+      }
       packageVersion = providers.gradleProperty("VERSION_NAME").get()
         .substringBefore("-")
         .let { semver ->

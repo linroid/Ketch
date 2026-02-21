@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		A001 /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B001 /* iOSApp.swift */; };
 		A002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B002 /* ContentView.swift */; };
+		A003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B004 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -16,6 +17,7 @@
 		B001 /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
 		B002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B003 /* Ketch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ketch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,6 +35,7 @@
 			isa = PBXGroup;
 			children = (
 				8676F78D2F3CDCA000DE65CF /* Ketch-Info.plist */,
+				B004 /* Assets.xcassets */,
 				D002 /* Sources */,
 				D003 /* Products */,
 			);
@@ -57,6 +60,17 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXResourcesBuildPhase section */
+		E005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A003 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXNativeTarget section */
 		E001 /* Ketch */ = {
 			isa = PBXNativeTarget;
@@ -64,6 +78,7 @@
 			buildPhases = (
 				E002 /* Compile Kotlin Framework */,
 				E003 /* Sources */,
+				E005 /* Resources */,
 				C001 /* Frameworks */,
 				E004 /* Embed Frameworks */,
 			);

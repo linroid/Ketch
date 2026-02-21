@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#0D1B2A"/>
+  <!-- Main sail -->
+  <polygon points="10.5,4.5 10.5,21.1 19.2,21.1" fill="#FFFFFF"/>
+  <!-- Mizzen sail -->
+  <polygon points="19.7,10.5 19.7,21.1 25.2,21.1" fill="#4FC3F7"/>
+  <!-- Hull -->
+  <path d="M5.5,21.6 Q16,27.6 26.5,21.6 Z" fill="#FFFFFF"/>
+</svg>

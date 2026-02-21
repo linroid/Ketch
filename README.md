@@ -1,4 +1,14 @@
-# Ketch
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="art/icon-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="art/icon.svg">
+    <img alt="Ketch" src="art/icon.svg" height="128">
+  </picture>
+</p>
+
+<h1 align="center">Ketch</h1>
+
+<p align="center">
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.10-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
@@ -10,6 +20,8 @@
 [![Desktop](https://img.shields.io/badge/Desktop-JVM_11+-DB380E.svg?logo=openjdk&logoColor=white)](https://openjdk.org)
 [![Web](https://img.shields.io/badge/Web-WasmJs-E4A125.svg?logo=webassembly&logoColor=white)](https://kotlinlang.org/docs/wasm-overview.html)
 [![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-6b48ff.svg?logo=anthropic&logoColor=white)](https://claude.ai/claude-code)
+
+</p>
 
 A full-featured Kotlin Multiplatform download manager — run locally, remotely, or embedded in your app. Supports Android, iOS, Desktop, and Web.
 
