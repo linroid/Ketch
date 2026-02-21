@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class KetchService : Service() {
+  private val log = KetchLogger("KetchService")
 
   inner class LocalBinder : Binder() {
     val service: KetchService get() = this@KetchService
@@ -71,7 +72,7 @@ class KetchService : Service() {
         downloadConfig = downloadConfig,
         deviceName = instanceName,
         localServerFactory = { port, apiToken, ketchApi ->
-          KetchLogger.i(TAG) { "Starting local server on port $port" }
+          log.i { "Starting local server on port $port" }
           val server = KetchServer(
             ketchApi,
             ServerConfig(
@@ -82,12 +83,12 @@ class KetchService : Service() {
             mdnsServiceName = instanceName,
           )
           server.start(wait = false)
-          KetchLogger.i(TAG) { "Local server started on port $port" }
+          log.i { "Local server started on port $port" }
           object : LocalServerHandle {
             override fun stop() {
-              KetchLogger.i(TAG) { "Stopping local server" }
+              log.i { "Stopping local server" }
               server.stop()
-              KetchLogger.i(TAG) { "Local server stopped" }
+              log.i { "Local server stopped" }
             }
           }
         },
@@ -160,7 +161,7 @@ class KetchService : Service() {
         if (shouldBeForeground) {
           val notification = buildNotification(activeCount, serverState)
           if (!isForeground) {
-            KetchLogger.i(TAG) { "Start notification" }
+            log.i { "Start notification" }
           }
           ServiceCompat.startForeground(
             this@KetchService,
@@ -223,7 +224,6 @@ class KetchService : Service() {
   }
 
   companion object {
-    private const val TAG = "KetchService"
     private const val CHANNEL_ID = "ketch_service"
     private const val NOTIFICATION_ID = 1
     private const val ACTION_REPOST_NOTIFICATION = "com.linroid.ketch.app.android.action.REPOST_NOTIFICATION"

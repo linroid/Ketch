@@ -92,17 +92,19 @@ class Ketch(
 
   override val backendLabel: String = "Core"
 
+  private val log = KetchLogger("Ketch")
+
   init {
     KetchLogger.setLogger(logger)
-    KetchLogger.i("Ketch") { "Ketch v${KetchApi.VERSION} initialized" }
+    log.i { "Ketch v${KetchApi.VERSION} initialized" }
     if (!config.speedLimit.isUnlimited) {
-      KetchLogger.i("Ketch") {
+      log.i {
         "Global speed limit: " +
           "${config.speedLimit.bytesPerSecond} bytes/sec"
       }
     }
     if (additionalSources.isNotEmpty()) {
-      KetchLogger.i("Ketch") {
+      log.i {
         "Additional sources: " +
           additionalSources.joinToString { it.type }
       }
@@ -149,7 +151,7 @@ class Ketch(
     val isScheduled =
       request.schedule !is DownloadSchedule.Immediate ||
         request.conditions.isNotEmpty()
-    KetchLogger.i("Ketch") {
+    log.i {
       "Downloading: taskId=$taskId, url=${request.url}, " +
         "connections=${request.connections}, " +
         "priority=${request.priority}" +
@@ -180,7 +182,7 @@ class Ketch(
         if (stateFlow.value.isActive) {
           coordinator.pause(taskId)
         } else {
-          KetchLogger.d("Ketch") {
+          log.d {
             "Ignoring pause for taskId=$taskId " +
               "in state ${stateFlow.value}"
           }
@@ -200,7 +202,7 @@ class Ketch(
             )
           }
         } else {
-          KetchLogger.d("Ketch") {
+          log.d {
             "Ignoring resume for taskId=$taskId in state $state"
           }
         }
@@ -215,7 +217,7 @@ class Ketch(
             stateFlow.value = DownloadState.Canceled
           }
         } else {
-          KetchLogger.d("Ketch") {
+          log.d {
             "Ignoring cancel for taskId=$taskId in state $s"
           }
         }
@@ -233,13 +235,13 @@ class Ketch(
       rescheduleAction = { schedule, conditions ->
         val s = stateFlow.value
         if (s.isTerminal) {
-          KetchLogger.d("Ketch") {
+          log.d {
             "Ignoring reschedule for taskId=$taskId in " +
               "terminal state $s"
           }
           return@DownloadTaskImpl
         }
-        KetchLogger.i("Ketch") {
+        log.i {
           "Rescheduling taskId=$taskId, schedule=$schedule, " +
             "conditions=${conditions.size}"
         }
@@ -264,7 +266,7 @@ class Ketch(
     url: String,
     headers: Map<String, String>,
   ): ResolvedSource {
-    KetchLogger.i("Ketch") { "Resolving URL: $url" }
+    log.i { "Resolving URL: $url" }
     val source = sourceResolver.resolve(url)
     return source.resolve(url, headers)
   }
@@ -300,11 +302,11 @@ class Ketch(
    * - `CANCELED` -> [DownloadState.Canceled]
    */
   suspend fun loadTasks() {
-    KetchLogger.i("Ketch") {
+    log.i {
       "Loading tasks from persistent storage"
     }
     val records = taskStore.loadAll()
-    KetchLogger.i("Ketch") { "Found ${records.size} task(s)" }
+    log.i { "Found ${records.size} task(s)" }
 
     tasksMutex.withLock {
       val currentTasks = _tasks.value
@@ -342,7 +344,7 @@ class Ketch(
         if (stateFlow.value.isActive) {
           coordinator.pause(record.taskId)
         } else {
-          KetchLogger.d("Ketch") {
+          log.d {
             "Ignoring pause for taskId=${record.taskId} " +
               "in state ${stateFlow.value}"
           }
@@ -362,7 +364,7 @@ class Ketch(
             )
           }
         } else {
-          KetchLogger.d("Ketch") {
+          log.d {
             "Ignoring resume for taskId=${record.taskId} " +
               "in state $state"
           }
@@ -378,7 +380,7 @@ class Ketch(
             stateFlow.value = DownloadState.Canceled
           }
         } else {
-          KetchLogger.d("Ketch") {
+          log.d {
             "Ignoring cancel for taskId=${record.taskId} " +
               "in state $s"
           }
@@ -397,13 +399,13 @@ class Ketch(
       rescheduleAction = { schedule, conditions ->
         val s = stateFlow.value
         if (s.isTerminal) {
-          KetchLogger.d("Ketch") {
+          log.d {
             "Ignoring reschedule for taskId=${record.taskId} in " +
               "terminal state $s"
           }
           return@DownloadTaskImpl
         }
-        KetchLogger.i("Ketch") {
+        log.i {
           "Rescheduling taskId=${record.taskId}, " +
             "schedule=$schedule, " +
             "conditions=${conditions.size}"
@@ -501,11 +503,11 @@ class Ketch(
     // Apply queue config
     scheduler.queueConfig = config.queueConfig
 
-    KetchLogger.i("Ketch") { "Config updated: $config" }
+    log.i { "Config updated: $config" }
   }
 
   override fun close() {
-    KetchLogger.i("Ketch") { "Closing Ketch" }
+    log.i { "Closing Ketch" }
     httpEngine.close()
     scope.cancel()
   }

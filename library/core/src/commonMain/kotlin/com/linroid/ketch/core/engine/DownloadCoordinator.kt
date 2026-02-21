@@ -42,6 +42,7 @@ internal class DownloadCoordinator(
   private val fileNameResolver: FileNameResolver,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
 ) {
+  private val log = KetchLogger("Coordinator")
   private val mutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveDownload>()
 
@@ -76,7 +77,7 @@ internal class DownloadCoordinator(
 
     mutex.withLock {
       if (activeDownloads.containsKey(taskId)) {
-        KetchLogger.d("Coordinator") {
+        log.d {
           "Download already active for taskId=$taskId, skipping start"
         }
         return
@@ -129,7 +130,7 @@ internal class DownloadCoordinator(
 
     mutex.withLock {
       if (activeDownloads.containsKey(record.taskId)) {
-        KetchLogger.d("Coordinator") {
+        log.d {
           "Download already active for taskId=${record.taskId}, " +
             "skipping startFromRecord"
         }
@@ -183,7 +184,7 @@ internal class DownloadCoordinator(
     val resolvedUrl: ResolvedSource
 
     if (resolved != null) {
-      KetchLogger.d("Coordinator") {
+      log.d {
         "Using pre-resolved info for ${request.url} " +
           "(source=${resolved.sourceType})"
       }
@@ -191,7 +192,7 @@ internal class DownloadCoordinator(
       resolvedUrl = resolved
     } else {
       source = sourceResolver.resolve(request.url)
-      KetchLogger.d("Coordinator") {
+      log.d {
         "Resolved source '${source.type}' for ${request.url}"
       }
       resolvedUrl = source.resolve(request.url, request.headers)
@@ -210,7 +211,7 @@ internal class DownloadCoordinator(
       serverFileName = fileName,
       deduplicate = true,
     )
-    KetchLogger.d("Coordinator") {
+    log.d {
       "Resolved outputPath=$outputPath"
     }
 
@@ -278,7 +279,7 @@ internal class DownloadCoordinator(
         )
       }
 
-      KetchLogger.i("Coordinator") {
+      log.i {
         "Download completed successfully for taskId=$taskId"
       }
       stateFlow.value =
@@ -296,7 +297,7 @@ internal class DownloadCoordinator(
   suspend fun pause(taskId: String) {
     mutex.withLock {
       val active = activeDownloads[taskId] ?: return
-      KetchLogger.i("Coordinator") {
+      log.i {
         "Pausing download for taskId=$taskId"
       }
 
@@ -319,7 +320,7 @@ internal class DownloadCoordinator(
       active.job.cancel()
 
       currentSegments?.let { segments ->
-        KetchLogger.d("Coordinator") {
+        log.d {
           "Saving pause state for taskId=$taskId"
         }
         val downloadedBytes =
@@ -338,7 +339,7 @@ internal class DownloadCoordinator(
         try {
           accessor.flush()
         } catch (e: Exception) {
-          KetchLogger.w("Coordinator", e) {
+          log.w(e) {
             "Failed to flush file during pause for taskId=$taskId"
           }
         }
@@ -357,7 +358,7 @@ internal class DownloadCoordinator(
   ): Boolean {
     mutex.withLock {
       if (activeDownloads.containsKey(taskId)) {
-        KetchLogger.d("Coordinator") {
+        log.d {
           "Download already active for taskId=$taskId, " +
             "skipping resume"
         }
@@ -425,7 +426,7 @@ internal class DownloadCoordinator(
   ) {
     val sourceType = taskRecord.sourceType ?: HttpDownloadSource.TYPE
     val source = sourceResolver.resolveByType(sourceType)
-    KetchLogger.i("Coordinator") {
+    log.i {
       "Resuming download for taskId=$taskId via " +
         "source '${source.type}'"
     }
@@ -520,7 +521,7 @@ internal class DownloadCoordinator(
         }
 
         if (!error.isRetryable || retryCount >= config.retryCount) {
-          KetchLogger.e("Coordinator", error) {
+          log.e(error) {
             "Download failed after $retryCount retries: " +
               "${error.message}"
           }
@@ -538,14 +539,14 @@ internal class DownloadCoordinator(
           )
           delayMs = error.retryAfterSeconds?.let { it * 1000L }
             ?: (config.retryDelayMs * (1 shl (retryCount - 1)))
-          KetchLogger.w("Coordinator") {
+          log.w {
             "Rate limited (429). Retry attempt $retryCount " +
               "after ${delayMs}ms delay, connections=" +
               "${context.maxConnections.value}"
           }
         } else {
           delayMs = config.retryDelayMs * (1 shl (retryCount - 1))
-          KetchLogger.w("Coordinator") {
+          log.w {
             "Retry attempt $retryCount after ${delayMs}ms " +
               "delay: ${error.message}"
           }
@@ -584,7 +585,7 @@ internal class DownloadCoordinator(
       (current / 2).coerceAtLeast(1)
     }
     context.maxConnections.value = reduced
-    KetchLogger.w("Coordinator") {
+    log.w {
       "Reducing connections for taskId=$taskId: " +
         "$current -> $reduced" +
         (rateLimitRemaining?.let {
@@ -594,7 +595,7 @@ internal class DownloadCoordinator(
   }
 
   suspend fun cancel(taskId: String) {
-    KetchLogger.i("Coordinator") {
+    log.i {
       "Canceling download for taskId=$taskId"
     }
     mutex.withLock {
@@ -638,7 +639,7 @@ internal class DownloadCoordinator(
   ) {
     val existing = taskStore.load(taskId)
     if (existing == null) {
-      KetchLogger.w("Coordinator") {
+      log.w {
         "TaskRecord not found for taskId=$taskId, skipping update"
       }
       return
@@ -659,7 +660,7 @@ internal class DownloadCoordinator(
       activeDownloads[taskId]?.context
         ?.maxConnections?.value = connections
     }
-    KetchLogger.i("Coordinator") {
+    log.i {
       "Task connections updated for taskId=$taskId: $connections"
     }
   }
@@ -675,7 +676,7 @@ internal class DownloadCoordinator(
       } else {
         active.taskLimiter.delegate = TokenBucket(limit.bytesPerSecond)
       }
-      KetchLogger.i("Coordinator") {
+      log.i {
         "Task speed limit updated for taskId=$taskId: " +
           "${limit.bytesPerSecond} bytes/sec"
       }

@@ -17,6 +17,7 @@ internal class DownloadScheduler(
   private val coordinator: DownloadCoordinator,
   private val scope: CoroutineScope,
 ) {
+  private val log = KetchLogger("Scheduler")
   private val mutex = Mutex()
   private val activeEntries = mutableMapOf<String, QueueEntry>()
   private val queuedEntries = mutableListOf<QueueEntry>()
@@ -58,7 +59,7 @@ internal class DownloadScheduler(
         activeEntries.size < queueConfig.maxConcurrentDownloads &&
         hostCount < queueConfig.maxConnectionsPerHost
       ) {
-        KetchLogger.i("Scheduler") {
+        log.i {
           "Starting download immediately: taskId=$taskId, " +
             "active=${activeEntries.size}/" +
             "${queueConfig.maxConcurrentDownloads}"
@@ -71,7 +72,7 @@ internal class DownloadScheduler(
       } else {
         insertSorted(entry)
         stateFlow.value = DownloadState.Queued
-        KetchLogger.i("Scheduler") {
+        log.i {
           "Download queued: taskId=$taskId, " +
             "priority=${request.priority}, " +
             "position=${queuedEntries.indexOfFirst {
@@ -98,14 +99,14 @@ internal class DownloadScheduler(
     if (victim == null) {
       insertSorted(entry)
       entry.stateFlow.value = DownloadState.Queued
-      KetchLogger.i("Scheduler") {
+      log.i {
         "Cannot preempt: all active tasks are URGENT. " +
           "Queuing taskId=${entry.taskId}"
       }
       return
     }
 
-    KetchLogger.i("Scheduler") {
+    log.i {
       "Preempting taskId=${victim.taskId} " +
         "(priority=${victim.priority}) for URGENT " +
         "taskId=${entry.taskId}"
@@ -122,7 +123,7 @@ internal class DownloadScheduler(
     if (activeEntries.size < queueConfig.maxConcurrentDownloads &&
       hostCount < queueConfig.maxConnectionsPerHost
     ) {
-      KetchLogger.i("Scheduler") {
+      log.i {
         "Starting URGENT download: taskId=${entry.taskId}, " +
           "active=${activeEntries.size + 1}/" +
           "${queueConfig.maxConcurrentDownloads}"
@@ -131,7 +132,7 @@ internal class DownloadScheduler(
     } else {
       insertSorted(entry)
       entry.stateFlow.value = DownloadState.Queued
-      KetchLogger.i("Scheduler") {
+      log.i {
         "URGENT taskId=${entry.taskId} queued " +
           "(host limit still exceeded)"
       }
@@ -141,7 +142,7 @@ internal class DownloadScheduler(
   suspend fun onTaskCompleted(taskId: String) {
     mutex.withLock {
       removeActive(taskId)
-      KetchLogger.d("Scheduler") {
+      log.d {
         "Task completed: taskId=$taskId, " +
           "active=${activeEntries.size}/" +
           "${queueConfig.maxConcurrentDownloads}"
@@ -153,7 +154,7 @@ internal class DownloadScheduler(
   suspend fun onTaskFailed(taskId: String) {
     mutex.withLock {
       removeActive(taskId)
-      KetchLogger.d("Scheduler") {
+      log.d {
         "Task failed: taskId=$taskId, " +
           "active=${activeEntries.size}/" +
           "${queueConfig.maxConcurrentDownloads}"
@@ -165,7 +166,7 @@ internal class DownloadScheduler(
   suspend fun onTaskCanceled(taskId: String) {
     mutex.withLock {
       removeActive(taskId)
-      KetchLogger.d("Scheduler") {
+      log.d {
         "Task canceled: taskId=$taskId, " +
           "active=${activeEntries.size}/" +
           "${queueConfig.maxConcurrentDownloads}"
@@ -178,7 +179,7 @@ internal class DownloadScheduler(
     mutex.withLock {
       val index = queuedEntries.indexOfFirst { it.taskId == taskId }
       if (index < 0) {
-        KetchLogger.d("Scheduler") {
+        log.d {
           "setPriority: taskId=$taskId not in queue " +
             "(may be active)"
         }
@@ -187,7 +188,7 @@ internal class DownloadScheduler(
       val entry = queuedEntries.removeAt(index)
       entry.priority = priority
       insertSorted(entry)
-      KetchLogger.i("Scheduler") {
+      log.i {
         "Priority updated: taskId=$taskId, " +
           "priority=$priority, " +
           "newPosition=${queuedEntries.indexOfFirst {
@@ -202,12 +203,12 @@ internal class DownloadScheduler(
     mutex.withLock {
       val removed = queuedEntries.removeAll { it.taskId == taskId }
       if (removed) {
-        KetchLogger.i("Scheduler") {
+        log.i {
           "Dequeued: taskId=$taskId"
         }
       } else if (activeEntries.containsKey(taskId)) {
         removeActive(taskId)
-        KetchLogger.i("Scheduler") {
+        log.i {
           "Removed active download from tracking: " +
             "taskId=$taskId"
         }
@@ -269,7 +270,7 @@ internal class DownloadScheduler(
       val entry = findNextEligible() ?: break
       queuedEntries.remove(entry)
       val host = extractHost(entry.request.url)
-      KetchLogger.i("Scheduler") {
+      log.i {
         "Promoting queued task: taskId=${entry.taskId}, " +
           "priority=${entry.priority}, " +
           "active=${activeEntries.size + 1}/" +

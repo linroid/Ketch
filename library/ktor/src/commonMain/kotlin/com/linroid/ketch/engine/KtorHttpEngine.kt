@@ -29,16 +29,17 @@ import kotlin.coroutines.cancellation.CancellationException
 class KtorHttpEngine(
   private val client: HttpClient = defaultClient(),
 ) : HttpEngine {
+  private val log = KetchLogger("KtorHttpEngine")
 
   override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
     try {
-      KetchLogger.d("KtorHttpEngine") { "HEAD request: $url" }
+      log.d { "HEAD request: $url" }
       val customHeaders = headers
       val response = client.head(url) {
         customHeaders.forEach { (name, value) -> header(name, value) }
       }
 
-      KetchLogger.d("KtorHttpEngine") {
+      log.d {
         "HEAD ${response.status.value} headers: " +
           response.headers.entries().joinToString { (k, v) ->
             "$k=${v.joinToString(",")}"
@@ -46,7 +47,7 @@ class KtorHttpEngine(
       }
 
       if (!response.status.isSuccess()) {
-        KetchLogger.e("KtorHttpEngine") {
+        log.e {
           "HTTP error ${response.status.value}: ${response.status.description}"
         }
         val is429 = response.status.value == 429
@@ -90,7 +91,7 @@ class KtorHttpEngine(
     } catch (e: KetchError) {
       throw e
     } catch (e: Exception) {
-      KetchLogger.e("KtorHttpEngine") { "Network error: ${e.message}" }
+      log.e { "Network error: ${e.message}" }
       throw KetchError.Network(e)
     }
   }
@@ -103,9 +104,9 @@ class KtorHttpEngine(
   ) {
     try {
       if (range != null) {
-        KetchLogger.d("KtorHttpEngine") { "GET request: $url, range=${range.first}-${range.last}" }
+        log.d { "GET request: $url, range=${range.first}-${range.last}" }
       } else {
-        KetchLogger.d("KtorHttpEngine") { "GET request: $url (no range)" }
+        log.d { "GET request: $url (no range)" }
       }
       val customHeaders = headers
       client.prepareGet(url) {
@@ -116,7 +117,7 @@ class KtorHttpEngine(
       }.execute { response ->
         val status = response.status
 
-        KetchLogger.d("KtorHttpEngine") {
+        log.d {
           "GET ${status.value} headers: " +
             response.headers.entries().joinToString { (k, v) ->
               "$k=${v.joinToString(",")}"
@@ -124,7 +125,7 @@ class KtorHttpEngine(
         }
 
         if (!status.isSuccess()) {
-          KetchLogger.e("KtorHttpEngine") {
+          log.e {
             "HTTP error ${status.value}: ${status.description}"
           }
           val is429 = status.value == 429
@@ -156,7 +157,7 @@ class KtorHttpEngine(
     } catch (e: KetchError) {
       throw e
     } catch (e: Exception) {
-      KetchLogger.e("KtorHttpEngine") { "Network error: ${e.message}" }
+      log.e { "Network error: ${e.message}" }
       throw KetchError.Network(e)
     }
   }

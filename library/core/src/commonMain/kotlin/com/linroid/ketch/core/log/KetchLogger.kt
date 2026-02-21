@@ -1,36 +1,48 @@
 package com.linroid.ketch.core.log
 
 /**
- * Logger holder for Ketch components.
- * This is set by the Ketch instance and used by all Ketch modules.
+ * Tagged logger for Ketch components.
  *
+ * Each component creates its own instance with a descriptive [tag].
+ * The global [Logger] backend is set once by the [Ketch][com.linroid.ketch.core.Ketch]
+ * instance and shared across all [KetchLogger] instances.
+ *
+ * ```kotlin
+ * private val logger = KetchLogger("Coordinator")
+ * logger.d { "state changed" }  // emits "[Coordinator] state changed"
+ * ```
+ *
+ * @param tag component name prepended to every log message
  * @suppress This is internal API and should not be used directly by library users.
  */
-object KetchLogger {
-  var logger: Logger = Logger.None
-    private set
+class KetchLogger(private val tag: String) {
 
-  fun setLogger(logger: Logger) {
-    this.logger = logger
-  }
-
-  fun v(tag: String, message: () -> String) {
+  fun v(message: () -> String) {
     logger.v { "[$tag] ${message()}" }
   }
 
-  fun d(tag: String, message: () -> String) {
+  fun d(message: () -> String) {
     logger.d { "[$tag] ${message()}" }
   }
 
-  fun i(tag: String, message: () -> String) {
+  fun i(message: () -> String) {
     logger.i { "[$tag] ${message()}" }
   }
 
-  fun w(tag: String, throwable: Throwable? = null, message: () -> String) {
+  fun w(throwable: Throwable? = null, message: () -> String) {
     logger.w(message = { "[$tag] ${message()}" }, throwable = throwable)
   }
 
-  fun e(tag: String, throwable: Throwable? = null, message: () -> String) {
+  fun e(throwable: Throwable? = null, message: () -> String) {
     logger.e(message = { "[$tag] ${message()}" }, throwable = throwable)
+  }
+
+  companion object {
+    var logger: Logger = Logger.None
+      private set
+
+    fun setLogger(logger: Logger) {
+      this.logger = logger
+    }
   }
 }

@@ -90,6 +90,7 @@ class KetchServer(
   private val mdnsServiceName: String = "Ketch",
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
 ) {
+  private val log = KetchLogger("KetchServer")
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
@@ -125,7 +126,7 @@ class KetchServer(
       val tokenValue =
         if (config.apiToken.isNullOrBlank()) "none"
         else "required"
-      KetchLogger.d(TAG) {
+      log.d {
         "Registering mDNS service:" +
           " name=$mdnsServiceName," +
           " type=${ServerConfig.MDNS_SERVICE_TYPE}," +
@@ -139,7 +140,7 @@ class KetchServer(
           port = config.port,
           metadata = mapOf("token" to tokenValue),
         )
-        KetchLogger.i(TAG) {
+        log.i {
           "mDNS registered: $mdnsServiceName" +
             " (${ServerConfig.MDNS_SERVICE_TYPE})"
         }
@@ -147,14 +148,14 @@ class KetchServer(
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        KetchLogger.w(TAG, throwable = e) {
+        log.w(throwable = e) {
           "mDNS registration failed: ${e.message}"
         }
       } finally {
         runCatching {
           mdnsRegistrar.unregister()
         }.onFailure { e ->
-          KetchLogger.w(TAG, throwable = e) {
+          log.w(throwable = e) {
             "mDNS unregister failed: ${e.message}"
           }
         }
@@ -242,7 +243,6 @@ class KetchServer(
   }
 
   companion object {
-    private const val TAG = "KetchServer"
     private const val AUTH_API = "api-bearer"
   }
 }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
  * advertised and is destroyed on [unregister].
  */
 internal class NativeMdnsRegistrar : MdnsRegistrar {
+  private val log = KetchLogger("NativeMdnsRegistrar")
   @Volatile private var process: Process? = null
 
   override suspend fun register(
@@ -28,7 +29,7 @@ internal class NativeMdnsRegistrar : MdnsRegistrar {
       serviceName, serviceType, ".", port.toString(),
     )
     metadata.forEach { (key, value) -> cmd.add("$key=$value") }
-    KetchLogger.d(TAG) { "Exec: ${cmd.joinToString(" ")}" }
+    log.d { "Exec: ${cmd.joinToString(" ")}" }
     process = withContext(Dispatchers.IO) {
       ProcessBuilder(cmd)
         .redirectErrorStream(true)
@@ -41,9 +42,5 @@ internal class NativeMdnsRegistrar : MdnsRegistrar {
       runCatching { proc.destroyForcibly() }
     }
     process = null
-  }
-
-  companion object {
-    private const val TAG = "NativeMdnsRegistrar"
   }
 }
