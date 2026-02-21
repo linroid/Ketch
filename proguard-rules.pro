@@ -30,6 +30,9 @@
 -dontwarn aQute.bnd.**
 -dontwarn edu.umd.cs.findbugs.**
 
+# DNS-SD (JmDNS) — JVM-only; not available on Android
+-dontwarn com.appstractive.dnssd.**
+
 # SQLDelight / SQLite JDBC
 -dontwarn app.cash.sqldelight.**
 -keep class org.sqlite.** { *; }
