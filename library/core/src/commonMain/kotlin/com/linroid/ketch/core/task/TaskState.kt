@@ -10,7 +10,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 enum class TaskState {
-  PENDING,
   SCHEDULED,
   QUEUED,
   DOWNLOADING,
@@ -29,6 +28,6 @@ enum class TaskState {
    * cannot be faithfully restored after serialization.
    */
   val isRestorable: Boolean
-    get() = this == PENDING || this == QUEUED ||
-      this == DOWNLOADING || this == PAUSED
+    get() = this == QUEUED || this == DOWNLOADING || this == PAUSED
+
 }

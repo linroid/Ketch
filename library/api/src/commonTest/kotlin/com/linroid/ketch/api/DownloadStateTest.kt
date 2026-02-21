@@ -7,16 +7,6 @@ import kotlin.test.assertTrue
 class DownloadStateTest {
 
   @Test
-  fun idle_isNotTerminal() {
-    assertFalse(DownloadState.Idle.isTerminal)
-  }
-
-  @Test
-  fun idle_isNotActive() {
-    assertFalse(DownloadState.Idle.isActive)
-  }
-
-  @Test
   fun scheduled_isNotTerminal() {
     val state = DownloadState.Scheduled(DownloadSchedule.Immediate)
     assertFalse(state.isTerminal)
@@ -36,16 +26,6 @@ class DownloadStateTest {
   @Test
   fun queued_isNotActive() {
     assertFalse(DownloadState.Queued.isActive)
-  }
-
-  @Test
-  fun pending_isNotTerminal() {
-    assertFalse(DownloadState.Pending.isTerminal)
-  }
-
-  @Test
-  fun pending_isActive() {
-    assertTrue(DownloadState.Pending.isActive)
   }
 
   @Test

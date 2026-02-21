@@ -66,8 +66,7 @@ fun DownloadListItem(
       .ifBlank { null }
     else -> null
   } ?: extractFilename(task.request.url).ifBlank { "download" }
-  val isDownloading = state is DownloadState.Downloading ||
-    state is DownloadState.Pending
+  val isDownloading = state is DownloadState.Downloading
   val isPaused = state is DownloadState.Paused
   val showToggles = isDownloading || isPaused ||
     state is DownloadState.Queued ||

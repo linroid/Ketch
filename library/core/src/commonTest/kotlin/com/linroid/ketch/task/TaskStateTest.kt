@@ -15,14 +15,14 @@ class TaskStateTest {
 
   @Test
   fun isTerminal_falseForActiveStates() {
-    assertFalse(TaskState.PENDING.isTerminal)
+    assertFalse(TaskState.QUEUED.isTerminal)
     assertFalse(TaskState.DOWNLOADING.isTerminal)
     assertFalse(TaskState.PAUSED.isTerminal)
   }
 
   @Test
   fun isRestorable_trueForPendingDownloadingPaused() {
-    assertTrue(TaskState.PENDING.isRestorable)
+    assertTrue(TaskState.QUEUED.isRestorable)
     assertTrue(TaskState.DOWNLOADING.isRestorable)
     assertTrue(TaskState.PAUSED.isRestorable)
   }

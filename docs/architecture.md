@@ -92,12 +92,12 @@ A download progresses through these stages:
 DownloadRequest
   |
   v
-[1. Queue]  DownloadScheduler checks concurrency limits and priority.
+[1. Queue]  DownloadQueue checks concurrency limits and priority.
   |         If slots are full, task enters Queued state.
   |         URGENT priority can preempt lower-priority active downloads.
   |
   v
-[2. Schedule]  ScheduleManager handles delayed/conditional starts.
+[2. Schedule]  DownloadScheduler handles delayed/conditional starts.
   |            Immediate (default), AtTime, AfterDelay, or DownloadCondition.
   |
   v
@@ -136,7 +136,7 @@ DownloadRequest
 - `supervisorScope` for segment downloads -- one segment failure doesn't cancel others.
 - `Mutex` protects shared state (file writes, progress aggregation).
 - Structured concurrency ensures cleanup on cancel/pause.
-- `DownloadScheduler` enforces global and per-host connection limits.
+- `DownloadQueue` enforces global and per-host connection limits.
 
 ## Error Classification
 

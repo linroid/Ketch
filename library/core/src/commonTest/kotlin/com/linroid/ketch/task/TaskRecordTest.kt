@@ -38,7 +38,7 @@ class TaskRecordTest {
     )
     assertEquals(1, record.request.connections)
     assertEquals(emptyMap(), record.request.headers)
-    assertEquals(TaskState.PENDING, record.state)
+    assertEquals(TaskState.QUEUED, record.state)
     assertEquals(-1, record.totalBytes)
     assertEquals(0, record.downloadedBytes)
     assertNull(record.errorMessage)
@@ -333,7 +333,7 @@ class TaskRecordTest {
           "properties": {}
         },
         "outputPath": "/tmp/f",
-        "state": "PENDING",
+        "state": "QUEUED",
         "totalBytes": 100,
         "downloadedBytes": 0,
         "createdAt": "$epoch",

@@ -81,35 +81,28 @@ data class StateColorPair(
 
 data class DownloadStateColors(
   val downloading: StateColorPair,
-  val pending: StateColorPair,
   val queued: StateColorPair,
   val scheduled: StateColorPair,
   val paused: StateColorPair,
   val completed: StateColorPair,
   val failed: StateColorPair,
   val canceled: StateColorPair,
-  val idle: StateColorPair,
 ) {
   fun forState(state: DownloadState): StateColorPair {
     return when (state) {
       is DownloadState.Downloading -> downloading
-      is DownloadState.Pending -> pending
       is DownloadState.Queued -> queued
       is DownloadState.Scheduled -> scheduled
       is DownloadState.Paused -> paused
       is DownloadState.Completed -> completed
       is DownloadState.Failed -> failed
       is DownloadState.Canceled -> canceled
-      is DownloadState.Idle -> idle
     }
   }
 }
 
 val DarkStateColors = DownloadStateColors(
   downloading = StateColorPair(
-    Color(0xFF00BCD4), Color(0xFF003840)
-  ),
-  pending = StateColorPair(
     Color(0xFF00BCD4), Color(0xFF003840)
   ),
   queued = StateColorPair(
@@ -130,16 +123,10 @@ val DarkStateColors = DownloadStateColors(
   canceled = StateColorPair(
     Color(0xFF78909C), Color(0xFF2A2D35)
   ),
-  idle = StateColorPair(
-    Color(0xFF78909C), Color(0xFF2A2D35)
-  )
 )
 
 val LightStateColors = DownloadStateColors(
   downloading = StateColorPair(
-    Color(0xFF00838F), Color(0xFFE0F7FA)
-  ),
-  pending = StateColorPair(
     Color(0xFF00838F), Color(0xFFE0F7FA)
   ),
   queued = StateColorPair(
@@ -160,7 +147,4 @@ val LightStateColors = DownloadStateColors(
   canceled = StateColorPair(
     Color(0xFF78909C), Color(0xFFECEFF1)
   ),
-  idle = StateColorPair(
-    Color(0xFF78909C), Color(0xFFECEFF1)
-  )
 )

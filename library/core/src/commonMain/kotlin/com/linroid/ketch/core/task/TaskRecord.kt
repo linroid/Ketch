@@ -18,7 +18,7 @@ data class TaskRecord(
   val taskId: String,
   val request: DownloadRequest,
   val outputPath: String? = null,
-  val state: TaskState = TaskState.PENDING,
+  val state: TaskState = TaskState.QUEUED,
   val totalBytes: Long = -1,
   val downloadedBytes: Long = 0,
   val errorMessage: String? = null,

@@ -12,8 +12,6 @@ enum class StatusFilter(val label: String) {
   fun matches(state: DownloadState): Boolean = when (this) {
     All -> true
     Downloading -> state is DownloadState.Downloading ||
-      state is DownloadState.Idle ||
-      state is DownloadState.Pending ||
       state is DownloadState.Queued ||
       state is DownloadState.Scheduled
     Paused -> state is DownloadState.Paused

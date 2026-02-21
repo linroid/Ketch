@@ -9,24 +9,23 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.config.DownloadConfig
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
-import com.linroid.ketch.core.engine.DownloadScheduler
+import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
-import com.linroid.ketch.core.engine.ScheduleManager
+import com.linroid.ketch.core.engine.DownloadScheduler
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
-import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.Logger
-import com.linroid.ketch.core.task.DownloadTaskImpl
 import com.linroid.ketch.core.task.InMemoryTaskStore
+import com.linroid.ketch.core.task.RealDownloadTask
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -96,14 +95,39 @@ class Ketch(
 
   private val log = KetchLogger("Ketch")
 
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+  private val coordinator = DownloadCoordinator(
+    sourceResolver = sourceResolver,
+    taskStore = taskStore,
+    config = config,
+    fileNameResolver = fileNameResolver,
+    globalLimiter = globalLimiter,
+    scope = scope,
+  )
+
+  private val scheduler = DownloadQueue(
+    queueConfig = config.queueConfig,
+    coordinator = coordinator,
+    scope = scope,
+  )
+
+  private val scheduleManager = DownloadScheduler(
+    scheduler = scheduler,
+    scope = scope,
+  )
+
+  private val tasksMutex = Mutex()
+  private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+
+  /** Observable list of all download tasks. */
+  override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
+
   init {
     KetchLogger.setLogger(logger)
     log.i { "Ketch v${KetchApi.VERSION} initialized" }
     if (!config.speedLimit.isUnlimited) {
-      log.i {
-        "Global speed limit: " +
-          "${config.speedLimit.bytesPerSecond} bytes/sec"
-      }
+      log.i { "Global speed limit: ${config.speedLimit}" }
     }
     if (additionalSources.isNotEmpty()) {
       log.i {
@@ -113,35 +137,6 @@ class Ketch(
     }
   }
 
-  private val scope =
-    CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-  private val coordinator = DownloadCoordinator(
-    sourceResolver = sourceResolver,
-    taskStore = taskStore,
-    config = config,
-    fileNameResolver = fileNameResolver,
-    globalLimiter = globalLimiter,
-  )
-
-  private val scheduler = DownloadScheduler(
-    queueConfig = config.queueConfig,
-    coordinator = coordinator,
-    scope = scope,
-  )
-
-  private val scheduleManager = ScheduleManager(
-    scheduler = scheduler,
-    scope = scope,
-  )
-
-  private val tasksMutex = Mutex()
-  private val _tasks =
-    MutableStateFlow<List<DownloadTask>>(emptyList())
-
-  /** Observable list of all download tasks. */
-  override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
-
   /**
    * Starts a new download and adds it to the [tasks] flow.
    * The task may be queued if the maximum number of concurrent
@@ -150,112 +145,29 @@ class Ketch(
   override suspend fun download(request: DownloadRequest): DownloadTask {
     val taskId = Uuid.random().toString()
     val now = Clock.System.now()
-    val isScheduled =
-      request.schedule !is DownloadSchedule.Immediate ||
-        request.conditions.isNotEmpty()
+    val isScheduled = request.schedule !is DownloadSchedule.Immediate ||
+      request.conditions.isNotEmpty()
     log.i {
       "Downloading: taskId=$taskId, url=${request.url}, " +
         "connections=${request.connections}, " +
         "priority=${request.priority}" +
         if (isScheduled) ", schedule=${request.schedule}" else ""
     }
-    val stateFlow =
-      MutableStateFlow<DownloadState>(DownloadState.Pending)
-    val segmentsFlow =
-      MutableStateFlow<List<Segment>>(emptyList())
-
-    if (isScheduled) {
-      scheduleManager.schedule(
-        taskId, request, now, stateFlow, segmentsFlow,
-      )
+    val initialState = if (isScheduled) {
+      TaskState.SCHEDULED
     } else {
-      scheduler.enqueue(
-        taskId, request, now, stateFlow, segmentsFlow,
-      )
+      TaskState.QUEUED
     }
-
-    val task = DownloadTaskImpl(
+    val record = TaskRecord(
       taskId = taskId,
       request = request,
+      state = initialState,
       createdAt = now,
-      state = stateFlow.asStateFlow(),
-      segments = segmentsFlow.asStateFlow(),
-      pauseAction = {
-        if (stateFlow.value.isActive) {
-          coordinator.pause(taskId)
-        } else {
-          log.d {
-            "Ignoring pause for taskId=$taskId " +
-              "in state ${stateFlow.value}"
-          }
-        }
-      },
-      resumeAction = { dest ->
-        val state = stateFlow.value
-        if (state is DownloadState.Paused ||
-          state is DownloadState.Failed
-        ) {
-          val resumed = coordinator.resume(
-            taskId, scope, stateFlow, segmentsFlow, dest,
-          )
-          if (!resumed) {
-            coordinator.start(
-              taskId, request, scope, stateFlow, segmentsFlow,
-            )
-          }
-        } else {
-          log.d { "Ignoring resume for taskId=$taskId in state $state" }
-        }
-      },
-      cancelAction = {
-        val s = stateFlow.value
-        if (!s.isTerminal) {
-          scheduleManager.cancel(taskId)
-          scheduler.dequeue(taskId)
-          coordinator.cancel(taskId)
-          if (s is DownloadState.Scheduled) {
-            stateFlow.value = DownloadState.Canceled
-          }
-        } else {
-          log.d { "Ignoring cancel for taskId=$taskId in state $s" }
-        }
-      },
-      removeAction = { removeTaskInternal(taskId) },
-      setSpeedLimitAction = { limit ->
-        coordinator.setTaskSpeedLimit(taskId, limit)
-      },
-      setPriorityAction = { priority ->
-        scheduler.setPriority(taskId, priority)
-      },
-      setConnectionsAction = { connections ->
-        coordinator.setTaskConnections(taskId, connections)
-      },
-      rescheduleAction = { schedule, conditions ->
-        val s = stateFlow.value
-        if (s.isTerminal) {
-          log.d {
-            "Ignoring reschedule for taskId=$taskId in " +
-              "terminal state $s"
-          }
-          return@DownloadTaskImpl
-        }
-        log.i {
-          "Rescheduling taskId=$taskId, schedule=$schedule, " +
-            "conditions=${conditions.size}"
-        }
-        scheduleManager.cancel(taskId)
-        if (s.isActive) {
-          coordinator.pause(taskId)
-        }
-        scheduler.dequeue(taskId)
-        scheduleManager.reschedule(
-          taskId, request, schedule, conditions,
-          now, stateFlow, segmentsFlow,
-        )
-      },
+      updatedAt = now,
     )
+    taskStore.save(record)
 
-    monitorTaskState(taskId, stateFlow)
+    val task = createTaskFromRecord(record)
     tasksMutex.withLock { _tasks.value += task }
     return task
   }
@@ -287,20 +199,19 @@ class Ketch(
 
   /**
    * Loads all task records from the [TaskStore] and populates the
-   * [tasks] flow. Does **not** auto-resume — call
-   * [DownloadTask.resume] on individual tasks to continue
-   * interrupted downloads.
+   * [tasks] flow. Non-terminal, non-paused tasks are automatically
+   * re-scheduled or enqueued based on their persisted state.
    *
-   * State mapping:
-   * - `SCHEDULED` / `PENDING` / `QUEUED` / `DOWNLOADING` / `PAUSED`
-   *   -> [DownloadState.Paused] (treat as paused, user decides when
-   *   to resume). `SCHEDULED` is mapped to Paused because conditions
-   *   are transient and cannot be restored after deserialization.
+   * State restoration:
+   * - `SCHEDULED` -> re-scheduled (schedule is preserved, conditions
+   *   default to met after deserialization)
+   * - `QUEUED` / `DOWNLOADING` -> enqueued for immediate download
+   * - `PAUSED` -> stays [DownloadState.Paused]
    * - `COMPLETED` -> [DownloadState.Completed]
    * - `FAILED` -> [DownloadState.Failed]
    * - `CANCELED` -> [DownloadState.Canceled]
    */
-  suspend fun loadTasks() {
+  private suspend fun loadTasks() {
     log.i { "Loading tasks from persistent storage" }
     val records = taskStore.loadAll()
     log.i { "Found ${records.size} task(s)" }
@@ -326,112 +237,50 @@ class Ketch(
     }
   }
 
-  private fun createTaskFromRecord(
-    record: TaskRecord,
-  ): DownloadTask {
-    val stateFlow = MutableStateFlow(mapRecordState(record))
-    val segmentsFlow =
-      MutableStateFlow(record.segments ?: emptyList())
-
-    monitorTaskState(record.taskId, stateFlow)
-
-    return DownloadTaskImpl(
-      taskId = record.taskId,
-      request = record.request,
+  private suspend fun createTaskFromRecord(record: TaskRecord): DownloadTask {
+    val taskId = record.taskId
+    val request = record.request
+    val task = RealDownloadTask(
+      taskId = taskId,
+      request = request,
       createdAt = record.createdAt,
-      state = stateFlow.asStateFlow(),
-      segments = segmentsFlow.asStateFlow(),
-      pauseAction = {
-        if (stateFlow.value.isActive) {
-          coordinator.pause(record.taskId)
-        } else {
-          log.d {
-            "Ignoring pause for taskId=${record.taskId} " +
-              "in state ${stateFlow.value}"
-          }
-        }
-      },
-      resumeAction = { dest ->
-        val state = stateFlow.value
-        if (state is DownloadState.Paused ||
-          state is DownloadState.Failed
-        ) {
-          val resumed = coordinator.resume(
-            record.taskId, scope, stateFlow, segmentsFlow, dest,
-          )
-          if (!resumed) {
-            coordinator.startFromRecord(
-              record, scope, stateFlow, segmentsFlow,
-            )
-          }
-        } else {
-          log.d {
-            "Ignoring resume for taskId=${record.taskId} " +
-              "in state $state"
-          }
-        }
-      },
-      cancelAction = {
-        val s = stateFlow.value
-        if (!s.isTerminal) {
-          scheduleManager.cancel(record.taskId)
-          scheduler.dequeue(record.taskId)
-          coordinator.cancel(record.taskId)
-          if (s is DownloadState.Scheduled) {
-            stateFlow.value = DownloadState.Canceled
-          }
-        } else {
-          log.d {
-            "Ignoring cancel for taskId=${record.taskId} " +
-              "in state $s"
-          }
-        }
-      },
-      removeAction = { removeTaskInternal(record.taskId) },
-      setSpeedLimitAction = { limit ->
-        coordinator.setTaskSpeedLimit(record.taskId, limit)
-      },
-      setPriorityAction = { priority ->
-        scheduler.setPriority(record.taskId, priority)
-      },
-      setConnectionsAction = { connections ->
-        coordinator.setTaskConnections(record.taskId, connections)
-      },
-      rescheduleAction = { schedule, conditions ->
-        val s = stateFlow.value
-        if (s.isTerminal) {
-          log.d {
-            "Ignoring reschedule for taskId=${record.taskId} in " +
-              "terminal state $s"
-          }
-          return@DownloadTaskImpl
-        }
-        log.i {
-          "Rescheduling taskId=${record.taskId}, " +
-            "schedule=$schedule, " +
-            "conditions=${conditions.size}"
-        }
-        scheduleManager.cancel(record.taskId)
-        if (s.isActive) {
-          coordinator.pause(record.taskId)
-        }
-        scheduler.dequeue(record.taskId)
-        scheduleManager.reschedule(
-          record.taskId, record.request, schedule, conditions,
-          record.createdAt, stateFlow, segmentsFlow,
-        )
-      },
+      initialState = mapRecordState(record),
+      initialSegments = record.segments ?: emptyList(),
+      coordinator = coordinator,
+      scheduler = scheduler,
+      scheduleManager = scheduleManager,
+      removeAction = { removeTaskInternal(taskId) },
     )
+
+    when (record.state) {
+      TaskState.SCHEDULED -> scheduleManager.schedule(
+        taskId, request, record.createdAt,
+        task.mutableState, task.mutableSegments,
+      )
+
+      TaskState.QUEUED,
+      TaskState.DOWNLOADING -> scheduler.enqueue(
+        taskId, request, record.createdAt,
+        task.mutableState, task.mutableSegments,
+        preferResume = true,
+      )
+
+      else -> {} // PAUSED, COMPLETED, FAILED, CANCELED — no action
+    }
+
+    monitorTaskState(taskId, task.state)
+    return task
   }
 
   private fun mapRecordState(record: TaskRecord): DownloadState {
     return when (record.state) {
-      // SCHEDULED maps to Paused: conditions are @Transient and
-      // cannot be restored, so treat as interrupted download.
-      TaskState.SCHEDULED,
-      TaskState.PENDING,
+      TaskState.SCHEDULED -> DownloadState.Scheduled(
+        record.request.schedule,
+      )
+
       TaskState.QUEUED,
-      TaskState.DOWNLOADING,
+      TaskState.DOWNLOADING -> DownloadState.Queued
+
       TaskState.PAUSED -> DownloadState.Paused(
         DownloadProgress(
           record.downloadedBytes, record.totalBytes,
@@ -456,7 +305,7 @@ class Ketch(
 
   private fun monitorTaskState(
     taskId: String,
-    stateFlow: MutableStateFlow<DownloadState>,
+    stateFlow: StateFlow<DownloadState>,
   ) {
     scope.launch {
       val terminalState =
@@ -513,6 +362,4 @@ class Ketch(
     httpEngine.close()
     scope.cancel()
   }
-
-  companion object
 }

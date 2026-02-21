@@ -110,6 +110,10 @@ value class SpeedLimit private constructor(val bytesPerSecond: Long) {
       }
     }
   }
+
+  override fun toString(): String {
+    return format(this)
+  }
 }
 
 internal object SpeedLimitSerializer : KSerializer<SpeedLimit> {

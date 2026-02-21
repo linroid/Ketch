@@ -12,10 +12,8 @@ import kotlin.test.assertTrue
 class StatusFilterTest {
 
   private val allStates: List<DownloadState> = listOf(
-    DownloadState.Idle,
     DownloadState.Scheduled(DownloadSchedule.Immediate),
     DownloadState.Queued,
-    DownloadState.Pending,
     DownloadState.Downloading(
       DownloadProgress(
         downloadedBytes = 100,
@@ -58,13 +56,6 @@ class StatusFilterTest {
       DownloadProgress(50, 100, 10)
     )
     assertTrue(StatusFilter.Downloading.matches(state))
-  }
-
-  @Test
-  fun downloading_matchesPendingState() {
-    assertTrue(
-      StatusFilter.Downloading.matches(DownloadState.Pending)
-    )
   }
 
   @Test
@@ -115,13 +106,6 @@ class StatusFilterTest {
     )
   }
 
-  @Test
-  fun downloading_matchesIdleState() {
-    assertTrue(
-      StatusFilter.Downloading.matches(DownloadState.Idle)
-    )
-  }
-
   // -----------------------------------------------------------
   // StatusFilter.Paused
   // -----------------------------------------------------------
@@ -167,20 +151,6 @@ class StatusFilterTest {
   fun paused_rejectsCanceled() {
     assertFalse(
       StatusFilter.Paused.matches(DownloadState.Canceled)
-    )
-  }
-
-  @Test
-  fun paused_rejectsIdle() {
-    assertFalse(
-      StatusFilter.Paused.matches(DownloadState.Idle)
-    )
-  }
-
-  @Test
-  fun paused_rejectsPending() {
-    assertFalse(
-      StatusFilter.Paused.matches(DownloadState.Pending)
     )
   }
 
@@ -237,13 +207,6 @@ class StatusFilterTest {
   fun completed_rejectsCanceled() {
     assertFalse(
       StatusFilter.Completed.matches(DownloadState.Canceled)
-    )
-  }
-
-  @Test
-  fun completed_rejectsIdle() {
-    assertFalse(
-      StatusFilter.Completed.matches(DownloadState.Idle)
     )
   }
 
@@ -312,20 +275,6 @@ class StatusFilterTest {
       StatusFilter.Failed.matches(
         DownloadState.Completed("/file")
       )
-    )
-  }
-
-  @Test
-  fun failed_rejectsIdle() {
-    assertFalse(
-      StatusFilter.Failed.matches(DownloadState.Idle)
-    )
-  }
-
-  @Test
-  fun failed_rejectsPending() {
-    assertFalse(
-      StatusFilter.Failed.matches(DownloadState.Pending)
     )
   }
 
