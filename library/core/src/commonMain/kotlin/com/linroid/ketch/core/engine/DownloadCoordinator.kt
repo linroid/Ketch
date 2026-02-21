@@ -77,9 +77,7 @@ internal class DownloadCoordinator(
 
     mutex.withLock {
       if (activeDownloads.containsKey(taskId)) {
-        log.d {
-          "Download already active for taskId=$taskId, skipping start"
-        }
+        log.d { "Download already active for taskId=$taskId, skipping start" }
         return
       }
 
@@ -192,9 +190,7 @@ internal class DownloadCoordinator(
       resolvedUrl = resolved
     } else {
       source = sourceResolver.resolve(request.url)
-      log.d {
-        "Resolved source '${source.type}' for ${request.url}"
-      }
+      log.d { "Resolved source '${source.type}' for ${request.url}" }
       resolvedUrl = source.resolve(request.url, request.headers)
     }
 
@@ -211,9 +207,7 @@ internal class DownloadCoordinator(
       serverFileName = fileName,
       deduplicate = true,
     )
-    log.d {
-      "Resolved outputPath=$outputPath"
-    }
+    log.d { "Resolved outputPath=$outputPath" }
 
     val now = Clock.System.now()
     updateTaskRecord(taskId) {
@@ -279,9 +273,7 @@ internal class DownloadCoordinator(
         )
       }
 
-      log.i {
-        "Download completed successfully for taskId=$taskId"
-      }
+      log.i { "Download completed successfully for taskId=$taskId" }
       stateFlow.value =
         DownloadState.Completed(outputPath)
     } finally {
@@ -297,9 +289,7 @@ internal class DownloadCoordinator(
   suspend fun pause(taskId: String) {
     mutex.withLock {
       val active = activeDownloads[taskId] ?: return
-      log.i {
-        "Pausing download for taskId=$taskId"
-      }
+      log.i { "Pausing download for taskId=$taskId" }
 
       // Use segmentsFlow as the source of truth — it is
       // continuously updated by the download source with the
@@ -320,9 +310,7 @@ internal class DownloadCoordinator(
       active.job.cancel()
 
       currentSegments?.let { segments ->
-        log.d {
-          "Saving pause state for taskId=$taskId"
-        }
+        log.d { "Saving pause state for taskId=$taskId" }
         val downloadedBytes =
           segments.sumOf { it.downloadedBytes }
         updateTaskRecord(taskId) {
@@ -595,9 +583,7 @@ internal class DownloadCoordinator(
   }
 
   suspend fun cancel(taskId: String) {
-    log.i {
-      "Canceling download for taskId=$taskId"
-    }
+    log.i { "Canceling download for taskId=$taskId" }
     mutex.withLock {
       val active = activeDownloads[taskId]
       active?.job?.cancel()
@@ -639,9 +625,7 @@ internal class DownloadCoordinator(
   ) {
     val existing = taskStore.load(taskId)
     if (existing == null) {
-      log.w {
-        "TaskRecord not found for taskId=$taskId, skipping update"
-      }
+      log.w { "TaskRecord not found for taskId=$taskId, skipping update" }
       return
     }
     taskStore.save(update(existing))
@@ -660,9 +644,7 @@ internal class DownloadCoordinator(
       activeDownloads[taskId]?.context
         ?.maxConnections?.value = connections
     }
-    log.i {
-      "Task connections updated for taskId=$taskId: $connections"
-    }
+    log.i { "Task connections updated for taskId=$taskId: $connections" }
   }
 
   suspend fun setTaskSpeedLimit(taskId: String, limit: SpeedLimit) {

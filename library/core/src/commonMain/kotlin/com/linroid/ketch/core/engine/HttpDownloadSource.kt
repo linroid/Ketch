@@ -109,9 +109,7 @@ internal class HttpDownloadSource(
       }
       SegmentCalculator.calculateSegments(totalBytes, connections)
     } else {
-      log.i {
-        "Single connection, totalBytes=$totalBytes"
-      }
+      log.i { "Single connection, totalBytes=$totalBytes" }
       SegmentCalculator.singleSegment(totalBytes)
     }
 
@@ -136,17 +134,13 @@ internal class HttpDownloadSource(
   ) {
     val state = Json.decodeFromString<HttpResumeState>(resumeState.data)
 
-    log.i {
-      "Resuming download for taskId=${context.taskId}"
-    }
+    log.i { "Resuming download for taskId=${context.taskId}" }
 
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(context.url, context.headers)
 
     if (state.etag != null && serverInfo.etag != state.etag) {
-      log.w {
-        "ETag mismatch - file has changed on server"
-      }
+      log.w { "ETag mismatch - file has changed on server" }
       throw KetchError.ValidationFailed(
         "ETag mismatch - file has changed on server"
       )
@@ -155,9 +149,7 @@ internal class HttpDownloadSource(
     if (state.lastModified != null &&
       serverInfo.lastModified != state.lastModified
     ) {
-      log.w {
-        "Last-Modified mismatch - file has changed on server"
-      }
+      log.w { "Last-Modified mismatch - file has changed on server" }
       throw KetchError.ValidationFailed(
         "Last-Modified mismatch - file has changed on server"
       )
@@ -337,9 +329,7 @@ internal class HttpDownloadSource(
           while (true) {
             delay(segmentSaveIntervalMs)
             context.segments.value = currentSegments()
-            log.v {
-              "Periodic segment save for taskId=${context.taskId}"
-            }
+            log.v { "Periodic segment save for taskId=${context.taskId}" }
           }
         }
 

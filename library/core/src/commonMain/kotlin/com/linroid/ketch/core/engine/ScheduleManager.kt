@@ -47,9 +47,7 @@ internal class ScheduleManager(
         waitForSchedule(taskId, schedule)
         waitForConditions(taskId, conditions)
 
-        log.i {
-          "Schedule and conditions met for taskId=$taskId, enqueuing"
-        }
+        log.i { "Schedule and conditions met for taskId=$taskId, enqueuing" }
         scheduler.enqueue(
           taskId, request, createdAt, stateFlow, segmentsFlow
         )
@@ -103,9 +101,7 @@ internal class ScheduleManager(
     mutex.withLock {
       scheduledJobs.remove(taskId)?.let { job ->
         job.cancel()
-        log.d {
-          "Canceled scheduled task: taskId=$taskId"
-        }
+        log.d { "Canceled scheduled task: taskId=$taskId" }
       }
     }
   }
@@ -143,9 +139,7 @@ internal class ScheduleManager(
   ) {
     if (conditions.isEmpty()) return
 
-    log.d {
-      "Waiting for ${conditions.size} condition(s) for taskId=$taskId"
-    }
+    log.d { "Waiting for ${conditions.size} condition(s) for taskId=$taskId" }
 
     val flows = conditions.map { it.isMet() }
     val combined = when (flows.size) {
@@ -155,9 +149,7 @@ internal class ScheduleManager(
 
     combined.first { it }
 
-    log.d {
-      "All conditions met for taskId=$taskId"
-    }
+    log.d { "All conditions met for taskId=$taskId" }
   }
 
   /** Whether a task is currently waiting for its schedule/conditions. */

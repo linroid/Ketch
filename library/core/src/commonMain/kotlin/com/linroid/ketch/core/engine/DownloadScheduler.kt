@@ -203,9 +203,7 @@ internal class DownloadScheduler(
     mutex.withLock {
       val removed = queuedEntries.removeAll { it.taskId == taskId }
       if (removed) {
-        log.i {
-          "Dequeued: taskId=$taskId"
-        }
+        log.i { "Dequeued: taskId=$taskId" }
       } else if (activeEntries.containsKey(taskId)) {
         removeActive(taskId)
         log.i {

@@ -34,9 +34,7 @@ internal class TokenBucket(
         }
       }
       if (waitMs > 0) {
-        log.v {
-          "Throttling: waiting ${waitMs}ms for $remaining bytes"
-        }
+        log.v { "Throttling: waiting ${waitMs}ms for $remaining bytes" }
         delay(waitMs)
       }
     }
@@ -44,9 +42,7 @@ internal class TokenBucket(
 
   fun updateRate(newBytesPerSecond: Long) {
     rate = newBytesPerSecond.toDouble()
-    log.d {
-      "Rate updated to $newBytesPerSecond bytes/sec"
-    }
+    log.d { "Rate updated to $newBytesPerSecond bytes/sec" }
   }
 
   private fun refill() {

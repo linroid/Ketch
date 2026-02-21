@@ -47,9 +47,7 @@ class KtorHttpEngine(
       }
 
       if (!response.status.isSuccess()) {
-        log.e {
-          "HTTP error ${response.status.value}: ${response.status.description}"
-        }
+        log.e { "HTTP error ${response.status.value}: ${response.status.description}" }
         val is429 = response.status.value == 429
         val retryAfter = if (is429) {
           parseRetryAfter(response.headers["Retry-After"])
@@ -125,9 +123,7 @@ class KtorHttpEngine(
         }
 
         if (!status.isSuccess()) {
-          log.e {
-            "HTTP error ${status.value}: ${status.description}"
-          }
+          log.e { "HTTP error ${status.value}: ${status.description}" }
           val is429 = status.value == 429
           val retryAfter = if (is429) {
             parseRetryAfter(response.headers["Retry-After"])

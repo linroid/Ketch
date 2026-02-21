@@ -24,23 +24,17 @@ internal class SourceResolver(private val sources: List<DownloadSource>) {
   fun resolve(url: String): DownloadSource {
     val source = sources.firstOrNull { it.canHandle(url) }
     if (source != null) {
-      log.d {
-        "Resolved source '${source.type}' for URL: $url"
-      }
+      log.d { "Resolved source '${source.type}' for URL: $url" }
       return source
     }
-    log.e {
-      "No source found for URL: $url"
-    }
+    log.e { "No source found for URL: $url" }
     throw KetchError.Unsupported
   }
 
   fun resolveByType(type: String): DownloadSource {
     val source = sources.firstOrNull { it.type == type }
     if (source != null) return source
-    log.e {
-      "No source found for type: $type"
-    }
+    log.e { "No source found for type: $type" }
     throw KetchError.Unsupported
   }
 }

@@ -202,9 +202,7 @@ class Ketch(
             )
           }
         } else {
-          log.d {
-            "Ignoring resume for taskId=$taskId in state $state"
-          }
+          log.d { "Ignoring resume for taskId=$taskId in state $state" }
         }
       },
       cancelAction = {
@@ -217,9 +215,7 @@ class Ketch(
             stateFlow.value = DownloadState.Canceled
           }
         } else {
-          log.d {
-            "Ignoring cancel for taskId=$taskId in state $s"
-          }
+          log.d { "Ignoring cancel for taskId=$taskId in state $s" }
         }
       },
       removeAction = { removeTaskInternal(taskId) },
@@ -302,9 +298,7 @@ class Ketch(
    * - `CANCELED` -> [DownloadState.Canceled]
    */
   suspend fun loadTasks() {
-    log.i {
-      "Loading tasks from persistent storage"
-    }
+    log.i { "Loading tasks from persistent storage" }
     val records = taskStore.loadAll()
     log.i { "Found ${records.size} task(s)" }
 
