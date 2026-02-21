@@ -101,10 +101,7 @@ internal class HttpDownloadSource(
           "resegmenting to $connections connections"
       }
       SegmentCalculator.resegment(existing, connections)
-    } else if (
-      resolved.supportsResume && connections > 1 &&
-      context.fileAccessor.canSegment()
-    ) {
+    } else if (resolved.supportsResume && connections > 1) {
       KDownLogger.i("HttpSource") {
         "Server supports ranges. Using $connections " +
           "connections, totalBytes=$totalBytes"

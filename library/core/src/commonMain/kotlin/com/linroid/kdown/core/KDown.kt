@@ -24,6 +24,7 @@ import com.linroid.kdown.core.engine.TokenBucket
 import com.linroid.kdown.core.file.DefaultFileNameResolver
 import com.linroid.kdown.core.file.FileAccessor
 import com.linroid.kdown.core.file.FileNameResolver
+import com.linroid.kdown.core.file.createFileAccessor
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.core.task.DownloadTaskImpl
@@ -65,9 +66,7 @@ class KDown(
   private val taskStore: TaskStore = InMemoryTaskStore(),
   private val config: DownloadConfig = DownloadConfig.Default,
   private val name: String = "KDown",
-  private val fileAccessorFactory: (String) -> FileAccessor = { path ->
-    FileAccessor(path)
-  },
+  private val fileAccessorFactory: (String) -> FileAccessor = ::createFileAccessor,
   private val fileNameResolver: FileNameResolver =
     DefaultFileNameResolver(),
   additionalSources: List<DownloadSource> = emptyList(),
