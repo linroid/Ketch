@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.android
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
+@SuppressLint("InlinedApi")
 class KetchService : Service() {
   private val log = KetchLogger("KetchService")
 
@@ -51,6 +53,17 @@ class KetchService : Service() {
 
   override fun onCreate() {
     super.onCreate()
+    // Call startForeground() immediately to avoid ANR from
+    // startForegroundService() timeout. The monitor updates it later.
+    createNotificationChannel()
+    ServiceCompat.startForeground(
+      this,
+      NOTIFICATION_ID,
+      buildNotification(0, ServerState.Stopped),
+      ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+    )
+    isForeground = true
+
     val configStore = FileConfigStore(
       filesDir.resolve("config.toml").absolutePath,
     )
@@ -96,7 +109,6 @@ class KetchService : Service() {
       initialRemotes = config.remote,
       configStore = configStore,
     )
-    createNotificationChannel()
     startForegroundMonitor()
   }
 
