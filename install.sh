@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 #
-# KDown CLI installer
+# Ketch CLI installer
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/linroid/Ketch/main/install.sh | bash
 #
 # Options (via environment variables):
-#   KDOWN_VERSION   - specific version to install (default: latest)
-#   KDOWN_INSTALL   - installation directory (default: /usr/local/bin)
+#   KETCH_VERSION   - specific version to install (default: latest)
+#   KETCH_INSTALL   - installation directory (default: /usr/local/bin)
 #
 set -euo pipefail
 
-REPO="linroid/KDown"
-BINARY_NAME="kdown"
-INSTALL_DIR="${KDOWN_INSTALL:-/usr/local/bin}"
+REPO="linroid/Ketch"
+BINARY_NAME="ketch"
+INSTALL_DIR="${KETCH_INSTALL:-/usr/local/bin}"
 
 # --- Helpers ---------------------------------------------------------------
 
@@ -56,9 +56,9 @@ detect_arch() {
 # --- Resolve version -------------------------------------------------------
 
 resolve_version() {
-  if [ -n "${KDOWN_VERSION:-}" ]; then
+  if [ -n "${KETCH_VERSION:-}" ]; then
     # Strip leading 'v' if present
-    echo "${KDOWN_VERSION#v}"
+    echo "${KETCH_VERSION#v}"
     return
   fi
 
@@ -86,7 +86,7 @@ main() {
   arch="$(detect_arch)"
   version="$(resolve_version)"
 
-  info "Installing kdown v${version} (${os}/${arch})"
+  info "Installing ketch v${version} (${os}/${arch})"
 
   # macOS CLI is only available for arm64
   if [ "$os" = "macos" ] && [ "$arch" = "x64" ]; then
@@ -104,7 +104,7 @@ main() {
     ext="zip"
   fi
 
-  local filename="kdown-cli-${version}-${os}-${arch}.${ext}"
+  local filename="ketch-cli-${version}-${os}-${arch}.${ext}"
   local url="https://github.com/${REPO}/releases/download/v${version}/${filename}"
   local tmpdir
   tmpdir="$(mktemp -d)"
@@ -145,11 +145,11 @@ main() {
     sudo mv "$binary" "${INSTALL_DIR}/${BINARY_NAME}"
   fi
 
-  info "Installed kdown to ${INSTALL_DIR}/${BINARY_NAME}"
+  info "Installed ketch to ${INSTALL_DIR}/${BINARY_NAME}"
 
   # Verify installation
-  if command -v kdown >/dev/null 2>&1; then
-    info "Done! Run 'kdown --help' to get started."
+  if command -v ketch >/dev/null 2>&1; then
+    info "Done! Run 'ketch --help' to get started."
   else
     warn "${INSTALL_DIR} is not in your PATH."
     warn "Add it with: export PATH=\"${INSTALL_DIR}:\$PATH\""

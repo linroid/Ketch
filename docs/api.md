@@ -7,14 +7,14 @@ Add the dependencies to your `build.gradle.kts`:
 ```kotlin
 // Version catalog (gradle/libs.versions.toml)
 [versions]
-kdown = "<latest-version>"
+ketch = "<latest-version>"
 
 [libraries]
-kdown-core = { module = "com.linroid.kdown:core", version.ref = "kdown" }
-kdown-ktor = { module = "com.linroid.kdown:ktor", version.ref = "kdown" }
-kdown-sqlite = { module = "com.linroid.kdown:sqlite", version.ref = "kdown" }
-kdown-kermit = { module = "com.linroid.kdown:kermit", version.ref = "kdown" }
-kdown-remote = { module = "com.linroid.kdown:remote", version.ref = "kdown" }
+ketch-core = { module = "com.linroid.ketch:core", version.ref = "ketch" }
+ketch-ktor = { module = "com.linroid.ketch:ktor", version.ref = "ketch" }
+ketch-sqlite = { module = "com.linroid.ketch:sqlite", version.ref = "ketch" }
+ketch-kermit = { module = "com.linroid.ketch:kermit", version.ref = "ketch" }
+ketch-remote = { module = "com.linroid.ketch:remote", version.ref = "ketch" }
 ```
 
 ```kotlin
@@ -22,18 +22,18 @@ kdown-remote = { module = "com.linroid.kdown:remote", version.ref = "kdown" }
 kotlin {
   sourceSets {
     commonMain.dependencies {
-      implementation(libs.kdown.core)  // Download engine
-      implementation(libs.kdown.ktor)  // HTTP engine (required by core)
+      implementation(libs.ketch.core)  // Download engine
+      implementation(libs.ketch.ktor)  // HTTP engine (required by core)
     }
     // Optional modules
     commonMain.dependencies {
-      implementation(libs.kdown.kermit)  // Kermit logging
-      implementation(libs.kdown.remote)  // Remote client for daemon server
+      implementation(libs.ketch.kermit)  // Kermit logging
+      implementation(libs.ketch.remote)  // Remote client for daemon server
     }
     // SQLite persistence (not available on WasmJs)
-    androidMain.dependencies { implementation(libs.kdown.sqlite) }
-    iosMain.dependencies { implementation(libs.kdown.sqlite) }
-    jvmMain.dependencies { implementation(libs.kdown.sqlite) }
+    androidMain.dependencies { implementation(libs.ketch.sqlite) }
+    iosMain.dependencies { implementation(libs.ketch.sqlite) }
+    jvmMain.dependencies { implementation(libs.ketch.sqlite) }
   }
 }
 ```
@@ -42,8 +42,8 @@ Or without a version catalog:
 
 ```kotlin
 dependencies {
-  implementation("com.linroid.kdown:core:<latest-version>")
-  implementation("com.linroid.kdown:ktor:<latest-version>")
+  implementation("com.linroid.ketch:core:<latest-version>")
+  implementation("com.linroid.ketch:ktor:<latest-version>")
 }
 ```
 
@@ -51,11 +51,11 @@ dependencies {
 
 ### `library:api`
 
-The public API surface. Both `library:core` and `library:remote` implement the `KDownApi` interface,
+The public API surface. Both `library:core` and `library:remote` implement the `KetchApi` interface,
 so UI code works identically regardless of backend:
 
 ```kotlin
-interface KDownApi {
+interface KetchApi {
   val tasks: StateFlow<List<DownloadTask>>
   suspend fun download(request: DownloadRequest): DownloadTask
   suspend fun setGlobalSpeedLimit(limit: SpeedLimit)
@@ -109,7 +109,7 @@ DownloadConfig(
 
 ```kotlin
 // High-priority download
-kdown.download(
+ketch.download(
   DownloadRequest(
     url = "https://example.com/urgent.zip",
     directory = "/downloads",
@@ -118,7 +118,7 @@ kdown.download(
 )
 
 // Scheduled download
-kdown.download(
+ketch.download(
   DownloadRequest(
     url = "https://example.com/file.zip",
     directory = "/downloads",
@@ -129,12 +129,12 @@ kdown.download(
 
 // Speed limiting
 task.setSpeedLimit(SpeedLimit.mbps(1))        // per-task
-kdown.setGlobalSpeedLimit(SpeedLimit.kbps(500)) // global
+ketch.setGlobalSpeedLimit(SpeedLimit.kbps(500)) // global
 ```
 
 ## Error Handling
 
-All errors are modeled as a sealed class `KDownError`:
+All errors are modeled as a sealed class `KetchError`:
 
 | Type | Retryable | Description |
 |---|---|---|
@@ -149,17 +149,17 @@ All errors are modeled as a sealed class `KDownError`:
 
 ## Logging
 
-KDown provides pluggable logging with zero overhead when disabled (default).
+Ketch provides pluggable logging with zero overhead when disabled (default).
 
 ```kotlin
 // No logging (default)
-KDown(httpEngine = KtorHttpEngine())
+Ketch(httpEngine = KtorHttpEngine())
 
 // Console logging (development)
-KDown(httpEngine = KtorHttpEngine(), logger = Logger.console())
+Ketch(httpEngine = KtorHttpEngine(), logger = Logger.console())
 
 // Kermit structured logging (production)
-KDown(httpEngine = KtorHttpEngine(), logger = KermitLogger(minSeverity = Severity.Debug))
+Ketch(httpEngine = KtorHttpEngine(), logger = KermitLogger(minSeverity = Severity.Debug))
 ```
 
 See [Logging](logging.md) for detailed documentation.

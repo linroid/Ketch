@@ -1,6 +1,6 @@
-# KDown
+# Ketch
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.linroid.kdown/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.kdown)
+[![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.10-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-4c8dec?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
 [![Ktor](https://img.shields.io/badge/Ktor-3.4.0-087CFA.svg?logo=ktor&logoColor=white)](https://ktor.io)
@@ -51,15 +51,15 @@ Add the SDK to your Kotlin Multiplatform project:
 ```kotlin
 // build.gradle.kts
 dependencies {
-  implementation("com.linroid.kdown:core:<latest-version>")
-  implementation("com.linroid.kdown:ktor:<latest-version>")
+  implementation("com.linroid.ketch:core:<latest-version>")
+  implementation("com.linroid.ketch:ktor:<latest-version>")
 }
 ```
 
 Start downloading:
 
 ```kotlin
-val kdown = KDown(
+val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
   config = DownloadConfig(
     maxConnections = 4,
@@ -67,7 +67,7 @@ val kdown = KDown(
   )
 )
 
-val task = kdown.download(
+val task = ketch.download(
   DownloadRequest(
     url = "https://example.com/large-file.zip",
     directory = "/path/to/downloads",
@@ -92,7 +92,7 @@ See [Installation](docs/api.md) for version catalog setup, optional modules (SQL
 
 ### Download the App
 
-Download the latest apps from [GitHub Releases](https://github.com/linroid/KDown/releases/latest):
+Download the latest apps from [GitHub Releases](https://github.com/linroid/Ketch/releases/latest):
 
 | Platform | Format |
 |---|---|
@@ -104,23 +104,23 @@ Download the latest apps from [GitHub Releases](https://github.com/linroid/KDown
 
 ### CLI / Server
 
-Install the native CLI to run KDown as a daemon on your server:
+Install the native CLI to run Ketch as a daemon on your server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/linroid/KDown/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/linroid/Ketch/main/install.sh | bash
 ```
 
 Then start the daemon:
 
 ```bash
 # Start the server with REST API + web UI on port 8642
-kdown server
+ketch server
 
 # Download a file directly
-kdown https://example.com/file.zip
+ketch https://example.com/file.zip
 
 # Use a TOML config file
-kdown server --config /path/to/config.toml
+ketch server --config /path/to/config.toml
 ```
 
 Supported platforms: **macOS** (arm64), **Linux** (x64, arm64), **Windows** (x64). See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.

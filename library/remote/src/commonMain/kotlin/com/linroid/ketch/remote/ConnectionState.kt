@@ -1,0 +1,12 @@
+package com.linroid.ketch.remote
+
+/**
+ * Connection health of the [RemoteKetch] backend.
+ */
+sealed class ConnectionState {
+  data object Connected : ConnectionState()
+  data object Connecting : ConnectionState()
+  data class Disconnected(val reason: String? = null) :
+    ConnectionState()
+  data object Unauthorized : ConnectionState()
+}

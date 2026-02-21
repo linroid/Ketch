@@ -11,7 +11,7 @@ kotlin {
   wasmJs {
     browser {
       commonWebpackConfig {
-        outputFileName = "kdown-web.js"
+        outputFileName = "ketch-web.js"
       }
     }
     binaries.executable()

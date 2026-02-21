@@ -1,13 +1,13 @@
-# KDown Logging
+# Ketch Logging
 
-KDown provides a pluggable logging system for diagnostics and debugging.
+Ketch provides a pluggable logging system for diagnostics and debugging.
 
 ## Quick Start
 
 ### Option 1: Use the built-in console logger
 
 ```kotlin
-val kdown = KDown(
+val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
   logger = Logger.console()  // Logs to console/logcat/NSLog
 )
@@ -18,20 +18,20 @@ val kdown = KDown(
 Add the dependency:
 ```kotlin
 dependencies {
-    implementation("com.linroid.kdown:kermit:1.0.0")
+    implementation("com.linroid.ketch:kermit:1.0.0")
 }
 ```
 
 Use it:
 ```kotlin
-import com.linroid.kdown.log.KermitLogger
+import com.linroid.ketch.log.KermitLogger
 import co.touchlab.kermit.Severity
 
 val logger = KermitLogger(
     minSeverity = Severity.Debug  // Verbose, Debug, Info, Warn, Error, Assert
 )
 
-val kdown = KDown(
+val ketch = Ketch(
     httpEngine = KtorHttpEngine(),
     logger = logger
 )
@@ -40,7 +40,7 @@ val kdown = KDown(
 ### Option 3: Disable logging (Default)
 
 ```kotlin
-val kdown = KDown(
+val ketch = Ketch(
     httpEngine = KtorHttpEngine(),
     logger = Logger.None  // No logging (default)
 )
@@ -57,7 +57,7 @@ val kdown = KDown(
 ## What Gets Logged
 
 ### Info Level (Recommended for Production)
-- KDown initialization
+- Ketch initialization
 - Download start/pause/resume/cancel
 - Server capabilities (range support, content length)
 - Download completion
@@ -79,8 +79,8 @@ val kdown = KDown(
 With `Logger.console()` or `Severity.Debug`:
 
 ```
-[INFO] [KDown] KDown v1.0.0 initialized
-[INFO] [KDown] Starting download: taskId=download-123, url=https://example.com/file.zip, connections=4
+[INFO] [Ketch] Ketch v1.0.0 initialized
+[INFO] [Ketch] Starting download: taskId=download-123, url=https://example.com/file.zip, connections=4
 [DEBUG] [Coordinator] Detecting server capabilities for https://example.com/file.zip
 [DEBUG] [RangeDetector] Sending HEAD request to https://example.com/file.zip
 [DEBUG] [KtorHttpEngine] HEAD request: https://example.com/file.zip
@@ -106,11 +106,11 @@ With `Logger.console()` or `Severity.Debug`:
 ### Pause/Resume Example
 
 ```
-[INFO] [KDown] Pausing download: taskId=download-123
+[INFO] [Ketch] Pausing download: taskId=download-123
 [INFO] [Coordinator] Pausing download for taskId=download-123
 [DEBUG] [Coordinator] Saving pause state for taskId=download-123
 ...
-[INFO] [KDown] Resuming download: taskId=download-123
+[INFO] [Ketch] Resuming download: taskId=download-123
 [INFO] [Coordinator] Resuming download for taskId=download-123, url=https://example.com/file.zip
 [DEBUG] [Coordinator] Validating server state for resume
 [DEBUG] [RangeDetector] Sending HEAD request to https://example.com/file.zip
@@ -161,19 +161,19 @@ class CustomLogger : Logger {
   }
 }
 
-val kdown = KDown(
+val ketch = Ketch(
     httpEngine = KtorHttpEngine(),
     logger = CustomLogger()
 )
 ```
 
-**Note:** Tags are included in the message itself by KDownLogger. Each log message is formatted as `[ComponentTag] message`, so you don't need to handle tags separately.
+**Note:** Tags are included in the message itself by KetchLogger. Each log message is formatted as `[ComponentTag] message`, so you don't need to handle tags separately.
 
 ## Platform-Specific Behavior
 
 ### Android
 - `Logger.console()` uses Android's `Log` class (appears in Logcat)
-- Tags are prefixed with "KDown."
+- Tags are prefixed with "Ketch."
 
 ### iOS
 - `Logger.console()` uses `NSLog` (appears in Xcode console)

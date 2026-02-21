@@ -61,5 +61,5 @@ When writing Kotlin code for this project:
 - **Internal classes**: Mark with `internal` modifier
 - **Naming**: Use meaningful, descriptive names
 - **Functions**: Keep focused and concise
-- **Sealed hierarchies**: Use sealed classes/interfaces for closed type hierarchies (e.g., `KDownError`)
+- **Sealed hierarchies**: Use sealed classes/interfaces for closed type hierarchies (e.g., `KetchError`)
 - **Simplicity**: Favor simple correctness over micro-optimizations

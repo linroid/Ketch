@@ -1,6 +1,6 @@
-# KDown CLI
+# Ketch CLI
 
-Command-line interface for KDown. Supports single-file downloads, a queue management demo, and running the KDown daemon server.
+Command-line interface for Ketch. Supports single-file downloads, a queue management demo, and running the Ketch daemon server.
 
 ## Build & Run
 
@@ -21,7 +21,7 @@ Command-line interface for KDown. Supports single-file downloads, a queue manage
 ### Download a file
 
 ```bash
-kdown <url> [destination] [options]
+ketch <url> [destination] [options]
 ```
 
 | Option | Description |
@@ -34,13 +34,13 @@ kdown <url> [destination] [options]
 
 ```bash
 # Basic download
-kdown https://example.com/file.zip
+ketch https://example.com/file.zip
 
 # Download to a specific path
-kdown https://example.com/file.zip /tmp/file.zip
+ketch https://example.com/file.zip /tmp/file.zip
 
 # With speed limit and priority
-kdown --speed-limit 1m --priority high https://example.com/file.zip
+ketch --speed-limit 1m --priority high https://example.com/file.zip
 ```
 
 ### Queue demo
@@ -48,17 +48,17 @@ kdown --speed-limit 1m --priority high https://example.com/file.zip
 Demonstrates queue management with multiple concurrent downloads and priority ordering.
 
 ```bash
-kdown --queue-demo <url1> <url2> <url3> ...
+ketch --queue-demo <url1> <url2> <url3> ...
 ```
 
 Runs at most 2 downloads concurrently. Remaining URLs are queued by priority. After 3 seconds, the first download's priority is boosted to URGENT to demonstrate dynamic re-ordering.
 
 ### Server
 
-Start the KDown daemon server with REST API and SSE event stream.
+Start the Ketch daemon server with REST API and SSE event stream.
 
 ```bash
-kdown server [options]
+ketch server [options]
 ```
 
 | Option | Description |
@@ -77,19 +77,19 @@ kdown server [options]
 
 ```bash
 # Start with defaults
-kdown server
+ketch server
 
 # Custom port and download directory
-kdown server --port 9000 --dir /tmp/downloads
+ketch server --port 9000 --dir /tmp/downloads
 
 # With authentication and CORS
-kdown server --token my-secret --cors "http://localhost:3000"
+ketch server --token my-secret --cors "http://localhost:3000"
 
 # With a config file, overriding the port
-kdown server --config /path/to/config.toml --port 9999
+ketch server --config /path/to/config.toml --port 9999
 
 # Generate a default config file
-kdown server --generate-config
+ketch server --generate-config
 ```
 
 ## Configuration File
@@ -100,16 +100,16 @@ The server command supports TOML configuration files. CLI flags always take prec
 
 | Platform | Default path |
 |---|---|
-| macOS | `~/Library/Application Support/kdown/config.toml` |
-| Linux | `$XDG_CONFIG_HOME/kdown/config.toml` (default: `~/.config/kdown/config.toml`) |
-| Windows | `%APPDATA%\kdown\config.toml` |
+| macOS | `~/Library/Application Support/ketch/config.toml` |
+| Linux | `$XDG_CONFIG_HOME/ketch/config.toml` (default: `~/.config/ketch/config.toml`) |
+| Windows | `%APPDATA%\ketch\config.toml` |
 
 If no `--config` flag is provided, the CLI automatically loads from the default path when the file exists.
 
 ### Generating a config file
 
 ```bash
-kdown server --generate-config
+ketch server --generate-config
 ```
 
 This creates a commented config file at the default location. Edit it to customize your setup.
@@ -117,7 +117,7 @@ This creates a commented config file at the default location. Edit it to customi
 ### Config file format
 
 ```toml
-# KDown Server Configuration
+# Ketch Server Configuration
 
 [server]
 host = "0.0.0.0"
@@ -189,6 +189,6 @@ Task metadata is stored in a SQLite database at the platform config directory:
 
 | Platform | Default path |
 |---|---|
-| macOS | `~/Library/Application Support/kdown/kdown.db` |
-| Linux | `$XDG_CONFIG_HOME/kdown/kdown.db` |
-| Windows | `%APPDATA%\kdown\kdown.db` |
+| macOS | `~/Library/Application Support/ketch/ketch.db` |
+| Linux | `$XDG_CONFIG_HOME/ketch/ketch.db` |
+| Windows | `%APPDATA%\ketch\ketch.db` |

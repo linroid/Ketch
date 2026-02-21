@@ -19,7 +19,7 @@ dependencies {
 
 compose.desktop {
   application {
-    mainClass = "com.linroid.kdown.app.desktop.MainKt"
+    mainClass = "com.linroid.ketch.app.desktop.MainKt"
 
     buildTypes.release.proguard {
       configurationFiles.from(rootProject.file("proguard-rules.pro"))
@@ -28,7 +28,7 @@ compose.desktop {
     nativeDistributions {
       targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
       modules("java.sql")
-      packageName = "KDown"
+      packageName = "Ketch"
       packageVersion = providers.gradleProperty("VERSION_NAME").get()
         .substringBefore("-")
         .let { semver ->
