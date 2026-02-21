@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.targets.wasm.binaryen.BinaryenExec
 
 plugins {
   alias(libs.plugins.kotlinMultiplatform)
@@ -27,4 +28,11 @@ kotlin {
       implementation(libs.compose.material3)
     }
   }
+}
+
+// Workaround: ktoml 0.7.1 generates Wasm code that binaryen's validator
+// rejects (type mismatch in TomlMainEncoder.appendValue). Skip validation
+// until ktoml ships a Kotlin 2.3-compatible release.
+tasks.withType<BinaryenExec>().configureEach {
+  binaryenArgs.add("--no-validation")
 }
