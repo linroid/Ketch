@@ -3,7 +3,7 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
-import com.linroid.ketch.core.log.KetchLogger
+import com.linroid.ketch.api.log.KetchLogger
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.head

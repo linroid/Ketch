@@ -16,7 +16,7 @@ import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.file.resolveChildPath
-import com.linroid.ketch.core.log.KetchLogger
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -177,7 +177,7 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
-    val resolved = request.resolvedUrl
+    val resolved = request.resolvedSource
     val source: DownloadSource
     val resolvedUrl: ResolvedSource
 

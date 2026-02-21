@@ -1,6 +1,6 @@
 package com.linroid.ketch.server.mdns
 
-import com.linroid.ketch.core.log.KetchLogger
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

@@ -1,5 +1,7 @@
 package com.linroid.ketch.api
 
+import kotlinx.serialization.Serializable
+
 /**
  * Snapshot of download progress aggregated across all segments.
  *
@@ -7,6 +9,7 @@ package com.linroid.ketch.api
  * @property totalBytes expected file size in bytes, or 0 if unknown
  * @property bytesPerSecond current download speed in bytes per second
  */
+@Serializable
 data class DownloadProgress(
   val downloadedBytes: Long,
   val totalBytes: Long,

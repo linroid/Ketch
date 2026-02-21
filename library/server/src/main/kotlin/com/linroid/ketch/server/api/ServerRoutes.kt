@@ -4,8 +4,6 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
-import com.linroid.ketch.endpoints.model.ResolveUrlResponse
-import com.linroid.ketch.endpoints.model.SourceFileResponse
 import io.ktor.server.request.receive
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
@@ -31,25 +29,6 @@ internal fun Route.serverRoutes(ketch: KetchApi) {
   post<Api.Resolve> {
     val body = call.receive<ResolveUrlRequest>()
     val resolved = ketch.resolve(body.url, body.headers)
-    call.respond(
-      ResolveUrlResponse(
-        url = resolved.url,
-        sourceType = resolved.sourceType,
-        totalBytes = resolved.totalBytes,
-        supportsResume = resolved.supportsResume,
-        suggestedFileName = resolved.suggestedFileName,
-        maxSegments = resolved.maxSegments,
-        metadata = resolved.metadata,
-        files = resolved.files.map { file ->
-          SourceFileResponse(
-            id = file.id,
-            name = file.name,
-            size = file.size,
-            metadata = file.metadata,
-          )
-        },
-        selectionMode = resolved.selectionMode.name,
-      )
-    )
+    call.respond(resolved)
   }
 }

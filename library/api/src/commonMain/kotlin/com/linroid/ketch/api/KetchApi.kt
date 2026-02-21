@@ -24,7 +24,7 @@ interface KetchApi {
    * Probes the URL (e.g., via an HTTP HEAD request) and returns
    * file size, resume support, suggested file name, and other
    * source-specific metadata. The returned [ResolvedSource] can be
-   * passed in [DownloadRequest.resolvedUrl] to skip the probe
+   * passed in [DownloadRequest.resolvedSource] to skip the probe
    * during [download].
    *
    * @param url the URL to resolve

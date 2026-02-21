@@ -3,16 +3,17 @@ package com.linroid.ketch.remote
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.config.DownloadConfig
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.Api
-import com.linroid.ketch.endpoints.model.CreateDownloadRequest
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
-import com.linroid.ketch.endpoints.model.ResolveUrlResponse
 import com.linroid.ketch.endpoints.model.TaskEvent
-import com.linroid.ketch.endpoints.model.TaskResponse
+import com.linroid.ketch.endpoints.model.TaskSnapshot
+import com.linroid.ketch.endpoints.model.TasksResponse
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.resources.Resources
@@ -23,7 +24,7 @@ import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.plugins.sse.sse
 import io.ktor.client.request.header
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
@@ -38,6 +39,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -59,14 +61,16 @@ class RemoteKetch(
 
   private val scheme = if (secure) "https" else "http"
   private val baseUrl = "$scheme://$host:$port"
-
   private val scope = CoroutineScope(
-    SupervisorJob() + Dispatchers.Default
+    SupervisorJob() + Dispatchers.Default,
   )
+  private val log = KetchLogger("RemoteKetch")
 
   private val json = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
+    isLenient = true
+    coerceInputValues = true
   }
 
   internal val httpClient = HttpClient {
@@ -79,14 +83,14 @@ class RemoteKetch(
       url(baseUrl)
       if (apiToken != null) {
         header(
-          HttpHeaders.Authorization, "Bearer $apiToken"
+          HttpHeaders.Authorization, "Bearer $apiToken",
         )
       }
     }
   }
 
   private val _connectionState = MutableStateFlow<ConnectionState>(
-    ConnectionState.Disconnected("Not started")
+    ConnectionState.Disconnected("Not started"),
   )
 
   val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
@@ -97,7 +101,7 @@ class RemoteKetch(
   private val taskMap = mutableMapOf<String, RemoteDownloadTask>()
 
   private val _tasks = MutableStateFlow<List<DownloadTask>>(
-    emptyList()
+    emptyList(),
   )
   override val tasks: StateFlow<List<DownloadTask>> =
     _tasks.asStateFlow()
@@ -107,21 +111,13 @@ class RemoteKetch(
   override suspend fun download(
     request: DownloadRequest,
   ): DownloadTask {
-    val wireRequest = WireMapper.toCreateWire(request)
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
-      setBody(
-        json.encodeToString(
-          CreateDownloadRequest.serializer(), wireRequest
-        )
-      )
+      setBody(request)
     }
     checkSuccess(response)
-    val wire: TaskResponse = json.decodeFromString(
-      response.bodyAsText()
-    )
-    val task = createRemoteTask(wire, request)
-    addTask(task)
+    val task = createRemoteTask(response.body())
+    addOrUpdate(task)
     return task
   }
 
@@ -129,23 +125,16 @@ class RemoteKetch(
     url: String,
     headers: Map<String, String>,
   ): ResolvedSource {
-    val wireRequest = ResolveUrlRequest(url, headers)
     val response = httpClient.post(Api.Resolve()) {
       contentType(ContentType.Application.Json)
-      setBody(
-        json.encodeToString(
-          ResolveUrlRequest.serializer(), wireRequest
-        )
-      )
+      setBody(ResolveUrlRequest(url, headers))
     }
     checkSuccess(response)
-    val wire: ResolveUrlResponse = json.decodeFromString(
-      response.bodyAsText()
-    )
-    return WireMapper.toResolvedSource(wire)
+    return response.body()
   }
 
   override suspend fun start() {
+    log.i { "Start" }
     if (sseJob?.isActive == true) return
     _connectionState.value = ConnectionState.Connecting
     sseJob = scope.launch { connectSse() }
@@ -154,17 +143,13 @@ class RemoteKetch(
   override suspend fun status(): KetchStatus {
     val response = httpClient.get(Api.Status())
     checkSuccess(response)
-    return json.decodeFromString(response.bodyAsText())
+    return response.body()
   }
 
   override suspend fun updateConfig(config: DownloadConfig) {
     val response = httpClient.put(Api.Config()) {
       contentType(ContentType.Application.Json)
-      setBody(
-        json.encodeToString(
-          DownloadConfig.serializer(), config
-        )
-      )
+      setBody(config)
     }
     checkSuccess(response)
   }
@@ -183,26 +168,25 @@ class RemoteKetch(
         fetchAllTasks()
         _connectionState.value = ConnectionState.Connected
         reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS
-
         httpClient.sse(
           urlString = "/api/events",
         ) {
+          log.i { "Connected to events" }
           incoming.collect { event ->
             val data = event.data ?: return@collect
             try {
-              val wireEvent: TaskEvent =
-                json.decodeFromString(data)
-              handleEvent(wireEvent)
-            } catch (_: Exception) {
-              // Skip malformed events
+              val event: TaskEvent = json.decodeFromString(data)
+              handleEvent(event)
+            } catch (error: Exception) {
+              log.e(error) { "Failed to handle event" }
             }
           }
         }
       } catch (_: UnauthorizedException) {
         _connectionState.value = ConnectionState.Unauthorized
         return
-      } catch (_: Exception) {
-        // Connection lost or failed
+      } catch (error: Exception) {
+        log.e(error) { "Failed to connect" }
       }
 
       _connectionState.value = ConnectionState.Disconnected()
@@ -215,95 +199,95 @@ class RemoteKetch(
   }
 
   private suspend fun fetchAllTasks() {
+    log.i { "Fetch all tasks" }
     val response = httpClient.get(Api.Tasks())
+    log.i { "Status: ${response.status}" }
     if (response.status.value == 401) {
       throw UnauthorizedException()
     }
     if (response.status.isSuccess()) {
-      val wireTasks: List<TaskResponse> =
-        json.decodeFromString(response.bodyAsText())
+      val snapshots: TasksResponse = response.body()
+      log.i { "Fetched ${snapshots.tasks.size} tasks" }
       taskMap.clear()
-      val tasks = wireTasks.map { wire ->
-        val request = WireMapper.toDownloadRequest(wire)
-        createRemoteTask(wire, request)
-      }
+      val tasks = snapshots.tasks.map(::createRemoteTask)
       tasks.forEach { taskMap[it.taskId] = it }
       _tasks.value = tasks
+      log.i { "Fetched ${snapshots.tasks.size} tasks -> ${tasks.size}" }
     }
   }
 
   private suspend fun handleEvent(event: TaskEvent) {
-    when (event.type) {
-      "task_added" -> {
+    log.i { "Handle event: ${event.eventType}" }
+    when (event) {
+      is TaskEvent.TaskAdded -> {
         try {
           val response = httpClient.get(
             Api.Tasks.ById(id = event.taskId),
           )
           if (response.status.isSuccess()) {
-            val wire: TaskResponse =
-              json.decodeFromString(response.bodyAsText())
-            val request = WireMapper.toDownloadRequest(wire)
-            val task = createRemoteTask(wire, request)
-            addTask(task)
+            val wire: TaskSnapshot = response.body()
+            val task = createRemoteTask(wire)
+            addOrUpdate(task)
           }
         } catch (_: Exception) {
           // Task may already be gone
         }
       }
 
-      "task_removed" -> {
-        taskMap.remove(event.taskId)
-        _tasks.value = _tasks.value.filter {
-          it.taskId != event.taskId
-        }
+      is TaskEvent.TaskRemoved -> {
+        removeTask(event.taskId)
       }
 
-      "state_changed", "progress" -> {
+      is TaskEvent.StateChanged -> {
         val task = taskMap[event.taskId] ?: return
-        val newState = WireMapper.toDownloadState(
-          event.state,
-          event.progress,
-          event.error,
-          event.outputPath
-        )
-        task.updateState(newState)
+        task.updateState(event.state)
+      }
+
+      is TaskEvent.Progress -> {
+        val task = taskMap[event.taskId] ?: return
+        task.updateState(event.state)
+      }
+
+      is TaskEvent.Error -> {
+        log.w { "Server error for task ${event.taskId}" }
       }
     }
   }
 
-  private fun createRemoteTask(
-    wire: TaskResponse,
-    request: DownloadRequest,
-  ): RemoteDownloadTask {
+  private fun createRemoteTask(wire: TaskSnapshot): RemoteDownloadTask {
     return RemoteDownloadTask(
       taskId = wire.taskId,
-      request = request,
-      createdAt = WireMapper.parseCreatedAt(wire.createdAt),
-      initialState = WireMapper.toDownloadState(wire),
-      initialSegments = WireMapper.toSegments(wire.segments),
+      request = wire.request,
+      createdAt = wire.createdAt,
+      initialState = wire.state,
+      initialSegments = wire.segments,
       httpClient = httpClient,
-      json = json,
       onRemoved = { id ->
         taskMap.remove(id)
         _tasks.value = _tasks.value.filter {
           it.taskId != id
         }
-      }
+      },
     )
   }
 
-  private fun addTask(task: RemoteDownloadTask) {
+  private fun addOrUpdate(task: RemoteDownloadTask) {
+    log.i { "Add or update: ${task.taskId}" }
     taskMap[task.taskId] = task
-    _tasks.value += task
+    _tasks.update { taskMap.values.toList() }
   }
 
-  private fun checkSuccess(
-    response: io.ktor.client.statement.HttpResponse,
-  ) {
+  private fun removeTask(taskId: String) {
+    log.i { "Remove task $taskId" }
+    taskMap.remove(taskId)
+    _tasks.update { taskMap.values.toList() }
+  }
+
+  private fun checkSuccess(response: HttpResponse) {
     if (!response.status.isSuccess()) {
       throw IllegalStateException(
         "HTTP ${response.status.value}: " +
-          response.status.description
+          response.status.description,
       )
     }
   }

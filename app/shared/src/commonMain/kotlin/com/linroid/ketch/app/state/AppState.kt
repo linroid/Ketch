@@ -183,7 +183,7 @@ class AppState(
           speedLimit = speedLimit,
           priority = priority,
           schedule = schedule,
-          resolvedUrl = resolvedUrl,
+          resolvedSource = resolvedUrl,
         )
         activeApi.value.download(request)
       }.onFailure { e ->

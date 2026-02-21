@@ -1,5 +1,6 @@
 package com.linroid.ketch.api
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -10,6 +11,8 @@ import kotlin.time.Instant
 @Serializable
 sealed class DownloadSchedule {
   /** Download starts immediately (default behavior). */
+  @Serializable
+  @SerialName("immediate")
   data object Immediate : DownloadSchedule()
 
   /**
@@ -17,6 +20,8 @@ sealed class DownloadSchedule {
    *
    * @property startAt the [Instant] at which the download should begin
    */
+  @Serializable
+  @SerialName("at_time")
   data class AtTime(val startAt: Instant) : DownloadSchedule()
 
   /**
@@ -24,5 +29,7 @@ sealed class DownloadSchedule {
    *
    * @property delay the [Duration] to wait before starting
    */
+  @Serializable
+  @SerialName("after_delay")
   data class AfterDelay(val delay: Duration) : DownloadSchedule()
 }

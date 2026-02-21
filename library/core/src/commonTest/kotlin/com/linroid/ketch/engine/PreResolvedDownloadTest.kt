@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 /**
  * Tests for the pre-resolved URL flow:
- * - [DownloadRequest.resolvedUrl] field behavior
+ * - [DownloadRequest.resolvedSource] field behavior
  * - [HttpDownloadSource.resolve] producing correct [ResolvedSource]
  * - Serialization round-trip of requests with resolvedUrl
  */
@@ -29,7 +29,7 @@ class PreResolvedDownloadTest {
     val request = DownloadRequest(
       url = "https://example.com/file",
     )
-    assertNull(request.resolvedUrl)
+    assertNull(request.resolvedSource)
   }
 
   @Test
@@ -44,13 +44,13 @@ class PreResolvedDownloadTest {
     )
     val request = DownloadRequest(
       url = "https://example.com/file.zip",
-      resolvedUrl = resolved,
+      resolvedSource = resolved,
     )
-    assertEquals(resolved, request.resolvedUrl)
+    assertEquals(resolved, request.resolvedSource)
   }
 
   @Test
-  fun downloadRequest_resolvedUrl_isTransient() {
+  fun downloadRequest_resolvedSource_survivesSerialization() {
     val resolved = ResolvedSource(
       url = "https://example.com/file.zip",
       sourceType = "http",
@@ -61,7 +61,7 @@ class PreResolvedDownloadTest {
     )
     val request = DownloadRequest(
       url = "https://example.com/file.zip",
-      resolvedUrl = resolved,
+      resolvedSource = resolved,
     )
     val serialized = json.encodeToString(
       DownloadRequest.serializer(), request,
@@ -69,9 +69,7 @@ class PreResolvedDownloadTest {
     val deserialized = json.decodeFromString(
       DownloadRequest.serializer(), serialized,
     )
-    // resolvedUrl is @Transient so it should be null after
-    // deserialization
-    assertNull(deserialized.resolvedUrl)
+    assertEquals(resolved, deserialized.resolvedSource)
   }
 
   // -- Resolve produces correct metadata for pre-resolved flow --
@@ -113,9 +111,9 @@ class PreResolvedDownloadTest {
     // This resolved URL can be passed to DownloadRequest
     val request = DownloadRequest(
       url = resolved.url,
-      resolvedUrl = resolved,
+      resolvedSource = resolved,
     )
-    assertEquals(resolved, request.resolvedUrl)
+    assertEquals(resolved, request.resolvedSource)
     assertEquals(1, engine.headCallCount)
   }
 

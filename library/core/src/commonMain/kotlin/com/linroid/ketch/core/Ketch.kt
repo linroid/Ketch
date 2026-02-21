@@ -23,8 +23,8 @@ import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
-import com.linroid.ketch.core.log.KetchLogger
-import com.linroid.ketch.core.log.Logger
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.task.DownloadTaskImpl
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskRecord
@@ -268,6 +268,7 @@ class Ketch(
   }
 
   override suspend fun start() {
+    log.i { "Start" }
     loadTasks()
   }
 

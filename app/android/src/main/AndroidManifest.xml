@@ -15,10 +15,11 @@
     android:name="com.linroid.ketch.app.android.KetchApplication"
     android:allowBackup="true"
     android:icon="@mipmap/ic_launcher"
-    android:roundIcon="@mipmap/ic_launcher_round"
     android:label="@string/app_name"
+    android:roundIcon="@mipmap/ic_launcher_round"
     android:supportsRtl="true"
-    android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    android:theme="@android:style/Theme.Material.Light.NoActionBar"
+    android:usesCleartextTraffic="true">
     <activity
       android:name="com.linroid.ketch.app.android.MainActivity"
       android:exported="true">
@@ -29,8 +30,8 @@
     </activity>
     <service
       android:name="com.linroid.ketch.app.android.KetchService"
-      android:foregroundServiceType="dataSync"
-      android:exported="false" />
+      android:exported="false"
+      android:foregroundServiceType="dataSync" />
   </application>
 
 </manifest>

@@ -5,7 +5,7 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.FileAccessor
-import com.linroid.ketch.core.log.KetchLogger
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive

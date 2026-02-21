@@ -3,7 +3,7 @@ package com.linroid.ketch.log
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
 import co.touchlab.kermit.platformLogWriter
-import com.linroid.ketch.core.log.Logger
+import com.linroid.ketch.api.log.Logger
 import co.touchlab.kermit.Logger as KermitLib
 
 /**

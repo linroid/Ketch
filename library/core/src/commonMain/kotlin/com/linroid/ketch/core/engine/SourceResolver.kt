@@ -1,7 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.core.log.KetchLogger
+import com.linroid.ketch.api.log.KetchLogger
 
 /**
  * Routes download URLs to the appropriate [DownloadSource].

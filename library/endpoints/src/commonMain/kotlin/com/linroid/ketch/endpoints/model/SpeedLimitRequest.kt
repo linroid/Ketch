@@ -1,13 +1,12 @@
 package com.linroid.ketch.endpoints.model
 
+import com.linroid.ketch.api.SpeedLimit
 import kotlinx.serialization.Serializable
 
 /**
  * Request body for updating speed limits.
- *
- * @property bytesPerSecond the speed limit. 0 means unlimited.
  */
 @Serializable
 data class SpeedLimitRequest(
-  val bytesPerSecond: Long,
+  val limit: SpeedLimit,
 )

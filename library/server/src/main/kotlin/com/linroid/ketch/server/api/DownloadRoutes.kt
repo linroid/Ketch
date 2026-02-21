@@ -1,19 +1,14 @@
 package com.linroid.ketch.server.api
 
 import com.linroid.ketch.api.Destination
-import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
-import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.SourceFile
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.endpoints.Api
-import com.linroid.ketch.endpoints.model.CreateDownloadRequest
-import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ConnectionsRequest
+import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
+import com.linroid.ketch.endpoints.model.TasksResponse
 import com.linroid.ketch.server.TaskMapper
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
@@ -30,62 +25,15 @@ import io.ktor.server.routing.Route
 internal fun Route.downloadRoutes(ketch: KetchApi) {
   get<Api.Tasks> {
     val tasks = ketch.tasks.value
-    call.respond(tasks.map(TaskMapper::toResponse))
+    call.respond(TasksResponse(tasks.map(TaskMapper::toSnapshot)))
   }
 
   post<Api.Tasks> {
-    val body = call.receive<CreateDownloadRequest>()
-    val priority = parsePriority(body.priority)
-    if (priority == null) {
-      call.respond(
-        HttpStatusCode.BadRequest,
-        ErrorResponse(
-          "invalid_priority",
-          "Priority must be one of: " +
-            "LOW, NORMAL, HIGH, URGENT"
-        )
-      )
-      return@post
-    }
-    val speedLimit = if (body.speedLimitBytesPerSecond > 0) {
-      SpeedLimit.of(body.speedLimitBytesPerSecond)
-    } else {
-      SpeedLimit.Unlimited
-    }
-    val resolvedUrl = body.resolvedUrl?.let { wire ->
-      ResolvedSource(
-        url = wire.url,
-        sourceType = wire.sourceType,
-        totalBytes = wire.totalBytes,
-        supportsResume = wire.supportsResume,
-        suggestedFileName = wire.suggestedFileName,
-        maxSegments = wire.maxSegments,
-        metadata = wire.metadata,
-        files = wire.files.map { f ->
-          SourceFile(
-            id = f.id,
-            name = f.name,
-            size = f.size,
-            metadata = f.metadata,
-          )
-        },
-        selectionMode = parseSelectionMode(wire.selectionMode),
-      )
-    }
-    val request = DownloadRequest(
-      url = body.url,
-      destination = body.destination?.let { Destination(it) },
-      connections = body.connections,
-      headers = body.headers,
-      priority = priority,
-      speedLimit = speedLimit,
-      selectedFileIds = body.selectedFileIds,
-      resolvedUrl = resolvedUrl,
-    )
+    val request = call.receive<DownloadRequest>()
     val task = ketch.download(request)
     call.respond(
       HttpStatusCode.Created,
-      TaskMapper.toResponse(task)
+      TaskMapper.toSnapshot(task),
     )
   }
 
@@ -97,12 +45,12 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       call.respond(
         HttpStatusCode.NotFound,
         ErrorResponse(
-          "not_found", "Task not found: ${resource.id}"
-        )
+          "not_found", "Task not found: ${resource.id}",
+        ),
       )
       return@get
     }
-    call.respond(TaskMapper.toResponse(task))
+    call.respond(TaskMapper.toSnapshot(task))
   }
 
   post<Api.Tasks.ById.Pause> { resource ->
@@ -113,12 +61,12 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
     if (task == null) {
       call.respond(
         HttpStatusCode.NotFound,
-        ErrorResponse("not_found", "Task not found: $taskId")
+        ErrorResponse("not_found", "Task not found: $taskId"),
       )
       return@post
     }
     task.pause()
-    call.respond(TaskMapper.toResponse(task))
+    call.respond(TaskMapper.toSnapshot(task))
   }
 
   post<Api.Tasks.ById.Resume> { resource ->
@@ -129,12 +77,12 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
     if (task == null) {
       call.respond(
         HttpStatusCode.NotFound,
-        ErrorResponse("not_found", "Task not found: $taskId")
+        ErrorResponse("not_found", "Task not found: $taskId"),
       )
       return@post
     }
     task.resume(resource.destination?.let { Destination(it) })
-    call.respond(TaskMapper.toResponse(task))
+    call.respond(TaskMapper.toSnapshot(task))
   }
 
   post<Api.Tasks.ById.Cancel> { resource ->
@@ -145,12 +93,12 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
     if (task == null) {
       call.respond(
         HttpStatusCode.NotFound,
-        ErrorResponse("not_found", "Task not found: $taskId")
+        ErrorResponse("not_found", "Task not found: $taskId"),
       )
       return@post
     }
     task.cancel()
-    call.respond(TaskMapper.toResponse(task))
+    call.respond(TaskMapper.toSnapshot(task))
   }
 
   delete<Api.Tasks.ById> { resource ->
@@ -161,8 +109,8 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       call.respond(
         HttpStatusCode.NotFound,
         ErrorResponse(
-          "not_found", "Task not found: ${resource.id}"
-        )
+          "not_found", "Task not found: ${resource.id}",
+        ),
       )
       return@delete
     }
@@ -178,18 +126,13 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
     if (task == null) {
       call.respond(
         HttpStatusCode.NotFound,
-        ErrorResponse("not_found", "Task not found: $taskId")
+        ErrorResponse("not_found", "Task not found: $taskId"),
       )
       return@put
     }
-    val body = call.receive<SpeedLimitRequest>()
-    val limit = if (body.bytesPerSecond > 0) {
-      SpeedLimit.of(body.bytesPerSecond)
-    } else {
-      SpeedLimit.Unlimited
-    }
-    task.setSpeedLimit(limit)
-    call.respond(TaskMapper.toResponse(task))
+    val request = call.receive<SpeedLimitRequest>()
+    task.setSpeedLimit(request.limit)
+    call.respond(TaskMapper.toSnapshot(task))
   }
 
   put<Api.Tasks.ById.Priority> { resource ->
@@ -200,25 +143,13 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
     if (task == null) {
       call.respond(
         HttpStatusCode.NotFound,
-        ErrorResponse("not_found", "Task not found: $taskId")
+        ErrorResponse("not_found", "Task not found: $taskId"),
       )
       return@put
     }
-    val body = call.receive<PriorityRequest>()
-    val priority = parsePriority(body.priority)
-    if (priority == null) {
-      call.respond(
-        HttpStatusCode.BadRequest,
-        ErrorResponse(
-          "invalid_priority",
-          "Priority must be one of: " +
-            "LOW, NORMAL, HIGH, URGENT"
-        )
-      )
-      return@put
-    }
-    task.setPriority(priority)
-    call.respond(TaskMapper.toResponse(task))
+    val request = call.receive<PriorityRequest>()
+    task.setPriority(request.priority)
+    call.respond(TaskMapper.toSnapshot(task))
   }
 
   put<Api.Tasks.ById.Connections> { resource ->
@@ -229,7 +160,7 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
     if (task == null) {
       call.respond(
         HttpStatusCode.NotFound,
-        ErrorResponse("not_found", "Task not found: $taskId")
+        ErrorResponse("not_found", "Task not found: $taskId"),
       )
       return@put
     }
@@ -239,28 +170,12 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
         HttpStatusCode.BadRequest,
         ErrorResponse(
           "invalid_connections",
-          "Connections must be greater than 0"
-        )
+          "Connections must be greater than 0",
+        ),
       )
       return@put
     }
     task.setConnections(body.connections)
-    call.respond(TaskMapper.toResponse(task))
-  }
-}
-
-private fun parsePriority(value: String): DownloadPriority? {
-  return try {
-    DownloadPriority.valueOf(value.uppercase())
-  } catch (_: IllegalArgumentException) {
-    null
-  }
-}
-
-private fun parseSelectionMode(value: String): FileSelectionMode {
-  return try {
-    FileSelectionMode.valueOf(value.uppercase())
-  } catch (_: IllegalArgumentException) {
-    FileSelectionMode.MULTIPLE
+    call.respond(TaskMapper.toSnapshot(task))
   }
 }

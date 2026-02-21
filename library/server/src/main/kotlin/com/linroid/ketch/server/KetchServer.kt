@@ -1,7 +1,7 @@
 package com.linroid.ketch.server
 
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.core.log.KetchLogger
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
@@ -205,6 +205,16 @@ class KetchServer(
           ),
         )
       }
+      exception<io.ktor.server.plugins.BadRequestException> {
+          call, cause ->
+        call.respond(
+          HttpStatusCode.BadRequest,
+          ErrorResponse(
+            "bad_request",
+            cause.message ?: "Bad request",
+          ),
+        )
+      }
       exception<Throwable> { call, cause ->
         call.respond(
           HttpStatusCode.InternalServerError,
@@ -278,4 +288,3 @@ private fun Route.webResources() {
     }
   }
 }
-

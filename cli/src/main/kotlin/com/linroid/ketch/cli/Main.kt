@@ -11,8 +11,8 @@ import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.config.KetchConfig
 import com.linroid.ketch.api.config.QueueConfig
 import com.linroid.ketch.core.Ketch
-import com.linroid.ketch.core.log.LogLevel
-import com.linroid.ketch.core.log.Logger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory

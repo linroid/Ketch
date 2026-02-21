@@ -5,7 +5,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.core.file.DefaultFileNameResolver
-import com.linroid.ketch.core.log.KetchLogger
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.segment.SegmentCalculator
 import com.linroid.ketch.core.segment.SegmentDownloader
 import kotlinx.coroutines.CancellationException

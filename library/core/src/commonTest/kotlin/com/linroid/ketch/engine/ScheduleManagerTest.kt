@@ -21,7 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -89,7 +88,7 @@ class ScheduleManagerTest {
 
         manager.schedule(
           "task-1", request, Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         assertIs<DownloadState.Scheduled>(stateFlow.value)
@@ -119,14 +118,14 @@ class ScheduleManagerTest {
 
         manager.schedule(
           "task-1", request, Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         val state = stateFlow.value
         assertIs<DownloadState.Scheduled>(state)
         assertEquals(
           DownloadSchedule.AtTime(futureTime),
-          state.schedule
+          state.schedule,
         )
         assertTrue(manager.isScheduled("task-1"))
       } finally {
@@ -155,7 +154,7 @@ class ScheduleManagerTest {
 
         manager.schedule(
           "task-1", request, Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         // Should transition out of Scheduled quickly
@@ -179,9 +178,7 @@ class ScheduleManagerTest {
           MutableStateFlow<List<Segment>>(emptyList())
 
         val conditionMet = MutableStateFlow(false)
-        val condition = object : DownloadCondition {
-          override fun isMet(): Flow<Boolean> = conditionMet
-        }
+        val condition = DownloadCondition.Test(conditionMet)
 
         val (_, manager) = createTestComponents(scope)
 
@@ -192,7 +189,7 @@ class ScheduleManagerTest {
 
         manager.schedule(
           "task-1", request, Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         // Should be in Scheduled state while waiting for condition
@@ -210,7 +207,7 @@ class ScheduleManagerTest {
         val state = stateFlow.value
         assertTrue(
           state !is DownloadState.Scheduled,
-          "Expected non-Scheduled state, got $state"
+          "Expected non-Scheduled state, got $state",
         )
       } finally {
         scope.cancel()
@@ -230,12 +227,8 @@ class ScheduleManagerTest {
 
         val condition1Met = MutableStateFlow(false)
         val condition2Met = MutableStateFlow(false)
-        val cond1 = object : DownloadCondition {
-          override fun isMet(): Flow<Boolean> = condition1Met
-        }
-        val cond2 = object : DownloadCondition {
-          override fun isMet(): Flow<Boolean> = condition2Met
-        }
+        val cond1 = DownloadCondition.Test(condition1Met)
+        val cond2 = DownloadCondition.Test(condition2Met)
 
         val (_, manager) = createTestComponents(scope)
 
@@ -245,7 +238,7 @@ class ScheduleManagerTest {
 
         manager.schedule(
           "task-1", request, Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         assertIs<DownloadState.Scheduled>(stateFlow.value)
@@ -285,7 +278,7 @@ class ScheduleManagerTest {
         )
         manager.schedule(
           "task-1", request, Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         assertTrue(manager.isScheduled("task-1"))
@@ -296,7 +289,7 @@ class ScheduleManagerTest {
         delay(100)
         assertTrue(
           !manager.isScheduled("task-1"),
-          "Task should no longer be scheduled after cancel"
+          "Task should no longer be scheduled after cancel",
         )
       } finally {
         scope.cancel()
@@ -339,9 +332,11 @@ class ScheduleManagerTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val stateFlow =
-          MutableStateFlow<DownloadState>(DownloadState.Paused(
-            com.linroid.ketch.api.DownloadProgress(500, 1000)
-          ))
+          MutableStateFlow<DownloadState>(
+            DownloadState.Paused(
+              com.linroid.ketch.api.DownloadProgress(500, 1000),
+            ),
+          )
         val segmentsFlow =
           MutableStateFlow<List<Segment>>(emptyList())
 
@@ -351,7 +346,7 @@ class ScheduleManagerTest {
 
         manager.reschedule(
           "task-1", request, newSchedule, emptyList(),
-          Clock.System.now(), stateFlow, segmentsFlow
+          Clock.System.now(), stateFlow, segmentsFlow,
         )
 
         val state = stateFlow.value
@@ -382,7 +377,7 @@ class ScheduleManagerTest {
         // Schedule with long delay
         manager.schedule(
           "task-1", request, Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
         assertTrue(manager.isScheduled("task-1"))
 
@@ -390,7 +385,7 @@ class ScheduleManagerTest {
         val shortDelay = DownloadSchedule.AfterDelay(100.milliseconds)
         manager.reschedule(
           "task-1", request, shortDelay, emptyList(),
-          Clock.System.now(), stateFlow, segmentsFlow
+          Clock.System.now(), stateFlow, segmentsFlow,
         )
 
         val state = stateFlow.value
@@ -413,16 +408,16 @@ class ScheduleManagerTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val stateFlow =
-          MutableStateFlow<DownloadState>(DownloadState.Paused(
-            com.linroid.ketch.api.DownloadProgress(500, 1000)
-          ))
+          MutableStateFlow<DownloadState>(
+            DownloadState.Paused(
+              com.linroid.ketch.api.DownloadProgress(500, 1000),
+            ),
+          )
         val segmentsFlow =
           MutableStateFlow<List<Segment>>(emptyList())
 
         val conditionMet = MutableStateFlow(false)
-        val condition = object : DownloadCondition {
-          override fun isMet(): Flow<Boolean> = conditionMet
-        }
+        val condition = DownloadCondition.Test(conditionMet)
 
         val (_, manager) = createTestComponents(scope)
         val request = createRequest()
@@ -430,7 +425,7 @@ class ScheduleManagerTest {
         manager.reschedule(
           "task-1", request, DownloadSchedule.Immediate,
           listOf(condition),
-          Clock.System.now(), stateFlow, segmentsFlow
+          Clock.System.now(), stateFlow, segmentsFlow,
         )
 
         // Should be Scheduled while waiting for condition
@@ -470,7 +465,7 @@ class ScheduleManagerTest {
 
         manager.schedule(
           "task-1", request, Clock.System.now(),
-          stateFlow, segmentsFlow
+          stateFlow, segmentsFlow,
         )
 
         assertIs<DownloadState.Scheduled>(stateFlow.value)

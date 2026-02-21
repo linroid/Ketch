@@ -1,7 +1,6 @@
 package com.linroid.ketch.api
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 
 /**
  * Describes a file to download.
@@ -39,7 +38,7 @@ import kotlinx.serialization.Transient
  *   [ResolvedSource.files]. Empty means download all/default.
  *   Sources read this via the download context to determine
  *   which files to download.
- * @property resolvedUrl pre-resolved URL metadata from
+ * @property resolvedSource pre-resolved metadata from
  *   [KetchApi.resolve]. When present, the download engine skips
  *   its own probe and uses this information directly. Not persisted
  *   across restarts.
@@ -55,10 +54,8 @@ data class DownloadRequest(
   val priority: DownloadPriority = DownloadPriority.NORMAL,
   val schedule: DownloadSchedule = DownloadSchedule.Immediate,
   val selectedFileIds: Set<String> = emptySet(),
-  @Transient
   val conditions: List<DownloadCondition> = emptyList(),
-  @Transient
-  val resolvedUrl: ResolvedSource? = null,
+  val resolvedSource: ResolvedSource? = null,
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }

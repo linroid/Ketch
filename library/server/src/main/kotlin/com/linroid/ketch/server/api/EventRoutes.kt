@@ -4,8 +4,8 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.endpoints.model.TaskEvent
-import com.linroid.ketch.server.TaskMapper
 import io.ktor.server.routing.Route
+import io.ktor.server.sse.ServerSSESession
 import io.ktor.server.sse.sse
 import io.ktor.sse.ServerSentEvent
 import kotlinx.coroutines.Job
@@ -20,15 +20,18 @@ private val json = Json { encodeDefaults = true }
  * download state changes to connected clients.
  *
  * Events are sent for:
- * - `task_added`: a new task appears in the tasks list
- * - `task_removed`: a task is removed from the tasks list
- * - `state_changed`: a task's state changes (includes progress)
+ * - [TaskEvent.TaskAdded]: a new task appears in the tasks list
+ * - [TaskEvent.TaskRemoved]: a task is removed from the tasks list
+ * - [TaskEvent.StateChanged]: a task's state changes
+ * - [TaskEvent.Progress]: download progress update
  */
 internal fun Route.eventRoutes(ketch: KetchApi) {
   sse("/api/events") {
     coroutineScope {
       val activeJobs = mutableMapOf<String, Job>()
-
+      for (task in ketch.tasks.value) {
+        activeJobs[task.taskId] = launch { trackTaskState(task) }
+      }
       ketch.tasks.collect { tasks ->
         val currentIds = tasks.map { it.taskId }.toSet()
         val trackedIds = activeJobs.keys.toSet()
@@ -36,22 +39,18 @@ internal fun Route.eventRoutes(ketch: KetchApi) {
         // Cancel trackers for removed tasks
         for (removedId in trackedIds - currentIds) {
           activeJobs.remove(removedId)?.cancel()
-          val event = TaskEvent(
-            taskId = removedId,
-            type = "task_removed",
-            state = "removed",
-          )
-          send(ServerSentEvent(
-            data = json.encodeToString(event),
-            event = "task_removed",
-            id = removedId,
-          ))
+          sendEvent(TaskEvent.TaskRemoved(taskId = removedId))
         }
 
         // Start trackers for new tasks
         for (task in tasks) {
           if (task.taskId !in trackedIds) {
-            sendTaskEvent(task, "task_added")
+            sendEvent(
+              TaskEvent.TaskAdded(
+                taskId = task.taskId,
+                state = task.state.value,
+              ),
+            )
             activeJobs[task.taskId] = launch {
               trackTaskState(task)
             }
@@ -65,43 +64,43 @@ internal fun Route.eventRoutes(ketch: KetchApi) {
     val taskId = call.parameters["id"]!!
     val task = ketch.tasks.value.find { it.taskId == taskId }
     if (task == null) {
-      // Send error and close
-      val errorEvent = TaskEvent(
-        taskId = taskId,
-        type = "error",
-        state = "not_found",
-      )
-      send(ServerSentEvent(
-        data = json.encodeToString(errorEvent),
-        event = "error",
-      ))
+      sendEvent(TaskEvent.Error(taskId = taskId))
       return@sse
     }
-    sendTaskEvent(task, "state_changed")
+    sendEvent(
+      TaskEvent.StateChanged(
+        taskId = task.taskId,
+        state = task.state.value,
+      ),
+    )
     trackTaskState(task)
   }
 }
 
-private suspend fun io.ktor.server.sse.ServerSSESession.trackTaskState(
+private suspend fun ServerSSESession.trackTaskState(
   task: DownloadTask,
 ) {
   task.state.collect { state ->
-    val eventType = when (state) {
-      is DownloadState.Downloading -> "progress"
-      else -> "state_changed"
+    val event = when (state) {
+      is DownloadState.Downloading -> TaskEvent.Progress(
+        taskId = task.taskId,
+        state = state,
+      )
+      else -> TaskEvent.StateChanged(
+        taskId = task.taskId,
+        state = state,
+      )
     }
-    sendTaskEvent(task, eventType)
+    sendEvent(event)
   }
 }
 
-private suspend fun io.ktor.server.sse.ServerSSESession.sendTaskEvent(
-  task: DownloadTask,
-  eventType: String,
-) {
-  val event = TaskMapper.toEvent(task, eventType)
-  send(ServerSentEvent(
-    data = json.encodeToString(event),
-    event = eventType,
-    id = task.taskId,
-  ))
+private suspend fun ServerSSESession.sendEvent(event: TaskEvent) {
+  send(
+    ServerSentEvent(
+      data = json.encodeToString(event),
+      event = event.eventType.value,
+      id = event.taskId,
+    ),
+  )
 }

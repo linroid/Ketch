@@ -1,5 +1,6 @@
 package com.linroid.ketch.endpoints.model
 
+import com.linroid.ketch.api.DownloadPriority
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,5 +10,5 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class PriorityRequest(
-  val priority: String,
+  val priority: DownloadPriority,
 )

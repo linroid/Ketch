@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
  * Pre-resolved metadata about a download URL.
  *
  * Returned by [KetchApi.resolve] after probing the URL without
- * downloading. When passed in [DownloadRequest.resolvedUrl], the
+ * downloading. When passed in [DownloadRequest.resolvedSource], the
  * download engine skips its own HEAD/probe request and uses this
  * information directly.
  *

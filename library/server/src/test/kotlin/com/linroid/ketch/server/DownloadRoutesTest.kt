@@ -1,11 +1,16 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.endpoints.model.CreateDownloadRequest
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
-import com.linroid.ketch.endpoints.model.TaskResponse
+import com.linroid.ketch.endpoints.model.TaskSnapshot
+import com.linroid.ketch.endpoints.model.TasksResponse
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -46,22 +51,27 @@ class DownloadRoutesTest {
       val response = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
-          CreateDownloadRequest(
+          DownloadRequest(
             url = "https://example.com/file.zip",
-            destination = "/tmp/downloads/",
+            destination = Destination("/tmp/downloads/"),
           )
         )
       }
       assertEquals(HttpStatusCode.Created, response.status)
-      val task = json.decodeFromString<TaskResponse>(
+      val task = json.decodeFromString<TaskSnapshot>(
         response.bodyAsText()
       )
       assertEquals(
-        "https://example.com/file.zip", task.url
+        "https://example.com/file.zip", task.request.url
       )
-      assertEquals("/tmp/downloads/", task.destination)
-      assertEquals("pending", task.state)
-      assertEquals("NORMAL", task.priority)
+      assertEquals(
+        "/tmp/downloads/",
+        task.request.destination?.value,
+      )
+      assertEquals(DownloadState.Pending, task.state)
+      assertEquals(
+        DownloadPriority.NORMAL, task.request.priority
+      )
     }
 
   @Test
@@ -78,21 +88,26 @@ class DownloadRoutesTest {
       val response = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
-          CreateDownloadRequest(
+          DownloadRequest(
             url = "https://example.com/file.zip",
-            destination = "/tmp/downloads/",
+            destination = Destination("/tmp/downloads/"),
             connections = 4,
-            priority = "HIGH",
-            speedLimitBytesPerSecond = 1024000,
+            priority = DownloadPriority.HIGH,
+            speedLimit = SpeedLimit.of(1024000),
           )
         )
       }
       assertEquals(HttpStatusCode.Created, response.status)
-      val task = json.decodeFromString<TaskResponse>(
+      val task = json.decodeFromString<TaskSnapshot>(
         response.bodyAsText()
       )
-      assertEquals("HIGH", task.priority)
-      assertEquals(1024000L, task.speedLimitBytesPerSecond)
+      assertEquals(
+        DownloadPriority.HIGH, task.request.priority
+      )
+      assertEquals(
+        SpeedLimit.of(1024000),
+        task.request.speedLimit,
+      )
     }
 
   @Test
@@ -108,18 +123,10 @@ class DownloadRoutesTest {
       val response = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
-          CreateDownloadRequest(
-            url = "https://example.com/file.zip",
-            destination = "/tmp/downloads/",
-            priority = "INVALID",
-          )
+          """{"url":"https://example.com/file.zip","priority":"INVALID"}"""
         )
       }
       assertEquals(HttpStatusCode.BadRequest, response.status)
-      val error = json.decodeFromString<ErrorResponse>(
-        response.bodyAsText()
-      )
-      assertEquals("invalid_priority", error.error)
     }
 
   @Test
@@ -136,13 +143,13 @@ class DownloadRoutesTest {
     val createResponse = client.post("/api/tasks") {
       contentType(ContentType.Application.Json)
       setBody(
-        CreateDownloadRequest(
+        DownloadRequest(
           url = "https://example.com/file.zip",
-          destination = "/tmp/downloads/",
+          destination = Destination("/tmp/downloads/"),
         )
       )
     }
-    val created = json.decodeFromString<TaskResponse>(
+    val created = json.decodeFromString<TaskSnapshot>(
       createResponse.bodyAsText()
     )
 
@@ -151,11 +158,11 @@ class DownloadRoutesTest {
       "/api/tasks/${created.taskId}"
     )
     assertEquals(HttpStatusCode.OK, getResponse.status)
-    val fetched = json.decodeFromString<TaskResponse>(
+    val fetched = json.decodeFromString<TaskSnapshot>(
       getResponse.bodyAsText()
     )
     assertEquals(created.taskId, fetched.taskId)
-    assertEquals(created.url, fetched.url)
+    assertEquals(created.request.url, fetched.request.url)
   }
 
   @Test
@@ -173,28 +180,28 @@ class DownloadRoutesTest {
       client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
-          CreateDownloadRequest(
+          DownloadRequest(
             url = "https://example.com/a.zip",
-            destination = "/tmp/",
+            destination = Destination("/tmp/"),
           )
         )
       }
       client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
-          CreateDownloadRequest(
+          DownloadRequest(
             url = "https://example.com/b.zip",
-            destination = "/tmp/",
+            destination = Destination("/tmp/"),
           )
         )
       }
 
       val listResponse = client.get("/api/tasks")
       assertEquals(HttpStatusCode.OK, listResponse.status)
-      val tasks = json.decodeFromString<List<TaskResponse>>(
+      val taskList = json.decodeFromString<TasksResponse>(
         listResponse.bodyAsText()
       )
-      assertEquals(2, tasks.size)
+      assertEquals(2, taskList.tasks.size)
     }
 
   @Test
@@ -211,13 +218,13 @@ class DownloadRoutesTest {
       val createResponse = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
-          CreateDownloadRequest(
+          DownloadRequest(
             url = "https://example.com/file.zip",
-            destination = "/tmp/",
+            destination = Destination("/tmp/"),
           )
         )
       }
-      val created = json.decodeFromString<TaskResponse>(
+      val created = json.decodeFromString<TaskSnapshot>(
         createResponse.bodyAsText()
       )
 
@@ -225,14 +232,13 @@ class DownloadRoutesTest {
         "/api/tasks/${created.taskId}/cancel"
       )
       assertEquals(HttpStatusCode.OK, cancelResponse.status)
-      val result = json.decodeFromString<TaskResponse>(
+      val result = json.decodeFromString<TaskSnapshot>(
         cancelResponse.bodyAsText()
       )
       // Task reaches a terminal state (canceled or failed,
       // depending on timing with the NoOpHttpEngine)
       assertTrue(
-        result.state == "canceled" ||
-          result.state == "failed",
+        result.state.isTerminal,
         "Expected terminal state, got: ${result.state}"
       )
     }
@@ -250,13 +256,13 @@ class DownloadRoutesTest {
     val createResponse = client.post("/api/tasks") {
       contentType(ContentType.Application.Json)
       setBody(
-        CreateDownloadRequest(
+        DownloadRequest(
           url = "https://example.com/file.zip",
-          destination = "/tmp/",
+          destination = Destination("/tmp/"),
         )
       )
     }
-    val created = json.decodeFromString<TaskResponse>(
+    val created = json.decodeFromString<TaskSnapshot>(
       createResponse.bodyAsText()
     )
 
@@ -340,7 +346,9 @@ class DownloadRoutesTest {
         "/api/tasks/nonexistent/speed-limit"
       ) {
         contentType(ContentType.Application.Json)
-        setBody(SpeedLimitRequest(bytesPerSecond = 1024))
+        setBody(
+          SpeedLimitRequest(limit = SpeedLimit.of(1024))
+        )
       }
       assertEquals(HttpStatusCode.NotFound, response.status)
     }
@@ -359,7 +367,9 @@ class DownloadRoutesTest {
         "/api/tasks/nonexistent/priority"
       ) {
         contentType(ContentType.Application.Json)
-        setBody(PriorityRequest(priority = "HIGH"))
+        setBody(
+          PriorityRequest(priority = DownloadPriority.HIGH)
+        )
       }
       assertEquals(HttpStatusCode.NotFound, response.status)
     }
@@ -378,13 +388,13 @@ class DownloadRoutesTest {
       val createResponse = client.post("/api/tasks") {
         contentType(ContentType.Application.Json)
         setBody(
-          CreateDownloadRequest(
+          DownloadRequest(
             url = "https://example.com/file.zip",
-            destination = "/tmp/",
+            destination = Destination("/tmp/"),
           )
         )
       }
-      val created = json.decodeFromString<TaskResponse>(
+      val created = json.decodeFromString<TaskSnapshot>(
         createResponse.bodyAsText()
       )
 
@@ -392,13 +402,9 @@ class DownloadRoutesTest {
         "/api/tasks/${created.taskId}/priority"
       ) {
         contentType(ContentType.Application.Json)
-        setBody(PriorityRequest(priority = "BOGUS"))
+        setBody("""{"priority":"BOGUS"}""")
       }
       assertEquals(HttpStatusCode.BadRequest, response.status)
-      val error = json.decodeFromString<ErrorResponse>(
-        response.bodyAsText()
-      )
-      assertEquals("invalid_priority", error.error)
     }
 
   @Test
@@ -414,16 +420,18 @@ class DownloadRoutesTest {
     val response = client.post("/api/tasks") {
       contentType(ContentType.Application.Json)
       setBody(
-        CreateDownloadRequest(
+        DownloadRequest(
           url = "https://example.com/file.zip",
-          destination = "custom.zip",
+          destination = Destination("custom.zip"),
         )
       )
     }
     assertEquals(HttpStatusCode.Created, response.status)
-    val task = json.decodeFromString<TaskResponse>(
+    val task = json.decodeFromString<TaskSnapshot>(
       response.bodyAsText()
     )
-    assertEquals("custom.zip", task.destination)
+    assertEquals(
+      "custom.zip", task.request.destination?.value
+    )
   }
 }

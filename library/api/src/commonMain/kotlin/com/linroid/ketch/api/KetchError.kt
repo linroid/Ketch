@@ -1,5 +1,9 @@
 package com.linroid.ketch.api
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+
 /**
  * Sealed hierarchy of all errors that Ketch can produce.
  *
@@ -11,14 +15,17 @@ package com.linroid.ketch.api
  * @property message human-readable error description
  * @property cause underlying exception, if any
  */
+@Serializable
 sealed class KetchError(
   override val message: String?,
-  override val cause: Throwable? = null,
+  @Transient override val cause: Throwable? = null,
 ) : Exception(message, cause) {
 
   /** Connection or timeout failure. Always retryable. */
+  @Serializable
+  @SerialName("network")
   data class Network(
-    override val cause: Throwable? = null,
+    @Transient override val cause: Throwable? = null,
   ) : KetchError("Network error occurred", cause)
 
   /**
@@ -34,6 +41,8 @@ sealed class KetchError(
    *   header, indicating how many requests remain in the current
    *   rate limit window. Used on 429 to inform connection reduction.
    */
+  @Serializable
+  @SerialName("http")
   data class Http(
     val code: Int,
     val statusMessage: String? = null,
@@ -42,11 +51,15 @@ sealed class KetchError(
   ) : KetchError("HTTP error $code: $statusMessage")
 
   /** File I/O failure (write, flush, preallocate). Not retryable. */
+  @Serializable
+  @SerialName("disk")
   data class Disk(
-    override val cause: Throwable? = null,
+    @Transient override val cause: Throwable? = null,
   ) : KetchError("Disk I/O error", cause)
 
   /** Server does not support a required feature (e.g., byte ranges). */
+  @Serializable
+  @SerialName("unsupported")
   data object Unsupported : KetchError("Operation not supported by server")
 
   /**
@@ -54,11 +67,15 @@ sealed class KetchError(
    *
    * @property reason description of what failed validation
    */
+  @Serializable
+  @SerialName("validation_failed")
   data class ValidationFailed(
     val reason: String,
   ) : KetchError("Validation failed: $reason")
 
   /** Download was explicitly canceled by the user. */
+  @Serializable
+  @SerialName("canceled")
   data object Canceled : KetchError("Download was canceled")
 
   /**
@@ -66,15 +83,20 @@ sealed class KetchError(
    *
    * @property sourceType identifier of the source that failed
    */
+  @Serializable
+  @SerialName("source")
   data class SourceError(
     val sourceType: String,
-    override val cause: Throwable? = null,
+    @Transient override val cause: Throwable? = null,
   ) : KetchError("Source '$sourceType' error", cause)
 
   /** Catch-all for unexpected errors. Not retryable. */
+  @Serializable
+  @SerialName("unknown")
   data class Unknown(
-    override val cause: Throwable? = null,
-  ) : KetchError("Unknown error occurred", cause)
+    @Transient override val cause: Throwable? = null,
+    val errorMessage: String? = null,
+  ) : KetchError(errorMessage ?: "Unknown error occurred", cause)
 
   /**
    * Whether this error is transient and the download should be retried.

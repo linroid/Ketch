@@ -17,7 +17,7 @@ import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.ServerState
-import com.linroid.ketch.core.log.KetchLogger
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.api.config.ServerConfig
 import com.linroid.ketch.sqlite.DriverFactory

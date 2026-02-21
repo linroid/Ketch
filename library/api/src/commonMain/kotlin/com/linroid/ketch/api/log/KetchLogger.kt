@@ -1,4 +1,4 @@
-package com.linroid.ketch.core.log
+package com.linroid.ketch.api.log
 
 /**
  * Tagged logger for Ketch components.

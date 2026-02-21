@@ -37,7 +37,11 @@ class KetchServerTest {
       }
       val response = client.get("/api/tasks")
       assertEquals(HttpStatusCode.OK, response.status)
-      assertEquals("[]", response.bodyAsText())
+      val body = response.bodyAsText()
+      val taskList = json.decodeFromString<
+        com.linroid.ketch.endpoints.model.TasksResponse
+      >(body)
+      assertEquals(0, taskList.tasks.size)
     }
 
   @Test

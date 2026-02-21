@@ -1,4 +1,4 @@
-package com.linroid.ketch.core.log
+package com.linroid.ketch.api.log
 
 /**
  * Log level for filtering log output.

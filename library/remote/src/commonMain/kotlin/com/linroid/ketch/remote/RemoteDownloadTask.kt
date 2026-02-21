@@ -13,20 +13,19 @@ import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ConnectionsRequest
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
-import com.linroid.ketch.endpoints.model.TaskResponse
+import com.linroid.ketch.endpoints.model.TaskSnapshot
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.plugins.resources.delete
 import io.ktor.client.plugins.resources.post
 import io.ktor.client.plugins.resources.put
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
 internal class RemoteDownloadTask(
@@ -36,7 +35,6 @@ internal class RemoteDownloadTask(
   initialState: DownloadState,
   initialSegments: List<Segment>,
   private val httpClient: HttpClient,
-  private val json: Json,
   private val onRemoved: (String) -> Unit,
 ) : DownloadTask {
 
@@ -51,10 +49,6 @@ internal class RemoteDownloadTask(
     _state.value = newState
   }
 
-  internal fun updateSegments(newSegments: List<Segment>) {
-    _segments.value = newSegments
-  }
-
   private val byId get() = Api.Tasks.ById(id = taskId)
 
   override suspend fun pause() {
@@ -62,7 +56,7 @@ internal class RemoteDownloadTask(
       Api.Tasks.ById.Pause(parent = byId),
     )
     checkSuccess(response)
-    applyWireResponse(response.bodyAsText())
+    update(response.body())
   }
 
   override suspend fun resume(destination: Destination?) {
@@ -73,7 +67,7 @@ internal class RemoteDownloadTask(
       ),
     )
     checkSuccess(response)
-    applyWireResponse(response.bodyAsText())
+    update(response.body())
   }
 
   override suspend fun cancel() {
@@ -81,7 +75,7 @@ internal class RemoteDownloadTask(
       Api.Tasks.ById.Cancel(parent = byId),
     )
     checkSuccess(response)
-    applyWireResponse(response.bodyAsText())
+    update(response.body())
   }
 
   override suspend fun remove() {
@@ -95,13 +89,10 @@ internal class RemoteDownloadTask(
       Api.Tasks.ById.SpeedLimit(parent = byId),
     ) {
       contentType(ContentType.Application.Json)
-      setBody(json.encodeToString(
-        SpeedLimitRequest.serializer(),
-        SpeedLimitRequest(limit.bytesPerSecond)
-      ))
+      setBody(SpeedLimitRequest(limit))
     }
     checkSuccess(response)
-    applyWireResponse(response.bodyAsText())
+    update(response.body())
   }
 
   override suspend fun setPriority(priority: DownloadPriority) {
@@ -109,13 +100,10 @@ internal class RemoteDownloadTask(
       Api.Tasks.ById.Priority(parent = byId),
     ) {
       contentType(ContentType.Application.Json)
-      setBody(json.encodeToString(
-        PriorityRequest.serializer(),
-        PriorityRequest(priority.name)
-      ))
+      setBody(PriorityRequest(priority))
     }
     checkSuccess(response)
-    applyWireResponse(response.bodyAsText())
+    update(response.body())
   }
 
   override suspend fun setConnections(connections: Int) {
@@ -123,13 +111,10 @@ internal class RemoteDownloadTask(
       Api.Tasks.ById.Connections(parent = byId),
     ) {
       contentType(ContentType.Application.Json)
-      setBody(json.encodeToString(
-        ConnectionsRequest.serializer(),
-        ConnectionsRequest(connections)
-      ))
+      setBody(ConnectionsRequest(connections))
     }
     checkSuccess(response)
-    applyWireResponse(response.bodyAsText())
+    update(response.body())
   }
 
   override suspend fun reschedule(
@@ -137,14 +122,13 @@ internal class RemoteDownloadTask(
     conditions: List<DownloadCondition>,
   ) {
     throw UnsupportedOperationException(
-      "Rescheduling is not supported for remote tasks"
+      "Rescheduling is not supported for remote tasks",
     )
   }
 
-  private fun applyWireResponse(body: String) {
-    val wire: TaskResponse = json.decodeFromString(body)
-    _state.value = WireMapper.toDownloadState(wire)
-    _segments.value = WireMapper.toSegments(wire.segments)
+  private fun update(response: TaskSnapshot) {
+    _state.value = response.state
+    _segments.value = response.segments
   }
 
   private fun checkSuccess(
@@ -153,7 +137,7 @@ internal class RemoteDownloadTask(
     if (!response.status.isSuccess()) {
       throw IllegalStateException(
         "HTTP ${response.status.value}: " +
-          response.status.description
+          response.status.description,
       )
     }
   }
