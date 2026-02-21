@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <!-- Background -->
-  <rect width="512" height="512" rx="96" fill="#0D1B2A"/>
+  <rect width="512" height="512" rx="96" fill="#000000"/>
   <!-- Main sail (taller, forward) -->
   <polygon points="168,72 168,338 308,338" fill="#FFFFFF"/>
   <!-- Mizzen sail (shorter, aft) -->
-  <polygon points="316,168 316,338 404,338" fill="#4FC3F7"/>
+  <polygon points="316,168 316,338 404,338" fill="#FF5252"/>
   <!-- Hull -->
   <path d="M88,346 Q256,432 424,346 Z" fill="#FFFFFF"/>
 </svg>
