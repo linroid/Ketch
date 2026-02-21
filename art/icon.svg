@@ -2,7 +2,7 @@
   <!-- Main sail (taller, forward) -->
   <polygon points="168,72 168,338 308,338" fill="#00BCD4"/>
   <!-- Mizzen sail (shorter, aft) -->
-  <polygon points="316,168 316,338 404,338" fill="#FF5252"/>
+  <polygon points="316,168 316,338 404,338" fill="#00BCD4"/>
   <!-- Hull -->
   <path d="M88,346 Q256,432 424,346 Z" fill="#0097A7"/>
 </svg>

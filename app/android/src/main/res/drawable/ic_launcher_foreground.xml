@@ -9,7 +9,7 @@
     android:pathData="M40.3,26 L40.3,67.4 L62.1,67.4 Z" />
   <!-- Mizzen sail (shorter, aft) -->
   <path
-    android:fillColor="#FF5252"
+    android:fillColor="#00BCD4"
     android:pathData="M63.3,40.9 L63.3,67.4 L77,67.4 Z" />
   <!-- Hull -->
   <path

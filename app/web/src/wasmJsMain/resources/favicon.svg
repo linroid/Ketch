@@ -4,7 +4,7 @@
   <!-- Main sail -->
   <polygon points="10.5,4.5 10.5,21.1 19.2,21.1" fill="#FFFFFF"/>
   <!-- Mizzen sail -->
-  <polygon points="19.7,10.5 19.7,21.1 25.2,21.1" fill="#FF5252"/>
+  <polygon points="19.7,10.5 19.7,21.1 25.2,21.1" fill="#00BCD4"/>
   <!-- Hull -->
   <path d="M5.5,21.6 Q16,27.6 26.5,21.6 Z" fill="#FFFFFF"/>
 </svg>
