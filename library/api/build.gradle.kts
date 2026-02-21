@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -42,6 +44,12 @@ kotlin {
     minSdk = libs.versions.android.minSdk.get().toInt()
     compilerOptions {
       jvmTarget.set(JvmTarget.JVM_11)
+    }
+    optimization {
+      consumerKeepRules.apply {
+        publish = true
+        file("consumer-rules.pro")
+      }
     }
   }
 

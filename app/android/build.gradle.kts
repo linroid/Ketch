@@ -43,7 +43,7 @@ android {
       isShrinkResources = true
       proguardFiles(
         getDefaultProguardFile("proguard-android-optimize.txt"),
-        rootProject.file("proguard-rules.pro"),
+        rootDir.resolve("app/proguard-rules.pro"),
       )
       signingConfigs.findByName("release")?.let {
         signingConfig = it

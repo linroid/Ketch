@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -15,6 +17,12 @@ kotlin {
 
     compilerOptions {
       jvmTarget.set(JvmTarget.JVM_11)
+    }
+    optimization {
+      consumerKeepRules.apply {
+        publish = true
+        file("consumer-rules.pro")
+      }
     }
   }
 

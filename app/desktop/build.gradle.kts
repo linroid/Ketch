@@ -22,7 +22,14 @@ compose.desktop {
     mainClass = "com.linroid.ketch.app.desktop.MainKt"
 
     buildTypes.release.proguard {
-      configurationFiles.from(rootProject.file("proguard-rules.pro"))
+      configurationFiles.from(
+        rootDir.resolve("app/proguard-rules.pro"),
+        project(":library:api").file("consumer-rules.pro"),
+        project(":library:core").file("consumer-rules.pro"),
+        project(":library:ktor").file("consumer-rules.pro"),
+        project(":library:sqlite").file("consumer-rules.pro"),
+        project(":library:remote").file("consumer-rules.pro"),
+      )
     }
 
     nativeDistributions {
