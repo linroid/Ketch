@@ -1,13 +1,15 @@
+@file:Suppress("UseKtx")
+
 package com.linroid.kdown.api
 
+import android.net.Uri
 import android.provider.DocumentsContract
-import androidx.core.net.toUri
 
 actual fun Destination.isFile(): Boolean =
   !isName() && !isDirectory()
 
 actual fun Destination.isDirectory(): Boolean {
-  val uri = value.toUri()
+  val uri = Uri.parse(value)
   if (uri.scheme == "content") {
     return DocumentsContract.isTreeUri(uri)
   }
@@ -15,7 +17,7 @@ actual fun Destination.isDirectory(): Boolean {
 }
 
 actual fun Destination.isName(): Boolean {
-  val uri = value.toUri()
+  val uri = Uri.parse(value)
   if (uri.scheme != null) return false
   return !value.contains('/') && !value.contains('\\')
 }

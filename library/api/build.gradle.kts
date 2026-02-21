@@ -65,9 +65,6 @@ kotlin {
       implementation(libs.kotlin.test)
     }
     androidMain {
-      dependencies {
-        implementation(libs.androidx.core.ktx)
-      }
     }
   }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("UseKtx")
+
 package com.linroid.kdown.core.file
 
 import android.net.Uri
