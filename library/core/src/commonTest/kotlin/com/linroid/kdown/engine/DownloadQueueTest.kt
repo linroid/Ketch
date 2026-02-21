@@ -59,7 +59,6 @@ class DownloadQueueTest {
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
-      fileAccessorFactory = { throw UnsupportedOperationException() },
       fileNameResolver = DefaultFileNameResolver(),
     )
     return DownloadScheduler(

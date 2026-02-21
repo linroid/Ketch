@@ -14,6 +14,7 @@ import com.linroid.kdown.api.isFile
 import com.linroid.kdown.api.isName
 import com.linroid.kdown.core.file.FileAccessor
 import com.linroid.kdown.core.file.FileNameResolver
+import com.linroid.kdown.core.file.createFileAccessor
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.core.task.TaskRecord
 import com.linroid.kdown.core.task.TaskState
@@ -37,7 +38,6 @@ internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
   private val taskStore: TaskStore,
   private val config: DownloadConfig,
-  private val fileAccessorFactory: (String) -> FileAccessor,
   private val fileNameResolver: FileNameResolver,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
 ) {
@@ -234,7 +234,7 @@ internal class DownloadCoordinator(
       )
     }
 
-    val fileAccessor = fileAccessorFactory(outputPath)
+    val fileAccessor = createFileAccessor(outputPath)
 
     val taskLimiter = mutex.withLock {
       activeDownloads[taskId]?.let {
@@ -434,7 +434,7 @@ internal class DownloadCoordinator(
         "source '${source.type}'"
     }
 
-    val fileAccessor = fileAccessorFactory(taskRecord.outputPath)
+    val fileAccessor = createFileAccessor(taskRecord.outputPath)
 
     val taskLimiter = mutex.withLock {
       activeDownloads[taskId]?.let {

@@ -60,7 +60,6 @@ class ScheduleManagerTest {
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
-      fileAccessorFactory = { throw UnsupportedOperationException() },
       fileNameResolver = DefaultFileNameResolver(),
     )
     val scheduler = DownloadScheduler(

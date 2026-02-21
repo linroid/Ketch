@@ -47,8 +47,7 @@ kotlin {
       implementation(libs.kotlinx.coroutines.test)
     }
     androidMain.dependencies {
-      implementation(libs.documentfile)
-      implementation(libs.contextprovider)
+      implementation(libs.androidx.startup)
     }
   }
 }

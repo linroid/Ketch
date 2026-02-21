@@ -5,7 +5,6 @@ import android.net.Uri
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
-import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -15,8 +14,8 @@ import java.io.IOException
 /**
  * [FileAccessor] for Android content URIs (e.g. SAF documents).
  *
- * Uses [Os.lseek] + [Os.write] for random-access writes via
- * the file descriptor, and [DocumentFile] for size/delete.
+ * Uses [Os.lseek] + [Os.write] for random-access writes and
+ * [Os.fstat] for file size. No `DocumentFile` dependency.
  */
 internal class ContentUriFileAccessor(
   private val context: Context,
@@ -29,11 +28,6 @@ internal class ContentUriFileAccessor(
   private val fileDescriptor = pfd?.fileDescriptor
     ?: throw IOException(
       "Failed to open file descriptor for Uri=$uri; " +
-        "the Uri may be invalid or permissions may be missing."
-    )
-  private val documentFile = DocumentFile.fromSingleUri(context, uri)
-    ?: throw IOException(
-      "Failed to open DocumentFile for Uri=$uri; " +
         "the Uri may be invalid or permissions may be missing."
     )
 
@@ -74,13 +68,14 @@ internal class ContentUriFileAccessor(
   override suspend fun delete() {
     withContext(Dispatchers.IO) {
       mutex.withLock {
-        documentFile.delete()
+        close()
+        context.contentResolver.delete(uri, null, null)
       }
     }
   }
 
   override suspend fun size(): Long = withContext(Dispatchers.IO) {
-    documentFile.length()
+    Os.fstat(fileDescriptor).st_size
   }
 
   override suspend fun preallocate(size: Long) {

@@ -7,9 +7,9 @@ import com.linroid.kdown.api.DownloadState
 import com.linroid.kdown.api.DownloadTask
 import com.linroid.kdown.api.KDownApi
 import com.linroid.kdown.api.KDownError
+import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.ResolvedSource
 import com.linroid.kdown.api.Segment
-import com.linroid.kdown.api.KDownStatus
 import com.linroid.kdown.api.config.DownloadConfig
 import com.linroid.kdown.core.engine.DelegatingSpeedLimiter
 import com.linroid.kdown.core.engine.DownloadCoordinator
@@ -22,9 +22,7 @@ import com.linroid.kdown.core.engine.SourceResolver
 import com.linroid.kdown.core.engine.SpeedLimiter
 import com.linroid.kdown.core.engine.TokenBucket
 import com.linroid.kdown.core.file.DefaultFileNameResolver
-import com.linroid.kdown.core.file.FileAccessor
 import com.linroid.kdown.core.file.FileNameResolver
-import com.linroid.kdown.core.file.createFileAccessor
 import com.linroid.kdown.core.log.KDownLogger
 import com.linroid.kdown.core.log.Logger
 import com.linroid.kdown.core.task.DownloadTaskImpl
@@ -55,7 +53,6 @@ import kotlin.uuid.Uuid
  * @param taskStore persistent storage for task records
  * @param config global download configuration
  * @param name user-visible instance name included in [status]
- * @param fileAccessorFactory factory for creating platform file writers
  * @param fileNameResolver strategy for resolving download file names
  * @param additionalSources extra [DownloadSource] implementations
  *   (e.g., torrent, media). HTTP is always included as a fallback.
@@ -66,9 +63,7 @@ class KDown(
   private val taskStore: TaskStore = InMemoryTaskStore(),
   private val config: DownloadConfig = DownloadConfig.Default,
   private val name: String = "KDown",
-  private val fileAccessorFactory: (String) -> FileAccessor = ::createFileAccessor,
-  private val fileNameResolver: FileNameResolver =
-    DefaultFileNameResolver(),
+  private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
   additionalSources: List<DownloadSource> = emptyList(),
   logger: Logger = Logger.None,
 ) : KDownApi {
@@ -121,7 +116,6 @@ class KDown(
     sourceResolver = sourceResolver,
     taskStore = taskStore,
     config = config,
-    fileAccessorFactory = fileAccessorFactory,
     fileNameResolver = fileNameResolver,
     globalLimiter = globalLimiter,
   )
@@ -188,7 +182,7 @@ class KDown(
         } else {
           KDownLogger.d("KDown") {
             "Ignoring pause for taskId=$taskId " +
-                "in state ${stateFlow.value}"
+              "in state ${stateFlow.value}"
           }
         }
       },
@@ -241,13 +235,13 @@ class KDown(
         if (s.isTerminal) {
           KDownLogger.d("KDown") {
             "Ignoring reschedule for taskId=$taskId in " +
-                "terminal state $s"
+              "terminal state $s"
           }
           return@DownloadTaskImpl
         }
         KDownLogger.i("KDown") {
           "Rescheduling taskId=$taskId, schedule=$schedule, " +
-              "conditions=${conditions.size}"
+            "conditions=${conditions.size}"
         }
         scheduleManager.cancel(taskId)
         if (s.isActive) {
@@ -350,7 +344,7 @@ class KDown(
         } else {
           KDownLogger.d("KDown") {
             "Ignoring pause for taskId=${record.taskId} " +
-                "in state ${stateFlow.value}"
+              "in state ${stateFlow.value}"
           }
         }
       },
@@ -370,7 +364,7 @@ class KDown(
         } else {
           KDownLogger.d("KDown") {
             "Ignoring resume for taskId=${record.taskId} " +
-                "in state $state"
+              "in state $state"
           }
         }
       },
@@ -386,7 +380,7 @@ class KDown(
         } else {
           KDownLogger.d("KDown") {
             "Ignoring cancel for taskId=${record.taskId} " +
-                "in state $s"
+              "in state $s"
           }
         }
       },
@@ -405,14 +399,14 @@ class KDown(
         if (s.isTerminal) {
           KDownLogger.d("KDown") {
             "Ignoring reschedule for taskId=${record.taskId} in " +
-                "terminal state $s"
+              "terminal state $s"
           }
           return@DownloadTaskImpl
         }
         KDownLogger.i("KDown") {
           "Rescheduling taskId=${record.taskId}, " +
-              "schedule=$schedule, " +
-              "conditions=${conditions.size}"
+            "schedule=$schedule, " +
+            "conditions=${conditions.size}"
         }
         scheduleManager.cancel(record.taskId)
         if (s.isActive) {
