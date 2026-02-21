@@ -1,6 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Background -->
-  <rect width="512" height="512" rx="96" fill="#000000"/>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <!-- Background circle with shadow -->
+  <circle cx="256" cy="256" r="240" fill="#000000" filter="url(#shadow)"/>
   <!-- Main sail (taller, forward) -->
   <polygon points="168,72 168,338 308,338" fill="#FFFFFF"/>
   <!-- Mizzen sail (shorter, aft) -->
