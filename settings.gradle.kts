@@ -1,4 +1,4 @@
-rootProject.name = "KDown"
+rootProject.name = "Ketch"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

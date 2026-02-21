@@ -1,4 +1,4 @@
-You are a senior Kotlin Multiplatform library engineer working on "KDown", an open-source Kotlin
+You are a senior Kotlin Multiplatform library engineer working on "Ketch", an open-source Kotlin
 Multiplatform download manager library.
 
 ## Project Status
@@ -17,7 +17,7 @@ library/
   ktor/       # Ktor-based HttpEngine implementation -- published SDK module
   kermit/     # Optional Kermit logging integration -- published SDK module
   sqlite/     # SQLite-backed TaskStore (Android, iOS, JVM only) -- published SDK module
-  remote/     # Remote KDownApi client (HTTP + SSE) -- published SDK module
+  remote/     # Remote KetchApi client (HTTP + SSE) -- published SDK module
 server/       # Ktor-based daemon server with REST API and SSE events
 app/
   shared/     # Shared Compose Multiplatform UI (supports Core + Remote backends)
@@ -31,25 +31,25 @@ cli/          # JVM CLI entry point
 ## Package Structure
 
 ### `library:api` (public API)
-- `com.linroid.kdown.api` -- `KDownApi`, `DownloadTask`, `DownloadRequest`, `DownloadState`,
-  `DownloadProgress`, `Segment`, `KDownError`, `SpeedLimit`, `DownloadPriority`,
-  `DownloadSchedule`, `DownloadCondition`, `KDownVersion`
+- `com.linroid.ketch.api` -- `KetchApi`, `DownloadTask`, `DownloadRequest`, `DownloadState`,
+  `DownloadProgress`, `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`,
+  `DownloadSchedule`, `DownloadCondition`, `KetchVersion`
 
 ### `library:core` (implementation)
-- `com.linroid.kdown.core` -- `KDown` (implements `KDownApi`), `DownloadConfig`, `QueueConfig`
-- `com.linroid.kdown.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `RangeSupportDetector`,
+- `com.linroid.ketch.core` -- `Ketch` (implements `KetchApi`), `DownloadConfig`, `QueueConfig`
+- `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `RangeSupportDetector`,
   `ServerInfo`, `DownloadSource`, `HttpDownloadSource`, `SourceResolver`, `SourceInfo`,
   `SourceResumeState`, `DownloadContext`, `DownloadScheduler`, `ScheduleManager`,
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`
-- `com.linroid.kdown.core.segment` -- `SegmentCalculator`, `SegmentDownloader`
-- `com.linroid.kdown.core.file` -- `FileAccessor` (expect/actual), `FileNameResolver`,
+- `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`
+- `com.linroid.ketch.core.file` -- `FileAccessor` (expect/actual), `FileNameResolver`,
   `DefaultFileNameResolver`, `PathSerializer`
-- `com.linroid.kdown.core.log` -- `Logger`, `KDownLogger`
-- `com.linroid.kdown.core.task` -- `DownloadTaskImpl`, `TaskStore`, `InMemoryTaskStore`,
+- `com.linroid.ketch.core.log` -- `Logger`, `KetchLogger`
+- `com.linroid.ketch.core.task` -- `DownloadTaskImpl`, `TaskStore`, `InMemoryTaskStore`,
   `TaskRecord`, `TaskState`
 
 ### `library:remote`
-- `com.linroid.kdown.remote` -- `RemoteKDown` (implements `KDownApi`), `RemoteDownloadTask`,
+- `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
   `ConnectionState`, `WireModels`, `WireMapper`
 
 ## Implemented Features
@@ -70,7 +70,7 @@ cli/          # JVM CLI entry point
 - URGENT preemption: pauses lowest-priority active download to make room
 
 ### Speed Limiting
-- Global speed limit via `DownloadConfig.speedLimit` or `KDownApi.setGlobalSpeedLimit()`
+- Global speed limit via `DownloadConfig.speedLimit` or `KetchApi.setGlobalSpeedLimit()`
 - Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`
 - Token-bucket algorithm (`TokenBucket`) with delegating wrapper
 
@@ -82,13 +82,13 @@ cli/          # JVM CLI entry point
 ### Pluggable Download Sources (`DownloadSource`)
 - `SourceResolver` routes URLs to the appropriate source
 - `HttpDownloadSource` is the built-in HTTP/HTTPS implementation
-- Additional sources registered via `KDown(additionalSources = listOf(...))`
+- Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source defines: `canHandle()`, `resolve()`, `download()`, `resume()`
 
 ### Daemon Server (`server/`)
 - Ktor-based REST API: create, list, pause, resume, cancel downloads
 - SSE event stream for real-time state updates
-- Remote backend (`RemoteKDown`) communicates via HTTP + SSE
+- Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
 
 ### Logging System
@@ -96,17 +96,17 @@ cli/          # JVM CLI entry point
 - Platform-specific console: Logcat (Android), NSLog (iOS), println/stderr (JVM), println (Wasm)
 - Lazy lambda evaluation for zero cost when disabled
 
-### Error Handling (sealed `KDownError`)
+### Error Handling (sealed `KetchError`)
 - `Network` (retryable), `Http(code)` (5xx retryable), `Disk`, `Unsupported`,
   `ValidationFailed`, `Canceled`, `SourceError`, `Unknown`
-- I/O exceptions from `FileAccessor` classified as `KDownError.Disk`
+- I/O exceptions from `FileAccessor` classified as `KetchError.Disk`
 
 ## Architecture Patterns
 
-### Dual Backend via `KDownApi`
-- `KDownApi` is the service interface (in `library:api`)
-- `KDown` (core) is the in-process implementation
-- `RemoteKDown` (remote) communicates with a daemon server over HTTP + SSE
+### Dual Backend via `KetchApi`
+- `KetchApi` is the service interface (in `library:api`)
+- `Ketch` (core) is the in-process implementation
+- `RemoteKetch` (remote) communicates with a daemon server over HTTP + SSE
 - UI code works identically regardless of backend
 
 ### Pluggable Components
@@ -146,8 +146,8 @@ cli/          # JVM CLI entry point
 - Test edge cases: 0-byte files, 1-byte files, uneven segment splits
 
 ### Logging
-- Use `KDownLogger` for all internal logging
-- Tags: "KDown", "Coordinator", "SegmentDownloader", "RangeDetector", "KtorHttpEngine",
+- Use `KetchLogger` for all internal logging
+- Tags: "Ketch", "Coordinator", "SegmentDownloader", "RangeDetector", "KtorHttpEngine",
   "Scheduler", "ScheduleManager", "SourceResolver"
 - Levels: verbose (segment detail), debug (state changes), info (user events),
   warn (retries), error (fatal)
@@ -156,7 +156,7 @@ cli/          # JVM CLI entry point
 ## Current Limitations
 
 1. WasmJs: Local file I/O not supported (`FileAccessor` is a stub that throws
-   `UnsupportedOperationException`). Use `RemoteKDown` for browser-based downloads.
+   `UnsupportedOperationException`). Use `RemoteKetch` for browser-based downloads.
 2. iOS support is best-effort via expect/actual (iosArm64 + iosSimulatorArm64)
 3. `library:sqlite` does not support WasmJs -- use `InMemoryTaskStore` on that platform
 
@@ -176,7 +176,7 @@ Planned features not yet implemented:
 6. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
    supporting various media sites and extractors
 7. **Browser Extension** - Browser extension for intercepting and managing downloads
-   directly from the browser, integrating with the KDown daemon server
-8. **AI Integration** - MCP server exposing KDown capabilities as tools for AI agents,
+   directly from the browser, integrating with the Ketch daemon server
+8. **AI Integration** - MCP server exposing Ketch capabilities as tools for AI agents,
    and skill-based automation (e.g., smart resource discovery, auto-categorization,
    intelligent scheduling based on content type)

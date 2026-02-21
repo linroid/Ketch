@@ -12,13 +12,13 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
   <application
-    android:name="com.linroid.kdown.app.android.KDownApplication"
+    android:name="com.linroid.ketch.app.android.KetchApplication"
     android:allowBackup="true"
     android:label="@string/app_name"
     android:supportsRtl="true"
     android:theme="@android:style/Theme.Material.Light.NoActionBar">
     <activity
-      android:name="com.linroid.kdown.app.android.MainActivity"
+      android:name="com.linroid.ketch.app.android.MainActivity"
       android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
@@ -26,7 +26,7 @@
       </intent-filter>
     </activity>
     <service
-      android:name="com.linroid.kdown.app.android.KDownService"
+      android:name="com.linroid.ketch.app.android.KetchService"
       android:foregroundServiceType="dataSync"
       android:exported="false" />
   </application>

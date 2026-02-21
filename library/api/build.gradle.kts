@@ -22,14 +22,14 @@ val generateVersion by tasks.registering {
   inputs.property("revision", revision)
   outputs.dir(outputDir)
   doLast {
-    val dir = outputDir.get().dir("com/linroid/kdown/api").asFile
+    val dir = outputDir.get().dir("com/linroid/ketch/api").asFile
     dir.mkdirs()
-    dir.resolve("KDownBuildVersion.kt").writeText(
+    dir.resolve("KetchBuildVersion.kt").writeText(
       """
-      |package com.linroid.kdown.api
+      |package com.linroid.ketch.api
       |
-      |internal const val KDOWN_BUILD_VERSION = "$ver"
-      |internal const val KDOWN_BUILD_REVISION = "$revision"
+      |internal const val KETCH_BUILD_VERSION = "$ver"
+      |internal const val KETCH_BUILD_REVISION = "$revision"
       |""".trimMargin(),
     )
   }
@@ -37,7 +37,7 @@ val generateVersion by tasks.registering {
 
 kotlin {
   androidLibrary {
-    namespace = "com.linroid.kdown.api"
+    namespace = "com.linroid.ketch.api"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
     compilerOptions {

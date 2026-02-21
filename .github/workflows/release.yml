@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 env:
-  KDOWN_VERSION: ${{ github.ref_name }}
+  KETCH_VERSION: ${{ github.ref_name }}
 
 defaults:
   run:
@@ -52,36 +52,36 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Build native image
-        run: ./gradlew :cli:nativeCompile -PVERSION_NAME=${KDOWN_VERSION#v}
+        run: ./gradlew :cli:nativeCompile -PVERSION_NAME=${KETCH_VERSION#v}
 
       - name: Compress with UPX (Linux)
         if: matrix.os == 'linux'
         run: |
           sudo apt-get update && sudo apt-get install -y upx-ucl
-          upx --best cli/build/native/nativeCompile/kdown
+          upx --best cli/build/native/nativeCompile/ketch
 
       - name: Compress with UPX (Windows)
         if: matrix.os == 'windows'
         run: |
           choco install upx -y
-          upx --best cli/build/native/nativeCompile/kdown.exe
+          upx --best cli/build/native/nativeCompile/ketch.exe
 
       - name: Package (Unix)
         if: matrix.os != 'windows'
         run: |
           cd cli/build/native/nativeCompile
-          tar -czf kdown-cli-${KDOWN_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz kdown
+          tar -czf ketch-cli-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz ketch
 
       - name: Package (Windows)
         if: matrix.os == 'windows'
         run: |
           cd cli/build/native/nativeCompile
-          7z a kdown-cli-${KDOWN_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.zip kdown.exe
+          7z a ketch-cli-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.zip ketch.exe
 
       - uses: actions/upload-artifact@v6
         with:
-          name: kdown-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: cli/build/native/nativeCompile/kdown-cli-*.${{ matrix.ext }}
+          name: ketch-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: cli/build/native/nativeCompile/ketch-cli-*.${{ matrix.ext }}
 
   build-android:
     name: Android APK
@@ -109,17 +109,17 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew :app:android:assembleRelease -PVERSION_NAME=${KDOWN_VERSION#v}
+        run: ./gradlew :app:android:assembleRelease -PVERSION_NAME=${KETCH_VERSION#v}
 
       - name: Rename APK
         run: |
           APK=$(find app/android/build/outputs/apk/release -name '*.apk' | head -1)
-          cp "$APK" app/android/build/outputs/apk/release/kdown-android-${KDOWN_VERSION#v}.apk
+          cp "$APK" app/android/build/outputs/apk/release/ketch-android-${KETCH_VERSION#v}.apk
 
       - uses: actions/upload-artifact@v6
         with:
-          name: kdown-android
-          path: app/android/build/outputs/apk/release/kdown-android-*.apk
+          name: ketch-android
+          path: app/android/build/outputs/apk/release/ketch-android-*.apk
 
   build-desktop:
     name: Desktop (${{ matrix.name }})
@@ -168,18 +168,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Build desktop package
-        run: ./gradlew :app:desktop:${{ matrix.task }} -PVERSION_NAME=${KDOWN_VERSION#v}
+        run: ./gradlew :app:desktop:${{ matrix.task }} -PVERSION_NAME=${KETCH_VERSION#v}
 
       - name: Rename artifact
         run: |
           SRC=$(find app/desktop/build/compose/binaries/main-release -name "*.${{ matrix.ext }}")
-          DEST="app/desktop/build/kdown-desktop-${KDOWN_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.${{ matrix.ext }}"
+          DEST="app/desktop/build/ketch-desktop-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.${{ matrix.ext }}"
           cp "$SRC" "$DEST"
 
       - uses: actions/upload-artifact@v6
         with:
-          name: kdown-desktop-${{ matrix.name }}
-          path: app/desktop/build/kdown-desktop-*.${{ matrix.ext }}
+          name: ketch-desktop-${{ matrix.name }}
+          path: app/desktop/build/ketch-desktop-*.${{ matrix.ext }}
 
   build-web:
     name: Web (WasmJs)
@@ -195,17 +195,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Build web distribution
-        run: ./gradlew :app:web:wasmJsBrowserDistribution -PVERSION_NAME=${KDOWN_VERSION#v}
+        run: ./gradlew :app:web:wasmJsBrowserDistribution -PVERSION_NAME=${KETCH_VERSION#v}
 
       - name: Package web distribution
         run: |
           cd app/web/build/dist/wasmJs/productionExecutable
-          zip -r /tmp/kdown-web-${KDOWN_VERSION#v}.zip .
+          zip -r /tmp/ketch-web-${KETCH_VERSION#v}.zip .
 
       - uses: actions/upload-artifact@v6
         with:
-          name: kdown-web
-          path: /tmp/kdown-web-*.zip
+          name: ketch-web
+          path: /tmp/ketch-web-*.zip
 
   publish-maven-central:
     name: Publish to Maven Central
@@ -223,7 +223,7 @@ jobs:
       - name: Publish to Maven Central
         run: >
           ./gradlew publishAndReleaseToMavenCentral
-          -PVERSION_NAME=${KDOWN_VERSION#v}
+          -PVERSION_NAME=${KETCH_VERSION#v}
           --no-configuration-cache
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}

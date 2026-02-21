@@ -9,7 +9,7 @@ plugins {
 
 kotlin {
   androidLibrary {
-    namespace = "com.linroid.kdown.sqlite"
+    namespace = "com.linroid.ketch.sqlite"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
 
@@ -50,8 +50,8 @@ kotlin {
 
 sqldelight {
   databases {
-    create("KDownDatabase") {
-      packageName.set("com.linroid.kdown.sqlite")
+    create("KetchDatabase") {
+      packageName.set("com.linroid.ketch.sqlite")
     }
   }
 }

@@ -10,7 +10,7 @@ plugins {
 
 kotlin {
   androidLibrary {
-    namespace = "com.linroid.kdown.app.shared"
+    namespace = "com.linroid.ketch.app.shared"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
 
@@ -24,7 +24,7 @@ kotlin {
     iosSimulatorArm64()
   ).forEach { iosTarget ->
     iosTarget.binaries.framework {
-      baseName = "KDownApp"
+      baseName = "KetchApp"
       isStatic = true
     }
   }

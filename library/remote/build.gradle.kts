@@ -10,7 +10,7 @@ plugins {
 
 kotlin {
   androidLibrary {
-    namespace = "com.linroid.kdown.remote"
+    namespace = "com.linroid.ketch.remote"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
     compilerOptions {

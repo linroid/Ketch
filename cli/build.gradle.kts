@@ -8,15 +8,15 @@ plugins {
 }
 
 application {
-  mainClass.set("com.linroid.kdown.cli.MainKt")
+  mainClass.set("com.linroid.ketch.cli.MainKt")
 }
 
 graalvmNative {
   toolchainDetection.set(true)
   binaries {
     named("main") {
-      imageName.set("kdown")
-      mainClass.set("com.linroid.kdown.cli.MainKt")
+      imageName.set("ketch")
+      mainClass.set("com.linroid.ketch.cli.MainKt")
       javaLauncher.set(
         project.extensions.getByType<JavaToolchainService>().launcherFor {
           languageVersion.set(JavaLanguageVersion.of(21))
@@ -53,7 +53,7 @@ val bundleWebApp by tasks.registering(Copy::class) {
     filter { line ->
       line.replace(
         "<head>",
-        "<head>\n    <meta name=\"kdown-auto-connect\" content=\"true\">",
+        "<head>\n    <meta name=\"ketch-auto-connect\" content=\"true\">",
       )
     }
   }

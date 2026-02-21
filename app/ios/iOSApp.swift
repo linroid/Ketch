@@ -1,5 +1,5 @@
 import SwiftUI
-import KDownApp
+import KetchApp
 
 @main
 struct iOSApp: App {

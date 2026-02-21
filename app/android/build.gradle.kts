@@ -13,11 +13,11 @@ kotlin {
 }
 
 android {
-  namespace = "com.linroid.kdown.app.android"
+  namespace = "com.linroid.ketch.app.android"
   compileSdk = libs.versions.android.compileSdk.get().toInt()
 
   defaultConfig {
-    applicationId = "com.linroid.kdown.app"
+    applicationId = "com.linroid.ketch.app"
     minSdk = libs.versions.android.minSdk.get().toInt()
     targetSdk = libs.versions.android.targetSdk.get().toInt()
     versionName = providers.gradleProperty("VERSION_NAME").get()

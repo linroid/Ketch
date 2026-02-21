@@ -1,4 +1,4 @@
-# Shared ProGuard/R8 rules for KDown release artifacts (Android & Desktop)
+# Shared ProGuard/R8 rules for Ketch release artifacts (Android & Desktop)
 
 # kotlinx-serialization
 -keepclassmembers class kotlinx.serialization.json.** {

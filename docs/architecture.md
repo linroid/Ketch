@@ -1,6 +1,6 @@
-# KDown Architecture
+# Ketch Architecture
 
-This document describes the internal architecture of KDown, covering module boundaries,
+This document describes the internal architecture of Ketch, covering module boundaries,
 core abstractions, the download pipeline, and the example app's multi-backend design.
 
 ## Module Dependency Graph
@@ -9,14 +9,14 @@ core abstractions, the download pipeline, and the example app's multi-backend de
 library:api          (public interfaces and models, no dependencies)
   ^
   |
-library:core         (download engine, implements KDownApi)
+library:core         (download engine, implements KetchApi)
   ^       ^
   |       |
   |    library:ktor  (Ktor-based HttpEngine)
   |
   +--- library:sqlite   (SQLite-backed TaskStore)
   +--- library:kermit   (Kermit logging adapter)
-  +--- library:remote   (HTTP+SSE client, implements KDownApi)
+  +--- library:remote   (HTTP+SSE client, implements KetchApi)
   +--- library:server   (Ktor REST API + SSE daemon)
 
 cli                  (JVM CLI, depends on core + server + ktor + sqlite)
@@ -28,32 +28,32 @@ app/web              (WasmJs entry point, depends on shared)
 
 ## Modules
 
-KDown is split into published SDK modules that you add as dependencies:
+Ketch is split into published SDK modules that you add as dependencies:
 
 | Module | Description | Platforms |
 |---|---|---|
-| `library:api` | Public API interfaces and models (`KDownApi`, `DownloadTask`, `DownloadState`, etc.) | All |
+| `library:api` | Public API interfaces and models (`KetchApi`, `DownloadTask`, `DownloadState`, etc.) | All |
 | `library:core` | In-process download engine -- embed downloads directly in your app | All |
 | `library:ktor` | Ktor-based `HttpEngine` implementation (required by `core`) | All |
 | `library:sqlite` | SQLite-backed `TaskStore` for persistent resume | Android, iOS, Desktop |
 | `library:kermit` | Optional [Kermit](https://github.com/touchlab/Kermit) logging integration | All |
-| `library:remote` | Remote client -- control a KDown daemon server from any platform | All |
+| `library:remote` | Remote client -- control a Ketch daemon server from any platform | All |
 | `server` | Daemon server with REST API and SSE events (not an SDK; standalone service) | Desktop |
 | [`cli`](../cli/README.md) | Command-line interface for downloads and running the daemon | Desktop |
 
 Choose your backend: use **`core`** for in-process downloads, or **`remote`** to control a daemon
-server. Both implement the same `KDownApi` interface, so your UI code works identically.
+server. Both implement the same `KetchApi` interface, so your UI code works identically.
 
 ## Core Abstractions
 
-### KDownApi
+### KetchApi
 
-The central service interface, defined in `library:api`. Both `KDown` (in-process) and
-`RemoteKDown` (HTTP+SSE client) implement it, so UI and CLI code works identically
+The central service interface, defined in `library:api`. Both `Ketch` (in-process) and
+`RemoteKetch` (HTTP+SSE client) implement it, so UI and CLI code works identically
 regardless of backend.
 
 ```
-KDownApi
+KetchApi
   |-- tasks: StateFlow<List<DownloadTask>>
   |-- download(request): DownloadTask
   |-- setGlobalSpeedLimit(limit)
@@ -63,7 +63,7 @@ KDownApi
 
 ### Pluggable Components
 
-KDown uses interface-based dependency injection for all platform-varying or
+Ketch uses interface-based dependency injection for all platform-varying or
 user-swappable components:
 
 | Interface | Purpose | Implementations |
@@ -140,7 +140,7 @@ DownloadRequest
 
 ## Error Classification
 
-All errors are modeled as sealed class `KDownError`:
+All errors are modeled as sealed class `KetchError`:
 
 | Type | Retryable | Trigger |
 |---|---|---|
@@ -168,33 +168,33 @@ Global SpeedLimiter (shared across all tasks)
         |-- tokens consumed = min(task budget, global budget)
 ```
 
-Set via `KDownApi.setGlobalSpeedLimit()` (global) or `DownloadTask.setSpeedLimit()`
+Set via `KetchApi.setGlobalSpeedLimit()` (global) or `DownloadTask.setSpeedLimit()`
 (per-task). Both can be changed at runtime.
 
 ## Daemon Server
 
-The server module (`library:server`) wraps a `KDown` instance with a Ktor HTTP server:
+The server module (`library:server`) wraps a `Ketch` instance with a Ktor HTTP server:
 
 - **REST API**: Create, list, pause, resume, cancel downloads
 - **SSE**: Real-time event stream for state changes and progress updates
-- **Auth**: Optional bearer token via `KDownServerConfig.apiToken`
+- **Auth**: Optional bearer token via `KetchServerConfig.apiToken`
 - **CORS**: Configurable allowed origins for browser clients
 
-`RemoteKDown` (`library:remote`) is the client counterpart -- it implements `KDownApi`
+`RemoteKetch` (`library:remote`) is the client counterpart -- it implements `KetchApi`
 by calling the REST API and subscribing to SSE events. Auto-reconnects with exponential
 backoff on disconnection.
 
 ## Example App: Multi-Backend Design
 
-The example app (`app/shared`) supports three backend modes, all through `KDownApi`:
+The example app (`app/shared`) supports three backend modes, all through `KetchApi`:
 
-1. **Embedded** (default) -- in-process `KDown`, works on all platforms
-2. **Remote** -- connects to an existing daemon via `RemoteKDown`
-3. **Local server** -- starts `KDownServer` in-process (JVM/Desktop only)
+1. **Embedded** (default) -- in-process `Ketch`, works on all platforms
+2. **Remote** -- connects to an existing daemon via `RemoteKetch`
+3. **Local server** -- starts `KetchServer` in-process (JVM/Desktop only)
 
 ### Key design decisions
 
-- **`KDownApi` is the only abstraction the UI needs.** Backend switching is transparent.
+- **`KetchApi` is the only abstraction the UI needs.** Backend switching is transparent.
 - **Lambda injection over expect/actual.** Local server support is JVM-only. Instead of
   expect/actual across 4 platforms, the JVM entry point injects a `localServerFactory`
   lambda. CommonMain checks `lambda != null` to gate UI visibility.
@@ -207,12 +207,12 @@ The example app (`app/shared`) supports three backend modes, all through `KDownA
 BackendManager
   |-- backends: StateFlow<List<BackendEntry>>
   |-- activeBackend: StateFlow<BackendEntry>
-  |-- activeApi: StateFlow<KDownApi>
+  |-- activeApi: StateFlow<KetchApi>
   |
   +-- BackendFactory(localServerFactory: ((LocalServer) -> LocalServerHandle)?)
-        |-- create(BackendConfig) -> KDownApi
-        |-- Embedded: creates KDown directly
-        |-- Remote: creates RemoteKDown
+        |-- create(BackendConfig) -> KetchApi
+        |-- Embedded: creates Ketch directly
+        |-- Remote: creates RemoteKetch
         |-- LocalServer: invokes lambda (JVM only)
 ```
 
@@ -221,7 +221,7 @@ Platform entry points:
 ```kotlin
 // Desktop (JVM) -- provides local server support
 BackendManager(BackendFactory(localServerFactory = { config ->
-  // start KDownServer, return LocalServerHandle
+  // start KetchServer, return LocalServerHandle
 }))
 
 // iOS, Android, WasmJs -- no local server
@@ -231,7 +231,7 @@ BackendManager(BackendFactory())
 ### Backend switching flow
 
 1. User selects a backend in the selector sheet
-2. `BackendManager.switchTo(id)` closes the old `KDownApi`
+2. `BackendManager.switchTo(id)` closes the old `KetchApi`
 3. `BackendFactory.create()` builds the new one
 4. `activeApi` StateFlow updates, UI recomposes with new task list
 

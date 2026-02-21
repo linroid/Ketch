@@ -9,7 +9,7 @@ plugins {
 
 kotlin {
   androidLibrary {
-    namespace = "com.linroid.kdown.ktor"
+    namespace = "com.linroid.ketch.ktor"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
 

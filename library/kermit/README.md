@@ -1,6 +1,6 @@
-# KDown Kermit Logger
+# Ketch Kermit Logger
 
-Kermit-based logger implementation for KDown, providing structured logging across all platforms.
+Kermit-based logger implementation for Ketch, providing structured logging across all platforms.
 
 ## Installation
 
@@ -9,7 +9,7 @@ Add the Kermit logger module to your dependencies:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.linroid.kdown:kermit:1.0.0")
+    implementation("com.linroid.ketch:kermit:1.0.0")
 }
 ```
 
@@ -18,9 +18,9 @@ dependencies {
 ### Basic Usage
 
 ```kotlin
-import com.linroid.kdown.KDown
-import com.linroid.kdown.engine.KtorHttpEngine
-import com.linroid.kdown.log.KermitLogger
+import com.linroid.ketch.Ketch
+import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.log.KermitLogger
 import co.touchlab.kermit.Severity
 
 // Create a KermitLogger with desired severity level
@@ -28,8 +28,8 @@ val logger = KermitLogger(
     minSeverity = Severity.Debug
 )
 
-// Pass it to KDown
-val kdown = KDown(
+// Pass it to Ketch
+val ketch = Ketch(
     httpEngine = KtorHttpEngine(),
     logger = logger
 )
@@ -86,20 +86,20 @@ val logger = KermitLogger(config = config)
 ## Example Output
 
 ```
-[INFO] [KDown.KDown] KDown v1.0.0 initialized with config: DownloadConfig(...)
-[INFO] [KDown.KDown] Starting download: taskId=task1, url=https://..., connections=4
-[DEBUG] [KDown.Coordinator] Detecting server capabilities for https://...
-[INFO] [KDown.RangeDetector] Server info: contentLength=1048576, acceptRanges=bytes, supportsResume=true
-[INFO] [KDown.Coordinator] Server supports range requests. Using 4 connections
-[DEBUG] [KDown.SegmentDownloader] Starting segment 0: range 0..262143 (262144 bytes remaining)
-[DEBUG] [KDown.SegmentDownloader] Starting segment 1: range 262144..524287 (262144 bytes remaining)
+[INFO] [Ketch.Ketch] Ketch v1.0.0 initialized with config: DownloadConfig(...)
+[INFO] [Ketch.Ketch] Starting download: taskId=task1, url=https://..., connections=4
+[DEBUG] [Ketch.Coordinator] Detecting server capabilities for https://...
+[INFO] [Ketch.RangeDetector] Server info: contentLength=1048576, acceptRanges=bytes, supportsResume=true
+[INFO] [Ketch.Coordinator] Server supports range requests. Using 4 connections
+[DEBUG] [Ketch.SegmentDownloader] Starting segment 0: range 0..262143 (262144 bytes remaining)
+[DEBUG] [Ketch.SegmentDownloader] Starting segment 1: range 262144..524287 (262144 bytes remaining)
 ...
-[INFO] [KDown.Coordinator] Download completed successfully for taskId=task1
+[INFO] [Ketch.Coordinator] Download completed successfully for taskId=task1
 ```
 
 ## Platform Support
 
-The Kermit logger works on all platforms supported by KDown:
+The Kermit logger works on all platforms supported by Ketch:
 - Android
 - iOS (arm64, simulator)
 - JVM/Desktop
@@ -108,4 +108,4 @@ The Kermit logger works on all platforms supported by KDown:
 ## See Also
 
 - [Kermit Documentation](https://github.com/touchlab/Kermit)
-- [KDown Core Documentation](../core/README.md)
+- [Ketch Core Documentation](../core/README.md)

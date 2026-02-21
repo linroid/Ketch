@@ -9,7 +9,7 @@ plugins {
 
 kotlin {
   androidLibrary {
-    namespace = "com.linroid.kdown.kermit"
+    namespace = "com.linroid.ketch.kermit"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
 
