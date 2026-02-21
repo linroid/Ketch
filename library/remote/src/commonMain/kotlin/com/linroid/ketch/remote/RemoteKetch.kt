@@ -111,6 +111,7 @@ class RemoteKetch(
   override suspend fun download(
     request: DownloadRequest,
   ): DownloadTask {
+    log.i { "Download: url=${request.url}" }
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(request)
@@ -134,7 +135,7 @@ class RemoteKetch(
   }
 
   override suspend fun start() {
-    log.i { "Start" }
+    log.i { "Connecting to $host:$port" }
     if (sseJob?.isActive == true) return
     _connectionState.value = ConnectionState.Connecting
     sseJob = scope.launch { connectSse() }
@@ -147,6 +148,7 @@ class RemoteKetch(
   }
 
   override suspend fun updateConfig(config: DownloadConfig) {
+    log.d { "Updating config: speedLimit=${config.speedLimit}" }
     val response = httpClient.put(Api.Config()) {
       contentType(ContentType.Application.Json)
       setBody(config)
@@ -155,6 +157,7 @@ class RemoteKetch(
   }
 
   override fun close() {
+    log.d { "Close" }
     scope.cancel()
     httpClient.close()
   }
@@ -171,7 +174,7 @@ class RemoteKetch(
         httpClient.sse(
           urlString = "/api/events",
         ) {
-          log.i { "Connected to events" }
+          log.i { "Connected to /events" }
           incoming.collect { event ->
             val data = event.data ?: return@collect
             try {
@@ -191,6 +194,7 @@ class RemoteKetch(
 
       _connectionState.value = ConnectionState.Disconnected()
 
+      log.d { "Reconnecting in ${reconnectDelayMs}ms" }
       delay(reconnectDelayMs)
       _connectionState.value = ConnectionState.Connecting
       reconnectDelayMs = (reconnectDelayMs * 2)
@@ -217,7 +221,7 @@ class RemoteKetch(
   }
 
   private suspend fun handleEvent(event: TaskEvent) {
-    log.i { "Handle event: ${event.eventType}" }
+    log.i { "Handle event: ${event}" }
     when (event) {
       is TaskEvent.TaskAdded -> {
         try {
@@ -229,8 +233,8 @@ class RemoteKetch(
             val task = createRemoteTask(wire)
             addOrUpdate(task)
           }
-        } catch (_: Exception) {
-          // Task may already be gone
+        } catch (e: Exception) {
+          log.w(e) { "Failed to fetch added task: ${event.taskId}" }
         }
       }
 
@@ -285,6 +289,7 @@ class RemoteKetch(
 
   private fun checkSuccess(response: HttpResponse) {
     if (!response.status.isSuccess()) {
+      log.w { "HTTP error ${response.status.value}" }
       throw IllegalStateException(
         "HTTP ${response.status.value}: " +
           response.status.description,

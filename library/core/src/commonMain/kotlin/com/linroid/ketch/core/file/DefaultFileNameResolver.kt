@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.file
 
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.ServerInfo
 
 /**
@@ -15,13 +16,17 @@ import com.linroid.ketch.core.engine.ServerInfo
  */
 internal class DefaultFileNameResolver : FileNameResolver {
 
+  private val log = KetchLogger("FileNameResolver")
+
   override fun resolve(
     request: DownloadRequest,
     serverInfo: ServerInfo,
   ): String {
-    return fromContentDisposition(serverInfo.contentDisposition)
+    val name = fromContentDisposition(serverInfo.contentDisposition)
       ?: fromUrl(request.url)
       ?: FALLBACK
+    log.d { "Resolved filename: \"$name\" for url: ${request.url}" }
+    return name
   }
 
   companion object {

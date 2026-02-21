@@ -312,6 +312,10 @@ class Ketch(
         if (currentTaskIds.contains(record.taskId)) {
           currentTasks.find { it.taskId == record.taskId }
         } else {
+          log.d {
+            "Loading record: taskId=${record.taskId}, " +
+              "state=${record.state}"
+          }
           createTaskFromRecord(record)
         }
       }
@@ -472,6 +476,7 @@ class Ketch(
   }
 
   private suspend fun removeTaskInternal(taskId: String) {
+    log.i { "Removing task: taskId=$taskId" }
     scheduleManager.cancel(taskId)
     scheduler.dequeue(taskId)
     coordinator.cancel(taskId)

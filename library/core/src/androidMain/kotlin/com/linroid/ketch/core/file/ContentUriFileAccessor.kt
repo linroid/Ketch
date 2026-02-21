@@ -6,6 +6,7 @@ import android.provider.DocumentsContract
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,6 +24,7 @@ internal class ContentUriFileAccessor(
   private val uri: Uri,
 ) : FileAccessor {
 
+  private val log = KetchLogger("FileAccessor")
   private val mutex = Mutex()
 
   private val pfd = context.contentResolver.openFileDescriptor(uri, "rw")
@@ -31,6 +33,10 @@ internal class ContentUriFileAccessor(
       "Failed to open file descriptor for Uri=$uri; " +
         "the Uri may be invalid or permissions may be missing.",
     )
+
+  init {
+    log.d { "Opened file descriptor for uri: $uri" }
+  }
 
   override suspend fun writeAt(offset: Long, data: ByteArray) {
     withContext(Dispatchers.IO) {
@@ -63,6 +69,7 @@ internal class ContentUriFileAccessor(
   }
 
   override fun close() {
+    log.d { "Closing uri: $uri" }
     pfd?.close()
   }
 
@@ -70,6 +77,7 @@ internal class ContentUriFileAccessor(
     withContext(Dispatchers.IO) {
       mutex.withLock {
         close()
+        log.d { "Deleting document: $uri" }
         DocumentsContract.deleteDocument(context.contentResolver, uri)
       }
     }
@@ -81,6 +89,7 @@ internal class ContentUriFileAccessor(
 
   override suspend fun preallocate(size: Long) {
     if (size <= 0) return
+    log.d { "Preallocating $size bytes for uri: $uri" }
     writeAt(size - 1, byteArrayOf(0))
   }
 }

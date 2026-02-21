@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.file
 
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -24,6 +25,7 @@ internal class PathFileAccessor(
   private val handleFactory: (String) -> RandomAccessHandle,
 ) : FileAccessor {
 
+  private val log = KetchLogger("FileAccessor")
   private val realPath = Path(path)
   private var handle: RandomAccessHandle? = null
   private val mutex = Mutex()
@@ -32,8 +34,10 @@ internal class PathFileAccessor(
     return handle ?: run {
       val parent = realPath.parent
       if (parent != null && !SystemFileSystem.exists(parent)) {
+        log.d { "Creating directories: $parent" }
         SystemFileSystem.createDirectories(parent)
       }
+      log.d { "Opening file: $realPath" }
       handleFactory(realPath.toString()).also { handle = it }
     }
   }
@@ -55,6 +59,7 @@ internal class PathFileAccessor(
   }
 
   override fun close() {
+    log.d { "Closing file: $realPath" }
     handle?.close()
     handle = null
   }
@@ -65,6 +70,7 @@ internal class PathFileAccessor(
         handle?.close()
         handle = null
         if (SystemFileSystem.exists(realPath)) {
+          log.d { "Deleting file: $realPath" }
           SystemFileSystem.delete(realPath)
         }
       }
@@ -76,6 +82,7 @@ internal class PathFileAccessor(
   }
 
   override suspend fun preallocate(size: Long) {
+    log.d { "Preallocating $size bytes: $realPath" }
     withContext(ioDispatcher) {
       mutex.withLock {
         getOrCreateHandle().preallocate(size)

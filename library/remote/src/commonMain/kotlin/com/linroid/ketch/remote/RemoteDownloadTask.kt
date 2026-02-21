@@ -9,6 +9,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ConnectionsRequest
 import com.linroid.ketch.endpoints.model.PriorityRequest
@@ -37,6 +38,7 @@ internal class RemoteDownloadTask(
   private val httpClient: HttpClient,
   private val onRemoved: (String) -> Unit,
 ) : DownloadTask {
+  private val log = KetchLogger("RemoteTask")
 
   private val _state = MutableStateFlow(initialState)
   override val state: StateFlow<DownloadState> = _state.asStateFlow()
@@ -46,12 +48,14 @@ internal class RemoteDownloadTask(
     _segments.asStateFlow()
 
   internal fun updateState(newState: DownloadState) {
+    log.d { "State update for taskId=$taskId: $newState" }
     _state.value = newState
   }
 
   private val byId get() = Api.Tasks.ById(id = taskId)
 
   override suspend fun pause() {
+    log.d { "Pause taskId=$taskId" }
     val response = httpClient.post(
       Api.Tasks.ById.Pause(parent = byId),
     )
@@ -60,6 +64,7 @@ internal class RemoteDownloadTask(
   }
 
   override suspend fun resume(destination: Destination?) {
+    log.d { "Resume taskId=$taskId" }
     val response = httpClient.post(
       Api.Tasks.ById.Resume(
         parent = byId,
@@ -71,6 +76,7 @@ internal class RemoteDownloadTask(
   }
 
   override suspend fun cancel() {
+    log.d { "Cancel taskId=$taskId" }
     val response = httpClient.post(
       Api.Tasks.ById.Cancel(parent = byId),
     )
@@ -79,6 +85,7 @@ internal class RemoteDownloadTask(
   }
 
   override suspend fun remove() {
+    log.d { "Remove taskId=$taskId" }
     val response = httpClient.delete(byId)
     checkSuccess(response)
     onRemoved(taskId)
@@ -135,6 +142,9 @@ internal class RemoteDownloadTask(
     response: io.ktor.client.statement.HttpResponse,
   ) {
     if (!response.status.isSuccess()) {
+      log.e {
+        "HTTP error ${response.status.value} for taskId=$taskId"
+      }
       throw IllegalStateException(
         "HTTP ${response.status.value}: " +
           response.status.description,

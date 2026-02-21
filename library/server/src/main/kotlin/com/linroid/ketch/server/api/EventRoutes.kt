@@ -3,6 +3,7 @@ package com.linroid.ketch.server.api
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.TaskEvent
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.ServerSSESession
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 private val json = Json { encodeDefaults = true }
+private val log = KetchLogger("EventRoutes")
 
 /**
  * Installs the `/api/events` SSE endpoint that streams real-time
@@ -27,9 +29,11 @@ private val json = Json { encodeDefaults = true }
  */
 internal fun Route.eventRoutes(ketch: KetchApi) {
   sse("/api/events") {
+    log.i { "SSE client connected to /api/events" }
     coroutineScope {
       val activeJobs = mutableMapOf<String, Job>()
       for (task in ketch.tasks.value) {
+        log.d { "Task tracker started for taskId=${task.taskId}" }
         activeJobs[task.taskId] = launch { trackTaskState(task) }
       }
       ketch.tasks.collect { tasks ->
@@ -39,6 +43,7 @@ internal fun Route.eventRoutes(ketch: KetchApi) {
         // Cancel trackers for removed tasks
         for (removedId in trackedIds - currentIds) {
           activeJobs.remove(removedId)?.cancel()
+          log.d { "Task tracker removed for taskId=$removedId" }
           sendEvent(TaskEvent.TaskRemoved(taskId = removedId))
         }
 
@@ -51,6 +56,7 @@ internal fun Route.eventRoutes(ketch: KetchApi) {
                 state = task.state.value,
               ),
             )
+            log.d { "Task tracker started for taskId=${task.taskId}" }
             activeJobs[task.taskId] = launch {
               trackTaskState(task)
             }
@@ -62,8 +68,10 @@ internal fun Route.eventRoutes(ketch: KetchApi) {
 
   sse("/api/events/{id}") {
     val taskId = call.parameters["id"]!!
+    log.i { "SSE client connected to /api/events/$taskId" }
     val task = ketch.tasks.value.find { it.taskId == taskId }
     if (task == null) {
+      log.w { "Task not found for SSE: taskId=$taskId" }
       sendEvent(TaskEvent.Error(taskId = taskId))
       return@sse
     }
@@ -96,6 +104,7 @@ private suspend fun ServerSSESession.trackTaskState(
 }
 
 private suspend fun ServerSSESession.sendEvent(event: TaskEvent) {
+  log.d { "SSE event: ${event.eventType.value} taskId=${event.taskId}" }
   send(
     ServerSentEvent(
       data = json.encodeToString(event),

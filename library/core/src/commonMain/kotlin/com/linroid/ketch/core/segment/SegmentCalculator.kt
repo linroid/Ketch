@@ -1,8 +1,11 @@
 package com.linroid.ketch.core.segment
 
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.log.KetchLogger
 
 internal object SegmentCalculator {
+
+  private val log = KetchLogger("SegmentCalc")
 
   fun calculateSegments(totalBytes: Long, connections: Int): List<Segment> {
     require(totalBytes > 0) { "totalBytes must be positive" }
@@ -10,6 +13,10 @@ internal object SegmentCalculator {
 
     val effectiveConnections =
       minOf(connections.toLong(), totalBytes.coerceAtLeast(1)).toInt()
+    log.d {
+      "Calculating segments: totalBytes=$totalBytes," +
+        " connections=$connections, effective=$effectiveConnections"
+    }
     val segmentSize = totalBytes / effectiveConnections
     val remainder = totalBytes % effectiveConnections
 
@@ -59,7 +66,14 @@ internal object SegmentCalculator {
   ): List<Segment> {
     require(newConnections > 0) { "connections must be positive" }
 
-    if (oldSegments.all { it.isComplete }) return oldSegments
+    if (oldSegments.all { it.isComplete }) {
+      log.d { "Resegment: all ${oldSegments.size} segments complete, skipping" }
+      return oldSegments
+    }
+    log.d {
+      "Resegmenting: ${oldSegments.size} old segments," +
+        " newConnections=$newConnections"
+    }
 
     val completed = mutableListOf<Segment>()
     val remainingRanges = mutableListOf<LongRange>()
@@ -112,7 +126,9 @@ internal object SegmentCalculator {
     }
 
     result.sortBy { it.start }
-    return result.mapIndexed { i, seg -> seg.copy(index = i) }
+    val reindexed = result.mapIndexed { i, seg -> seg.copy(index = i) }
+    log.d { "Resegmented: ${reindexed.size} segments" }
+    return reindexed
   }
 
   /**

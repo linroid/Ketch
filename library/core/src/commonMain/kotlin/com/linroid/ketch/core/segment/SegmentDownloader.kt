@@ -24,6 +24,7 @@ internal class SegmentDownloader(
     onProgress: suspend (bytesDownloaded: Long) -> Unit,
   ): Segment {
     if (segment.isComplete) {
+      log.d { "Skipping complete segment ${segment.index}" }
       return segment
     }
 

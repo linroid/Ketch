@@ -56,6 +56,12 @@ class KtorHttpEngine(
         val remaining = if (is429) {
           findRateLimitRemaining(response.headers)
         } else null
+        if (is429) {
+          log.d {
+            "Rate limit headers: retryAfter=$retryAfter, " +
+              "remaining=$remaining"
+          }
+        }
         throw KetchError.Http(
           response.status.value,
           response.status.description,
@@ -132,6 +138,12 @@ class KtorHttpEngine(
           val remaining = if (is429) {
             findRateLimitRemaining(response.headers)
           } else null
+          if (is429) {
+            log.d {
+              "Rate limit headers: retryAfter=$retryAfter, " +
+                "remaining=$remaining"
+            }
+          }
           throw KetchError.Http(
             status.value, status.description, retryAfter, remaining,
           )

@@ -3,6 +3,7 @@ package com.linroid.ketch.sqlite
 import app.cash.sqldelight.db.SqlDriver
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -19,6 +20,7 @@ import kotlin.time.Instant
  * @param driver a platform-specific [SqlDriver] instance
  */
 class SqliteTaskStore(driver: SqlDriver) : TaskStore {
+  private val log = KetchLogger("SqliteStore")
   private val database = KetchDatabase(driver)
   private val queries = database.taskRecordsQueries
   private val mutex = Mutex()
@@ -30,6 +32,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
    * task ID already exists, it will be replaced.
    */
   override suspend fun save(record: TaskRecord): Unit = mutex.withLock {
+    log.d { "Saving task: ${record.taskId}" }
     queries.save(
       task_id = record.taskId,
       request_json = json.encodeToString(
@@ -55,20 +58,25 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
    * Loads a [TaskRecord] for the given task ID. Returns `null` if not found.
    */
   override suspend fun load(taskId: String): TaskRecord? = mutex.withLock {
-    queries.load(taskId).executeAsOneOrNull()?.toTaskRecord()
+    val record = queries.load(taskId).executeAsOneOrNull()?.toTaskRecord()
+    log.d { "Loaded task: $taskId, found=${record != null}" }
+    record
   }
 
   /**
    * Loads all [TaskRecord]s from the database.
    */
   override suspend fun loadAll(): List<TaskRecord> = mutex.withLock {
-    queries.loadAll().executeAsList().map { it.toTaskRecord() }
+    val records = queries.loadAll().executeAsList().map { it.toTaskRecord() }
+    log.d { "Loaded all tasks: ${records.size} records" }
+    records
   }
 
   /**
    * Removes the task record for the given task ID from the database.
    */
   override suspend fun remove(taskId: String): Unit = mutex.withLock {
+    log.d { "Removing task: $taskId" }
     queries.remove(taskId)
   }
 
@@ -89,7 +97,8 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       segments = segments_json?.let {
         try {
           json.decodeFromString(segmentListSerializer, it)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+          log.w(e) { "Failed to deserialize segments for task: $task_id" }
           null
         }
       },

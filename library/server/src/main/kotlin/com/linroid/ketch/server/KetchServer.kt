@@ -1,11 +1,11 @@
 package com.linroid.ketch.server
 
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.config.ServerConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
-import com.linroid.ketch.api.config.ServerConfig
 import com.linroid.ketch.server.api.serverRoutes
 import com.linroid.ketch.server.mdns.MdnsRegistrar
 import com.linroid.ketch.server.mdns.defaultMdnsRegistrar
@@ -107,12 +107,14 @@ class KetchServer(
    */
   fun start(wait: Boolean = true) {
     check(scope.isActive) { "Server has been stopped" }
+    log.i { "Starting server on ${config.host}:${config.port}" }
     engine.start(wait = wait)
     startMdnsRegistration()
   }
 
   /** Stops the daemon server gracefully. */
   fun stop() {
+    log.i { "Stopping server" }
     scope.cancel()
     engine.stop(
       gracePeriodMillis = 1000,
@@ -140,24 +142,17 @@ class KetchServer(
           port = config.port,
           metadata = mapOf("token" to tokenValue),
         )
-        log.i {
-          "mDNS registered: $mdnsServiceName" +
-            " (${ServerConfig.MDNS_SERVICE_TYPE})"
-        }
+        log.i { "mDNS registered: $mdnsServiceName (${ServerConfig.MDNS_SERVICE_TYPE})" }
         awaitCancellation()
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        log.w(throwable = e) {
-          "mDNS registration failed: ${e.message}"
-        }
+        log.w(e) { "mDNS registration failed: ${e.message}" }
       } finally {
         runCatching {
           mdnsRegistrar.unregister()
         }.onFailure { e ->
-          log.w(throwable = e) {
-            "mDNS unregister failed: ${e.message}"
-          }
+          log.w(e) { "mDNS unregister failed: ${e.message}" }
         }
       }
     }
@@ -205,13 +200,11 @@ class KetchServer(
           ),
         )
       }
-      exception<io.ktor.server.plugins.BadRequestException> {
-          call, cause ->
+      exception<io.ktor.server.plugins.BadRequestException> { call, cause ->
         call.respond(
           HttpStatusCode.BadRequest,
           ErrorResponse(
-            "bad_request",
-            cause.message ?: "Bad request",
+            "bad_request", cause.message ?: "Bad request",
           ),
         )
       }

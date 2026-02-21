@@ -64,6 +64,7 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
+    log.i { "Starting download: taskId=$taskId, url=${request.url}" }
     val now = Clock.System.now()
     taskStore.save(
       TaskRecord(
@@ -119,6 +120,7 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
+    log.i { "Starting from record: taskId=${record.taskId}" }
     updateTaskRecord(record.taskId) {
       it.copy(
         state = TaskState.PENDING,
@@ -356,6 +358,12 @@ internal class DownloadCoordinator(
 
     val taskRecord = taskStore.load(taskId) ?: return false
     val segments = taskRecord.segments ?: return false
+    log.d {
+      "Resume loaded record: taskId=$taskId, " +
+        "segments=${segments.size}, " +
+        "downloaded=${taskRecord.downloadedBytes}/" +
+        "${taskRecord.totalBytes}"
+    }
 
     stateFlow.value = DownloadState.Pending
     segmentsFlow.value = segments
@@ -478,6 +486,7 @@ internal class DownloadCoordinator(
         )
       }
 
+      log.i { "Resume completed successfully for taskId=$taskId" }
       stateFlow.value =
         DownloadState.Completed(outputPath)
     } finally {
@@ -597,6 +606,7 @@ internal class DownloadCoordinator(
         updatedAt = Clock.System.now(),
       )
     }
+    log.d { "Cancel record updated for taskId=$taskId" }
   }
 
   suspend fun getState(taskId: String): DownloadState? {
