@@ -3,28 +3,28 @@ package com.linroid.ketch.app.theme
 import androidx.compose.ui.graphics.Color
 import com.linroid.ketch.api.DownloadState
 
-// Surface palette (deep blue-gray)
-val KetchBackground = Color(0xFF0F1419)
-val KetchSurface = Color(0xFF1A2028)
-val KetchSurfaceVariant = Color(0xFF242D38)
-val KetchSurfaceContainer = Color(0xFF1E2630)
-val KetchSurfaceContainerHigh = Color(0xFF283040)
-val KetchOnSurface = Color(0xFFE2E8F0)
-val KetchOnSurfaceVariant = Color(0xFF8899AA)
-val KetchOutline = Color(0xFF4A5568)
-val KetchOutlineVariant = Color(0xFF2D3748)
+// Surface palette (neutral dark)
+val KetchBackground = Color(0xFF101010)
+val KetchSurface = Color(0xFF1A1A1A)
+val KetchSurfaceVariant = Color(0xFF252525)
+val KetchSurfaceContainer = Color(0xFF1F1F1F)
+val KetchSurfaceContainerHigh = Color(0xFF2A2A2A)
+val KetchOnSurface = Color(0xFFE8E8E8)
+val KetchOnSurfaceVariant = Color(0xFF999999)
+val KetchOutline = Color(0xFF4A4A4A)
+val KetchOutlineVariant = Color(0xFF303030)
 
-// Primary accent (teal-blue)
-val KetchPrimary = Color(0xFF4FC3F7)
-val KetchPrimaryContainer = Color(0xFF1A3A4A)
-val KetchOnPrimary = Color(0xFF0F1419)
-val KetchOnPrimaryContainer = Color(0xFFB3E5FC)
+// Primary (teal — from logo)
+val KetchPrimary = Color(0xFF00BCD4)
+val KetchPrimaryContainer = Color(0xFF003840)
+val KetchOnPrimary = Color(0xFF000000)
+val KetchOnPrimaryContainer = Color(0xFFB2EBF2)
 
-// Secondary (teal)
-val KetchSecondary = Color(0xFF80CBC4)
-val KetchSecondaryContainer = Color(0xFF1A3A38)
-val KetchOnSecondary = Color(0xFF0F1419)
-val KetchOnSecondaryContainer = Color(0xFFB2DFDB)
+// Secondary (deep teal — from logo hull)
+val KetchSecondary = Color(0xFF0097A7)
+val KetchSecondaryContainer = Color(0xFF002E33)
+val KetchOnSecondary = Color(0xFF000000)
+val KetchOnSecondaryContainer = Color(0xFF80DEEA)
 
 // Tertiary (success/green)
 val KetchTertiary = Color(0xFF66BB6A)
@@ -38,25 +38,25 @@ val KetchErrorContainer = Color(0xFF3A1B1B)
 val KetchOnError = Color(0xFF0F1419)
 val KetchOnErrorContainer = Color(0xFFEF9A9A)
 
-// Light theme surface palette
-val KetchLightBackground = Color(0xFFF8FAFC)
+// Light theme surface palette (neutral light)
+val KetchLightBackground = Color(0xFFFAFAFA)
 val KetchLightSurface = Color(0xFFFFFFFF)
-val KetchLightSurfaceVariant = Color(0xFFE2E8F0)
-val KetchLightSurfaceContainer = Color(0xFFF1F5F9)
-val KetchLightSurfaceContainerHigh = Color(0xFFE2E8F0)
-val KetchLightOnSurface = Color(0xFF1A202C)
-val KetchLightOnSurfaceVariant = Color(0xFF4A5568)
-val KetchLightOutline = Color(0xFF94A3B8)
-val KetchLightOutlineVariant = Color(0xFFCBD5E1)
+val KetchLightSurfaceVariant = Color(0xFFE8E8E8)
+val KetchLightSurfaceContainer = Color(0xFFF2F2F2)
+val KetchLightSurfaceContainerHigh = Color(0xFFE8E8E8)
+val KetchLightOnSurface = Color(0xFF1A1A1A)
+val KetchLightOnSurfaceVariant = Color(0xFF555555)
+val KetchLightOutline = Color(0xFF999999)
+val KetchLightOutlineVariant = Color(0xFFCCCCCC)
 
-// Light primary
-val KetchLightPrimary = Color(0xFF0277BD)
-val KetchLightPrimaryContainer = Color(0xFFB3E5FC)
+// Light primary (teal — from logo, darker for readability)
+val KetchLightPrimary = Color(0xFF00838F)
+val KetchLightPrimaryContainer = Color(0xFFB2EBF2)
 val KetchLightOnPrimary = Color(0xFFFFFFFF)
-val KetchLightOnPrimaryContainer = Color(0xFF01579B)
+val KetchLightOnPrimaryContainer = Color(0xFF006064)
 
-// Light secondary
-val KetchLightSecondary = Color(0xFF00796B)
+// Light secondary (deep teal)
+val KetchLightSecondary = Color(0xFF00695C)
 val KetchLightSecondaryContainer = Color(0xFFB2DFDB)
 val KetchLightOnSecondary = Color(0xFFFFFFFF)
 val KetchLightOnSecondaryContainer = Color(0xFF004D40)
@@ -107,10 +107,10 @@ data class DownloadStateColors(
 
 val DarkStateColors = DownloadStateColors(
   downloading = StateColorPair(
-    Color(0xFF4FC3F7), Color(0xFF1B3A4F)
+    Color(0xFF00BCD4), Color(0xFF003840)
   ),
   pending = StateColorPair(
-    Color(0xFF4FC3F7), Color(0xFF1B3A4F)
+    Color(0xFF00BCD4), Color(0xFF003840)
   ),
   queued = StateColorPair(
     Color(0xFF90A4AE), Color(0xFF2A2D35)
@@ -137,10 +137,10 @@ val DarkStateColors = DownloadStateColors(
 
 val LightStateColors = DownloadStateColors(
   downloading = StateColorPair(
-    Color(0xFF0277BD), Color(0xFFE1F5FE)
+    Color(0xFF00838F), Color(0xFFE0F7FA)
   ),
   pending = StateColorPair(
-    Color(0xFF0277BD), Color(0xFFE1F5FE)
+    Color(0xFF00838F), Color(0xFFE0F7FA)
   ),
   queued = StateColorPair(
     Color(0xFF546E7A), Color(0xFFECEFF1)
