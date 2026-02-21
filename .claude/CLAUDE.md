@@ -94,7 +94,8 @@ cli/          # JVM CLI entry point
 ### Logging System
 - `Logger.None` (default, zero overhead), `Logger.console()`, `KermitLogger`
 - Platform-specific console: Logcat (Android), NSLog (iOS), println/stderr (JVM), println (Wasm)
-- Lazy lambda evaluation for zero cost when disabled
+- `KetchLogger` uses `inline` functions with `Logger.None` fast-path for zero-cost disabled logging
+- `Logger` interface accepts `String` messages; lazy evaluation handled by `KetchLogger`
 
 ### Error Handling (sealed `KetchError`)
 - `Network` (retryable), `Http(code)` (5xx retryable), `Disk`, `Unsupported`,
@@ -146,12 +147,14 @@ cli/          # JVM CLI entry point
 - Test edge cases: 0-byte files, 1-byte files, uneven segment splits
 
 ### Logging
-- Use `KetchLogger` for all internal logging
+- Use `KetchLogger` for all internal logging — instantiate per component:
+  `private val log = KetchLogger("Coordinator")`
 - Tags: "Ketch", "Coordinator", "SegmentDownloader", "RangeDetector", "KtorHttpEngine",
-  "Scheduler", "ScheduleManager", "SourceResolver"
+  "Scheduler", "ScheduleManager", "SourceResolver", "HttpSource", "TokenBucket"
 - Levels: verbose (segment detail), debug (state changes), info (user events),
   warn (retries), error (fatal)
-- Use lazy lambdas: `logger.d { "expensive $computation" }`
+- Use lazy lambdas: `log.d { "expensive $computation" }`
+- Keep log calls on one line when the message is short enough (within 100 chars)
 
 ## Current Limitations
 

@@ -42,23 +42,23 @@ class KermitLogger(
     tag = tag,
   )
 
-  override fun v(message: () -> String) {
-    kermit.v(messageString = message())
+  override fun v(message: String) {
+    kermit.v(messageString = message)
   }
 
-  override fun d(message: () -> String) {
-    kermit.d(messageString = message())
+  override fun d(message: String) {
+    kermit.d(messageString = message)
   }
 
-  override fun i(message: () -> String) {
-    kermit.i(messageString = message())
+  override fun i(message: String) {
+    kermit.i(messageString = message)
   }
 
-  override fun w(message: () -> String, throwable: Throwable?) {
-    kermit.w(messageString = message(), throwable = throwable)
+  override fun w(message: String, throwable: Throwable?) {
+    kermit.w(messageString = message, throwable = throwable)
   }
 
-  override fun e(message: () -> String, throwable: Throwable?) {
-    kermit.e(messageString = message(), throwable = throwable)
+  override fun e(message: String, throwable: Throwable?) {
+    kermit.e(messageString = message, throwable = throwable)
   }
 }

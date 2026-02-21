@@ -4,7 +4,7 @@ package com.linroid.ketch.core.log
  * Log level for filtering log output.
  *
  * Messages at or above the configured level are emitted;
- * messages below are discarded without evaluating the lambda.
+ * messages below are silently discarded.
  */
 enum class LogLevel {
   VERBOSE, DEBUG, INFO, WARN, ERROR
@@ -14,7 +14,9 @@ enum class LogLevel {
  * Logger abstraction for Ketch.
  *
  * Ketch supports pluggable logging with zero overhead when disabled (default).
- * All log methods accept lambda parameters for lazy evaluation.
+ * All log methods accept a pre-built [String] message. Lazy evaluation is
+ * handled by [KetchLogger]'s `inline` functions, which skip the message
+ * construction entirely when [Logger.None] is active.
  *
  * ## Usage
  *
@@ -50,11 +52,11 @@ enum class LogLevel {
  * ### Custom Logger
  * ```kotlin
  * class MyLogger : Logger {
- *   override fun v(message: () -> String) { println(message()) }
- *   override fun d(message: () -> String) { println(message()) }
- *   override fun i(message: () -> String) { println(message()) }
- *   override fun w(message: () -> String, throwable: Throwable?) { println(message()) }
- *   override fun e(message: () -> String, throwable: Throwable?) { System.err.println(message()) }
+ *   override fun v(message: String) { println(message) }
+ *   override fun d(message: String) { println(message) }
+ *   override fun i(message: String) { println(message) }
+ *   override fun w(message: String, throwable: Throwable?) { println(message) }
+ *   override fun e(message: String, throwable: Throwable?) { System.err.println(message) }
  * }
  * ```
  *
@@ -70,42 +72,30 @@ enum class LogLevel {
  * @see Logger.None
  */
 interface Logger {
-  /**
-   * Log a verbose message. Used for detailed diagnostic information.
-   *
-   * @param message Lazy message provider (only evaluated if logging is enabled)
-   */
-  fun v(message: () -> String)
+  /** Log a verbose message. Used for detailed diagnostic information. */
+  fun v(message: String)
 
-  /**
-   * Log a debug message. Used for debugging information.
-   *
-   * @param message Lazy message provider (only evaluated if logging is enabled)
-   */
-  fun d(message: () -> String)
+  /** Log a debug message. Used for debugging information. */
+  fun d(message: String)
 
-  /**
-   * Log an info message. Used for general informational messages.
-   *
-   * @param message Lazy message provider (only evaluated if logging is enabled)
-   */
-  fun i(message: () -> String)
+  /** Log an info message. Used for general informational messages. */
+  fun i(message: String)
 
   /**
    * Log a warning message. Used for potentially harmful situations.
    *
-   * @param message Lazy message provider (only evaluated if logging is enabled)
+   * @param message Log message
    * @param throwable Optional throwable to log
    */
-  fun w(message: () -> String, throwable: Throwable? = null)
+  fun w(message: String, throwable: Throwable? = null)
 
   /**
    * Log an error message. Used for error events.
    *
-   * @param message Lazy message provider (only evaluated if logging is enabled)
+   * @param message Log message
    * @param throwable Optional throwable to log
    */
-  fun e(message: () -> String, throwable: Throwable? = null)
+  fun e(message: String, throwable: Throwable? = null)
 
   companion object {
     /**
@@ -113,11 +103,11 @@ interface Logger {
      * This is the default logger if none is provided.
      */
     val None: Logger = object : Logger {
-      override fun v(message: () -> String) {}
-      override fun d(message: () -> String) {}
-      override fun i(message: () -> String) {}
-      override fun w(message: () -> String, throwable: Throwable?) {}
-      override fun e(message: () -> String, throwable: Throwable?) {}
+      override fun v(message: String) {}
+      override fun d(message: String) {}
+      override fun i(message: String) {}
+      override fun w(message: String, throwable: Throwable?) {}
+      override fun e(message: String, throwable: Throwable?) {}
     }
 
     /**

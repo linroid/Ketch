@@ -9,7 +9,7 @@ package com.linroid.ketch.core.log
  *
  * All logging methods are `inline` with a fast-path check for [Logger.None],
  * so when logging is disabled (the default) there is zero allocation overhead —
- * neither the message lambda nor the tag-wrapper lambda is created.
+ * the message lambda is never created and the string is never constructed.
  *
  * ```kotlin
  * private val logger = KetchLogger("Coordinator")
@@ -21,45 +21,29 @@ package com.linroid.ketch.core.log
  */
 class KetchLogger(@PublishedApi internal val tag: String) {
 
-  inline fun v(crossinline message: () -> String) {
+  inline fun v(message: () -> String) {
     val l = logger
-    if (l !== Logger.None) {
-      l.v { "[$tag] ${message()}" }
-    }
+    if (l !== Logger.None) l.v("[$tag] ${message()}")
   }
 
-  inline fun d(crossinline message: () -> String) {
+  inline fun d(message: () -> String) {
     val l = logger
-    if (l !== Logger.None) {
-      l.d { "[$tag] ${message()}" }
-    }
+    if (l !== Logger.None) l.d("[$tag] ${message()}")
   }
 
-  inline fun i(crossinline message: () -> String) {
+  inline fun i(message: () -> String) {
     val l = logger
-    if (l !== Logger.None) {
-      l.i { "[$tag] ${message()}" }
-    }
+    if (l !== Logger.None) l.i("[$tag] ${message()}")
   }
 
-  inline fun w(
-    throwable: Throwable? = null,
-    crossinline message: () -> String,
-  ) {
+  inline fun w(throwable: Throwable? = null, message: () -> String) {
     val l = logger
-    if (l !== Logger.None) {
-      l.w(message = { "[$tag] ${message()}" }, throwable = throwable)
-    }
+    if (l !== Logger.None) l.w("[$tag] ${message()}", throwable)
   }
 
-  inline fun e(
-    throwable: Throwable? = null,
-    crossinline message: () -> String,
-  ) {
+  inline fun e(throwable: Throwable? = null, message: () -> String) {
     val l = logger
-    if (l !== Logger.None) {
-      l.e(message = { "[$tag] ${message()}" }, throwable = throwable)
-    }
+    if (l !== Logger.None) l.e("[$tag] ${message()}", throwable)
   }
 
   companion object {

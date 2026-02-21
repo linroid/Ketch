@@ -133,30 +133,25 @@ You can implement your own logger by implementing the `Logger` interface:
 
 ```kotlin
 class CustomLogger : Logger {
-  override fun v(message: () -> String) {
-    // Verbose logging
-    println("[VERBOSE] ${message()}")
+  override fun v(message: String) {
+    println("[VERBOSE] $message")
   }
 
-  override fun d(message: () -> String) {
-    // Debug logging
-    println("[DEBUG] ${message()}")
+  override fun d(message: String) {
+    println("[DEBUG] $message")
   }
 
-  override fun i(message: () -> String) {
-    // Info logging
-    println("[INFO] ${message()}")
+  override fun i(message: String) {
+    println("[INFO] $message")
   }
 
-  override fun w(message: () -> String, throwable: Throwable?) {
-    // Warning logging
-    println("[WARN] ${message()}")
+  override fun w(message: String, throwable: Throwable?) {
+    println("[WARN] $message")
     throwable?.printStackTrace()
   }
 
-  override fun e(message: () -> String, throwable: Throwable?) {
-    // Error logging
-    System.err.println("[ERROR] ${message()}")
+  override fun e(message: String, throwable: Throwable?) {
+    System.err.println("[ERROR] $message")
     throwable?.printStackTrace()
   }
 }
@@ -167,7 +162,11 @@ val ketch = Ketch(
 )
 ```
 
-**Note:** Tags are included in the message itself by KetchLogger. Each log message is formatted as `[ComponentTag] message`, so you don't need to handle tags separately.
+**Note:** `Logger` receives pre-built `String` messages. Lazy evaluation is handled by
+`KetchLogger`'s `inline` functions, which skip message construction entirely when
+`Logger.None` is active (the default). Tags are included in the message by `KetchLogger` —
+each message is formatted as `[ComponentTag] message`, so you don't need to handle tags
+separately.
 
 ## Platform-Specific Behavior
 
