@@ -4,8 +4,8 @@
       <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
     </filter>
   </defs>
-  <!-- Background circle with shadow -->
-  <circle cx="256" cy="256" r="240" fill="#000000" filter="url(#shadow)"/>
+  <!-- Background rounded rectangle with shadow -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="#000000" filter="url(#shadow)"/>
   <!-- Main sail (taller, forward) -->
   <polygon points="168,72 168,338 308,338" fill="#FFFFFF"/>
   <!-- Mizzen sail (shorter, aft) -->
