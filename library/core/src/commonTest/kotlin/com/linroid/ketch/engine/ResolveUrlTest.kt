@@ -8,13 +8,11 @@ import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SourceResumeState
-import com.linroid.ketch.core.file.DefaultFileNameResolver
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResolveUrlTest {
@@ -33,7 +31,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve(
       "https://example.com/file.zip",
@@ -63,7 +60,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve(
       "https://example.com/file.zip",
@@ -86,7 +82,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/stream")
     assertEquals(-1L, resolved.totalBytes)
@@ -99,7 +94,6 @@ class ResolveUrlTest {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val headers = mapOf(
       "Authorization" to "Bearer token",
@@ -115,7 +109,6 @@ class ResolveUrlTest {
     val engine = FakeHttpEngine(failOnHead = true)
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     assertFailsWith<KetchError.Network> {
       source.resolve("https://example.com/file")
@@ -127,7 +120,6 @@ class ResolveUrlTest {
     val engine = FakeHttpEngine(httpErrorCode = 404)
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     assertFailsWith<KetchError.Http> {
       source.resolve("https://example.com/file")
@@ -147,7 +139,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/dl?id=1")
     assertEquals("report.pdf", resolved.suggestedFileName)
@@ -166,7 +157,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/file.zip")
     assertEquals("file.zip", resolved.suggestedFileName)
@@ -184,7 +174,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/file")
     assertTrue(resolved.metadata.isEmpty())
@@ -202,7 +191,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/file")
     assertEquals("\"v1\"", resolved.metadata["etag"])
@@ -223,7 +211,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/file.zip")
     assertEquals("10", resolved.metadata["rateLimitRemaining"])
@@ -244,7 +231,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/file.zip")
     assertEquals("0", resolved.metadata["rateLimitRemaining"])
@@ -263,7 +249,6 @@ class ResolveUrlTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/file.zip")
     assertFalse(resolved.metadata.containsKey("rateLimitRemaining"))
@@ -330,7 +315,6 @@ class ResolveUrlTest {
     val engine = FakeHttpEngine()
     val httpSource = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolver = SourceResolver(listOf(fakeSource, httpSource))
     val source = resolver.resolve("magnet:?xt=urn:btih:abc123")

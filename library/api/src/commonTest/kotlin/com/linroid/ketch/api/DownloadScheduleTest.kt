@@ -15,7 +15,7 @@ class DownloadScheduleTest {
   fun immediate_isDefaultSchedule() {
     val request = DownloadRequest(
       url = "https://example.com/file.zip",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
     )
     assertEquals(DownloadSchedule.Immediate, request.schedule)
   }

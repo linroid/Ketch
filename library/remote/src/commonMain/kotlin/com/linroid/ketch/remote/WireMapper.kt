@@ -1,5 +1,6 @@
 package com.linroid.ketch.remote
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
@@ -23,8 +24,7 @@ internal object WireMapper {
   fun toDownloadRequest(wire: TaskResponse): DownloadRequest {
     return DownloadRequest(
       url = wire.url,
-      directory = wire.directory,
-      fileName = wire.fileName,
+      destination = wire.destination?.let { Destination(it) },
       connections = wire.connections,
       speedLimit = if (wire.speedLimitBytesPerSecond > 0) {
         SpeedLimit.of(wire.speedLimitBytesPerSecond)
@@ -40,8 +40,7 @@ internal object WireMapper {
   ): CreateDownloadRequest {
     return CreateDownloadRequest(
       url = request.url,
-      directory = request.directory ?: "",
-      fileName = request.fileName,
+      destination = request.destination?.value,
       connections = request.connections,
       headers = request.headers,
       priority = request.priority.name,
@@ -59,7 +58,7 @@ internal object WireMapper {
       wire.state,
       wire.progress,
       wire.error,
-      wire.filePath
+      wire.outputPath
     )
   }
 
@@ -67,7 +66,7 @@ internal object WireMapper {
     state: String,
     progress: ProgressResponse?,
     error: String?,
-    filePath: String?,
+    outputPath: String?,
   ): DownloadState {
     return when (state) {
       "idle" -> DownloadState.Idle
@@ -83,7 +82,7 @@ internal object WireMapper {
           ?: DownloadProgress(0, 0)
       )
       "completed" -> DownloadState.Completed(
-        filePath ?: ""
+        outputPath ?: ""
       )
       "failed" -> DownloadState.Failed(
         KetchError.Unknown(cause = Exception(error ?: "Unknown")),

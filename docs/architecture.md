@@ -77,9 +77,9 @@ user-swappable components:
 
 Platform-specific code is minimized to a few expect/actual declarations:
 
-| Declaration | Android/JVM | iOS | WasmJs |
-|---|---|---|---|
-| `FileAccessor` | `RandomAccessFile` | `NSFileHandle` | Stub (throws) |
+| Declaratiozn       | Android/JVM | iOS | WasmJs |
+|--------------------|---|---|---|
+| `FileAccessor`     | `RandomAccessFile` | `NSFileHandle` | Stub (throws) |
 | `Logger.console()` | Logcat | NSLog | println |
 
 All platforms use `Dispatchers.IO` for file operations.

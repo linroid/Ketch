@@ -146,7 +146,7 @@ class ResolveModelsTest {
     )
     val original = CreateDownloadRequest(
       url = "https://example.com/file.zip",
-      directory = "/tmp",
+      destination = "/tmp/",
       resolvedUrl = resolvedUrl,
     )
     val serialized = json.encodeToString(
@@ -163,7 +163,7 @@ class ResolveModelsTest {
   fun createDownloadRequest_serialization_nullResolvedSource() {
     val original = CreateDownloadRequest(
       url = "https://example.com/file.zip",
-      directory = "/tmp",
+      destination = "/tmp/",
     )
     val serialized = json.encodeToString(
       CreateDownloadRequest.serializer(), original,
@@ -178,7 +178,7 @@ class ResolveModelsTest {
   fun createDownloadRequest_defaultResolvedSource_isNull() {
     val request = CreateDownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = "/tmp/",
     )
     assertNull(request.resolvedUrl)
   }
@@ -297,7 +297,7 @@ class ResolveModelsTest {
   fun createDownloadRequest_serialization_withSelectedFileIds() {
     val original = CreateDownloadRequest(
       url = "magnet:?xt=urn:btih:abc",
-      directory = "/downloads",
+      destination = "/downloads/",
       selectedFileIds = setOf("f1", "f3"),
     )
     val serialized = json.encodeToString(
@@ -313,7 +313,7 @@ class ResolveModelsTest {
   fun createDownloadRequest_defaultSelectedFileIds_isEmpty() {
     val request = CreateDownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = "/tmp/",
     )
     assertEquals(emptySet(), request.selectedFileIds)
   }

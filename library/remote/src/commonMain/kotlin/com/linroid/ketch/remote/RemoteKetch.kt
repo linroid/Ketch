@@ -264,7 +264,7 @@ class RemoteKetch(
           event.state,
           event.progress,
           event.error,
-          event.filePath
+          event.outputPath
         )
         task.updateState(newState)
       }

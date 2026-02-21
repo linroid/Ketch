@@ -29,7 +29,6 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -64,10 +63,6 @@ fun AppShell(instanceManager: InstanceManager) {
     AppState(instanceManager, scope)
   }
 
-  DisposableEffect(Unit) {
-    onDispose { instanceManager.close() }
-  }
-
   val instances by appState.instances.collectAsState()
   // Auto-show add-remote-server dialog when no instances
   // are configured (remote-only mode without auto-connect).
@@ -78,12 +73,9 @@ fun AppShell(instanceManager: InstanceManager) {
   }
 
   val sortedTasks by appState.sortedTasks.collectAsState()
-  val activeInstance by
-    appState.activeInstance.collectAsState()
-  val connectionState by
-    appState.connectionState.collectAsState()
-  val serverState by
-    appState.serverState.collectAsState()
+  val activeInstance by appState.activeInstance.collectAsState()
+  val connectionState by appState.connectionState.collectAsState()
+  val serverState by appState.serverState.collectAsState()
 
   // Collect all task states for filtering/counts
   val taskStates = remember {
@@ -161,7 +153,7 @@ fun AppShell(instanceManager: InstanceManager) {
   val adaptiveInfo = currentWindowAdaptiveInfo()
   val isExpanded = adaptiveInfo.windowSizeClass
     .isWidthAtLeastBreakpoint(
-      WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND
+      WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND,
     )
   val navLayoutType = if (isExpanded) {
     NavigationSuiteType.None
@@ -184,7 +176,7 @@ fun AppShell(instanceManager: InstanceManager) {
               BadgedBox(
                 badge = {
                   Badge { Text(count.toString()) }
-                }
+                },
               ) {
                 Icon(
                   imageVector = filterIcon(filter),
@@ -199,7 +191,7 @@ fun AppShell(instanceManager: InstanceManager) {
                 modifier = Modifier.size(24.dp),
               )
             }
-          }
+          },
         )
       }
     },
@@ -218,11 +210,11 @@ fun AppShell(instanceManager: InstanceManager) {
               },
               onAddClick = {
                 appState.requestAddDownload()
-              }
+              },
             )
             VerticalDivider(
               color =
-                MaterialTheme.colorScheme.outlineVariant
+                MaterialTheme.colorScheme.outlineVariant,
             )
           }
 
@@ -246,13 +238,13 @@ fun AppShell(instanceManager: InstanceManager) {
                   onResumeAll = { appState.resumeAll() },
                   onClearCompleted = {
                     appState.clearCompleted()
-                  }
+                  },
                 )
               },
               colors = TopAppBarDefaults.topAppBarColors(
                 containerColor =
-                  MaterialTheme.colorScheme.surface
-              )
+                  MaterialTheme.colorScheme.surface,
+              ),
             )
 
             // Error banner
@@ -261,7 +253,7 @@ fun AppShell(instanceManager: InstanceManager) {
                 colors = CardDefaults.cardColors(
                   containerColor =
                     MaterialTheme.colorScheme
-                      .errorContainer
+                      .errorContainer,
                 ),
                 modifier = Modifier
                   .fillMaxWidth()
@@ -272,7 +264,7 @@ fun AppShell(instanceManager: InstanceManager) {
                   verticalAlignment =
                     Alignment.CenterVertically,
                   horizontalArrangement =
-                    Arrangement.spacedBy(12.dp)
+                    Arrangement.spacedBy(12.dp),
                 ) {
                   Text(
                     text = appState.errorMessage ?: "",
@@ -285,7 +277,7 @@ fun AppShell(instanceManager: InstanceManager) {
                   TextButton(
                     onClick = {
                       appState.dismissError()
-                    }
+                    },
                   ) {
                     Text("Dismiss")
                   }
@@ -318,7 +310,7 @@ fun AppShell(instanceManager: InstanceManager) {
           connectionState = connectionState,
           onInstanceClick = {
             appState.showInstanceSelector = true
-          }
+          },
         )
       }
 
@@ -359,9 +351,9 @@ fun AppShell(instanceManager: InstanceManager) {
         appState.dismissError()
         appState.startDownload(
           url, fileName, speedLimit, priority,
-          schedule, resolvedUrl
+          schedule, resolvedUrl,
         )
-      }
+      },
     )
   }
 
@@ -382,7 +374,7 @@ fun AppShell(instanceManager: InstanceManager) {
       },
       onDismiss = {
         appState.showInstanceSelector = false
-      }
+      },
     )
   }
 
@@ -406,7 +398,7 @@ fun AppShell(instanceManager: InstanceManager) {
         appState.showAddRemoteDialog = false
         if (unauthorized != null) {
           appState.reconnectWithToken(
-            unauthorized, token ?: ""
+            unauthorized, token ?: "",
           )
         } else {
           appState.addRemoteServer(host, port, token)

@@ -192,7 +192,7 @@ class WireMapperResolveTest {
     )
     val request = com.linroid.ketch.api.DownloadRequest(
       url = "https://example.com/file.zip",
-      directory = "/tmp",
+      destination = com.linroid.ketch.api.Destination("/tmp/"),
       resolvedUrl = resolved,
     )
     val wire = WireMapper.toCreateWire(request)
@@ -207,7 +207,7 @@ class WireMapperResolveTest {
   fun toCreateWire_withoutResolvedSource_isNull() {
     val request = com.linroid.ketch.api.DownloadRequest(
       url = "https://example.com/file.zip",
-      directory = "/tmp",
+      destination = com.linroid.ketch.api.Destination("/tmp/"),
     )
     val wire = WireMapper.toCreateWire(request)
     assertNull(wire.resolvedUrl)
@@ -363,7 +363,7 @@ class WireMapperResolveTest {
   fun toCreateWire_withSelectedFileIds() {
     val request = com.linroid.ketch.api.DownloadRequest(
       url = "magnet:?xt=urn:btih:abc",
-      directory = "/downloads",
+      destination = com.linroid.ketch.api.Destination("/downloads/"),
       selectedFileIds = setOf("f1", "f3"),
     )
     val wire = WireMapper.toCreateWire(request)
@@ -374,7 +374,7 @@ class WireMapperResolveTest {
   fun toCreateWire_emptySelectedFileIds() {
     val request = com.linroid.ketch.api.DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = com.linroid.ketch.api.Destination("/tmp/"),
     )
     val wire = WireMapper.toCreateWire(request)
     assertEquals(emptySet(), wire.selectedFileIds)

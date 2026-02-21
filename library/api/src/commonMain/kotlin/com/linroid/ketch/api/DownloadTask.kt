@@ -23,8 +23,15 @@ interface DownloadTask {
   /** Pauses the download, preserving segment progress for later resume. */
   suspend fun pause()
 
-  /** Resumes a paused or failed download from where it left off. */
-  suspend fun resume()
+  /**
+   * Resumes a paused or failed download from where it left off.
+   *
+   * @param destination optionally override the download destination.
+   *   This can be useful if the destination is obtained through
+   *   Android's document provider framework, since the returned URI
+   *   can change even when it points to the same file.
+   */
+  suspend fun resume(destination: Destination? = null)
 
   /** Cancels the download. This is a terminal action. */
   suspend fun cancel()
@@ -83,7 +90,7 @@ interface DownloadTask {
   suspend fun await(): Result<String> {
     val finalState = state.first { it.isTerminal }
     return when (finalState) {
-      is DownloadState.Completed -> Result.success(finalState.filePath)
+      is DownloadState.Completed -> Result.success(finalState.outputPath)
       is DownloadState.Failed -> Result.failure(finalState.error)
       is DownloadState.Canceled -> Result.failure(KetchError.Canceled)
       else -> Result.failure(KetchError.Unknown(null))

@@ -7,9 +7,9 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
@@ -22,7 +22,6 @@ import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.file.DefaultFileNameResolver
-import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.log.KetchLogger
 import com.linroid.ketch.core.log.Logger
@@ -43,7 +42,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.io.files.Path
 import kotlin.time.Clock
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
@@ -55,7 +53,6 @@ import kotlin.uuid.Uuid
  * @param taskStore persistent storage for task records
  * @param config global download configuration
  * @param name user-visible instance name included in [status]
- * @param fileAccessorFactory factory for creating platform file writers
  * @param fileNameResolver strategy for resolving download file names
  * @param additionalSources extra [DownloadSource] implementations
  *   (e.g., torrent, media). HTTP is always included as a fallback.
@@ -66,11 +63,7 @@ class Ketch(
   private val taskStore: TaskStore = InMemoryTaskStore(),
   private val config: DownloadConfig = DownloadConfig.Default,
   private val name: String = "Ketch",
-  private val fileAccessorFactory: (Path) -> FileAccessor = { path ->
-    FileAccessor(path)
-  },
-  private val fileNameResolver: FileNameResolver =
-    DefaultFileNameResolver(),
+  private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
   additionalSources: List<DownloadSource> = emptyList(),
   logger: Logger = Logger.None,
 ) : KetchApi {
@@ -88,7 +81,6 @@ class Ketch(
 
   private val httpSource = HttpDownloadSource(
     httpEngine = httpEngine,
-    fileNameResolver = fileNameResolver,
     maxConnections = config.maxConnections,
     progressUpdateIntervalMs = config.progressUpdateIntervalMs,
     segmentSaveIntervalMs = config.segmentSaveIntervalMs,
@@ -124,7 +116,6 @@ class Ketch(
     sourceResolver = sourceResolver,
     taskStore = taskStore,
     config = config,
-    fileAccessorFactory = fileAccessorFactory,
     fileNameResolver = fileNameResolver,
     globalLimiter = globalLimiter,
   )
@@ -191,17 +182,17 @@ class Ketch(
         } else {
           KetchLogger.d("Ketch") {
             "Ignoring pause for taskId=$taskId " +
-                "in state ${stateFlow.value}"
+              "in state ${stateFlow.value}"
           }
         }
       },
-      resumeAction = {
+      resumeAction = { dest ->
         val state = stateFlow.value
         if (state is DownloadState.Paused ||
           state is DownloadState.Failed
         ) {
           val resumed = coordinator.resume(
-            taskId, scope, stateFlow, segmentsFlow,
+            taskId, scope, stateFlow, segmentsFlow, dest,
           )
           if (!resumed) {
             coordinator.start(
@@ -244,13 +235,13 @@ class Ketch(
         if (s.isTerminal) {
           KetchLogger.d("Ketch") {
             "Ignoring reschedule for taskId=$taskId in " +
-                "terminal state $s"
+              "terminal state $s"
           }
           return@DownloadTaskImpl
         }
         KetchLogger.i("Ketch") {
           "Rescheduling taskId=$taskId, schedule=$schedule, " +
-              "conditions=${conditions.size}"
+            "conditions=${conditions.size}"
         }
         scheduleManager.cancel(taskId)
         if (s.isActive) {
@@ -353,17 +344,17 @@ class Ketch(
         } else {
           KetchLogger.d("Ketch") {
             "Ignoring pause for taskId=${record.taskId} " +
-                "in state ${stateFlow.value}"
+              "in state ${stateFlow.value}"
           }
         }
       },
-      resumeAction = {
+      resumeAction = { dest ->
         val state = stateFlow.value
         if (state is DownloadState.Paused ||
           state is DownloadState.Failed
         ) {
           val resumed = coordinator.resume(
-            record.taskId, scope, stateFlow, segmentsFlow,
+            record.taskId, scope, stateFlow, segmentsFlow, dest,
           )
           if (!resumed) {
             coordinator.startFromRecord(
@@ -373,7 +364,7 @@ class Ketch(
         } else {
           KetchLogger.d("Ketch") {
             "Ignoring resume for taskId=${record.taskId} " +
-                "in state $state"
+              "in state $state"
           }
         }
       },
@@ -389,7 +380,7 @@ class Ketch(
         } else {
           KetchLogger.d("Ketch") {
             "Ignoring cancel for taskId=${record.taskId} " +
-                "in state $s"
+              "in state $s"
           }
         }
       },
@@ -408,14 +399,14 @@ class Ketch(
         if (s.isTerminal) {
           KetchLogger.d("Ketch") {
             "Ignoring reschedule for taskId=${record.taskId} in " +
-                "terminal state $s"
+              "terminal state $s"
           }
           return@DownloadTaskImpl
         }
         KetchLogger.i("Ketch") {
           "Rescheduling taskId=${record.taskId}, " +
-              "schedule=$schedule, " +
-              "conditions=${conditions.size}"
+            "schedule=$schedule, " +
+            "conditions=${conditions.size}"
         }
         scheduleManager.cancel(record.taskId)
         if (s.isActive) {
@@ -445,7 +436,7 @@ class Ketch(
       )
 
       TaskState.COMPLETED -> DownloadState.Completed(
-        record.destPath.toString(),
+        record.outputPath ?: "",
       )
 
       TaskState.FAILED -> DownloadState.Failed(

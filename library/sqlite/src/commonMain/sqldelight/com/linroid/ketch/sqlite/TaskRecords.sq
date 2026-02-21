@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS task_records (
   task_id TEXT NOT NULL PRIMARY KEY,
   request_json TEXT NOT NULL,
-  dest_path TEXT NOT NULL,
+  output_path TEXT,
   state TEXT NOT NULL DEFAULT 'PENDING',
   total_bytes INTEGER NOT NULL DEFAULT -1,
   downloaded_bytes INTEGER NOT NULL DEFAULT 0,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS task_records (
 
 save:
 INSERT OR REPLACE INTO task_records(
-  task_id, request_json, dest_path, state,
+  task_id, request_json, output_path, state,
   total_bytes, downloaded_bytes, error_message,
   accept_ranges, etag, last_modified, segments_json,
   created_at, updated_at

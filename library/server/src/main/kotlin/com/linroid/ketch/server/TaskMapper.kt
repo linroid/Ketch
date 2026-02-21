@@ -14,15 +14,15 @@ internal object TaskMapper {
   fun toResponse(task: DownloadTask): TaskResponse {
     val state = task.state.value
     val segments = task.segments.value
+
     return TaskResponse(
       taskId = task.taskId,
       url = task.request.url,
-      directory = task.request.directory ?: "",
-      fileName = task.request.fileName,
+      destination = task.request.destination?.value,
       state = stateToString(state),
       progress = extractProgress(state)?.let(::toProgressResponse),
       error = extractError(state),
-      filePath = extractFilePath(state),
+      outputPath = extractOutputPath(state),
       segments = segments.map(::toSegmentResponse),
       createdAt = task.createdAt.toString(),
       priority = task.request.priority.name,
@@ -43,7 +43,7 @@ internal object TaskMapper {
       state = stateToString(state),
       progress = extractProgress(state)?.let(::toProgressResponse),
       error = extractError(state),
-      filePath = extractFilePath(state),
+      outputPath = extractOutputPath(state),
     )
   }
 
@@ -99,9 +99,9 @@ internal object TaskMapper {
     }
   }
 
-  private fun extractFilePath(state: DownloadState): String? {
+  private fun extractOutputPath(state: DownloadState): String? {
     return when (state) {
-      is DownloadState.Completed -> state.filePath
+      is DownloadState.Completed -> state.outputPath
       else -> null
     }
   }

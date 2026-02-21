@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
  * Request body for creating a new download task.
  *
  * @property url the URL to download
- * @property directory the target directory path
- * @property fileName optional explicit file name
+ * @property destination optional download destination (directory,
+ *   file path, bare name, or content URI)
  * @property connections number of concurrent segments (0 = use config default)
  * @property headers custom HTTP headers
  * @property priority task priority level
@@ -18,8 +18,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CreateDownloadRequest(
   val url: String,
-  val directory: String,
-  val fileName: String? = null,
+  val destination: String? = null,
   val connections: Int = 0,
   val headers: Map<String, String> = emptyMap(),
   val priority: String = "NORMAL",

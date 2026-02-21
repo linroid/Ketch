@@ -1,6 +1,7 @@
 package com.linroid.ketch.cli
 
 import ch.qos.logback.classic.Level
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
@@ -19,7 +20,6 @@ import com.linroid.ketch.sqlite.SqliteTaskStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.io.files.Path
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.Locale
@@ -118,20 +118,14 @@ fun main(args: Array<String>) {
     return
   }
 
-  val directory: String
-  val fileName: String?
-  if (dest != null) {
-    val destPath = Path(dest)
-    directory = (destPath.parent ?: Path(".")).toString()
-    fileName = destPath.name
+  val destination = if (dest != null) {
+    Destination(dest)
   } else {
-    directory = "."
-    fileName = null
+    Destination(".")
   }
 
   println("Downloading: $url")
-  println("Directory: $directory")
-  if (fileName != null) println("File name: $fileName")
+  println("Destination: ${destination.value}")
   if (!speedLimit.isUnlimited) {
     println("Speed limit: ${formatBytes(speedLimit.bytesPerSecond)}/s")
   }
@@ -159,8 +153,7 @@ fun main(args: Array<String>) {
   runBlocking {
     val request = DownloadRequest(
       url = url,
-      directory = directory,
-      fileName = fileName,
+      destination = destination,
       speedLimit = speedLimit,
       priority = priority,
     )
@@ -194,7 +187,7 @@ fun main(args: Array<String>) {
           is DownloadState.Paused ->
             println("\n[Paused] Download paused.")
           is DownloadState.Completed ->
-            println("\n[Completed] Saved to ${state.filePath}")
+            println("\n[Completed] Saved to ${state.outputPath}")
           is DownloadState.Failed ->
             println("\n[Failed] ${state.error.message}")
           is DownloadState.Canceled ->

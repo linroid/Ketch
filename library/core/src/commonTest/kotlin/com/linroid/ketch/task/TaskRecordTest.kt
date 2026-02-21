@@ -1,11 +1,11 @@
 package com.linroid.ketch.task
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
-import kotlinx.io.files.Path
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +22,7 @@ class TaskRecordTest {
     headers: Map<String, String> = emptyMap(),
   ) = DownloadRequest(
     url = url,
-    directory = "/tmp",
+    destination = Destination("/tmp/"),
     connections = connections,
     headers = headers,
   )
@@ -32,7 +32,7 @@ class TaskRecordTest {
     val record = TaskRecord(
       taskId = "test-1",
       request = defaultRequest(),
-      destPath = Path("/tmp/file.bin"),
+      outputPath = "/tmp/file.bin",
       createdAt = Instant.fromEpochMilliseconds(1000),
       updatedAt = Instant.fromEpochMilliseconds(1000),
     )
@@ -58,7 +58,7 @@ class TaskRecordTest {
         connections = 8,
         headers = mapOf("X-Custom" to "value"),
       ),
-      destPath = Path("/tmp/file.bin"),
+      outputPath = "/tmp/file.bin",
       state = TaskState.PAUSED,
       totalBytes = 2048,
       downloadedBytes = 1024,
@@ -77,8 +77,8 @@ class TaskRecordTest {
     assertEquals(record.taskId, deserialized.taskId)
     assertEquals(record.request.url, deserialized.request.url)
     assertEquals(
-      record.destPath.toString(),
-      deserialized.destPath.toString()
+      record.outputPath,
+      deserialized.outputPath
     )
     assertEquals(record.request.connections, deserialized.request.connections)
     assertEquals(record.request.headers, deserialized.request.headers)
@@ -98,7 +98,7 @@ class TaskRecordTest {
     val record = TaskRecord(
       taskId = "test-1",
       request = defaultRequest(),
-      destPath = Path("/tmp/file.bin"),
+      outputPath = "/tmp/file.bin",
       state = TaskState.FAILED,
       errorMessage = "Network timeout",
       createdAt = Instant.fromEpochMilliseconds(1000),
@@ -122,7 +122,7 @@ class TaskRecordTest {
     val original = TaskRecord(
       taskId = "test-1",
       request = defaultRequest(),
-      destPath = Path("/tmp/file.bin"),
+      outputPath = "/tmp/file.bin",
       state = TaskState.DOWNLOADING,
       totalBytes = 1000,
       downloadedBytes = 500,
@@ -150,7 +150,7 @@ class TaskRecordTest {
     val record = TaskRecord(
       taskId = "test-1",
       request = defaultRequest(),
-      destPath = Path("/tmp/file.bin"),
+      outputPath = "/tmp/file.bin",
       state = TaskState.DOWNLOADING,
       totalBytes = 2048,
       acceptRanges = true,
@@ -184,7 +184,7 @@ class TaskRecordTest {
     val record = TaskRecord(
       taskId = "test-1",
       request = defaultRequest(),
-      destPath = Path("/tmp/file.bin"),
+      outputPath = "/tmp/file.bin",
       state = TaskState.PAUSED,
       totalBytes = 1000,
       downloadedBytes = 500,
@@ -214,12 +214,12 @@ class TaskRecordTest {
         "taskId": "t1",
         "request": {
           "url": "https://example.com/f",
-          "directory": "/tmp",
+          "destination": "/tmp/",
           "connections": 4,
           "headers": {},
           "properties": {}
         },
-        "destPath": "/tmp/f",
+        "outputPath": "/tmp/f",
         "state": "COMPLETED",
         "totalBytes": 1000,
         "downloadedBytes": 1000,
@@ -236,7 +236,7 @@ class TaskRecordTest {
     val record = TaskRecord(
       taskId = "test-1",
       request = defaultRequest(),
-      destPath = Path("/tmp/file.bin"),
+      outputPath = "/tmp/file.bin",
       state = TaskState.DOWNLOADING,
       totalBytes = 2048,
       sourceType = "http",
@@ -264,7 +264,7 @@ class TaskRecordTest {
     val record = TaskRecord(
       taskId = "test-1",
       request = defaultRequest(),
-      destPath = Path("/tmp/file.bin"),
+      outputPath = "/tmp/file.bin",
       state = TaskState.COMPLETED,
       totalBytes = 2048,
       downloadedBytes = 2048,
@@ -301,12 +301,12 @@ class TaskRecordTest {
         "taskId": "t1",
         "request": {
           "url": "https://example.com/f",
-          "directory": "/tmp",
+          "destination": "/tmp/",
           "connections": 4,
           "headers": {},
           "properties": {}
         },
-        "destPath": "/tmp/f",
+        "outputPath": "/tmp/f",
         "state": "COMPLETED",
         "totalBytes": 1000,
         "downloadedBytes": 1000,
@@ -327,12 +327,12 @@ class TaskRecordTest {
         "taskId": "t1",
         "request": {
           "url": "https://example.com/f",
-          "directory": "/tmp",
+          "destination": "/tmp/",
           "connections": 4,
           "headers": {},
           "properties": {}
         },
-        "destPath": "/tmp/f",
+        "outputPath": "/tmp/f",
         "state": "PENDING",
         "totalBytes": 100,
         "downloadedBytes": 0,

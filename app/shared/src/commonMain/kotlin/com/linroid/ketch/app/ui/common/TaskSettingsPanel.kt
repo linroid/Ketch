@@ -71,12 +71,11 @@ fun TaskSettingsPanel(
       verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
       CopyableInfoRow("URL", task.request.url)
-      if (task.request.directory != null) {
-        InfoRow("Directory", task.request.directory!!)
+
+      task.request.destination?.let { dest ->
+        InfoRow("Destination", dest.value)
       }
-      if (task.request.fileName != null) {
-        InfoRow("File name", task.request.fileName!!)
-      }
+
       InfoRow(
         "Connections",
         if (task.request.connections > 0) {

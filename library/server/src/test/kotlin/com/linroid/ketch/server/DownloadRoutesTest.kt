@@ -48,7 +48,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp/downloads",
+            destination = "/tmp/downloads/",
           )
         )
       }
@@ -59,7 +59,7 @@ class DownloadRoutesTest {
       assertEquals(
         "https://example.com/file.zip", task.url
       )
-      assertEquals("/tmp/downloads", task.directory)
+      assertEquals("/tmp/downloads/", task.destination)
       assertEquals("pending", task.state)
       assertEquals("NORMAL", task.priority)
     }
@@ -80,7 +80,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp/downloads",
+            destination = "/tmp/downloads/",
             connections = 4,
             priority = "HIGH",
             speedLimitBytesPerSecond = 1024000,
@@ -110,7 +110,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp/downloads",
+            destination = "/tmp/downloads/",
             priority = "INVALID",
           )
         )
@@ -138,7 +138,7 @@ class DownloadRoutesTest {
       setBody(
         CreateDownloadRequest(
           url = "https://example.com/file.zip",
-          directory = "/tmp/downloads",
+          destination = "/tmp/downloads/",
         )
       )
     }
@@ -175,7 +175,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/a.zip",
-            directory = "/tmp",
+            destination = "/tmp/",
           )
         )
       }
@@ -184,7 +184,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/b.zip",
-            directory = "/tmp",
+            destination = "/tmp/",
           )
         )
       }
@@ -213,7 +213,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp",
+            destination = "/tmp/",
           )
         )
       }
@@ -252,7 +252,7 @@ class DownloadRoutesTest {
       setBody(
         CreateDownloadRequest(
           url = "https://example.com/file.zip",
-          directory = "/tmp",
+          destination = "/tmp/",
         )
       )
     }
@@ -380,7 +380,7 @@ class DownloadRoutesTest {
         setBody(
           CreateDownloadRequest(
             url = "https://example.com/file.zip",
-            directory = "/tmp",
+            destination = "/tmp/",
           )
         )
       }
@@ -402,7 +402,7 @@ class DownloadRoutesTest {
     }
 
   @Test
-  fun `POST with fileName preserves it`() = testApplication {
+  fun `POST with destination preserves it`() = testApplication {
     val ketch = createKetch()
     application {
       val server = createTestServer(ketch = ketch)
@@ -416,8 +416,7 @@ class DownloadRoutesTest {
       setBody(
         CreateDownloadRequest(
           url = "https://example.com/file.zip",
-          directory = "/tmp",
-          fileName = "custom.zip",
+          destination = "custom.zip",
         )
       )
     }
@@ -425,6 +424,6 @@ class DownloadRoutesTest {
     val task = json.decodeFromString<TaskResponse>(
       response.bodyAsText()
     )
-    assertEquals("custom.zip", task.fileName)
+    assertEquals("custom.zip", task.destination)
   }
 }

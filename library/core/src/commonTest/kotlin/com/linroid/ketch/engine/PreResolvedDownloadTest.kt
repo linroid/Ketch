@@ -4,7 +4,6 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.ServerInfo
-import com.linroid.ketch.core.file.DefaultFileNameResolver
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -90,7 +89,6 @@ class PreResolvedDownloadTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve(
       "https://example.com/data",
@@ -134,7 +132,6 @@ class PreResolvedDownloadTest {
       )
       val source = HttpDownloadSource(
         httpEngine = engine,
-        fileNameResolver = DefaultFileNameResolver(),
       )
       val resolved = source.resolve("https://example.com/file")
 
@@ -156,7 +153,6 @@ class PreResolvedDownloadTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val resolved = source.resolve("https://example.com/stream")
     assertEquals(-1L, resolved.totalBytes)
@@ -167,7 +163,6 @@ class PreResolvedDownloadTest {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     source.resolve("https://example.com/file")
     assertEquals(1, engine.headCallCount)
@@ -179,7 +174,6 @@ class PreResolvedDownloadTest {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     source.resolve("https://example.com/a")
     source.resolve("https://example.com/b")

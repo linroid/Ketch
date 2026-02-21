@@ -51,7 +51,7 @@ class DownloadPriorityTest {
   fun defaultPriority_inRequest_isNormal() {
     val request = DownloadRequest(
       url = "https://example.com/file.zip",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
     )
     assertEquals(DownloadPriority.NORMAL, request.priority)
   }
@@ -60,7 +60,7 @@ class DownloadPriorityTest {
   fun customPriority_inRequest_isPreserved() {
     val request = DownloadRequest(
       url = "https://example.com/file.zip",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
       priority = DownloadPriority.URGENT,
     )
     assertEquals(DownloadPriority.URGENT, request.priority)

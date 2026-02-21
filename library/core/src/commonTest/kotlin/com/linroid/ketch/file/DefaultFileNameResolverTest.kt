@@ -21,7 +21,7 @@ class DefaultFileNameResolverTest {
 
   private fun request(url: String) = DownloadRequest(
     url = url,
-    directory = dir,
+    destination = com.linroid.ketch.api.Destination("$dir/"),
   )
 
   // --- Content-Disposition: filename*=UTF-8'' ---
@@ -157,14 +157,16 @@ class DefaultFileNameResolverTest {
   // --- Priority ---
 
   @Test
-  fun resolve_requestFileNameTakesPriority() {
+  fun resolve_dispositionTakesPriorityOverUrl_explicit() {
+    // Explicit file names via Destination are now handled by the
+    // coordinator, not the resolver. The resolver always returns
+    // the server-derived name.
     val info = serverInfo("attachment; filename=\"server-name.zip\"")
     val req = DownloadRequest(
       url = "https://example.com/url-name.zip",
-      directory = dir,
-      fileName = "explicit.zip",
+      destination = com.linroid.ketch.api.Destination("explicit.zip"),
     )
-    assertEquals("explicit.zip", resolver.resolve(req, info))
+    assertEquals("server-name.zip", resolver.resolve(req, info))
   }
 
   @Test

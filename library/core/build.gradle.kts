@@ -46,6 +46,9 @@ kotlin {
       implementation(libs.kotlin.test)
       implementation(libs.kotlinx.coroutines.test)
     }
+    androidMain.dependencies {
+      implementation(libs.androidx.startup)
+    }
   }
 }
 

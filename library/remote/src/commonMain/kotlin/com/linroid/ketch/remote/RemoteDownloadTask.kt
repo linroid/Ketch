@@ -1,5 +1,6 @@
 package com.linroid.ketch.remote
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -64,9 +65,12 @@ internal class RemoteDownloadTask(
     applyWireResponse(response.bodyAsText())
   }
 
-  override suspend fun resume() {
+  override suspend fun resume(destination: Destination?) {
     val response = httpClient.post(
-      Api.Tasks.ById.Resume(parent = byId),
+      Api.Tasks.ById.Resume(
+        parent = byId,
+        destination = destination?.value,
+      ),
     )
     checkSuccess(response)
     applyWireResponse(response.bodyAsText())

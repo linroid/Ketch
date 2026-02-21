@@ -1,5 +1,6 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
@@ -40,7 +41,7 @@ class DownloadQueueTest {
     priority: DownloadPriority = DownloadPriority.NORMAL,
   ) = DownloadRequest(
     url = url,
-    directory = "/tmp",
+    destination = Destination("/tmp/"),
     priority = priority,
   )
 
@@ -53,13 +54,11 @@ class DownloadQueueTest {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
-      fileAccessorFactory = { throw UnsupportedOperationException() },
       fileNameResolver = DefaultFileNameResolver(),
     )
     return DownloadScheduler(

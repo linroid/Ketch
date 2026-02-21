@@ -1,11 +1,11 @@
 package com.linroid.ketch.task
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.test.runTest
-import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -21,11 +21,11 @@ class InMemoryTaskStoreTest {
     taskId = taskId,
     request = DownloadRequest(
       url = "https://example.com/file.bin",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
       connections = 4,
       headers = mapOf("Authorization" to "Bearer token"),
     ),
-    destPath = Path("/tmp/file.bin"),
+    outputPath = "/tmp/file.bin",
     state = state,
     totalBytes = 1000,
     downloadedBytes = 0,

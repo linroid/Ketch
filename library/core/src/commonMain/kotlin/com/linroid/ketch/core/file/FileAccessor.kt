@@ -1,20 +1,16 @@
 package com.linroid.ketch.core.file
 
-import kotlinx.io.files.Path
-
 /**
  * Platform-specific random-access file writer.
  *
- * Each platform provides an actual implementation:
+ * Each platform provides an implementation via [createFileAccessor]:
  * - **Android/JVM**: `RandomAccessFile` with `Dispatchers.IO`
  * - **iOS**: Foundation `NSFileHandle` / `NSFileManager` with `Dispatchers.IO`
  * - **WasmJs**: Stub that throws `UnsupportedOperationException` (no file I/O)
  *
  * Android, JVM, and iOS implementations are thread-safe (protected by a `Mutex`).
- *
- * @param path the file system path to write to
  */
-expect class FileAccessor(path: Path) {
+interface FileAccessor {
   /** Writes [data] starting at the given byte [offset]. */
   suspend fun writeAt(offset: Long, data: ByteArray)
 

@@ -7,11 +7,15 @@ import kotlinx.serialization.Transient
  * Describes a file to download.
  *
  * @property url the HTTP(S) URL to download from. Must not be blank.
- * @property directory the local directory where the file will be saved.
- *   When `null`, the implementation chooses a default location.
- * @property fileName explicit file name to save as. When `null`, the
- *   file name is determined from the server response
- *   (Content-Disposition header, URL path, or a fallback).
+ * @property destination where the file should be saved. Semantics depend
+ *   on the value:
+ *   - `null` — use the default directory, resolve file name from server
+ *   - `Destination("/downloads/")` — directory (trailing `/`), resolve
+ *     file name from server
+ *   - `Destination("custom.zip")` — bare name ([Destination.isName]),
+ *     use default directory
+ *   - `Destination("/downloads/custom.zip")` — full file path, use as-is
+ *   - `Destination("content://...")` — content URI, use as-is
  * @property connections number of concurrent connections (segments) to
  *   use. Must be non-negative. When `0` (the default), the engine uses
  *   [DownloadConfig.maxConnections][com.linroid.ketch.api.config.DownloadConfig.maxConnections].
@@ -43,8 +47,7 @@ import kotlinx.serialization.Transient
 @Serializable
 data class DownloadRequest(
   val url: String,
-  val directory: String? = null,
-  val fileName: String? = null,
+  val destination: Destination? = null,
   val connections: Int = 0,
   val headers: Map<String, String> = emptyMap(),
   val properties: Map<String, String> = emptyMap(),

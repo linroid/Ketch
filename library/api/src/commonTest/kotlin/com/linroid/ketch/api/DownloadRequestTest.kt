@@ -14,37 +14,41 @@ class DownloadRequestTest {
   fun defaultConnections_isZero() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
     )
     assertEquals(0, request.connections)
   }
 
   @Test
-  fun defaultFileName_isNull() {
+  fun defaultDestination_isNull() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
     )
-    assertNull(request.fileName)
+    assertNull(request.destination)
   }
 
   @Test
-  fun customFileName_preserved() {
+  fun destination_preserved() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
-      fileName = "custom.zip",
+      destination = Destination("custom.zip"),
     )
-    assertEquals("custom.zip", request.fileName)
+    assertEquals(Destination("custom.zip"), request.destination)
   }
 
   @Test
   fun blankUrl_throws() {
     assertFailsWith<IllegalArgumentException> {
-      DownloadRequest(url = "", directory = "/tmp")
+      DownloadRequest(
+        url = "",
+        destination = Destination("/tmp/"),
+      )
     }
     assertFailsWith<IllegalArgumentException> {
-      DownloadRequest(url = "   ", directory = "/tmp")
+      DownloadRequest(
+        url = "   ",
+        destination = Destination("/tmp/"),
+      )
     }
   }
 
@@ -52,7 +56,7 @@ class DownloadRequestTest {
   fun zeroConnections_meansUseConfigDefault() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
       connections = 0,
     )
     assertEquals(0, request.connections)
@@ -63,7 +67,7 @@ class DownloadRequestTest {
     assertFailsWith<IllegalArgumentException> {
       DownloadRequest(
         url = "https://example.com/file",
-        directory = "/tmp",
+        destination = Destination("/tmp/"),
         connections = -1,
       )
     }
@@ -73,7 +77,7 @@ class DownloadRequestTest {
   fun defaultHeaders_isEmpty() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
     )
     assertEquals(emptyMap(), request.headers)
   }
@@ -86,7 +90,7 @@ class DownloadRequestTest {
     )
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
       headers = headers,
     )
     assertEquals(headers, request.headers)
@@ -98,7 +102,7 @@ class DownloadRequestTest {
   fun defaultSpeedLimit_isUnlimited() {
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
     )
     assertTrue(request.speedLimit.isUnlimited)
   }
@@ -108,7 +112,7 @@ class DownloadRequestTest {
     val limit = SpeedLimit.mbps(10)
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
       speedLimit = limit,
     )
     assertEquals(limit, request.speedLimit)
@@ -120,7 +124,7 @@ class DownloadRequestTest {
     val json = Json { ignoreUnknownKeys = true }
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
       speedLimit = SpeedLimit.kbps(512),
     )
     val serialized = json.encodeToString(
@@ -141,7 +145,7 @@ class DownloadRequestTest {
     val json = Json { ignoreUnknownKeys = true }
     val request = DownloadRequest(
       url = "https://example.com/file",
-      directory = "/tmp",
+      destination = Destination("/tmp/"),
     )
     val serialized = json.encodeToString(
       DownloadRequest.serializer(), request
@@ -150,14 +154,6 @@ class DownloadRequestTest {
       DownloadRequest.serializer(), serialized
     )
     assertTrue(deserialized.speedLimit.isUnlimited)
-  }
-
-  @Test
-  fun defaultDirectory_isNull() {
-    val request = DownloadRequest(
-      url = "https://example.com/file",
-    )
-    assertNull(request.directory)
   }
 
   // -- selectedFileIds --

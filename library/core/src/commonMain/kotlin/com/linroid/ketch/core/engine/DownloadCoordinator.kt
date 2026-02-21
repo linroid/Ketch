@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
@@ -8,8 +9,13 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.config.DownloadConfig
+import com.linroid.ketch.api.isDirectory
+import com.linroid.ketch.api.isFile
+import com.linroid.ketch.api.isName
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.file.createFileAccessor
+import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.log.KetchLogger
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
@@ -33,7 +39,6 @@ internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
   private val taskStore: TaskStore,
   private val config: DownloadConfig,
-  private val fileAccessorFactory: (Path) -> FileAccessor,
   private val fileNameResolver: FileNameResolver,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
 ) {
@@ -58,18 +63,11 @@ internal class DownloadCoordinator(
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
-    val directory = request.directory?.let { Path(it) }
-      ?: Path(config.defaultDirectory)
-    val initialDestPath = request.fileName?.let {
-      Path(directory, it)
-    } ?: directory
-
     val now = Clock.System.now()
     taskStore.save(
       TaskRecord(
         taskId = taskId,
         request = request,
-        destPath = initialDestPath,
         state = TaskState.PENDING,
         createdAt = now,
         updatedAt = now,
@@ -206,14 +204,20 @@ internal class DownloadCoordinator(
       ?: fileNameResolver.resolve(
         request, toServerInfo(resolvedUrl),
       )
-    val dir = request.directory?.let { Path(it) }
-      ?: Path(config.defaultDirectory)
-    val destPath = deduplicatePath(dir, fileName)
+    val outputPath = resolveDestPath(
+      destination = request.destination,
+      defaultDir = config.defaultDirectory,
+      serverFileName = fileName,
+      deduplicate = true,
+    )
+    KetchLogger.d("Coordinator") {
+      "Resolved outputPath=$outputPath"
+    }
 
     val now = Clock.System.now()
     updateTaskRecord(taskId) {
       it.copy(
-        destPath = destPath,
+        outputPath = outputPath,
         state = TaskState.DOWNLOADING,
         totalBytes = totalBytes,
         acceptRanges = resolvedUrl.supportsResume,
@@ -226,7 +230,7 @@ internal class DownloadCoordinator(
       )
     }
 
-    val fileAccessor = fileAccessorFactory(destPath)
+    val fileAccessor = createFileAccessor(outputPath)
 
     val taskLimiter = mutex.withLock {
       activeDownloads[taskId]?.let {
@@ -278,7 +282,7 @@ internal class DownloadCoordinator(
         "Download completed successfully for taskId=$taskId"
       }
       stateFlow.value =
-        DownloadState.Completed(destPath.toString())
+        DownloadState.Completed(outputPath)
     } finally {
       fileAccessor.close()
       withContext(NonCancellable) {
@@ -349,6 +353,7 @@ internal class DownloadCoordinator(
     scope: CoroutineScope,
     stateFlow: MutableStateFlow<DownloadState>,
     segmentsFlow: MutableStateFlow<List<Segment>>,
+    destination: Destination? = null,
   ): Boolean {
     mutex.withLock {
       if (activeDownloads.containsKey(taskId)) {
@@ -370,6 +375,7 @@ internal class DownloadCoordinator(
       it.copy(
         state = TaskState.DOWNLOADING,
         updatedAt = Clock.System.now(),
+        outputPath = destination?.value ?: it.outputPath,
       )
     }
 
@@ -424,7 +430,13 @@ internal class DownloadCoordinator(
         "source '${source.type}'"
     }
 
-    val fileAccessor = fileAccessorFactory(taskRecord.destPath)
+    val outputPath = taskRecord.outputPath
+      ?: throw KetchError.Unknown(
+        IllegalStateException(
+          "No outputPath for taskId=${taskRecord.taskId}"
+        )
+      )
+    val fileAccessor = createFileAccessor(outputPath)
 
     val taskLimiter = mutex.withLock {
       activeDownloads[taskId]?.let {
@@ -478,7 +490,7 @@ internal class DownloadCoordinator(
       }
 
       stateFlow.value =
-        DownloadState.Completed(taskRecord.destPath.toString())
+        DownloadState.Completed(outputPath)
     } finally {
       fileAccessor.close()
       withContext(NonCancellable) {
@@ -508,7 +520,7 @@ internal class DownloadCoordinator(
         }
 
         if (!error.isRetryable || retryCount >= config.retryCount) {
-          KetchLogger.e("Coordinator") {
+          KetchLogger.e("Coordinator", error) {
             "Download failed after $retryCount retries: " +
               "${error.message}"
           }
@@ -755,12 +767,40 @@ internal class DownloadCoordinator(
     )
   }
 
+  private fun resolveDestPath(
+    destination: Destination?,
+    defaultDir: String,
+    serverFileName: String?,
+    deduplicate: Boolean,
+  ): String {
+    if (destination != null && destination.isFile()) {
+      return destination.value
+    }
+    val directory = when {
+      destination != null && destination.isDirectory() ->
+        destination.value.trimEnd('/', '\\')
+      else -> defaultDir
+    }
+    val fileName = when {
+      destination != null && destination.isName() ->
+        destination.value
+      else -> serverFileName
+    }
+    if (fileName == null) return directory
+    // resolveChildPath handles content URIs on Android
+    // (DocumentsContract.createDocument auto-deduplicates)
+    val outputPath = resolveChildPath(directory, fileName)
+    return if (deduplicate && !directory.contains("://")) {
+      deduplicatePath(Path(outputPath)).toString()
+    } else {
+      outputPath
+    }
+  }
+
   companion object {
-    internal fun deduplicatePath(
-      directory: Path,
-      fileName: String,
-    ): Path {
-      val candidate = Path(directory, fileName)
+    internal fun deduplicatePath(candidate: Path): Path {
+      val fileName = candidate.name
+      val directory = candidate.parent ?: return candidate
       if (!SystemFileSystem.exists(candidate)) return candidate
 
       val dotIndex = fileName.lastIndexOf('.')

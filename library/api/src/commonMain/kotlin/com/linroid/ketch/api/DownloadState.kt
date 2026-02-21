@@ -35,8 +35,8 @@ sealed class DownloadState {
   /** Download paused by the user or preempted by the scheduler. */
   data class Paused(val progress: DownloadProgress) : DownloadState()
 
-  /** Download finished successfully. [filePath] is the output file. */
-  data class Completed(val filePath: String) : DownloadState()
+  /** Download finished successfully. [outputPath] is the resolved output location. */
+  data class Completed(val outputPath: String) : DownloadState()
 
   /** Download failed with [error]. May be retried if the error is retryable. */
   data class Failed(val error: KetchError) : DownloadState()

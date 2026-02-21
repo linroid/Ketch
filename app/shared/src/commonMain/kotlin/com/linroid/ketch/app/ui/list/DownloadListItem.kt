@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.isName
 import com.linroid.ketch.app.ui.common.PriorityBadge
 import com.linroid.ketch.app.ui.common.PriorityIcon
 import com.linroid.ketch.app.ui.common.PriorityPanel
@@ -58,9 +59,13 @@ fun DownloadListItem(
   modifier: Modifier = Modifier,
 ) {
   val state by task.state.collectAsState()
-  val fileName = task.request.fileName
-    ?: extractFilename(task.request.url)
-      .ifBlank { "download" }
+  val dest = task.request.destination
+  val fileName = when {
+    dest != null && dest.isName() -> dest.value
+    dest != null -> extractFilename(dest.value)
+      .ifBlank { null }
+    else -> null
+  } ?: extractFilename(task.request.url).ifBlank { "download" }
   val isDownloading = state is DownloadState.Downloading ||
     state is DownloadState.Pending
   val isPaused = state is DownloadState.Paused

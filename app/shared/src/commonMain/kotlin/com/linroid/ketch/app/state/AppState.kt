@@ -3,6 +3,7 @@ package com.linroid.ketch.app.state
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
@@ -177,8 +178,8 @@ class AppState(
       runCatching {
         val request = DownloadRequest(
           url = url,
-          directory = null,
-          fileName = fileName.ifBlank { null },
+          destination = fileName.ifBlank { null }
+            ?.let { Destination(it) },
           speedLimit = speedLimit,
           priority = priority,
           schedule = schedule,

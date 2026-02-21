@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.task
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -18,7 +19,7 @@ internal class DownloadTaskImpl(
   override val state: StateFlow<DownloadState>,
   override val segments: StateFlow<List<Segment>>,
   private val pauseAction: suspend () -> Unit,
-  private val resumeAction: suspend () -> Unit,
+  private val resumeAction: suspend (Destination?) -> Unit,
   private val cancelAction: suspend () -> Unit,
   private val removeAction: suspend () -> Unit,
   private val setSpeedLimitAction: suspend (SpeedLimit) -> Unit,
@@ -31,8 +32,8 @@ internal class DownloadTaskImpl(
     pauseAction()
   }
 
-  override suspend fun resume() {
-    resumeAction()
+  override suspend fun resume(destination: Destination?) {
+    resumeAction(destination)
   }
 
   override suspend fun cancel() {

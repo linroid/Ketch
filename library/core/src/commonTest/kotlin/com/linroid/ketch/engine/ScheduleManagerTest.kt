@@ -1,5 +1,6 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -42,7 +43,7 @@ class ScheduleManagerTest {
     conditions: List<DownloadCondition> = emptyList(),
   ) = DownloadRequest(
     url = "https://example.com/file.zip",
-    directory = "/tmp",
+    destination = Destination("/tmp/"),
     schedule = schedule,
     conditions = conditions,
     priority = DownloadPriority.NORMAL,
@@ -54,13 +55,11 @@ class ScheduleManagerTest {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
-      fileNameResolver = DefaultFileNameResolver(),
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
-      fileAccessorFactory = { throw UnsupportedOperationException() },
       fileNameResolver = DefaultFileNameResolver(),
     )
     val scheduler = DownloadScheduler(

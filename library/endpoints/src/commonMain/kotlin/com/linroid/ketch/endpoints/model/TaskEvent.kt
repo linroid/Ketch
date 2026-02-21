@@ -12,5 +12,5 @@ data class TaskEvent(
   val state: String,
   val progress: ProgressResponse? = null,
   val error: String? = null,
-  val filePath: String? = null,
+  val outputPath: String? = null,
 )
