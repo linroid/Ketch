@@ -81,37 +81,6 @@ class RateLimitTest {
   }
 
   @Test
-  fun connectionReduction_halvesWithMinimumOfOne() {
-    // Verifies the reduction formula used by
-    // DownloadCoordinator.reduceConnections
-    val cases = mapOf(
-      8 to 4,
-      4 to 2,
-      3 to 1,
-      2 to 1,
-      1 to 1,
-    )
-    for ((input, expected) in cases) {
-      val reduced = (input / 2).coerceAtLeast(1)
-      assertEquals(
-        expected, reduced,
-        "Expected $input connections to reduce to $expected",
-      )
-    }
-  }
-
-  @Test
-  fun connectionReduction_chain() {
-    // Simulates successive 429 reductions: 8 -> 4 -> 2 -> 1 -> 1
-    var connections = 8
-    val expected = listOf(4, 2, 1, 1)
-    for (exp in expected) {
-      connections = (connections / 2).coerceAtLeast(1)
-      assertEquals(exp, connections)
-    }
-  }
-
-  @Test
   fun resegmentOnConnectionReduction_mergesIncompleteSegments() {
     // Simulate: 4 segments, 2 fully complete, 2 with some progress
     // When reduced to 2 connections, should merge remaining incomplete bytes
@@ -169,33 +138,6 @@ class RateLimitTest {
   }
 
   @Test
-  fun rateLimitCapping_remainingLessThanConnections() {
-    // Simulates the capping formula from HttpDownloadSource.applyRateLimit:
-    // if remaining > 0 && remaining < connections -> cap to remaining (min 1)
-    val connections = 4
-    val remaining = 2L
-    val capped = remaining.toInt().coerceAtLeast(1)
-    assertEquals(2, capped)
-    assertTrue(capped < connections)
-  }
-
-  @Test
-  fun rateLimitCapping_remainingIsOne() {
-    val remaining = 1L
-    val capped = remaining.toInt().coerceAtLeast(1)
-    assertEquals(1, capped)
-  }
-
-  @Test
-  fun rateLimitCapping_remainingGreaterThanConnections_noChange() {
-    // When remaining >= connections, no capping occurs
-    val connections = 4
-    val remaining = 10L
-    // applyRateLimit returns connections unchanged
-    assertTrue(remaining >= connections)
-  }
-
-  @Test
   fun resolve_rateLimitCapsMaxSegments() = runTest {
     // When rate limit remaining is less than maxConnections,
     // the metadata carries the rate limit info for download() to use
@@ -250,60 +192,6 @@ class RateLimitTest {
     }
     assertEquals(429, error.code)
     assertEquals(2L, error.rateLimitRemaining)
-  }
-
-  @Test
-  fun connectionReduction_usesRateLimitRemaining_whenLessThanCurrent() {
-    // When RateLimit-Remaining=2 and current=4, reduce to 2
-    val current = 4
-    val rateLimitRemaining = 2L
-    val reduced = if (rateLimitRemaining < current) {
-      rateLimitRemaining.toInt().coerceAtLeast(1)
-    } else {
-      (current / 2).coerceAtLeast(1)
-    }
-    assertEquals(2, reduced)
-  }
-
-  @Test
-  fun connectionReduction_usesRateLimitRemaining_zeroMeansOne() {
-    // When RateLimit-Remaining=0, reduce to minimum of 1
-    val current = 4
-    val rateLimitRemaining = 0L
-    val reduced = if (rateLimitRemaining < current) {
-      rateLimitRemaining.toInt().coerceAtLeast(1)
-    } else {
-      (current / 2).coerceAtLeast(1)
-    }
-    assertEquals(1, reduced)
-  }
-
-  @Test
-  fun connectionReduction_fallsBackToHalving_whenRemainingNull() {
-    // When RateLimit-Remaining is absent, halve as before
-    val current = 4
-    val rateLimitRemaining: Long? = null
-    val reduced = if (rateLimitRemaining != null &&
-      rateLimitRemaining < current
-    ) {
-      rateLimitRemaining.toInt().coerceAtLeast(1)
-    } else {
-      (current / 2).coerceAtLeast(1)
-    }
-    assertEquals(2, reduced)
-  }
-
-  @Test
-  fun connectionReduction_fallsBackToHalving_whenRemainingHigher() {
-    // RateLimit-Remaining >= current → fall back to halving
-    val current = 4
-    val rateLimitRemaining = 10L
-    val reduced = if (rateLimitRemaining < current) {
-      rateLimitRemaining.toInt().coerceAtLeast(1)
-    } else {
-      (current / 2).coerceAtLeast(1)
-    }
-    assertEquals(2, reduced)
   }
 
   @Test

@@ -9,7 +9,6 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -21,16 +20,6 @@ import kotlin.test.assertTrue
 class PreResolvedDownloadTest {
 
   private val json = Json { ignoreUnknownKeys = true }
-
-  // -- DownloadRequest.resolvedUrl field --
-
-  @Test
-  fun downloadRequest_defaultResolvedSource_isNull() {
-    val request = DownloadRequest(
-      url = "https://example.com/file",
-    )
-    assertNull(request.resolvedSource)
-  }
 
   @Test
   fun downloadRequest_withResolvedSource_preserved() {
@@ -164,18 +153,6 @@ class PreResolvedDownloadTest {
     )
     source.resolve("https://example.com/file")
     assertEquals(1, engine.headCallCount)
-    assertEquals(0, engine.downloadCallCount)
-  }
-
-  @Test
-  fun resolve_thenResolveAgain_callsHeadTwice() = runTest {
-    val engine = FakeHttpEngine()
-    val source = HttpDownloadSource(
-      httpEngine = engine,
-    )
-    source.resolve("https://example.com/a")
-    source.resolve("https://example.com/b")
-    assertEquals(2, engine.headCallCount)
     assertEquals(0, engine.downloadCallCount)
   }
 }

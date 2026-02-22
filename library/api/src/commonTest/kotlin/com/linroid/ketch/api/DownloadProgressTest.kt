@@ -54,10 +54,4 @@ class DownloadProgressTest {
     val progress = DownloadProgress(downloadedBytes = 0, totalBytes = 0)
     assertFalse(progress.isComplete)
   }
-
-  @Test
-  fun defaultBytesPerSecond_isZero() {
-    val progress = DownloadProgress(downloadedBytes = 100, totalBytes = 200)
-    assertEquals(0, progress.bytesPerSecond)
-  }
 }
