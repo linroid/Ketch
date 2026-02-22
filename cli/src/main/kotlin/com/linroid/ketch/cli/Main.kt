@@ -7,7 +7,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.config.DownloadConfig
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.FileConfigStore

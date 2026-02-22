@@ -1,6 +1,5 @@
-package com.linroid.ketch.api.config
+package com.linroid.ketch.api
 
-import com.linroid.ketch.api.SpeedLimit
 import kotlinx.serialization.Serializable
 
 /**

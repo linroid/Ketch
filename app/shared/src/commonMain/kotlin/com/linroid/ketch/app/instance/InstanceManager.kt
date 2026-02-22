@@ -5,7 +5,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.config.DownloadConfig
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.core.Ketch

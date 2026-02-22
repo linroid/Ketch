@@ -1,6 +1,6 @@
 package com.linroid.ketch
 
-import com.linroid.ketch.api.config.DownloadConfig
+import com.linroid.ketch.api.DownloadConfig
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 

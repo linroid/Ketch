@@ -1,6 +1,5 @@
 package com.linroid.ketch.api
 
-import com.linroid.ketch.api.config.DownloadConfig
 import kotlinx.serialization.Serializable
 
 /**

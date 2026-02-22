@@ -1,7 +1,7 @@
 package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.config.DownloadConfig
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.core.Ketch
