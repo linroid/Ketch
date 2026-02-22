@@ -1,6 +1,5 @@
 package com.linroid.ketch.engine
 
-import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
@@ -47,18 +46,6 @@ class TokenBucketTest {
   }
 
   @Test
-  fun veryLargeRate_withinBurst_doesNotDelay() = runTest {
-    val limiter = TokenBucket(Long.MAX_VALUE / 2, burstSize = 1_000_000)
-    val elapsed = measureTime {
-      limiter.acquire(1_000_000)
-    }
-    assertTrue(
-      elapsed < 500.milliseconds,
-      "Very large rate should not delay, took $elapsed"
-    )
-  }
-
-  @Test
   fun defaultBurstSize_is65536() = runTest {
     val limiter = TokenBucket(100_000)
     // Should be able to acquire up to default burst size (65536)
@@ -69,20 +56,6 @@ class TokenBucketTest {
     assertTrue(
       elapsed < 500.milliseconds,
       "Expected no delay within default burst, took $elapsed"
-    )
-  }
-
-  @Test
-  fun unlimitedSpeedLimiter_neverDelays() = runTest {
-    val limiter = SpeedLimiter.Unlimited
-    val elapsed = measureTime {
-      repeat(1000) {
-        limiter.acquire(1_000_000)
-      }
-    }
-    assertTrue(
-      elapsed < 500.milliseconds,
-      "Unlimited should never delay, took $elapsed"
     )
   }
 

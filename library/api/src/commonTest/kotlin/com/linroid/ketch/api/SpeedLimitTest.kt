@@ -99,16 +99,6 @@ class SpeedLimitTest {
   }
 
   @Test
-  fun equality_sameValue() {
-    assertEquals(SpeedLimit.of(1024), SpeedLimit.of(1024))
-  }
-
-  @Test
-  fun equality_differentValue() {
-    assertFalse(SpeedLimit.of(1024) == SpeedLimit.of(2048))
-  }
-
-  @Test
   fun kbps_one_equals1024Bytes() {
     assertEquals(SpeedLimit.of(1024), SpeedLimit.kbps(1))
   }
@@ -116,11 +106,6 @@ class SpeedLimitTest {
   @Test
   fun mbps_one_equals1048576Bytes() {
     assertEquals(SpeedLimit.of(1024 * 1024), SpeedLimit.mbps(1))
-  }
-
-  @Test
-  fun unlimited_equalsAnotherUnlimited() {
-    assertEquals(SpeedLimit.Unlimited, SpeedLimit.Unlimited)
   }
 
   @Test

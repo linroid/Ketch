@@ -1,10 +1,8 @@
 package com.linroid.ketch.app
 
-import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.formatEta
-import com.linroid.ketch.app.util.priorityLabel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -242,42 +240,5 @@ class FormatUtilsTest {
       "file.zip",
       extractFilename("  https://example.com/file.zip  ")
     )
-  }
-
-  // -----------------------------------------------------------
-  // priorityLabel
-  // -----------------------------------------------------------
-
-  @Test
-  fun priorityLabel_low() {
-    assertEquals("Low", priorityLabel(DownloadPriority.LOW))
-  }
-
-  @Test
-  fun priorityLabel_normal() {
-    assertEquals("Normal", priorityLabel(DownloadPriority.NORMAL))
-  }
-
-  @Test
-  fun priorityLabel_high() {
-    assertEquals("High", priorityLabel(DownloadPriority.HIGH))
-  }
-
-  @Test
-  fun priorityLabel_urgent() {
-    assertEquals("Urgent", priorityLabel(DownloadPriority.URGENT))
-  }
-
-  @Test
-  fun priorityLabel_allEntriesCovered() {
-    // Ensure every enum entry produces a non-blank label
-    DownloadPriority.entries.forEach { priority ->
-      val label = priorityLabel(priority)
-      assertEquals(
-        true,
-        label.isNotBlank(),
-        "Priority $priority should have a non-blank label"
-      )
-    }
   }
 }

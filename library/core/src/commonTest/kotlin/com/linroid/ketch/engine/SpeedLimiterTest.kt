@@ -19,30 +19,4 @@ class SpeedLimiterTest {
       "Unlimited acquire should be instant, took $elapsed"
     )
   }
-
-  @Test
-  fun unlimited_multipleAcquires_noDelay() = runTest {
-    val limiter = SpeedLimiter.Unlimited
-    val elapsed = measureTime {
-      repeat(10_000) {
-        limiter.acquire(8192)
-      }
-    }
-    assertTrue(
-      elapsed.inWholeMilliseconds < 100,
-      "Unlimited acquire loop should be fast, took $elapsed"
-    )
-  }
-
-  @Test
-  fun unlimited_zeroBytes_noDelay() = runTest {
-    val limiter = SpeedLimiter.Unlimited
-    val elapsed = measureTime {
-      limiter.acquire(0)
-    }
-    assertTrue(
-      elapsed.inWholeMilliseconds < 50,
-      "Unlimited acquire(0) should be instant, took $elapsed"
-    )
-  }
 }

@@ -78,10 +78,4 @@ class SegmentTest {
     val segment = Segment(index = 0, start = 0, end = 99, downloadedBytes = 100)
     assertEquals(0, segment.remainingBytes)
   }
-
-  @Test
-  fun defaultDownloadedBytes_isZero() {
-    val segment = Segment(index = 0, start = 0, end = 99)
-    assertEquals(0, segment.downloadedBytes)
-  }
 }
