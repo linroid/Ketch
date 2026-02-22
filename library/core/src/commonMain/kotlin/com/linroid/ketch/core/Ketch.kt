@@ -15,10 +15,10 @@ import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
+import com.linroid.ketch.core.engine.DownloadScheduler
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
-import com.linroid.ketch.core.engine.DownloadScheduler
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
@@ -109,7 +109,6 @@ class Ketch(
   private val scheduler = DownloadQueue(
     queueConfig = config.queueConfig,
     coordinator = coordinator,
-    scope = scope,
   )
 
   private val scheduleManager = DownloadScheduler(
