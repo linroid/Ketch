@@ -11,7 +11,6 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.DownloadCoordinator
-import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.DownloadScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +24,7 @@ internal class RealDownloadTask(
   initialState: DownloadState,
   initialSegments: List<Segment>,
   private val coordinator: DownloadCoordinator,
-  private val scheduler: DownloadQueue,
-  private val scheduleManager: DownloadScheduler,
+  private val scheduler: DownloadScheduler,
   private val removeAction: suspend () -> Unit,
 ) : DownloadTask {
   internal val mutableState = MutableStateFlow(initialState)
@@ -52,7 +50,7 @@ internal class RealDownloadTask(
         taskId, mutableState, mutableSegments, destination,
       )
       if (!resumed) {
-        coordinator.startFromRecord(
+        coordinator.start(
           taskId, request, mutableState, mutableSegments,
         )
       }
@@ -64,7 +62,7 @@ internal class RealDownloadTask(
   override suspend fun cancel() {
     val s = mutableState.value
     if (!s.isTerminal) {
-      scheduleManager.cancel(taskId)
+      scheduler.cancel(taskId)
       scheduler.dequeue(taskId)
       coordinator.cancel(taskId)
       if (s is DownloadState.Scheduled) {
@@ -97,12 +95,12 @@ internal class RealDownloadTask(
       return
     }
     log.i { "Rescheduling taskId=$taskId, schedule=$schedule, conditions=${conditions.size}" }
-    scheduleManager.cancel(taskId)
+    scheduler.cancel(taskId)
     if (s.isActive) {
       coordinator.pause(taskId)
     }
     scheduler.dequeue(taskId)
-    scheduleManager.reschedule(
+    scheduler.reschedule(
       taskId, request, schedule, conditions,
       createdAt, mutableState, mutableSegments,
     )

@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.DownloadCondition
+import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
@@ -19,7 +20,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 internal class DownloadScheduler(
-  private val scheduler: DownloadQueue,
+  private val queue: DownloadQueue,
   private val scope: CoroutineScope,
 ) {
   private val log = KetchLogger("DownloadScheduler")
@@ -48,8 +49,8 @@ internal class DownloadScheduler(
         waitForConditions(taskId, conditions)
 
         log.i { "Schedule and conditions met for taskId=$taskId, enqueuing" }
-        scheduler.enqueue(
-          taskId, request, createdAt, stateFlow, segmentsFlow
+        queue.enqueue(
+          taskId, request, createdAt, stateFlow, segmentsFlow,
         )
 
         mutex.withLock { scheduledJobs.remove(taskId) }
@@ -86,7 +87,7 @@ internal class DownloadScheduler(
           "Reschedule conditions met for taskId=$taskId, enqueuing " +
             "with preferResume=true"
         }
-        scheduler.enqueue(
+        queue.enqueue(
           taskId, request, createdAt, stateFlow, segmentsFlow,
           preferResume = true,
         )
@@ -106,6 +107,38 @@ internal class DownloadScheduler(
     }
   }
 
+  // -- Queue facade methods --
+
+  suspend fun enqueue(
+    taskId: String,
+    request: DownloadRequest,
+    createdAt: Instant,
+    stateFlow: MutableStateFlow<DownloadState>,
+    segmentsFlow: MutableStateFlow<List<Segment>>,
+    preferResume: Boolean = false,
+  ) = queue.enqueue(taskId, request, createdAt, stateFlow, segmentsFlow, preferResume)
+
+  suspend fun setPriority(taskId: String, priority: DownloadPriority) =
+    queue.setPriority(taskId, priority)
+
+  suspend fun dequeue(taskId: String) = queue.dequeue(taskId)
+
+  suspend fun onTaskCompleted(taskId: String) = queue.onTaskCompleted(taskId)
+
+  suspend fun onTaskFailed(taskId: String) = queue.onTaskFailed(taskId)
+
+  suspend fun onTaskCanceled(taskId: String) = queue.onTaskCanceled(taskId)
+
+  /** Effective max concurrent downloads — delegates to [DownloadQueue]. */
+  var maxConcurrent: Int
+    get() = queue.maxConcurrent
+    set(value) { queue.maxConcurrent = value }
+
+  /** Effective max connections per host — delegates to [DownloadQueue]. */
+  var maxPerHost: Int
+    get() = queue.maxPerHost
+    set(value) { queue.maxPerHost = value }
+
   private suspend fun waitForSchedule(
     taskId: String,
     schedule: DownloadSchedule,
@@ -116,18 +149,13 @@ internal class DownloadScheduler(
         val now = Clock.System.now()
         val waitDuration = schedule.startAt - now
         if (waitDuration.isPositive()) {
-          log.d {
-            "Waiting ${waitDuration.inWholeSeconds}s for " +
-              "taskId=$taskId (startAt=${schedule.startAt})"
-          }
+          log.d { "Waiting $waitDuration for taskId=$taskId (startAt=${schedule.startAt})" }
           delay(waitDuration)
         }
       }
+
       is DownloadSchedule.AfterDelay -> {
-        log.d {
-          "Waiting ${schedule.delay.inWholeSeconds}s delay " +
-            "for taskId=$taskId"
-        }
+        log.d { "Waiting ${schedule.delay} delay for taskId=$taskId" }
         delay(schedule.delay)
       }
     }

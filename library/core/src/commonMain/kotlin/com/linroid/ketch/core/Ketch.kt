@@ -112,14 +112,14 @@ class Ketch(
     dispatchers = dispatchers,
   )
 
-  private val scheduler = DownloadQueue(
+  private val queue = DownloadQueue(
     maxConcurrentDownloads = config.maxConcurrentDownloads,
     maxConnectionsPerHost = config.maxConnectionsPerHost,
     coordinator = coordinator,
   )
 
-  private val scheduleManager = DownloadScheduler(
-    scheduler = scheduler,
+  private val scheduler = DownloadScheduler(
+    queue = queue,
     scope = scope,
   )
 
@@ -251,12 +251,11 @@ class Ketch(
       initialSegments = record.segments ?: emptyList(),
       coordinator = coordinator,
       scheduler = scheduler,
-      scheduleManager = scheduleManager,
       removeAction = { removeTaskInternal(taskId) },
     )
 
     when (record.state) {
-      TaskState.SCHEDULED -> scheduleManager.schedule(
+      TaskState.SCHEDULED -> scheduler.schedule(
         taskId, request, record.createdAt,
         task.mutableState, task.mutableSegments,
       )
@@ -331,7 +330,7 @@ class Ketch(
 
   private suspend fun removeTaskInternal(taskId: String) {
     log.i { "Removing task: taskId=$taskId" }
-    scheduleManager.cancel(taskId)
+    scheduler.cancel(taskId)
     scheduler.dequeue(taskId)
     coordinator.cancel(taskId)
     taskStore.remove(taskId)
