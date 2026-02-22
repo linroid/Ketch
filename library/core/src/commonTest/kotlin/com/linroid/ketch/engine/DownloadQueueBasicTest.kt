@@ -8,7 +8,7 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.config.QueueConfig
 import com.linroid.ketch.core.engine.DownloadCoordinator
-import com.linroid.ketch.core.engine.DownloadScheduler
+import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
@@ -29,7 +29,7 @@ import kotlin.test.assertIs
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
-class DownloadSchedulerTest {
+class DownloadQueueTest {
 
   private fun createRequest(
     priority: DownloadPriority = DownloadPriority.NORMAL,
@@ -43,7 +43,7 @@ class DownloadSchedulerTest {
     scope: CoroutineScope,
     maxConcurrent: Int = 10,
     autoStart: Boolean = true,
-  ): DownloadScheduler {
+  ): DownloadQueue {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
@@ -54,7 +54,7 @@ class DownloadSchedulerTest {
       config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
     )
-    return DownloadScheduler(
+    return DownloadQueue(
       queueConfig = QueueConfig(
         maxConcurrentDownloads = maxConcurrent,
         autoStart = autoStart,
@@ -220,7 +220,7 @@ class DownloadSchedulerTest {
 
   @Test
   fun extractHost_parsesCorrectly() {
-    val host = DownloadScheduler.extractHost(
+    val host = DownloadQueue.extractHost(
       "https://cdn.example.com:8080/path/file.zip",
     )
     assertEquals(host, "cdn.example.com", "Expected 'cdn.example.com', got '$host'")
@@ -228,7 +228,7 @@ class DownloadSchedulerTest {
 
   @Test
   fun extractHost_simpleUrl() {
-    val host = DownloadScheduler.extractHost(
+    val host = DownloadQueue.extractHost(
       "https://example.com/file.zip",
     )
     assertEquals(host, "example.com", "Expected 'example.com', got '$host'")

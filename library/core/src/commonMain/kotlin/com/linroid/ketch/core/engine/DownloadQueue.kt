@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 import kotlin.time.Instant
 
-internal class DownloadScheduler(
+internal class DownloadQueue(
   @Volatile
   internal var queueConfig: QueueConfig,
   private val coordinator: DownloadCoordinator,
