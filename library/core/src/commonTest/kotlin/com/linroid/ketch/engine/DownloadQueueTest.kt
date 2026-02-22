@@ -69,7 +69,6 @@ class DownloadQueueTest {
         autoStart = autoStart,
       ),
       coordinator = coordinator,
-      scope = scope,
     )
   }
 

@@ -61,7 +61,6 @@ class DownloadQueueBasicTest {
         autoStart = autoStart,
       ),
       coordinator = coordinator,
-      scope = scope,
     )
   }
 
