@@ -12,7 +12,7 @@ import com.linroid.ketch.api.SpeedLimit
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Instant
 
-internal class DownloadTaskImpl(
+internal class RealDownloadTask(
   override val taskId: String,
   override val request: DownloadRequest,
   override val createdAt: Instant,

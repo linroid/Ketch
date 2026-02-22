@@ -12,7 +12,7 @@ import com.linroid.ketch.api.config.QueueConfig
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadScheduler
 import com.linroid.ketch.core.engine.HttpDownloadSource
-import com.linroid.ketch.core.engine.ScheduleManager
+import com.linroid.ketch.core.engine.DownloadScheduler
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.InMemoryTaskStore
@@ -35,7 +35,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-class ScheduleManagerTest {
+class DownloadSchedulerTest {
 
   private fun createRequest(
     schedule: DownloadSchedule = DownloadSchedule.Immediate,
@@ -50,7 +50,7 @@ class ScheduleManagerTest {
 
   private fun createTestComponents(
     scope: CoroutineScope,
-  ): Pair<DownloadScheduler, ScheduleManager> {
+  ): Pair<DownloadScheduler, DownloadScheduler> {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
@@ -66,7 +66,7 @@ class ScheduleManagerTest {
       coordinator = coordinator,
       scope = scope,
     )
-    val manager = ScheduleManager(scheduler, scope)
+    val manager = DownloadScheduler(scheduler, scope)
     return scheduler to manager
   }
 

@@ -18,11 +18,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-internal class ScheduleManager(
+internal class DownloadScheduler(
   private val scheduler: DownloadScheduler,
   private val scope: CoroutineScope,
 ) {
-  private val log = KetchLogger("ScheduleManager")
+  private val log = KetchLogger("DownloadScheduler")
   private val mutex = Mutex()
   private val scheduledJobs = mutableMapOf<String, Job>()
 
