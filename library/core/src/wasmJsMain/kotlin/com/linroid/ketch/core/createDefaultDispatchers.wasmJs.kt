@@ -7,7 +7,7 @@ internal actual fun createDefaultDispatchers(
   networkPoolSize: Int,
   ioPoolSize: Int,
 ): KetchDispatchers = KetchDispatchers(
-  task = Dispatchers.Default,
+  main = Dispatchers.Default,
   network = Dispatchers.Default,
   io = Dispatchers.Default,
 )

@@ -10,7 +10,7 @@ internal actual fun createDefaultDispatchers(
   networkPoolSize: Int,
   ioPoolSize: Int,
 ): KetchDispatchers = KetchDispatchers(
-  task = newSingleThreadContext("ketch-task"),
+  main = newSingleThreadContext("ketch-main"),
   network = newFixedThreadPoolContext(networkPoolSize, "ketch-network"),
   io = newFixedThreadPoolContext(ioPoolSize, "ketch-io"),
 )

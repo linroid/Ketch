@@ -118,7 +118,7 @@ class Ketch(
 
   /** Scope for task coordination (scheduling, queue, state). */
   private val taskScope =
-    CoroutineScope(SupervisorJob() + dispatchers.task)
+    CoroutineScope(SupervisorJob() + dispatchers.main)
 
   /** Scope for network-bound download execution. */
   private val networkScope =

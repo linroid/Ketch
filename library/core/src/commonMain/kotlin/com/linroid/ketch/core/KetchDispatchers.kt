@@ -8,7 +8,7 @@ import kotlinx.coroutines.CoroutineDispatcher
  * Dispatchers used by the Ketch download engine.
  *
  * Provides dedicated dispatchers for different workloads:
- * - [task]: Single-threaded dispatcher for task management (scheduling,
+ * - [main]: Single-threaded dispatcher for task management (scheduling,
  *   queue operations, state transitions). Serialized execution eliminates
  *   Mutex contention for coordination logic.
  * - [network]: Thread pool for network operations (HTTP requests, segment
@@ -20,7 +20,7 @@ import kotlinx.coroutines.CoroutineDispatcher
  */
 class KetchDispatchers(
   /** Single-threaded dispatcher for task coordination. */
-  val task: CoroutineDispatcher,
+  val main: CoroutineDispatcher,
   /** Thread pool for network operations. */
   val network: CoroutineDispatcher,
   /** Thread pool for blocking file I/O. */
@@ -34,7 +34,7 @@ class KetchDispatchers(
    * `Dispatchers.IO` are left untouched.
    */
   fun close() {
-    (task as? CloseableCoroutineDispatcher)?.close()
+    (main as? CloseableCoroutineDispatcher)?.close()
     (network as? CloseableCoroutineDispatcher)?.close()
     (io as? CloseableCoroutineDispatcher)?.close()
   }
