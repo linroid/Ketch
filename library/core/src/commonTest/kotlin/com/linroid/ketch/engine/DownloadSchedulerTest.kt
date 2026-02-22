@@ -65,7 +65,6 @@ class DownloadSchedulerTest {
     val scheduler = DownloadQueue(
       queueConfig = QueueConfig(maxConcurrentDownloads = 10),
       coordinator = coordinator,
-      scope = scope,
     )
     val manager = DownloadScheduler(scheduler, scope)
     return scheduler to manager
