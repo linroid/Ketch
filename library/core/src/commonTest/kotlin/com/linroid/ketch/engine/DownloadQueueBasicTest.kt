@@ -5,8 +5,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.api.config.CoreConfig
-import com.linroid.ketch.api.config.QueueConfig
+import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
@@ -42,7 +41,6 @@ class DownloadQueueBasicTest {
 
   private fun createScheduler(
     maxConcurrent: Int = 10,
-    autoStart: Boolean = true,
   ): DownloadQueue {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
@@ -51,7 +49,7 @@ class DownloadQueueBasicTest {
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
-      config = CoreConfig(),
+      config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
@@ -60,16 +58,14 @@ class DownloadQueueBasicTest {
       ),
     )
     return DownloadQueue(
-      queueConfig = QueueConfig(
-        maxConcurrentDownloads = maxConcurrent,
-        autoStart = autoStart,
-      ),
+      maxConcurrentDownloads = maxConcurrent,
+      maxConnectionsPerHost = 0,
       coordinator = coordinator,
     )
   }
 
   @Test
-  fun enqueue_autoStart_movesToActiveState() = runTest {
+  fun enqueue_startsImmediatelyWhenSlotAvailable() = runTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
@@ -89,29 +85,6 @@ class DownloadQueueBasicTest {
         withTimeout(2.seconds) {
           stateFlow.first { it != DownloadState.Queued }
         }
-      } finally {
-        scope.cancel()
-      }
-    }
-  }
-
-  @Test
-  fun enqueue_noAutoStart_staysQueued() = runTest {
-    withContext(Dispatchers.Default) {
-      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-      try {
-        val scheduler = createScheduler(autoStart = false)
-        val stateFlow =
-          MutableStateFlow<DownloadState>(DownloadState.Queued)
-        val segmentsFlow =
-          MutableStateFlow<List<Segment>>(emptyList())
-
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          stateFlow, segmentsFlow,
-        )
-
-        assertIs<DownloadState.Queued>(stateFlow.value)
       } finally {
         scope.cancel()
       }

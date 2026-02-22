@@ -1,7 +1,7 @@
 package com.linroid.ketch.server.api
 
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.config.CoreConfig
+import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
@@ -25,8 +25,8 @@ internal fun Route.serverRoutes(ketch: KetchApi) {
   }
 
   put<Api.Config> {
-    val body = call.receive<CoreConfig>()
-    log.i { "PUT /api/config: speedLimit=${body.speed}" }
+    val body = call.receive<DownloadConfig>()
+    log.i { "PUT /api/config: speedLimit=${body.speedLimit}" }
     ketch.updateConfig(body)
     call.respond(body)
   }

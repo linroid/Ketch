@@ -15,7 +15,7 @@ import kotlinx.coroutines.CoroutineDispatcher
  * - [io]: Thread pool for blocking file I/O (writes, reads, preallocate).
  *
  * Pass your own [CoroutineDispatcher] instances for full control, or use
- * `KetchDispatchers(networkPoolSize, ioPoolSize)` for platform-appropriate
+ * `KetchDispatchers(networkThreads, ioThreads)` for platform-appropriate
  * defaults with configurable pool sizes.
  */
 class KetchDispatchers(
@@ -29,17 +29,17 @@ class KetchDispatchers(
   /**
    * Creates platform-default dispatchers with dedicated thread pools.
    *
-   * @param networkPoolSize number of threads in the network pool;
+   * @param networkThreads number of threads in the network pool;
    *   must be positive
-   * @param ioPoolSize number of threads in the I/O pool; must be positive
+   * @param ioThreads number of threads in the I/O pool; must be positive
    */
   constructor(
-    networkPoolSize: Int = 8,
-    ioPoolSize: Int = 4,
+    networkThreads: Int = 8,
+    ioThreads: Int = 4,
   ) : this(
     main = createMainDispatcher(),
-    network = createNetworkDispatcher(networkPoolSize),
-    io = createIoDispatcher(ioPoolSize),
+    network = createNetworkDispatcher(networkThreads),
+    io = createIoDispatcher(ioThreads),
   )
 
   /**

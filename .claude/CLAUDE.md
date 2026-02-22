@@ -34,9 +34,10 @@ cli/          # JVM CLI entry point
 - `com.linroid.ketch.api` -- `KetchApi`, `DownloadTask`, `DownloadRequest`, `DownloadState`,
   `DownloadProgress`, `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`,
   `DownloadSchedule`, `DownloadCondition`, `KetchVersion`
+- `com.linroid.ketch.api.config` -- `DownloadConfig`
 
 ### `library:core` (implementation)
-- `com.linroid.ketch.core` -- `Ketch` (implements `KetchApi`), `DownloadConfig`, `QueueConfig`
+- `com.linroid.ketch.core` -- `Ketch` (implements `KetchApi`)
 - `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `RangeSupportDetector`,
   `ServerInfo`, `DownloadSource`, `HttpDownloadSource`, `SourceResolver`, `SourceInfo`,
   `SourceResumeState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
@@ -64,8 +65,8 @@ cli/          # JVM CLI entry point
 - Duplicate download guards in `start()`, `startFromRecord()`, `resume()`
 
 ### Queue Management (`DownloadQueue`)
-- Configurable concurrent download slots (`QueueConfig.maxConcurrentDownloads`)
-- Per-host connection limits (`QueueConfig.maxConnectionsPerHost`)
+- Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)
+- Per-host connection limits (`DownloadConfig.maxConnectionsPerHost`)
 - Priority-based ordering (`DownloadPriority`: LOW, NORMAL, HIGH, URGENT)
 - URGENT preemption: pauses lowest-priority active download to make room
 

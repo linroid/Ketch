@@ -1,7 +1,7 @@
 package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.config.CoreConfig
+import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.core.Ketch
@@ -29,13 +29,13 @@ import com.linroid.ketch.remote.RemoteKetch
  */
 class InstanceFactory(
   taskStore: TaskStore? = null,
-  defaultDirectory: String = "downloads",
-  coreConfig: CoreConfig = CoreConfig(
+  defaultDirectory: String? = null,
+  downloadConfig: DownloadConfig = DownloadConfig(
     defaultDirectory = defaultDirectory,
   ),
   val deviceName: String = "Embedded",
   private val embeddedFactory: (() -> Ketch)? = taskStore?.let { ts ->
-    { createDefaultEmbeddedKetch(ts, coreConfig, deviceName) }
+    { createDefaultEmbeddedKetch(ts, downloadConfig, deviceName) }
   },
   private val localServerFactory: ((KetchApi) -> LocalServerHandle)? = null,
 ) {
@@ -103,7 +103,7 @@ class InstanceFactory(
 
 private fun createDefaultEmbeddedKetch(
   taskStore: TaskStore,
-  config: CoreConfig,
+  config: DownloadConfig,
   name: String,
 ): Ketch {
   return Ketch(

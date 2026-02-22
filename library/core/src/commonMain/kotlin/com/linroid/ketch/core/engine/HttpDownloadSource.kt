@@ -34,8 +34,8 @@ import kotlin.time.Duration.Companion.milliseconds
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
   private val maxConnections: Int = 4,
-  private val progressUpdateIntervalMs: Long = 200,
-  private val segmentSaveIntervalMs: Long = 5000,
+  private val progressIntervalMs: Long = 200,
+  private val saveIntervalMs: Long = 5000,
 ) : DownloadSource {
   private val log = KetchLogger("HttpSource")
 
@@ -315,7 +315,7 @@ internal class HttpDownloadSource(
       val now = Clock.System.now()
       progressMutex.withLock {
         if (now - lastProgressUpdate >=
-          progressUpdateIntervalMs.milliseconds
+          progressIntervalMs.milliseconds
         ) {
           val snapshot = currentSegments()
           val downloaded = snapshot.sumOf { it.downloadedBytes }
@@ -334,7 +334,7 @@ internal class HttpDownloadSource(
       coroutineScope {
         val saveJob = launch {
           while (true) {
-            delay(segmentSaveIntervalMs)
+            delay(saveIntervalMs)
             context.segments.value = currentSegments()
             log.v { "Periodic segment save for taskId=${context.taskId}" }
           }

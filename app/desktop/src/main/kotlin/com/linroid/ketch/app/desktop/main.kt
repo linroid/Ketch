@@ -30,15 +30,14 @@ fun main() = application {
       File.separator + "Downloads"
     val downloadConfig = config.download.copy(
       defaultDirectory = config.download.defaultDirectory
-        .takeIf { it != "downloads" }
         ?: defaultDownloadsDir,
     )
-    val instanceName = config.name
-      ?: InetAddress.getLocalHost().hostName
+    val instanceName = config.name?.ifEmpty { null }
+      ?: InetAddress.getLocalHost().hostName.removeSuffix(".local")
     InstanceManager(
       factory = InstanceFactory(
         taskStore = taskStore,
-        coreConfig = downloadConfig,
+        downloadConfig = downloadConfig,
         deviceName = instanceName,
         localServerFactory = { ketchApi ->
           val serverConfig = config.server
@@ -60,7 +59,7 @@ fun main() = application {
           }
         },
       ),
-      initialRemotes = config.remote,
+      initialRemotes = config.remotes,
       configStore = configStore,
     )
   }

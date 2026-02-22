@@ -117,7 +117,7 @@ DownloadRequest
   |
   v
 [6. Persist]  Segment progress is saved to TaskStore at regular intervals
-  |           (segmentSaveIntervalMs) for crash recovery.
+  |           (saveIntervalMs) for crash recovery.
   |
   v
 [7. Complete]  All segments finished -> Completed state with file path.

@@ -21,19 +21,19 @@ fun main() {
     val instanceManager = remember {
       InstanceManager(
         factory = InstanceFactory(),
-        initialRemotes = config.remote,
+        initialRemotes = config.remotes,
         configStore = configStore,
       )
     }
     val scope = rememberCoroutineScope()
     DisposableEffect(Unit) {
       // Auto-connect from config remotes or meta tag
-      if (config.remote.isEmpty() && shouldAutoConnect()) {
+      if (config.remotes.isEmpty() && shouldAutoConnect()) {
         val host = window.location.hostname
         val port = window.location.port.toIntOrNull() ?: 80
         val entry = instanceManager.addRemote(host, port)
         scope.launch { instanceManager.switchTo(entry) }
-      } else if (config.remote.isNotEmpty()) {
+      } else if (config.remotes.isNotEmpty()) {
         val first = instanceManager.instances.value
           .drop(1).firstOrNull() // skip embedded (null), take first remote
         if (first != null) {

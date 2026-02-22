@@ -3,8 +3,7 @@ package com.linroid.ketch.server
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.config.CoreConfig
-import com.linroid.ketch.api.config.QueueConfig
+import com.linroid.ketch.api.config.DownloadConfig
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.put
@@ -58,16 +57,14 @@ class ServerRoutesTest {
 
   @Test
   fun `status includes download config`() = testApplication {
-    val coreConfig = CoreConfig(
+    val downloadConfig = DownloadConfig(
       defaultDirectory = "/tmp/test-downloads",
-      maxConnections = 8,
+      maxConnectionsPerDownload = 8,
       retryCount = 5,
-      queue = QueueConfig(
-        maxConcurrentDownloads = 6,
-        maxConnectionsPerHost = 2,
-      ),
+      maxConcurrentDownloads = 6,
+      maxConnectionsPerHost = 2,
     )
-    val ketch = createTestKetch(config = coreConfig)
+    val ketch = createTestKetch(config = downloadConfig)
     application {
       val server = createTestServer(ketch = ketch)
       with(server) { configureServer() }
@@ -80,16 +77,10 @@ class ServerRoutesTest {
       "/tmp/test-downloads",
       status.config.defaultDirectory,
     )
-    assertEquals(8, status.config.maxConnections)
+    assertEquals(8, status.config.maxConnectionsPerDownload)
     assertEquals(5, status.config.retryCount)
-    assertEquals(
-      6,
-      status.config.queue.maxConcurrentDownloads,
-    )
-    assertEquals(
-      2,
-      status.config.queue.maxConnectionsPerHost,
-    )
+    assertEquals(6, status.config.maxConcurrentDownloads)
+    assertEquals(2, status.config.maxConnectionsPerHost)
   }
 
   @Test
@@ -131,18 +122,18 @@ class ServerRoutesTest {
     val client = createClient {
       install(ContentNegotiation) { json(json) }
     }
-    val newConfig = CoreConfig(
-      speed = SpeedLimit.of(512000),
+    val newConfig = DownloadConfig(
+      speedLimit = SpeedLimit.of(512000),
     )
     val response = client.put("/api/config") {
       contentType(ContentType.Application.Json)
       setBody(newConfig)
     }
     assertEquals(HttpStatusCode.OK, response.status)
-    val body = json.decodeFromString<CoreConfig>(
+    val body = json.decodeFromString<DownloadConfig>(
       response.bodyAsText()
     )
-    assertEquals(512000L, body.speed.bytesPerSecond)
+    assertEquals(512000L, body.speedLimit.bytesPerSecond)
   }
 
   @Test
@@ -155,8 +146,8 @@ class ServerRoutesTest {
       val client = createClient {
         install(ContentNegotiation) { json(json) }
       }
-      val newConfig = CoreConfig(
-        speed = SpeedLimit.Unlimited,
+      val newConfig = DownloadConfig(
+        speedLimit = SpeedLimit.Unlimited,
       )
       val response = client.put("/api/config") {
         contentType(ContentType.Application.Json)

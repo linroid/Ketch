@@ -91,17 +91,14 @@ Ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
 
 ```kotlin
 DownloadConfig(
-  maxConnections = 4,             // max concurrent segments per task
+  maxConnectionsPerDownload = 4,  // max concurrent segments per task
   retryCount = 3,                 // retries per segment
   retryDelayMs = 1000,            // base delay (exponential backoff)
-  progressUpdateIntervalMs = 200, // progress throttle
+  progressIntervalMs = 200,       // progress throttle
   bufferSize = 8192,              // read buffer size
   speedLimit = SpeedLimit.kbps(500), // global speed limit
-  queueConfig = QueueConfig(
-    maxConcurrentDownloads = 3,   // max simultaneous downloads
-    maxConnectionsPerHost = 4,    // per-host limit
-    autoStart = true              // auto-start queued tasks
-  )
+  maxConcurrentDownloads = 3,     // max simultaneous downloads (0 = unlimited)
+  maxConnectionsPerHost = 4,      // per-host limit (0 = unlimited)
 )
 ```
 

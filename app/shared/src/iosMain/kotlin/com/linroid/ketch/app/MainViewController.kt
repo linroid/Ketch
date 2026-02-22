@@ -23,21 +23,19 @@ fun MainViewController() = ComposeUIViewController {
     val configStore = FileConfigStore("$docsDir/config.toml")
     val config = configStore.load()
     val taskStore = createSqliteTaskStore(DriverFactory())
-    val downloadsDir = docsDir
     val downloadConfig = config.download.copy(
       defaultDirectory = config.download.defaultDirectory
-        .takeIf { it != "downloads" }
-        ?: downloadsDir,
+        ?: docsDir,
     )
     val instanceName = config.name
       ?: UIDevice.currentDevice.name
     InstanceManager(
       factory = InstanceFactory(
         taskStore = taskStore,
-        coreConfig = downloadConfig,
+        downloadConfig = downloadConfig,
         deviceName = instanceName,
       ),
-      initialRemotes = config.remote,
+      initialRemotes = config.remotes,
       configStore = configStore,
     )
   }

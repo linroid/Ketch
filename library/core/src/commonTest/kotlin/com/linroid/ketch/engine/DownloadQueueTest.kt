@@ -5,8 +5,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.api.config.CoreConfig
-import com.linroid.ketch.api.config.QueueConfig
+import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
@@ -49,7 +48,6 @@ class DownloadQueueTest {
   private fun createScheduler(
     maxConcurrent: Int = 10,
     maxPerHost: Int = 4,
-    autoStart: Boolean = true,
   ): DownloadQueue {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
@@ -58,7 +56,7 @@ class DownloadQueueTest {
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       taskStore = InMemoryTaskStore(),
-      config = CoreConfig(),
+      config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
@@ -67,11 +65,8 @@ class DownloadQueueTest {
       ),
     )
     return DownloadQueue(
-      queueConfig = QueueConfig(
-        maxConcurrentDownloads = maxConcurrent,
-        maxConnectionsPerHost = maxPerHost,
-        autoStart = autoStart,
-      ),
+      maxConcurrentDownloads = maxConcurrent,
+      maxConnectionsPerHost = maxPerHost,
       coordinator = coordinator,
     )
   }
@@ -439,62 +434,6 @@ class DownloadQueueTest {
   }
 
   // ---- Auto-start tests ----
-
-  @Test
-  fun autoStartDisabled_allTasksQueued() = runTest {
-    withContext(Dispatchers.Default) {
-      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-      try {
-        val scheduler = createScheduler(
-          maxConcurrent = 10, autoStart = false,
-        )
-
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
-        assertIs<DownloadState.Queued>(sf1.value)
-
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          sf2, seg2
-        )
-        assertIs<DownloadState.Queued>(sf2.value)
-      } finally {
-        scope.cancel()
-      }
-    }
-  }
-
-  @Test
-  fun autoStartDisabled_promotionDoesNotOccur() = runTest {
-    withContext(Dispatchers.Default) {
-      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-      try {
-        val scheduler = createScheduler(
-          maxConcurrent = 10, autoStart = false,
-        )
-
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
-        assertIs<DownloadState.Queued>(sf1.value)
-
-        // Signal completion from outside — promotion should not
-        // happen because autoStart is false
-        scheduler.onTaskCompleted("task-1")
-
-        delay(200)
-        assertIs<DownloadState.Queued>(sf1.value)
-      } finally {
-        scope.cancel()
-      }
-    }
-  }
 
   // ---- Preemption tests ----
 

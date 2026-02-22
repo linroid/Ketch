@@ -17,7 +17,7 @@ import kotlinx.serialization.Serializable
  *   - `Destination("content://...")` — content URI, use as-is
  * @property connections number of concurrent connections (segments) to
  *   use. Must be non-negative. When `0` (the default), the engine uses
- *   [DownloadConfig.maxConnections][com.linroid.ketch.api.config.CoreConfig.maxConnections].
+ *   [DownloadConfig.maxConnectionsPerDownload][com.linroid.ketch.api.config.DownloadConfig.maxConnectionsPerDownload].
  *   Falls back to a single connection if the server does not support
  *   HTTP Range requests.
  * @property headers custom HTTP headers to include in every request

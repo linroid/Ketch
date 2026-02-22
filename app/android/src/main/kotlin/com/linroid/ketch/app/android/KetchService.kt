@@ -73,7 +73,6 @@ class KetchService : Service() {
       .absolutePath
     val downloadConfig = config.download.copy(
       defaultDirectory = config.download.defaultDirectory
-        .takeIf { it != "downloads" }
         ?: downloadsDir,
     )
     val instanceName = config.name
@@ -81,7 +80,7 @@ class KetchService : Service() {
     instanceManager = InstanceManager(
       factory = InstanceFactory(
         taskStore = taskStore,
-        coreConfig = downloadConfig,
+        downloadConfig = downloadConfig,
         deviceName = instanceName,
         localServerFactory = { ketchApi ->
           val serverConfig = config.server
@@ -107,7 +106,7 @@ class KetchService : Service() {
           }
         },
       ),
-      initialRemotes = config.remote,
+      initialRemotes = config.remotes,
       configStore = configStore,
     )
     startForegroundMonitor()

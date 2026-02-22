@@ -9,7 +9,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.config.CoreConfig
+import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
@@ -62,34 +62,34 @@ import kotlin.uuid.Uuid
 class Ketch(
   private val httpEngine: HttpEngine,
   private val taskStore: TaskStore = InMemoryTaskStore(),
-  private val config: CoreConfig = CoreConfig.Default,
+  private val config: DownloadConfig = DownloadConfig.Default,
   private val name: String = "Ketch",
   private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
   additionalSources: List<DownloadSource> = emptyList(),
   logger: Logger = Logger.None,
   private val dispatchers: KetchDispatchers = KetchDispatchers(
-    config.threads.networkPoolSize,
-    config.threads.ioPoolSize,
+    networkThreads = config.maxConnectionsPerDownload,
+    ioThreads = maxOf(config.maxConnectionsPerDownload / 2, 2),
   ),
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
   @Volatile
-  private var currentConfig: CoreConfig = config
+  private var currentConfig: DownloadConfig = config
 
   private val globalLimiter = DelegatingSpeedLimiter(
-    if (config.speed.isUnlimited) {
+    if (config.speedLimit.isUnlimited) {
       SpeedLimiter.Unlimited
     } else {
-      TokenBucket(config.speed.bytesPerSecond)
+      TokenBucket(config.speedLimit.bytesPerSecond)
     },
   )
 
   private val httpSource = HttpDownloadSource(
     httpEngine = httpEngine,
-    maxConnections = config.maxConnections,
-    progressUpdateIntervalMs = config.progressUpdateIntervalMs,
-    segmentSaveIntervalMs = config.segmentSaveIntervalMs,
+    maxConnections = config.maxConnectionsPerDownload,
+    progressIntervalMs = config.progressIntervalMs,
+    saveIntervalMs = config.saveIntervalMs,
   )
 
   private val sourceResolver = SourceResolver(
@@ -113,7 +113,8 @@ class Ketch(
   )
 
   private val scheduler = DownloadQueue(
-    queueConfig = config.queue,
+    maxConcurrentDownloads = config.maxConcurrentDownloads,
+    maxConnectionsPerHost = config.maxConnectionsPerHost,
     coordinator = coordinator,
   )
 
@@ -131,14 +132,11 @@ class Ketch(
   init {
     KetchLogger.setLogger(logger)
     log.i { "Ketch v${KetchApi.VERSION} initialized" }
-    if (!config.speed.isUnlimited) {
-      log.i { "Global speed limit: ${config.speed}" }
+    if (!config.speedLimit.isUnlimited) {
+      log.i { "Global speed limit: ${config.speedLimit}" }
     }
     if (additionalSources.isNotEmpty()) {
-      log.i {
-        "Additional sources: " +
-          additionalSources.joinToString { it.type }
-      }
+      log.i { "Additional sources: ${additionalSources.joinToString { it.type }}" }
     }
   }
 
@@ -198,7 +196,7 @@ class Ketch(
       revision = KetchApi.REVISION,
       uptime = startMark.elapsedNow().inWholeSeconds,
       config = currentConfig,
-      system = currentSystemInfo(config.defaultDirectory),
+      system = currentSystemInfo(config.defaultDirectory ?: "downloads"),
     )
   }
 
@@ -342,11 +340,11 @@ class Ketch(
     }
   }
 
-  override suspend fun updateConfig(config: CoreConfig) {
+  override suspend fun updateConfig(config: DownloadConfig) {
     currentConfig = config
 
     // Apply speed limit
-    val limit = config.speed
+    val limit = config.speedLimit
     val current = globalLimiter.delegate
     if (limit.isUnlimited) {
       globalLimiter.delegate = SpeedLimiter.Unlimited
@@ -357,7 +355,8 @@ class Ketch(
     }
 
     // Apply queue config
-    scheduler.queueConfig = config.queue
+    scheduler.maxConcurrent = config.maxConcurrentDownloads
+    scheduler.maxPerHost = config.maxConnectionsPerHost
 
     log.i { "Config updated: $config" }
   }

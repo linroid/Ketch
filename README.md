@@ -74,8 +74,8 @@ Start downloading:
 val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
   config = DownloadConfig(
-    maxConnections = 4,
-    queueConfig = QueueConfig(maxConcurrentDownloads = 3)
+    maxConnectionsPerDownload = 4,
+    maxConcurrentDownloads = 3,
   )
 )
 

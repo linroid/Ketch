@@ -96,16 +96,6 @@
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.ketch.api.config.QueueConfig",
-    "allDeclaredFields": true,
-    "allDeclaredMethods": true,
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "com.linroid.ketch.api.config.QueueConfig$Companion",
-    "allDeclaredMethods": true
-  },
-  {
     "name": "com.linroid.ketch.api.SystemInfo",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,

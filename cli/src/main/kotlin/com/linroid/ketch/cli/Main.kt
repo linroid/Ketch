@@ -7,8 +7,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.config.CoreConfig
-import com.linroid.ketch.api.config.QueueConfig
+import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.FileConfigStore
@@ -139,14 +138,12 @@ fun main(args: Array<String>) {
   println("Max concurrent: $maxConcurrent")
   println()
 
-  val config = CoreConfig(
-    maxConnections = 4,
+  val config = DownloadConfig(
+    maxConnectionsPerDownload = 4,
     retryCount = 3,
     retryDelayMs = 1000,
-    progressUpdateIntervalMs = 200,
-    queue = QueueConfig(
-      maxConcurrentDownloads = maxConcurrent,
-    )
+    progressIntervalMs = 200,
+    maxConcurrentDownloads = maxConcurrent,
   )
 
   val ketch = Ketch(
@@ -397,10 +394,9 @@ private fun runServer(args: Array<String>) {
     download = fileConfig.download.copy(
       defaultDirectory = cliDownloadDir
         ?: fileConfig.download.defaultDirectory
-          .takeIf { it != "downloads" }
         ?: defaultDownloadDir,
-      speed = cliSpeedLimit
-        ?: fileConfig.download.speed,
+      speedLimit = cliSpeedLimit
+        ?: fileConfig.download.speedLimit,
     ),
   )
 
@@ -454,10 +450,10 @@ private fun runServer(args: Array<String>) {
         serverConfig.corsAllowedHosts.joinToString(", ")
     )
   }
-  if (!downloadConfig.speed.isUnlimited) {
+  if (!downloadConfig.speedLimit.isUnlimited) {
     println(
       "  Speed limit:   " +
-        "${downloadConfig.speed.bytesPerSecond / 1024} KB/s"
+        "${downloadConfig.speedLimit.bytesPerSecond / 1024} KB/s"
     )
   }
   println()

@@ -4,7 +4,6 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.api.config.QueueConfig
 import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -13,8 +12,8 @@ import kotlin.concurrent.Volatile
 import kotlin.time.Instant
 
 internal class DownloadQueue(
-  @Volatile
-  internal var queueConfig: QueueConfig,
+  maxConcurrentDownloads: Int,
+  maxConnectionsPerHost: Int,
   private val coordinator: DownloadCoordinator,
 ) {
   private val log = KetchLogger("DownloadQueue")
@@ -22,6 +21,20 @@ internal class DownloadQueue(
   private val activeEntries = mutableMapOf<String, QueueEntry>()
   private val queuedEntries = mutableListOf<QueueEntry>()
   private val hostConnectionCount = mutableMapOf<String, Int>()
+
+  /** Effective max concurrent downloads (0 = unlimited → Int.MAX_VALUE). */
+  @Volatile
+  var maxConcurrent: Int = effectiveLimit(maxConcurrentDownloads)
+    internal set(value) {
+      field = effectiveLimit(value)
+    }
+
+  /** Effective max connections per host (0 = unlimited → Int.MAX_VALUE). */
+  @Volatile
+  var maxPerHost: Int = effectiveLimit(maxConnectionsPerHost)
+    internal set(value) {
+      field = effectiveLimit(value)
+    }
 
   internal data class QueueEntry(
     val taskId: String,
@@ -55,19 +68,16 @@ internal class DownloadQueue(
         preempted = preferResume,
       )
 
-      if (queueConfig.autoStart &&
-        activeEntries.size < queueConfig.maxConcurrentDownloads &&
-        hostCount < queueConfig.maxConnectionsPerHost
+      if (activeEntries.size < maxConcurrent &&
+        hostCount < maxPerHost
       ) {
         log.i {
           "Starting download immediately: taskId=$taskId, " +
             "active=${activeEntries.size}/" +
-            "${queueConfig.maxConcurrentDownloads}"
+            "$maxConcurrent"
         }
         startTask(entry, host)
-      } else if (request.priority == DownloadPriority.URGENT &&
-        queueConfig.autoStart
-      ) {
+      } else if (request.priority == DownloadPriority.URGENT) {
         tryPreemptAndStart(entry, host)
       } else {
         insertSorted(entry)
@@ -122,13 +132,13 @@ internal class DownloadQueue(
     insertSorted(victim)
 
     val hostCount = hostConnectionCount.getOrElse(host) { 0 }
-    if (activeEntries.size < queueConfig.maxConcurrentDownloads &&
-      hostCount < queueConfig.maxConnectionsPerHost
+    if (activeEntries.size < maxConcurrent &&
+      hostCount < maxPerHost
     ) {
       log.i {
         "Starting URGENT download: taskId=${entry.taskId}, " +
           "active=${activeEntries.size + 1}/" +
-          "${queueConfig.maxConcurrentDownloads}"
+          "$maxConcurrent"
       }
       startTask(entry, host)
     } else {
@@ -147,7 +157,7 @@ internal class DownloadQueue(
       log.d {
         "Task completed: taskId=$taskId, " +
           "active=${activeEntries.size}/" +
-          "${queueConfig.maxConcurrentDownloads}"
+          "$maxConcurrent"
       }
       promoteNext()
     }
@@ -159,7 +169,7 @@ internal class DownloadQueue(
       log.d {
         "Task failed: taskId=$taskId, " +
           "active=${activeEntries.size}/" +
-          "${queueConfig.maxConcurrentDownloads}"
+          "${maxConcurrent}"
       }
       promoteNext()
     }
@@ -171,7 +181,7 @@ internal class DownloadQueue(
       log.d {
         "Task canceled: taskId=$taskId, " +
           "active=${activeEntries.size}/" +
-          "${queueConfig.maxConcurrentDownloads}"
+          "${maxConcurrent}"
       }
       promoteNext()
     }
@@ -266,9 +276,7 @@ internal class DownloadQueue(
   }
 
   private suspend fun promoteNext() {
-    if (!queueConfig.autoStart) return
-
-    while (activeEntries.size < queueConfig.maxConcurrentDownloads) {
+    while (activeEntries.size < maxConcurrent) {
       val entry = findNextEligible() ?: break
       queuedEntries.remove(entry)
       val host = extractHost(entry.request.url)
@@ -276,7 +284,7 @@ internal class DownloadQueue(
         "Promoting queued task: taskId=${entry.taskId}, " +
           "priority=${entry.priority}, " +
           "active=${activeEntries.size + 1}/" +
-          "${queueConfig.maxConcurrentDownloads}"
+          "${maxConcurrent}"
       }
       startTask(entry, host)
     }
@@ -286,7 +294,7 @@ internal class DownloadQueue(
     for (entry in queuedEntries) {
       val host = extractHost(entry.request.url)
       val hostCount = hostConnectionCount.getOrElse(host) { 0 }
-      if (hostCount < queueConfig.maxConnectionsPerHost) {
+      if (hostCount < maxPerHost) {
         return entry
       }
     }
@@ -313,5 +321,8 @@ internal class DownloadQueue(
       val hostPort = afterScheme.substringBefore("/")
       return hostPort.substringBefore(":")
     }
+
+    private fun effectiveLimit(value: Int): Int =
+      if (value > 0) value else Int.MAX_VALUE
   }
 }

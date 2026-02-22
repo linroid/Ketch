@@ -5,7 +5,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.config.CoreConfig
+import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.core.Ketch
@@ -220,7 +220,7 @@ class InstanceManager(
       .filterIsInstance<RemoteInstance>()
       .map { it.remoteConfig }
     val current = store.load()
-    store.save(current.copy(remote = remotes))
+    store.save(current.copy(remotes = remotes))
   }
 }
 
@@ -257,7 +257,7 @@ private object DisconnectedApi : KetchApi {
     )
   }
 
-  override suspend fun updateConfig(config: CoreConfig) {}
+  override suspend fun updateConfig(config: DownloadConfig) {}
   override suspend fun start() {}
   override fun close() {}
 }
