@@ -9,10 +9,8 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -52,27 +50,23 @@ fun StatusIndicator(
 private fun stateIcon(state: DownloadState): ImageVector {
   return when (state) {
     is DownloadState.Downloading -> Icons.Filled.ArrowDownward
-    is DownloadState.Pending -> Icons.Filled.HourglassTop
     is DownloadState.Queued -> Icons.Filled.Inbox
     is DownloadState.Scheduled -> Icons.Filled.Schedule
     is DownloadState.Paused -> Icons.Filled.Pause
     is DownloadState.Completed -> Icons.Filled.CheckCircle
     is DownloadState.Failed -> Icons.Filled.ErrorOutline
     is DownloadState.Canceled -> Icons.Filled.Cancel
-    is DownloadState.Idle -> Icons.Filled.RadioButtonUnchecked
   }
 }
 
 private fun stateLabel(state: DownloadState): String {
   return when (state) {
     is DownloadState.Downloading -> "Downloading"
-    is DownloadState.Pending -> "Pending"
     is DownloadState.Queued -> "Queued"
     is DownloadState.Scheduled -> "Scheduled"
     is DownloadState.Paused -> "Paused"
     is DownloadState.Completed -> "Completed"
     is DownloadState.Failed -> "Failed"
     is DownloadState.Canceled -> "Canceled"
-    is DownloadState.Idle -> "Idle"
   }
 }

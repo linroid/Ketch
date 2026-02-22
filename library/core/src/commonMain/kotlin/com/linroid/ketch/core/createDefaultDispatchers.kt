@@ -1,12 +1,12 @@
 package com.linroid.ketch.core
 
-/**
- * Creates platform-default [KetchDispatchers].
- *
- * @param networkPoolSize number of threads in the network dispatcher pool
- * @param ioPoolSize number of threads in the I/O dispatcher pool
- */
-internal expect fun createDefaultDispatchers(
-  networkPoolSize: Int,
-  ioPoolSize: Int,
-): KetchDispatchers
+import kotlinx.coroutines.CoroutineDispatcher
+
+/** Creates the single-threaded main/task dispatcher. */
+internal expect fun createMainDispatcher(): CoroutineDispatcher
+
+/** Creates a thread pool for network operations. */
+internal expect fun createNetworkDispatcher(poolSize: Int): CoroutineDispatcher
+
+/** Creates a thread pool for blocking file I/O. */
+internal expect fun createIoDispatcher(poolSize: Int): CoroutineDispatcher

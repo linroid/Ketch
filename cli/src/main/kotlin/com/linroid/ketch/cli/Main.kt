@@ -169,8 +169,6 @@ fun main(args: Array<String>) {
             println("[Scheduled] Waiting for scheduled time...")
           is DownloadState.Queued ->
             println("[Queued] Waiting for download slot...")
-          is DownloadState.Pending ->
-            println("[Pending] Preparing download...")
           is DownloadState.Downloading -> {
             val progress = state.progress
             val pct = (progress.percent * 100).toInt()
@@ -192,7 +190,6 @@ fun main(args: Array<String>) {
             println("\n[Failed] ${state.error.message}")
           is DownloadState.Canceled ->
             println("\n[Canceled] Download canceled.")
-          is DownloadState.Idle -> {}
         }
       }
     }

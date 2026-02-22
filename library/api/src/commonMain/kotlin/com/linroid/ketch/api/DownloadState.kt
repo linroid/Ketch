@@ -8,24 +8,19 @@ import kotlinx.serialization.Serializable
  *
  * State transitions follow this general flow:
  * ```
- * Idle -> Scheduled -> Queued -> Pending -> Downloading -> Completed
- *                                  |            |
- *                                  v            v
- *                               Canceled      Paused -> Downloading
- *                                               |
- *                                               v
- *                                             Failed
+ * Scheduled -> Queued -> Downloading -> Completed
+ *                |            |
+ *                v            v
+ *             Canceled      Paused -> Downloading
+ *                             |
+ *                             v
+ *                           Failed
  * ```
  *
  * @see DownloadTask.state
  */
 @Serializable
 sealed class DownloadState {
-  /** Initial state before the task has been submitted. */
-  @Serializable
-  @SerialName("idle")
-  data object Idle : DownloadState()
-
   /** Waiting for a [DownloadSchedule] trigger or [DownloadCondition]s. */
   @Serializable
   @SerialName("scheduled")
@@ -35,11 +30,6 @@ sealed class DownloadState {
   @Serializable
   @SerialName("queued")
   data object Queued : DownloadState()
-
-  /** Slot acquired; download is about to start. */
-  @Serializable
-  @SerialName("pending")
-  data object Pending : DownloadState()
 
   /** Actively downloading. [progress] is updated periodically. */
   @Serializable
@@ -72,5 +62,5 @@ sealed class DownloadState {
 
   /** `true` when the task is actively using a download slot. */
   val isActive: Boolean
-    get() = this is Pending || this is Downloading
+    get() = this is Downloading
 }

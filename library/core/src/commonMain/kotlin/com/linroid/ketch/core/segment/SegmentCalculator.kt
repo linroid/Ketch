@@ -35,11 +35,12 @@ internal object SegmentCalculator {
   }
 
   fun singleSegment(totalBytes: Long): List<Segment> {
+    if (totalBytes == 0L) return emptyList()
     return listOf(
       Segment(
         index = 0,
         start = 0,
-        end = if (totalBytes > 0) totalBytes - 1 else 0,
+        end = totalBytes - 1,
         downloadedBytes = 0,
       )
     )

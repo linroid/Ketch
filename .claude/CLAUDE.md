@@ -39,13 +39,13 @@ cli/          # JVM CLI entry point
 - `com.linroid.ketch.core` -- `Ketch` (implements `KetchApi`), `DownloadConfig`, `QueueConfig`
 - `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `RangeSupportDetector`,
   `ServerInfo`, `DownloadSource`, `HttpDownloadSource`, `SourceResolver`, `SourceInfo`,
-  `SourceResumeState`, `DownloadContext`, `DownloadScheduler`, `ScheduleManager`,
+  `SourceResumeState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`
 - `com.linroid.ketch.core.file` -- `FileAccessor` (expect/actual), `FileNameResolver`,
   `DefaultFileNameResolver`, `PathSerializer`
 - `com.linroid.ketch.core.log` -- `Logger`, `KetchLogger`
-- `com.linroid.ketch.core.task` -- `DownloadTaskImpl`, `TaskStore`, `InMemoryTaskStore`,
+- `com.linroid.ketch.core.task` -- `RealDownloadTask`, `TaskStore`, `InMemoryTaskStore`,
   `TaskRecord`, `TaskState`
 
 ### `library:remote`
@@ -63,7 +63,7 @@ cli/          # JVM CLI entry point
 - Persistent task metadata via `TaskStore` interface
 - Duplicate download guards in `start()`, `startFromRecord()`, `resume()`
 
-### Queue Management (`DownloadScheduler`)
+### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`QueueConfig.maxConcurrentDownloads`)
 - Per-host connection limits (`QueueConfig.maxConnectionsPerHost`)
 - Priority-based ordering (`DownloadPriority`: LOW, NORMAL, HIGH, URGENT)
@@ -74,7 +74,7 @@ cli/          # JVM CLI entry point
 - Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`
 - Token-bucket algorithm (`TokenBucket`) with delegating wrapper
 
-### Download Scheduling (`ScheduleManager`)
+### Download Scheduling (`DownloadScheduler`)
 - `DownloadSchedule.Immediate`, `AtTime(Instant)`, `AfterDelay(Duration)`
 - `DownloadCondition` interface for user-defined conditions (e.g., WiFi-only)
 - Reschedule support via `DownloadTask.reschedule()`
@@ -150,7 +150,7 @@ cli/          # JVM CLI entry point
 - Use `KetchLogger` for all internal logging — instantiate per component:
   `private val log = KetchLogger("Coordinator")`
 - Tags: "Ketch", "Coordinator", "SegmentDownloader", "RangeDetector", "KtorHttpEngine",
-  "Scheduler", "ScheduleManager", "SourceResolver", "HttpSource", "TokenBucket"
+  "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "TokenBucket"
 - Levels: verbose (segment detail), debug (state changes), info (user events),
   warn (retries), error (fatal)
 - Use lazy lambdas: `log.d { "expensive $computation" }`

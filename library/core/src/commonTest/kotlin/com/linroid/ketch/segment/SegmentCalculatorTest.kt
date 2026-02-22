@@ -137,9 +137,7 @@ class SegmentCalculatorTest {
   @Test
   fun singleSegment_zeroBytes() {
     val segments = SegmentCalculator.singleSegment(totalBytes = 0)
-    assertEquals(1, segments.size)
-    assertEquals(0L, segments[0].start)
-    assertEquals(0L, segments[0].end)
+    assertEquals(0, segments.size)
   }
 
   // --- resegment tests ---

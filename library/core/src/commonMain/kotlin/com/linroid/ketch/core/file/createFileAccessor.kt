@@ -11,9 +11,9 @@ import kotlinx.coroutines.CoroutineDispatcher
  * a stub that throws [UnsupportedOperationException] is returned.
  *
  * @param path file system path (or content URI on Android)
- * @param ioDispatcher dispatcher for blocking file I/O operations
+ * @param dispatcher dispatcher for blocking file I/O operations
  */
 expect fun createFileAccessor(
   path: String,
-  ioDispatcher: CoroutineDispatcher,
+  dispatcher: CoroutineDispatcher,
 ): FileAccessor

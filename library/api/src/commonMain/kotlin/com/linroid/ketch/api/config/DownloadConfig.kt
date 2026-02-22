@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
  * Download configuration.
  *
  * @property defaultDirectory Default directory for saving downloaded files when
- *   [DownloadRequest.directory][com.linroid.ketch.api.DownloadRequest.directory] is `null`.
+ *   [DownloadRequest.directory][com.linroid.ketch.api.DownloadRequest.destination] is `null`.
  *   Should be set to a platform-appropriate path by the app layer.
  * @property maxConnections Maximum number of concurrent segment downloads
  * @property retryCount Maximum number of retry attempts for failed requests

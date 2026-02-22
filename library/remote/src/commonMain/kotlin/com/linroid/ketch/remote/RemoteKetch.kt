@@ -42,6 +42,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 /**
@@ -103,6 +105,7 @@ class RemoteKetch(
   override val backendLabel: String =
     "Remote · $host:$port"
 
+  private val taskMutex = Mutex()
   private val taskMap = mutableMapOf<String, RemoteDownloadTask>()
 
   private val _tasks = MutableStateFlow<List<DownloadTask>>(
@@ -111,6 +114,7 @@ class RemoteKetch(
   override val tasks: StateFlow<List<DownloadTask>> =
     _tasks.asStateFlow()
 
+  private val sseMutex = Mutex()
   private var sseJob: Job? = null
 
   override suspend fun download(
@@ -123,7 +127,7 @@ class RemoteKetch(
     }
     checkSuccess(response)
     val task = createRemoteTask(response.body())
-    addOrUpdate(task)
+    taskMutex.withLock { addOrUpdate(task) }
     return task
   }
 
@@ -141,9 +145,11 @@ class RemoteKetch(
 
   override suspend fun start() {
     log.i { "Connecting to $host:$port" }
-    if (sseJob?.isActive == true) return
-    _connectionState.value = ConnectionState.Connecting
-    sseJob = scope.launch { connectSse() }
+    sseMutex.withLock {
+      if (sseJob?.isActive == true) return
+      _connectionState.value = ConnectionState.Connecting
+      sseJob = scope.launch { connectSse() }
+    }
   }
 
   override suspend fun status(): KetchStatus {
@@ -163,8 +169,11 @@ class RemoteKetch(
 
   override fun close() {
     log.d { "Close" }
-    scope.cancel()
-    httpClient.close()
+    try {
+      scope.cancel()
+    } finally {
+      httpClient.close()
+    }
   }
 
   // -- SSE connection with reconnection --
@@ -180,11 +189,12 @@ class RemoteKetch(
           urlString = "/api/events",
         ) {
           log.i { "Connected to /events" }
-          incoming.collect { event ->
-            val data = event.data ?: return@collect
+          incoming.collect { sseEvent ->
+            val data = sseEvent.data ?: return@collect
             try {
-              val event: TaskEvent = json.decodeFromString(data)
-              handleEvent(event)
+              val taskEvent: TaskEvent =
+                json.decodeFromString(data)
+              handleEvent(taskEvent)
             } catch (error: Exception) {
               log.e(error) { "Failed to handle event" }
             }
@@ -217,10 +227,12 @@ class RemoteKetch(
     if (response.status.isSuccess()) {
       val snapshots: TasksResponse = response.body()
       log.i { "Fetched ${snapshots.tasks.size} tasks" }
-      taskMap.clear()
       val tasks = snapshots.tasks.map(::createRemoteTask)
-      tasks.forEach { taskMap[it.taskId] = it }
-      _tasks.value = tasks
+      taskMutex.withLock {
+        taskMap.clear()
+        tasks.forEach { taskMap[it.taskId] = it }
+        _tasks.value = tasks
+      }
       log.i { "Fetched ${snapshots.tasks.size} tasks -> ${tasks.size}" }
     }
   }
@@ -236,7 +248,7 @@ class RemoteKetch(
           if (response.status.isSuccess()) {
             val wire: TaskSnapshot = response.body()
             val task = createRemoteTask(wire)
-            addOrUpdate(task)
+            taskMutex.withLock { addOrUpdate(task) }
           }
         } catch (e: Exception) {
           log.w(e) { "Failed to fetch added task: ${event.taskId}" }
@@ -244,16 +256,20 @@ class RemoteKetch(
       }
 
       is TaskEvent.TaskRemoved -> {
-        removeTask(event.taskId)
+        taskMutex.withLock { removeTask(event.taskId) }
       }
 
       is TaskEvent.StateChanged -> {
-        val task = taskMap[event.taskId] ?: return
+        val task = taskMutex.withLock {
+          taskMap[event.taskId]
+        } ?: return
         task.updateState(event.state)
       }
 
       is TaskEvent.Progress -> {
-        val task = taskMap[event.taskId] ?: return
+        val task = taskMutex.withLock {
+          taskMap[event.taskId]
+        } ?: return
         task.updateState(event.state)
       }
 
@@ -272,10 +288,7 @@ class RemoteKetch(
       initialSegments = wire.segments,
       httpClient = httpClient,
       onRemoved = { id ->
-        taskMap.remove(id)
-        _tasks.value = _tasks.value.filter {
-          it.taskId != id
-        }
+        taskMutex.withLock { removeTask(id) }
       },
     )
   }

@@ -5,9 +5,9 @@ import java.io.RandomAccessFile
 
 actual fun createFileAccessor(
   path: String,
-  ioDispatcher: CoroutineDispatcher,
+  dispatcher: CoroutineDispatcher,
 ): FileAccessor {
-  return PathFileAccessor(path, ioDispatcher) { realPath ->
+  return PathFileAccessor(path, dispatcher) { realPath ->
     JvmRandomAccessHandle(RandomAccessFile(realPath, "rw"))
   }
 }

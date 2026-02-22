@@ -68,7 +68,7 @@ class DownloadRoutesTest {
         "/tmp/downloads/",
         task.request.destination?.value,
       )
-      assertEquals(DownloadState.Pending, task.state)
+      assertEquals(DownloadState.Queued, task.state)
       assertEquals(
         DownloadPriority.NORMAL, task.request.priority
       )

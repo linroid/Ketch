@@ -246,8 +246,7 @@ class KtorHttpEngine(
     }
 
     /**
-     * Extracts a numeric parameter from a
-     * [structured field](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers)
+     * Extracts a numeric parameter from a structured field
      * value like `"default";r=50;t=30`.
      */
     private fun parseStructuredParam(

@@ -1,15 +1,18 @@
 package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.config.QueueConfig
 import com.linroid.ketch.core.engine.DownloadCoordinator
-import com.linroid.ketch.core.engine.DownloadScheduler
+import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.HttpDownloadSource
+import com.linroid.ketch.core.engine.DownloadScheduler
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.InMemoryTaskStore
@@ -25,25 +28,29 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class DownloadSchedulerTest {
 
   private fun createRequest(
-    priority: DownloadPriority = DownloadPriority.NORMAL,
+    schedule: DownloadSchedule = DownloadSchedule.Immediate,
+    conditions: List<DownloadCondition> = emptyList(),
   ) = DownloadRequest(
     url = "https://example.com/file.zip",
     destination = Destination("/tmp/"),
-    priority = priority,
+    schedule = schedule,
+    conditions = conditions,
+    priority = DownloadPriority.NORMAL,
   )
 
-  private fun createScheduler(
+  private fun createTestComponents(
     scope: CoroutineScope,
-    maxConcurrent: Int = 10,
-    autoStart: Boolean = true,
-  ): DownloadScheduler {
+  ): Pair<DownloadQueue, DownloadScheduler> {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
@@ -53,37 +60,106 @@ class DownloadSchedulerTest {
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
-    )
-    return DownloadScheduler(
-      queueConfig = QueueConfig(
-        maxConcurrentDownloads = maxConcurrent,
-        autoStart = autoStart,
-      ),
-      coordinator = coordinator,
       scope = scope,
     )
+    val scheduler = DownloadQueue(
+      queueConfig = QueueConfig(maxConcurrentDownloads = 10),
+      coordinator = coordinator,
+    )
+    val manager = DownloadScheduler(scheduler, scope)
+    return scheduler to manager
   }
 
   @Test
-  fun enqueue_autoStart_movesToActiveState() = runTest {
+  fun afterDelay_enqueuesAfterDelay() = runTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope)
         val stateFlow =
-          MutableStateFlow<DownloadState>(DownloadState.Pending)
+          MutableStateFlow<DownloadState>(DownloadState.Queued)
         val segmentsFlow =
           MutableStateFlow<List<Segment>>(emptyList())
 
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
+        val (_, manager) = createTestComponents(scope)
+
+        val request = createRequest(
+          schedule = DownloadSchedule.AfterDelay(200.milliseconds),
+        )
+
+        manager.schedule(
+          "task-1", request, Clock.System.now(),
           stateFlow, segmentsFlow,
         )
 
-        // Should have moved past Pending (to Downloading or failed
-        // since fileAccessor throws)
+        assertIs<DownloadState.Scheduled>(stateFlow.value)
+        assertTrue(manager.isScheduled("task-1"))
+      } finally {
+        scope.cancel()
+      }
+    }
+  }
+
+  @Test
+  fun atTime_setsScheduledState() = runTest {
+    withContext(Dispatchers.Default) {
+      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      try {
+        val stateFlow =
+          MutableStateFlow<DownloadState>(DownloadState.Queued)
+        val segmentsFlow =
+          MutableStateFlow<List<Segment>>(emptyList())
+
+        val (_, manager) = createTestComponents(scope)
+
+        val futureTime = Clock.System.now() + 10.seconds
+        val request = createRequest(
+          schedule = DownloadSchedule.AtTime(futureTime),
+        )
+
+        manager.schedule(
+          "task-1", request, Clock.System.now(),
+          stateFlow, segmentsFlow,
+        )
+
+        val state = stateFlow.value
+        assertIs<DownloadState.Scheduled>(state)
+        assertEquals(
+          DownloadSchedule.AtTime(futureTime),
+          state.schedule,
+        )
+        assertTrue(manager.isScheduled("task-1"))
+      } finally {
+        scope.cancel()
+      }
+    }
+  }
+
+  @Test
+  fun atTime_pastTime_enqueuesImmediately() = runTest {
+    withContext(Dispatchers.Default) {
+      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      try {
+        val stateFlow =
+          MutableStateFlow<DownloadState>(DownloadState.Queued)
+        val segmentsFlow =
+          MutableStateFlow<List<Segment>>(emptyList())
+
+        val (_, manager) = createTestComponents(scope)
+
+        // Schedule in the past — should fire immediately
+        val pastTime = Clock.System.now() - 1.seconds
+        val request = createRequest(
+          schedule = DownloadSchedule.AtTime(pastTime),
+        )
+
+        manager.schedule(
+          "task-1", request, Clock.System.now(),
+          stateFlow, segmentsFlow,
+        )
+
+        // Should transition out of Scheduled quickly
         withTimeout(2.seconds) {
-          stateFlow.first { it != DownloadState.Pending }
+          stateFlow.first { it !is DownloadState.Scheduled }
         }
       } finally {
         scope.cancel()
@@ -92,22 +168,47 @@ class DownloadSchedulerTest {
   }
 
   @Test
-  fun enqueue_noAutoStart_staysQueued() = runTest {
+  fun immediate_withConditions_waitsForCondition() = runTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, autoStart = false)
         val stateFlow =
-          MutableStateFlow<DownloadState>(DownloadState.Pending)
+          MutableStateFlow<DownloadState>(DownloadState.Queued)
         val segmentsFlow =
           MutableStateFlow<List<Segment>>(emptyList())
 
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
+        val conditionMet = MutableStateFlow(false)
+        val condition = DownloadCondition.Test(conditionMet)
+
+        val (_, manager) = createTestComponents(scope)
+
+        val request = createRequest(
+          schedule = DownloadSchedule.Immediate,
+          conditions = listOf(condition),
+        )
+
+        manager.schedule(
+          "task-1", request, Clock.System.now(),
           stateFlow, segmentsFlow,
         )
 
-        assertIs<DownloadState.Queued>(stateFlow.value)
+        // Should be in Scheduled state while waiting for condition
+        assertIs<DownloadState.Scheduled>(stateFlow.value)
+
+        // Meet the condition
+        conditionMet.value = true
+
+        // Wait for the scheduler to pick it up
+        withTimeout(2.seconds) {
+          stateFlow.first { it !is DownloadState.Scheduled }
+        }
+
+        // Should have moved past Scheduled
+        val state = stateFlow.value
+        assertTrue(
+          state !is DownloadState.Scheduled,
+          "Expected non-Scheduled state, got $state",
+        )
       } finally {
         scope.cancel()
       }
@@ -115,61 +216,43 @@ class DownloadSchedulerTest {
   }
 
   @Test
-  fun enqueue_exceedingMaxConcurrent_queuesTask() = runTest {
+  fun multipleConditions_allMustBeMet() = runTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
-
-        // Fill the single slot
-        val stateFlow1 =
-          MutableStateFlow<DownloadState>(DownloadState.Pending)
-        val segmentsFlow1 =
-          MutableStateFlow<List<Segment>>(emptyList())
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          stateFlow1, segmentsFlow1,
-        )
-
-        // Second task should be queued
-        val stateFlow2 =
-          MutableStateFlow<DownloadState>(DownloadState.Pending)
-        val segmentsFlow2 =
-          MutableStateFlow<List<Segment>>(emptyList())
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          stateFlow2, segmentsFlow2,
-        )
-
-        assertIs<DownloadState.Queued>(stateFlow2.value)
-      } finally {
-        scope.cancel()
-      }
-    }
-  }
-
-  @Test
-  fun enqueue_preferResume_setsPreemptedFlag() = runTest {
-    withContext(Dispatchers.Default) {
-      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-      try {
-        val scheduler = createScheduler(scope)
         val stateFlow =
-          MutableStateFlow<DownloadState>(DownloadState.Pending)
+          MutableStateFlow<DownloadState>(DownloadState.Queued)
         val segmentsFlow =
           MutableStateFlow<List<Segment>>(emptyList())
 
-        // Enqueue with preferResume — the task will be started
-        // with resume() first (which may fail since no record
-        // exists), then fall back to start()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          stateFlow, segmentsFlow, preferResume = true,
+        val condition1Met = MutableStateFlow(false)
+        val condition2Met = MutableStateFlow(false)
+        val cond1 = DownloadCondition.Test(condition1Met)
+        val cond2 = DownloadCondition.Test(condition2Met)
+
+        val (_, manager) = createTestComponents(scope)
+
+        val request = createRequest(
+          conditions = listOf(cond1, cond2),
         )
 
-        // Should have attempted to start (moved past Pending)
+        manager.schedule(
+          "task-1", request, Clock.System.now(),
+          stateFlow, segmentsFlow,
+        )
+
+        assertIs<DownloadState.Scheduled>(stateFlow.value)
+
+        // Meet only the first condition — should still wait
+        condition1Met.value = true
+        delay(200)
+        assertIs<DownloadState.Scheduled>(stateFlow.value)
+
+        // Meet the second condition — now should proceed
+        condition2Met.value = true
+
         withTimeout(2.seconds) {
-          stateFlow.first { it != DownloadState.Pending }
+          stateFlow.first { it !is DownloadState.Scheduled }
         }
       } finally {
         scope.cancel()
@@ -178,40 +261,36 @@ class DownloadSchedulerTest {
   }
 
   @Test
-  fun dequeue_removesQueuedTask() = runTest {
+  fun cancel_stopsScheduledTask() = runTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
-
-        // Fill the single slot
-        val stateFlow1 =
-          MutableStateFlow<DownloadState>(DownloadState.Pending)
-        val segmentsFlow1 =
+        val stateFlow =
+          MutableStateFlow<DownloadState>(DownloadState.Queued)
+        val segmentsFlow =
           MutableStateFlow<List<Segment>>(emptyList())
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          stateFlow1, segmentsFlow1,
+
+        val (_, manager) = createTestComponents(scope)
+
+        // Schedule with long delay
+        val request = createRequest(
+          schedule = DownloadSchedule.AfterDelay(10.seconds),
+        )
+        manager.schedule(
+          "task-1", request, Clock.System.now(),
+          stateFlow, segmentsFlow,
         )
 
-        // Queue a second task
-        val stateFlow2 =
-          MutableStateFlow<DownloadState>(DownloadState.Pending)
-        val segmentsFlow2 =
-          MutableStateFlow<List<Segment>>(emptyList())
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          stateFlow2, segmentsFlow2,
-        )
-        assertIs<DownloadState.Queued>(stateFlow2.value)
+        assertTrue(manager.isScheduled("task-1"))
 
-        // Dequeue the second task — it should be removed from queue
-        scheduler.dequeue("task-2")
+        // Cancel it
+        manager.cancel("task-1")
 
-        // Verify it stays Queued (not promoted) — the dequeue
-        // only removes, it doesn't change state
         delay(100)
-        assertIs<DownloadState.Queued>(stateFlow2.value)
+        assertTrue(
+          !manager.isScheduled("task-1"),
+          "Task should no longer be scheduled after cancel",
+        )
       } finally {
         scope.cancel()
       }
@@ -219,18 +298,189 @@ class DownloadSchedulerTest {
   }
 
   @Test
-  fun extractHost_parsesCorrectly() {
-    val host = DownloadScheduler.extractHost(
-      "https://cdn.example.com:8080/path/file.zip",
-    )
-    assertEquals(host, "cdn.example.com", "Expected 'cdn.example.com', got '$host'")
+  fun cancel_nonExistentTask_doesNothing() = runTest {
+    withContext(Dispatchers.Default) {
+      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      try {
+        val (_, manager) = createTestComponents(scope)
+
+        // Should not throw
+        manager.cancel("non-existent")
+        assertFalse(manager.isScheduled("non-existent"))
+      } finally {
+        scope.cancel()
+      }
+    }
   }
 
   @Test
-  fun extractHost_simpleUrl() {
-    val host = DownloadScheduler.extractHost(
-      "https://example.com/file.zip",
-    )
-    assertEquals(host, "example.com", "Expected 'example.com', got '$host'")
+  fun isScheduled_returnsFalseForUnknownTask() = runTest {
+    withContext(Dispatchers.Default) {
+      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      try {
+        val (_, manager) = createTestComponents(scope)
+        assertFalse(manager.isScheduled("unknown"))
+      } finally {
+        scope.cancel()
+      }
+    }
+  }
+
+  @Test
+  fun reschedule_setsScheduledState() = runTest {
+    withContext(Dispatchers.Default) {
+      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      try {
+        val stateFlow =
+          MutableStateFlow<DownloadState>(
+            DownloadState.Paused(
+              com.linroid.ketch.api.DownloadProgress(500, 1000),
+            ),
+          )
+        val segmentsFlow =
+          MutableStateFlow<List<Segment>>(emptyList())
+
+        val (_, manager) = createTestComponents(scope)
+        val request = createRequest()
+        val newSchedule = DownloadSchedule.AfterDelay(10.seconds)
+
+        manager.reschedule(
+          "task-1", request, newSchedule, emptyList(),
+          Clock.System.now(), stateFlow, segmentsFlow,
+        )
+
+        val state = stateFlow.value
+        assertIs<DownloadState.Scheduled>(state)
+        assertEquals(newSchedule, state.schedule)
+        assertTrue(manager.isScheduled("task-1"))
+      } finally {
+        scope.cancel()
+      }
+    }
+  }
+
+  @Test
+  fun reschedule_cancelsOldScheduleJob() = runTest {
+    withContext(Dispatchers.Default) {
+      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      try {
+        val stateFlow =
+          MutableStateFlow<DownloadState>(DownloadState.Queued)
+        val segmentsFlow =
+          MutableStateFlow<List<Segment>>(emptyList())
+
+        val (_, manager) = createTestComponents(scope)
+        val request = createRequest(
+          schedule = DownloadSchedule.AfterDelay(10.seconds),
+        )
+
+        // Schedule with long delay
+        manager.schedule(
+          "task-1", request, Clock.System.now(),
+          stateFlow, segmentsFlow,
+        )
+        assertTrue(manager.isScheduled("task-1"))
+
+        // Reschedule with short delay — old job should be canceled
+        val shortDelay = DownloadSchedule.AfterDelay(100.milliseconds)
+        manager.reschedule(
+          "task-1", request, shortDelay, emptyList(),
+          Clock.System.now(), stateFlow, segmentsFlow,
+        )
+
+        val state = stateFlow.value
+        assertIs<DownloadState.Scheduled>(state)
+        assertEquals(shortDelay, state.schedule)
+
+        // New schedule should fire quickly
+        withTimeout(2.seconds) {
+          stateFlow.first { it !is DownloadState.Scheduled }
+        }
+      } finally {
+        scope.cancel()
+      }
+    }
+  }
+
+  @Test
+  fun reschedule_withConditions_waitsForConditions() = runTest {
+    withContext(Dispatchers.Default) {
+      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      try {
+        val stateFlow =
+          MutableStateFlow<DownloadState>(
+            DownloadState.Paused(
+              com.linroid.ketch.api.DownloadProgress(500, 1000),
+            ),
+          )
+        val segmentsFlow =
+          MutableStateFlow<List<Segment>>(emptyList())
+
+        val conditionMet = MutableStateFlow(false)
+        val condition = DownloadCondition.Test(conditionMet)
+
+        val (_, manager) = createTestComponents(scope)
+        val request = createRequest()
+
+        manager.reschedule(
+          "task-1", request, DownloadSchedule.Immediate,
+          listOf(condition),
+          Clock.System.now(), stateFlow, segmentsFlow,
+        )
+
+        // Should be Scheduled while waiting for condition
+        assertIs<DownloadState.Scheduled>(stateFlow.value)
+
+        // Still waiting
+        delay(200)
+        assertIs<DownloadState.Scheduled>(stateFlow.value)
+
+        // Meet the condition
+        conditionMet.value = true
+
+        withTimeout(2.seconds) {
+          stateFlow.first { it !is DownloadState.Scheduled }
+        }
+      } finally {
+        scope.cancel()
+      }
+    }
+  }
+
+  @Test
+  fun afterDelay_enqueuesMovesPastScheduled() = runTest {
+    withContext(Dispatchers.Default) {
+      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      try {
+        val stateFlow =
+          MutableStateFlow<DownloadState>(DownloadState.Queued)
+        val segmentsFlow =
+          MutableStateFlow<List<Segment>>(emptyList())
+
+        val (_, manager) = createTestComponents(scope)
+
+        val request = createRequest(
+          schedule = DownloadSchedule.AfterDelay(100.milliseconds),
+        )
+
+        manager.schedule(
+          "task-1", request, Clock.System.now(),
+          stateFlow, segmentsFlow,
+        )
+
+        assertIs<DownloadState.Scheduled>(stateFlow.value)
+
+        // After the delay fires, state should move past Scheduled
+        withTimeout(2.seconds) {
+          stateFlow.first { it !is DownloadState.Scheduled }
+        }
+
+        // And the job should be cleaned up
+        delay(100)
+        assertFalse(manager.isScheduled("task-1"))
+      } finally {
+        scope.cancel()
+      }
+    }
   }
 }

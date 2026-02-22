@@ -34,8 +34,7 @@ fun TaskActionButtons(
     verticalAlignment = Alignment.CenterVertically,
   ) {
     when (state) {
-      is DownloadState.Downloading,
-      is DownloadState.Pending -> {
+      is DownloadState.Downloading -> {
         ActionIcon(
           icon = Icons.Filled.Pause,
           description = "Pause",
@@ -74,8 +73,7 @@ fun TaskActionButtons(
       }
       is DownloadState.Completed,
       is DownloadState.Scheduled,
-      is DownloadState.Queued,
-      is DownloadState.Idle -> {}
+      is DownloadState.Queued -> {}
     }
   }
 }

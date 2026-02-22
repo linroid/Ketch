@@ -8,8 +8,6 @@ import android.system.Os
 import android.system.OsConstants
 import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
@@ -19,16 +17,16 @@ import java.io.IOException
  * Uses [Os.lseek] + [Os.write] for random-access writes and
  * [Os.fstat] for file size. No `DocumentFile` dependency.
  *
- * @param ioDispatcher dispatcher for blocking I/O operations
+ * @param dispatcher dispatcher for blocking I/O operations
  */
 internal class ContentUriFileAccessor(
   private val context: Context,
   private val uri: Uri,
-  private val ioDispatcher: CoroutineDispatcher,
+  dispatcher: CoroutineDispatcher,
 ) : FileAccessor {
 
   private val log = KetchLogger("FileAccessor")
-  private val mutex = Mutex()
+  private val dispatcher = dispatcher.limitedParallelism(1)
 
   private val pfd = context.contentResolver.openFileDescriptor(uri, "rw")
   private val fileDescriptor = pfd?.fileDescriptor
@@ -42,32 +40,28 @@ internal class ContentUriFileAccessor(
   }
 
   override suspend fun writeAt(offset: Long, data: ByteArray) {
-    withContext(ioDispatcher) {
-      mutex.withLock {
-        Os.lseek(fileDescriptor, offset, OsConstants.SEEK_SET)
-        if (data.isEmpty()) return@withLock
+    withContext(dispatcher) {
+      Os.lseek(fileDescriptor, offset, OsConstants.SEEK_SET)
+      if (data.isEmpty()) return@withContext
 
-        var byteOffset = 0
-        var byteCount = data.size
-        try {
-          while (byteCount > 0) {
-            val bytesWritten =
-              Os.write(fileDescriptor, data, byteOffset, byteCount)
-            byteCount -= bytesWritten
-            byteOffset += bytesWritten
-          }
-        } catch (e: ErrnoException) {
-          throw IOException(e.message).apply { initCause(e) }
+      var byteOffset = 0
+      var byteCount = data.size
+      try {
+        while (byteCount > 0) {
+          val bytesWritten =
+            Os.write(fileDescriptor, data, byteOffset, byteCount)
+          byteCount -= bytesWritten
+          byteOffset += bytesWritten
         }
+      } catch (e: ErrnoException) {
+        throw IOException(e.message).apply { initCause(e) }
       }
     }
   }
 
   override suspend fun flush() {
-    withContext(ioDispatcher) {
-      mutex.withLock {
-        fileDescriptor.sync()
-      }
+    withContext(dispatcher) {
+      fileDescriptor.sync()
     }
   }
 
@@ -77,16 +71,14 @@ internal class ContentUriFileAccessor(
   }
 
   override suspend fun delete() {
-    withContext(ioDispatcher) {
-      mutex.withLock {
-        close()
-        log.d { "Deleting document: $uri" }
-        DocumentsContract.deleteDocument(context.contentResolver, uri)
-      }
+    withContext(dispatcher) {
+      close()
+      log.d { "Deleting document: $uri" }
+      DocumentsContract.deleteDocument(context.contentResolver, uri)
     }
   }
 
-  override suspend fun size(): Long = withContext(ioDispatcher) {
+  override suspend fun size(): Long = withContext(dispatcher) {
     Os.fstat(fileDescriptor).st_size
   }
 

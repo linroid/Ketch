@@ -132,7 +132,14 @@ internal class HttpDownloadSource(
     context: DownloadContext,
     resumeState: SourceResumeState,
   ) {
-    val state = Json.decodeFromString<HttpResumeState>(resumeState.data)
+    val state = try {
+      Json.decodeFromString<HttpResumeState>(resumeState.data)
+    } catch (e: Exception) {
+      if (e is CancellationException) throw e
+      throw KetchError.ValidationFailed(
+        "Corrupt resume state: ${e.message}"
+      )
+    }
 
     log.i { "Resuming download for taskId=${context.taskId}" }
 

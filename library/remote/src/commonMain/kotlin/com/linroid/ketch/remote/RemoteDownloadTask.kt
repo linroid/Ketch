@@ -36,7 +36,7 @@ internal class RemoteDownloadTask(
   initialState: DownloadState,
   initialSegments: List<Segment>,
   private val httpClient: HttpClient,
-  private val onRemoved: (String) -> Unit,
+  private val onRemoved: suspend (String) -> Unit,
 ) : DownloadTask {
   private val log = KetchLogger("RemoteTask")
 

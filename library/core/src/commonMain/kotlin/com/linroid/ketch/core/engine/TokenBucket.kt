@@ -40,7 +40,7 @@ internal class TokenBucket(
     }
   }
 
-  fun updateRate(newBytesPerSecond: Long) {
+  suspend fun updateRate(newBytesPerSecond: Long) = mutex.withLock {
     rate = newBytesPerSecond.toDouble()
     log.d { "Rate updated to $newBytesPerSecond bytes/sec" }
   }

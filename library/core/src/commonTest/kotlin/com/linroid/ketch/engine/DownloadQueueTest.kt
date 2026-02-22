@@ -8,7 +8,7 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.config.QueueConfig
 import com.linroid.ketch.core.engine.DownloadCoordinator
-import com.linroid.ketch.core.engine.DownloadScheduler
+import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
@@ -30,7 +30,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Comprehensive tests for queue management via DownloadScheduler:
+ * Comprehensive tests for queue management via DownloadQueue:
  * priority ordering, concurrency limits, per-host limits,
  * auto-scheduling, preemption, and dequeue/cancel in queue.
  */
@@ -50,7 +50,7 @@ class DownloadQueueTest {
     maxConcurrent: Int = 10,
     maxPerHost: Int = 4,
     autoStart: Boolean = true,
-  ): DownloadScheduler {
+  ): DownloadQueue {
     val engine = FakeHttpEngine()
     val source = HttpDownloadSource(
       httpEngine = engine,
@@ -60,15 +60,15 @@ class DownloadQueueTest {
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
+      scope = scope,
     )
-    return DownloadScheduler(
+    return DownloadQueue(
       queueConfig = QueueConfig(
         maxConcurrentDownloads = maxConcurrent,
         maxConnectionsPerHost = maxPerHost,
         autoStart = autoStart,
       ),
       coordinator = coordinator,
-      scope = scope,
     )
   }
 
@@ -76,7 +76,7 @@ class DownloadQueueTest {
     MutableStateFlow<DownloadState>,
     MutableStateFlow<List<Segment>>
   > {
-    return MutableStateFlow<DownloadState>(DownloadState.Pending) to
+    return MutableStateFlow<DownloadState>(DownloadState.Queued) to
       MutableStateFlow<List<Segment>>(emptyList())
   }
 
@@ -134,7 +134,7 @@ class DownloadQueueTest {
 
         // HIGH should have been promoted (moved past Queued)
         withTimeout(2.seconds) {
-          sfHigh.first { it != DownloadState.Pending && it !is DownloadState.Queued }
+          sfHigh.first { it != DownloadState.Queued && it !is DownloadState.Queued }
         }
 
         // NORMAL and LOW should still be queued
@@ -188,7 +188,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sfFirst.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
 
@@ -234,7 +234,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sf3.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
       } finally {
@@ -270,7 +270,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sf2.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
       } finally {
@@ -306,7 +306,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sf2.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
       } finally {
@@ -352,9 +352,9 @@ class DownloadQueueTest {
           Clock.System.now(), sf3, seg3
         )
 
-        // task-3 should have moved past Pending (started)
+        // task-3 should have moved past Queued (started)
         withTimeout(2.seconds) {
-          sf3.first { it != DownloadState.Pending }
+          sf3.first { it != DownloadState.Queued }
         }
       } finally {
         scope.cancel()
@@ -391,7 +391,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sf2.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
       } finally {
@@ -425,7 +425,7 @@ class DownloadQueueTest {
         // All should start (no host conflicts)
         for ((idx, sf) in flows.withIndex()) {
           withTimeout(2.seconds) {
-            sf.first { it != DownloadState.Pending }
+            sf.first { it != DownloadState.Queued }
           }
         }
       } finally {
@@ -512,7 +512,7 @@ class DownloadQueueTest {
 
         // Wait for it to start
         withTimeout(2.seconds) {
-          sfLow.first { it != DownloadState.Pending }
+          sfLow.first { it != DownloadState.Queued }
         }
 
         // Enqueue URGENT — should preempt the LOW task
@@ -531,7 +531,7 @@ class DownloadQueueTest {
         // The URGENT task should have started
         withTimeout(2.seconds) {
           sfUrgent.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
       } finally {
@@ -556,7 +556,7 @@ class DownloadQueueTest {
         )
 
         withTimeout(2.seconds) {
-          sf1.first { it != DownloadState.Pending }
+          sf1.first { it != DownloadState.Queued }
         }
 
         // Enqueue another URGENT — cannot preempt, should be queued
@@ -615,7 +615,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sfB.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
 
@@ -705,7 +705,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sfB.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
 
@@ -744,7 +744,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sf2.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
       } finally {
@@ -772,7 +772,7 @@ class DownloadQueueTest {
 
   @Test
   fun extractHost_httpUrl() {
-    val host = DownloadScheduler.extractHost(
+    val host = DownloadQueue.extractHost(
       "http://cdn.example.com/path/file.zip"
     )
     assertEquals("cdn.example.com", host)
@@ -780,7 +780,7 @@ class DownloadQueueTest {
 
   @Test
   fun extractHost_httpsUrlWithPort() {
-    val host = DownloadScheduler.extractHost(
+    val host = DownloadQueue.extractHost(
       "https://cdn.example.com:443/path/file.zip"
     )
     assertEquals("cdn.example.com", host)
@@ -788,7 +788,7 @@ class DownloadQueueTest {
 
   @Test
   fun extractHost_noPath() {
-    val host = DownloadScheduler.extractHost(
+    val host = DownloadQueue.extractHost(
       "https://example.com"
     )
     assertEquals("example.com", host)
@@ -796,13 +796,13 @@ class DownloadQueueTest {
 
   @Test
   fun extractHost_noScheme_returnsInput() {
-    val host = DownloadScheduler.extractHost("not-a-url")
+    val host = DownloadQueue.extractHost("not-a-url")
     assertEquals("not-a-url", host)
   }
 
   @Test
   fun extractHost_ipAddress() {
-    val host = DownloadScheduler.extractHost(
+    val host = DownloadQueue.extractHost(
       "https://192.168.1.1:8080/file"
     )
     assertEquals("192.168.1.1", host)
@@ -850,12 +850,12 @@ class DownloadQueueTest {
         // Both queued tasks should now be promoted
         withTimeout(2.seconds) {
           sf3.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
         withTimeout(2.seconds) {
           sf4.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
       } finally {
@@ -911,7 +911,7 @@ class DownloadQueueTest {
         scheduler.onTaskCompleted("task-0")
         withTimeout(2.seconds) {
           sfHigh.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
         assertIs<DownloadState.Queued>(sfNorm.value)
@@ -921,7 +921,7 @@ class DownloadQueueTest {
         scheduler.onTaskCompleted("task-high")
         withTimeout(2.seconds) {
           sfNorm.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
         assertIs<DownloadState.Queued>(sfLow.value)
@@ -930,7 +930,7 @@ class DownloadQueueTest {
         scheduler.onTaskCompleted("task-normal")
         withTimeout(2.seconds) {
           sfLow.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
       } finally {
@@ -1031,7 +1031,7 @@ class DownloadQueueTest {
 
         withTimeout(2.seconds) {
           sfC.first {
-            it != DownloadState.Pending && it !is DownloadState.Queued
+            it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
 

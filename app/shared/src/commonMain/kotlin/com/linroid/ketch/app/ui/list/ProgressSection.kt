@@ -102,19 +102,6 @@ fun ProgressSection(
         )
       }
     }
-    is DownloadState.Pending -> {
-      val colors = stateColors.pending
-      LinearProgressIndicator(
-        modifier = Modifier.fillMaxWidth(),
-        color = colors.foreground,
-        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-      )
-      Text(
-        text = "Preparing download\u2026",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-    }
     is DownloadState.Queued -> {
       Text(
         text = "Queued \u2014 waiting for download slot\u2026",
@@ -152,6 +139,5 @@ fun ProgressSection(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
-    is DownloadState.Idle -> {}
   }
 }

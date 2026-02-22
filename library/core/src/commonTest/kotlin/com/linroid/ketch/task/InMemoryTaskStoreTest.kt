@@ -16,7 +16,7 @@ class InMemoryTaskStoreTest {
 
   private fun createRecord(
     taskId: String = "task-1",
-    state: TaskState = TaskState.PENDING,
+    state: TaskState = TaskState.QUEUED,
   ) = TaskRecord(
     taskId = taskId,
     request = DownloadRequest(

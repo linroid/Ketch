@@ -7,9 +7,9 @@ import platform.Foundation.fileHandleForWritingAtPath
 
 actual fun createFileAccessor(
   path: String,
-  ioDispatcher: CoroutineDispatcher,
+  dispatcher: CoroutineDispatcher,
 ): FileAccessor {
-  return PathFileAccessor(path, ioDispatcher) { realPath ->
+  return PathFileAccessor(path, dispatcher) { realPath ->
     val fileManager = NSFileManager.defaultManager
     if (!fileManager.fileExistsAtPath(realPath)) {
       fileManager.createFileAtPath(realPath, null, null)

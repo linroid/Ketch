@@ -13,7 +13,11 @@ plugins {
 
 kotlin {
   compilerOptions {
-    optIn.add("kotlin.uuid.ExperimentalUuidApi")
+    optIn.addAll(
+      "kotlin.uuid.ExperimentalUuidApi",
+      "kotlin.time.ExperimentalTime",
+      "kotlinx.coroutines.ExperimentalCoroutinesApi",
+    )
   }
 
   androidLibrary {
