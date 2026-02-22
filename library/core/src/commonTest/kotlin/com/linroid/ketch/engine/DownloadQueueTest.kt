@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.config.QueueConfig
+import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.HttpDownloadSource
@@ -46,7 +47,6 @@ class DownloadQueueTest {
   )
 
   private fun createScheduler(
-    scope: CoroutineScope,
     maxConcurrent: Int = 10,
     maxPerHost: Int = 4,
     autoStart: Boolean = true,
@@ -60,7 +60,11 @@ class DownloadQueueTest {
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
-      scope = scope,
+      dispatchers = KetchDispatchers(
+        main = Dispatchers.Default,
+        network = Dispatchers.Default,
+        io = Dispatchers.Default,
+      ),
     )
     return DownloadQueue(
       queueConfig = QueueConfig(
@@ -88,7 +92,7 @@ class DownloadQueueTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         // maxConcurrent=1 so only one task can run; the rest queue
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the single active slot
         val (sf1, seg1) = newFlows()
@@ -151,7 +155,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the active slot
         val (sf0, seg0) = newFlows()
@@ -207,7 +211,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 2)
+        val scheduler = createScheduler(maxConcurrent = 2)
 
         // Fill both slots
         val (sf1, seg1) = newFlows()
@@ -248,7 +252,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the slot
         val (sf1, seg1) = newFlows()
@@ -284,7 +288,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the slot
         val (sf1, seg1) = newFlows()
@@ -324,7 +328,7 @@ class DownloadQueueTest {
       try {
         // Allow 10 concurrent but only 1 per host
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, maxPerHost = 1,
+          maxConcurrent = 10, maxPerHost = 1,
         )
 
         // First task from example.com — should start
@@ -368,7 +372,7 @@ class DownloadQueueTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, maxPerHost = 1,
+          maxConcurrent = 10, maxPerHost = 1,
         )
 
         val (sf1, seg1) = newFlows()
@@ -407,7 +411,7 @@ class DownloadQueueTest {
       try {
         // 1 per host, 10 overall
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, maxPerHost = 1,
+          maxConcurrent = 10, maxPerHost = 1,
         )
 
         // Start tasks from three different hosts
@@ -442,7 +446,7 @@ class DownloadQueueTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, autoStart = false,
+          maxConcurrent = 10, autoStart = false,
         )
 
         val (sf1, seg1) = newFlows()
@@ -470,7 +474,7 @@ class DownloadQueueTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val scheduler = createScheduler(
-          scope, maxConcurrent = 10, autoStart = false,
+          maxConcurrent = 10, autoStart = false,
         )
 
         val (sf1, seg1) = newFlows()
@@ -500,7 +504,7 @@ class DownloadQueueTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         // maxConcurrent=1 so the URGENT task will try to preempt
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Start a LOW priority task
         val (sfLow, segLow) = newFlows()
@@ -545,7 +549,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Start an URGENT task
         val (sf1, seg1) = newFlows()
@@ -581,7 +585,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill slot
         val (sf0, seg0) = newFlows()
@@ -632,7 +636,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 10)
+        val scheduler = createScheduler(maxConcurrent = 10)
 
         val (sf1, seg1) = newFlows()
         scheduler.enqueue(
@@ -656,7 +660,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 10)
+        val scheduler = createScheduler(maxConcurrent = 10)
 
         // Should not throw
         scheduler.setPriority("non-existent", DownloadPriority.HIGH)
@@ -673,7 +677,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill slot
         val (sf1, seg1) = newFlows()
@@ -723,7 +727,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         val (sf1, seg1) = newFlows()
         scheduler.enqueue(
@@ -758,7 +762,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 10)
+        val scheduler = createScheduler(maxConcurrent = 10)
 
         // Should not throw
         scheduler.dequeue("non-existent")
@@ -815,7 +819,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 2)
+        val scheduler = createScheduler(maxConcurrent = 2)
 
         // Fill both slots
         val (sf1, seg1) = newFlows()
@@ -871,7 +875,7 @@ class DownloadQueueTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the slot
         val (sf0, seg0) = newFlows()
@@ -948,7 +952,7 @@ class DownloadQueueTest {
       try {
         // Global limit of 2, per-host limit of 2
         val scheduler = createScheduler(
-          scope, maxConcurrent = 2, maxPerHost = 2,
+          maxConcurrent = 2, maxPerHost = 2,
         )
 
         // Fill both global slots from the same host
@@ -987,7 +991,7 @@ class DownloadQueueTest {
       try {
         // 2 concurrent, 1 per host
         val scheduler = createScheduler(
-          scope, maxConcurrent = 2, maxPerHost = 1,
+          maxConcurrent = 2, maxPerHost = 1,
         )
 
         // Start one task from host-A

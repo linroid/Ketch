@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.config.QueueConfig
+import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.HttpDownloadSource
@@ -40,7 +41,6 @@ class DownloadQueueBasicTest {
   )
 
   private fun createScheduler(
-    scope: CoroutineScope,
     maxConcurrent: Int = 10,
     autoStart: Boolean = true,
   ): DownloadQueue {
@@ -53,7 +53,11 @@ class DownloadQueueBasicTest {
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
-      scope = scope,
+      dispatchers = KetchDispatchers(
+        main = Dispatchers.Default,
+        network = Dispatchers.Default,
+        io = Dispatchers.Default,
+      ),
     )
     return DownloadQueue(
       queueConfig = QueueConfig(
@@ -69,7 +73,7 @@ class DownloadQueueBasicTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope)
+        val scheduler = createScheduler()
         val stateFlow =
           MutableStateFlow<DownloadState>(DownloadState.Queued)
         val segmentsFlow =
@@ -96,7 +100,7 @@ class DownloadQueueBasicTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, autoStart = false)
+        val scheduler = createScheduler(autoStart = false)
         val stateFlow =
           MutableStateFlow<DownloadState>(DownloadState.Queued)
         val segmentsFlow =
@@ -119,7 +123,7 @@ class DownloadQueueBasicTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the single slot
         val stateFlow1 =
@@ -153,7 +157,7 @@ class DownloadQueueBasicTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope)
+        val scheduler = createScheduler()
         val stateFlow =
           MutableStateFlow<DownloadState>(DownloadState.Queued)
         val segmentsFlow =
@@ -182,7 +186,7 @@ class DownloadQueueBasicTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
-        val scheduler = createScheduler(scope, maxConcurrent = 1)
+        val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the single slot
         val stateFlow1 =

@@ -9,10 +9,11 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.config.DownloadConfig
 import com.linroid.ketch.api.config.QueueConfig
+import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
-import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.DownloadScheduler
+import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.InMemoryTaskStore
@@ -60,7 +61,11 @@ class DownloadSchedulerTest {
       taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
-      scope = scope,
+      dispatchers = KetchDispatchers(
+        main = Dispatchers.Default,
+        network = Dispatchers.Default,
+        io = Dispatchers.Default,
+      ),
     )
     val scheduler = DownloadQueue(
       queueConfig = QueueConfig(maxConcurrentDownloads = 10),
