@@ -39,6 +39,7 @@ internal class DownloadCoordinator(
   private val activeDownloads = mutableMapOf<String, ActiveEntry>()
 
   private data class ActiveEntry(
+    val handle: TaskHandle,
     val execution: DownloadExecution,
     val job: Job,
   )
@@ -56,16 +57,17 @@ internal class DownloadCoordinator(
   suspend fun pause(taskId: String) {
     mutex.withLock {
       val entry = activeDownloads[taskId] ?: return
+      val handle = entry.handle
       val execution = entry.execution
       log.i { "Pausing download for taskId=$taskId" }
 
-      val currentSegments = execution.segmentsFlow.value
+      val currentSegments = handle.mutableSegments.value
         .ifEmpty { null }
 
       val pausedDownloaded =
         currentSegments?.sumOf { it.downloadedBytes } ?: 0L
 
-      execution.stateFlow.value = DownloadState.Paused(
+      handle.mutableState.value = DownloadState.Paused(
         DownloadProgress(pausedDownloaded, execution.totalBytes),
       )
 
@@ -150,7 +152,7 @@ internal class DownloadCoordinator(
     mutex.withLock {
       val entry = activeDownloads[taskId]
       entry?.job?.cancel()
-      entry?.execution?.stateFlow?.value = DownloadState.Canceled
+      entry?.handle?.mutableState?.value = DownloadState.Canceled
       activeDownloads.remove(taskId)
     }
     updateTaskRecord(taskId) {
@@ -216,16 +218,13 @@ internal class DownloadCoordinator(
         }
       }
 
-      activeDownloads[taskId] = ActiveEntry(execution, job)
+      activeDownloads[taskId] = ActiveEntry(handle, execution, job)
     }
   }
 
   private fun createExecution(handle: TaskHandle): DownloadExecution {
     return DownloadExecution(
-      taskId = handle.taskId,
-      request = handle.request,
-      stateFlow = handle.mutableState,
-      segmentsFlow = handle.mutableSegments,
+      handle = handle,
       sourceResolver = sourceResolver,
       fileNameResolver = fileNameResolver,
       config = config,

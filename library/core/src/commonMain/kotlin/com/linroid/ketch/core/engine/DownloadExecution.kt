@@ -2,7 +2,6 @@ package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
-import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
@@ -17,6 +16,7 @@ import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.file.resolveChildPath
+import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -43,10 +43,7 @@ import kotlin.time.TimeSource
  * discarded after the download completes, fails, or is canceled.
  */
 internal class DownloadExecution(
-  val taskId: String,
-  val request: DownloadRequest,
-  val stateFlow: MutableStateFlow<DownloadState>,
-  val segmentsFlow: MutableStateFlow<List<Segment>>,
+  private val handle: TaskHandle,
   private val sourceResolver: SourceResolver,
   private val fileNameResolver: FileNameResolver,
   private val config: DownloadConfig,
@@ -57,6 +54,9 @@ internal class DownloadExecution(
 ) {
   private val log = KetchLogger("Execution")
 
+  private val taskId get() = handle.taskId
+  private val request get() = handle.request
+
   val taskLimiter = DelegatingSpeedLimiter()
   var context: DownloadContext? = null
   var fileAccessor: FileAccessor? = null
@@ -65,13 +65,13 @@ internal class DownloadExecution(
   /**
    * Executes a download — either fresh or resumed.
    *
-   * When [resumeState] is non-null, loads the task record and
+   * When [resumeInfo] is non-null, loads the task record and
    * resumes from the saved segments. Otherwise starts a fresh
    * download from the request URL.
    */
-  suspend fun execute(resumeState: ResumeInfo? = null) {
-    if (resumeState != null) {
-      executeResume(resumeState)
+  suspend fun execute(resumeInfo: ResumeInfo? = null) {
+    if (resumeInfo != null) {
+      executeResume(resumeInfo)
     } else {
       executeFresh()
     }
@@ -145,32 +145,7 @@ internal class DownloadExecution(
     log.d { "Resolved outputPath=$outputPath" }
 
     if (total == 0L) {
-      log.i { "Zero-byte file for taskId=$taskId, completing" }
-      val fa = createFileAccessor(outputPath, dispatchers.io)
-      try {
-        fa.flush()
-      } catch (e: Exception) {
-        if (e is CancellationException) throw e
-        throw KetchError.Disk(e)
-      } finally {
-        try {
-          fa.close()
-        } catch (e: Exception) {
-          log.w(e) { "Failed to close file for taskId=$taskId" }
-        }
-      }
-      updateTaskRecord(taskId) {
-        it.copy(
-          outputPath = outputPath,
-          state = TaskState.COMPLETED,
-          totalBytes = 0,
-          downloadedBytes = 0,
-          segments = null,
-          sourceType = source.type,
-          updatedAt = Clock.System.now(),
-        )
-      }
-      stateFlow.value = DownloadState.Completed(outputPath)
+      completeZeroByteFile(outputPath, source.type)
       return
     }
 
@@ -190,54 +165,16 @@ internal class DownloadExecution(
       )
     }
 
-    val fa = createFileAccessor(outputPath, dispatchers.io)
-    fileAccessor = fa
     taskLimiter.delegate = createLimiter(request.speedLimit)
 
-    var completed = false
-    try {
-      val ctx = buildContext(
-        taskId, request.url, request, fa,
-        segmentsFlow, stateFlow, taskLimiter, total,
-        request.headers,
-        preResolved = if (resolved != null) resolvedUrl else null,
-      )
-      context = ctx
-
-      downloadWithRetry(taskId, ctx) {
-        source.download(ctx)
-      }
-
-      try {
-        fa.flush()
-      } catch (e: Exception) {
-        if (e is CancellationException) throw e
-        if (e is KetchError) throw e
-        throw KetchError.Disk(e)
-      }
-
-      val resumeState = buildHttpResumeState(taskId)
-      updateTaskRecord(taskId) {
-        it.copy(
-          state = TaskState.COMPLETED,
-          downloadedBytes = total,
-          segments = null,
-          sourceResumeState = resumeState,
-          updatedAt = Clock.System.now(),
-        )
-      }
-
-      completed = true
-      log.i { "Download completed successfully for taskId=$taskId" }
-      stateFlow.value = DownloadState.Completed(outputPath)
-    } finally {
-      cleanupAfterExecution(fa, completed)
+    val preResolved = if (resolved != null) resolvedUrl else null
+    runDownload(outputPath, total, preResolved) { ctx ->
+      source.download(ctx)
     }
   }
 
   private suspend fun executeResume(info: ResumeInfo) {
     val taskRecord = info.record
-    val segments = info.segments
 
     val sourceType = taskRecord.sourceType ?: HttpDownloadSource.TYPE
     val source = sourceResolver.resolveByType(sourceType)
@@ -252,8 +189,6 @@ internal class DownloadExecution(
           "No outputPath for taskId=${taskRecord.taskId}",
         ),
       )
-    val fa = createFileAccessor(outputPath, dispatchers.io)
-    fileAccessor = fa
     totalBytes = taskRecord.totalBytes
     taskLimiter.delegate = createLimiter(taskRecord.request.speedLimit)
 
@@ -264,17 +199,33 @@ internal class DownloadExecution(
         totalBytes = taskRecord.totalBytes,
       )
 
-    val ctx = buildContext(
-      taskId, taskRecord.request.url, taskRecord.request,
-      fa, segmentsFlow, stateFlow, taskLimiter,
-      taskRecord.totalBytes, taskRecord.request.headers,
-    )
-    context = ctx
+    runDownload(outputPath, taskRecord.totalBytes) { ctx ->
+      context = ctx
+      source.resume(ctx, resumeState)
+    }
+  }
+
+  /**
+   * Common download-to-completion sequence: creates a [FileAccessor],
+   * builds the [DownloadContext], runs [downloadBlock] with retry,
+   * flushes, persists completion, and cleans up.
+   */
+  private suspend fun runDownload(
+    outputPath: String,
+    total: Long,
+    preResolved: ResolvedSource? = null,
+    downloadBlock: suspend (DownloadContext) -> Unit,
+  ) {
+    val fa = createFileAccessor(outputPath, dispatchers.io)
+    fileAccessor = fa
 
     var completed = false
     try {
-      downloadWithRetry(taskId, ctx) {
-        source.resume(ctx, resumeState)
+      val ctx = buildContext(fa, total, preResolved)
+      context = ctx
+
+      downloadWithRetry(ctx) {
+        downloadBlock(ctx)
       }
 
       try {
@@ -285,21 +236,55 @@ internal class DownloadExecution(
         throw KetchError.Disk(e)
       }
 
+      val resumeState = buildHttpResumeState()
       updateTaskRecord(taskId) {
         it.copy(
           state = TaskState.COMPLETED,
-          downloadedBytes = taskRecord.totalBytes,
+          downloadedBytes = total,
           segments = null,
+          sourceResumeState = resumeState,
           updatedAt = Clock.System.now(),
         )
       }
 
       completed = true
-      log.i { "Resume completed successfully for taskId=$taskId" }
-      stateFlow.value = DownloadState.Completed(outputPath)
+      log.i { "Download completed for taskId=$taskId" }
+      handle.mutableState.value = DownloadState.Completed(outputPath)
     } finally {
       cleanupAfterExecution(fa, completed)
     }
+  }
+
+  private suspend fun completeZeroByteFile(
+    outputPath: String,
+    sourceType: String,
+  ) {
+    log.i { "Zero-byte file for taskId=$taskId, completing" }
+    val fa = createFileAccessor(outputPath, dispatchers.io)
+    try {
+      fa.flush()
+    } catch (e: Exception) {
+      if (e is CancellationException) throw e
+      throw KetchError.Disk(e)
+    } finally {
+      try {
+        fa.close()
+      } catch (e: Exception) {
+        log.w(e) { "Failed to close file for taskId=$taskId" }
+      }
+    }
+    updateTaskRecord(taskId) {
+      it.copy(
+        outputPath = outputPath,
+        state = TaskState.COMPLETED,
+        totalBytes = 0,
+        downloadedBytes = 0,
+        segments = null,
+        sourceType = sourceType,
+        updatedAt = Clock.System.now(),
+      )
+    }
+    handle.mutableState.value = DownloadState.Completed(outputPath)
   }
 
   private suspend fun cleanupAfterExecution(
@@ -312,9 +297,10 @@ internal class DownloadExecution(
       log.w(e) { "Failed to close file for taskId=$taskId" }
     }
     withContext(NonCancellable) {
-      if (!completed && stateFlow.value !is DownloadState.Paused &&
-        stateFlow.value !is DownloadState.Queued &&
-        stateFlow.value !is DownloadState.Canceled
+      val state = handle.mutableState.value
+      if (!completed && state !is DownloadState.Paused &&
+        state !is DownloadState.Queued &&
+        state !is DownloadState.Canceled
       ) {
         try {
           fa.delete()
@@ -329,7 +315,6 @@ internal class DownloadExecution(
   }
 
   private suspend fun downloadWithRetry(
-    taskId: String,
     ctx: DownloadContext? = null,
     block: suspend () -> Unit,
   ) {
@@ -407,15 +392,8 @@ internal class DownloadExecution(
   }
 
   private fun buildContext(
-    taskId: String,
-    url: String,
-    request: DownloadRequest,
     fileAccessor: FileAccessor,
-    segmentsFlow: MutableStateFlow<List<Segment>>,
-    stateFlow: MutableStateFlow<DownloadState>,
-    taskLimiter: SpeedLimiter,
     totalBytes: Long,
-    headers: Map<String, String>,
     preResolved: ResolvedSource? = null,
   ): DownloadContext {
     var lastBytes = 0L
@@ -423,10 +401,10 @@ internal class DownloadExecution(
     var speed = 0L
     return DownloadContext(
       taskId = taskId,
-      url = url,
+      url = request.url,
       request = request,
       fileAccessor = fileAccessor,
-      segments = segmentsFlow,
+      segments = handle.mutableSegments,
       onProgress = { downloaded, total ->
         val now = TimeSource.Monotonic.markNow()
         val elapsed = (now - lastMark).inWholeMilliseconds
@@ -436,10 +414,10 @@ internal class DownloadExecution(
           lastBytes = downloaded
           lastMark = now
         }
-        stateFlow.value = DownloadState.Downloading(
+        handle.mutableState.value = DownloadState.Downloading(
           DownloadProgress(downloaded, total, speed),
         )
-        val snapshot = segmentsFlow.value
+        val snapshot = handle.mutableSegments.value
         updateTaskRecord(taskId) {
           it.copy(
             segments = snapshot,
@@ -452,7 +430,7 @@ internal class DownloadExecution(
         taskLimiter.acquire(bytes)
         globalLimiter.acquire(bytes)
       },
-      headers = headers,
+      headers = request.headers,
       preResolved = preResolved,
       maxConnections = MutableStateFlow(
         request.connections.takeIf { it > 0 } ?: 0,
@@ -460,9 +438,7 @@ internal class DownloadExecution(
     )
   }
 
-  private suspend fun buildHttpResumeState(
-    taskId: String,
-  ): SourceResumeState? {
+  private suspend fun buildHttpResumeState(): SourceResumeState? {
     val record = taskStore.load(taskId) ?: return null
     return HttpDownloadSource.buildResumeState(
       etag = record.etag,
