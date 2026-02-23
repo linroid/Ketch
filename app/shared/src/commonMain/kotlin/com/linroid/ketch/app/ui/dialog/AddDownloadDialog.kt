@@ -62,10 +62,12 @@ private enum class DialogPanel {
   None, SpeedLimit, Priority, Schedule
 }
 
-private fun isHttpUrl(url: String): Boolean {
-  val trimmed = url.trim()
-  return trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://")
+private fun isSupportedUrl(url: String): Boolean {
+  val lower = url.trim().lowercase()
+  return lower.startsWith("http://") ||
+    lower.startsWith("https://") ||
+    lower.startsWith("ftp://") ||
+    lower.startsWith("ftps://")
 }
 
 @Composable
@@ -105,7 +107,7 @@ fun AddDownloadDialog(
   val urlFocusRequester = remember {
     FocusRequester()
   }
-  val isValidUrl = url.isBlank() || isHttpUrl(url)
+  val isValidUrl = url.isBlank() || isSupportedUrl(url)
 
   // Track the last resolved URL to avoid re-resolving
   var lastResolvedSource by remember {
@@ -115,11 +117,11 @@ fun AddDownloadDialog(
   // Debounce: auto-resolve when URL looks valid
   LaunchedEffect(url) {
     val trimmed = url.trim()
-    if (isHttpUrl(trimmed) && trimmed != lastResolvedSource) {
+    if (isSupportedUrl(trimmed) && trimmed != lastResolvedSource) {
       delay(500)
       lastResolvedSource = trimmed
       onResolveUrl(trimmed)
-    } else if (!isHttpUrl(trimmed)) {
+    } else if (!isSupportedUrl(trimmed)) {
       if (lastResolvedSource.isNotEmpty()) {
         lastResolvedSource = ""
         onResetResolve()
@@ -167,7 +169,7 @@ fun AddDownloadDialog(
           label = { Text("URL") },
           singleLine = true,
           placeholder = {
-            Text("https://example.com/file.zip")
+            Text("https:// or ftp://...")
           },
           isError = !isValidUrl,
           trailingIcon = {
@@ -191,7 +193,7 @@ fun AddDownloadDialog(
                 IconButton(
                   onClick = {
                     val trimmed = url.trim()
-                    if (isHttpUrl(trimmed)) {
+                    if (isSupportedUrl(trimmed)) {
                       lastResolvedSource = trimmed
                       onResolveUrl(trimmed)
                     }
@@ -212,8 +214,8 @@ fun AddDownloadDialog(
           supportingText = if (!isValidUrl) {
             {
               Text(
-                "URL must start with " +
-                  "http:// or https://"
+                "URL must start with http://, " +
+                  "https://, ftp://, or ftps://"
               )
             }
           } else {
