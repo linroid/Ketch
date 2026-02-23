@@ -35,7 +35,6 @@ internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
   private val maxConnections: Int = 4,
   private val progressIntervalMs: Long = 200,
-  private val saveIntervalMs: Long = 5000,
 ) : DownloadSource {
   private val log = KetchLogger("HttpSource")
 
@@ -332,14 +331,6 @@ internal class HttpDownloadSource(
 
     return try {
       coroutineScope {
-        val saveJob = launch {
-          while (true) {
-            delay(saveIntervalMs)
-            context.segments.value = currentSegments()
-            log.v { "Periodic segment save for taskId=${context.taskId}" }
-          }
-        }
-
         // Watcher: detect connection count changes and trigger
         // resegmentation by canceling the scope. Compares against the
         // last-seen flow value (not segment count) to avoid an infinite
@@ -394,7 +385,6 @@ internal class HttpDownloadSource(
           results.awaitAll()
         } finally {
           watcherJob.cancel()
-          saveJob.cancel()
         }
 
         context.segments.value = currentSegments()

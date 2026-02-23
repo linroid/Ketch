@@ -95,7 +95,6 @@ class Ketch(
     httpEngine = httpEngine,
     maxConnections = config.maxConnectionsPerDownload,
     progressIntervalMs = config.progressIntervalMs,
-    saveIntervalMs = config.saveIntervalMs,
   )
 
   private val sourceResolver = SourceResolver(

@@ -21,8 +21,10 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -219,8 +221,26 @@ internal class DownloadExecution(
       val ctx = buildContext(fa, total, preResolved)
       context = ctx
 
-      downloadWithRetry(ctx) {
-        downloadBlock(ctx)
+      coroutineScope {
+        val saveJob = launch {
+          while (true) {
+            delay(config.saveIntervalMs)
+            val snapshot = handle.mutableSegments.value
+            val downloaded = snapshot.sumOf { it.downloadedBytes }
+            handle.record.update {
+              it.copy(
+                segments = snapshot,
+                downloadedBytes = downloaded,
+                updatedAt = Clock.System.now(),
+              )
+            }
+          }
+        }
+        try {
+          downloadWithRetry(ctx) { downloadBlock(ctx) }
+        } finally {
+          saveJob.cancel()
+        }
       }
 
       try {
@@ -415,14 +435,6 @@ internal class DownloadExecution(
         handle.mutableState.value = DownloadState.Downloading(
           DownloadProgress(downloaded, total, speed),
         )
-        val snapshot = handle.mutableSegments.value
-        handle.record.update {
-          it.copy(
-            segments = snapshot,
-            downloadedBytes = downloaded,
-            updatedAt = Clock.System.now(),
-          )
-        }
       },
       throttle = { bytes ->
         taskLimiter.acquire(bytes)
