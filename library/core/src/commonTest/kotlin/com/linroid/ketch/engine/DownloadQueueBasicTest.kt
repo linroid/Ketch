@@ -13,6 +13,7 @@ import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.InMemoryTaskStore
+import com.linroid.ketch.core.task.TaskHandle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +29,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 class DownloadQueueBasicTest {
 
@@ -38,6 +40,22 @@ class DownloadQueueBasicTest {
     destination = Destination("/tmp/"),
     priority = priority,
   )
+
+  private fun createHandle(
+    taskId: String,
+    request: DownloadRequest = createRequest(),
+    createdAt: Instant = Clock.System.now(),
+  ): TaskHandle {
+    return object : TaskHandle {
+      override val taskId = taskId
+      override val request = request
+      override val createdAt = createdAt
+      override val mutableState =
+        MutableStateFlow<DownloadState>(DownloadState.Queued)
+      override val mutableSegments =
+        MutableStateFlow<List<Segment>>(emptyList())
+    }
+  }
 
   private fun createScheduler(
     maxConcurrent: Int = 10,
@@ -70,20 +88,14 @@ class DownloadQueueBasicTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val scheduler = createScheduler()
-        val stateFlow =
-          MutableStateFlow<DownloadState>(DownloadState.Queued)
-        val segmentsFlow =
-          MutableStateFlow<List<Segment>>(emptyList())
+        val handle = createHandle("task-1")
 
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          stateFlow, segmentsFlow,
-        )
+        scheduler.enqueue(handle)
 
         // Should have moved past Queued (to Downloading or failed
         // since fileAccessor throws)
         withTimeout(2.seconds) {
-          stateFlow.first { it != DownloadState.Queued }
+          handle.mutableState.first { it != DownloadState.Queued }
         }
       } finally {
         scope.cancel()
@@ -99,26 +111,14 @@ class DownloadQueueBasicTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the single slot
-        val stateFlow1 =
-          MutableStateFlow<DownloadState>(DownloadState.Queued)
-        val segmentsFlow1 =
-          MutableStateFlow<List<Segment>>(emptyList())
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          stateFlow1, segmentsFlow1,
-        )
+        val handle1 = createHandle("task-1")
+        scheduler.enqueue(handle1)
 
         // Second task should be queued
-        val stateFlow2 =
-          MutableStateFlow<DownloadState>(DownloadState.Queued)
-        val segmentsFlow2 =
-          MutableStateFlow<List<Segment>>(emptyList())
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          stateFlow2, segmentsFlow2,
-        )
+        val handle2 = createHandle("task-2")
+        scheduler.enqueue(handle2)
 
-        assertIs<DownloadState.Queued>(stateFlow2.value)
+        assertIs<DownloadState.Queued>(handle2.mutableState.value)
       } finally {
         scope.cancel()
       }
@@ -131,22 +131,16 @@ class DownloadQueueBasicTest {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       try {
         val scheduler = createScheduler()
-        val stateFlow =
-          MutableStateFlow<DownloadState>(DownloadState.Queued)
-        val segmentsFlow =
-          MutableStateFlow<List<Segment>>(emptyList())
+        val handle = createHandle("task-1")
 
         // Enqueue with preferResume — the task will be started
         // with resume() first (which may fail since no record
         // exists), then fall back to start()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          stateFlow, segmentsFlow, preferResume = true,
-        )
+        scheduler.enqueue(handle, preferResume = true)
 
         // Should have attempted to start (moved past Queued)
         withTimeout(2.seconds) {
-          stateFlow.first { it != DownloadState.Queued }
+          handle.mutableState.first { it != DownloadState.Queued }
         }
       } finally {
         scope.cancel()
@@ -162,25 +156,13 @@ class DownloadQueueBasicTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the single slot
-        val stateFlow1 =
-          MutableStateFlow<DownloadState>(DownloadState.Queued)
-        val segmentsFlow1 =
-          MutableStateFlow<List<Segment>>(emptyList())
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          stateFlow1, segmentsFlow1,
-        )
+        val handle1 = createHandle("task-1")
+        scheduler.enqueue(handle1)
 
         // Queue a second task
-        val stateFlow2 =
-          MutableStateFlow<DownloadState>(DownloadState.Queued)
-        val segmentsFlow2 =
-          MutableStateFlow<List<Segment>>(emptyList())
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          stateFlow2, segmentsFlow2,
-        )
-        assertIs<DownloadState.Queued>(stateFlow2.value)
+        val handle2 = createHandle("task-2")
+        scheduler.enqueue(handle2)
+        assertIs<DownloadState.Queued>(handle2.mutableState.value)
 
         // Dequeue the second task — it should be removed from queue
         scheduler.dequeue("task-2")
@@ -188,7 +170,7 @@ class DownloadQueueBasicTest {
         // Verify it stays Queued (not promoted) — the dequeue
         // only removes, it doesn't change state
         delay(100)
-        assertIs<DownloadState.Queued>(stateFlow2.value)
+        assertIs<DownloadState.Queued>(handle2.mutableState.value)
       } finally {
         scope.cancel()
       }

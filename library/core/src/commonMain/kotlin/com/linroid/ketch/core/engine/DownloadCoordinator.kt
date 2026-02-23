@@ -2,15 +2,14 @@ package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadProgress
-import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -18,7 +17,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -44,55 +43,14 @@ internal class DownloadCoordinator(
     val job: Job,
   )
 
-  suspend fun start(
-    taskId: String,
-    request: DownloadRequest,
-    stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>,
-  ) {
-    log.i { "Starting download: taskId=$taskId, url=${request.url}" }
+  suspend fun start(handle: TaskHandle) {
+    val taskId = handle.taskId
+    log.i { "Starting download: taskId=$taskId, url=${handle.request.url}" }
     updateTaskRecord(taskId) {
       it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
     }
 
-    mutex.withLock {
-      if (activeDownloads.containsKey(taskId)) {
-        log.d { "Download already active for taskId=$taskId, skipping start" }
-        return
-      }
-
-      val execution = createExecution(
-        taskId, request, stateFlow, segmentsFlow,
-      )
-
-      val job = scope.launch {
-        try {
-          execution.execute()
-        } catch (e: CancellationException) {
-          val s = stateFlow.value
-          if (s !is DownloadState.Paused &&
-            s !is DownloadState.Queued
-          ) {
-            stateFlow.value = DownloadState.Canceled
-          }
-          throw e
-        } catch (e: Exception) {
-          if (e is CancellationException) throw e
-          val error = when (e) {
-            is KetchError -> e
-            else -> KetchError.Unknown(e)
-          }
-          updateTaskState(taskId, TaskState.FAILED, error.message)
-          stateFlow.value = DownloadState.Failed(error)
-        } finally {
-          withContext(NonCancellable) {
-            mutex.withLock { activeDownloads.remove(taskId) }
-          }
-        }
-      }
-
-      activeDownloads[taskId] = ActiveEntry(execution, job)
-    }
+    launchExecution(handle)
   }
 
   suspend fun pause(taskId: String) {
@@ -142,11 +100,10 @@ internal class DownloadCoordinator(
   }
 
   suspend fun resume(
-    taskId: String,
-    stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>,
+    handle: TaskHandle,
     destination: Destination? = null,
   ): Boolean {
+    val taskId = handle.taskId
     mutex.withLock {
       if (activeDownloads.containsKey(taskId)) {
         log.d {
@@ -166,8 +123,8 @@ internal class DownloadCoordinator(
         "${taskRecord.totalBytes}"
     }
 
-    stateFlow.value = DownloadState.Queued
-    segmentsFlow.value = segments
+    handle.mutableState.value = DownloadState.Queued
+    handle.mutableSegments.value = segments
 
     updateTaskRecord(taskId) {
       it.copy(
@@ -177,46 +134,14 @@ internal class DownloadCoordinator(
       )
     }
 
-    mutex.withLock {
-      val execution = createExecution(
-        taskId, taskRecord.request, stateFlow, segmentsFlow,
-      )
-      val resumeInfo = DownloadExecution.ResumeInfo(
-        record = taskRecord.copy(
-          outputPath = destination?.value ?: taskRecord.outputPath,
-        ),
-        segments = segments,
-      )
+    val resumeInfo = DownloadExecution.ResumeInfo(
+      record = taskRecord.copy(
+        outputPath = destination?.value ?: taskRecord.outputPath,
+      ),
+      segments = segments,
+    )
 
-      val job = scope.launch {
-        try {
-          execution.execute(resumeInfo)
-        } catch (e: CancellationException) {
-          val s = stateFlow.value
-          if (s !is DownloadState.Paused &&
-            s !is DownloadState.Queued
-          ) {
-            stateFlow.value = DownloadState.Canceled
-          }
-          throw e
-        } catch (e: Exception) {
-          if (e is CancellationException) throw e
-          val error = when (e) {
-            is KetchError -> e
-            else -> KetchError.Unknown(e)
-          }
-          updateTaskState(taskId, TaskState.FAILED, error.message)
-          stateFlow.value = DownloadState.Failed(error)
-        } finally {
-          withContext(NonCancellable) {
-            mutex.withLock { activeDownloads.remove(taskId) }
-          }
-        }
-      }
-
-      activeDownloads[taskId] = ActiveEntry(execution, job)
-    }
-
+    launchExecution(handle, resumeInfo)
     return true
   }
 
@@ -252,17 +177,55 @@ internal class DownloadCoordinator(
     }
   }
 
-  private fun createExecution(
-    taskId: String,
-    request: DownloadRequest,
-    stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>,
-  ): DownloadExecution {
+  private suspend fun launchExecution(
+    handle: TaskHandle,
+    resumeInfo: DownloadExecution.ResumeInfo? = null,
+  ) {
+    val taskId = handle.taskId
+    mutex.withLock {
+      if (activeDownloads.containsKey(taskId)) {
+        log.d { "Download already active for taskId=$taskId, skipping" }
+        return
+      }
+
+      val execution = createExecution(handle)
+
+      val job = scope.launch {
+        try {
+          execution.execute(resumeInfo)
+        } catch (e: CancellationException) {
+          val s = handle.mutableState.value
+          if (s !is DownloadState.Paused &&
+            s !is DownloadState.Queued
+          ) {
+            handle.mutableState.value = DownloadState.Canceled
+          }
+          throw e
+        } catch (e: Exception) {
+          if (e is CancellationException) throw e
+          val error = when (e) {
+            is KetchError -> e
+            else -> KetchError.Unknown(e)
+          }
+          updateTaskState(taskId, TaskState.FAILED, error.message)
+          handle.mutableState.value = DownloadState.Failed(error)
+        } finally {
+          withContext(NonCancellable) {
+            mutex.withLock { activeDownloads.remove(taskId) }
+          }
+        }
+      }
+
+      activeDownloads[taskId] = ActiveEntry(execution, job)
+    }
+  }
+
+  private fun createExecution(handle: TaskHandle): DownloadExecution {
     return DownloadExecution(
-      taskId = taskId,
-      request = request,
-      stateFlow = stateFlow,
-      segmentsFlow = segmentsFlow,
+      taskId = handle.taskId,
+      request = handle.request,
+      stateFlow = handle.mutableState,
+      segmentsFlow = handle.mutableSegments,
       sourceResolver = sourceResolver,
       fileNameResolver = fileNameResolver,
       config = config,
@@ -298,4 +261,7 @@ internal class DownloadCoordinator(
     taskStore.save(update(existing))
   }
 
+  fun close() {
+    scope.cancel()
+  }
 }

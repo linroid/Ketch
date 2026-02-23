@@ -1,15 +1,12 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.linroid.ketch.core.task.TaskHandle
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
-import kotlin.time.Instant
 
 internal class DownloadQueue(
   maxConcurrentDownloads: Int,
@@ -37,34 +34,24 @@ internal class DownloadQueue(
     }
 
   internal data class QueueEntry(
-    val taskId: String,
-    val request: DownloadRequest,
-    val createdAt: Instant,
-    val stateFlow: MutableStateFlow<DownloadState>,
-    val segmentsFlow: MutableStateFlow<List<Segment>>,
+    val handle: TaskHandle,
     var priority: DownloadPriority = DownloadPriority.NORMAL,
     var preempted: Boolean = false,
-  )
+  ) {
+    val taskId get() = handle.taskId
+  }
 
   suspend fun enqueue(
-    taskId: String,
-    request: DownloadRequest,
-    createdAt: Instant,
-    stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>,
+    handle: TaskHandle,
     preferResume: Boolean = false,
   ) {
     mutex.withLock {
-      val host = extractHost(request.url)
+      val host = extractHost(handle.request.url)
       val hostCount = hostConnectionCount.getOrElse(host) { 0 }
 
       val entry = QueueEntry(
-        taskId = taskId,
-        request = request,
-        createdAt = createdAt,
-        stateFlow = stateFlow,
-        segmentsFlow = segmentsFlow,
-        priority = request.priority,
+        handle = handle,
+        priority = handle.request.priority,
         preempted = preferResume,
       )
 
@@ -72,22 +59,22 @@ internal class DownloadQueue(
         hostCount < maxPerHost
       ) {
         log.i {
-          "Starting download immediately: taskId=$taskId, " +
+          "Starting download immediately: taskId=${entry.taskId}, " +
             "active=${activeEntries.size}/" +
             "$maxConcurrent"
         }
         startTask(entry, host)
-      } else if (request.priority == DownloadPriority.URGENT) {
+      } else if (handle.request.priority == DownloadPriority.URGENT) {
         tryPreemptAndStart(entry, host)
       } else {
         insertSorted(entry)
-        stateFlow.value = DownloadState.Queued
+        handle.mutableState.value = DownloadState.Queued
         log.i {
-          "Download queued: taskId=$taskId, " +
-            "priority=${request.priority}, " +
+          "Download queued: taskId=${entry.taskId}, " +
+            "priority=${handle.request.priority}, " +
             "position=${
               queuedEntries.indexOfFirst {
-                it.taskId == taskId
+                it.taskId == entry.taskId
               } + 1
             }/${queuedEntries.size}"
         }
@@ -110,7 +97,7 @@ internal class DownloadQueue(
 
     if (victim == null) {
       insertSorted(entry)
-      entry.stateFlow.value = DownloadState.Queued
+      entry.handle.mutableState.value = DownloadState.Queued
       log.i {
         "Cannot preempt: all active tasks are URGENT. " +
           "Queuing taskId=${entry.taskId}"
@@ -128,7 +115,7 @@ internal class DownloadQueue(
     removeActive(victim.taskId)
 
     victim.preempted = true
-    victim.stateFlow.value = DownloadState.Queued
+    victim.handle.mutableState.value = DownloadState.Queued
     insertSorted(victim)
 
     val hostCount = hostConnectionCount.getOrElse(host) { 0 }
@@ -143,7 +130,7 @@ internal class DownloadQueue(
       startTask(entry, host)
     } else {
       insertSorted(entry)
-      entry.stateFlow.value = DownloadState.Queued
+      entry.handle.mutableState.value = DownloadState.Queued
       log.i {
         "URGENT taskId=${entry.taskId} queued " +
           "(host limit still exceeded)"
@@ -258,20 +245,12 @@ internal class DownloadQueue(
     taskHostMap[entry.taskId] = host
     if (entry.preempted) {
       entry.preempted = false
-      val resumed = coordinator.resume(
-        entry.taskId, entry.stateFlow, entry.segmentsFlow,
-      )
+      val resumed = coordinator.resume(entry.handle)
       if (!resumed) {
-        coordinator.start(
-          entry.taskId, entry.request,
-          entry.stateFlow, entry.segmentsFlow,
-        )
+        coordinator.start(entry.handle)
       }
     } else {
-      coordinator.start(
-        entry.taskId, entry.request,
-        entry.stateFlow, entry.segmentsFlow,
-      )
+      coordinator.start(entry.handle)
     }
   }
 
@@ -279,7 +258,7 @@ internal class DownloadQueue(
     while (activeEntries.size < maxConcurrent) {
       val entry = findNextEligible() ?: break
       queuedEntries.remove(entry)
-      val host = extractHost(entry.request.url)
+      val host = extractHost(entry.handle.request.url)
       log.i {
         "Promoting queued task: taskId=${entry.taskId}, " +
           "priority=${entry.priority}, " +
@@ -292,7 +271,7 @@ internal class DownloadQueue(
 
   private fun findNextEligible(): QueueEntry? {
     for (entry in queuedEntries) {
-      val host = extractHost(entry.request.url)
+      val host = extractHost(entry.handle.request.url)
       val hostCount = hostConnectionCount.getOrElse(host) { 0 }
       if (hostCount < maxPerHost) {
         return entry
@@ -305,7 +284,7 @@ internal class DownloadQueue(
     val insertIndex = queuedEntries.indexOfFirst { existing ->
       entry.priority.ordinal > existing.priority.ordinal ||
         (entry.priority == existing.priority &&
-          entry.createdAt < existing.createdAt)
+          entry.handle.createdAt < existing.handle.createdAt)
     }
     if (insertIndex < 0) {
       queuedEntries.add(entry)
