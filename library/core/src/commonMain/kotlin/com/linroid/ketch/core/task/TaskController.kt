@@ -15,8 +15,8 @@ import com.linroid.ketch.api.SpeedLimit
 internal interface TaskController {
   suspend fun pause(taskId: String)
   suspend fun resume(handle: TaskHandle, destination: Destination? = null)
-  suspend fun cancel(taskId: String)
-  suspend fun remove(taskId: String)
+  suspend fun cancel(handle: TaskHandle)
+  suspend fun remove(handle: TaskHandle)
   suspend fun setSpeedLimit(taskId: String, limit: SpeedLimit)
   suspend fun setConnections(taskId: String, connections: Int)
   suspend fun setPriority(taskId: String, priority: DownloadPriority)

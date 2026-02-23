@@ -12,8 +12,10 @@ import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
-import com.linroid.ketch.core.task.InMemoryTaskStore
+import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
+import com.linroid.ketch.core.task.TaskRecord
+import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,6 +54,13 @@ class DownloadQueueTest {
     request: DownloadRequest = createRequest(),
     createdAt: Instant = Clock.System.now(),
   ): TaskHandle {
+    val record = TaskRecord(
+      taskId = taskId,
+      request = request,
+      state = TaskState.QUEUED,
+      createdAt = createdAt,
+      updatedAt = createdAt,
+    )
     return object : TaskHandle {
       override val taskId = taskId
       override val request = request
@@ -60,6 +69,7 @@ class DownloadQueueTest {
         MutableStateFlow<DownloadState>(DownloadState.Queued)
       override val mutableSegments =
         MutableStateFlow<List<Segment>>(emptyList())
+      override val record = AtomicSaver(record) {}
     }
   }
 
@@ -73,7 +83,6 @@ class DownloadQueueTest {
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
-      taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(

@@ -10,9 +10,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.task.TaskHandle
-import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
-import com.linroid.ketch.core.task.TaskStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -26,7 +24,6 @@ import kotlin.time.Clock
 
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
-  private val taskStore: TaskStore,
   private val config: DownloadConfig,
   private val fileNameResolver: FileNameResolver,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
@@ -35,7 +32,6 @@ internal class DownloadCoordinator(
   private val scope: CoroutineScope = CoroutineScope(dispatchers.network)
   private val log = KetchLogger("Coordinator")
   private val mutex = Mutex()
-  private val recordMutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveEntry>()
 
   private data class ActiveEntry(
@@ -47,7 +43,7 @@ internal class DownloadCoordinator(
   suspend fun start(handle: TaskHandle) {
     val taskId = handle.taskId
     log.i { "Starting download: taskId=$taskId, url=${handle.request.url}" }
-    updateTaskRecord(taskId) {
+    handle.record.update {
       it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
     }
 
@@ -77,7 +73,7 @@ internal class DownloadCoordinator(
         log.d { "Saving pause state for taskId=$taskId" }
         val downloadedBytes =
           segments.sumOf { it.downloadedBytes }
-        updateTaskRecord(taskId) {
+        handle.record.update {
           it.copy(
             state = TaskState.PAUSED,
             downloadedBytes = downloadedBytes,
@@ -116,7 +112,7 @@ internal class DownloadCoordinator(
       }
     }
 
-    val taskRecord = taskStore.load(taskId) ?: return false
+    val taskRecord = handle.record.value
     val segments = taskRecord.segments ?: return false
     log.d {
       "Resume loaded record: taskId=$taskId, " +
@@ -128,7 +124,7 @@ internal class DownloadCoordinator(
     handle.mutableState.value = DownloadState.Queued
     handle.mutableSegments.value = segments
 
-    updateTaskRecord(taskId) {
+    handle.record.update {
       it.copy(
         state = TaskState.DOWNLOADING,
         updatedAt = Clock.System.now(),
@@ -147,15 +143,16 @@ internal class DownloadCoordinator(
     return true
   }
 
-  suspend fun cancel(taskId: String) {
+  suspend fun cancel(handle: TaskHandle) {
+    val taskId = handle.taskId
     log.i { "Canceling download for taskId=$taskId" }
     mutex.withLock {
       val entry = activeDownloads[taskId]
       entry?.job?.cancel()
-      entry?.handle?.mutableState?.value = DownloadState.Canceled
       activeDownloads.remove(taskId)
     }
-    updateTaskRecord(taskId) {
+    handle.mutableState.value = DownloadState.Canceled
+    handle.record.update {
       it.copy(
         state = TaskState.CANCELED,
         segments = null,
@@ -209,7 +206,13 @@ internal class DownloadCoordinator(
             is KetchError -> e
             else -> KetchError.Unknown(e)
           }
-          updateTaskState(taskId, TaskState.FAILED, error.message)
+          handle.record.update {
+            it.copy(
+              state = TaskState.FAILED,
+              errorMessage = error.message,
+              updatedAt = Clock.System.now(),
+            )
+          }
           handle.mutableState.value = DownloadState.Failed(error)
         } finally {
           withContext(NonCancellable) {
@@ -229,35 +232,8 @@ internal class DownloadCoordinator(
       fileNameResolver = fileNameResolver,
       config = config,
       globalLimiter = globalLimiter,
-      taskStore = taskStore,
-      recordMutex = recordMutex,
       dispatchers = dispatchers,
     )
-  }
-
-  private suspend fun updateTaskState(
-    taskId: String,
-    state: TaskState,
-    errorMessage: String? = null,
-  ) {
-    updateTaskRecord(taskId) {
-      it.copy(
-        state = state,
-        errorMessage = errorMessage,
-        updatedAt = Clock.System.now(),
-      )
-    }
-  }
-
-  private suspend fun updateTaskRecord(
-    taskId: String,
-    update: (TaskRecord) -> TaskRecord,
-  ) = recordMutex.withLock {
-    val existing = taskStore.load(taskId) ?: run {
-      log.w { "TaskRecord not found for taskId=$taskId" }
-      return@withLock
-    }
-    taskStore.save(update(existing))
   }
 
   fun close() {

@@ -22,12 +22,16 @@ internal class RealDownloadTask(
   initialState: DownloadState,
   initialSegments: List<Segment>,
   private val controller: TaskController,
+  taskStore: TaskStore,
+  record: TaskRecord,
 ) : DownloadTask, TaskHandle {
   override val mutableState = MutableStateFlow(initialState)
   override val mutableSegments = MutableStateFlow(initialSegments)
 
   override val state: StateFlow<DownloadState> = mutableState.asStateFlow()
   override val segments: StateFlow<List<Segment>> = mutableSegments.asStateFlow()
+
+  override val record = AtomicSaver(record) { taskStore.save(it) }
 
   private val log = KetchLogger("DownloadTask")
 
@@ -50,7 +54,7 @@ internal class RealDownloadTask(
 
   override suspend fun cancel() {
     if (!mutableState.value.isTerminal) {
-      controller.cancel(taskId)
+      controller.cancel(this)
     } else {
       log.w { "Ignoring cancel for taskId=$taskId in state ${mutableState.value}" }
     }
@@ -81,6 +85,6 @@ internal class RealDownloadTask(
   }
 
   override suspend fun remove() {
-    controller.remove(taskId)
+    controller.remove(this)
   }
 }

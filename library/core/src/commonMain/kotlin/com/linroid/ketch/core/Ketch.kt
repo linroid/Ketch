@@ -111,7 +111,6 @@ class Ketch(
 
   private val coordinator = DownloadCoordinator(
     sourceResolver = sourceResolver,
-    taskStore = taskStore,
     config = config,
     fileNameResolver = fileNameResolver,
     globalLimiter = globalLimiter,
@@ -221,17 +220,19 @@ class Ketch(
       }
     }
 
-    override suspend fun cancel(taskId: String) {
+    override suspend fun cancel(handle: TaskHandle) {
+      val taskId = handle.taskId
       scheduler.cancel(taskId)
       queue.dequeue(taskId)
-      coordinator.cancel(taskId)
+      coordinator.cancel(handle)
     }
 
-    override suspend fun remove(taskId: String) {
+    override suspend fun remove(handle: TaskHandle) {
+      val taskId = handle.taskId
       log.i { "Removing task: taskId=$taskId" }
       scheduler.cancel(taskId)
       queue.dequeue(taskId)
-      coordinator.cancel(taskId)
+      coordinator.cancel(handle)
       taskStore.remove(taskId)
       tasksMutex.withLock {
         _tasks.value = _tasks.value.filter { it.taskId != taskId }
@@ -322,6 +323,8 @@ class Ketch(
       initialState = mapRecordState(record),
       initialSegments = record.segments ?: emptyList(),
       controller = taskController,
+      taskStore = taskStore,
+      record = record,
     )
 
     when (record.state) {

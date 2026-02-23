@@ -19,4 +19,5 @@ internal interface TaskHandle {
   val createdAt: Instant
   val mutableState: MutableStateFlow<DownloadState>
   val mutableSegments: MutableStateFlow<List<Segment>>
+  val record: AtomicSaver<TaskRecord>
 }

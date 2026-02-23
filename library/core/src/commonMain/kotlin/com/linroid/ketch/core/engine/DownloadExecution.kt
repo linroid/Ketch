@@ -19,13 +19,10 @@ import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
-import com.linroid.ketch.core.task.TaskStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -48,8 +45,6 @@ internal class DownloadExecution(
   private val fileNameResolver: FileNameResolver,
   private val config: DownloadConfig,
   private val globalLimiter: SpeedLimiter,
-  private val taskStore: TaskStore,
-  private val recordMutex: Mutex,
   private val dispatchers: KetchDispatchers,
 ) {
   private val log = KetchLogger("Execution")
@@ -78,7 +73,7 @@ internal class DownloadExecution(
   }
 
   suspend fun setSpeedLimit(limit: SpeedLimit) {
-    updateTaskRecord(taskId) {
+    handle.record.update {
       it.copy(
         request = it.request.copy(speedLimit = limit),
         updatedAt = Clock.System.now(),
@@ -100,7 +95,7 @@ internal class DownloadExecution(
 
   suspend fun setConnections(connections: Int) {
     require(connections > 0) { "Connections must be greater than 0" }
-    updateTaskRecord(taskId) {
+    handle.record.update {
       it.copy(
         request = it.request.copy(connections = connections),
         updatedAt = Clock.System.now(),
@@ -150,7 +145,7 @@ internal class DownloadExecution(
     }
 
     val now = Clock.System.now()
-    updateTaskRecord(taskId) {
+    handle.record.update {
       it.copy(
         outputPath = outputPath,
         state = TaskState.DOWNLOADING,
@@ -236,13 +231,16 @@ internal class DownloadExecution(
         throw KetchError.Disk(e)
       }
 
-      val resumeState = buildHttpResumeState()
-      updateTaskRecord(taskId) {
+      handle.record.update {
         it.copy(
           state = TaskState.COMPLETED,
           downloadedBytes = total,
           segments = null,
-          sourceResumeState = resumeState,
+          sourceResumeState = HttpDownloadSource.buildResumeState(
+            etag = it.etag,
+            lastModified = it.lastModified,
+            totalBytes = it.totalBytes,
+          ),
           updatedAt = Clock.System.now(),
         )
       }
@@ -273,7 +271,7 @@ internal class DownloadExecution(
         log.w(e) { "Failed to close file for taskId=$taskId" }
       }
     }
-    updateTaskRecord(taskId) {
+    handle.record.update {
       it.copy(
         outputPath = outputPath,
         state = TaskState.COMPLETED,
@@ -418,7 +416,7 @@ internal class DownloadExecution(
           DownloadProgress(downloaded, total, speed),
         )
         val snapshot = handle.mutableSegments.value
-        updateTaskRecord(taskId) {
+        handle.record.update {
           it.copy(
             segments = snapshot,
             downloadedBytes = downloaded,
@@ -438,32 +436,12 @@ internal class DownloadExecution(
     )
   }
 
-  private suspend fun buildHttpResumeState(): SourceResumeState? {
-    val record = taskStore.load(taskId) ?: return null
-    return HttpDownloadSource.buildResumeState(
-      etag = record.etag,
-      lastModified = record.lastModified,
-      totalBytes = record.totalBytes,
-    )
-  }
-
   private fun createLimiter(speedLimit: SpeedLimit): SpeedLimiter {
     return if (speedLimit.isUnlimited) {
       SpeedLimiter.Unlimited
     } else {
       TokenBucket(speedLimit.bytesPerSecond)
     }
-  }
-
-  private suspend fun updateTaskRecord(
-    taskId: String,
-    update: (TaskRecord) -> TaskRecord,
-  ) = recordMutex.withLock {
-    val existing = taskStore.load(taskId) ?: run {
-      log.w { "TaskRecord not found for taskId=$taskId" }
-      return@withLock
-    }
-    taskStore.save(update(existing))
   }
 
   private fun toServerInfo(resolved: ResolvedSource): ServerInfo {
