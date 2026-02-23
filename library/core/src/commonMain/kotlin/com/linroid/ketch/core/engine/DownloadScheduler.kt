@@ -1,42 +1,34 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.DownloadCondition
-import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.core.task.TaskHandle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
-import kotlin.time.Instant
 
 internal class DownloadScheduler(
-  private val scheduler: DownloadQueue,
+  private val queue: DownloadQueue,
   private val scope: CoroutineScope,
 ) {
   private val log = KetchLogger("DownloadScheduler")
   private val mutex = Mutex()
   private val scheduledJobs = mutableMapOf<String, Job>()
 
-  suspend fun schedule(
-    taskId: String,
-    request: DownloadRequest,
-    createdAt: Instant,
-    stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>,
-  ) {
-    val schedule = request.schedule
-    val conditions = request.conditions
+  suspend fun schedule(handle: TaskHandle) {
+    val taskId = handle.taskId
+    val schedule = handle.request.schedule
+    val conditions = handle.request.conditions
 
-    stateFlow.value = DownloadState.Scheduled(schedule)
+    handle.mutableState.value = DownloadState.Scheduled(schedule)
     log.i {
       "Scheduling download: taskId=$taskId, schedule=$schedule, " +
         "conditions=${conditions.size}"
@@ -48,9 +40,7 @@ internal class DownloadScheduler(
         waitForConditions(taskId, conditions)
 
         log.i { "Schedule and conditions met for taskId=$taskId, enqueuing" }
-        scheduler.enqueue(
-          taskId, request, createdAt, stateFlow, segmentsFlow
-        )
+        queue.enqueue(handle)
 
         mutex.withLock { scheduledJobs.remove(taskId) }
       }
@@ -59,19 +49,16 @@ internal class DownloadScheduler(
   }
 
   suspend fun reschedule(
-    taskId: String,
-    request: DownloadRequest,
+    handle: TaskHandle,
     schedule: DownloadSchedule,
     conditions: List<DownloadCondition>,
-    createdAt: Instant,
-    stateFlow: MutableStateFlow<DownloadState>,
-    segmentsFlow: MutableStateFlow<List<Segment>>,
   ) {
+    val taskId = handle.taskId
     mutex.withLock {
       scheduledJobs.remove(taskId)?.cancel()
     }
 
-    stateFlow.value = DownloadState.Scheduled(schedule)
+    handle.mutableState.value = DownloadState.Scheduled(schedule)
     log.i {
       "Rescheduling download: taskId=$taskId, schedule=$schedule, " +
         "conditions=${conditions.size}"
@@ -86,10 +73,7 @@ internal class DownloadScheduler(
           "Reschedule conditions met for taskId=$taskId, enqueuing " +
             "with preferResume=true"
         }
-        scheduler.enqueue(
-          taskId, request, createdAt, stateFlow, segmentsFlow,
-          preferResume = true,
-        )
+        queue.enqueue(handle, preferResume = true)
 
         mutex.withLock { scheduledJobs.remove(taskId) }
       }
@@ -106,6 +90,11 @@ internal class DownloadScheduler(
     }
   }
 
+  /** Whether a task is currently waiting for its schedule/conditions. */
+  suspend fun isScheduled(taskId: String): Boolean {
+    return mutex.withLock { scheduledJobs.containsKey(taskId) }
+  }
+
   private suspend fun waitForSchedule(
     taskId: String,
     schedule: DownloadSchedule,
@@ -116,18 +105,13 @@ internal class DownloadScheduler(
         val now = Clock.System.now()
         val waitDuration = schedule.startAt - now
         if (waitDuration.isPositive()) {
-          log.d {
-            "Waiting ${waitDuration.inWholeSeconds}s for " +
-              "taskId=$taskId (startAt=${schedule.startAt})"
-          }
+          log.d { "Waiting $waitDuration for taskId=$taskId (startAt=${schedule.startAt})" }
           delay(waitDuration)
         }
       }
+
       is DownloadSchedule.AfterDelay -> {
-        log.d {
-          "Waiting ${schedule.delay.inWholeSeconds}s delay " +
-            "for taskId=$taskId"
-        }
+        log.d { "Waiting ${schedule.delay} delay for taskId=$taskId" }
         delay(schedule.delay)
       }
     }
@@ -150,10 +134,5 @@ internal class DownloadScheduler(
     combined.first { it }
 
     log.i { "All conditions met for taskId=$taskId" }
-  }
-
-  /** Whether a task is currently waiting for its schedule/conditions. */
-  suspend fun isScheduled(taskId: String): Boolean {
-    return mutex.withLock { scheduledJobs.containsKey(taskId) }
   }
 }

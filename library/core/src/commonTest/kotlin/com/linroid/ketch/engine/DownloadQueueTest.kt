@@ -12,7 +12,10 @@ import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
-import com.linroid.ketch.core.task.InMemoryTaskStore
+import com.linroid.ketch.core.task.AtomicSaver
+import com.linroid.ketch.core.task.TaskHandle
+import com.linroid.ketch.core.task.TaskRecord
+import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +31,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Comprehensive tests for queue management via DownloadQueue:
@@ -45,6 +49,30 @@ class DownloadQueueTest {
     priority = priority,
   )
 
+  private fun createHandle(
+    taskId: String,
+    request: DownloadRequest = createRequest(),
+    createdAt: Instant = Clock.System.now(),
+  ): TaskHandle {
+    val record = TaskRecord(
+      taskId = taskId,
+      request = request,
+      state = TaskState.QUEUED,
+      createdAt = createdAt,
+      updatedAt = createdAt,
+    )
+    return object : TaskHandle {
+      override val taskId = taskId
+      override val request = request
+      override val createdAt = createdAt
+      override val mutableState =
+        MutableStateFlow<DownloadState>(DownloadState.Queued)
+      override val mutableSegments =
+        MutableStateFlow<List<Segment>>(emptyList())
+      override val record = AtomicSaver(record) {}
+    }
+  }
+
   private fun createScheduler(
     maxConcurrent: Int = 10,
     maxPerHost: Int = 4,
@@ -55,7 +83,6 @@ class DownloadQueueTest {
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
-      taskStore = InMemoryTaskStore(),
       config = DownloadConfig(),
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(
@@ -71,14 +98,6 @@ class DownloadQueueTest {
     )
   }
 
-  private fun newFlows(): Pair<
-    MutableStateFlow<DownloadState>,
-    MutableStateFlow<List<Segment>>
-  > {
-    return MutableStateFlow<DownloadState>(DownloadState.Queued) to
-      MutableStateFlow<List<Segment>>(emptyList())
-  }
-
   // ---- Priority ordering tests ----
 
   @Test
@@ -90,41 +109,32 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the single active slot
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
-          "task-active", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
+        val active = createHandle("task-active")
+        scheduler.enqueue(active)
 
         // Enqueue LOW priority
-        val (sfLow, segLow) = newFlows()
-        scheduler.enqueue(
+        val low = createHandle(
           "task-low",
           createRequest(priority = DownloadPriority.LOW),
-          Clock.System.now(),
-          sfLow, segLow
         )
-        assertIs<DownloadState.Queued>(sfLow.value)
+        scheduler.enqueue(low)
+        assertIs<DownloadState.Queued>(low.mutableState.value)
 
         // Enqueue HIGH priority
-        val (sfHigh, segHigh) = newFlows()
-        scheduler.enqueue(
+        val high = createHandle(
           "task-high",
           createRequest(priority = DownloadPriority.HIGH),
-          Clock.System.now(),
-          sfHigh, segHigh
         )
-        assertIs<DownloadState.Queued>(sfHigh.value)
+        scheduler.enqueue(high)
+        assertIs<DownloadState.Queued>(high.mutableState.value)
 
         // Enqueue NORMAL priority
-        val (sfNorm, segNorm) = newFlows()
-        scheduler.enqueue(
+        val normal = createHandle(
           "task-normal",
           createRequest(priority = DownloadPriority.NORMAL),
-          Clock.System.now(),
-          sfNorm, segNorm
         )
-        assertIs<DownloadState.Queued>(sfNorm.value)
+        scheduler.enqueue(normal)
+        assertIs<DownloadState.Queued>(normal.mutableState.value)
 
         // When the active task completes, HIGH should be promoted
         // first, then NORMAL, then LOW.
@@ -133,12 +143,14 @@ class DownloadQueueTest {
 
         // HIGH should have been promoted (moved past Queued)
         withTimeout(2.seconds) {
-          sfHigh.first { it != DownloadState.Queued && it !is DownloadState.Queued }
+          high.mutableState.first {
+            it != DownloadState.Queued && it !is DownloadState.Queued
+          }
         }
 
         // NORMAL and LOW should still be queued
-        assertIs<DownloadState.Queued>(sfNorm.value)
-        assertIs<DownloadState.Queued>(sfLow.value)
+        assertIs<DownloadState.Queued>(normal.mutableState.value)
+        assertIs<DownloadState.Queued>(low.mutableState.value)
       } finally {
         scope.cancel()
       }
@@ -153,46 +165,39 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the active slot
-        val (sf0, seg0) = newFlows()
-        scheduler.enqueue(
-          "task-0", createRequest(), Clock.System.now(),
-          sf0, seg0
-        )
+        val h0 = createHandle("task-0")
+        scheduler.enqueue(h0)
 
         // Enqueue two NORMAL tasks in order
-        val (sfFirst, segFirst) = newFlows()
-        scheduler.enqueue(
+        val first = createHandle(
           "task-first",
           createRequest(priority = DownloadPriority.NORMAL),
-          Clock.System.now(),
-          sfFirst, segFirst
         )
-        assertIs<DownloadState.Queued>(sfFirst.value)
+        scheduler.enqueue(first)
+        assertIs<DownloadState.Queued>(first.mutableState.value)
 
         // Small delay to ensure different createdAt
         delay(10)
 
-        val (sfSecond, segSecond) = newFlows()
-        scheduler.enqueue(
+        val second = createHandle(
           "task-second",
           createRequest(priority = DownloadPriority.NORMAL),
-          Clock.System.now(),
-          sfSecond, segSecond
         )
-        assertIs<DownloadState.Queued>(sfSecond.value)
+        scheduler.enqueue(second)
+        assertIs<DownloadState.Queued>(second.mutableState.value)
 
         // Complete the active task — the first enqueued should
         // be promoted (FIFO within same priority)
         scheduler.onTaskCompleted("task-0")
 
         withTimeout(2.seconds) {
-          sfFirst.first {
+          first.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
 
         // Second should still be queued
-        assertIs<DownloadState.Queued>(sfSecond.value)
+        assertIs<DownloadState.Queued>(second.mutableState.value)
       } finally {
         scope.cancel()
       }
@@ -209,30 +214,21 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 2)
 
         // Fill both slots
-        val (sf1, seg1) = newFlows()
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          sf2, seg2
-        )
+        val h1 = createHandle("task-1")
+        val h2 = createHandle("task-2")
+        scheduler.enqueue(h1)
+        scheduler.enqueue(h2)
 
         // Third task should be queued
-        val (sf3, seg3) = newFlows()
-        scheduler.enqueue(
-          "task-3", createRequest(), Clock.System.now(),
-          sf3, seg3
-        )
-        assertIs<DownloadState.Queued>(sf3.value)
+        val h3 = createHandle("task-3")
+        scheduler.enqueue(h3)
+        assertIs<DownloadState.Queued>(h3.mutableState.value)
 
         // Complete one task — the queued task should be promoted
         scheduler.onTaskCompleted("task-1")
 
         withTimeout(2.seconds) {
-          sf3.first {
+          h3.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
@@ -250,25 +246,19 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the slot
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
+        val h1 = createHandle("task-1")
+        scheduler.enqueue(h1)
 
         // Queue a second task
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          sf2, seg2
-        )
-        assertIs<DownloadState.Queued>(sf2.value)
+        val h2 = createHandle("task-2")
+        scheduler.enqueue(h2)
+        assertIs<DownloadState.Queued>(h2.mutableState.value)
 
         // Signal failure of first task — should promote second
         scheduler.onTaskFailed("task-1")
 
         withTimeout(2.seconds) {
-          sf2.first {
+          h2.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
@@ -286,25 +276,19 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the slot
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
+        val h1 = createHandle("task-1")
+        scheduler.enqueue(h1)
 
         // Queue a second task
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          sf2, seg2
-        )
-        assertIs<DownloadState.Queued>(sf2.value)
+        val h2 = createHandle("task-2")
+        scheduler.enqueue(h2)
+        assertIs<DownloadState.Queued>(h2.mutableState.value)
 
         // Signal cancellation of first task — should promote second
         scheduler.onTaskCanceled("task-1")
 
         withTimeout(2.seconds) {
-          sf2.first {
+          h2.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
@@ -327,33 +311,30 @@ class DownloadQueueTest {
         )
 
         // First task from example.com — should start
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
+        val h1 = createHandle(
           "task-1",
           createRequest(url = "https://example.com/file1.zip"),
-          Clock.System.now(), sf1, seg1
         )
+        scheduler.enqueue(h1)
 
         // Second task from same host — should be queued
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
+        val h2 = createHandle(
           "task-2",
           createRequest(url = "https://example.com/file2.zip"),
-          Clock.System.now(), sf2, seg2
         )
-        assertIs<DownloadState.Queued>(sf2.value)
+        scheduler.enqueue(h2)
+        assertIs<DownloadState.Queued>(h2.mutableState.value)
 
         // Task from different host — should start immediately
-        val (sf3, seg3) = newFlows()
-        scheduler.enqueue(
+        val h3 = createHandle(
           "task-3",
           createRequest(url = "https://other.com/file.zip"),
-          Clock.System.now(), sf3, seg3
         )
+        scheduler.enqueue(h3)
 
         // task-3 should have moved past Queued (started)
         withTimeout(2.seconds) {
-          sf3.first { it != DownloadState.Queued }
+          h3.mutableState.first { it != DownloadState.Queued }
         }
       } finally {
         scope.cancel()
@@ -370,26 +351,24 @@ class DownloadQueueTest {
           maxConcurrent = 10, maxPerHost = 1,
         )
 
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
+        val h1 = createHandle(
           "task-1",
           createRequest(url = "https://example.com/file1.zip"),
-          Clock.System.now(), sf1, seg1
         )
+        scheduler.enqueue(h1)
 
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
+        val h2 = createHandle(
           "task-2",
           createRequest(url = "https://example.com/file2.zip"),
-          Clock.System.now(), sf2, seg2
         )
-        assertIs<DownloadState.Queued>(sf2.value)
+        scheduler.enqueue(h2)
+        assertIs<DownloadState.Queued>(h2.mutableState.value)
 
         // Complete first task — second should be promoted
         scheduler.onTaskCompleted("task-1")
 
         withTimeout(2.seconds) {
-          sf2.first {
+          h2.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
@@ -411,20 +390,19 @@ class DownloadQueueTest {
 
         // Start tasks from three different hosts
         val hosts = listOf("alpha.com", "beta.com", "gamma.com")
-        val flows = hosts.mapIndexed { idx, host ->
-          val (sf, seg) = newFlows()
-          scheduler.enqueue(
+        val handles = hosts.mapIndexed { idx, host ->
+          val handle = createHandle(
             "task-$idx",
             createRequest(url = "https://$host/file.zip"),
-            Clock.System.now(), sf, seg
           )
-          sf
+          scheduler.enqueue(handle)
+          handle
         }
 
         // All should start (no host conflicts)
-        for ((idx, sf) in flows.withIndex()) {
+        for (handle in handles) {
           withTimeout(2.seconds) {
-            sf.first { it != DownloadState.Queued }
+            handle.mutableState.first { it != DownloadState.Queued }
           }
         }
       } finally {
@@ -446,34 +424,32 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Start a LOW priority task
-        val (sfLow, segLow) = newFlows()
-        scheduler.enqueue(
+        val low = createHandle(
           "task-low",
           createRequest(priority = DownloadPriority.LOW),
-          Clock.System.now(), sfLow, segLow
         )
+        scheduler.enqueue(low)
 
         // Wait for it to start
         withTimeout(2.seconds) {
-          sfLow.first { it != DownloadState.Queued }
+          low.mutableState.first { it != DownloadState.Queued }
         }
 
         // Enqueue URGENT — should preempt the LOW task
-        val (sfUrgent, segUrgent) = newFlows()
-        scheduler.enqueue(
+        val urgent = createHandle(
           "task-urgent",
           createRequest(priority = DownloadPriority.URGENT),
-          Clock.System.now(), sfUrgent, segUrgent
         )
+        scheduler.enqueue(urgent)
 
         // The LOW task should be re-queued
         withTimeout(2.seconds) {
-          sfLow.first { it is DownloadState.Queued }
+          low.mutableState.first { it is DownloadState.Queued }
         }
 
         // The URGENT task should have started
         withTimeout(2.seconds) {
-          sfUrgent.first {
+          urgent.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
@@ -491,26 +467,24 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Start an URGENT task
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
+        val h1 = createHandle(
           "task-urgent-1",
           createRequest(priority = DownloadPriority.URGENT),
-          Clock.System.now(), sf1, seg1
         )
+        scheduler.enqueue(h1)
 
         withTimeout(2.seconds) {
-          sf1.first { it != DownloadState.Queued }
+          h1.mutableState.first { it != DownloadState.Queued }
         }
 
         // Enqueue another URGENT — cannot preempt, should be queued
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
+        val h2 = createHandle(
           "task-urgent-2",
           createRequest(priority = DownloadPriority.URGENT),
-          Clock.System.now(), sf2, seg2
         )
+        scheduler.enqueue(h2)
 
-        assertIs<DownloadState.Queued>(sf2.value)
+        assertIs<DownloadState.Queued>(h2.mutableState.value)
       } finally {
         scope.cancel()
       }
@@ -527,28 +501,23 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill slot
-        val (sf0, seg0) = newFlows()
-        scheduler.enqueue(
-          "task-0", createRequest(), Clock.System.now(),
-          sf0, seg0
-        )
+        val h0 = createHandle("task-0")
+        scheduler.enqueue(h0)
 
         // Queue two NORMAL tasks
-        val (sfA, segA) = newFlows()
-        scheduler.enqueue(
+        val hA = createHandle(
           "task-A",
           createRequest(priority = DownloadPriority.NORMAL),
-          Clock.System.now(), sfA, segA
         )
+        scheduler.enqueue(hA)
 
         delay(10)
 
-        val (sfB, segB) = newFlows()
-        scheduler.enqueue(
+        val hB = createHandle(
           "task-B",
           createRequest(priority = DownloadPriority.NORMAL),
-          Clock.System.now(), sfB, segB
         )
+        scheduler.enqueue(hB)
 
         // Boost task-B to HIGH — it should now be ahead of task-A
         scheduler.setPriority("task-B", DownloadPriority.HIGH)
@@ -557,13 +526,13 @@ class DownloadQueueTest {
         scheduler.onTaskCompleted("task-0")
 
         withTimeout(2.seconds) {
-          sfB.first {
+          hB.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
 
         // task-A should still be queued
-        assertIs<DownloadState.Queued>(sfA.value)
+        assertIs<DownloadState.Queued>(hA.mutableState.value)
       } finally {
         scope.cancel()
       }
@@ -577,11 +546,8 @@ class DownloadQueueTest {
       try {
         val scheduler = createScheduler(maxConcurrent = 10)
 
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
+        val h1 = createHandle("task-1")
+        scheduler.enqueue(h1)
 
         // task-1 is active, setPriority should be a no-op
         scheduler.setPriority("task-1", DownloadPriority.HIGH)
@@ -619,26 +585,17 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill slot
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
+        val h1 = createHandle("task-1")
+        scheduler.enqueue(h1)
 
         // Queue two more
-        val (sfA, segA) = newFlows()
-        scheduler.enqueue(
-          "task-A", createRequest(), Clock.System.now(),
-          sfA, segA
-        )
-        assertIs<DownloadState.Queued>(sfA.value)
+        val hA = createHandle("task-A")
+        scheduler.enqueue(hA)
+        assertIs<DownloadState.Queued>(hA.mutableState.value)
 
-        val (sfB, segB) = newFlows()
-        scheduler.enqueue(
-          "task-B", createRequest(), Clock.System.now(),
-          sfB, segB
-        )
-        assertIs<DownloadState.Queued>(sfB.value)
+        val hB = createHandle("task-B")
+        scheduler.enqueue(hB)
+        assertIs<DownloadState.Queued>(hB.mutableState.value)
 
         // Dequeue task-A
         scheduler.dequeue("task-A")
@@ -647,14 +604,14 @@ class DownloadQueueTest {
         scheduler.onTaskCompleted("task-1")
 
         withTimeout(2.seconds) {
-          sfB.first {
+          hB.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
 
         // task-A should remain as Queued (no state change from
         // dequeue itself)
-        assertIs<DownloadState.Queued>(sfA.value)
+        assertIs<DownloadState.Queued>(hA.mutableState.value)
       } finally {
         scope.cancel()
       }
@@ -668,25 +625,19 @@ class DownloadQueueTest {
       try {
         val scheduler = createScheduler(maxConcurrent = 1)
 
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
+        val h1 = createHandle("task-1")
+        scheduler.enqueue(h1)
 
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          sf2, seg2
-        )
-        assertIs<DownloadState.Queued>(sf2.value)
+        val h2 = createHandle("task-2")
+        scheduler.enqueue(h2)
+        assertIs<DownloadState.Queued>(h2.mutableState.value)
 
         // Dequeue the active task — should cancel it and promote
         // the queued task
         scheduler.dequeue("task-1")
 
         withTimeout(2.seconds) {
-          sf2.first {
+          h2.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
@@ -716,7 +667,7 @@ class DownloadQueueTest {
   @Test
   fun extractHost_httpUrl() {
     val host = DownloadQueue.extractHost(
-      "http://cdn.example.com/path/file.zip"
+      "http://cdn.example.com/path/file.zip",
     )
     assertEquals("cdn.example.com", host)
   }
@@ -724,7 +675,7 @@ class DownloadQueueTest {
   @Test
   fun extractHost_httpsUrlWithPort() {
     val host = DownloadQueue.extractHost(
-      "https://cdn.example.com:443/path/file.zip"
+      "https://cdn.example.com:443/path/file.zip",
     )
     assertEquals("cdn.example.com", host)
   }
@@ -732,7 +683,7 @@ class DownloadQueueTest {
   @Test
   fun extractHost_noPath() {
     val host = DownloadQueue.extractHost(
-      "https://example.com"
+      "https://example.com",
     )
     assertEquals("example.com", host)
   }
@@ -746,7 +697,7 @@ class DownloadQueueTest {
   @Test
   fun extractHost_ipAddress() {
     val host = DownloadQueue.extractHost(
-      "https://192.168.1.1:8080/file"
+      "https://192.168.1.1:8080/file",
     )
     assertEquals("192.168.1.1", host)
   }
@@ -761,30 +712,18 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 2)
 
         // Fill both slots
-        val (sf1, seg1) = newFlows()
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
-          "task-1", createRequest(), Clock.System.now(),
-          sf1, seg1
-        )
-        scheduler.enqueue(
-          "task-2", createRequest(), Clock.System.now(),
-          sf2, seg2
-        )
+        val h1 = createHandle("task-1")
+        val h2 = createHandle("task-2")
+        scheduler.enqueue(h1)
+        scheduler.enqueue(h2)
 
         // Queue two more
-        val (sf3, seg3) = newFlows()
-        val (sf4, seg4) = newFlows()
-        scheduler.enqueue(
-          "task-3", createRequest(), Clock.System.now(),
-          sf3, seg3
-        )
-        scheduler.enqueue(
-          "task-4", createRequest(), Clock.System.now(),
-          sf4, seg4
-        )
-        assertIs<DownloadState.Queued>(sf3.value)
-        assertIs<DownloadState.Queued>(sf4.value)
+        val h3 = createHandle("task-3")
+        val h4 = createHandle("task-4")
+        scheduler.enqueue(h3)
+        scheduler.enqueue(h4)
+        assertIs<DownloadState.Queued>(h3.mutableState.value)
+        assertIs<DownloadState.Queued>(h4.mutableState.value)
 
         // Complete both active tasks
         scheduler.onTaskCompleted("task-1")
@@ -792,12 +731,12 @@ class DownloadQueueTest {
 
         // Both queued tasks should now be promoted
         withTimeout(2.seconds) {
-          sf3.first {
+          h3.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
         withTimeout(2.seconds) {
-          sf4.first {
+          h4.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
@@ -817,62 +756,56 @@ class DownloadQueueTest {
         val scheduler = createScheduler(maxConcurrent = 1)
 
         // Fill the slot
-        val (sf0, seg0) = newFlows()
-        scheduler.enqueue(
-          "task-0", createRequest(), Clock.System.now(),
-          sf0, seg0
-        )
+        val h0 = createHandle("task-0")
+        scheduler.enqueue(h0)
 
         // Queue LOW, HIGH, NORMAL in that enqueue order
-        val (sfLow, segLow) = newFlows()
-        scheduler.enqueue(
+        val low = createHandle(
           "task-low",
           createRequest(priority = DownloadPriority.LOW),
-          Clock.System.now(), sfLow, segLow
         )
+        scheduler.enqueue(low)
 
-        val (sfHigh, segHigh) = newFlows()
-        scheduler.enqueue(
+        val high = createHandle(
           "task-high",
           createRequest(priority = DownloadPriority.HIGH),
-          Clock.System.now(), sfHigh, segHigh
         )
+        scheduler.enqueue(high)
 
-        val (sfNorm, segNorm) = newFlows()
-        scheduler.enqueue(
+        val normal = createHandle(
           "task-normal",
           createRequest(priority = DownloadPriority.NORMAL),
-          Clock.System.now(), sfNorm, segNorm
         )
+        scheduler.enqueue(normal)
 
         // Verify all queued
-        assertIs<DownloadState.Queued>(sfLow.value)
-        assertIs<DownloadState.Queued>(sfHigh.value)
-        assertIs<DownloadState.Queued>(sfNorm.value)
+        assertIs<DownloadState.Queued>(low.mutableState.value)
+        assertIs<DownloadState.Queued>(high.mutableState.value)
+        assertIs<DownloadState.Queued>(normal.mutableState.value)
 
         // Round 1: complete task-0 — HIGH promoted
         scheduler.onTaskCompleted("task-0")
         withTimeout(2.seconds) {
-          sfHigh.first {
+          high.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
-        assertIs<DownloadState.Queued>(sfNorm.value)
-        assertIs<DownloadState.Queued>(sfLow.value)
+        assertIs<DownloadState.Queued>(normal.mutableState.value)
+        assertIs<DownloadState.Queued>(low.mutableState.value)
 
         // Round 2: complete task-high — NORMAL promoted
         scheduler.onTaskCompleted("task-high")
         withTimeout(2.seconds) {
-          sfNorm.first {
+          normal.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
-        assertIs<DownloadState.Queued>(sfLow.value)
+        assertIs<DownloadState.Queued>(low.mutableState.value)
 
         // Round 3: complete task-normal — LOW promoted
         scheduler.onTaskCompleted("task-normal")
         withTimeout(2.seconds) {
-          sfLow.first {
+          low.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
@@ -895,28 +828,25 @@ class DownloadQueueTest {
         )
 
         // Fill both global slots from the same host
-        val (sf1, seg1) = newFlows()
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
+        val h1 = createHandle(
           "task-1",
           createRequest(url = "https://example.com/a"),
-          Clock.System.now(), sf1, seg1
         )
-        scheduler.enqueue(
+        val h2 = createHandle(
           "task-2",
           createRequest(url = "https://example.com/b"),
-          Clock.System.now(), sf2, seg2
         )
+        scheduler.enqueue(h1)
+        scheduler.enqueue(h2)
 
         // A third task from a different host — should be queued
         // because global limit is 2
-        val (sf3, seg3) = newFlows()
-        scheduler.enqueue(
+        val h3 = createHandle(
           "task-3",
           createRequest(url = "https://other.com/c"),
-          Clock.System.now(), sf3, seg3
         )
-        assertIs<DownloadState.Queued>(sf3.value)
+        scheduler.enqueue(h3)
+        assertIs<DownloadState.Queued>(h3.mutableState.value)
       } finally {
         scope.cancel()
       }
@@ -934,38 +864,34 @@ class DownloadQueueTest {
         )
 
         // Start one task from host-A
-        val (sf1, seg1) = newFlows()
-        scheduler.enqueue(
+        val h1 = createHandle(
           "task-1",
           createRequest(url = "https://host-a.com/file"),
-          Clock.System.now(), sf1, seg1
         )
+        scheduler.enqueue(h1)
 
         // Start one task from host-B
-        val (sf2, seg2) = newFlows()
-        scheduler.enqueue(
+        val h2 = createHandle(
           "task-2",
           createRequest(url = "https://host-b.com/file"),
-          Clock.System.now(), sf2, seg2
         )
+        scheduler.enqueue(h2)
 
         // Queue: another host-A (blocked by per-host limit)
-        val (sfA2, segA2) = newFlows()
-        scheduler.enqueue(
+        val hA2 = createHandle(
           "task-a2",
           createRequest(url = "https://host-a.com/file2"),
-          Clock.System.now(), sfA2, segA2
         )
-        assertIs<DownloadState.Queued>(sfA2.value)
+        scheduler.enqueue(hA2)
+        assertIs<DownloadState.Queued>(hA2.mutableState.value)
 
         // Queue: host-C (should be eligible when slot opens)
-        val (sfC, segC) = newFlows()
-        scheduler.enqueue(
+        val hC = createHandle(
           "task-c",
           createRequest(url = "https://host-c.com/file"),
-          Clock.System.now(), sfC, segC
         )
-        assertIs<DownloadState.Queued>(sfC.value)
+        scheduler.enqueue(hC)
+        assertIs<DownloadState.Queued>(hC.mutableState.value)
 
         // Complete task from host-B. Now slot is open.
         // task-a2 is first in queue but host-a is at limit.
@@ -973,13 +899,13 @@ class DownloadQueueTest {
         scheduler.onTaskCompleted("task-2")
 
         withTimeout(2.seconds) {
-          sfC.first {
+          hC.mutableState.first {
             it != DownloadState.Queued && it !is DownloadState.Queued
           }
         }
 
         // task-a2 should still be queued (host-a at limit)
-        assertIs<DownloadState.Queued>(sfA2.value)
+        assertIs<DownloadState.Queued>(hA2.mutableState.value)
       } finally {
         scope.cancel()
       }

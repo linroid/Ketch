@@ -1,5 +1,8 @@
 package com.linroid.ketch.core
 
+import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadCondition
+import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
@@ -9,6 +12,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
@@ -26,6 +30,8 @@ import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.RealDownloadTask
+import com.linroid.ketch.core.task.TaskController
+import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -89,7 +95,6 @@ class Ketch(
     httpEngine = httpEngine,
     maxConnections = config.maxConnectionsPerDownload,
     progressIntervalMs = config.progressIntervalMs,
-    saveIntervalMs = config.saveIntervalMs,
   )
 
   private val sourceResolver = SourceResolver(
@@ -105,21 +110,20 @@ class Ketch(
 
   private val coordinator = DownloadCoordinator(
     sourceResolver = sourceResolver,
-    taskStore = taskStore,
     config = config,
     fileNameResolver = fileNameResolver,
     globalLimiter = globalLimiter,
     dispatchers = dispatchers,
   )
 
-  private val scheduler = DownloadQueue(
+  private val queue = DownloadQueue(
     maxConcurrentDownloads = config.maxConcurrentDownloads,
     maxConnectionsPerHost = config.maxConnectionsPerHost,
     coordinator = coordinator,
   )
 
-  private val scheduleManager = DownloadScheduler(
-    scheduler = scheduler,
+  private val scheduler = DownloadScheduler(
+    queue = queue,
     scope = scope,
   )
 
@@ -200,6 +204,76 @@ class Ketch(
     )
   }
 
+  private val taskController = object : TaskController {
+    override suspend fun pause(taskId: String) {
+      coordinator.pause(taskId)
+    }
+
+    override suspend fun resume(
+      handle: TaskHandle,
+      destination: Destination?,
+    ) {
+      val resumed = coordinator.resume(handle, destination)
+      if (!resumed) {
+        coordinator.start(handle)
+      }
+    }
+
+    override suspend fun cancel(handle: TaskHandle) {
+      val taskId = handle.taskId
+      scheduler.cancel(taskId)
+      queue.dequeue(taskId)
+      coordinator.cancel(handle)
+    }
+
+    override suspend fun remove(handle: TaskHandle) {
+      val taskId = handle.taskId
+      log.i { "Removing task: taskId=$taskId" }
+      scheduler.cancel(taskId)
+      queue.dequeue(taskId)
+      coordinator.cancel(handle)
+      taskStore.remove(taskId)
+      tasksMutex.withLock {
+        _tasks.value = _tasks.value.filter { it.taskId != taskId }
+      }
+    }
+
+    override suspend fun setSpeedLimit(taskId: String, limit: SpeedLimit) {
+      coordinator.setTaskSpeedLimit(taskId, limit)
+    }
+
+    override suspend fun setConnections(taskId: String, connections: Int) {
+      coordinator.setTaskConnections(taskId, connections)
+    }
+
+    override suspend fun setPriority(
+      taskId: String,
+      priority: DownloadPriority,
+    ) {
+      queue.setPriority(taskId, priority)
+    }
+
+    override suspend fun reschedule(
+      handle: TaskHandle,
+      schedule: DownloadSchedule,
+      conditions: List<DownloadCondition>,
+    ) {
+      val state = handle.mutableState.value
+      log.i {
+        "Rescheduling taskId=${handle.taskId}, " +
+          "schedule=$schedule, conditions=${conditions.size}"
+      }
+      scheduler.cancel(handle.taskId)
+      if (state.isActive) {
+        coordinator.pause(handle.taskId)
+      }
+      queue.dequeue(handle.taskId)
+      scheduler.reschedule(handle, schedule, conditions)
+    }
+  }
+
+  // -- Internal task lifecycle --
+
   /**
    * Loads all task records from the [TaskStore] and populates the
    * [tasks] flow. Non-terminal, non-paused tasks are automatically
@@ -241,37 +315,29 @@ class Ketch(
   }
 
   private suspend fun createTaskFromRecord(record: TaskRecord): DownloadTask {
-    val taskId = record.taskId
-    val request = record.request
     val task = RealDownloadTask(
-      taskId = taskId,
-      request = request,
+      taskId = record.taskId,
+      request = record.request,
       createdAt = record.createdAt,
       initialState = mapRecordState(record),
       initialSegments = record.segments ?: emptyList(),
-      coordinator = coordinator,
-      scheduler = scheduler,
-      scheduleManager = scheduleManager,
-      removeAction = { removeTaskInternal(taskId) },
+      controller = taskController,
+      taskStore = taskStore,
+      record = record,
     )
 
     when (record.state) {
-      TaskState.SCHEDULED -> scheduleManager.schedule(
-        taskId, request, record.createdAt,
-        task.mutableState, task.mutableSegments,
-      )
+      TaskState.SCHEDULED -> scheduler.schedule(task)
 
       TaskState.QUEUED,
-      TaskState.DOWNLOADING -> scheduler.enqueue(
-        taskId, request, record.createdAt,
-        task.mutableState, task.mutableSegments,
-        preferResume = true,
+      TaskState.DOWNLOADING -> queue.enqueue(
+        task, preferResume = true,
       )
 
       else -> {} // PAUSED, COMPLETED, FAILED, CANCELED — no action
     }
 
-    monitorTaskState(taskId, task.state)
+    monitorTaskState(record.taskId, task.state)
     return task
   }
 
@@ -316,27 +382,16 @@ class Ketch(
           .first { it.isTerminal }
       when (terminalState) {
         is DownloadState.Completed ->
-          scheduler.onTaskCompleted(taskId)
+          queue.onTaskCompleted(taskId)
 
         is DownloadState.Failed ->
-          scheduler.onTaskFailed(taskId)
+          queue.onTaskFailed(taskId)
 
         is DownloadState.Canceled ->
-          scheduler.onTaskCanceled(taskId)
+          queue.onTaskCanceled(taskId)
 
         else -> {}
       }
-    }
-  }
-
-  private suspend fun removeTaskInternal(taskId: String) {
-    log.i { "Removing task: taskId=$taskId" }
-    scheduleManager.cancel(taskId)
-    scheduler.dequeue(taskId)
-    coordinator.cancel(taskId)
-    taskStore.remove(taskId)
-    tasksMutex.withLock {
-      _tasks.value = _tasks.value.filter { it.taskId != taskId }
     }
   }
 
@@ -355,8 +410,8 @@ class Ketch(
     }
 
     // Apply queue config
-    scheduler.maxConcurrent = config.maxConcurrentDownloads
-    scheduler.maxPerHost = config.maxConnectionsPerHost
+    queue.maxConcurrent = config.maxConcurrentDownloads
+    queue.maxPerHost = config.maxConnectionsPerHost
 
     log.i { "Config updated: $config" }
   }
@@ -364,6 +419,7 @@ class Ketch(
   override fun close() {
     log.i { "Closing Ketch" }
     httpEngine.close()
+    coordinator.close()
     scope.cancel()
     dispatchers.close()
   }
