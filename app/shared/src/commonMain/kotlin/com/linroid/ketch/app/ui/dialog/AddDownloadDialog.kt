@@ -62,14 +62,6 @@ private enum class DialogPanel {
   None, SpeedLimit, Priority, Schedule
 }
 
-private fun isSupportedUrl(url: String): Boolean {
-  val lower = url.trim().lowercase()
-  return lower.startsWith("http://") ||
-    lower.startsWith("https://") ||
-    lower.startsWith("ftp://") ||
-    lower.startsWith("ftps://")
-}
-
 @Composable
 fun AddDownloadDialog(
   resolveState: ResolveState,
@@ -107,21 +99,19 @@ fun AddDownloadDialog(
   val urlFocusRequester = remember {
     FocusRequester()
   }
-  val isValidUrl = url.isBlank() || isSupportedUrl(url)
-
   // Track the last resolved URL to avoid re-resolving
   var lastResolvedSource by remember {
     mutableStateOf("")
   }
 
-  // Debounce: auto-resolve when URL looks valid
+  // Debounce: auto-resolve when URL is non-blank
   LaunchedEffect(url) {
     val trimmed = url.trim()
-    if (isSupportedUrl(trimmed) && trimmed != lastResolvedSource) {
+    if (trimmed.isNotBlank() && trimmed != lastResolvedSource) {
       delay(500)
       lastResolvedSource = trimmed
       onResolveUrl(trimmed)
-    } else if (!isSupportedUrl(trimmed)) {
+    } else if (trimmed.isBlank()) {
       if (lastResolvedSource.isNotEmpty()) {
         lastResolvedSource = ""
         onResetResolve()
@@ -168,10 +158,9 @@ fun AddDownloadDialog(
             .focusRequester(urlFocusRequester),
           label = { Text("URL") },
           singleLine = true,
-          placeholder = {
-            Text("https:// or ftp://...")
-          },
-          isError = !isValidUrl,
+          placeholder = { Text("Enter URL...") },
+          isError =
+            resolveState is ResolveState.Error,
           trailingIcon = {
             when (resolveState) {
               is ResolveState.Resolving -> {
@@ -193,7 +182,7 @@ fun AddDownloadDialog(
                 IconButton(
                   onClick = {
                     val trimmed = url.trim()
-                    if (isSupportedUrl(trimmed)) {
+                    if (trimmed.isNotBlank()) {
                       lastResolvedSource = trimmed
                       onResolveUrl(trimmed)
                     }
@@ -211,16 +200,7 @@ fun AddDownloadDialog(
               is ResolveState.Idle -> {}
             }
           },
-          supportingText = if (!isValidUrl) {
-            {
-              Text(
-                "URL must start with http://, " +
-                  "https://, ftp://, or ftps://"
-              )
-            }
-          } else {
-            null
-          }
+          supportingText = null
         )
 
         // Resolve result section
@@ -350,7 +330,7 @@ fun AddDownloadDialog(
             )
           }
         },
-        enabled = url.isNotBlank() && isValidUrl,
+        enabled = url.isNotBlank(),
       ) {
         Text("Download")
       }
