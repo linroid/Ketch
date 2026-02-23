@@ -23,7 +23,8 @@ internal object FtpError {
    * - 425, 426 (data connection issues) -> Network
    * - 452, 552 (storage issues) -> Disk
    * - Other 4xx -> Network (transient, retryable)
-   * - 430, 530, 450, 451, 500-504, 550, 551, 553 -> SourceError
+   * - 430, 530 (authentication failures) -> AuthenticationFailed
+   * - 450, 451, 500-504, 550, 551, 553 -> SourceError
    * - Other 5xx -> SourceError
    */
   fun fromReply(reply: FtpReply): KetchError {
@@ -36,6 +37,12 @@ internal object FtpError {
         Exception("FTP ${reply.code}: ${reply.message}")
       )
 
+      // Authentication failures
+      430, 530 -> KetchError.AuthenticationFailed(
+        sourceType = FtpDownloadSource.TYPE,
+        cause = Exception("FTP ${reply.code}: ${reply.message}"),
+      )
+
       // Storage / disk errors
       452, 552 -> KetchError.Disk(
         Exception("FTP ${reply.code}: ${reply.message}")
@@ -46,7 +53,7 @@ internal object FtpError {
         Exception("FTP ${reply.code}: ${reply.message}")
       )
 
-      // All 5xx: FTP protocol errors (auth, file not found, etc.)
+      // All 5xx: FTP protocol errors (file not found, etc.)
       in 500..599 -> KetchError.SourceError(
         sourceType = FtpDownloadSource.TYPE,
         cause = Exception("FTP ${reply.code}: ${reply.message}"),

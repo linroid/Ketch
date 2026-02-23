@@ -47,7 +47,10 @@ sealed interface ResolveState {
   data object Idle : ResolveState
   data object Resolving : ResolveState
   data class Resolved(val result: ResolvedSource) : ResolveState
-  data class Error(val message: String) : ResolveState
+  data class Error(
+    val message: String,
+    val cause: Throwable? = null,
+  ) : ResolveState
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -154,7 +157,8 @@ class AppState(
       }.onFailure { e ->
         if (resolvingUrl == url) {
           resolveState = ResolveState.Error(
-            e.message ?: "Failed to resolve URL"
+            message = e.message ?: "Failed to resolve URL",
+            cause = e,
           )
         }
       }

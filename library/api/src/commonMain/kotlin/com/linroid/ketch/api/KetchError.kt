@@ -90,6 +90,20 @@ sealed class KetchError(
     @Transient override val cause: Throwable? = null,
   ) : KetchError("Source '$sourceType' error", cause)
 
+  /**
+   * Authentication failed (e.g., FTP 530 "Not logged in").
+   *
+   * @property sourceType identifier of the source that rejected credentials
+   */
+  @Serializable
+  @SerialName("auth_failed")
+  data class AuthenticationFailed(
+    val sourceType: String,
+    @Transient override val cause: Throwable? = null,
+  ) : KetchError(
+    "Authentication failed for '$sourceType'", cause,
+  )
+
   /** Catch-all for unexpected errors. Not retryable. */
   @Serializable
   @SerialName("unknown")
@@ -112,6 +126,7 @@ sealed class KetchError(
       is ValidationFailed -> false
       is Canceled -> false
       is SourceError -> false
+      is AuthenticationFailed -> false
       is Unknown -> false
     }
 }

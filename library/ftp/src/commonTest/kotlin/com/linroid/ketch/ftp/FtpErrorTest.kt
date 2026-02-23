@@ -37,24 +37,23 @@ class FtpErrorTest {
     assertTrue(error.isRetryable)
   }
 
-  // --- Authentication failures (4xx) -> Network (transient) ---
+  // --- Authentication failures -> AuthenticationFailed ---
 
   @Test
-  fun fromReply_430_mapsToNetwork() {
+  fun fromReply_430_mapsToAuthenticationFailed() {
     val error = FtpError.fromReply(
       FtpReply(430, "Invalid username or password")
     )
-    assertIs<KetchError.Network>(error)
+    assertIs<KetchError.AuthenticationFailed>(error)
+    assertEquals("ftp", error.sourceType)
   }
 
-  // --- Authentication failures (5xx) -> SourceError ---
-
   @Test
-  fun fromReply_530_mapsToSourceError() {
+  fun fromReply_530_mapsToAuthenticationFailed() {
     val error = FtpError.fromReply(
       FtpReply(530, "Not logged in")
     )
-    assertIs<KetchError.SourceError>(error)
+    assertIs<KetchError.AuthenticationFailed>(error)
     assertEquals("ftp", error.sourceType)
   }
 
@@ -201,7 +200,7 @@ class FtpErrorTest {
     val error = FtpError.fromReply(
       FtpReply(530, "Not logged in")
     )
-    assertIs<KetchError.SourceError>(error)
+    assertIs<KetchError.AuthenticationFailed>(error)
     assertTrue(!error.isRetryable)
   }
 
