@@ -17,6 +17,7 @@ import com.linroid.ketch.config.defaultDbPath
 import com.linroid.ketch.config.generateConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
@@ -416,6 +417,7 @@ private fun runServer(args: Array<String>) {
     config = downloadConfig,
     name = instanceName,
     logger = Logger.console(ketchLogLevel),
+    additionalSources = listOf(FtpDownloadSource())
   )
   val server = KetchServer(
     ketch,

@@ -45,7 +45,7 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Daemon server** `✅` -- Run as a background service with REST API and real-time events
 - **Remote control** `✅` -- Manage a remote server from any client (mobile, desktop, web, or CLI)
 - **Pluggable architecture** `✅` -- Swap out HTTP engines, storage backends, and download sources
-- **FTP/FTPS** `🔜` -- Download from FTP servers
+- **FTP/FTPS** `✅` -- Download from FTP servers with segmented parallel transfers and resume
 - **BitTorrent** `🔜` -- Peer-to-peer file sharing
 - **Magnet links** `🔜` -- Start BitTorrent downloads from magnet links
 - **HLS streaming** `🔜` -- Download and save HTTP Live Streaming videos

@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.remote.RemoteKetch
@@ -34,8 +35,13 @@ class InstanceFactory(
     defaultDirectory = defaultDirectory,
   ),
   val deviceName: String = "Embedded",
+  additionalSources: List<DownloadSource> = platformAdditionalSources(),
   private val embeddedFactory: (() -> Ketch)? = taskStore?.let { ts ->
-    { createDefaultEmbeddedKetch(ts, downloadConfig, deviceName) }
+    {
+      createDefaultEmbeddedKetch(
+        ts, downloadConfig, deviceName, additionalSources,
+      )
+    }
   },
   private val localServerFactory: ((KetchApi) -> LocalServerHandle)? = null,
 ) {
@@ -101,10 +107,13 @@ class InstanceFactory(
   }
 }
 
+internal expect fun platformAdditionalSources(): List<DownloadSource>
+
 private fun createDefaultEmbeddedKetch(
   taskStore: TaskStore,
   config: DownloadConfig,
   name: String,
+  additionalSources: List<DownloadSource>,
 ): Ketch {
   return Ketch(
     httpEngine = KtorHttpEngine(),
@@ -112,5 +121,6 @@ private fun createDefaultEmbeddedKetch(
     config = config,
     name = name,
     logger = Logger.console(),
+    additionalSources = additionalSources,
   )
 }

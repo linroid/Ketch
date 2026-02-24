@@ -42,10 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.state.ResolveState
@@ -60,12 +62,6 @@ import kotlinx.coroutines.delay
 
 private enum class DialogPanel {
   None, SpeedLimit, Priority, Schedule
-}
-
-private fun isHttpUrl(url: String): Boolean {
-  val trimmed = url.trim()
-  return trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://")
 }
 
 @Composable
@@ -99,27 +95,38 @@ fun AddDownloadDialog(
       DownloadSchedule.Immediate
     )
   }
+  var username by remember { mutableStateOf("") }
+  var password by remember { mutableStateOf("") }
   var expanded by remember {
     mutableStateOf(DialogPanel.None)
   }
   val urlFocusRequester = remember {
     FocusRequester()
   }
-  val isValidUrl = url.isBlank() || isHttpUrl(url)
+  val needsAuth =
+    resolveState is ResolveState.Error &&
+      resolveState.cause is KetchError.AuthenticationFailed
 
   // Track the last resolved URL to avoid re-resolving
   var lastResolvedSource by remember {
     mutableStateOf("")
   }
 
-  // Debounce: auto-resolve when URL looks valid
+  fun buildResolveUrl(): String {
+    val trimmed = url.trim()
+    if (username.isBlank()) return trimmed
+    return embedCredentials(trimmed, username, password)
+  }
+
+  // Debounce: auto-resolve when URL is non-blank
   LaunchedEffect(url) {
     val trimmed = url.trim()
-    if (isHttpUrl(trimmed) && trimmed != lastResolvedSource) {
+    if (trimmed.isNotBlank() && trimmed != lastResolvedSource) {
       delay(500)
-      lastResolvedSource = trimmed
-      onResolveUrl(trimmed)
-    } else if (!isHttpUrl(trimmed)) {
+      val resolveUrl = buildResolveUrl()
+      lastResolvedSource = resolveUrl
+      onResolveUrl(resolveUrl)
+    } else if (trimmed.isBlank()) {
       if (lastResolvedSource.isNotEmpty()) {
         lastResolvedSource = ""
         onResetResolve()
@@ -166,10 +173,9 @@ fun AddDownloadDialog(
             .focusRequester(urlFocusRequester),
           label = { Text("URL") },
           singleLine = true,
-          placeholder = {
-            Text("https://example.com/file.zip")
-          },
-          isError = !isValidUrl,
+          placeholder = { Text("Enter URL...") },
+          isError =
+            resolveState is ResolveState.Error,
           trailingIcon = {
             when (resolveState) {
               is ResolveState.Resolving -> {
@@ -190,10 +196,10 @@ fun AddDownloadDialog(
               is ResolveState.Error -> {
                 IconButton(
                   onClick = {
-                    val trimmed = url.trim()
-                    if (isHttpUrl(trimmed)) {
-                      lastResolvedSource = trimmed
-                      onResolveUrl(trimmed)
+                    if (url.isNotBlank()) {
+                      val resolveUrl = buildResolveUrl()
+                      lastResolvedSource = resolveUrl
+                      onResolveUrl(resolveUrl)
                     }
                   }
                 ) {
@@ -209,20 +215,30 @@ fun AddDownloadDialog(
               is ResolveState.Idle -> {}
             }
           },
-          supportingText = if (!isValidUrl) {
-            {
-              Text(
-                "URL must start with " +
-                  "http:// or https://"
-              )
-            }
-          } else {
-            null
-          }
+          supportingText = null
         )
 
         // Resolve result section
         ResolveInfoSection(resolveState)
+
+        // Credential fields shown on authentication failure
+        AnimatedVisibility(
+          visible = needsAuth,
+          enter = expandVertically() + fadeIn(),
+          exit = shrinkVertically() + fadeOut(),
+        ) {
+          CredentialFields(
+            username = username,
+            password = password,
+            onUsernameChange = { username = it },
+            onPasswordChange = { password = it },
+            onRetry = {
+              val resolveUrl = buildResolveUrl()
+              lastResolvedSource = resolveUrl
+              onResolveUrl(resolveUrl)
+            },
+          )
+        }
 
         OutlinedTextField(
           value = fileName,
@@ -339,16 +355,16 @@ fun AddDownloadDialog(
     confirmButton = {
       Button(
         onClick = {
-          val trimmed = url.trim()
-          if (trimmed.isNotEmpty()) {
+          val downloadUrl = buildResolveUrl()
+          if (downloadUrl.isNotEmpty()) {
             onDownload(
-              trimmed, fileName.trim(),
+              downloadUrl, fileName.trim(),
               selectedSpeed, selectedPriority,
               selectedSchedule, resolved,
             )
           }
         },
-        enabled = url.isNotBlank() && isValidUrl,
+        enabled = url.isNotBlank(),
       ) {
         Text("Download")
       }
@@ -541,6 +557,102 @@ private fun ResolveErrorCard(
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
       )
+    }
+  }
+}
+
+@Composable
+private fun CredentialFields(
+  username: String,
+  password: String,
+  onUsernameChange: (String) -> Unit,
+  onPasswordChange: (String) -> Unit,
+  onRetry: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  Column(
+    modifier = modifier,
+    verticalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement =
+        Arrangement.spacedBy(8.dp),
+    ) {
+      OutlinedTextField(
+        value = username,
+        onValueChange = onUsernameChange,
+        modifier = Modifier.weight(1f),
+        label = { Text("Username") },
+        singleLine = true,
+      )
+      OutlinedTextField(
+        value = password,
+        onValueChange = onPasswordChange,
+        modifier = Modifier.weight(1f),
+        label = { Text("Password") },
+        singleLine = true,
+        visualTransformation =
+          PasswordVisualTransformation(),
+      )
+    }
+    Button(
+      onClick = onRetry,
+      enabled = username.isNotBlank(),
+      modifier = Modifier.align(Alignment.End),
+    ) {
+      Text("Retry with credentials")
+    }
+  }
+}
+
+/**
+ * Embeds [username] and [password] into a URL's authority section.
+ *
+ * For example, `ftp://host/path` becomes `ftp://user:pass@host/path`.
+ * Any existing credentials in the URL are replaced.
+ */
+private fun embedCredentials(
+  url: String,
+  username: String,
+  password: String,
+): String {
+  val schemeEnd = url.indexOf("://")
+  if (schemeEnd < 0) return url
+
+  val afterScheme = url.substring(schemeEnd + 3)
+
+  // Strip any existing credentials
+  val atIndex = afterScheme.indexOf('@')
+  val hostAndPath = if (atIndex >= 0) {
+    afterScheme.substring(atIndex + 1)
+  } else {
+    afterScheme
+  }
+
+  val scheme = url.substring(0, schemeEnd + 3)
+  val encodedUser = percentEncode(username)
+  val encodedPass = percentEncode(password)
+  return "$scheme$encodedUser:$encodedPass@$hostAndPath"
+}
+
+private fun percentEncode(value: String): String {
+  return buildString {
+    for (c in value) {
+      when (c) {
+        in 'a'..'z', in 'A'..'Z', in '0'..'9',
+        '-', '.', '_', '~' -> append(c)
+        else -> {
+          val bytes = c.toString().encodeToByteArray()
+          for (b in bytes) {
+            append('%')
+            append(
+              b.toInt().and(0xFF)
+                .toString(16).uppercase().padStart(2, '0')
+            )
+          }
+        }
+      }
     }
   }
 }

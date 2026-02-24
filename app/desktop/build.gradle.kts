@@ -27,6 +27,7 @@ compose.desktop {
         rootDir.resolve("app/proguard-rules.pro"),
         project(":library:api").file("consumer-rules.pro"),
         project(":library:core").file("consumer-rules.pro"),
+        project(":library:ftp").file("consumer-rules.pro"),
         project(":library:ktor").file("consumer-rules.pro"),
         project(":library:sqlite").file("consumer-rules.pro"),
         project(":library:remote").file("consumer-rules.pro"),

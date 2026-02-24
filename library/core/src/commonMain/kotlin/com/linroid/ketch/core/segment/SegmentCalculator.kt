@@ -3,7 +3,14 @@ package com.linroid.ketch.core.segment
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 
-internal object SegmentCalculator {
+/**
+ * Utility for splitting a file into byte-range [Segment]s and
+ * redistributing segments when the connection count changes.
+ *
+ * Used by [DownloadSource][com.linroid.ketch.core.engine.DownloadSource]
+ * implementations to calculate segments for parallel downloads.
+ */
+object SegmentCalculator {
 
   private val log = KetchLogger("SegmentCalc")
 

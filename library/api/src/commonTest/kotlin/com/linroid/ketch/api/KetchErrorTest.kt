@@ -93,4 +93,17 @@ class KetchErrorTest {
     val error = KetchError.SourceError("torrent")
     assertTrue(error.message!!.contains("torrent"))
   }
+
+  @Test
+  fun authenticationFailed_isNotRetryable() {
+    assertFalse(
+      KetchError.AuthenticationFailed("ftp").isRetryable
+    )
+  }
+
+  @Test
+  fun authenticationFailed_containsSourceType() {
+    val error = KetchError.AuthenticationFailed("ftp")
+    assertTrue(error.message!!.contains("ftp"))
+  }
 }

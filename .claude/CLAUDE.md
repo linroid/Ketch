@@ -15,6 +15,7 @@ library/
   api/        # Public API interfaces and models -- published SDK module
   core/       # In-process download engine -- published SDK module
   ktor/       # Ktor-based HttpEngine implementation -- published SDK module
+  ftp/        # FTP/FTPS DownloadSource (Android, iOS, JVM only) -- published SDK module
   kermit/     # Optional Kermit logging integration -- published SDK module
   sqlite/     # SQLite-backed TaskStore (Android, iOS, JVM only) -- published SDK module
   remote/     # Remote KetchApi client (HTTP + SSE) -- published SDK module
@@ -48,6 +49,10 @@ cli/          # JVM CLI entry point
 - `com.linroid.ketch.core.log` -- `Logger`, `KetchLogger`
 - `com.linroid.ketch.core.task` -- `RealDownloadTask`, `TaskStore`, `InMemoryTaskStore`,
   `TaskRecord`, `TaskState`
+
+### `library:ftp`
+- `com.linroid.ketch.ftp` -- `FtpDownloadSource` (implements `DownloadSource`), `FtpClient`,
+  `RealFtpClient`, `FtpUrl`, `FtpReply`, `FtpError`, `FtpResumeState`, `TlsUpgrade`
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
@@ -83,8 +88,17 @@ cli/          # JVM CLI entry point
 ### Pluggable Download Sources (`DownloadSource`)
 - `SourceResolver` routes URLs to the appropriate source
 - `HttpDownloadSource` is the built-in HTTP/HTTPS implementation
+- `FtpDownloadSource` handles FTP/FTPS with segmented parallel transfers
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source defines: `canHandle()`, `resolve()`, `download()`, `resume()`
+
+### FTP/FTPS Support (`library:ftp`)
+- FTP and FTPS (FTP over TLS) as a pluggable `DownloadSource`
+- Segmented parallel downloads via multiple FTP connections with REST offsets
+- Resume support with MDTM-based server file change validation
+- FTPS on JVM/Android via ktor-network-tls; iOS deferred (no ktor TLS support)
+- Passive mode only (PASV/EPSV); FTP URL parsing with credentials
+- Platforms: Android, JVM, iOS (no WasmJs — requires raw TCP sockets)
 
 ### Daemon Server (`server/`)
 - Ktor-based REST API: create, list, pause, resume, cancel downloads
@@ -100,7 +114,7 @@ cli/          # JVM CLI entry point
 
 ### Error Handling (sealed `KetchError`)
 - `Network` (retryable), `Http(code)` (5xx retryable), `Disk`, `Unsupported`,
-  `ValidationFailed`, `Canceled`, `SourceError`, `Unknown`
+  `ValidationFailed`, `Canceled`, `SourceError`, `AuthenticationFailed`, `Unknown`
 - I/O exceptions from `FileAccessor` classified as `KetchError.Disk`
 
 ## Architecture Patterns
@@ -151,7 +165,8 @@ cli/          # JVM CLI entry point
 - Use `KetchLogger` for all internal logging — instantiate per component:
   `private val log = KetchLogger("Coordinator")`
 - Tags: "Ketch", "Coordinator", "SegmentDownloader", "RangeDetector", "KtorHttpEngine",
-  "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "TokenBucket"
+  "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
+  "FtpClient", "TokenBucket"
 - Levels: verbose (segment detail), debug (state changes), info (user events),
   warn (retries), error (fatal)
 - Use lazy lambdas: `log.d { "expensive $computation" }`
@@ -163,24 +178,26 @@ cli/          # JVM CLI entry point
    `UnsupportedOperationException`). Use `RemoteKetch` for browser-based downloads.
 2. iOS support is best-effort via expect/actual (iosArm64 + iosSimulatorArm64)
 3. `library:sqlite` does not support WasmJs -- use `InMemoryTaskStore` on that platform
+4. `library:ftp` does not support WasmJs (requires raw TCP sockets)
+5. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
+   (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 
 ## Roadmap
 
 Planned features not yet implemented:
 
-1. **FTP Support** - FTP/FTPS protocol as a pluggable `DownloadSource`
-2. **BitTorrent Support** - BitTorrent protocol as a pluggable `DownloadSource`, with
+1. **BitTorrent Support** - BitTorrent protocol as a pluggable `DownloadSource`, with
    segmented piece downloading and peer-to-peer transfers
-3. **Magnet Link Support** - Magnet URI scheme for starting BitTorrent downloads without
+2. **Magnet Link Support** - Magnet URI scheme for starting BitTorrent downloads without
    a .torrent file (DHT/tracker-based metadata resolution)
-4. **HLS Support** - HTTP Live Streaming (HLS) as a pluggable `DownloadSource`, downloading
+3. **HLS Support** - HTTP Live Streaming (HLS) as a pluggable `DownloadSource`, downloading
    and merging `.m3u8` playlist segments into a single media file
-5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
+4. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
-6. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
+5. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
    supporting various media sites and extractors
-7. **Browser Extension** - Browser extension for intercepting and managing downloads
+6. **Browser Extension** - Browser extension for intercepting and managing downloads
    directly from the browser, integrating with the Ketch daemon server
-8. **AI Integration** - MCP server exposing Ketch capabilities as tools for AI agents,
+7. **AI Integration** - MCP server exposing Ketch capabilities as tools for AI agents,
    and skill-based automation (e.g., smart resource discovery, auto-categorization,
    intelligent scheduling based on content type)
