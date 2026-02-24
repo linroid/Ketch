@@ -1,12 +1,9 @@
 package com.linroid.ketch.ai
 
+import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.fetch.ContentExtractor
-import com.linroid.ketch.ai.fetch.RateLimiter
 import com.linroid.ketch.ai.fetch.SafeFetcher
 import com.linroid.ketch.ai.fetch.UrlValidator
-import com.linroid.ketch.ai.llm.DummyLlmProvider
-import com.linroid.ketch.ai.llm.KoogLlmProvider
-import com.linroid.ketch.ai.llm.LlmProvider
 import com.linroid.ketch.ai.search.DummySearchProvider
 import com.linroid.ketch.ai.search.SearchProvider
 import com.linroid.ketch.ai.site.SiteProfileStore
@@ -34,16 +31,14 @@ class AiModule(
      * Creates a fully wired AI module from [config].
      *
      * @param config AI configuration settings
-     * @param llmProvider custom LLM provider, or `null` to auto-detect
-     *   from [config] (uses Koog/OpenAI when API key is set, otherwise
-     *   a no-op dummy)
      * @param searchProvider custom search provider, or `null` to use
      *   the default no-op provider
+     * @param stepListener optional listener for agent progress steps
      */
     fun create(
       config: AiConfig,
-      llmProvider: LlmProvider? = null,
       searchProvider: SearchProvider? = null,
+      stepListener: DiscoveryStepListener = DiscoveryStepListener.None,
     ): AiModule {
       val urlValidator = UrlValidator()
       val fetcherClient = HttpClient {
@@ -57,39 +52,20 @@ class AiModule(
         maxContentBytes = config.fetcher.maxContentBytes,
         userAgent = config.discovery.userAgent,
       )
-      val rateLimiter = RateLimiter(
-        maxGlobalConcurrent =
-          config.discovery.maxConcurrentRequests,
-      )
       val contentExtractor = ContentExtractor()
       val siteProfileStore = SiteProfileStore()
       val siteProfiler = SiteProfiler(fetcher)
-
-      val resolvedLlmProvider = llmProvider ?: run {
-        if (config.llm.apiKey.isNotBlank()) {
-          KoogLlmProvider(
-            apiKey = config.llm.apiKey,
-            model = config.llm.model,
-            maxTokens = config.llm.maxTokens,
-            urlValidator = urlValidator,
-          )
-        } else {
-          DummyLlmProvider()
-        }
-      }
 
       val resolvedSearchProvider =
         searchProvider ?: DummySearchProvider()
 
       val discoveryService = ResourceDiscoveryService(
-        llmProvider = resolvedLlmProvider,
         searchProvider = resolvedSearchProvider,
         fetcher = fetcher,
         urlValidator = urlValidator,
         contentExtractor = contentExtractor,
-        siteProfileStore = siteProfileStore,
-        rateLimiter = rateLimiter,
         config = config,
+        stepListener = stepListener,
       )
 
       return AiModule(

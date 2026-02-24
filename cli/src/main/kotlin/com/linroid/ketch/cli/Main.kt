@@ -480,7 +480,7 @@ private fun runAiDiscover(args: List<String>) {
     println("  ketch ai-discover \"ffmpeg release\" --sites ffmpeg.org")
     println()
     println("Set OPENAI_API_KEY env var for LLM-powered discovery.")
-    println("Without it, results will be empty (DummyLlmProvider).")
+    println("Without it, results will be empty.")
     return
   }
 
@@ -517,7 +517,7 @@ private fun runAiDiscover(args: List<String>) {
   val apiKey = System.getenv("OPENAI_API_KEY") ?: ""
   if (apiKey.isBlank()) {
     println("Note: OPENAI_API_KEY not set." +
-      " Using DummyLlmProvider (empty results).")
+      " Discovery will return empty results.")
     println()
   }
 

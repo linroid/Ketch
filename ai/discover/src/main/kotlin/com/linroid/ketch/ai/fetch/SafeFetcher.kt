@@ -3,6 +3,7 @@ package com.linroid.ketch.ai.fetch
 import com.linroid.ketch.api.log.KetchLogger
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.head
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
@@ -78,6 +79,51 @@ internal class SafeFetcher(
     }
   }
 
+  /**
+   * Performs an HTTP HEAD request on [url] after SSRF validation.
+   *
+   * @return [HeadResult.Success] with response metadata, or
+   *   [HeadResult.Failed] with a reason
+   */
+  suspend fun head(url: String): HeadResult {
+    when (val validation = urlValidator.validate(url)) {
+      is ValidationResult.Blocked -> {
+        log.w { "URL blocked: ${validation.reason}" }
+        return HeadResult.Failed(url, validation.reason)
+      }
+      is ValidationResult.Valid -> {
+        // URL passed validation
+      }
+    }
+
+    return try {
+      val response = httpClient.head(url) {
+        header(HttpHeaders.UserAgent, userAgent)
+      }
+
+      val finalUrl = response.headers[HttpHeaders.Location] ?: url
+      if (!response.status.isSuccess()) {
+        return HeadResult.Failed(
+          url, "HTTP ${response.status.value}"
+        )
+      }
+
+      HeadResult.Success(
+        url = url,
+        finalUrl = finalUrl,
+        statusCode = response.status.value,
+        contentType = response.headers[HttpHeaders.ContentType],
+        contentLength = response.headers[HttpHeaders.ContentLength]
+          ?.toLongOrNull(),
+        lastModified = response.headers[HttpHeaders.LastModified],
+        etag = response.headers[HttpHeaders.ETag],
+      )
+    } catch (e: Exception) {
+      log.w(e) { "HEAD failed for $url" }
+      HeadResult.Failed(url, e.message ?: "Unknown error")
+    }
+  }
+
   companion object {
     private const val DEFAULT_MAX_CONTENT_BYTES = 2L * 1024 * 1024
     private const val DEFAULT_USER_AGENT = "KetchBot/1.0"
@@ -100,4 +146,26 @@ internal sealed interface FetchResult {
     override val url: String,
     val reason: String,
   ) : FetchResult
+}
+
+/** Result of an HTTP HEAD request. */
+internal sealed interface HeadResult {
+  val url: String
+
+  /** Successful HEAD response with metadata. */
+  data class Success(
+    override val url: String,
+    val finalUrl: String,
+    val statusCode: Int,
+    val contentType: String?,
+    val contentLength: Long?,
+    val lastModified: String?,
+    val etag: String?,
+  ) : HeadResult
+
+  /** HEAD request failed or was blocked. */
+  data class Failed(
+    override val url: String,
+    val reason: String,
+  ) : HeadResult
 }

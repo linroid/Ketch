@@ -1,6 +1,5 @@
 package com.linroid.ketch.ai
 
-import com.linroid.ketch.ai.llm.RankedCandidate
 import kotlin.time.Instant
 
 /**

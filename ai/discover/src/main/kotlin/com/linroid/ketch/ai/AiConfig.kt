@@ -15,6 +15,7 @@ data class AiConfig(
   val search: SearchConfig = SearchConfig(),
   val fetcher: FetcherConfig = FetcherConfig(),
   val discovery: DiscoveryConfig = DiscoveryConfig(),
+  val agent: AgentConfig = AgentConfig(),
 )
 
 /**
@@ -71,4 +72,15 @@ data class DiscoveryConfig(
   val maxConcurrentRequests: Int = 3,
   val userAgent: String = "KetchBot/1.0",
   val allowedDomains: List<String> = emptyList(),
+)
+
+/**
+ * Agent execution configuration.
+ *
+ * @param maxIterations maximum agent tool-call iterations
+ * @param temperature LLM sampling temperature
+ */
+data class AgentConfig(
+  val maxIterations: Int = 30,
+  val temperature: Double = 0.2,
 )

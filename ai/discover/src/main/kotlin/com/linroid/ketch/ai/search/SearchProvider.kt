@@ -1,5 +1,7 @@
 package com.linroid.ketch.ai.search
 
+import kotlinx.serialization.Serializable
+
 /**
  * Interface for web search functionality.
  *
@@ -26,6 +28,7 @@ interface SearchProvider {
 /**
  * A single search result.
  */
+@Serializable
 data class SearchResult(
   val url: String,
   val title: String,
