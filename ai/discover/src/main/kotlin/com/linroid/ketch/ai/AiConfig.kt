@@ -38,12 +38,16 @@ data class LlmConfig(
 /**
  * Search provider configuration.
  *
- * @param provider search API provider type
- * @param apiKey search API key if needed
+ * @param provider search API provider type: `"bing"`, `"google"`, or
+ *   `"llm"` (default, no-op fallback)
+ * @param apiKey search API key (Bing subscription key or Google API key)
+ * @param cx Google Custom Search Engine ID (only used when
+ *   [provider] is `"google"`)
  */
 data class SearchConfig(
   val provider: String = "llm",
   val apiKey: String = "",
+  val cx: String = "",
 )
 
 /**

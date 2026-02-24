@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
+import com.linroid.ketch.ai.SearchConfig
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -524,6 +525,7 @@ private fun runAiDiscover(args: List<String>) {
   val aiConfig = AiConfig(
     enabled = true,
     llm = LlmConfig(apiKey = apiKey),
+    search = resolveSearchConfig(),
   )
   val aiModule = AiModule.create(aiConfig)
 
@@ -606,6 +608,11 @@ private fun printUsage() {
   println("    --max-results <n>      Max results (default: 5)")
   println("                           Requires OPENAI_API_KEY env var")
   println()
+  println("  Search env vars (checked in order):")
+  println("    BING_SEARCH_API_KEY    Use Bing Web Search API")
+  println("    GOOGLE_SEARCH_API_KEY  Use Google Custom Search")
+  println("    GOOGLE_SEARCH_CX      Google Search Engine ID")
+  println()
   println("Examples:")
   println("  ketch https://example.com/file.zip")
   println("  ketch -v https://example.com/file.zip")
@@ -644,6 +651,28 @@ private fun printServerUsage() {
   println("  ketch server --speed-limit 10m")
   println("  ketch server --config /path/to/config.toml")
   println("  ketch server --generate-config")
+}
+
+/**
+ * Resolves [SearchConfig] from environment variables.
+ *
+ * Priority: `BING_SEARCH_API_KEY` > `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` > default.
+ */
+private fun resolveSearchConfig(): SearchConfig {
+  val bingKey = System.getenv("BING_SEARCH_API_KEY")
+  if (!bingKey.isNullOrBlank()) {
+    return SearchConfig(provider = "bing", apiKey = bingKey)
+  }
+  val googleKey = System.getenv("GOOGLE_SEARCH_API_KEY")
+  val googleCx = System.getenv("GOOGLE_SEARCH_CX")
+  if (!googleKey.isNullOrBlank() && !googleCx.isNullOrBlank()) {
+    return SearchConfig(
+      provider = "google",
+      apiKey = googleKey,
+      cx = googleCx,
+    )
+  }
+  return SearchConfig()
 }
 
 private fun parsePriority(value: String): DownloadPriority? {
