@@ -87,14 +87,9 @@ internal fun Route.aiRoutes(
       try {
         val downloadRequest = DownloadRequest(
           url = candidate.url,
-          fileName = candidate.fileName,
           destination = request.destination
             ?.let { Destination(it) },
-          connections = if (request.connections > 0) {
-            request.connections
-          } else {
-            null
-          },
+          connections = request.connections,
         )
         val task = ketch.download(downloadRequest)
         AiDownloadResult(

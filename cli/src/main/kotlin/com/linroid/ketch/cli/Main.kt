@@ -557,8 +557,9 @@ private fun runAiDiscover(args: List<String>) {
       if (candidate.fileName != null) {
         println("     File: ${candidate.fileName}")
       }
-      if (candidate.fileSize != null) {
-        println("     Size: ${formatBytes(candidate.fileSize)}")
+      val fileSize = candidate.fileSize
+      if (fileSize != null) {
+        println("     Size: ${formatBytes(fileSize)}")
       }
       println("     Confidence: ${"%.0f".format(candidate.confidence * 100)}%")
       if (candidate.description.isNotEmpty()) {
