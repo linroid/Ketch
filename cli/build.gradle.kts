@@ -42,9 +42,24 @@ graalvmNative {
   }
 }
 
+// Pre-built web assets directory. When set (e.g. from CI), the
+// wasmJsBrowserDistribution task is skipped and assets are copied
+// from this path instead.
+val prebuiltWebDir = providers.gradleProperty("prebuiltWebDir")
+  .map { layout.projectDirectory.dir(it) }
+
+val webSourceDir = if (prebuiltWebDir.isPresent) {
+  prebuiltWebDir.get()
+} else {
+  project(":app:web").layout.buildDirectory
+    .dir("dist/wasmJs/productionExecutable").get()
+}
+
 val bundleWebApp by tasks.registering(Copy::class) {
-  dependsOn(":app:web:wasmJsBrowserDistribution")
-  from(project(":app:web").layout.buildDirectory.dir("dist/wasmJs/productionExecutable"))
+  if (!prebuiltWebDir.isPresent) {
+    dependsOn(":app:web:wasmJsBrowserDistribution")
+  }
+  from(webSourceDir)
   exclude("*.map", "*.LICENSE.txt")
   into(layout.buildDirectory.dir("generated/resources/web"))
   // Inject auto-connect flag so the bundled web UI connects to its
