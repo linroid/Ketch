@@ -71,12 +71,9 @@ internal class DownloadCoordinator(
 
       currentSegments?.let { segments ->
         log.d { "Saving pause state for taskId=$taskId" }
-        val downloadedBytes =
-          segments.sumOf { it.downloadedBytes }
         handle.record.update {
           it.copy(
             state = TaskState.PAUSED,
-            downloadedBytes = downloadedBytes,
             segments = segments,
             updatedAt = Clock.System.now(),
           )
@@ -117,8 +114,7 @@ internal class DownloadCoordinator(
     log.d {
       "Resume loaded record: taskId=$taskId, " +
         "segments=${segments.size}, " +
-        "downloaded=${taskRecord.downloadedBytes}/" +
-        "${taskRecord.totalBytes}"
+        "totalBytes=${taskRecord.totalBytes}"
     }
 
     handle.mutableState.value = DownloadState.Queued
@@ -209,7 +205,7 @@ internal class DownloadCoordinator(
           handle.record.update {
             it.copy(
               state = TaskState.FAILED,
-              errorMessage = error.message,
+              error = error,
               updatedAt = Clock.System.now(),
             )
           }

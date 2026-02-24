@@ -238,7 +238,6 @@ internal class DownloadExecution(
             handle.record.update {
               it.copy(
                 segments = snapshot,
-                downloadedBytes = downloaded,
                 updatedAt = Clock.System.now(),
               )
             }
@@ -262,7 +261,6 @@ internal class DownloadExecution(
       handle.record.update {
         it.copy(
           state = TaskState.COMPLETED,
-          downloadedBytes = total,
           segments = null,
           sourceResumeState = HttpDownloadSource.buildResumeState(
             etag = it.etag,
@@ -304,7 +302,6 @@ internal class DownloadExecution(
         outputPath = outputPath,
         state = TaskState.COMPLETED,
         totalBytes = 0,
-        downloadedBytes = 0,
         segments = null,
         sourceType = sourceType,
         updatedAt = Clock.System.now(),

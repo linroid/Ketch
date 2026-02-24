@@ -65,17 +65,24 @@ class KetchErrorTest {
 
   @Test
   fun unsupported_isNotRetryable() {
-    assertFalse(KetchError.Unsupported.isRetryable)
+    assertFalse(KetchError.Unsupported().isRetryable)
   }
 
   @Test
-  fun validationFailed_isNotRetryable() {
-    assertFalse(KetchError.ValidationFailed("etag mismatch").isRetryable)
+  fun fileChanged_isNotRetryable() {
+    assertFalse(
+      KetchError.FileChanged("etag mismatch").isRetryable,
+    )
+  }
+
+  @Test
+  fun corruptResumeState_isNotRetryable() {
+    assertFalse(KetchError.CorruptResumeState().isRetryable)
   }
 
   @Test
   fun canceled_isNotRetryable() {
-    assertFalse(KetchError.Canceled.isRetryable)
+    assertFalse(KetchError.Canceled().isRetryable)
   }
 
   @Test

@@ -1,0 +1,29 @@
+CREATE TABLE task_records_new (
+  task_id TEXT NOT NULL PRIMARY KEY,
+  request_json TEXT NOT NULL,
+  output_path TEXT,
+  state TEXT NOT NULL DEFAULT 'PENDING',
+  total_bytes INTEGER NOT NULL DEFAULT -1,
+  accept_ranges INTEGER,
+  etag TEXT,
+  last_modified TEXT,
+  segments_json TEXT,
+  created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+  error_json TEXT
+);
+
+INSERT INTO task_records_new (
+  task_id, request_json, output_path, state,
+  total_bytes, accept_ranges, etag, last_modified,
+  segments_json, created_at, updated_at
+)
+SELECT
+  task_id, request_json, output_path, state,
+  total_bytes, accept_ranges, etag, last_modified,
+  segments_json, created_at, updated_at
+FROM task_records;
+
+DROP TABLE task_records;
+
+ALTER TABLE task_records_new RENAME TO task_records;

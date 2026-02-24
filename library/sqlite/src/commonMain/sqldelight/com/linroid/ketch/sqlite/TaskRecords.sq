@@ -4,23 +4,35 @@ CREATE TABLE IF NOT EXISTS task_records (
   output_path TEXT,
   state TEXT NOT NULL DEFAULT 'PENDING',
   total_bytes INTEGER NOT NULL DEFAULT -1,
-  downloaded_bytes INTEGER NOT NULL DEFAULT 0,
-  error_message TEXT,
   accept_ranges INTEGER,
   etag TEXT,
   last_modified TEXT,
   segments_json TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+  error_json TEXT
 );
 
-save:
-INSERT OR REPLACE INTO task_records(
+insertOrIgnore:
+INSERT OR IGNORE INTO task_records(
   task_id, request_json, output_path, state,
-  total_bytes, downloaded_bytes, error_message,
-  accept_ranges, etag, last_modified, segments_json,
-  created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+  total_bytes, accept_ranges, etag, last_modified,
+  segments_json, error_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE task_records SET
+  request_json = ?,
+  output_path = ?,
+  state = ?,
+  total_bytes = ?,
+  accept_ranges = ?,
+  etag = ?,
+  last_modified = ?,
+  segments_json = ?,
+  error_json = ?,
+  updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+WHERE task_id = ?;
 
 load:
 SELECT * FROM task_records WHERE task_id = ?;

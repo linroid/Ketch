@@ -352,7 +352,8 @@ class Ketch(
 
       TaskState.PAUSED -> DownloadState.Paused(
         DownloadProgress(
-          record.downloadedBytes, record.totalBytes,
+          record.segments?.sumOf { it.downloadedBytes } ?: 0L,
+          record.totalBytes,
         ),
       )
 
@@ -361,11 +362,7 @@ class Ketch(
       )
 
       TaskState.FAILED -> DownloadState.Failed(
-        KetchError.Unknown(
-          cause = Exception(
-            record.errorMessage ?: "Unknown error",
-          ),
-        ),
+        record.error ?: KetchError.Unknown(),
       )
 
       TaskState.CANCELED -> DownloadState.Canceled

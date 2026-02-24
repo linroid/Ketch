@@ -150,9 +150,7 @@ class FtpDownloadSource(
       Json.decodeFromString<FtpResumeState>(resumeState.data)
     } catch (e: Exception) {
       if (e is CancellationException) throw e
-      throw KetchError.ValidationFailed(
-        "Corrupt resume state: ${e.message}",
-      )
+      throw KetchError.CorruptResumeState(e.message, e)
     }
 
     log.i { "Resuming download for taskId=${context.taskId}" }
@@ -170,7 +168,7 @@ class FtpDownloadSource(
         val currentMdtm = client.mdtm(ftpUrl.path)
         if (currentMdtm != null && currentMdtm != state.mdtm) {
           log.w { "MDTM mismatch - file has changed on server" }
-          throw KetchError.ValidationFailed(
+          throw KetchError.FileChanged(
             "MDTM mismatch - file has changed on server",
           )
         }

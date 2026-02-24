@@ -79,7 +79,7 @@ internal class HttpDownloadSource(
     val resolved = context.preResolved
       ?: resolve(context.url, context.headers)
     val totalBytes = resolved.totalBytes
-    if (totalBytes < 0) throw KetchError.Unsupported
+    if (totalBytes < 0) throw KetchError.Unsupported()
 
     val remaining = resolved.metadata[META_RATE_LIMIT_REMAINING]
       ?.toLongOrNull()
@@ -135,9 +135,7 @@ internal class HttpDownloadSource(
       Json.decodeFromString<HttpResumeState>(resumeState.data)
     } catch (e: Exception) {
       if (e is CancellationException) throw e
-      throw KetchError.ValidationFailed(
-        "Corrupt resume state: ${e.message}"
-      )
+      throw KetchError.CorruptResumeState(e.message, e)
     }
 
     log.i { "Resuming download for taskId=${context.taskId}" }
@@ -147,8 +145,8 @@ internal class HttpDownloadSource(
 
     if (state.etag != null && serverInfo.etag != state.etag) {
       log.w { "ETag mismatch - file has changed on server" }
-      throw KetchError.ValidationFailed(
-        "ETag mismatch - file has changed on server"
+      throw KetchError.FileChanged(
+        "ETag mismatch - file has changed on server",
       )
     }
 
@@ -156,8 +154,8 @@ internal class HttpDownloadSource(
       serverInfo.lastModified != state.lastModified
     ) {
       log.w { "Last-Modified mismatch - file has changed on server" }
-      throw KetchError.ValidationFailed(
-        "Last-Modified mismatch - file has changed on server"
+      throw KetchError.FileChanged(
+        "Last-Modified mismatch - file has changed on server",
       )
     }
 

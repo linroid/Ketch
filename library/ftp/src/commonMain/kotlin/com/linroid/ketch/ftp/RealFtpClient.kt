@@ -87,7 +87,7 @@ internal class RealFtpClient(
     val upgraded = tlsUpgrade(socket, host, port)
     if (upgraded == null) {
       log.e { "TLS not available on this platform" }
-      throw KetchError.Unsupported
+      throw KetchError.Unsupported()
     }
 
     controlSocket = upgraded
