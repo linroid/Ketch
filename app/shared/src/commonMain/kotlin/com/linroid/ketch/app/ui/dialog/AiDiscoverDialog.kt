@@ -29,7 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.endpoints.model.ResourceCandidate
+import com.linroid.ketch.app.state.AiCandidate
 
 /**
  * State for the AI discovery dialog.
@@ -38,7 +38,7 @@ sealed interface AiDiscoverState {
   data object Idle : AiDiscoverState
   data object Loading : AiDiscoverState
   data class Results(
-    val candidates: List<ResourceCandidate>,
+    val candidates: List<AiCandidate>,
   ) : AiDiscoverState
   data class Error(val message: String) : AiDiscoverState
 }
@@ -54,7 +54,7 @@ sealed interface AiDiscoverState {
 fun AiDiscoverDialog(
   state: AiDiscoverState,
   onDiscover: (query: String, sites: String) -> Unit,
-  onDownloadSelected: (List<ResourceCandidate>) -> Unit,
+  onDownloadSelected: (List<AiCandidate>) -> Unit,
   onDismiss: () -> Unit,
 ) {
   var query by remember { mutableStateOf("") }
@@ -195,7 +195,7 @@ fun AiDiscoverDialog(
 
 @Composable
 private fun CandidateItem(
-  candidate: ResourceCandidate,
+  candidate: AiCandidate,
   isSelected: Boolean,
   onToggle: () -> Unit,
 ) {

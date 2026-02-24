@@ -6,11 +6,10 @@ plugins {
 dependencies {
   api(projects.library.core)
   api(projects.library.endpoints)
-  implementation(projects.library.ai)
   implementation(projects.library.ktor)
   implementation(projects.library.sqlite)
 
-  api(libs.ktor.serverCore)
+  implementation(libs.ktor.serverCore)
   implementation(libs.ktor.serverCio)
   implementation(libs.ktor.serverContentNegotiation)
   implementation(libs.ktor.serverResources)

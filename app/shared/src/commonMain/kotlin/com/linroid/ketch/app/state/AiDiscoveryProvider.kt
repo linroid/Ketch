@@ -1,25 +1,41 @@
 package com.linroid.ketch.app.state
 
-import com.linroid.ketch.endpoints.model.DiscoverRequest
-import com.linroid.ketch.endpoints.model.DiscoverResponse
-import com.linroid.ketch.remote.RemoteKetch
-import com.linroid.ketch.remote.discoverResources
+/**
+ * A discovered resource candidate from AI discovery.
+ */
+data class AiCandidate(
+  val url: String,
+  val title: String,
+  val fileName: String? = null,
+  val fileSize: Long? = null,
+  val mimeType: String? = null,
+  val sourceUrl: String = "",
+  val confidence: Float,
+  val description: String,
+)
 
 /**
- * Abstraction for AI resource discovery, allowing both remote
- * (server-side) and embedded (in-process) implementations.
+ * Request for AI resource discovery.
+ */
+data class AiDiscoverRequest(
+  val query: String,
+  val sites: List<String> = emptyList(),
+  val maxResults: Int = 10,
+  val fileTypes: List<String> = emptyList(),
+)
+
+/**
+ * Response from AI resource discovery.
+ */
+data class AiDiscoverResponse(
+  val query: String,
+  val candidates: List<AiCandidate>,
+)
+
+/**
+ * Abstraction for AI resource discovery, allowing platform-specific
+ * implementations (e.g., embedded in-process on JVM/Android).
  */
 interface AiDiscoveryProvider {
-  suspend fun discover(request: DiscoverRequest): DiscoverResponse
-}
-
-/**
- * Delegates AI discovery to a remote Ketch server via HTTP.
- */
-class RemoteAiDiscoveryProvider(
-  private val remote: RemoteKetch,
-) : AiDiscoveryProvider {
-  override suspend fun discover(
-    request: DiscoverRequest,
-  ): DiscoverResponse = remote.discoverResources(request)
+  suspend fun discover(request: AiDiscoverRequest): AiDiscoverResponse
 }

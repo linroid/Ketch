@@ -2,10 +2,6 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.ResourceDiscoveryService
-import com.linroid.ketch.endpoints.model.DiscoverRequest
-import com.linroid.ketch.endpoints.model.DiscoverResponse
-import com.linroid.ketch.endpoints.model.ResourceCandidate
-import com.linroid.ketch.endpoints.model.SourceReference
 
 /**
  * In-process AI discovery using the `library:ai` module directly.
@@ -16,8 +12,8 @@ class EmbeddedAiDiscoveryProvider(
 ) : AiDiscoveryProvider {
 
   override suspend fun discover(
-    request: DiscoverRequest,
-  ): DiscoverResponse {
+    request: AiDiscoverRequest,
+  ): AiDiscoverResponse {
     val result = discoveryService.discover(
       DiscoverQuery(
         query = request.query,
@@ -26,10 +22,10 @@ class EmbeddedAiDiscoveryProvider(
         fileTypes = request.fileTypes,
       )
     )
-    return DiscoverResponse(
+    return AiDiscoverResponse(
       query = result.query,
       candidates = result.candidates.map { c ->
-        ResourceCandidate(
+        AiCandidate(
           url = c.url,
           title = c.title,
           fileName = c.fileName,
@@ -38,13 +34,6 @@ class EmbeddedAiDiscoveryProvider(
           sourceUrl = c.sourceUrl,
           confidence = c.confidence,
           description = c.description,
-        )
-      },
-      sources = result.sources.map { s ->
-        SourceReference(
-          url = s.url,
-          title = s.title,
-          fetchedAt = s.fetchedAt,
         )
       },
     )

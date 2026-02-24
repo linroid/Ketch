@@ -20,12 +20,7 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.ui.dialog.AiDiscoverState
-import com.linroid.ketch.endpoints.model.AiDownloadCandidate
-import com.linroid.ketch.endpoints.model.AiDownloadRequest
-import com.linroid.ketch.endpoints.model.DiscoverRequest
-import com.linroid.ketch.endpoints.model.ResourceCandidate
 import com.linroid.ketch.remote.ConnectionState
-import com.linroid.ketch.remote.downloadCandidates
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -332,16 +327,9 @@ class AppState(
   }
 
   fun aiDiscover(query: String, sites: String) {
-    val provider = when (val inst = activeInstance.value) {
-      is RemoteInstance -> RemoteAiDiscoveryProvider(
-        inst.instance,
-      )
-      is EmbeddedInstance -> embeddedAiProvider
-      else -> null
-    }
-    if (provider == null) {
+    if (embeddedAiProvider == null) {
       aiDiscoverState = AiDiscoverState.Error(
-        "AI discovery is not available for this instance",
+        "AI discovery is not available",
       )
       return
     }
@@ -351,8 +339,8 @@ class AppState(
         val siteList = sites.split(",", " ")
           .map { it.trim() }
           .filter { it.isNotBlank() }
-        provider.discover(
-          DiscoverRequest(
+        embeddedAiProvider.discover(
+          AiDiscoverRequest(
             query = query,
             sites = siteList,
           ),
@@ -369,36 +357,20 @@ class AppState(
     }
   }
 
-  fun aiDownloadSelected(
-    candidates: List<ResourceCandidate>,
-  ) {
+  fun aiDownloadSelected(candidates: List<AiCandidate>) {
     showAiDiscoverDialog = false
     aiDiscoverState = AiDiscoverState.Idle
     scope.launch {
-      val instance = activeInstance.value
       runCatching {
-        if (instance is RemoteInstance) {
-          instance.instance.downloadCandidates(
-            AiDownloadRequest(
-              candidates = candidates.map {
-                AiDownloadCandidate(
-                  url = it.url,
-                  fileName = it.fileName,
-                )
-              },
+        val api = activeApi.value
+        candidates.forEach { c ->
+          api.download(
+            DownloadRequest(
+              url = c.url,
+              destination = c.fileName
+                ?.let { Destination(it) },
             ),
           )
-        } else {
-          val api = activeApi.value
-          candidates.forEach { c ->
-            api.download(
-              DownloadRequest(
-                url = c.url,
-                destination = c.fileName
-                  ?.let { Destination(it) },
-              ),
-            )
-          }
         }
       }.onFailure { e ->
         errorMessage =

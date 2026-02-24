@@ -80,8 +80,6 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
  * @param ketch the KetchApi instance to expose
- * @param plugins additional route installers; each lambda receives
- *   the parent [Route] and the [KetchApi] instance
  * @param mdnsRegistrar mDNS service registrar for LAN discovery
  */
 class KetchServer(
@@ -93,7 +91,6 @@ class KetchServer(
   private val corsAllowedHosts: List<String> = emptyList(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
-  private val plugins: List<Route.(KetchApi) -> Unit> = emptyList(),
 ) {
   private val log = KetchLogger("KetchServer")
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -241,10 +238,10 @@ class KetchServer(
     routing {
       if (apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(ketch, plugins)
+          apiRoutes(ketch)
         }
       } else {
-        apiRoutes(ketch, plugins)
+        apiRoutes(ketch)
       }
       webResources()
     }
@@ -258,14 +255,10 @@ class KetchServer(
   }
 }
 
-private fun Route.apiRoutes(
-  ketch: KetchApi,
-  plugins: List<Route.(KetchApi) -> Unit>,
-) {
+private fun Route.apiRoutes(ketch: KetchApi) {
   serverRoutes(ketch)
   downloadRoutes(ketch)
   eventRoutes(ketch)
-  plugins.forEach { plugin -> plugin(ketch) }
 }
 
 /**
