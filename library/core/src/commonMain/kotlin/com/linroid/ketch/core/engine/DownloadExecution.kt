@@ -126,7 +126,15 @@ internal class DownloadExecution(
     }
 
     val total = resolvedUrl.totalBytes
-    if (total < 0) throw KetchError.Unsupported
+    if (total < 0) {
+      log.e { "Unknown file size for ${request.url}" }
+      throw KetchError.SourceError(
+        sourceType = source.type,
+        cause = Exception(
+          "Unknown file size for ${request.url}"
+        ),
+      )
+    }
     totalBytes = total
 
     val fileName = resolvedUrl.suggestedFileName

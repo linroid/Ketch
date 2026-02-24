@@ -63,3 +63,4 @@ When writing Kotlin code for this project:
 - **Functions**: Keep focused and concise
 - **Sealed hierarchies**: Use sealed classes/interfaces for closed type hierarchies (e.g., `KetchError`)
 - **Simplicity**: Favor simple correctness over micro-optimizations
+- **Final newline**: Always end files with a trailing empty line
