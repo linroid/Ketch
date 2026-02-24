@@ -60,12 +60,12 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: ketch-web
-          path: /tmp/ketch-web
+          path: ${{ runner.temp }}/ketch-web
 
       - name: Unpack web assets
         run: |
           mkdir -p cli/build/prebuilt-web
-          unzip /tmp/ketch-web/ketch-web-*.zip -d cli/build/prebuilt-web
+          unzip "$RUNNER_TEMP/ketch-web"/ketch-web-*.zip -d cli/build/prebuilt-web
 
       - name: Build native image
         run: >
