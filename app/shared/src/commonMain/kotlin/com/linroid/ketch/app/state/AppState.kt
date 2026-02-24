@@ -16,8 +16,10 @@ import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LanServerDiscovery
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.ui.dialog.AiDiscoverState
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +59,7 @@ sealed interface ResolveState {
 class AppState(
   val instanceManager: InstanceManager,
   private val scope: CoroutineScope,
+  private val embeddedAiProvider: AiDiscoveryProvider? = null,
 ) {
   private val lanServerDiscovery = LanServerDiscovery()
 
@@ -102,6 +105,11 @@ class AppState(
   var showAddDialog by mutableStateOf(false)
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
+  var showAiDiscoverDialog by mutableStateOf(false)
+  var aiDiscoverState by mutableStateOf<AiDiscoverState>(
+    AiDiscoverState.Idle
+  )
+    private set
 
   /**
    * Handle "New Task" action. If no backend is available,
@@ -316,6 +324,63 @@ class AppState(
           "Failed to reconnect: ${e.message}"
       }
     }
+  }
+
+  fun aiDiscover(query: String, sites: String) {
+    if (embeddedAiProvider == null) {
+      aiDiscoverState = AiDiscoverState.Error(
+        "AI discovery is not available",
+      )
+      return
+    }
+    aiDiscoverState = AiDiscoverState.Loading
+    scope.launch {
+      runCatching {
+        val siteList = sites.split(",", " ")
+          .map { it.trim() }
+          .filter { it.isNotBlank() }
+        embeddedAiProvider.discover(
+          AiDiscoverRequest(
+            query = query,
+            sites = siteList,
+          ),
+        )
+      }.onSuccess { response ->
+        aiDiscoverState = AiDiscoverState.Results(
+          candidates = response.candidates,
+        )
+      }.onFailure { e ->
+        aiDiscoverState = AiDiscoverState.Error(
+          e.message ?: "Discovery failed",
+        )
+      }
+    }
+  }
+
+  fun aiDownloadSelected(candidates: List<AiCandidate>) {
+    showAiDiscoverDialog = false
+    aiDiscoverState = AiDiscoverState.Idle
+    scope.launch {
+      runCatching {
+        val api = activeApi.value
+        candidates.forEach { c ->
+          api.download(
+            DownloadRequest(
+              url = c.url,
+              destination = c.fileName
+                ?.let { Destination(it) },
+            ),
+          )
+        }
+      }.onFailure { e ->
+        errorMessage =
+          e.message ?: "Failed to start AI downloads"
+      }
+    }
+  }
+
+  fun resetAiDiscover() {
+    aiDiscoverState = AiDiscoverState.Idle
   }
 
   fun dismissError() {

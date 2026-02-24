@@ -61,6 +61,7 @@ kotlin {
       implementation(libs.kotlinx.coroutines.test)
     }
     androidMain.dependencies {
+      implementation(projects.ai.discover)
       implementation(projects.library.ftp)
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.ktor.client.okhttp)
@@ -73,6 +74,7 @@ kotlin {
       implementation(libs.dnssd)
     }
     jvmMain.dependencies {
+      implementation(projects.ai.discover)
       implementation(projects.library.ftp)
       implementation(projects.library.sqlite)
       implementation(libs.kotlinx.coroutinesSwing)

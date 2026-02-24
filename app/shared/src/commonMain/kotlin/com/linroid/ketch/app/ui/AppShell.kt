@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
@@ -43,10 +45,12 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
 import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
+import com.linroid.ketch.app.ui.dialog.AiDiscoverDialog
 import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.sidebar.SidebarNavigation
@@ -57,10 +61,13 @@ import com.linroid.ketch.app.ui.toolbar.countTasksByFilter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppShell(instanceManager: InstanceManager) {
+fun AppShell(
+  instanceManager: InstanceManager,
+  embeddedAiProvider: AiDiscoveryProvider? = null,
+) {
   val scope = rememberCoroutineScope()
   val appState = remember(instanceManager) {
-    AppState(instanceManager, scope)
+    AppState(instanceManager, scope, embeddedAiProvider)
   }
 
   val instances by appState.instances.collectAsState()
@@ -230,6 +237,16 @@ fun AppShell(instanceManager: InstanceManager) {
                 )
               },
               actions = {
+                IconButton(
+                  onClick = {
+                    appState.showAiDiscoverDialog = true
+                  },
+                ) {
+                  Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = "AI Discover",
+                  )
+                }
                 BatchActionBar(
                   hasActiveDownloads = hasActive,
                   hasPausedDownloads = hasPaused,
@@ -374,6 +391,22 @@ fun AppShell(instanceManager: InstanceManager) {
       },
       onDismiss = {
         appState.showInstanceSelector = false
+      },
+    )
+  }
+
+  if (appState.showAiDiscoverDialog) {
+    AiDiscoverDialog(
+      state = appState.aiDiscoverState,
+      onDiscover = { query, sites ->
+        appState.aiDiscover(query, sites)
+      },
+      onDownloadSelected = { candidates ->
+        appState.aiDownloadSelected(candidates)
+      },
+      onDismiss = {
+        appState.resetAiDiscover()
+        appState.showAiDiscoverDialog = false
       },
     )
   }

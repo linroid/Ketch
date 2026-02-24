@@ -5,10 +5,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.linroid.ketch.ai.AiConfig
+import com.linroid.ketch.ai.AiModule
+import com.linroid.ketch.ai.LlmConfig
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
+import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProvider
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.server.KetchServer
@@ -63,6 +67,20 @@ fun main() = application {
       configStore = configStore,
     )
   }
+  val embeddedAiProvider = remember {
+    val apiKey = System.getenv("OPENAI_API_KEY") ?: ""
+    if (apiKey.isNotBlank()) {
+      val aiModule = AiModule.create(
+        AiConfig(
+          enabled = true,
+          llm = LlmConfig(apiKey = apiKey),
+        ),
+      )
+      EmbeddedAiDiscoveryProvider(aiModule.discoveryService)
+    } else {
+      null
+    }
+  }
   DisposableEffect(Unit) {
     onDispose { instanceManager.close() }
   }
@@ -71,6 +89,6 @@ fun main() = application {
     title = "Ketch",
     icon = painterResource("icon.svg"),
   ) {
-    App(instanceManager)
+    App(instanceManager, embeddedAiProvider)
   }
 }

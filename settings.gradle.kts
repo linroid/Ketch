@@ -45,6 +45,9 @@ include(":library:sqlite")
 include(":library:ftp")
 include(":library:server")
 
+// AI modules
+include(":ai:discover")
+
 // Config module
 include(":config")
 
