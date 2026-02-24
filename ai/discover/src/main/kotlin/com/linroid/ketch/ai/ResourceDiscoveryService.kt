@@ -170,12 +170,9 @@ class ResourceDiscoveryService internal constructor(
       |   b) Device safety (CRITICAL):
       |      - Prefer HTTPS, official domains, reputable hosts
       |      - BLOCK URL shorteners (bit.ly, t.co, tinyurl.com, etc.)
-      |      - BLOCK "free-download" aggregator sites
       |      - High-risk extensions (.exe/.msi/.dmg/.pkg/.apk) ONLY from
       |        official vendor release pages or well-known distribution
       |        channels (GitHub Releases, vendor download pages)
-      |      - BLOCK if context contains: crack, keygen, patch, loader,
-      |        warez, torrent (piracy signals)
       |      - BLOCK password-protected archives from untrusted sources
       |      - Flag mismatched content-type vs file extension
       |      - Flag multiple redirects to ad domains
