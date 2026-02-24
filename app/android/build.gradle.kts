@@ -63,6 +63,7 @@ android {
   packaging {
     resources {
       excludes += setOf(
+        "META-INF/DEPENDENCIES",
         "META-INF/{INDEX.LIST,io.netty.versions.properties}",
         "META-INF/*.version",
         "META-INF/native-image/**",
