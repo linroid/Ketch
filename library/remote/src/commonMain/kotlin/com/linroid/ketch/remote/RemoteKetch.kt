@@ -305,7 +305,7 @@ class RemoteKetch(
     _tasks.update { taskMap.values.toList() }
   }
 
-  private fun checkSuccess(response: HttpResponse) {
+  internal fun checkSuccess(response: HttpResponse) {
     if (!response.status.isSuccess()) {
       log.w { "HTTP error ${response.status.value}" }
       throw IllegalStateException(

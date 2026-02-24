@@ -66,6 +66,7 @@ sourceSets.main {
 dependencies {
   implementation(projects.config)
   implementation(projects.library.server)
+  implementation(projects.library.ai)
   implementation(projects.library.core)
   implementation(projects.library.sqlite)
   implementation(projects.library.ktor)

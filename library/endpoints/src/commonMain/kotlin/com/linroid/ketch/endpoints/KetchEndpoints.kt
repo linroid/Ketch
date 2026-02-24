@@ -31,6 +31,13 @@ import kotlinx.serialization.Serializable
  * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
+ *
+ * ### AI Resource Discovery
+ * - `POST   /api/ai/discover`       — discover downloadable resources
+ * - `POST   /api/ai/download`       — start downloads for candidates
+ * - `GET    /api/ai/sites`          — list allowlisted sites
+ * - `POST   /api/ai/sites`          — add a site to the allowlist
+ * - `DELETE /api/ai/sites/{domain}` — remove a site
  */
 @Serializable
 @Resource("/api")
@@ -95,5 +102,30 @@ class Api {
       val parent: Events = Events(),
       val id: String,
     )
+  }
+
+  @Serializable
+  @Resource("ai")
+  data class Ai(val parent: Api = Api()) {
+
+    @Serializable
+    @Resource("discover")
+    data class Discover(val parent: Ai = Ai())
+
+    @Serializable
+    @Resource("download")
+    data class Download(val parent: Ai = Ai())
+
+    @Serializable
+    @Resource("sites")
+    data class Sites(val parent: Ai = Ai()) {
+
+      @Serializable
+      @Resource("{domain}")
+      data class ByDomain(
+        val parent: Sites = Sites(),
+        val domain: String,
+      )
+    }
   }
 }

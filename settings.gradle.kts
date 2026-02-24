@@ -43,6 +43,7 @@ include(":library:ktor")
 include(":library:kermit")
 include(":library:sqlite")
 include(":library:ftp")
+include(":library:ai")
 include(":library:server")
 
 // Config module

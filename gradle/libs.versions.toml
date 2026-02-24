@@ -20,6 +20,7 @@ kotlinx-serialization = "1.10.0"
 kotlinx-io = "0.9.0"
 kotlinx-datetime = "0.7.1"
 kermit = "2.0.8"
+koog = "0.6.2"
 kotlinx-browser = "0.5.0"
 ktoml = "0.7.1"
 ktor = "3.4.0"
@@ -57,6 +58,7 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
+koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }

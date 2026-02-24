@@ -1,6 +1,9 @@
 package com.linroid.ketch.cli
 
 import ch.qos.logback.classic.Level
+import com.linroid.ketch.ai.AiConfig
+import com.linroid.ketch.ai.AiModule
+import com.linroid.ketch.ai.LlmConfig
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -10,6 +13,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.defaultConfigPath
@@ -46,6 +50,10 @@ fun main(args: Array<String>) {
   when (remaining[0]) {
     "server" -> {
       runServer(remaining.drop(1).toTypedArray())
+      return
+    }
+    "ai-discover" -> {
+      runAiDiscover(remaining.drop(1))
       return
     }
   }
@@ -463,9 +471,115 @@ private fun runServer(args: Array<String>) {
   server.start(wait = true)
 }
 
+private fun runAiDiscover(args: List<String>) {
+  if (args.isEmpty()) {
+    println("Usage: ketch ai-discover <query> [--sites domain1,domain2]")
+    println()
+    println("Examples:")
+    println("  ketch ai-discover \"latest Ubuntu 24.04 ISO\"")
+    println("  ketch ai-discover \"ffmpeg release\" --sites ffmpeg.org")
+    println()
+    println("Set OPENAI_API_KEY env var for LLM-powered discovery.")
+    println("Without it, results will be empty (DummyLlmProvider).")
+    return
+  }
+
+  var query = ""
+  var sites = emptyList<String>()
+  var maxResults = 5
+
+  var i = 0
+  while (i < args.size) {
+    when (args[i]) {
+      "--sites" -> {
+        if (i + 1 < args.size) {
+          sites = args[++i].split(",").map { it.trim() }
+        }
+      }
+      "--max-results" -> {
+        if (i + 1 < args.size) {
+          maxResults = args[++i].toIntOrNull() ?: 5
+        }
+      }
+      else -> {
+        query = if (query.isEmpty()) args[i]
+        else "$query ${args[i]}"
+      }
+    }
+    i++
+  }
+
+  if (query.isBlank()) {
+    println("Error: query is required")
+    return
+  }
+
+  val apiKey = System.getenv("OPENAI_API_KEY") ?: ""
+  if (apiKey.isBlank()) {
+    println("Note: OPENAI_API_KEY not set." +
+      " Using DummyLlmProvider (empty results).")
+    println()
+  }
+
+  val aiConfig = AiConfig(
+    enabled = true,
+    llm = LlmConfig(apiKey = apiKey),
+  )
+  val aiModule = AiModule.create(aiConfig)
+
+  println("Discovering resources for: \"$query\"")
+  if (sites.isNotEmpty()) {
+    println("Sites: ${sites.joinToString(", ")}")
+  }
+  println()
+
+  runBlocking {
+    val discoverQuery = DiscoverQuery(
+      query = query,
+      sites = sites,
+      maxResults = maxResults,
+    )
+    val response = aiModule.discoveryService.discover(discoverQuery)
+
+    if (response.candidates.isEmpty()) {
+      println("No candidates found.")
+      if (apiKey.isBlank()) {
+        println("(Set OPENAI_API_KEY for real results)")
+      }
+      return@runBlocking
+    }
+
+    println("Found ${response.candidates.size} candidate(s):")
+    println()
+    response.candidates.forEachIndexed { idx, candidate ->
+      println("  ${idx + 1}. ${candidate.title}")
+      println("     URL: ${candidate.url}")
+      if (candidate.fileName != null) {
+        println("     File: ${candidate.fileName}")
+      }
+      if (candidate.fileSize != null) {
+        println("     Size: ${formatBytes(candidate.fileSize)}")
+      }
+      println("     Confidence: ${"%.0f".format(candidate.confidence * 100)}%")
+      if (candidate.description.isNotEmpty()) {
+        println("     ${candidate.description}")
+      }
+      println()
+    }
+
+    if (response.sources.isNotEmpty()) {
+      println("Sources analyzed:")
+      response.sources.forEach { src ->
+        println("  - ${src.title} (${src.url})")
+      }
+    }
+  }
+}
+
 private fun printUsage() {
   println("Usage: ketch [options] <url> [destination]")
   println("       ketch server [options]")
+  println("       ketch ai-discover <query> [options]")
   println()
   println("Global Options:")
   println("  -v, --verbose            Enable verbose logging (DEBUG)")
@@ -485,11 +599,19 @@ private fun printUsage() {
   println("                           Run `ketch server --help`")
   println("                           for server options")
   println()
+  println("AI Discovery:")
+  println("  ai-discover <query>      Discover downloadable resources")
+  println("    --sites <domains>      Comma-separated domain allowlist")
+  println("    --max-results <n>      Max results (default: 5)")
+  println("                           Requires OPENAI_API_KEY env var")
+  println()
   println("Examples:")
   println("  ketch https://example.com/file.zip")
   println("  ketch -v https://example.com/file.zip")
   println("  ketch --priority high https://example.com/file.zip")
   println("  ketch server --port 9000 --dir /tmp/downloads")
+  println("  ketch ai-discover \"latest Ubuntu ISO\"")
+  println("  ketch ai-discover \"ffmpeg\" --sites ffmpeg.org")
 }
 
 private fun printServerUsage() {

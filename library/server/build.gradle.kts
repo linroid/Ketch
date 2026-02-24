@@ -8,6 +8,7 @@ dependencies {
   api(projects.library.endpoints)
   implementation(projects.library.ktor)
   implementation(projects.library.sqlite)
+  implementation(projects.library.ai)
 
   implementation(libs.ktor.serverCore)
   implementation(libs.ktor.serverCio)
