@@ -1,6 +1,6 @@
-# ai:discover — AI Resource Discovery
+# ai:discover — AI agent-driven resource discovery
 
-JVM-only module that discovers downloadable files from natural language queries
+Discovers downloadable files from natural language queries
 using an LLM agent with tool-calling capabilities.
 
 ## Overview
