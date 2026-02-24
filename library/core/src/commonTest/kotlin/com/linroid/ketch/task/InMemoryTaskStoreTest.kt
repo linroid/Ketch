@@ -28,7 +28,6 @@ class InMemoryTaskStoreTest {
     outputPath = "/tmp/file.bin",
     state = state,
     totalBytes = 1000,
-    downloadedBytes = 0,
     createdAt = Instant.fromEpochMilliseconds(1000),
     updatedAt = Instant.fromEpochMilliseconds(1000),
   )
@@ -51,11 +50,10 @@ class InMemoryTaskStoreTest {
   fun save_overwritesPrevious() = runTest {
     val store = InMemoryTaskStore()
     val record1 = createRecord()
-    val record2 = record1.copy(state = TaskState.DOWNLOADING, downloadedBytes = 500)
+    val record2 = record1.copy(state = TaskState.DOWNLOADING)
     store.save(record1)
     store.save(record2)
     assertEquals(TaskState.DOWNLOADING, store.load("task-1")?.state)
-    assertEquals(500, store.load("task-1")?.downloadedBytes)
   }
 
   @Test
@@ -106,7 +104,7 @@ class InMemoryTaskStoreTest {
   fun multipleTasks_independent() = runTest {
     val store = InMemoryTaskStore()
     val r1 = createRecord("task-1")
-    val r2 = createRecord("task-2", TaskState.DOWNLOADING).copy(downloadedBytes = 500)
+    val r2 = createRecord("task-2", TaskState.DOWNLOADING)
     store.save(r1)
     store.save(r2)
     assertEquals(r1, store.load("task-1"))

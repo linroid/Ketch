@@ -352,7 +352,8 @@ class Ketch(
 
       TaskState.PAUSED -> DownloadState.Paused(
         DownloadProgress(
-          record.downloadedBytes, record.totalBytes,
+          record.segments?.sumOf { it.downloadedBytes } ?: 0L,
+          record.totalBytes,
         ),
       )
 

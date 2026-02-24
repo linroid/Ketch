@@ -35,28 +35,42 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
    */
   override suspend fun save(record: TaskRecord): Unit = mutex.withLock {
     log.d { "Saving task: ${record.taskId}" }
-    queries.save(
-      task_id = record.taskId,
-      request_json = json.encodeToString(
-        DownloadRequest.serializer(), record.request
-      ),
-      output_path = record.outputPath,
-      state = record.state.name,
-      total_bytes = record.totalBytes,
-      downloaded_bytes = record.downloadedBytes,
-      error_json = record.error?.let {
-        json.encodeToString(errorSerializer, it)
-      },
-      error_message = null,
-      accept_ranges = record.acceptRanges?.let { if (it) 1L else 0L },
-      etag = record.etag,
-      last_modified = record.lastModified,
-      segments_json = record.segments?.let {
-        json.encodeToString(segmentListSerializer, it)
-      },
-      created_at = record.createdAt.toEpochMilliseconds(),
-      updated_at = record.updatedAt.toEpochMilliseconds(),
+    val requestJson = json.encodeToString(
+      DownloadRequest.serializer(), record.request
     )
+    val acceptRanges = record.acceptRanges?.let { if (it) 1L else 0L }
+    val segmentsJson = record.segments?.let {
+      json.encodeToString(segmentListSerializer, it)
+    }
+    val errorJson = record.error?.let {
+      json.encodeToString(errorSerializer, it)
+    }
+    queries.transaction {
+      queries.insertOrIgnore(
+        task_id = record.taskId,
+        request_json = requestJson,
+        output_path = record.outputPath,
+        state = record.state.name,
+        total_bytes = record.totalBytes,
+        accept_ranges = acceptRanges,
+        etag = record.etag,
+        last_modified = record.lastModified,
+        segments_json = segmentsJson,
+        error_json = errorJson,
+      )
+      queries.update(
+        task_id = record.taskId,
+        request_json = requestJson,
+        output_path = record.outputPath,
+        state = record.state.name,
+        total_bytes = record.totalBytes,
+        accept_ranges = acceptRanges,
+        etag = record.etag,
+        last_modified = record.lastModified,
+        segments_json = segmentsJson,
+        error_json = errorJson,
+      )
+    }
   }
 
   /**
@@ -94,7 +108,6 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       outputPath = output_path,
       state = TaskState.valueOf(state),
       totalBytes = total_bytes,
-      downloadedBytes = downloaded_bytes,
       error = error_json?.let {
         try {
           json.decodeFromString(errorSerializer, it)

@@ -38,7 +38,6 @@ class TaskRecordTest {
       outputPath = "/tmp/file.bin",
       state = TaskState.PAUSED,
       totalBytes = 1000,
-      downloadedBytes = 500,
       segments = segments,
       createdAt = Instant.fromEpochMilliseconds(1000),
       updatedAt = Instant.fromEpochMilliseconds(2000),
