@@ -17,6 +17,7 @@ defaults:
 jobs:
   build-cli:
     name: CLI (${{ matrix.name }})
+    needs: [build-web]
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -51,8 +52,26 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      # Download pre-built web assets from the build-web job so we
+      # don't re-run wasmJsBrowserProductionWebpack inside nativeCompile.
+      # This avoids yarn concurrency issues on Windows and speeds up
+      # the CLI build on all platforms.
+      - name: Download web distribution
+        uses: actions/download-artifact@v7
+        with:
+          name: ketch-web
+          path: /tmp/ketch-web
+
+      - name: Unpack web assets
+        run: |
+          mkdir -p cli/build/prebuilt-web
+          unzip /tmp/ketch-web/ketch-web-*.zip -d cli/build/prebuilt-web
+
       - name: Build native image
-        run: ./gradlew :cli:nativeCompile -PVERSION_NAME=${KETCH_VERSION#v}
+        run: >
+          ./gradlew :cli:nativeCompile
+          -PVERSION_NAME=${KETCH_VERSION#v}
+          -PprebuiltWebDir=build/prebuilt-web
 
       - name: Compress with UPX (Linux)
         if: matrix.os == 'linux'
