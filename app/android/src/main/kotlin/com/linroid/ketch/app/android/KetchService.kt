@@ -12,11 +12,16 @@ import android.os.Environment
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.linroid.ketch.ai.AiConfig
+import com.linroid.ketch.ai.AiModule
+import com.linroid.ketch.ai.LlmConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.state.AiDiscoveryProvider
+import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProvider
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
@@ -40,6 +45,8 @@ class KetchService : Service() {
   }
 
   lateinit var instanceManager: InstanceManager
+    private set
+  var aiProvider: AiDiscoveryProvider? = null
     private set
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -109,6 +116,19 @@ class KetchService : Service() {
       initialRemotes = config.remotes,
       configStore = configStore,
     )
+
+    val apiKey = System.getenv("OPENAI_API_KEY") ?: ""
+    if (apiKey.isNotBlank()) {
+      val aiModule = AiModule.create(
+        AiConfig(
+          enabled = true,
+          llm = LlmConfig(apiKey = apiKey),
+        ),
+      )
+      aiProvider = EmbeddedAiDiscoveryProvider(
+        aiModule.discoveryService,
+      )
+    }
     startForegroundMonitor()
   }
 

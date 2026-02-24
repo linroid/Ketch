@@ -10,6 +10,7 @@ plugins {
 dependencies {
   implementation(projects.config)
   implementation(projects.app.shared)
+  implementation(projects.library.ai)
   implementation(projects.library.server)
   implementation(projects.library.ktor)
   implementation(projects.library.sqlite)

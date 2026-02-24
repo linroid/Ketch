@@ -1,11 +1,8 @@
 package com.linroid.ketch.server
 
-import com.linroid.ketch.ai.AiConfig
-import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
-import com.linroid.ketch.server.api.aiRoutes
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
 import com.linroid.ketch.server.api.serverRoutes
@@ -82,16 +79,9 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
- * ### AI Resource Discovery (when [aiConfig] is enabled)
- * - `POST   /api/ai/discover`       — discover resources
- * - `POST   /api/ai/download`       — download candidates
- * - `GET    /api/ai/sites`          — list allowlisted sites
- * - `POST   /api/ai/sites`          — add a site
- * - `DELETE /api/ai/sites/{domain}` — remove a site
- *
  * @param ketch the KetchApi instance to expose
- * @param aiConfig optional AI resource discovery configuration;
- *   `null` or `enabled=false` disables AI endpoints
+ * @param plugins additional route installers; each lambda receives
+ *   the parent [Route] and the [KetchApi] instance
  * @param mdnsRegistrar mDNS service registrar for LAN discovery
  */
 class KetchServer(
@@ -103,7 +93,7 @@ class KetchServer(
   private val corsAllowedHosts: List<String> = emptyList(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
-  private val aiConfig: AiConfig? = null,
+  private val plugins: List<Route.(KetchApi) -> Unit> = emptyList(),
 ) {
   private val log = KetchLogger("KetchServer")
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -248,19 +238,13 @@ class KetchServer(
       }
     }
 
-    val aiModule = if (aiConfig?.enabled == true) {
-      AiModule.create(aiConfig)
-    } else {
-      null
-    }
-
     routing {
       if (apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(ketch, aiModule)
+          apiRoutes(ketch, plugins)
         }
       } else {
-        apiRoutes(ketch, aiModule)
+        apiRoutes(ketch, plugins)
       }
       webResources()
     }
@@ -276,19 +260,12 @@ class KetchServer(
 
 private fun Route.apiRoutes(
   ketch: KetchApi,
-  aiModule: AiModule?,
+  plugins: List<Route.(KetchApi) -> Unit>,
 ) {
   serverRoutes(ketch)
   downloadRoutes(ketch)
   eventRoutes(ketch)
-  if (aiModule != null) {
-    aiRoutes(
-      ketch = ketch,
-      discoveryService = aiModule.discoveryService,
-      siteProfiler = aiModule.siteProfiler,
-      siteProfileStore = aiModule.siteProfileStore,
-    )
-  }
+  plugins.forEach { plugin -> plugin(ketch) }
 }
 
 /**

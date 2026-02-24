@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
@@ -60,10 +61,13 @@ import com.linroid.ketch.app.ui.toolbar.countTasksByFilter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppShell(instanceManager: InstanceManager) {
+fun AppShell(
+  instanceManager: InstanceManager,
+  embeddedAiProvider: AiDiscoveryProvider? = null,
+) {
   val scope = rememberCoroutineScope()
   val appState = remember(instanceManager) {
-    AppState(instanceManager, scope)
+    AppState(instanceManager, scope, embeddedAiProvider)
   }
 
   val instances by appState.instances.collectAsState()

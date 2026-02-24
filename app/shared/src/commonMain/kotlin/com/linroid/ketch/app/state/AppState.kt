@@ -16,6 +16,7 @@ import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LanServerDiscovery
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.ui.dialog.AiDiscoverState
@@ -24,7 +25,6 @@ import com.linroid.ketch.endpoints.model.AiDownloadRequest
 import com.linroid.ketch.endpoints.model.DiscoverRequest
 import com.linroid.ketch.endpoints.model.ResourceCandidate
 import com.linroid.ketch.remote.ConnectionState
-import com.linroid.ketch.remote.discoverResources
 import com.linroid.ketch.remote.downloadCandidates
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +64,7 @@ sealed interface ResolveState {
 class AppState(
   val instanceManager: InstanceManager,
   private val scope: CoroutineScope,
+  private val embeddedAiProvider: AiDiscoveryProvider? = null,
 ) {
   private val lanServerDiscovery = LanServerDiscovery()
 
@@ -331,10 +332,16 @@ class AppState(
   }
 
   fun aiDiscover(query: String, sites: String) {
-    val remote = (activeInstance.value as? RemoteInstance)
-      ?.instance ?: run {
+    val provider = when (val inst = activeInstance.value) {
+      is RemoteInstance -> RemoteAiDiscoveryProvider(
+        inst.instance,
+      )
+      is EmbeddedInstance -> embeddedAiProvider
+      else -> null
+    }
+    if (provider == null) {
       aiDiscoverState = AiDiscoverState.Error(
-        "AI discovery requires a remote server connection",
+        "AI discovery is not available for this instance",
       )
       return
     }
@@ -344,7 +351,7 @@ class AppState(
         val siteList = sites.split(",", " ")
           .map { it.trim() }
           .filter { it.isNotBlank() }
-        remote.discoverResources(
+        provider.discover(
           DiscoverRequest(
             query = query,
             sites = siteList,
@@ -365,22 +372,34 @@ class AppState(
   fun aiDownloadSelected(
     candidates: List<ResourceCandidate>,
   ) {
-    val remote = (activeInstance.value as? RemoteInstance)
-      ?.instance ?: return
     showAiDiscoverDialog = false
     aiDiscoverState = AiDiscoverState.Idle
     scope.launch {
+      val instance = activeInstance.value
       runCatching {
-        remote.downloadCandidates(
-          AiDownloadRequest(
-            candidates = candidates.map {
-              AiDownloadCandidate(
-                url = it.url,
-                fileName = it.fileName,
-              )
-            },
-          ),
-        )
+        if (instance is RemoteInstance) {
+          instance.instance.downloadCandidates(
+            AiDownloadRequest(
+              candidates = candidates.map {
+                AiDownloadCandidate(
+                  url = it.url,
+                  fileName = it.fileName,
+                )
+              },
+            ),
+          )
+        } else {
+          val api = activeApi.value
+          candidates.forEach { c ->
+            api.download(
+              DownloadRequest(
+                url = c.url,
+                destination = c.fileName
+                  ?.let { Destination(it) },
+              ),
+            )
+          }
+        }
       }.onFailure { e ->
         errorMessage =
           e.message ?: "Failed to start AI downloads"

@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
+import com.linroid.ketch.ai.server.ketchAiPlugin
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -427,6 +428,13 @@ private fun runServer(args: Array<String>) {
     logger = Logger.console(ketchLogLevel),
     additionalSources = listOf(FtpDownloadSource())
   )
+  val aiApiKey = System.getenv("OPENAI_API_KEY") ?: ""
+  val aiConfig = if (aiApiKey.isNotBlank()) {
+    AiConfig(enabled = true, llm = LlmConfig(apiKey = aiApiKey))
+  } else {
+    null
+  }
+
   val server = KetchServer(
     ketch,
     host = serverConfig.host,
@@ -435,6 +443,9 @@ private fun runServer(args: Array<String>) {
     name = instanceName,
     corsAllowedHosts = serverConfig.corsAllowedHosts,
     mdnsEnabled = serverConfig.mdnsEnabled,
+    plugins = listOfNotNull(
+      aiConfig?.let { ketchAiPlugin(it) },
+    ),
   )
 
   Runtime.getRuntime().addShutdownHook(Thread {

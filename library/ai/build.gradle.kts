@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
   api(projects.library.api)
+  api(projects.library.endpoints)
 
   // Koog framework for LLM integration
   implementation(libs.koog.agents)
@@ -13,6 +14,10 @@ dependencies {
   implementation(libs.ktor.client.cio)
   implementation(libs.ktor.client.contentNegotiation)
   implementation(libs.ktor.serialization.json)
+
+  // Ktor server for the route plugin
+  implementation(libs.ktor.serverCore)
+  implementation(libs.ktor.serverResources)
 
   // Coroutines
   implementation(libs.kotlinx.coroutines.core)
