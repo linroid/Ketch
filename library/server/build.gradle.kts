@@ -6,6 +6,7 @@ plugins {
 dependencies {
   api(projects.library.core)
   api(projects.library.endpoints)
+  implementation(projects.library.ai)
   implementation(projects.library.ktor)
   implementation(projects.library.sqlite)
 

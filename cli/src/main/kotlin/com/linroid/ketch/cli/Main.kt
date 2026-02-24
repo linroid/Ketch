@@ -4,7 +4,7 @@ import ch.qos.logback.classic.Level
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
-import com.linroid.ketch.ai.server.ketchAiPlugin
+import com.linroid.ketch.server.api.ketchAiPlugin
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest

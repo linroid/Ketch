@@ -1,4 +1,4 @@
-package com.linroid.ketch.ai.server
+package com.linroid.ketch.server.api
 
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.ResourceDiscoveryService

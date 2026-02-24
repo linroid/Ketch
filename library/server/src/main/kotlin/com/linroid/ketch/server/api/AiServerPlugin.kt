@@ -1,4 +1,4 @@
-package com.linroid.ketch.ai.server
+package com.linroid.ketch.server.api
 
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
@@ -21,6 +21,11 @@ import io.ktor.server.routing.Route
 fun ketchAiPlugin(config: AiConfig): Route.(KetchApi) -> Unit {
   val aiModule = AiModule.create(config)
   return { ketch ->
-    aiRoutes(ketch, aiModule.discoveryService, aiModule.siteProfiler, aiModule.siteProfileStore)
+    aiRoutes(
+      ketch,
+      aiModule.discoveryService,
+      aiModule.siteProfiler,
+      aiModule.siteProfileStore,
+    )
   }
 }
