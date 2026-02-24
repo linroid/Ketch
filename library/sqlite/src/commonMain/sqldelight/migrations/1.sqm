@@ -1,0 +1,1 @@
+ALTER TABLE task_records ADD COLUMN error_json TEXT;

@@ -2,6 +2,7 @@ package com.linroid.ketch.sqlite
 
 import app.cash.sqldelight.db.SqlDriver
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.task.TaskRecord
@@ -25,6 +26,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
   private val queries = database.taskRecordsQueries
   private val mutex = Mutex()
   private val json = Json { ignoreUnknownKeys = true }
+  private val errorSerializer = KetchError.serializer()
   private val segmentListSerializer = ListSerializer(Segment.serializer())
 
   /**
@@ -42,7 +44,10 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       state = record.state.name,
       total_bytes = record.totalBytes,
       downloaded_bytes = record.downloadedBytes,
-      error_message = record.errorMessage,
+      error_json = record.error?.let {
+        json.encodeToString(errorSerializer, it)
+      },
+      error_message = null,
       accept_ranges = record.acceptRanges?.let { if (it) 1L else 0L },
       etag = record.etag,
       last_modified = record.lastModified,
@@ -90,7 +95,14 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       state = TaskState.valueOf(state),
       totalBytes = total_bytes,
       downloadedBytes = downloaded_bytes,
-      errorMessage = error_message,
+      error = error_json?.let {
+        try {
+          json.decodeFromString(errorSerializer, it)
+        } catch (e: Exception) {
+          log.w(e) { "Failed to deserialize error for task: $task_id" }
+          null
+        }
+      },
       acceptRanges = accept_ranges?.let { it != 0L },
       etag = etag,
       lastModified = last_modified,

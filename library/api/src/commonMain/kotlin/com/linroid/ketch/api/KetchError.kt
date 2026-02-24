@@ -48,7 +48,8 @@ sealed class KetchError(
     val statusMessage: String? = null,
     val retryAfterSeconds: Long? = null,
     val rateLimitRemaining: Long? = null,
-  ) : KetchError("HTTP error $code: $statusMessage")
+    @Transient override val cause: Throwable? = null,
+  ) : KetchError("HTTP error $code: $statusMessage", cause)
 
   /** File I/O failure (write, flush, preallocate). Not retryable. */
   @Serializable
@@ -60,26 +61,49 @@ sealed class KetchError(
   /** Server does not support a required feature (e.g., byte ranges). */
   @Serializable
   @SerialName("unsupported")
-  data object Unsupported : KetchError("Operation not supported by server")
+  data class Unsupported(
+    @Transient override val cause: Throwable? = null,
+  ) : KetchError("Operation not supported by server", cause)
 
   /**
-   * Resume validation failed (ETag or Last-Modified mismatch).
+   * Server file has changed since the download started (ETag,
+   * Last-Modified, or MDTM mismatch). Not retryable — the download
+   * must be restarted from scratch.
    *
-   * @property reason description of what failed validation
+   * @property reason description of what changed
    */
   @Serializable
-  @SerialName("validation_failed")
-  data class ValidationFailed(
+  @SerialName("file_changed")
+  data class FileChanged(
     val reason: String,
-  ) : KetchError("Validation failed: $reason")
+    @Transient override val cause: Throwable? = null,
+  ) : KetchError("File changed on server: $reason", cause)
+
+  /**
+   * Resume state (stored JSON) could not be parsed. Not retryable —
+   * the download must be restarted from scratch.
+   *
+   * @property detail optional detail about what was corrupt
+   */
+  @Serializable
+  @SerialName("corrupt_resume_state")
+  data class CorruptResumeState(
+    val detail: String? = null,
+    @Transient override val cause: Throwable? = null,
+  ) : KetchError(
+    "Corrupt resume state" + if (detail != null) ": $detail" else "",
+    cause,
+  )
 
   /** Download was explicitly canceled by the user. */
   @Serializable
   @SerialName("canceled")
-  data object Canceled : KetchError("Download was canceled")
+  data class Canceled(
+    @Transient override val cause: Throwable? = null,
+  ) : KetchError("Download was canceled", cause)
 
   /**
-   * Error originating from a pluggable [com.linroid.ketch.core.engine.DownloadSource].
+   * Error originating from a pluggable source.
    *
    * @property sourceType identifier of the source that failed
    */
@@ -123,7 +147,8 @@ sealed class KetchError(
       is Http -> code in 500..599 || code == 429
       is Disk -> false
       is Unsupported -> false
-      is ValidationFailed -> false
+      is FileChanged -> false
+      is CorruptResumeState -> false
       is Canceled -> false
       is SourceError -> false
       is AuthenticationFailed -> false

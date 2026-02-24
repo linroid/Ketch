@@ -3,6 +3,7 @@ package com.linroid.ketch.sqlite
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import java.io.File
+import java.util.Properties
 
 actual class DriverFactory(private val dbPath: String) {
   actual fun createDriver(): SqlDriver {
@@ -12,8 +13,10 @@ actual class DriverFactory(private val dbPath: String) {
       File(dbPath).parentFile?.mkdirs()
       "jdbc:sqlite:$dbPath"
     }
-    val driver = JdbcSqliteDriver(url)
-    KetchDatabase.Schema.create(driver)
-    return driver
+    return JdbcSqliteDriver(
+      url = url,
+      properties = Properties(),
+      schema = KetchDatabase.Schema,
+    )
   }
 }

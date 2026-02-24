@@ -28,13 +28,13 @@ internal class SourceResolver(private val sources: List<DownloadSource>) {
       return source
     }
     log.e { "No source found for URL: $url" }
-    throw KetchError.Unsupported
+    throw KetchError.Unsupported()
   }
 
   fun resolveByType(type: String): DownloadSource {
     val source = sources.firstOrNull { it.type == type }
     if (source != null) return source
     log.e { "No source found for type: $type" }
-    throw KetchError.Unsupported
+    throw KetchError.Unsupported()
   }
 }

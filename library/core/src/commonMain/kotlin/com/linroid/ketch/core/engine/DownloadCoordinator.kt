@@ -209,7 +209,7 @@ internal class DownloadCoordinator(
           handle.record.update {
             it.copy(
               state = TaskState.FAILED,
-              errorMessage = error.message,
+              error = error,
               updatedAt = Clock.System.now(),
             )
           }

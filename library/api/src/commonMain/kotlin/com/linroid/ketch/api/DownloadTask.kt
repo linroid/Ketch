@@ -92,7 +92,7 @@ interface DownloadTask {
     return when (finalState) {
       is DownloadState.Completed -> Result.success(finalState.outputPath)
       is DownloadState.Failed -> Result.failure(finalState.error)
-      is DownloadState.Canceled -> Result.failure(KetchError.Canceled)
+      is DownloadState.Canceled -> Result.failure(KetchError.Canceled())
       else -> Result.failure(KetchError.Unknown(null))
     }
   }

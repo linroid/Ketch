@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.task
 
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.SourceResumeState
 import kotlinx.serialization.Serializable
@@ -21,7 +22,7 @@ data class TaskRecord(
   val state: TaskState = TaskState.QUEUED,
   val totalBytes: Long = -1,
   val downloadedBytes: Long = 0,
-  val errorMessage: String? = null,
+  val error: KetchError? = null,
   val acceptRanges: Boolean? = null,
   val etag: String? = null,
   val lastModified: String? = null,

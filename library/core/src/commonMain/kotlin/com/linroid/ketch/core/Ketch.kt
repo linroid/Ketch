@@ -361,11 +361,7 @@ class Ketch(
       )
 
       TaskState.FAILED -> DownloadState.Failed(
-        KetchError.Unknown(
-          cause = Exception(
-            record.errorMessage ?: "Unknown error",
-          ),
-        ),
+        record.error ?: KetchError.Unknown(),
       )
 
       TaskState.CANCELED -> DownloadState.Canceled

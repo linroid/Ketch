@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS task_records (
   last_modified TEXT,
   segments_json TEXT,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  error_json TEXT
 );
 
 save:
@@ -19,8 +20,8 @@ INSERT OR REPLACE INTO task_records(
   task_id, request_json, output_path, state,
   total_bytes, downloaded_bytes, error_message,
   accept_ranges, etag, last_modified, segments_json,
-  created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+  created_at, updated_at, error_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 load:
 SELECT * FROM task_records WHERE task_id = ?;
