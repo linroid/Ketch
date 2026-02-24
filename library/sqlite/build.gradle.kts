@@ -60,6 +60,8 @@ sqldelight {
   databases {
     create("KetchDatabase") {
       packageName.set("com.linroid.ketch.sqlite")
+      schemaOutputDirectory.set(file("src/main/sqldelight/databases"))
+      verifyMigrations.set(true)
     }
   }
 }
