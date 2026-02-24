@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
@@ -47,6 +49,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
 import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
+import com.linroid.ketch.app.ui.dialog.AiDiscoverDialog
 import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.sidebar.SidebarNavigation
@@ -230,6 +233,16 @@ fun AppShell(instanceManager: InstanceManager) {
                 )
               },
               actions = {
+                IconButton(
+                  onClick = {
+                    appState.showAiDiscoverDialog = true
+                  },
+                ) {
+                  Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = "AI Discover",
+                  )
+                }
                 BatchActionBar(
                   hasActiveDownloads = hasActive,
                   hasPausedDownloads = hasPaused,
@@ -374,6 +387,22 @@ fun AppShell(instanceManager: InstanceManager) {
       },
       onDismiss = {
         appState.showInstanceSelector = false
+      },
+    )
+  }
+
+  if (appState.showAiDiscoverDialog) {
+    AiDiscoverDialog(
+      state = appState.aiDiscoverState,
+      onDiscover = { query, sites ->
+        appState.aiDiscover(query, sites)
+      },
+      onDownloadSelected = { candidates ->
+        appState.aiDownloadSelected(candidates)
+      },
+      onDismiss = {
+        appState.resetAiDiscover()
+        appState.showAiDiscoverDialog = false
       },
     )
   }

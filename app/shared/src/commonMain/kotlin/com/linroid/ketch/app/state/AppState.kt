@@ -18,7 +18,14 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LanServerDiscovery
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.ui.dialog.AiDiscoverState
+import com.linroid.ketch.endpoints.model.AiDownloadCandidate
+import com.linroid.ketch.endpoints.model.AiDownloadRequest
+import com.linroid.ketch.endpoints.model.DiscoverRequest
+import com.linroid.ketch.endpoints.model.ResourceCandidate
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.remote.discoverResources
+import com.linroid.ketch.remote.downloadCandidates
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -102,6 +109,11 @@ class AppState(
   var showAddDialog by mutableStateOf(false)
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
+  var showAiDiscoverDialog by mutableStateOf(false)
+  var aiDiscoverState by mutableStateOf<AiDiscoverState>(
+    AiDiscoverState.Idle
+  )
+    private set
 
   /**
    * Handle "New Task" action. If no backend is available,
@@ -316,6 +328,68 @@ class AppState(
           "Failed to reconnect: ${e.message}"
       }
     }
+  }
+
+  fun aiDiscover(query: String, sites: String) {
+    val remote = (activeInstance.value as? RemoteInstance)
+      ?.instance ?: run {
+      aiDiscoverState = AiDiscoverState.Error(
+        "AI discovery requires a remote server connection",
+      )
+      return
+    }
+    aiDiscoverState = AiDiscoverState.Loading
+    scope.launch {
+      runCatching {
+        val siteList = sites.split(",", " ")
+          .map { it.trim() }
+          .filter { it.isNotBlank() }
+        remote.discoverResources(
+          DiscoverRequest(
+            query = query,
+            sites = siteList,
+          ),
+        )
+      }.onSuccess { response ->
+        aiDiscoverState = AiDiscoverState.Results(
+          candidates = response.candidates,
+        )
+      }.onFailure { e ->
+        aiDiscoverState = AiDiscoverState.Error(
+          e.message ?: "Discovery failed",
+        )
+      }
+    }
+  }
+
+  fun aiDownloadSelected(
+    candidates: List<ResourceCandidate>,
+  ) {
+    val remote = (activeInstance.value as? RemoteInstance)
+      ?.instance ?: return
+    showAiDiscoverDialog = false
+    aiDiscoverState = AiDiscoverState.Idle
+    scope.launch {
+      runCatching {
+        remote.downloadCandidates(
+          AiDownloadRequest(
+            candidates = candidates.map {
+              AiDownloadCandidate(
+                url = it.url,
+                fileName = it.fileName,
+              )
+            },
+          ),
+        )
+      }.onFailure { e ->
+        errorMessage =
+          e.message ?: "Failed to start AI downloads"
+      }
+    }
+  }
+
+  fun resetAiDiscover() {
+    aiDiscoverState = AiDiscoverState.Idle
   }
 
   fun dismissError() {
