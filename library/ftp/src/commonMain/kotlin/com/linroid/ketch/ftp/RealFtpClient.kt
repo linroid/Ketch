@@ -75,14 +75,20 @@ internal class RealFtpClient(
         Exception("Not connected")
       )
 
+    log.d { "Upgrading to TLS for $host:$port" }
+
     // Send AUTH TLS
     val authReply = sendCommand("AUTH TLS")
     if (!authReply.isPositiveCompletion) {
+      log.e { "AUTH TLS rejected: $authReply" }
       throw FtpError.fromReply(authReply)
     }
 
     val upgraded = tlsUpgrade(socket, host, port)
-      ?: throw KetchError.Unsupported
+    if (upgraded == null) {
+      log.e { "TLS not available on this platform" }
+      throw KetchError.Unsupported
+    }
 
     controlSocket = upgraded
     reader = upgraded.openReadChannel()
@@ -99,10 +105,11 @@ internal class RealFtpClient(
       log.w { "PROT P failed: $protReply" }
     }
 
-    log.d { "TLS upgrade complete" }
+    log.d { "TLS upgrade complete for $host:$port" }
   }
 
   override suspend fun login(username: String, password: String) {
+    log.d { "Authenticating as '$username'" }
     val userReply = sendCommand("USER $username")
     when (userReply.code) {
       230 -> {
@@ -110,13 +117,17 @@ internal class RealFtpClient(
         return
       }
       331 -> {
-        // Password required
+        log.v { "Password required for $username" }
       }
-      else -> throw FtpError.fromReply(userReply)
+      else -> {
+        log.e { "USER rejected: $userReply" }
+        throw FtpError.fromReply(userReply)
+      }
     }
 
     val passReply = sendCommand("PASS $password")
     if (!passReply.isPositiveCompletion) {
+      log.e { "Login failed for '$username': $passReply" }
       throw FtpError.fromReply(passReply)
     }
     log.d { "Logged in as $username" }
@@ -125,28 +136,48 @@ internal class RealFtpClient(
   override suspend fun setBinaryMode() {
     val reply = sendCommand("TYPE I")
     if (!reply.isPositiveCompletion) {
+      log.e { "TYPE I failed: $reply" }
       throw FtpError.fromReply(reply)
     }
+    log.v { "Binary mode set" }
   }
 
   override suspend fun size(path: String): Long? {
     val reply = sendCommand("SIZE $path")
     if (!reply.isPositiveCompletion) {
-      if (reply.code == 550 || reply.code == 502) return null
+      if (reply.code == 550) {
+        log.d { "SIZE: file not found — $path" }
+        return null
+      }
+      if (reply.code == 502) {
+        log.d { "SIZE: command not supported by server" }
+        return null
+      }
       log.w { "SIZE failed: $reply" }
       return null
     }
-    return reply.message.trim().toLongOrNull()
+    val size = reply.message.trim().toLongOrNull()
+    log.d { "SIZE $path = $size bytes" }
+    return size
   }
 
   override suspend fun mdtm(path: String): String? {
     val reply = sendCommand("MDTM $path")
     if (!reply.isPositiveCompletion) {
-      if (reply.code == 550 || reply.code == 502) return null
+      if (reply.code == 550) {
+        log.d { "MDTM: file not found — $path" }
+        return null
+      }
+      if (reply.code == 502) {
+        log.d { "MDTM: command not supported by server" }
+        return null
+      }
       log.w { "MDTM failed: $reply" }
       return null
     }
-    return reply.message.trim()
+    val timestamp = reply.message.trim()
+    log.d { "MDTM $path = $timestamp" }
+    return timestamp
   }
 
   override suspend fun supportsRest(): Boolean {
@@ -154,9 +185,7 @@ internal class RealFtpClient(
     val reply = sendCommand("REST 0")
     val supported = reply.code == 350
     restSupported = supported
-    if (!supported) {
-      log.d { "REST not supported: $reply" }
-    }
+    log.d { "REST support: $supported" }
     return supported
   }
 
@@ -165,11 +194,13 @@ internal class RealFtpClient(
     offset: Long,
     onData: suspend (ByteArray) -> Unit,
   ) {
+    log.d { "RETR $path (offset=$offset)" }
     val dataSocket = openPassiveDataConnection()
     try {
       if (offset > 0) {
         val restReply = sendCommand("REST $offset")
         if (restReply.code != 350) {
+          log.e { "REST $offset rejected: $restReply" }
           throw FtpError.fromReply(restReply)
         }
       }
@@ -178,6 +209,7 @@ internal class RealFtpClient(
       if (!retrReply.isPositivePreliminary &&
         !retrReply.isPositiveCompletion
       ) {
+        log.e { "RETR rejected: $retrReply" }
         throw FtpError.fromReply(retrReply)
       }
 
@@ -208,10 +240,13 @@ internal class RealFtpClient(
     val completeReply = readReply()
     if (!completeReply.isPositiveCompletion) {
       log.w { "Transfer complete reply: $completeReply" }
+    } else {
+      log.d { "Transfer complete for $path" }
     }
   }
 
   override suspend fun disconnect() {
+    log.v { "Disconnecting from $host:$port" }
     try {
       if (isConnected) {
         sendCommand("QUIT")
@@ -240,13 +275,18 @@ internal class RealFtpClient(
     if (epsvReply.isPositiveCompletion) {
       val dataPort = parseEpsvPort(epsvReply.message)
       if (dataPort != null) {
+        log.d { "EPSV data connection on port $dataPort" }
         return connectDataSocket(host, dataPort)
       }
+      log.d { "EPSV response unparseable, falling back to PASV" }
+    } else {
+      log.d { "EPSV not supported, falling back to PASV" }
     }
 
     // Fall back to PASV
     val pasvReply = sendCommand("PASV")
     if (!pasvReply.isPositiveCompletion) {
+      log.e { "PASV failed: $pasvReply" }
       throw FtpError.fromReply(pasvReply)
     }
 
@@ -255,6 +295,7 @@ internal class RealFtpClient(
         Exception("Failed to parse PASV response: ${pasvReply.message}")
       )
 
+    log.d { "PASV data connection to $dataHost:$dataPort" }
     return connectDataSocket(dataHost, dataPort)
   }
 

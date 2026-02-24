@@ -103,7 +103,16 @@ class FtpDownloadSource(
     val resolved = context.preResolved
       ?: resolve(context.url, context.headers)
     val totalBytes = resolved.totalBytes
-    if (totalBytes < 0) throw KetchError.Unsupported
+    if (totalBytes < 0) {
+      log.e { "Unknown file size for ${context.url} — file may not exist" }
+      throw KetchError.SourceError(
+        sourceType = TYPE,
+        cause = Exception(
+          "Unknown file size — file may not exist: " +
+            context.url,
+        ),
+      )
+    }
 
     val connections = effectiveConnections(context)
 
@@ -142,7 +151,7 @@ class FtpDownloadSource(
     } catch (e: Exception) {
       if (e is CancellationException) throw e
       throw KetchError.ValidationFailed(
-        "Corrupt resume state: ${e.message}"
+        "Corrupt resume state: ${e.message}",
       )
     }
 
@@ -162,7 +171,7 @@ class FtpDownloadSource(
         if (currentMdtm != null && currentMdtm != state.mdtm) {
           log.w { "MDTM mismatch - file has changed on server" }
           throw KetchError.ValidationFailed(
-            "MDTM mismatch - file has changed on server"
+            "MDTM mismatch - file has changed on server",
           )
         }
       }
@@ -185,7 +194,7 @@ class FtpDownloadSource(
     }
 
     val validatedSegments = validateLocalFile(
-      context, segments, totalBytes
+      context, segments, totalBytes,
     )
     if (validatedSegments !== segments) {
       context.segments.value = validatedSegments
@@ -250,7 +259,7 @@ class FtpDownloadSource(
       if (incomplete.isEmpty()) break
 
       val batchCompleted = downloadBatch(
-        context, currentSegments, incomplete, totalBytes
+        context, currentSegments, incomplete, totalBytes,
       )
 
       if (batchCompleted) break
@@ -258,7 +267,7 @@ class FtpDownloadSource(
       val newCount = context.pendingResegment
       context.pendingResegment = 0
       currentSegments = SegmentCalculator.resegment(
-        context.segments.value, newCount
+        context.segments.value, newCount,
       )
       context.segments.value = currentSegments
       log.i {
@@ -343,7 +352,7 @@ class FtpDownloadSource(
           val results = incompleteSegments.map { segment ->
             async {
               downloadSegment(
-                context, segment
+                context, segment,
               ) { bytesDownloaded ->
                 segmentMutex.withLock {
                   segmentProgress[segment.index] =
@@ -473,8 +482,8 @@ class FtpDownloadSource(
       throw KetchError.Network(
         Exception(
           "FTP connection closed prematurely: received " +
-            "$downloadedBytes of ${segment.totalBytes} bytes"
-        )
+            "$downloadedBytes of ${segment.totalBytes} bytes",
+        ),
       )
     }
 
@@ -496,6 +505,7 @@ class FtpDownloadSource(
     return when {
       context.maxConnections.value > 0 ->
         context.maxConnections.value
+
       context.request.connections > 0 -> context.request.connections
       else -> maxConnections
     }
