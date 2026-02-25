@@ -15,6 +15,7 @@ import androidx.core.app.ServiceCompat
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
+import com.linroid.ketch.ai.SearchConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -123,6 +124,7 @@ class KetchService : Service() {
         AiConfig(
           enabled = true,
           llm = LlmConfig(apiKey = apiKey),
+          search = resolveSearchConfig(),
         ),
       )
       aiProvider = EmbeddedAiDiscoveryProvider(
@@ -258,6 +260,24 @@ class KetchService : Service() {
   companion object {
     private const val CHANNEL_ID = "ketch_service"
     private const val NOTIFICATION_ID = 1
-    private const val ACTION_REPOST_NOTIFICATION = "com.linroid.ketch.app.android.action.REPOST_NOTIFICATION"
+    private const val ACTION_REPOST_NOTIFICATION =
+      "com.linroid.ketch.app.android.action.REPOST_NOTIFICATION"
   }
+}
+
+private fun resolveSearchConfig(): SearchConfig {
+  val bingKey = System.getenv("BING_SEARCH_API_KEY")
+  if (!bingKey.isNullOrBlank()) {
+    return SearchConfig(provider = "bing", apiKey = bingKey)
+  }
+  val googleKey = System.getenv("GOOGLE_SEARCH_API_KEY")
+  val googleCx = System.getenv("GOOGLE_SEARCH_CX")
+  if (!googleKey.isNullOrBlank() && !googleCx.isNullOrBlank()) {
+    return SearchConfig(
+      provider = "google",
+      apiKey = googleKey,
+      cx = googleCx,
+    )
+  }
+  return SearchConfig()
 }
