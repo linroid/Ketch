@@ -2,7 +2,10 @@ package com.linroid.ketch.torrent
 
 internal actual fun createTorrentEngine(
   config: TorrentConfig,
-): TorrentEngine = createLibtorrent4jEngine(config)
+): TorrentEngine {
+  NativeLibraryLoader.ensureLoaded()
+  return createLibtorrent4jEngine(config)
+}
 
 internal actual fun encodeBase64(data: ByteArray): String =
   jvmEncodeBase64(data)
