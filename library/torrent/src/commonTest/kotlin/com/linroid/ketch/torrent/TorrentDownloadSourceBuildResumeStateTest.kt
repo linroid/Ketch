@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Tests for [TorrentDownloadSource.buildResumeState].
@@ -32,7 +33,7 @@ class TorrentDownloadSourceBuildResumeStateTest {
     assertEquals(setOf("0", "2"), parsed.selectedFileIds)
     assertEquals("/downloads/torrent", parsed.savePath)
     // resumeData should be base64-encoded, not empty
-    assert(parsed.resumeData.isNotEmpty())
+    assertTrue(parsed.resumeData.isNotEmpty())
   }
 
   @Test
