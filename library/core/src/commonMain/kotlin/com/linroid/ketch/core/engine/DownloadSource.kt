@@ -17,6 +17,14 @@ interface DownloadSource {
   /** Unique identifier for this source type (e.g., "http", "torrent"). */
   val type: String
 
+  /**
+   * Whether this source manages its own file I/O instead of using
+   * [DownloadContext.fileAccessor]. When `true`, the download engine
+   * skips [FileAccessor][com.linroid.ketch.core.file.FileAccessor]
+   * creation, flush, and cleanup.
+   */
+  val managesOwnFileIo: Boolean get() = false
+
   /** Returns true if this source can handle the given URL. */
   fun canHandle(url: String): Boolean
 

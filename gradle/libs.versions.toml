@@ -21,6 +21,7 @@ kotlinx-io = "0.9.0"
 kotlinx-datetime = "0.7.1"
 kermit = "2.0.8"
 koog = "0.6.2"
+libtorrent4j = "2.1.0-31"
 kotlinx-browser = "0.5.0"
 ktoml = "0.7.1"
 ktor = "3.4.0"
@@ -86,6 +87,14 @@ ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json-jv
 ktor-serialization-json-common = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-serverTestHost = { module = "io.ktor:ktor-server-test-host-jvm", version.ref = "ktor" }
 ktoml-core = { module = "com.akuleshov7:ktoml-core", version.ref = "ktoml" }
+libtorrent4j = { module = "org.libtorrent4j:libtorrent4j", version.ref = "libtorrent4j" }
+libtorrent4j-android-arm64 = { module = "org.libtorrent4j:libtorrent4j-android-arm64", version.ref = "libtorrent4j" }
+libtorrent4j-android-arm = { module = "org.libtorrent4j:libtorrent4j-android-arm", version.ref = "libtorrent4j" }
+libtorrent4j-android-x86 = { module = "org.libtorrent4j:libtorrent4j-android-x86", version.ref = "libtorrent4j" }
+libtorrent4j-android-x8664 = { module = "org.libtorrent4j:libtorrent4j-android-x86_64", version.ref = "libtorrent4j" }
+libtorrent4j-macos = { module = "org.libtorrent4j:libtorrent4j-macos", version.ref = "libtorrent4j" }
+libtorrent4j-linux = { module = "org.libtorrent4j:libtorrent4j-linux", version.ref = "libtorrent4j" }
+libtorrent4j-windows = { module = "org.libtorrent4j:libtorrent4j-windows", version.ref = "libtorrent4j" }
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
 sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }

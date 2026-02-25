@@ -63,12 +63,14 @@ kotlin {
     androidMain.dependencies {
       implementation(projects.ai.discover)
       implementation(projects.library.ftp)
+      implementation(projects.library.torrent)
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.ktor.client.okhttp)
       implementation(libs.dnssd)
     }
     iosMain.dependencies {
       implementation(projects.library.ftp)
+      implementation(projects.library.torrent)
       implementation(projects.library.sqlite)
       implementation(libs.ktor.client.darwin)
       implementation(libs.dnssd)
@@ -76,6 +78,7 @@ kotlin {
     jvmMain.dependencies {
       implementation(projects.ai.discover)
       implementation(projects.library.ftp)
+      implementation(projects.library.torrent)
       implementation(projects.library.sqlite)
       implementation(libs.kotlinx.coroutinesSwing)
       implementation(libs.ktor.client.cio)

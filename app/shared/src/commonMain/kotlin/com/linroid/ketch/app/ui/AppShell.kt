@@ -363,12 +363,12 @@ fun AppShell(
       onDismiss = { appState.showAddDialog = false },
       onDownload = { url, fileName, speedLimit,
                      priority, schedule,
-                     resolvedUrl ->
+                     resolvedUrl, selectedFileIds ->
         appState.showAddDialog = false
         appState.dismissError()
         appState.startDownload(
           url, fileName, speedLimit, priority,
-          schedule, resolvedUrl,
+          schedule, resolvedUrl, selectedFileIds,
         )
       },
     )

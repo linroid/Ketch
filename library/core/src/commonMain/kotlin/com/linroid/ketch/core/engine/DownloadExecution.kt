@@ -14,6 +14,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.TaskHandle
@@ -173,7 +174,9 @@ internal class DownloadExecution(
     taskLimiter.delegate = createLimiter(request.speedLimit)
 
     val preResolved = if (resolved != null) resolvedUrl else null
-    runDownload(outputPath, total, preResolved) { ctx ->
+    runDownload(
+      outputPath, total, source.managesOwnFileIo, preResolved,
+    ) { ctx ->
       source.download(ctx)
     }
   }
@@ -204,7 +207,9 @@ internal class DownloadExecution(
         totalBytes = taskRecord.totalBytes,
       )
 
-    runDownload(outputPath, taskRecord.totalBytes) { ctx ->
+    runDownload(
+      outputPath, taskRecord.totalBytes, source.managesOwnFileIo,
+    ) { ctx ->
       context = ctx
       source.resume(ctx, resumeState)
     }
@@ -214,14 +219,22 @@ internal class DownloadExecution(
    * Common download-to-completion sequence: creates a [FileAccessor],
    * builds the [DownloadContext], runs [downloadBlock] with retry,
    * flushes, persists completion, and cleans up.
+   *
+   * When [selfManagedIo] is `true`, the source handles its own file
+   * I/O so we use [NoOpFileAccessor] and skip flush/cleanup.
    */
   private suspend fun runDownload(
     outputPath: String,
     total: Long,
+    selfManagedIo: Boolean = false,
     preResolved: ResolvedSource? = null,
     downloadBlock: suspend (DownloadContext) -> Unit,
   ) {
-    val fa = createFileAccessor(outputPath, dispatchers.io)
+    val fa = if (selfManagedIo) {
+      NoOpFileAccessor
+    } else {
+      createFileAccessor(outputPath, dispatchers.io)
+    }
     fileAccessor = fa
 
     var completed = false
@@ -250,12 +263,14 @@ internal class DownloadExecution(
         }
       }
 
-      try {
-        fa.flush()
-      } catch (e: Exception) {
-        if (e is CancellationException) throw e
-        if (e is KetchError) throw e
-        throw KetchError.Disk(e)
+      if (!selfManagedIo) {
+        try {
+          fa.flush()
+        } catch (e: Exception) {
+          if (e is CancellationException) throw e
+          if (e is KetchError) throw e
+          throw KetchError.Disk(e)
+        }
       }
 
       handle.record.update {
@@ -275,7 +290,9 @@ internal class DownloadExecution(
       log.i { "Download completed for taskId=$taskId" }
       handle.mutableState.value = DownloadState.Completed(outputPath)
     } finally {
-      cleanupAfterExecution(fa, completed)
+      if (!selfManagedIo) {
+        cleanupAfterExecution(fa, completed)
+      }
     }
   }
 
