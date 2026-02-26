@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -28,6 +29,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
   private val json = Json { ignoreUnknownKeys = true }
   private val errorSerializer = KetchError.serializer()
   private val segmentListSerializer = ListSerializer(Segment.serializer())
+  private val resumeStateSerializer = SourceResumeState.serializer()
 
   /**
    * Saves a [TaskRecord] to the SQLite database. If a record with the same
@@ -38,12 +40,14 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
     val requestJson = json.encodeToString(
       DownloadRequest.serializer(), record.request
     )
-    val acceptRanges = record.acceptRanges?.let { if (it) 1L else 0L }
     val segmentsJson = record.segments?.let {
       json.encodeToString(segmentListSerializer, it)
     }
     val errorJson = record.error?.let {
       json.encodeToString(errorSerializer, it)
+    }
+    val resumeStateJson = record.sourceResumeState?.let {
+      json.encodeToString(resumeStateSerializer, it)
     }
     queries.transaction {
       queries.insertOrIgnore(
@@ -52,9 +56,8 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         output_path = record.outputPath,
         state = record.state.name,
         total_bytes = record.totalBytes,
-        accept_ranges = acceptRanges,
-        etag = record.etag,
-        last_modified = record.lastModified,
+        source_type = record.sourceType,
+        source_resume_state_json = resumeStateJson,
         segments_json = segmentsJson,
         error_json = errorJson,
       )
@@ -64,9 +67,8 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         output_path = record.outputPath,
         state = record.state.name,
         total_bytes = record.totalBytes,
-        accept_ranges = acceptRanges,
-        etag = record.etag,
-        last_modified = record.lastModified,
+        source_type = record.sourceType,
+        source_resume_state_json = resumeStateJson,
         segments_json = segmentsJson,
         error_json = errorJson,
       )
@@ -116,14 +118,22 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
           null
         }
       },
-      acceptRanges = accept_ranges?.let { it != 0L },
-      etag = etag,
-      lastModified = last_modified,
       segments = segments_json?.let {
         try {
           json.decodeFromString(segmentListSerializer, it)
         } catch (e: Exception) {
           log.w(e) { "Failed to deserialize segments for task: $task_id" }
+          null
+        }
+      },
+      sourceType = source_type,
+      sourceResumeState = source_resume_state_json?.let {
+        try {
+          json.decodeFromString(resumeStateSerializer, it)
+        } catch (e: Exception) {
+          log.w(e) {
+            "Failed to deserialize resume state for task: $task_id"
+          }
           null
         }
       },

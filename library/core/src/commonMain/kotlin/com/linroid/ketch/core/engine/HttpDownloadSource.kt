@@ -47,10 +47,10 @@ internal class HttpDownloadSource(
 
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     val detector = RangeSupportDetector(httpEngine)
-    val serverInfo = detector.detect(url, headers)
+    val serverInfo = detector.detect(url, properties)
     val fileName = serverInfo.contentDisposition?.let {
       extractDispositionFileName(it)
     } ?: DefaultFileNameResolver.fromUrl(url)
@@ -65,6 +65,9 @@ internal class HttpDownloadSource(
         serverInfo.etag?.let { put(META_ETAG, it) }
         serverInfo.lastModified?.let { put(META_LAST_MODIFIED, it) }
         if (serverInfo.acceptRanges) put(META_ACCEPT_RANGES, "true")
+        serverInfo.contentDisposition?.let {
+          put(META_CONTENT_DISPOSITION, it)
+        }
         serverInfo.rateLimitRemaining?.let {
           put(META_RATE_LIMIT_REMAINING, it.toString())
         }
@@ -454,6 +457,17 @@ internal class HttpDownloadSource(
     return connections
   }
 
+  override fun buildResumeState(
+    resolved: ResolvedSource,
+    totalBytes: Long,
+  ): SourceResumeState {
+    return buildResumeState(
+      etag = resolved.metadata[META_ETAG],
+      lastModified = resolved.metadata[META_LAST_MODIFIED],
+      totalBytes = totalBytes,
+    )
+  }
+
   private fun extractDispositionFileName(
     contentDisposition: String,
   ): String? {
@@ -466,6 +480,7 @@ internal class HttpDownloadSource(
     internal const val META_ETAG = "etag"
     internal const val META_LAST_MODIFIED = "lastModified"
     internal const val META_ACCEPT_RANGES = "acceptRanges"
+    internal const val META_CONTENT_DISPOSITION = "contentDisposition"
     internal const val META_RATE_LIMIT_REMAINING = "rateLimitRemaining"
     internal const val META_RATE_LIMIT_RESET = "rateLimitReset"
 

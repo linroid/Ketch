@@ -54,9 +54,19 @@ class FtpDownloadSource(
     return lower.startsWith("ftp://") || lower.startsWith("ftps://")
   }
 
+  override fun buildResumeState(
+    resolved: ResolvedSource,
+    totalBytes: Long,
+  ): SourceResumeState {
+    return buildResumeState(
+      totalBytes = totalBytes,
+      mdtm = resolved.metadata[META_MDTM],
+    )
+  }
+
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     val ftpUrl = try {
       FtpUrl.parse(url)

@@ -61,9 +61,27 @@ class TorrentDownloadSource(
       lower.contains(".torrent?")
   }
 
+  override fun buildResumeState(
+    resolved: ResolvedSource,
+    totalBytes: Long,
+  ): SourceResumeState {
+    val infoHash = resolved.metadata[META_INFO_HASH] ?: ""
+    val state = TorrentResumeState(
+      infoHash = infoHash,
+      totalBytes = totalBytes,
+      resumeData = "",
+      selectedFileIds = resolved.files.map { it.id }.toSet(),
+      savePath = "",
+    )
+    return SourceResumeState(
+      sourceType = TYPE,
+      data = Json.encodeToString(state),
+    )
+  }
+
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     val metadata = try {
       resolveMetadata(url)
