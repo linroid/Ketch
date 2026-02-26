@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *   reports in milliseconds
  * @param tag log tag for this helper instance
  */
-internal class SegmentedDownloadHelper(
+class SegmentedDownloadHelper(
   private val progressIntervalMs: Long = 200,
   tag: String = "SegmentHelper",
 ) {
