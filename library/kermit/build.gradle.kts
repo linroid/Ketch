@@ -25,20 +25,25 @@ kotlin {
       }
     }
   }
-
   iosArm64()
   iosSimulatorArm64()
 
   jvm()
 
-  @OptIn(ExperimentalWasmDsl::class)
-  wasmJs {
+  js {
     browser()
+    nodejs()
   }
+
+  @OptIn(ExperimentalWasmDsl::class)
+  wasmJs { browser() }
+
+  @OptIn(ExperimentalWasmDsl::class)
+  wasmWasi { nodejs() }
 
   sourceSets {
     commonMain.dependencies {
-      api(projects.library.core)
+      api(projects.library.api)
       implementation(libs.kermit)
     }
     commonTest.dependencies {
