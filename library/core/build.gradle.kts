@@ -41,8 +41,12 @@ kotlin {
 
   jvm()
 
+  js {
+    nodejs()
+  }
+
   @OptIn(ExperimentalWasmDsl::class)
-  wasmJs {
+  wasmWasi {
     nodejs()
   }
 
@@ -60,6 +64,12 @@ kotlin {
     }
     androidMain.dependencies {
       implementation(libs.androidx.startup)
+    }
+    jsMain.dependencies {
+      implementation(libs.okio.nodefilesystem)
+    }
+    wasmWasiMain.dependencies {
+      implementation(libs.okio.wasifilesystem)
     }
   }
 }

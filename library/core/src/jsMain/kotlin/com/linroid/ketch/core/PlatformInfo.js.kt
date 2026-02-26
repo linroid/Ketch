@@ -4,8 +4,8 @@ import com.linroid.ketch.api.SystemInfo
 
 internal actual fun currentSystemInfo(directory: String): SystemInfo {
   return SystemInfo(
-    os = "Browser",
-    arch = "wasm",
+    os = "Node.js",
+    arch = "js",
     separator = "/",
     javaVersion = "N/A",
     availableProcessors = 1,

@@ -1,8 +1,5 @@
 package com.linroid.ketch.api.log
 
-import com.linroid.ketch.api.log.LogLevel
-import com.linroid.ketch.api.log.Logger
-
 internal actual fun consoleLogger(minLevel: LogLevel): Logger =
   object : Logger {
     override fun v(message: String) {
