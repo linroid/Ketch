@@ -107,31 +107,4 @@ class TaskRecordTest {
     assertNull(record.sourceResumeState)
   }
 
-  @Test
-  fun deserialization_withoutServerInfoFields_defaultsToNull() {
-    val epoch = Instant.fromEpochMilliseconds(0)
-    val jsonStr = """
-      {
-        "taskId": "t1",
-        "request": {
-          "url": "https://example.com/f",
-          "destination": "/tmp/",
-          "connections": 4,
-          "headers": {},
-          "properties": {}
-        },
-        "outputPath": "/tmp/f",
-        "state": "QUEUED",
-        "totalBytes": 100,
-        "downloadedBytes": 0,
-        "createdAt": "$epoch",
-        "updatedAt": "$epoch"
-      }
-    """.trimIndent()
-    val record = json.decodeFromString<TaskRecord>(jsonStr)
-    assertNull(record.acceptRanges)
-    assertNull(record.etag)
-    assertNull(record.lastModified)
-  }
-
 }

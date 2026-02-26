@@ -27,11 +27,13 @@ interface KetchApi {
    * during [download].
    *
    * @param url the URL to resolve
-   * @param headers optional HTTP headers to include in the probe
+   * @param properties source-specific key-value pairs. For HTTP
+   *   sources this contains HTTP headers; other sources may
+   *   interpret them differently or ignore them.
    */
   suspend fun resolve(
     url: String,
-    headers: Map<String, String> = emptyMap(),
+    properties: Map<String, String> = emptyMap(),
   ): ResolvedSource
 
   /**

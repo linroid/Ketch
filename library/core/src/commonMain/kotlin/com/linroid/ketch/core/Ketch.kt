@@ -181,11 +181,11 @@ class Ketch(
 
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     log.i { "Resolving URL: $url" }
     val source = sourceResolver.resolve(url)
-    return source.resolve(url, headers)
+    return source.resolve(url, properties)
   }
 
   override suspend fun start() {

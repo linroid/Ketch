@@ -44,6 +44,7 @@ class TorrentDownloadSource(
   override val managesOwnFileIo: Boolean = true
 
   private var engine: TorrentEngine? = null
+  private var activeSession: TorrentSession? = null
 
   private suspend fun getEngine(): TorrentEngine {
     val existing = engine
@@ -61,9 +62,49 @@ class TorrentDownloadSource(
       lower.contains(".torrent?")
   }
 
+  override fun buildResumeState(
+    resolved: ResolvedSource,
+    totalBytes: Long,
+  ): SourceResumeState {
+    val infoHash = resolved.metadata[META_INFO_HASH] ?: ""
+    val state = TorrentResumeState(
+      infoHash = infoHash,
+      totalBytes = totalBytes,
+      resumeData = "",
+      selectedFileIds = resolved.files.map { it.id }.toSet(),
+      savePath = "",
+    )
+    return SourceResumeState(
+      sourceType = TYPE,
+      data = Json.encodeToString(state),
+    )
+  }
+
+  override suspend fun updateResumeState(
+    context: DownloadContext,
+  ): SourceResumeState? {
+    val session = activeSession ?: return null
+    val resumeData = session.saveResumeData() ?: return null
+    val selectedIds = context.request.selectedFileIds.ifEmpty {
+      context.segments.value.map { it.index.toString() }.toSet()
+    }
+    return SourceResumeState(
+      sourceType = TYPE,
+      data = Json.encodeToString(
+        TorrentResumeState(
+          infoHash = session.infoHash,
+          totalBytes = context.segments.value.sumOf { it.totalBytes },
+          resumeData = encodeBase64(resumeData),
+          selectedFileIds = selectedIds,
+          savePath = extractSavePath(context),
+        ),
+      ),
+    )
+  }
+
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     val metadata = try {
       resolveMetadata(url)
@@ -186,6 +227,7 @@ class TorrentDownloadSource(
       session.setDownloadRateLimit(speedLimit.bytesPerSecond)
     }
 
+    activeSession = session
     try {
       monitorProgress(context, session, segments, totalBytes)
     } catch (e: CancellationException) {
@@ -194,6 +236,8 @@ class TorrentDownloadSource(
     } catch (e: Exception) {
       if (e is KetchError) throw e
       throw KetchError.SourceError(TYPE, e)
+    } finally {
+      activeSession = null
     }
   }
 
@@ -253,6 +297,7 @@ class TorrentDownloadSource(
     val segments = context.segments.value
     val totalBytes = state.totalBytes
 
+    activeSession = session
     try {
       monitorProgress(context, session, segments, totalBytes)
     } catch (e: CancellationException) {
@@ -261,6 +306,8 @@ class TorrentDownloadSource(
     } catch (e: Exception) {
       if (e is KetchError) throw e
       throw KetchError.SourceError(TYPE, e)
+    } finally {
+      activeSession = null
     }
   }
 
@@ -300,25 +347,6 @@ class TorrentDownloadSource(
     // Final progress update
     updateSegmentProgress(context, segments, totalBytes, totalBytes)
     context.onProgress(totalBytes, totalBytes)
-
-    // Save resume data for potential re-seeding
-    val resumeData = session.saveResumeData()
-    if (resumeData != null) {
-      val savePath = extractSavePath(context)
-      val selectedIds = context.request.selectedFileIds.ifEmpty {
-        segments.map { it.index.toString() }.toSet()
-      }
-      val sourceState = TorrentResumeState(
-        infoHash = session.infoHash,
-        totalBytes = totalBytes,
-        resumeData = encodeBase64(resumeData),
-        selectedFileIds = selectedIds,
-        savePath = savePath,
-      )
-      // Store resume state by updating the context's segments
-      // The DownloadExecution will persist this through TaskRecord
-      log.d { "Saved torrent resume data for ${session.infoHash}" }
-    }
   }
 
   /**

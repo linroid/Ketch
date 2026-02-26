@@ -34,7 +34,7 @@ internal fun Route.serverRoutes(ketch: KetchApi) {
   post<Api.Resolve> {
     val body = call.receive<ResolveUrlRequest>()
     log.i { "POST /api/resolve url=${body.url}" }
-    val resolved = ketch.resolve(body.url, body.headers)
+    val resolved = ketch.resolve(body.url, body.properties)
     call.respond(resolved)
   }
 }

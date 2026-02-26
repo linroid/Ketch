@@ -5,7 +5,6 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
-import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SourceResumeState
 import kotlinx.coroutines.test.runTest
@@ -265,7 +264,7 @@ class ResolveUrlTest {
         url.startsWith("magnet:")
       override suspend fun resolve(
         url: String,
-        headers: Map<String, String>,
+        properties: Map<String, String>,
       ) = ResolvedSource(
         url = url,
         sourceType = "magnet",
@@ -279,6 +278,10 @@ class ResolveUrlTest {
         context: DownloadContext,
         resumeState: SourceResumeState,
       ) {}
+      override fun buildResumeState(
+        resolved: ResolvedSource,
+        totalBytes: Long,
+      ) = SourceResumeState(sourceType = "magnet", data = "{}")
     }
     val resolver = SourceResolver(listOf(fakeSource))
     assertFailsWith<KetchError.Unsupported> {
@@ -296,7 +299,7 @@ class ResolveUrlTest {
         url.startsWith("magnet:")
       override suspend fun resolve(
         url: String,
-        headers: Map<String, String>,
+        properties: Map<String, String>,
       ) = ResolvedSource(
         url = url,
         sourceType = "magnet",
@@ -310,6 +313,10 @@ class ResolveUrlTest {
         context: DownloadContext,
         resumeState: SourceResumeState,
       ) {}
+      override fun buildResumeState(
+        resolved: ResolvedSource,
+        totalBytes: Long,
+      ) = SourceResumeState(sourceType = "magnet", data = "{}")
     }
 
     val engine = FakeHttpEngine()
