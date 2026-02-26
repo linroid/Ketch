@@ -172,6 +172,7 @@ internal class DownloadExecution(
     val preResolved = if (resolved != null) resolvedUrl else null
     runDownload(
       outputPath, total, source.managesOwnFileIo, preResolved,
+      source = source,
     ) { ctx ->
       source.download(ctx)
     }
@@ -208,6 +209,7 @@ internal class DownloadExecution(
 
     runDownload(
       outputPath, taskRecord.totalBytes, source.managesOwnFileIo,
+      source = source,
     ) { ctx ->
       context = ctx
       source.resume(ctx, resumeState)
@@ -227,6 +229,7 @@ internal class DownloadExecution(
     total: Long,
     selfManagedIo: Boolean = false,
     preResolved: ResolvedSource? = null,
+    source: DownloadSource? = null,
     downloadBlock: suspend (DownloadContext) -> Unit,
   ) {
     val fa = if (selfManagedIo) {
@@ -246,10 +249,14 @@ internal class DownloadExecution(
           while (true) {
             delay(config.saveIntervalMs)
             val snapshot = handle.mutableSegments.value
-            val downloaded = snapshot.sumOf { it.downloadedBytes }
+            val updatedResume = context?.let {
+              source?.updateResumeState(it)
+            }
             handle.record.update {
               it.copy(
                 segments = snapshot,
+                sourceResumeState = updatedResume
+                  ?: it.sourceResumeState,
                 updatedAt = Clock.System.now(),
               )
             }

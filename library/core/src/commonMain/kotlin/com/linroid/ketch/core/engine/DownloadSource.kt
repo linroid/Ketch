@@ -76,4 +76,20 @@ interface DownloadSource {
     resolved: ResolvedSource,
     totalBytes: Long,
   ): SourceResumeState
+
+  /**
+   * Called periodically during download to let the source update
+   * its resume state. The returned state replaces the current
+   * resume state in the task record.
+   *
+   * Default implementation returns `null` (no update needed).
+   * Sources like BitTorrent override this to persist bitfield
+   * progress incrementally.
+   *
+   * @param context the active download context
+   * @return updated resume state, or `null` to keep the current one
+   */
+  suspend fun updateResumeState(
+    context: DownloadContext,
+  ): SourceResumeState? = null
 }
