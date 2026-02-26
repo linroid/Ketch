@@ -46,13 +46,15 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Remote control** `✅` -- Manage a remote server from any client (mobile, desktop, web, or CLI)
 - **Pluggable architecture** `✅` -- Swap out HTTP engines, storage backends, and download sources
 - **FTP/FTPS** `✅` -- Download from FTP servers with segmented parallel transfers and resume
-- **BitTorrent** `🔜` -- Peer-to-peer file sharing
-- **Magnet links** `🔜` -- Start BitTorrent downloads from magnet links
-- **HLS streaming** `🔜` -- Download and save HTTP Live Streaming videos
-- **Resource sniffer** `🔜` -- Detect downloadable files from web pages
-- **Media downloads** `🔜` -- Extract and download media from websites (like yt-dlp)
+- **BitTorrent & Magnet** `🚧` -- Peer-to-peer file sharing with .torrent files and magnet links
+- **Metalink** `🔜` -- Multi-source downloads with mirrors, checksums, and chunk verification
+- **WebDAV** `🔜` -- Download from WebDAV servers with resume support
+- **HLS streaming** `🔜` -- Download and merge HTTP Live Streaming videos
+- **Media extraction** `🔜` -- Extract and download media from websites (like yt-dlp)
+- **Resource sniffer** `🔜` -- Detect downloadable resources from web pages
 - **Browser extension** `🔜` -- Intercept and manage downloads directly from your browser
-- **AI integration** `🔜` -- Control downloads via AI agents using MCP
+- **AI-driven discovery** `🚧` -- Find download links from natural language queries using an LLM agent
+- **MCP server** `🔜` -- Expose Ketch capabilities as tools for AI agents via Model Context Protocol
 
 ## Getting Started
 
