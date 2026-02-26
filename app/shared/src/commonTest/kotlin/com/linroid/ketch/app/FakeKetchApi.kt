@@ -41,7 +41,7 @@ class FakeKetchApi(
 
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     throw UnsupportedOperationException(
       "FakeKetchApi does not support resolve"

@@ -21,18 +21,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   call this with the number of bytes before writing each chunk.
  *   This replaces direct [SpeedLimiter] access to avoid cross-module
  *   visibility issues with internal types.
- * @property headers HTTP headers or source-specific metadata headers
+ * @property headers request headers from [DownloadRequest.headers].
+ *   Used by HTTP sources for custom headers; other sources may ignore.
  * @property preResolved pre-resolved URL metadata, allowing the
  *   download source to skip its own probe/HEAD request
  * @property maxConnections observable override for the number of
  *   concurrent segment connections. When positive, takes precedence
  *   over [DownloadRequest.connections]. Emitting a new value triggers
- *   live resegmentation in [HttpDownloadSource]. Reduced automatically
- *   on HTTP 429 (Too Many Requests) responses.
+ *   live resegmentation in sources that support it. Reduced
+ *   automatically on HTTP 429 (Too Many Requests) responses.
  * @property pendingResegment target connection count for a pending
  *   resegmentation. Set by the connection-change watcher before
- *   canceling the download batch scope. Read by [HttpDownloadSource]
- *   to distinguish resegment-cancel from external cancel.
+ *   canceling the download batch scope. Read by sources to
+ *   distinguish resegment-cancel from external cancel.
  */
 class DownloadContext(
   val taskId: String,

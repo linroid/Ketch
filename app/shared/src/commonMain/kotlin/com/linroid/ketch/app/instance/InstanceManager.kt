@@ -244,7 +244,7 @@ private object DisconnectedApi : KetchApi {
 
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     throw IllegalStateException(
       "No instance connected. Add a remote server first.",
