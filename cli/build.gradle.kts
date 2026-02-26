@@ -27,7 +27,7 @@ graalvmNative {
         "--no-fallback",
         "-Ob",
         "-H:+ReportExceptionStackTraces",
-        "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io",
+        "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,okio",
         "--initialize-at-build-time=ch.qos.logback",
         "--initialize-at-build-time=org.slf4j",
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",

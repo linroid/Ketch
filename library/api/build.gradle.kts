@@ -57,8 +57,16 @@ kotlin {
   iosSimulatorArm64()
   jvm()
 
+  js {
+    browser()
+    nodejs()
+  }
+
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs { browser() }
+
+  @OptIn(ExperimentalWasmDsl::class)
+  wasmWasi { nodejs() }
 
   sourceSets {
     commonMain {

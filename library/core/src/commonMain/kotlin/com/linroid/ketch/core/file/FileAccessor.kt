@@ -4,11 +4,11 @@ package com.linroid.ketch.core.file
  * Platform-specific random-access file writer.
  *
  * Each platform provides an implementation via [createFileAccessor]:
- * - **Android/JVM**: `RandomAccessFile` with `Dispatchers.IO`
- * - **iOS**: Foundation `NSFileHandle` / `NSFileManager` with `Dispatchers.IO`
+ * - **Android/JVM/iOS**: okio `FileHandle` via [PathFileAccessor] with `Dispatchers.IO`
+ * - **Android content URIs**: `ContentUriFileAccessor` for SAF-backed storage
  * - **WasmJs**: Stub that throws `UnsupportedOperationException` (no file I/O)
  *
- * Android, JVM, and iOS implementations are thread-safe (protected by a `Mutex`).
+ * Android, JVM, and iOS implementations are thread-safe (serialized dispatcher).
  */
 interface FileAccessor {
   /** Writes [data] starting at the given byte [offset]. */
