@@ -16,6 +16,7 @@ import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.createFileAccessor
+import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
@@ -27,8 +28,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
+import okio.Path
+import okio.Path.Companion.toPath
 import kotlin.time.Clock
 import kotlin.time.TimeSource
 
@@ -501,7 +502,7 @@ internal class DownloadExecution(
     if (fileName == null) return directory
     val outputPath = resolveChildPath(directory, fileName)
     return if (deduplicate && !directory.contains("://")) {
-      deduplicatePath(Path(outputPath)).toString()
+      deduplicatePath(outputPath.toPath()).toString()
     } else {
       outputPath
     }
@@ -519,7 +520,7 @@ internal class DownloadExecution(
     internal fun deduplicatePath(candidate: Path): Path {
       val fileName = candidate.name
       val directory = candidate.parent ?: return candidate
-      if (!SystemFileSystem.exists(candidate)) return candidate
+      if (!platformFileSystem.exists(candidate)) return candidate
 
       val dotIndex = fileName.lastIndexOf('.')
       val baseName: String
@@ -534,8 +535,8 @@ internal class DownloadExecution(
 
       var seq = 1
       while (true) {
-        val path = Path(directory, "$baseName ($seq)$extension")
-        if (!SystemFileSystem.exists(path)) return path
+        val path = directory / "$baseName ($seq)$extension"
+        if (!platformFileSystem.exists(path)) return path
         seq++
       }
     }

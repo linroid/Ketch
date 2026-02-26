@@ -2,7 +2,6 @@ package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.remote.RemoteKetch
 import kotlinx.coroutines.flow.StateFlow
@@ -13,7 +12,7 @@ interface InstanceEntry {
 }
 
 data class EmbeddedInstance(
-  override val instance: Ketch,
+  override val instance: KetchApi,
   override val label: String,
 ) : InstanceEntry
 

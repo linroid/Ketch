@@ -4,7 +4,6 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.remote.RemoteKetch
 
 /**
@@ -50,12 +49,8 @@ class FakeInstanceFactory(
       )
     }
     val api = embeddedFactory()
-    // In tests we use FakeKetchApi which is not a real Ketch,
-    // so we cast unsafely. Real tests needing Ketch type
-    // should provide a real Ketch instance.
-    @Suppress("UNCHECKED_CAST")
     return EmbeddedInstance(
-      instance = api as Ketch,
+      instance = api,
       label = label,
     )
   }

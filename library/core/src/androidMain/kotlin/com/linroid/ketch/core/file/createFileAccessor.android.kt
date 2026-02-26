@@ -5,7 +5,6 @@ package com.linroid.ketch.core.file
 import android.net.Uri
 import com.linroid.ketch.core.AndroidContext
 import kotlinx.coroutines.CoroutineDispatcher
-import java.io.RandomAccessFile
 
 /**
  * Creates a [FileAccessor] for the given [path], supporting both
@@ -21,9 +20,7 @@ actual fun createFileAccessor(
 ): FileAccessor {
   val uri = Uri.parse(path)
   return if (uri.isRelative) {
-    PathFileAccessor(path, ioDispatcher) { realPath ->
-      JvmRandomAccessHandle(RandomAccessFile(realPath, "rw"))
-    }
+    PathFileAccessor(path, ioDispatcher)
   } else {
     ContentUriFileAccessor(AndroidContext.get(), uri, ioDispatcher)
   }

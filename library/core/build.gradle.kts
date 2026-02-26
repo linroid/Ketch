@@ -41,8 +41,12 @@ kotlin {
 
   jvm()
 
+  js {
+    nodejs()
+  }
+
   @OptIn(ExperimentalWasmDsl::class)
-  wasmJs {
+  wasmWasi {
     nodejs()
   }
 
@@ -52,7 +56,7 @@ kotlin {
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.serialization.json)
       implementation(libs.kotlinx.datetime)
-      implementation(libs.kotlinx.io.core)
+      implementation(libs.okio)
     }
     commonTest.dependencies {
       implementation(libs.kotlin.test)
@@ -60,6 +64,12 @@ kotlin {
     }
     androidMain.dependencies {
       implementation(libs.androidx.startup)
+    }
+    jsMain.dependencies {
+      implementation(libs.okio.nodefilesystem)
+    }
+    wasmWasiMain.dependencies {
+      implementation(libs.okio.wasifilesystem)
     }
   }
 }
