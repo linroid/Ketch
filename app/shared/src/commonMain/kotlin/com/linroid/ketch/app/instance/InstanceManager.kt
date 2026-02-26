@@ -8,7 +8,6 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.remote.RemoteKetch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +23,7 @@ import kotlinx.coroutines.launch
  * instance, and lifecycle transitions.
  *
  * When [InstanceFactory.hasEmbedded] is `true` (Android, iOS,
- * JVM/Desktop), an embedded [Ketch] instance is created once
+ * JVM/Desktop), an embedded [KetchApi] instance is created once
  * and reused. An optional HTTP server can be started/stopped
  * to expose the same instance over the network.
  *
