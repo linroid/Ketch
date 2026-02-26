@@ -1,8 +1,8 @@
 package com.linroid.ketch.core.file
 
-import kotlinx.io.files.Path
+import okio.Path.Companion.toPath
 
 internal actual fun resolveChildPath(
   directory: String,
   fileName: String,
-): String = Path(directory, fileName).toString()
+): String = (directory.toPath() / fileName).toString()

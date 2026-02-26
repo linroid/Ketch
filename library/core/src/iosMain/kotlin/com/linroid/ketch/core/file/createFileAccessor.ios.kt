@@ -1,23 +1,10 @@
 package com.linroid.ketch.core.file
 
 import kotlinx.coroutines.CoroutineDispatcher
-import platform.Foundation.NSFileHandle
-import platform.Foundation.NSFileManager
-import platform.Foundation.fileHandleForWritingAtPath
 
 actual fun createFileAccessor(
   path: String,
   ioDispatcher: CoroutineDispatcher,
 ): FileAccessor {
-  return PathFileAccessor(path, ioDispatcher) { realPath ->
-    val fileManager = NSFileManager.defaultManager
-    if (!fileManager.fileExistsAtPath(realPath)) {
-      fileManager.createFileAtPath(realPath, null, null)
-    }
-    val handle = NSFileHandle.fileHandleForWritingAtPath(realPath)
-      ?: throw IllegalStateException(
-        "Cannot open file for writing: $realPath"
-      )
-    IosRandomAccessHandle(handle)
-  }
+  return PathFileAccessor(path, ioDispatcher)
 }
