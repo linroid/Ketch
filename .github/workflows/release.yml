@@ -57,7 +57,7 @@ jobs:
       # This avoids yarn concurrency issues on Windows and speeds up
       # the CLI build on all platforms.
       - name: Download web distribution
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: ketch-web
           path: ${{ runner.temp }}/ketch-web
@@ -262,7 +262,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
