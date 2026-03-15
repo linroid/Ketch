@@ -7,8 +7,7 @@ import com.linroid.ketch.api.ResolvedSource
  *
  * Each source handles a specific protocol or download mechanism.
  * The default implementation is [HttpDownloadSource] for HTTP/HTTPS
- * downloads. Future implementations may include torrent, media
- * extraction, or other protocols.
+ * downloads. Other implementations include FTP, BitTorrent, etc.
  *
  * Sources are registered with [SourceResolver] which routes
  * download requests to the appropriate source based on URL matching.
@@ -32,10 +31,15 @@ interface DownloadSource {
    * Resolves source metadata for the given URL without downloading.
    * This is analogous to an HTTP HEAD request but generalized for
    * any source type.
+   *
+   * @param url the URL to resolve
+   * @param properties source-specific key-value pairs. For HTTP
+   *   sources this contains HTTP headers; other sources may
+   *   interpret them differently or ignore them.
    */
   suspend fun resolve(
     url: String,
-    headers: Map<String, String> = emptyMap(),
+    properties: Map<String, String> = emptyMap(),
   ): ResolvedSource
 
   /**
@@ -56,4 +60,36 @@ interface DownloadSource {
    * [com.linroid.ketch.api.KetchError.Unsupported].
    */
   suspend fun resume(context: DownloadContext, resumeState: SourceResumeState)
+
+  /**
+   * Builds an opaque [SourceResumeState] from resolved metadata.
+   *
+   * Called after [resolve] completes to persist source-specific
+   * state needed for resume validation (e.g., HTTP ETag/Last-Modified,
+   * FTP MDTM, torrent info hash). The returned state is stored in
+   * the task record and passed back to [resume] on restart.
+   *
+   * @param resolved the metadata returned by [resolve]
+   * @param totalBytes total download size in bytes
+   */
+  fun buildResumeState(
+    resolved: ResolvedSource,
+    totalBytes: Long,
+  ): SourceResumeState
+
+  /**
+   * Called periodically during download to let the source update
+   * its resume state. The returned state replaces the current
+   * resume state in the task record.
+   *
+   * Default implementation returns `null` (no update needed).
+   * Sources like BitTorrent override this to persist bitfield
+   * progress incrementally.
+   *
+   * @param context the active download context
+   * @return updated resume state, or `null` to keep the current one
+   */
+  suspend fun updateResumeState(
+    context: DownloadContext,
+  ): SourceResumeState? = null
 }

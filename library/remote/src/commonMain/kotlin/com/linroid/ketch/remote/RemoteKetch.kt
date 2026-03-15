@@ -133,11 +133,11 @@ class RemoteKetch(
 
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     val response = httpClient.post(Api.Resolve()) {
       contentType(ContentType.Application.Json)
-      setBody(ResolveUrlRequest(url, headers))
+      setBody(ResolveUrlRequest(url, properties))
     }
     checkSuccess(response)
     return response.body()

@@ -8,20 +8,11 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.segment.SegmentCalculator
+import com.linroid.ketch.core.segment.SegmentedDownloadHelper
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * FTP/FTPS download source using the [FtpClient] protocol layer.
@@ -54,9 +45,19 @@ class FtpDownloadSource(
     return lower.startsWith("ftp://") || lower.startsWith("ftps://")
   }
 
+  override fun buildResumeState(
+    resolved: ResolvedSource,
+    totalBytes: Long,
+  ): SourceResumeState {
+    return buildResumeState(
+      totalBytes = totalBytes,
+      mdtm = resolved.metadata[META_MDTM],
+    )
+  }
+
   override suspend fun resolve(
     url: String,
-    headers: Map<String, String>,
+    properties: Map<String, String>,
   ): ResolvedSource {
     val ftpUrl = try {
       FtpUrl.parse(url)
@@ -242,152 +243,25 @@ class FtpDownloadSource(
     return segments
   }
 
+  private val segmentHelper = SegmentedDownloadHelper(
+    progressIntervalMs = progressIntervalMs,
+    tag = "FtpSource",
+  )
+
   /**
-   * Downloads segments with dynamic resegmentation support.
+   * Downloads segments via FTP connections with dynamic
+   * resegmentation support. Delegates the concurrent batch loop
+   * to [SegmentedDownloadHelper].
    */
   private suspend fun downloadSegments(
     context: DownloadContext,
     segments: List<Segment>,
     totalBytes: Long,
   ) {
-    var currentSegments = segments
-
-    while (true) {
-      val incomplete = currentSegments.filter { !it.isComplete }
-      if (incomplete.isEmpty()) break
-
-      val batchCompleted = downloadBatch(
-        context, currentSegments, incomplete, totalBytes,
-      )
-
-      if (batchCompleted) break
-
-      val newCount = context.pendingResegment
-      context.pendingResegment = 0
-      currentSegments = SegmentCalculator.resegment(
-        context.segments.value, newCount,
-      )
-      context.segments.value = currentSegments
-      log.i {
-        "Resegmented to $newCount connections for " +
-          "taskId=${context.taskId}"
-      }
-    }
-
-    context.segments.value = currentSegments
-    context.onProgress(totalBytes, totalBytes)
-  }
-
-  /**
-   * Downloads one batch of incomplete segments concurrently.
-   *
-   * Each segment gets its own FTP connection. The watcher coroutine
-   * monitors connection count changes for live resegmentation.
-   *
-   * @return true if all segments completed, false if interrupted
-   *   for resegmentation
-   */
-  private suspend fun downloadBatch(
-    context: DownloadContext,
-    allSegments: List<Segment>,
-    incompleteSegments: List<Segment>,
-    totalBytes: Long,
-  ): Boolean {
-    val segmentProgress =
-      allSegments.map { it.downloadedBytes }.toMutableList()
-    val segmentMutex = Mutex()
-    val updatedSegments = allSegments.toMutableList()
-
-    var lastProgressUpdate = Clock.System.now()
-    val progressMutex = Mutex()
-
-    suspend fun currentSegments(): List<Segment> {
-      return segmentMutex.withLock {
-        updatedSegments.mapIndexed { i, seg ->
-          seg.copy(downloadedBytes = segmentProgress[i])
-        }
-      }
-    }
-
-    suspend fun updateProgress() {
-      val now = Clock.System.now()
-      progressMutex.withLock {
-        if (now - lastProgressUpdate >=
-          progressIntervalMs.milliseconds
-        ) {
-          val snapshot = currentSegments()
-          val downloaded = snapshot.sumOf { it.downloadedBytes }
-          context.onProgress(downloaded, totalBytes)
-          context.segments.value = snapshot
-          lastProgressUpdate = now
-        }
-      }
-    }
-
-    val downloadedBytes = allSegments.sumOf { it.downloadedBytes }
-    context.onProgress(downloadedBytes, totalBytes)
-    context.segments.value = allSegments
-
-    return try {
-      coroutineScope {
-        // Watcher for connection count changes
-        val watcherJob = launch {
-          val lastSeen = context.maxConnections.value
-          context.maxConnections.first { count ->
-            count > 0 && count != lastSeen
-          }
-          context.pendingResegment =
-            context.maxConnections.value
-          log.i {
-            "Connection change detected for " +
-              "taskId=${context.taskId}: " +
-              "$lastSeen -> ${context.pendingResegment}"
-          }
-          throw CancellationException("Resegmenting")
-        }
-
-        try {
-          val results = incompleteSegments.map { segment ->
-            async {
-              downloadSegment(
-                context, segment,
-              ) { bytesDownloaded ->
-                segmentMutex.withLock {
-                  segmentProgress[segment.index] =
-                    bytesDownloaded
-                }
-                updateProgress()
-              }
-            }
-          }
-
-          for ((i, deferred) in results.withIndex()) {
-            val completed = deferred.await()
-            segmentMutex.withLock {
-              updatedSegments[completed.index] = completed
-            }
-            context.segments.value = currentSegments()
-            log.d {
-              "Segment ${completed.index} completed for " +
-                "taskId=${context.taskId}"
-            }
-          }
-        } finally {
-          watcherJob.cancel()
-        }
-
-        context.segments.value = currentSegments()
-        true
-      }
-    } catch (e: CancellationException) {
-      if (context.pendingResegment > 0) {
-        withContext(NonCancellable) {
-          context.segments.value = currentSegments()
-        }
-        false
-      } else {
-        throw e
-      }
+    segmentHelper.downloadAll(
+      context, segments, totalBytes,
+    ) { segment, onProgress ->
+      downloadSegment(context, segment, onProgress)
     }
   }
 
