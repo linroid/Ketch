@@ -317,6 +317,11 @@ class KetchToolSet(
     if (value.equals("unlimited", ignoreCase = true) || value.isEmpty()) {
       SpeedLimit.Unlimited
     } else {
-      SpeedLimit.parse(value) ?: SpeedLimit.Unlimited
+      SpeedLimit.parse(value)
+        ?: throw IllegalArgumentException(
+          "Invalid speed limit '$value'. " +
+            "Use e.g. '1m' (1 MB/s), '500k' (500 KB/s), " +
+            "a raw byte count, or 'unlimited'.",
+        )
     }
 }

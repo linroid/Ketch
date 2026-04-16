@@ -594,10 +594,22 @@ private fun runMcp(args: List<String>) {
         return
       }
       "--config" -> {
-        if (i + 1 < args.size) configPath = args[++i]
+        if (i + 1 >= args.size) {
+          println("Error: --config requires a value")
+          println()
+          printMcpUsage()
+          return
+        }
+        configPath = args[++i]
       }
       "--dir" -> {
-        if (i + 1 < args.size) cliDownloadDir = args[++i]
+        if (i + 1 >= args.size) {
+          println("Error: --dir requires a value")
+          println()
+          printMcpUsage()
+          return
+        }
+        cliDownloadDir = args[++i]
       }
     }
     i++
