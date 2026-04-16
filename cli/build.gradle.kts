@@ -80,6 +80,7 @@ sourceSets.main {
 dependencies {
   implementation(projects.config)
   implementation(projects.library.server)
+  implementation(projects.library.mcp)
   implementation(projects.ai.discover)
   implementation(projects.library.core)
   implementation(projects.library.sqlite)

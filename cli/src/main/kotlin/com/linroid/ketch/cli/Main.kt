@@ -22,6 +22,7 @@ import com.linroid.ketch.config.generateConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.ftp.FtpDownloadSource
+import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
@@ -54,6 +55,10 @@ fun main(args: Array<String>) {
     }
     "ai-discover" -> {
       runAiDiscover(remaining.drop(1))
+      return
+    }
+    "mcp" -> {
+      runMcp(remaining.drop(1))
       return
     }
   }
@@ -577,9 +582,100 @@ private fun runAiDiscover(args: List<String>) {
   }
 }
 
+private fun runMcp(args: List<String>) {
+  var configPath: String? = null
+  var cliDownloadDir: String? = null
+
+  var i = 0
+  while (i < args.size) {
+    when (args[i]) {
+      "--help", "-h" -> {
+        printMcpUsage()
+        return
+      }
+      "--config" -> {
+        if (i + 1 < args.size) configPath = args[++i]
+      }
+      "--dir" -> {
+        if (i + 1 < args.size) cliDownloadDir = args[++i]
+      }
+    }
+    i++
+  }
+
+  val fileConfig = if (configPath != null) {
+    FileConfigStore(configPath).load()
+  } else {
+    val defaultPath = defaultConfigPath()
+    if (File(defaultPath).exists()) {
+      FileConfigStore(defaultPath).load()
+    } else {
+      KetchConfig()
+    }
+  }
+
+  val defaultDownloadDir = System.getProperty("user.home") +
+    File.separator + "Downloads"
+  val downloadConfig = fileConfig.download.copy(
+    defaultDirectory = cliDownloadDir
+      ?: fileConfig.download.defaultDirectory
+      ?: defaultDownloadDir,
+  )
+
+  File(downloadConfig.defaultDirectory!!).mkdirs()
+
+  val dbPath = defaultDbPath()
+  val driver = DriverFactory(dbPath).createDriver()
+  val taskStore = SqliteTaskStore(driver)
+
+  val ketch = Ketch(
+    httpEngine = KtorHttpEngine(),
+    taskStore = taskStore,
+    config = downloadConfig,
+    logger = Logger.console(ketchLogLevel),
+    additionalSources = listOf(FtpDownloadSource()),
+  )
+
+  Runtime.getRuntime().addShutdownHook(Thread {
+    ketch.close()
+  })
+
+  val mcpServer = KetchMcpServer(ketch)
+
+  runBlocking {
+    ketch.start()
+    mcpServer.startStdio()
+  }
+}
+
+private fun printMcpUsage() {
+  println("Usage: ketch mcp [options]")
+  println()
+  println("Start Ketch as an MCP (Model Context Protocol) server")
+  println("using stdio transport. AI agents like Claude Desktop")
+  println("can manage downloads through MCP tools.")
+  println()
+  println("Options:")
+  println("  --config <path>   Path to TOML config file")
+  println("  --dir <path>      Download directory")
+  println("                    (default: ~/Downloads)")
+  println("  --help, -h        Show this help message")
+  println()
+  println("MCP client configuration (e.g. claude_desktop_config.json):")
+  println("  {")
+  println("    \"mcpServers\": {")
+  println("      \"ketch\": {")
+  println("        \"command\": \"ketch\",")
+  println("        \"args\": [\"mcp\"]")
+  println("      }")
+  println("    }")
+  println("  }")
+}
+
 private fun printUsage() {
   println("Usage: ketch [options] <url> [destination]")
   println("       ketch server [options]")
+  println("       ketch mcp [options]")
   println("       ketch ai-discover <query> [options]")
   println()
   println("Global Options:")
@@ -599,6 +695,11 @@ private fun printUsage() {
   println("  server [options]         Start Ketch daemon server")
   println("                           Run `ketch server --help`")
   println("                           for server options")
+  println()
+  println("MCP Server:")
+  println("  mcp [options]            Start MCP server (stdio)")
+  println("                           Run `ketch mcp --help`")
+  println("                           for MCP options")
   println()
   println("AI Discovery:")
   println("  ai-discover <query>      Discover downloadable resources")
