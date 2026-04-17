@@ -1,0 +1,90 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":pinDevDependencies"
+  ],
+  "schedule": ["before 9am on Monday"],
+  "timezone": "Asia/Shanghai",
+  "labels": ["dependencies"],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "major": {
+    "automerge": false
+  },
+  "packageRules": [
+    {
+      "description": "Kotlin & Compose Compiler",
+      "groupName": "Kotlin",
+      "matchPackageNames": [
+        "org.jetbrains.kotlin{/,}**"
+      ],
+      "matchManagers": ["gradle", "gradle-wrapper"]
+    },
+    {
+      "description": "Compose Multiplatform & Material3",
+      "groupName": "Compose Multiplatform",
+      "matchPackageNames": [
+        "org.jetbrains.compose{/,}**",
+        "org.jetbrains.compose.material3{/,}**"
+      ]
+    },
+    {
+      "description": "Ktor (client, server, network, serialization)",
+      "groupName": "Ktor",
+      "matchPackageNames": [
+        "io.ktor{/,}**"
+      ]
+    },
+    {
+      "description": "KotlinX libraries (coroutines, serialization, datetime, browser)",
+      "groupName": "KotlinX",
+      "matchPackageNames": [
+        "org.jetbrains.kotlinx{/,}**"
+      ]
+    },
+    {
+      "description": "AndroidX libraries",
+      "groupName": "AndroidX",
+      "matchPackageNames": [
+        "androidx.{/,}**",
+        "org.jetbrains.androidx.{/,}**"
+      ]
+    },
+    {
+      "description": "Android Gradle Plugin",
+      "groupName": "Android Gradle Plugin",
+      "matchPackageNames": [
+        "com.android.{/,}**"
+      ]
+    },
+    {
+      "description": "SQLDelight",
+      "groupName": "SQLDelight",
+      "matchPackageNames": [
+        "app.cash.sqldelight{/,}**"
+      ]
+    },
+    {
+      "description": "libtorrent4j",
+      "groupName": "libtorrent4j",
+      "matchPackageNames": [
+        "org.libtorrent4j{/,}**"
+      ]
+    },
+    {
+      "description": "Okio",
+      "groupName": "Okio",
+      "matchPackageNames": [
+        "com.squareup.okio{/,}**"
+      ]
+    },
+    {
+      "description": "GitHub Actions",
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"]
+    }
+  ]
+}
