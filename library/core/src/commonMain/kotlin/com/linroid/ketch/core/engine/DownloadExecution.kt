@@ -171,10 +171,7 @@ internal class DownloadExecution(
     taskLimiter.delegate = createLimiter(request.speedLimit)
 
     val preResolved = if (resolved != null) resolvedUrl else null
-    runDownload(
-      outputPath, total, source.managesOwnFileIo, preResolved,
-      source = source,
-    ) { ctx ->
+    runDownload(outputPath, total, source, preResolved) { ctx ->
       source.download(ctx)
     }
   }
@@ -208,11 +205,7 @@ internal class DownloadExecution(
         "No resume state for taskId=${taskRecord.taskId}",
       )
 
-    runDownload(
-      outputPath, taskRecord.totalBytes, source.managesOwnFileIo,
-      source = source,
-    ) { ctx ->
-      context = ctx
+    runDownload(outputPath, taskRecord.totalBytes, source) { ctx ->
       source.resume(ctx, resumeState)
     }
   }
@@ -222,17 +215,18 @@ internal class DownloadExecution(
    * builds the [DownloadContext], runs [downloadBlock] with retry,
    * flushes, persists completion, and cleans up.
    *
-   * When [selfManagedIo] is `true`, the source handles its own file
-   * I/O so we use [NoOpFileAccessor] and skip flush/cleanup.
+   * When [DownloadSource.managesOwnFileIo] is `true`, the source
+   * handles its own file I/O so we use [NoOpFileAccessor] and skip
+   * flush/cleanup.
    */
   private suspend fun runDownload(
     outputPath: String,
     total: Long,
-    selfManagedIo: Boolean = false,
+    source: DownloadSource,
     preResolved: ResolvedSource? = null,
-    source: DownloadSource? = null,
     downloadBlock: suspend (DownloadContext) -> Unit,
   ) {
+    val selfManagedIo = source.managesOwnFileIo
     val fa = if (selfManagedIo) {
       NoOpFileAccessor
     } else {
@@ -250,9 +244,7 @@ internal class DownloadExecution(
           while (true) {
             delay(config.saveIntervalMs)
             val snapshot = handle.mutableSegments.value
-            val updatedResume = context?.let {
-              source?.updateResumeState(it)
-            }
+            val updatedResume = source.updateResumeState(ctx)
             handle.record.update {
               it.copy(
                 segments = snapshot,
