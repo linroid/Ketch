@@ -1,7 +1,7 @@
 package com.linroid.ketch.file
 
 import com.linroid.ketch.api.DownloadRequest
-import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,12 +11,20 @@ class DefaultFileNameResolverTest {
   private val resolver = DefaultFileNameResolver()
   private val dir = "/tmp"
 
-  private fun serverInfo(contentDisposition: String? = null) = ServerInfo(
-    contentLength = 1000,
-    acceptRanges = true,
-    etag = null,
-    lastModified = null,
-    contentDisposition = contentDisposition,
+  private fun resolved(
+    contentDisposition: String? = null,
+  ) = ResolvedSource(
+    url = "https://example.com",
+    sourceType = "http",
+    totalBytes = 1000,
+    supportsResume = true,
+    suggestedFileName = null,
+    maxSegments = 4,
+    metadata = buildMap {
+      contentDisposition?.let {
+        put(DefaultFileNameResolver.META_CONTENT_DISPOSITION, it)
+      }
+    },
   )
 
   private fun request(url: String) = DownloadRequest(
@@ -28,7 +36,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_filenameStarUtf8() {
-    val info = serverInfo("attachment; filename*=UTF-8''my%20file.zip")
+    val info = resolved("attachment; filename*=UTF-8''my%20file.zip")
     assertEquals(
       "my file.zip",
       resolver.resolve(request("https://example.com"), info)
@@ -37,7 +45,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_filenameStarUtf8_caseInsensitive() {
-    val info = serverInfo("attachment; Filename*=utf-8''report.pdf")
+    val info = resolved("attachment; Filename*=utf-8''report.pdf")
     assertEquals(
       "report.pdf",
       resolver.resolve(request("https://example.com"), info)
@@ -48,7 +56,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_filenameQuoted() {
-    val info = serverInfo("attachment; filename=\"document.pdf\"")
+    val info = resolved("attachment; filename=\"document.pdf\"")
     assertEquals(
       "document.pdf",
       resolver.resolve(request("https://example.com"), info)
@@ -57,7 +65,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_filenameQuoted_withSpaces() {
-    val info = serverInfo("attachment; filename=\"my document.pdf\"")
+    val info = resolved("attachment; filename=\"my document.pdf\"")
     assertEquals(
       "my document.pdf",
       resolver.resolve(request("https://example.com"), info)
@@ -68,7 +76,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_filenameUnquoted() {
-    val info = serverInfo("attachment; filename=report.csv")
+    val info = resolved("attachment; filename=report.csv")
     assertEquals(
       "report.csv",
       resolver.resolve(request("https://example.com"), info)
@@ -79,7 +87,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_fromUrlPath() {
-    val info = serverInfo()
+    val info = resolved()
     assertEquals(
       "archive.tar.gz",
       resolver.resolve(
@@ -91,7 +99,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_fromUrlPath_withQuery() {
-    val info = serverInfo()
+    val info = resolved()
     assertEquals(
       "file.zip",
       resolver.resolve(
@@ -103,7 +111,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_fromUrlPath_withFragment() {
-    val info = serverInfo()
+    val info = resolved()
     assertEquals(
       "file.zip",
       resolver.resolve(
@@ -115,7 +123,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_fromUrlPath_percentEncoded() {
-    val info = serverInfo()
+    val info = resolved()
     assertEquals(
       "my file.zip",
       resolver.resolve(
@@ -127,7 +135,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_fromUrlPath_trailingSlash() {
-    val info = serverInfo()
+    val info = resolved()
     assertEquals(
       "dir",
       resolver.resolve(request("https://example.com/dir/"), info)
@@ -138,7 +146,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_fallback_noPathNoDisposition() {
-    val info = serverInfo()
+    val info = resolved()
     assertEquals(
       "download",
       resolver.resolve(request("https://example.com/"), info)
@@ -147,7 +155,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_fallback_rootUrl() {
-    val info = serverInfo()
+    val info = resolved()
     assertEquals(
       "download",
       resolver.resolve(request("https://example.com"), info)
@@ -161,7 +169,7 @@ class DefaultFileNameResolverTest {
     // Explicit file names via Destination are now handled by the
     // coordinator, not the resolver. The resolver always returns
     // the server-derived name.
-    val info = serverInfo("attachment; filename=\"server-name.zip\"")
+    val info = resolved("attachment; filename=\"server-name.zip\"")
     val req = DownloadRequest(
       url = "https://example.com/url-name.zip",
       destination = com.linroid.ketch.api.Destination("explicit.zip"),
@@ -171,7 +179,7 @@ class DefaultFileNameResolverTest {
 
   @Test
   fun resolve_dispositionTakesPriorityOverUrl() {
-    val info = serverInfo("attachment; filename=\"server-name.zip\"")
+    val info = resolved("attachment; filename=\"server-name.zip\"")
     assertEquals(
       "server-name.zip",
       resolver.resolve(

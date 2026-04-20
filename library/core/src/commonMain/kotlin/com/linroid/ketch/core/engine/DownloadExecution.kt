@@ -140,9 +140,7 @@ internal class DownloadExecution(
     totalBytes = total
 
     val fileName = resolvedUrl.suggestedFileName
-      ?: fileNameResolver.resolve(
-        request, toServerInfo(resolvedUrl),
-      )
+      ?: fileNameResolver.resolve(request, resolvedUrl)
     val outputPath = resolveDestPath(
       destination = request.destination,
       defaultDir = config.defaultDirectory ?: "downloads",
@@ -162,12 +160,10 @@ internal class DownloadExecution(
         outputPath = outputPath,
         state = TaskState.DOWNLOADING,
         totalBytes = total,
-        acceptRanges = resolvedUrl.supportsResume,
-        etag = resolvedUrl.metadata[HttpDownloadSource.META_ETAG],
-        lastModified = resolvedUrl.metadata[
-          HttpDownloadSource.META_LAST_MODIFIED,
-        ],
         sourceType = source.type,
+        sourceResumeState = source.buildResumeState(
+          resolvedUrl, total,
+        ),
         updatedAt = now,
       )
     }
@@ -175,9 +171,7 @@ internal class DownloadExecution(
     taskLimiter.delegate = createLimiter(request.speedLimit)
 
     val preResolved = if (resolved != null) resolvedUrl else null
-    runDownload(
-      outputPath, total, source.managesOwnFileIo, preResolved,
-    ) { ctx ->
+    runDownload(outputPath, total, source, preResolved) { ctx ->
       source.download(ctx)
     }
   }
@@ -185,7 +179,12 @@ internal class DownloadExecution(
   private suspend fun executeResume(info: ResumeInfo) {
     val taskRecord = info.record
 
-    val sourceType = taskRecord.sourceType ?: HttpDownloadSource.TYPE
+    val sourceType = taskRecord.sourceType
+      ?: throw KetchError.Unknown(
+        IllegalStateException(
+          "No sourceType for taskId=${taskRecord.taskId}",
+        ),
+      )
     val source = sourceResolver.resolveByType(sourceType)
     log.i {
       "Resuming download for taskId=$taskId via " +
@@ -202,16 +201,11 @@ internal class DownloadExecution(
     taskLimiter.delegate = createLimiter(taskRecord.request.speedLimit)
 
     val resumeState = taskRecord.sourceResumeState
-      ?: HttpDownloadSource.buildResumeState(
-        etag = taskRecord.etag,
-        lastModified = taskRecord.lastModified,
-        totalBytes = taskRecord.totalBytes,
+      ?: throw KetchError.CorruptResumeState(
+        "No resume state for taskId=${taskRecord.taskId}",
       )
 
-    runDownload(
-      outputPath, taskRecord.totalBytes, source.managesOwnFileIo,
-    ) { ctx ->
-      context = ctx
+    runDownload(outputPath, taskRecord.totalBytes, source) { ctx ->
       source.resume(ctx, resumeState)
     }
   }
@@ -221,16 +215,18 @@ internal class DownloadExecution(
    * builds the [DownloadContext], runs [downloadBlock] with retry,
    * flushes, persists completion, and cleans up.
    *
-   * When [selfManagedIo] is `true`, the source handles its own file
-   * I/O so we use [NoOpFileAccessor] and skip flush/cleanup.
+   * When [DownloadSource.managesOwnFileIo] is `true`, the source
+   * handles its own file I/O so we use [NoOpFileAccessor] and skip
+   * flush/cleanup.
    */
   private suspend fun runDownload(
     outputPath: String,
     total: Long,
-    selfManagedIo: Boolean = false,
+    source: DownloadSource,
     preResolved: ResolvedSource? = null,
     downloadBlock: suspend (DownloadContext) -> Unit,
   ) {
+    val selfManagedIo = source.managesOwnFileIo
     val fa = if (selfManagedIo) {
       NoOpFileAccessor
     } else {
@@ -248,10 +244,12 @@ internal class DownloadExecution(
           while (true) {
             delay(config.saveIntervalMs)
             val snapshot = handle.mutableSegments.value
-            val downloaded = snapshot.sumOf { it.downloadedBytes }
+            val updatedResume = source.updateResumeState(ctx)
             handle.record.update {
               it.copy(
                 segments = snapshot,
+                sourceResumeState = updatedResume
+                  ?: it.sourceResumeState,
                 updatedAt = Clock.System.now(),
               )
             }
@@ -278,11 +276,6 @@ internal class DownloadExecution(
         it.copy(
           state = TaskState.COMPLETED,
           segments = null,
-          sourceResumeState = HttpDownloadSource.buildResumeState(
-            etag = it.etag,
-            lastModified = it.lastModified,
-            totalBytes = it.totalBytes,
-          ),
           updatedAt = Clock.System.now(),
         )
       }
@@ -477,17 +470,6 @@ internal class DownloadExecution(
     } else {
       TokenBucket(speedLimit.bytesPerSecond)
     }
-  }
-
-  private fun toServerInfo(resolved: ResolvedSource): ServerInfo {
-    return ServerInfo(
-      contentLength = resolved.totalBytes,
-      acceptRanges = resolved.supportsResume,
-      etag = resolved.metadata[HttpDownloadSource.META_ETAG],
-      lastModified = resolved.metadata[
-        HttpDownloadSource.META_LAST_MODIFIED,
-      ],
-    )
   }
 
   private fun resolveDestPath(

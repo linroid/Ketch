@@ -25,7 +25,7 @@ class SourceResolverTest {
       url.startsWith("magnet:")
     override suspend fun resolve(
       url: String,
-      headers: Map<String, String>,
+      properties: Map<String, String>,
     ) = ResolvedSource(
       url = url,
       sourceType = "magnet",
@@ -39,6 +39,10 @@ class SourceResolverTest {
       context: DownloadContext,
       resumeState: SourceResumeState,
     ) {}
+    override fun buildResumeState(
+      resolved: ResolvedSource,
+      totalBytes: Long,
+    ) = SourceResumeState(sourceType = "magnet", data = "{}")
   }
 
   @Test
