@@ -1,11 +1,11 @@
 package com.linroid.ketch.ai.search
 
+import com.linroid.ketch.api.log.KetchLogger
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -20,6 +20,8 @@ internal class BingSearchProvider(
   private val apiKey: String,
   private val market: String = "en-US",
 ) : SearchProvider {
+
+  private val log = KetchLogger("BingSearch")
 
   override suspend fun search(
     query: String,
@@ -40,7 +42,8 @@ internal class BingSearchProvider(
         snippet = page.snippet,
       )
     } ?: emptyList()
-  } catch (_: Exception) {
+  } catch (e: Exception) {
+    log.w(e) { "Bing search failed for query: $query" }
     emptyList()
   }
 
@@ -77,6 +80,4 @@ internal data class BingWebPage(
   val name: String,
   val url: String,
   val snippet: String = "",
-  @SerialName("dateLastCrawled")
-  val dateLastCrawled: String? = null,
 )

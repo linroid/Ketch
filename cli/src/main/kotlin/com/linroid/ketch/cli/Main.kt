@@ -4,7 +4,7 @@ import ch.qos.logback.classic.Level
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
-import com.linroid.ketch.ai.SearchConfig
+import com.linroid.ketch.ai.resolveSearchConfigFromEnv
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -530,7 +530,7 @@ private fun runAiDiscover(args: List<String>) {
   val aiConfig = AiConfig(
     enabled = true,
     llm = LlmConfig(apiKey = apiKey),
-    search = resolveSearchConfig(),
+    search = resolveSearchConfigFromEnv(),
   )
   val aiModule = AiModule.create(aiConfig)
 
@@ -764,28 +764,6 @@ private fun printServerUsage() {
   println("  ketch server --speed-limit 10m")
   println("  ketch server --config /path/to/config.toml")
   println("  ketch server --generate-config")
-}
-
-/**
- * Resolves [SearchConfig] from environment variables.
- *
- * Priority: `BING_SEARCH_API_KEY` > `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` > default.
- */
-private fun resolveSearchConfig(): SearchConfig {
-  val bingKey = System.getenv("BING_SEARCH_API_KEY")
-  if (!bingKey.isNullOrBlank()) {
-    return SearchConfig(provider = "bing", apiKey = bingKey)
-  }
-  val googleKey = System.getenv("GOOGLE_SEARCH_API_KEY")
-  val googleCx = System.getenv("GOOGLE_SEARCH_CX")
-  if (!googleKey.isNullOrBlank() && !googleCx.isNullOrBlank()) {
-    return SearchConfig(
-      provider = "google",
-      apiKey = googleKey,
-      cx = googleCx,
-    )
-  }
-  return SearchConfig()
 }
 
 private fun parsePriority(value: String): DownloadPriority? {

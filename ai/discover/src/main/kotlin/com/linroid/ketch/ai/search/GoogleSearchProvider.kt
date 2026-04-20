@@ -1,5 +1,6 @@
 package com.linroid.ketch.ai.search
 
+import com.linroid.ketch.api.log.KetchLogger
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -18,6 +19,8 @@ internal class GoogleSearchProvider(
   private val apiKey: String,
   private val cx: String,
 ) : SearchProvider {
+
+  private val log = KetchLogger("GoogleSearch")
 
   override suspend fun search(
     query: String,
@@ -43,7 +46,8 @@ internal class GoogleSearchProvider(
         snippet = item.snippet ?: "",
       )
     } ?: emptyList()
-  } catch (_: Exception) {
+  } catch (e: Exception) {
+    log.w(e) { "Google search failed for query: $query" }
     emptyList()
   }
 

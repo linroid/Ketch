@@ -8,7 +8,7 @@ import androidx.compose.ui.window.application
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
-import com.linroid.ketch.ai.SearchConfig
+import com.linroid.ketch.ai.resolveSearchConfigFromEnv
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -26,23 +26,6 @@ import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import java.io.File
 import java.net.InetAddress
-
-private fun resolveSearchConfig(): SearchConfig {
-  val bingKey = System.getenv("BING_SEARCH_API_KEY")
-  if (!bingKey.isNullOrBlank()) {
-    return SearchConfig(provider = "bing", apiKey = bingKey)
-  }
-  val googleKey = System.getenv("GOOGLE_SEARCH_API_KEY")
-  val googleCx = System.getenv("GOOGLE_SEARCH_CX")
-  if (!googleKey.isNullOrBlank() && !googleCx.isNullOrBlank()) {
-    return SearchConfig(
-      provider = "google",
-      apiKey = googleKey,
-      cx = googleCx,
-    )
-  }
-  return SearchConfig()
-}
 
 fun main() = application {
   val instanceManager = remember {
@@ -108,7 +91,7 @@ fun main() = application {
         AiConfig(
           enabled = true,
           llm = LlmConfig(apiKey = apiKey),
-          search = resolveSearchConfig(),
+          search = resolveSearchConfigFromEnv(),
         ),
       )
       EmbeddedAiDiscoveryProvider(aiModule.discoveryService)
