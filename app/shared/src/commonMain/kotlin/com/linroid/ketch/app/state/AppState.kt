@@ -185,6 +185,7 @@ class AppState(
     priority: DownloadPriority,
     schedule: DownloadSchedule = DownloadSchedule.Immediate,
     resolvedUrl: ResolvedSource? = null,
+    selectedFileIds: Set<String> = emptySet(),
   ) {
     scope.launch {
       runCatching {
@@ -196,6 +197,7 @@ class AppState(
           priority = priority,
           schedule = schedule,
           resolvedSource = resolvedUrl,
+          selectedFileIds = selectedFileIds,
         )
         activeApi.value.download(request)
       }.onFailure { e ->

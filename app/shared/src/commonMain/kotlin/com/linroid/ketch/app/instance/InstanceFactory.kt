@@ -1,48 +1,27 @@
 package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.DownloadConfig
-import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.core.Ketch
-import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.task.TaskStore
-import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.remote.RemoteKetch
 
 /**
  * Creates [KetchApi] instances for each instance type.
  *
- * @param taskStore persistent storage for download task records.
- *   Required when using the default embedded instance. Pass `null`
- *   for remote-only mode (e.g. wasmJs/web).
  * @param deviceName label for the embedded instance (e.g. device
  *   model on Android, hostname on desktop).
- * @param embeddedFactory factory for creating the embedded Ketch
+ * @param embeddedFactory factory for creating the embedded [KetchApi]
  *   instance. When `null`, no embedded instance is available and
- *   [InstanceManager] starts in remote-only mode.
- *   Override in tests to inject fakes.
+ *   [InstanceManager] starts in remote-only mode (e.g. wasmJs/web).
+ *   Each platform provides its own factory that wires up the core
+ *   engine with platform-specific dependencies.
  * @param localServerFactory optional factory that starts an HTTP
- *   server exposing the embedded [KetchApi]. Receives port,
- *   optional API token, and the embedded KetchApi instance.
- *   When non-null, server controls appear in the Embedded
- *   instance entry. Provided by Android and JVM/Desktop.
+ *   server exposing the embedded [KetchApi]. Receives the embedded
+ *   KetchApi instance. When non-null, server controls appear in
+ *   the Embedded instance entry. Provided by Android and JVM/Desktop.
  */
 class InstanceFactory(
-  taskStore: TaskStore? = null,
-  defaultDirectory: String? = null,
-  downloadConfig: DownloadConfig = DownloadConfig(
-    defaultDirectory = defaultDirectory,
-  ),
   val deviceName: String = "Embedded",
-  additionalSources: List<DownloadSource> = platformAdditionalSources(),
-  private val embeddedFactory: (() -> Ketch)? = taskStore?.let { ts ->
-    {
-      createDefaultEmbeddedKetch(
-        ts, downloadConfig, deviceName, additionalSources,
-      )
-    }
-  },
+  private val embeddedFactory: (() -> KetchApi)? = null,
   private val localServerFactory: ((KetchApi) -> LocalServerHandle)? = null,
 ) {
   /** Whether an embedded instance is available. */
@@ -54,7 +33,7 @@ class InstanceFactory(
 
   private var localServer: LocalServerHandle? = null
 
-  /** Create the embedded Ketch instance. */
+  /** Create the embedded [KetchApi] instance. */
   fun createEmbedded(): EmbeddedInstance {
     val ketch = embeddedFactory?.invoke()
       ?: throw UnsupportedOperationException(
@@ -105,22 +84,4 @@ class InstanceFactory(
     localServer?.stop()
     localServer = null
   }
-}
-
-internal expect fun platformAdditionalSources(): List<DownloadSource>
-
-private fun createDefaultEmbeddedKetch(
-  taskStore: TaskStore,
-  config: DownloadConfig,
-  name: String,
-  additionalSources: List<DownloadSource>,
-): Ketch {
-  return Ketch(
-    httpEngine = KtorHttpEngine(),
-    taskStore = taskStore,
-    config = config,
-    name = name,
-    logger = Logger.console(),
-    additionalSources = additionalSources,
-  )
 }

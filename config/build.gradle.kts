@@ -29,7 +29,7 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.library.api)
-      implementation(libs.kotlinx.io.core)
+      implementation(libs.okio)
       implementation(libs.ktoml.core)
     }
     commonTest.dependencies {

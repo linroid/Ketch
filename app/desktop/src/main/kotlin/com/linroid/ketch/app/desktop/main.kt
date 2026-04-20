@@ -9,6 +9,7 @@ import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
 import com.linroid.ketch.ai.SearchConfig
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -16,9 +17,13 @@ import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProvider
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.defaultConfigDir
+import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
+import com.linroid.ketch.torrent.TorrentDownloadSource
 import java.io.File
 import java.net.InetAddress
 
@@ -58,9 +63,20 @@ fun main() = application {
       ?: InetAddress.getLocalHost().hostName.removeSuffix(".local")
     InstanceManager(
       factory = InstanceFactory(
-        taskStore = taskStore,
-        downloadConfig = downloadConfig,
         deviceName = instanceName,
+        embeddedFactory = {
+          Ketch(
+            httpEngine = KtorHttpEngine(),
+            taskStore = taskStore,
+            config = downloadConfig,
+            name = instanceName,
+            logger = Logger.console(),
+            additionalSources = listOf(
+              FtpDownloadSource(),
+              TorrentDownloadSource(),
+            ),
+          )
+        },
         localServerFactory = { ketchApi ->
           val serverConfig = config.server
           val server = KetchServer(

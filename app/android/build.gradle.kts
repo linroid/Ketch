@@ -63,6 +63,7 @@ android {
   packaging {
     resources {
       excludes += setOf(
+        "META-INF/DEPENDENCIES",
         "META-INF/{INDEX.LIST,io.netty.versions.properties}",
         "META-INF/*.version",
         "META-INF/native-image/**",
@@ -83,6 +84,9 @@ dependencies {
   implementation(projects.app.shared)
   implementation(projects.ai.discover)
   implementation(projects.library.core)
+  implementation(projects.library.ktor)
+  implementation(projects.library.ftp)
+  implementation(projects.library.torrent)
   implementation(projects.library.sqlite)
   implementation(projects.library.server)
   implementation(libs.androidx.activity.compose)

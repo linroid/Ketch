@@ -1,10 +1,7 @@
 package com.linroid.ketch.config
 
-import kotlinx.io.buffered
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.readString
-import kotlinx.io.writeString
+import okio.Path.Companion.toPath
+import okio.buffer
 
 /**
  * File-based [ConfigStore] that persists config as TOML.
@@ -18,34 +15,41 @@ class FileConfigStore(private val path: String) : ConfigStore {
   private val tmpPath = "$path.tmp"
 
   override fun load(): KetchConfig {
-    val file = Path(path)
-    val tmp = Path(tmpPath)
-    if (!SystemFileSystem.exists(file) &&
-      SystemFileSystem.exists(tmp)
+    val file = path.toPath()
+    val tmp = tmpPath.toPath()
+    if (!platformFileSystem.exists(file) &&
+      platformFileSystem.exists(tmp)
     ) {
       // Previous save wrote .tmp but didn't rename — recover
-      SystemFileSystem.atomicMove(tmp, file)
-    } else if (SystemFileSystem.exists(tmp)) {
+      platformFileSystem.atomicMove(tmp, file)
+    } else if (platformFileSystem.exists(tmp)) {
       // Main file exists, leftover .tmp is stale — remove
-      SystemFileSystem.delete(tmp)
+      platformFileSystem.delete(tmp)
     }
-    if (!SystemFileSystem.exists(file)) return KetchConfig()
-    val content = SystemFileSystem.source(file).buffered()
-      .use { it.readString() }
+    if (!platformFileSystem.exists(file)) return KetchConfig()
+    val source = platformFileSystem.source(file).buffer()
+    val content = try {
+      source.readUtf8()
+    } finally {
+      source.close()
+    }
     return ConfigStore.toml.decodeFromString(
       KetchConfig.serializer(), content,
     )
   }
 
   override fun save(config: KetchConfig) {
-    val file = Path(path)
-    val tmp = Path(tmpPath)
-    file.parent?.let { SystemFileSystem.createDirectories(it) }
-    SystemFileSystem.sink(tmp).buffered().use { sink ->
+    val file = path.toPath()
+    val tmp = tmpPath.toPath()
+    file.parent?.let { platformFileSystem.createDirectories(it) }
+    val sink = platformFileSystem.sink(tmp).buffer()
+    try {
       val encoded = ConfigStore.toml
         .encodeToString(KetchConfig.serializer(), config)
-      sink.writeString(encoded)
+      sink.writeUtf8(encoded)
+    } finally {
+      sink.close()
     }
-    SystemFileSystem.atomicMove(tmp, file)
+    platformFileSystem.atomicMove(tmp, file)
   }
 }

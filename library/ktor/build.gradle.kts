@@ -31,10 +31,10 @@ kotlin {
 
   jvm()
 
-  @OptIn(ExperimentalWasmDsl::class)
-  wasmJs {
-    browser()
-  }
+  iosArm64()
+  iosSimulatorArm64()
+
+  jvm()
 
   sourceSets {
     commonMain.dependencies {

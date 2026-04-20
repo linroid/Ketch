@@ -7,15 +7,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -24,6 +28,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,8 +43,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -49,6 +56,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.state.ResolveState
 import com.linroid.ketch.app.ui.common.PriorityIcon
@@ -77,6 +85,7 @@ fun AddDownloadDialog(
     DownloadPriority,
     DownloadSchedule,
     ResolvedSource?,
+    selectedFileIds: Set<String>,
   ) -> Unit,
 ) {
   var url by remember { mutableStateOf("") }
@@ -99,6 +108,9 @@ fun AddDownloadDialog(
   var password by remember { mutableStateOf("") }
   var expanded by remember {
     mutableStateOf(DialogPanel.None)
+  }
+  val selectedFileIds = remember {
+    mutableSetOf<String>().toMutableStateList()
   }
   val urlFocusRequester = remember {
     FocusRequester()
@@ -134,15 +146,22 @@ fun AddDownloadDialog(
     }
   }
 
-  // Pre-fill filename from resolved result
+  // Pre-fill filename and file selection from resolved result
   val resolved = (resolveState as? ResolveState.Resolved)
     ?.result
   LaunchedEffect(resolved) {
-    if (resolved != null && !fileNameEditedByUser) {
-      val suggested = resolved.suggestedFileName
-      if (!suggested.isNullOrBlank()) {
-        fileName = suggested
+    if (resolved != null) {
+      if (!fileNameEditedByUser) {
+        val suggested = resolved.suggestedFileName
+        if (!suggested.isNullOrBlank()) {
+          fileName = suggested
+        }
       }
+      // Select all files by default for multi-file sources
+      selectedFileIds.clear()
+      selectedFileIds.addAll(
+        resolved.files.map { it.id }
+      )
     }
   }
 
@@ -173,7 +192,9 @@ fun AddDownloadDialog(
             .focusRequester(urlFocusRequester),
           label = { Text("URL") },
           singleLine = true,
-          placeholder = { Text("Enter URL...") },
+          placeholder = {
+            Text("URL, magnet link, or .torrent")
+          },
           isError =
             resolveState is ResolveState.Error,
           trailingIcon = {
@@ -220,6 +241,38 @@ fun AddDownloadDialog(
 
         // Resolve result section
         ResolveInfoSection(resolveState)
+
+        // File selector for multi-file sources (e.g., torrent)
+        val hasFiles = resolved != null &&
+          resolved.files.size > 1
+        AnimatedVisibility(
+          visible = hasFiles,
+          enter = expandVertically() + fadeIn(),
+          exit = shrinkVertically() + fadeOut(),
+        ) {
+          if (resolved != null && resolved.files.size > 1) {
+            FileSelector(
+              files = resolved.files,
+              selectedIds = selectedFileIds,
+              onToggle = { id ->
+                if (id in selectedFileIds) {
+                  selectedFileIds.remove(id)
+                } else {
+                  selectedFileIds.add(id)
+                }
+              },
+              onSelectAll = {
+                selectedFileIds.clear()
+                selectedFileIds.addAll(
+                  resolved.files.map { it.id }
+                )
+              },
+              onDeselectAll = {
+                selectedFileIds.clear()
+              },
+            )
+          }
+        }
 
         // Credential fields shown on authentication failure
         AnimatedVisibility(
@@ -353,18 +406,26 @@ fun AddDownloadDialog(
       }
     },
     confirmButton = {
+      val hasMultipleFiles = resolved != null &&
+        resolved.files.size > 1
       Button(
         onClick = {
           val downloadUrl = buildResolveUrl()
           if (downloadUrl.isNotEmpty()) {
+            val fileIds = if (hasMultipleFiles) {
+              selectedFileIds.toSet()
+            } else {
+              emptySet()
+            }
             onDownload(
               downloadUrl, fileName.trim(),
               selectedSpeed, selectedPriority,
-              selectedSchedule, resolved,
+              selectedSchedule, resolved, fileIds,
             )
           }
         },
-        enabled = url.isNotBlank(),
+        enabled = url.isNotBlank() &&
+          (!hasMultipleFiles || selectedFileIds.isNotEmpty()),
       ) {
         Text("Download")
       }
@@ -496,6 +557,29 @@ private fun ResolvedInfoCard(
         )
       }
 
+      // File count for multi-file sources
+      if (resolved.files.size > 1) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+            text = "Files",
+            style =
+              MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme
+              .onSurfaceVariant,
+            modifier = Modifier.width(80.dp),
+          )
+          Text(
+            text = "${resolved.files.size} files",
+            style =
+              MaterialTheme.typography.labelSmall,
+            color =
+              MaterialTheme.colorScheme.onSurface,
+          )
+        }
+      }
+
       // Resume warning
       if (!resolved.supportsResume) {
         Spacer(Modifier.height(4.dp))
@@ -602,6 +686,110 @@ private fun CredentialFields(
       modifier = Modifier.align(Alignment.End),
     ) {
       Text("Retry with credentials")
+    }
+  }
+}
+
+@Composable
+private fun FileSelector(
+  files: List<SourceFile>,
+  selectedIds: List<String>,
+  onToggle: (String) -> Unit,
+  onSelectAll: () -> Unit,
+  onDeselectAll: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  Surface(
+    modifier = modifier.fillMaxWidth(),
+    color = MaterialTheme.colorScheme
+      .surfaceContainerHigh,
+    shape = RoundedCornerShape(8.dp),
+  ) {
+    Column(
+      modifier = Modifier.padding(8.dp),
+    ) {
+      // Header with select all / deselect all
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+          text = "Files (${selectedIds.size}/${files.size})",
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.onSurface,
+        )
+        Row(
+          horizontalArrangement =
+            Arrangement.spacedBy(4.dp),
+        ) {
+          TextButton(
+            onClick = onSelectAll,
+            enabled = selectedIds.size < files.size,
+          ) {
+            Text(
+              text = "All",
+              style =
+                MaterialTheme.typography.labelSmall,
+            )
+          }
+          TextButton(
+            onClick = onDeselectAll,
+            enabled = selectedIds.isNotEmpty(),
+          ) {
+            Text(
+              text = "None",
+              style =
+                MaterialTheme.typography.labelSmall,
+            )
+          }
+        }
+      }
+
+      // File list
+      LazyColumn(
+        modifier = Modifier.heightIn(max = 200.dp),
+      ) {
+        items(files, key = { it.id }) { file ->
+          val checked = file.id in selectedIds
+          Row(
+            modifier = Modifier.fillMaxWidth()
+              .clip(RoundedCornerShape(4.dp))
+              .clickable { onToggle(file.id) }
+              .padding(vertical = 2.dp),
+            verticalAlignment =
+              Alignment.CenterVertically,
+          ) {
+            Checkbox(
+              checked = checked,
+              onCheckedChange = { onToggle(file.id) },
+              modifier = Modifier.size(32.dp),
+            )
+            Column(
+              modifier = Modifier.weight(1f),
+            ) {
+              Text(
+                text = file.name,
+                style =
+                  MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme
+                  .onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+              if (file.size >= 0) {
+                Text(
+                  text = formatBytes(file.size),
+                  style =
+                    MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme
+                    .onSurfaceVariant,
+                )
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

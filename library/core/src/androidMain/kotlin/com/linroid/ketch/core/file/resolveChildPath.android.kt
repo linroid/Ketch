@@ -5,7 +5,7 @@ package com.linroid.ketch.core.file
 import android.net.Uri
 import android.provider.DocumentsContract
 import com.linroid.ketch.core.AndroidContext
-import kotlinx.io.files.Path
+import okio.Path.Companion.toPath
 
 internal actual fun resolveChildPath(
   directory: String,
@@ -31,5 +31,5 @@ internal actual fun resolveChildPath(
     )
     return docUri.toString()
   }
-  return Path(directory, fileName).toString()
+  return (directory.toPath() / fileName).toString()
 }

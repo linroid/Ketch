@@ -1,13 +1,13 @@
 package com.linroid.ketch.core.file
 
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.core.engine.ServerInfo
 
 /**
  * Default strategy for resolving file names:
  * 1. Content-Disposition header (`filename*=UTF-8''...`, `filename="..."`,
- *    or `filename=...`)
+ *    or `filename=...`) — extracted from `resolved.metadata["contentDisposition"]`
  * 2. Last non-empty URL path segment (percent-decoded, query/fragment stripped)
  * 3. Fallback: `"download"`
  *
@@ -20,9 +20,10 @@ internal class DefaultFileNameResolver : FileNameResolver {
 
   override fun resolve(
     request: DownloadRequest,
-    serverInfo: ServerInfo,
+    resolved: ResolvedSource,
   ): String {
-    val name = fromContentDisposition(serverInfo.contentDisposition)
+    val contentDisposition = resolved.metadata[META_CONTENT_DISPOSITION]
+    val name = fromContentDisposition(contentDisposition)
       ?: fromUrl(request.url)
       ?: FALLBACK
     log.d { "Resolved filename: \"$name\" for url: ${request.url}" }
@@ -31,6 +32,7 @@ internal class DefaultFileNameResolver : FileNameResolver {
 
   companion object {
     internal const val FALLBACK = "download"
+    internal const val META_CONTENT_DISPOSITION = "contentDisposition"
 
     internal fun fromContentDisposition(header: String?): String? {
       if (header.isNullOrBlank()) return null

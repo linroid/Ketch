@@ -17,6 +17,7 @@ defaults:
 jobs:
   build-cli:
     name: CLI (${{ matrix.name }})
+    needs: [build-web]
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -51,8 +52,26 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      # Download pre-built web assets from the build-web job so we
+      # don't re-run wasmJsBrowserProductionWebpack inside nativeCompile.
+      # This avoids yarn concurrency issues on Windows and speeds up
+      # the CLI build on all platforms.
+      - name: Download web distribution
+        uses: actions/download-artifact@v8
+        with:
+          name: ketch-web
+          path: ${{ runner.temp }}/ketch-web
+
+      - name: Unpack web assets
+        run: |
+          mkdir -p cli/build/prebuilt-web
+          unzip "$RUNNER_TEMP/ketch-web"/ketch-web-*.zip -d cli/build/prebuilt-web
+
       - name: Build native image
-        run: ./gradlew :cli:nativeCompile -PVERSION_NAME=${KETCH_VERSION#v}
+        run: >
+          ./gradlew :cli:nativeCompile
+          -PVERSION_NAME=${KETCH_VERSION#v}
+          -PprebuiltWebDir=build/prebuilt-web
 
       - name: Compress with UPX (Linux)
         if: matrix.os == 'linux'
@@ -78,7 +97,7 @@ jobs:
           cd cli/build/native/nativeCompile
           7z a ketch-cli-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.zip ketch.exe
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: ketch-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: cli/build/native/nativeCompile/ketch-cli-*.${{ matrix.ext }}
@@ -116,7 +135,7 @@ jobs:
           APK=$(find app/android/build/outputs/apk/release -name '*.apk' | head -1)
           cp "$APK" app/android/build/outputs/apk/release/ketch-android-${KETCH_VERSION#v}.apk
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: ketch-android
           path: app/android/build/outputs/apk/release/ketch-android-*.apk
@@ -176,7 +195,7 @@ jobs:
           DEST="app/desktop/build/ketch-desktop-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.${{ matrix.ext }}"
           cp "$SRC" "$DEST"
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: ketch-desktop-${{ matrix.name }}
           path: app/desktop/build/ketch-desktop-*.${{ matrix.ext }}
@@ -202,13 +221,14 @@ jobs:
           cd app/web/build/dist/wasmJs/productionExecutable
           zip -r /tmp/ketch-web-${KETCH_VERSION#v}.zip .
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: ketch-web
           path: /tmp/ketch-web-*.zip
 
   publish-maven-central:
     name: Publish to Maven Central
+    needs: [build-cli, build-android, build-desktop, build-web]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -242,7 +262,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true

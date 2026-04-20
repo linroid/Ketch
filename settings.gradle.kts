@@ -43,7 +43,9 @@ include(":library:ktor")
 include(":library:kermit")
 include(":library:sqlite")
 include(":library:ftp")
+include(":library:torrent")
 include(":library:server")
+include(":library:mcp")
 
 // AI modules
 include(":ai:discover")

@@ -40,9 +40,8 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       implementation(projects.config)
-      implementation(projects.library.core)
       implementation(projects.library.remote)
-      implementation(projects.library.ktor)
+
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.compose.runtime)
       implementation(libs.compose.foundation)
@@ -61,21 +60,30 @@ kotlin {
       implementation(libs.kotlinx.coroutines.test)
     }
     androidMain.dependencies {
+      implementation(projects.library.core)
+      implementation(projects.library.ktor)
       implementation(projects.ai.discover)
       implementation(projects.library.ftp)
+      implementation(projects.library.torrent)
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.ktor.client.okhttp)
       implementation(libs.dnssd)
     }
     iosMain.dependencies {
+      implementation(projects.library.core)
+      implementation(projects.library.ktor)
       implementation(projects.library.ftp)
+      implementation(projects.library.torrent)
       implementation(projects.library.sqlite)
       implementation(libs.ktor.client.darwin)
       implementation(libs.dnssd)
     }
     jvmMain.dependencies {
+      implementation(projects.library.core)
+      implementation(projects.library.ktor)
       implementation(projects.ai.discover)
       implementation(projects.library.ftp)
+      implementation(projects.library.torrent)
       implementation(projects.library.sqlite)
       implementation(libs.kotlinx.coroutinesSwing)
       implementation(libs.ktor.client.cio)
