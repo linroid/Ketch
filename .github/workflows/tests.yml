@@ -75,6 +75,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      - name: Ensure iOS simulator runtime is complete
+        run: xcodebuild -downloadPlatform iOS
+
       - name: Run iOS simulator tests
         run: ./gradlew iosSimulatorArm64Test
 
