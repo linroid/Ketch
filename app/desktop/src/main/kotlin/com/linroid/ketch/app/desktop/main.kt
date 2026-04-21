@@ -8,6 +8,7 @@ import androidx.compose.ui.window.application
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
+import com.linroid.ketch.ai.resolveSearchConfigFromEnv
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -90,6 +91,7 @@ fun main() = application {
         AiConfig(
           enabled = true,
           llm = LlmConfig(apiKey = apiKey),
+          search = resolveSearchConfigFromEnv(),
         ),
       )
       EmbeddedAiDiscoveryProvider(aiModule.discoveryService)

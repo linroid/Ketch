@@ -15,6 +15,7 @@ import androidx.core.app.ServiceCompat
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
+import com.linroid.ketch.ai.resolveSearchConfigFromEnv
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -139,6 +140,7 @@ class KetchService : Service() {
         AiConfig(
           enabled = true,
           llm = LlmConfig(apiKey = apiKey),
+          search = resolveSearchConfigFromEnv(),
         ),
       )
       aiProvider = EmbeddedAiDiscoveryProvider(
@@ -274,6 +276,7 @@ class KetchService : Service() {
   companion object {
     private const val CHANNEL_ID = "ketch_service"
     private const val NOTIFICATION_ID = 1
-    private const val ACTION_REPOST_NOTIFICATION = "com.linroid.ketch.app.android.action.REPOST_NOTIFICATION"
+    private const val ACTION_REPOST_NOTIFICATION =
+      "com.linroid.ketch.app.android.action.REPOST_NOTIFICATION"
   }
 }

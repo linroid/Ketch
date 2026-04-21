@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.LlmConfig
+import com.linroid.ketch.ai.resolveSearchConfigFromEnv
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -529,6 +530,7 @@ private fun runAiDiscover(args: List<String>) {
   val aiConfig = AiConfig(
     enabled = true,
     llm = LlmConfig(apiKey = apiKey),
+    search = resolveSearchConfigFromEnv(),
   )
   val aiModule = AiModule.create(aiConfig)
 
@@ -718,6 +720,11 @@ private fun printUsage() {
   println("    --sites <domains>      Comma-separated domain allowlist")
   println("    --max-results <n>      Max results (default: 5)")
   println("                           Requires OPENAI_API_KEY env var")
+  println()
+  println("  Search env vars (checked in order):")
+  println("    BING_SEARCH_API_KEY    Use Bing Web Search API")
+  println("    GOOGLE_SEARCH_API_KEY  Use Google Custom Search")
+  println("    GOOGLE_SEARCH_CX      Google Search Engine ID")
   println()
   println("Examples:")
   println("  ketch https://example.com/file.zip")

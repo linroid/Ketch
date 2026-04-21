@@ -38,13 +38,46 @@ data class LlmConfig(
 /**
  * Search provider configuration.
  *
- * @param provider search API provider type
- * @param apiKey search API key if needed
+ * @param provider search API provider type: `"bing"`, `"google"`, or
+ *   `"none"` (default, no-op fallback)
+ * @param apiKey search API key (Bing subscription key or Google API key)
+ * @param cx Google Custom Search Engine ID (only used when
+ *   [provider] is `"google"`)
  */
 data class SearchConfig(
-  val provider: String = "llm",
+  val provider: String = "none",
   val apiKey: String = "",
+  val cx: String = "",
 )
+
+/**
+ * Resolves a [SearchConfig] from environment variables.
+ *
+ * Priority:
+ * 1. `BING_SEARCH_API_KEY` → Bing
+ * 2. `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` → Google
+ * 3. Default (no-op)
+ *
+ * @param getenv environment lookup, overridable for testing
+ */
+fun resolveSearchConfigFromEnv(
+  getenv: (String) -> String? = System::getenv,
+): SearchConfig {
+  val bingKey = getenv("BING_SEARCH_API_KEY")
+  if (!bingKey.isNullOrBlank()) {
+    return SearchConfig(provider = "bing", apiKey = bingKey)
+  }
+  val googleKey = getenv("GOOGLE_SEARCH_API_KEY")
+  val googleCx = getenv("GOOGLE_SEARCH_CX")
+  if (!googleKey.isNullOrBlank() && !googleCx.isNullOrBlank()) {
+    return SearchConfig(
+      provider = "google",
+      apiKey = googleKey,
+      cx = googleCx,
+    )
+  }
+  return SearchConfig()
+}
 
 /**
  * Fetcher security settings.
