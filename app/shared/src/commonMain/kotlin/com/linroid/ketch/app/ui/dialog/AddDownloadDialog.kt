@@ -27,7 +27,9 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchButtonVariant
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -36,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -408,7 +409,8 @@ fun AddDownloadDialog(
     confirmButton = {
       val hasMultipleFiles = resolved != null &&
         resolved.files.size > 1
-      Button(
+      KetchButton(
+        text = "Download",
         onClick = {
           val downloadUrl = buildResolveUrl()
           if (downloadUrl.isNotEmpty()) {
@@ -426,19 +428,17 @@ fun AddDownloadDialog(
         },
         enabled = url.isNotBlank() &&
           (!hasMultipleFiles || selectedFileIds.isNotEmpty()),
-      ) {
-        Text("Download")
-      }
+      )
     },
     dismissButton = {
-      TextButton(
+      KetchButton(
+        text = "Cancel",
         onClick = {
           onResetResolve()
           onDismiss()
-        }
-      ) {
-        Text("Cancel")
-      }
+        },
+        variant = KetchButtonVariant.Ghost,
+      )
     }
   )
 }
@@ -680,13 +680,12 @@ private fun CredentialFields(
           PasswordVisualTransformation(),
       )
     }
-    Button(
+    KetchButton(
+      text = "Retry with credentials",
       onClick = onRetry,
       enabled = username.isNotBlank(),
       modifier = Modifier.align(Alignment.End),
-    ) {
-      Text("Retry with credentials")
-    }
+    )
   }
 }
 
@@ -723,26 +722,20 @@ private fun FileSelector(
           horizontalArrangement =
             Arrangement.spacedBy(4.dp),
         ) {
-          TextButton(
+          KetchButton(
+            text = "All",
             onClick = onSelectAll,
             enabled = selectedIds.size < files.size,
-          ) {
-            Text(
-              text = "All",
-              style =
-                MaterialTheme.typography.labelSmall,
-            )
-          }
-          TextButton(
+            variant = KetchButtonVariant.Ghost,
+            size = KetchButtonSize.Small,
+          )
+          KetchButton(
+            text = "None",
             onClick = onDeselectAll,
             enabled = selectedIds.isNotEmpty(),
-          ) {
-            Text(
-              text = "None",
-              style =
-                MaterialTheme.typography.labelSmall,
-            )
-          }
+            variant = KetchButtonVariant.Ghost,
+            size = KetchButtonSize.Small,
+          )
         }
       }
 

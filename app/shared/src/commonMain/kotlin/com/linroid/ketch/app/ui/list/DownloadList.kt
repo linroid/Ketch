@@ -10,12 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CloudDownload
-import androidx.compose.material.icons.outlined.FilterList
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,7 +18,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.theme.KetchTheme
 import kotlinx.coroutines.CoroutineScope
 
 @Composable
@@ -88,30 +86,29 @@ private fun EmptyState(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-      Icon(
-        imageVector = Icons.Outlined.CloudDownload,
-        contentDescription = null,
-        modifier = Modifier.size(64.dp),
-        tint = MaterialTheme.colorScheme.primary
-          .copy(alpha = 0.6f),
+      KetchIconImage(
+        icon = KetchIcon.Active,
+        size = 64.dp,
+        tint = KetchTheme.colors.primary.copy(alpha = 0.6f),
       )
       Spacer(modifier = Modifier.height(8.dp))
       Text(
         text = "No downloads yet",
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface,
+        style = KetchTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
+        color = KetchTheme.colors.onBackground,
       )
       Text(
         text = "Click \"New Task\" to start downloading",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = KetchTheme.typography.bodyMedium,
+        color = KetchTheme.colors.onSurfaceVariant,
         textAlign = TextAlign.Center,
       )
       Spacer(modifier = Modifier.height(16.dp))
-      Button(onClick = onAddClick) {
-        Text("New Task")
-      }
+      KetchButton(
+        text = "New Task",
+        onClick = onAddClick,
+        leadingIcon = KetchIcon.Plus,
+      )
     }
   }
 }
@@ -129,23 +126,21 @@ private fun EmptyFilterState(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-      Icon(
-        imageVector = Icons.Outlined.FilterList,
-        contentDescription = null,
-        modifier = Modifier.size(48.dp),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant
-          .copy(alpha = 0.4f),
+      KetchIconImage(
+        icon = KetchIcon.Filter,
+        size = 48.dp,
+        tint = KetchTheme.colors.onSurfaceVariant.copy(alpha = 0.4f),
       )
       Spacer(modifier = Modifier.height(4.dp))
       Text(
         text = "No ${filter.label.lowercase()} downloads",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = KetchTheme.typography.bodyLarge,
+        color = KetchTheme.colors.onSurfaceVariant,
       )
       Text(
         text = "Try a different category",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.outline,
+        style = KetchTheme.typography.bodySmall,
+        color = KetchTheme.colors.onSurfaceDim,
       )
     }
   }

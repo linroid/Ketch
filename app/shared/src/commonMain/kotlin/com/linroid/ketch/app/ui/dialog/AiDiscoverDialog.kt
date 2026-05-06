@@ -11,14 +11,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonVariant
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -164,31 +164,29 @@ fun AiDiscoverDialog(
     confirmButton = {
       val results = state as? AiDiscoverState.Results
       if (results != null && selected.isNotEmpty()) {
-        Button(
+        KetchButton(
+          text = "Download ${selected.size} selected",
           onClick = {
             val selectedCandidates =
-              results.candidates.filter {
-                it.url in selected
-              }
+              results.candidates.filter { it.url in selected }
             onDownloadSelected(selectedCandidates)
           },
-        ) {
-          Text("Download ${selected.size} selected")
-        }
+        )
       } else {
-        Button(
+        KetchButton(
+          text = "Discover",
           onClick = { onDiscover(query, sites) },
           enabled = query.isNotBlank() &&
             state !is AiDiscoverState.Loading,
-        ) {
-          Text("Discover")
-        }
+        )
       }
     },
     dismissButton = {
-      TextButton(onClick = onDismiss) {
-        Text("Cancel")
-      }
+      KetchButton(
+        text = "Cancel",
+        onClick = onDismiss,
+        variant = KetchButtonVariant.Ghost,
+      )
     },
   )
 }

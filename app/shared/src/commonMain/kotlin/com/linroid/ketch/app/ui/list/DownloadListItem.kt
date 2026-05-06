@@ -11,14 +11,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.theme.KetchTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -82,10 +81,8 @@ fun DownloadListItem(
     },
     enabled = isDownloading || isPaused,
     colors = CardDefaults.cardColors(
-      containerColor =
-        MaterialTheme.colorScheme.surfaceContainer,
-      disabledContainerColor =
-        MaterialTheme.colorScheme.surfaceContainer
+      containerColor = KetchTheme.colors.surface,
+      disabledContainerColor = KetchTheme.colors.surface,
     ),
     modifier = modifier.fillMaxWidth(),
   ) {
@@ -114,9 +111,10 @@ fun DownloadListItem(
           ) {
             Text(
               text = fileName,
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold,
-              color = MaterialTheme.colorScheme.onSurface,
+              style = KetchTheme.typography.bodyLarge.copy(
+                fontWeight = FontWeight.SemiBold,
+              ),
+              color = KetchTheme.colors.onBackground,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
               modifier = Modifier.weight(
@@ -131,9 +129,8 @@ fun DownloadListItem(
           }
           Text(
             text = task.request.url,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme
-              .onSurfaceVariant,
+            style = KetchTheme.typography.monoSmall,
+            color = KetchTheme.colors.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
           )
@@ -227,18 +224,11 @@ fun DownloadListItem(
           )
         }
         Spacer(modifier = Modifier.weight(1f))
-        IconButton(
+        KetchIconButton(
+          icon = KetchIcon.Trash,
           onClick = { scope.launch { task.remove() } },
-          modifier = Modifier.size(32.dp),
-        ) {
-          Icon(
-            imageVector = Icons.Outlined.DeleteOutline,
-            contentDescription = "Remove",
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme
-              .onSurfaceVariant
-          )
-        }
+          size = KetchButtonSize.Medium,
+        )
       }
 
       if (showToggles) {

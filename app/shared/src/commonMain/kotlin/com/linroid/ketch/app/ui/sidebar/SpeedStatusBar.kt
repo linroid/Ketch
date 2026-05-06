@@ -6,15 +6,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.theme.KetchTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,12 +32,10 @@ fun SpeedStatusBar(
   modifier: Modifier = Modifier,
 ) {
   Surface(
-    color = MaterialTheme.colorScheme.surfaceContainerLow,
+    color = KetchTheme.colors.surfaceVariant,
     modifier = modifier.fillMaxWidth(),
   ) {
-    HorizontalDivider(
-      color = MaterialTheme.colorScheme.outlineVariant,
-    )
+    HorizontalDivider(color = KetchTheme.colors.outlineVariant)
     val windowSizeClass =
       currentWindowAdaptiveInfo().windowSizeClass
     val isCompact = !windowSizeClass
@@ -65,8 +61,8 @@ fun SpeedStatusBar(
         }
         Text(
           text = instanceLabel ?: "Not connected",
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          style = KetchTheme.typography.labelSmall,
+          color = KetchTheme.colors.onSurfaceVariant,
         )
       }
       // Right side: speed info
@@ -79,16 +75,15 @@ fun SpeedStatusBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
           ) {
-            Icon(
-              Icons.Filled.ArrowDownward,
-              contentDescription = "Download speed",
-              modifier = Modifier.size(14.dp),
-              tint = MaterialTheme.colorScheme.primary,
+            KetchIconImage(
+              icon = KetchIcon.Active,
+              size = 14.dp,
+              tint = KetchTheme.colors.primary,
             )
             Text(
               text = "${formatBytes(totalSpeed)}/s",
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.primary,
+              style = KetchTheme.typography.monoXSmall,
+              color = KetchTheme.colors.primary,
             )
           }
         }
@@ -96,11 +91,10 @@ fun SpeedStatusBar(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-          Icon(
-            Icons.Filled.Speed,
-            contentDescription = null,
-            modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          KetchIconImage(
+            icon = KetchIcon.Speed,
+            size = 14.dp,
+            tint = KetchTheme.colors.onSurfaceVariant,
           )
           Text(
             text = if (activeDownloads > 0) {
@@ -108,8 +102,8 @@ fun SpeedStatusBar(
             } else {
               "Idle"
             },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = KetchTheme.typography.labelSmall,
+            color = KetchTheme.colors.onSurfaceVariant,
           )
         }
       }

@@ -8,21 +8,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
@@ -30,6 +20,13 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchCard
+import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.theme.KetchTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -185,17 +182,17 @@ fun AppShell(
                   Badge { Text(count.toString()) }
                 },
               ) {
-                Icon(
-                  imageVector = filterIcon(filter),
-                  contentDescription = filter.label,
-                  modifier = Modifier.size(24.dp),
+                KetchIconImage(
+                  icon = filterIcon(filter),
+                  size = 24.dp,
+                  tint = KetchTheme.colors.onSurfaceVariant,
                 )
               }
             } else {
-              Icon(
-                imageVector = filterIcon(filter),
-                contentDescription = filter.label,
-                modifier = Modifier.size(24.dp),
+              KetchIconImage(
+                icon = filterIcon(filter),
+                size = 24.dp,
+                tint = KetchTheme.colors.onSurfaceVariant,
               )
             }
           },
@@ -237,16 +234,12 @@ fun AppShell(
                 )
               },
               actions = {
-                IconButton(
+                KetchIconButton(
+                  icon = KetchIcon.Ai,
                   onClick = {
                     appState.showAiDiscoverDialog = true
                   },
-                ) {
-                  Icon(
-                    Icons.Filled.AutoAwesome,
-                    contentDescription = "AI Discover",
-                  )
-                }
+                )
                 BatchActionBar(
                   hasActiveDownloads = hasActive,
                   hasPausedDownloads = hasPaused,
@@ -266,15 +259,11 @@ fun AppShell(
 
             // Error banner
             if (appState.errorMessage != null) {
-              Card(
-                colors = CardDefaults.cardColors(
-                  containerColor =
-                    MaterialTheme.colorScheme
-                      .errorContainer,
-                ),
+              KetchCard(
                 modifier = Modifier
                   .fillMaxWidth()
                   .padding(horizontal = 16.dp),
+                padding = 0.dp,
               ) {
                 Row(
                   modifier = Modifier.padding(16.dp),
@@ -285,19 +274,18 @@ fun AppShell(
                 ) {
                   Text(
                     text = appState.errorMessage ?: "",
-                    style =
-                      MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme
-                      .onErrorContainer,
+                    style = KetchTheme.typography.bodySmall,
+                    color = KetchTheme.colors.error,
                     modifier = Modifier.weight(1f),
                   )
-                  TextButton(
-                    onClick = {
-                      appState.dismissError()
-                    },
-                  ) {
-                    Text("Dismiss")
-                  }
+                  KetchButton(
+                    text = "Dismiss",
+                    onClick = { appState.dismissError() },
+                    variant =
+                      com.linroid.ketch.app.components
+                        .KetchButtonVariant.Ghost,
+                    size = KetchButtonSize.Small,
+                  )
                 }
               }
             }
@@ -331,25 +319,18 @@ fun AppShell(
         )
       }
 
-      // FAB for Compact/Medium layouts (sidebar has its
-      // own "New Task" button on Expanded)
+      // FAB-style primary action for Compact/Medium layouts.
+      // (Sidebar has its own "New Task" button on Expanded.)
       if (!isExpanded) {
-        FloatingActionButton(
+        KetchButton(
+          text = "New Task",
           onClick = { appState.requestAddDownload() },
+          leadingIcon = KetchIcon.Plus,
+          size = KetchButtonSize.Large,
           modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(end = 16.dp, bottom = 72.dp),
-          containerColor =
-            MaterialTheme.colorScheme.primary,
-          contentColor =
-            MaterialTheme.colorScheme.onPrimary,
-          shape = RoundedCornerShape(16.dp),
-        ) {
-          Icon(
-            Icons.Filled.Add,
-            contentDescription = "New Task",
-          )
-        }
+        )
       }
     }
   }
