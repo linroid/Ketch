@@ -54,6 +54,7 @@ import com.linroid.ketch.app.ui.sidebar.SidebarNavigation
 import com.linroid.ketch.app.ui.sidebar.SpeedStatusBar
 import com.linroid.ketch.app.ui.sidebar.filterIcon
 import com.linroid.ketch.app.ui.toolbar.BatchActionBar
+import com.linroid.ketch.app.ui.toolbar.KetchToolbar
 import com.linroid.ketch.app.ui.toolbar.countTasksByFilter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -212,50 +213,64 @@ fun AppShell(
               onFilterSelect = { selected ->
                 appState.statusFilter = selected
               },
-              onAddClick = {
-                appState.requestAddDownload()
+              activeInstance = activeInstance,
+              connectionState = connectionState,
+              onInstanceClick = {
+                appState.showInstanceSelector = true
               },
-            )
-            VerticalDivider(
-              color =
-                MaterialTheme.colorScheme.outlineVariant,
             )
           }
 
           // Content area
           Column(modifier = Modifier.weight(1f)) {
-            TopAppBar(
-              title = {
-                Text(
-                  text = appState.statusFilter.label,
-                  style =
-                    MaterialTheme.typography.titleMedium,
-                  fontWeight = FontWeight.SemiBold,
-                )
-              },
-              actions = {
-                KetchIconButton(
-                  icon = KetchIcon.Ai,
-                  onClick = {
-                    appState.showAiDiscoverDialog = true
-                  },
-                )
-                BatchActionBar(
-                  hasActiveDownloads = hasActive,
-                  hasPausedDownloads = hasPaused,
-                  hasCompletedDownloads = hasCompleted,
-                  onPauseAll = { appState.pauseAll() },
-                  onResumeAll = { appState.resumeAll() },
-                  onClearCompleted = {
-                    appState.clearCompleted()
-                  },
-                )
-              },
-              colors = TopAppBarDefaults.topAppBarColors(
-                containerColor =
-                  MaterialTheme.colorScheme.surface,
-              ),
-            )
+            if (isExpanded) {
+              KetchToolbar(
+                title = appState.statusFilter.label,
+                bandwidthBytesPerSec = totalSpeed,
+                globalCapBytesPerSec = null,
+                hasActiveDownloads = hasActive,
+                hasPausedDownloads = hasPaused,
+                hasCompletedDownloads = hasCompleted,
+                onPauseAll = { appState.pauseAll() },
+                onResumeAll = { appState.resumeAll() },
+                onClearCompleted = { appState.clearCompleted() },
+                onAiDiscoverClick = {
+                  appState.showAiDiscoverDialog = true
+                },
+                onAddClick = { appState.requestAddDownload() },
+              )
+            } else {
+              TopAppBar(
+                title = {
+                  Text(
+                    text = appState.statusFilter.label,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                  )
+                },
+                actions = {
+                  KetchIconButton(
+                    icon = KetchIcon.Ai,
+                    onClick = {
+                      appState.showAiDiscoverDialog = true
+                    },
+                  )
+                  BatchActionBar(
+                    hasActiveDownloads = hasActive,
+                    hasPausedDownloads = hasPaused,
+                    hasCompletedDownloads = hasCompleted,
+                    onPauseAll = { appState.pauseAll() },
+                    onResumeAll = { appState.resumeAll() },
+                    onClearCompleted = {
+                      appState.clearCompleted()
+                    },
+                  )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                  containerColor = MaterialTheme.colorScheme.surface,
+                ),
+              )
+            }
 
             // Error banner
             if (appState.errorMessage != null) {
