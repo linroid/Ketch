@@ -58,6 +58,7 @@ import com.linroid.ketch.app.ui.common.SpeedLimitIcon
 import com.linroid.ketch.app.ui.common.SpeedLimitPanel
 import com.linroid.ketch.app.ui.common.TaskSettingsIcon
 import com.linroid.ketch.app.ui.common.TaskSettingsPanel
+import com.linroid.ketch.app.ui.dialog.RemoveDownloadDialog
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.formatEta
@@ -88,6 +89,7 @@ fun DownloadListItem(
 
   var expanded by remember { mutableStateOf(false) }
   var subPanel by remember { mutableStateOf(ExpandedSubPanel.None) }
+  var showRemoveDialog by remember { mutableStateOf(false) }
 
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
@@ -124,9 +126,9 @@ fun DownloadListItem(
 
         ExpandedSettingsRow(
           task = task,
-          scope = scope,
           subPanel = subPanel,
           onSubPanelChange = { subPanel = it },
+          onRemoveRequest = { showRemoveDialog = true },
         )
 
         AnimatedContent(
@@ -151,6 +153,22 @@ fun DownloadListItem(
         }
       }
     }
+  }
+
+  if (showRemoveDialog) {
+    val totalBytes = when (val s = state) {
+      is DownloadState.Downloading -> s.progress.totalBytes
+      is DownloadState.Paused -> s.progress.totalBytes
+      else -> null
+    }
+    RemoveDownloadDialog(
+      fileName = fileName,
+      totalBytes = totalBytes,
+      onDismiss = { showRemoveDialog = false },
+      onConfirm = { deleteFiles ->
+        scope.launch { task.remove(deleteFiles = deleteFiles) }
+      },
+    )
   }
 }
 
@@ -336,9 +354,9 @@ private fun RowAction(icon: KetchIcon, tint: Color, onClick: () -> Unit) {
 @Composable
 private fun ExpandedSettingsRow(
   task: DownloadTask,
-  scope: CoroutineScope,
   subPanel: ExpandedSubPanel,
   onSubPanelChange: (ExpandedSubPanel) -> Unit,
+  onRemoveRequest: () -> Unit,
 ) {
   val state by task.state.collectAsState()
   val canConfigure = state is DownloadState.Downloading ||
@@ -379,7 +397,7 @@ private fun ExpandedSettingsRow(
     Spacer(Modifier.weight(1f))
     com.linroid.ketch.app.components.KetchIconButton(
       icon = KetchIcon.Trash,
-      onClick = { scope.launch { task.remove() } },
+      onClick = onRemoveRequest,
     )
   }
 }

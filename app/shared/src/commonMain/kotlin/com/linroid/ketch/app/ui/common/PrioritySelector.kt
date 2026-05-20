@@ -1,7 +1,8 @@
 package com.linroid.ketch.app.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LowPriority
@@ -50,15 +51,17 @@ fun PriorityIcon(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PrioritySelector(
   value: DownloadPriority,
   onValueChange: (DownloadPriority) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  Row(
+  FlowRow(
     modifier = modifier,
     horizontalArrangement = Arrangement.spacedBy(6.dp),
+    verticalArrangement = Arrangement.spacedBy(4.dp),
   ) {
     DownloadPriority.entries.forEach { priority ->
       FilterChip(

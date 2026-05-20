@@ -84,7 +84,7 @@ internal class RealDownloadTask(
     controller.reschedule(this, schedule, conditions)
   }
 
-  override suspend fun remove() {
-    controller.remove(this)
+  override suspend fun remove(deleteFiles: Boolean) {
+    controller.remove(this, deleteFiles)
   }
 }

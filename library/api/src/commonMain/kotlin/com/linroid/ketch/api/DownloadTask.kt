@@ -78,8 +78,13 @@ interface DownloadTask {
 
   /**
    * Cancels the download and removes it from the task store and tasks list.
+   *
+   * @param deleteFiles when `true`, also delete the downloaded data
+   *   (partial or completed). Deletion is best-effort: failures are
+   *   logged and do not prevent the task record from being removed.
+   *   Defaults to `false` for backward compatibility.
    */
-  suspend fun remove()
+  suspend fun remove(deleteFiles: Boolean = false)
 
   /**
    * Suspends until the download reaches a terminal state.

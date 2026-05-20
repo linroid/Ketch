@@ -64,6 +64,43 @@ interface KetchApi {
 }
 ```
 
+`KetchApi.download(...)` returns a `DownloadTask` for controlling an
+individual download. Tasks expose reactive state and per-task actions:
+
+```kotlin
+interface DownloadTask {
+  val taskId: String
+  val request: DownloadRequest
+  val state: StateFlow<DownloadState>
+  val segments: StateFlow<List<Segment>>
+
+  suspend fun pause()
+  suspend fun resume(destination: Destination? = null)
+  suspend fun cancel()
+  suspend fun setSpeedLimit(limit: SpeedLimit)
+  suspend fun setPriority(priority: DownloadPriority)
+  suspend fun setConnections(connections: Int)
+  suspend fun reschedule(
+    schedule: DownloadSchedule,
+    conditions: List<DownloadCondition> = emptyList(),
+  )
+
+  /**
+   * Cancels the download and removes it from the task list.
+   *
+   * @param deleteFiles when `true`, also delete the data this task
+   *   wrote to disk (partial bytes, completed file, or a torrent's
+   *   save path). Deletion is best-effort — failures are logged
+   *   and do not prevent the task record from being removed.
+   *   Defaults to `false`.
+   */
+  suspend fun remove(deleteFiles: Boolean = false)
+
+  /** Suspends until the task reaches a terminal state. */
+  suspend fun await(): Result<String>
+}
+```
+
 ### `library:core`
 
 The in-process download engine. Depends on an `HttpEngine` interface (no HTTP client dependency):

@@ -118,7 +118,9 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
   }
 
   delete<Api.Tasks.ById> { resource ->
-    log.d { "DELETE /api/tasks/${resource.id}" }
+    val deleteFiles = call.request.queryParameters["deleteFiles"]
+      ?.toBooleanStrictOrNull() ?: false
+    log.d { "DELETE /api/tasks/${resource.id} deleteFiles=$deleteFiles" }
     val task = ketch.tasks.value.find {
       it.taskId == resource.id
     }
@@ -132,8 +134,8 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       )
       return@delete
     }
-    task.remove()
-    log.d { "Removed taskId=${resource.id}" }
+    task.remove(deleteFiles = deleteFiles)
+    log.d { "Removed taskId=${resource.id} deleteFiles=$deleteFiles" }
     call.respond(HttpStatusCode.NoContent)
   }
 

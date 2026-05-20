@@ -281,6 +281,94 @@ class DownloadRoutesTest {
   }
 
   @Test
+  fun `DELETE with deleteFiles=true forwards flag to task`() = testApplication {
+    val ketch = createKetch()
+    val recording = RecordingKetchApi(ketch)
+    application {
+      val server = createTestServer(ketch = recording)
+      with(server) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    val created = json.decodeFromString<TaskSnapshot>(
+      client.post("/api/tasks") {
+        contentType(ContentType.Application.Json)
+        setBody(
+          DownloadRequest(
+            url = "https://example.com/file.zip",
+            destination = Destination("/tmp/"),
+          )
+        )
+      }.bodyAsText()
+    )
+
+    val response = client.delete(
+      "/api/tasks/${created.taskId}?deleteFiles=true"
+    )
+    assertEquals(HttpStatusCode.NoContent, response.status)
+    assertEquals(listOf(true), recording.removeCalls)
+  }
+
+  @Test
+  fun `DELETE without deleteFiles defaults to false`() = testApplication {
+    val ketch = createKetch()
+    val recording = RecordingKetchApi(ketch)
+    application {
+      val server = createTestServer(ketch = recording)
+      with(server) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    val created = json.decodeFromString<TaskSnapshot>(
+      client.post("/api/tasks") {
+        contentType(ContentType.Application.Json)
+        setBody(
+          DownloadRequest(
+            url = "https://example.com/file.zip",
+            destination = Destination("/tmp/"),
+          )
+        )
+      }.bodyAsText()
+    )
+
+    val response = client.delete("/api/tasks/${created.taskId}")
+    assertEquals(HttpStatusCode.NoContent, response.status)
+    assertEquals(listOf(false), recording.removeCalls)
+  }
+
+  @Test
+  fun `DELETE with invalid deleteFiles value defaults to false`() = testApplication {
+    val ketch = createKetch()
+    val recording = RecordingKetchApi(ketch)
+    application {
+      val server = createTestServer(ketch = recording)
+      with(server) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    val created = json.decodeFromString<TaskSnapshot>(
+      client.post("/api/tasks") {
+        contentType(ContentType.Application.Json)
+        setBody(
+          DownloadRequest(
+            url = "https://example.com/file.zip",
+            destination = Destination("/tmp/"),
+          )
+        )
+      }.bodyAsText()
+    )
+
+    val response = client.delete(
+      "/api/tasks/${created.taskId}?deleteFiles=banana"
+    )
+    assertEquals(HttpStatusCode.NoContent, response.status)
+    assertEquals(listOf(false), recording.removeCalls)
+  }
+
+  @Test
   fun `pause on nonexistent task returns 404`() =
     testApplication {
       application {
