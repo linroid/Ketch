@@ -12,7 +12,7 @@ plugins {
 }
 
 kotlin {
-  androidLibrary {
+  android {
     namespace = "com.linroid.ketch.ftp"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()

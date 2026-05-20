@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
   alias(libs.plugins.kotlinMultiplatform)
@@ -10,7 +11,7 @@ plugins {
 }
 
 kotlin {
-  androidLibrary {
+  android {
     namespace = "com.linroid.ketch.app.shared"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
@@ -27,6 +28,22 @@ kotlin {
     iosTarget.binaries.framework {
       baseName = "KetchApp"
       isStatic = true
+    }
+  }
+
+  // Compose Multiplatform 1.11+ references iOS 18 APIs (e.g. UIViewLayoutRegion in
+  // compose-ui-uikit) and dnssd 1.1.0 is built for iOS 15+. Kotlin/Native defaults to
+  // iOS 14.0, which causes link failures and missing back-deployment dylib lookups at
+  // runtime. Override the minimum iOS version to 18.0.
+  targets.withType<KotlinNativeTarget>().configureEach {
+    compilations.configureEach {
+      compileTaskProvider.configure {
+        compilerOptions.freeCompilerArgs.add(
+          "-Xoverride-konan-properties=" +
+            "osVersionMin.ios_arm64=18.0;" +
+            "osVersionMin.ios_simulator_arm64=18.0",
+        )
+      }
     }
   }
 
