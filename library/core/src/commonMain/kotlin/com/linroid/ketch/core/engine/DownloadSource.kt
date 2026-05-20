@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.ResolvedSource
+import kotlinx.coroutines.CancellationException
 
 /**
  * Abstraction for pluggable download source types.
@@ -92,4 +93,37 @@ interface DownloadSource {
   suspend fun updateResumeState(
     context: DownloadContext,
   ): SourceResumeState? = null
+
+  /**
+   * Deletes any data this source wrote for the given task. Called by
+   * the engine when a task is removed with `deleteFiles = true`,
+   * after the active download (if any) has been cancelled.
+   *
+   * Best-effort: implementations should log and swallow non-fatal
+   * errors rather than throwing. [CancellationException] must still
+   * propagate.
+   *
+   * The default implementation deletes [DownloadContext.fileAccessor],
+   * which is the right behavior for sources that write to a single
+   * output file. Sources with `managesOwnFileIo = true` (e.g.
+   * torrents) should override this and use [resumeState] to locate
+   * their internal handle (such as an info hash) for cleanup.
+   *
+   * @param context the download context, with a [DownloadContext.fileAccessor]
+   *   pointing at the persisted output path
+   * @param resumeState the source-specific resume state persisted in the
+   *   task record, or `null` if the task never produced one
+   */
+  suspend fun cleanup(
+    context: DownloadContext,
+    resumeState: SourceResumeState?,
+  ) {
+    try {
+      context.fileAccessor.delete()
+    } catch (e: CancellationException) {
+      throw e
+    } catch (_: Throwable) {
+      // best-effort; caller is responsible for logging
+    }
+  }
 }

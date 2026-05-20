@@ -44,6 +44,7 @@ import com.linroid.ketch.app.ui.common.SpeedLimitPanel
 import com.linroid.ketch.app.ui.common.StatusIndicator
 import com.linroid.ketch.app.ui.common.TaskSettingsIcon
 import com.linroid.ketch.app.ui.common.TaskSettingsPanel
+import com.linroid.ketch.app.ui.dialog.RemoveDownloadDialog
 import com.linroid.ketch.app.util.extractFilename
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -72,6 +73,7 @@ fun DownloadListItem(
     state is DownloadState.Queued ||
     state is DownloadState.Scheduled
   var expanded by remember { mutableStateOf(ExpandedPanel.None) }
+  var showRemoveDialog by remember { mutableStateOf(false) }
 
   Card(
     onClick = {
@@ -228,7 +230,7 @@ fun DownloadListItem(
         }
         Spacer(modifier = Modifier.weight(1f))
         IconButton(
-          onClick = { scope.launch { task.remove() } },
+          onClick = { showRemoveDialog = true },
           modifier = Modifier.size(32.dp),
         ) {
           Icon(
@@ -239,6 +241,22 @@ fun DownloadListItem(
               .onSurfaceVariant
           )
         }
+      }
+
+      if (showRemoveDialog) {
+        val totalBytes = when (val s = state) {
+          is DownloadState.Downloading -> s.progress.totalBytes
+          is DownloadState.Paused -> s.progress.totalBytes
+          else -> null
+        }
+        RemoveDownloadDialog(
+          fileName = fileName,
+          totalBytes = totalBytes,
+          onDismiss = { showRemoveDialog = false },
+          onConfirm = { deleteFiles ->
+            scope.launch { task.remove(deleteFiles = deleteFiles) }
+          },
+        )
       }
 
       if (showToggles) {

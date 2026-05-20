@@ -16,7 +16,7 @@ internal interface TaskController {
   suspend fun pause(taskId: String)
   suspend fun resume(handle: TaskHandle, destination: Destination? = null)
   suspend fun cancel(handle: TaskHandle)
-  suspend fun remove(handle: TaskHandle)
+  suspend fun remove(handle: TaskHandle, deleteFiles: Boolean)
   suspend fun setSpeedLimit(taskId: String, limit: SpeedLimit)
   suspend fun setConnections(taskId: String, connections: Int)
   suspend fun setPriority(taskId: String, priority: DownloadPriority)

@@ -9,6 +9,8 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.file.NoOpFileAccessor
+import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CancellationException
@@ -16,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -142,11 +145,17 @@ internal class DownloadCoordinator(
   suspend fun cancel(handle: TaskHandle) {
     val taskId = handle.taskId
     log.i { "Canceling download for taskId=$taskId" }
-    mutex.withLock {
+    val job = mutex.withLock {
       val entry = activeDownloads[taskId]
       entry?.job?.cancel()
       activeDownloads.remove(taskId)
+      entry?.job
     }
+    // Await the job's finally chain (including FileAccessor.close)
+    // before returning, so callers can safely follow up with file
+    // cleanup. Joining must happen outside the mutex because the
+    // job's own finally re-acquires it to clean up activeDownloads.
+    job?.join()
     handle.mutableState.value = DownloadState.Canceled
     handle.record.update {
       it.copy(
@@ -230,6 +239,56 @@ internal class DownloadCoordinator(
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
     )
+  }
+
+  /**
+   * Deletes any data produced for the given task by dispatching to its
+   * [DownloadSource.cleanup]. The caller must have cancelled the active
+   * download (if any) before invoking this. No-op if the task has no
+   * recorded sourceType or outputPath (nothing to clean up).
+   */
+  suspend fun cleanup(handle: TaskHandle) {
+    val record = handle.record.value
+    val sourceType = record.sourceType
+    val outputPath = record.outputPath
+    if (sourceType == null || outputPath == null) {
+      log.d {
+        "Skipping cleanup for taskId=${handle.taskId} " +
+          "(sourceType=$sourceType, outputPath=$outputPath)"
+      }
+      return
+    }
+    val source = try {
+      sourceResolver.resolveByType(sourceType)
+    } catch (e: KetchError) {
+      log.w(e) {
+        "Skipping cleanup for taskId=${handle.taskId}: " +
+          "unknown source type '$sourceType'"
+      }
+      return
+    }
+    val fa = if (source.managesOwnFileIo) {
+      NoOpFileAccessor
+    } else {
+      createFileAccessor(outputPath, dispatchers.io)
+    }
+    val ctx = DownloadContext(
+      taskId = handle.taskId,
+      url = handle.request.url,
+      request = handle.request,
+      fileAccessor = fa,
+      segments = MutableStateFlow(handle.mutableSegments.value),
+      onProgress = { _, _ -> },
+      throttle = { _ -> },
+      headers = handle.request.headers,
+    )
+    try {
+      source.cleanup(ctx, record.sourceResumeState)
+    } finally {
+      if (!source.managesOwnFileIo) {
+        fa.close()
+      }
+    }
   }
 
   fun close() {
