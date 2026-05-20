@@ -1,7 +1,8 @@
 package com.linroid.ketch.app.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Schedule
@@ -75,15 +76,17 @@ fun ScheduleIcon(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ScheduleSelector(
   value: DownloadSchedule,
   onValueChange: (DownloadSchedule) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  Row(
+  FlowRow(
     modifier = modifier,
     horizontalArrangement = Arrangement.spacedBy(6.dp),
+    verticalArrangement = Arrangement.spacedBy(4.dp),
   ) {
     scheduleOptions.forEach { option ->
       FilterChip(
@@ -101,6 +104,7 @@ fun ScheduleSelector(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SchedulePanel(
   task: DownloadTask,
@@ -108,9 +112,10 @@ fun SchedulePanel(
   onScheduled: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  Row(
+  FlowRow(
     modifier = modifier,
     horizontalArrangement = Arrangement.spacedBy(6.dp),
+    verticalArrangement = Arrangement.spacedBy(4.dp),
   ) {
     scheduleOptions.forEach { option ->
       FilterChip(
