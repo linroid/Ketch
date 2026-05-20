@@ -64,7 +64,10 @@ jobs:
 
   ios-tests:
     name: iOS Tests
-    runs-on: macos-latest
+    # Use macos-26 for Xcode 26 (default 26.2) which ships the iOS 26 SDK.
+    # Compose Multiplatform 1.11+ references iOS 26 APIs (UIViewLayoutRegion)
+    # that are not present in the iOS 18 SDK bundled with Xcode 16.x.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
 
