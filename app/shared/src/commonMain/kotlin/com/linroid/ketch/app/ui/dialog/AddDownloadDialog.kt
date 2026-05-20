@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -115,6 +116,7 @@ fun AddDownloadDialog(
   val urlFocusRequester = remember {
     FocusRequester()
   }
+  val focusManager = LocalFocusManager.current
   val needsAuth =
     resolveState is ResolveState.Error &&
       resolveState.cause is KetchError.AuthenticationFailed
@@ -331,6 +333,7 @@ fun AddDownloadDialog(
             selected =
               expanded == DialogPanel.SpeedLimit,
             onClick = {
+              focusManager.clearFocus()
               expanded = if (expanded ==
                 DialogPanel.SpeedLimit
               ) {
@@ -346,6 +349,7 @@ fun AddDownloadDialog(
             selected =
               expanded == DialogPanel.Priority,
             onClick = {
+              focusManager.clearFocus()
               expanded = if (expanded ==
                 DialogPanel.Priority
               ) {
@@ -359,6 +363,7 @@ fun AddDownloadDialog(
             selected =
               expanded == DialogPanel.Schedule,
             onClick = {
+              focusManager.clearFocus()
               expanded = if (expanded ==
                 DialogPanel.Schedule
               ) {
