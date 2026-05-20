@@ -71,9 +71,23 @@ internal class PathFileAccessor(
   }
 
   override suspend fun preallocate(size: Long) {
+    if (size <= 0) return
     log.d { "Preallocating $size bytes: $realPath" }
     withContext(dispatcher) {
-      getOrCreateHandle().resize(size)
+      val handle = getOrCreateHandle()
+      val current = handle.size()
+      when {
+        size > current -> {
+          // okio 3.16.4 JvmFileHandle.protectedResize() grows by
+          // allocating ByteArray((size - current).toInt()) and writing
+          // it whole — this overflows Int and crashes with
+          // NegativeArraySizeException once delta exceeds 2 GB. Extend
+          // via a single sparse-byte write to avoid the bug and the
+          // gratuitous allocation.
+          handle.write(size - 1, byteArrayOf(0), 0, 1)
+        }
+        size < current -> handle.resize(size)
+      }
     }
   }
 }
