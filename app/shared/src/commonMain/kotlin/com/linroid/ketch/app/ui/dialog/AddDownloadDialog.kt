@@ -10,6 +10,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +27,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,6 +59,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.state.ResolveState
+import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.common.PriorityIcon
 import com.linroid.ketch.app.ui.common.PrioritySelector
 import com.linroid.ketch.app.ui.common.ScheduleIcon
@@ -112,9 +113,7 @@ fun AddDownloadDialog(
   val selectedFileIds = remember {
     mutableSetOf<String>().toMutableStateList()
   }
-  val urlFocusRequester = remember {
-    FocusRequester()
-  }
+  val urlFocusRequester = remember { FocusRequester() }
   val needsAuth =
     resolveState is ResolveState.Error &&
       resolveState.cause is KetchError.AuthenticationFailed
@@ -165,281 +164,255 @@ fun AddDownloadDialog(
     }
   }
 
-  AlertDialog(
-    onDismissRequest = {
-      onResetResolve()
-      onDismiss()
-    },
-    title = { Text("Add download") },
-    text = {
-      Column(
-        verticalArrangement =
-          Arrangement.spacedBy(12.dp)
-      ) {
-        LaunchedEffect(Unit) {
-          urlFocusRequester.requestFocus()
+  val onCancel = {
+    onResetResolve()
+    onDismiss()
+  }
+
+  val hasMultipleFiles = resolved != null &&
+    resolved.files.size > 1
+
+  val formContent: @Composable ColumnScope.() -> Unit = {
+    LaunchedEffect(Unit) {
+      urlFocusRequester.requestFocus()
+    }
+    OutlinedTextField(
+      value = url,
+      onValueChange = {
+        url = it
+        if (!fileNameEditedByUser) {
+          // Reset filename so resolve can fill it
+          fileName = ""
         }
-        OutlinedTextField(
-          value = url,
-          onValueChange = {
-            url = it
-            if (!fileNameEditedByUser) {
-              // Reset filename so resolve can fill it
-              fileName = ""
-            }
-          },
-          modifier = Modifier.fillMaxWidth()
-            .focusRequester(urlFocusRequester),
-          label = { Text("URL") },
-          singleLine = true,
-          placeholder = {
-            Text("URL, magnet link, or .torrent")
-          },
-          isError =
-            resolveState is ResolveState.Error,
-          trailingIcon = {
-            when (resolveState) {
-              is ResolveState.Resolving -> {
-                CircularProgressIndicator(
-                  modifier = Modifier.size(20.dp),
-                  strokeWidth = 2.dp,
-                )
-              }
-              is ResolveState.Resolved -> {
-                Icon(
-                  Icons.Filled.CheckCircle,
-                  contentDescription = "Resolved",
-                  tint =
-                    MaterialTheme.colorScheme.primary,
-                  modifier = Modifier.size(20.dp),
-                )
-              }
-              is ResolveState.Error -> {
-                IconButton(
-                  onClick = {
-                    if (url.isNotBlank()) {
-                      val resolveUrl = buildResolveUrl()
-                      lastResolvedSource = resolveUrl
-                      onResolveUrl(resolveUrl)
-                    }
-                  }
-                ) {
-                  Icon(
-                    Icons.Filled.Refresh,
-                    contentDescription = "Retry",
-                    tint = MaterialTheme.colorScheme
-                      .error,
-                    modifier = Modifier.size(20.dp),
-                  )
-                }
-              }
-              is ResolveState.Idle -> {}
-            }
-          },
-          supportingText = null
-        )
-
-        // Resolve result section
-        ResolveInfoSection(resolveState)
-
-        // File selector for multi-file sources (e.g., torrent)
-        val hasFiles = resolved != null &&
-          resolved.files.size > 1
-        AnimatedVisibility(
-          visible = hasFiles,
-          enter = expandVertically() + fadeIn(),
-          exit = shrinkVertically() + fadeOut(),
-        ) {
-          if (resolved != null && resolved.files.size > 1) {
-            FileSelector(
-              files = resolved.files,
-              selectedIds = selectedFileIds,
-              onToggle = { id ->
-                if (id in selectedFileIds) {
-                  selectedFileIds.remove(id)
-                } else {
-                  selectedFileIds.add(id)
-                }
-              },
-              onSelectAll = {
-                selectedFileIds.clear()
-                selectedFileIds.addAll(
-                  resolved.files.map { it.id }
-                )
-              },
-              onDeselectAll = {
-                selectedFileIds.clear()
-              },
+      },
+      modifier = Modifier.fillMaxWidth()
+        .focusRequester(urlFocusRequester),
+      label = { Text("URL") },
+      singleLine = true,
+      placeholder = {
+        Text("URL, magnet link, or .torrent")
+      },
+      isError = resolveState is ResolveState.Error,
+      trailingIcon = {
+        when (resolveState) {
+          is ResolveState.Resolving -> {
+            CircularProgressIndicator(
+              modifier = Modifier.size(20.dp),
+              strokeWidth = 2.dp,
             )
           }
-        }
-
-        // Credential fields shown on authentication failure
-        AnimatedVisibility(
-          visible = needsAuth,
-          enter = expandVertically() + fadeIn(),
-          exit = shrinkVertically() + fadeOut(),
-        ) {
-          CredentialFields(
-            username = username,
-            password = password,
-            onUsernameChange = { username = it },
-            onPasswordChange = { password = it },
-            onRetry = {
-              val resolveUrl = buildResolveUrl()
-              lastResolvedSource = resolveUrl
-              onResolveUrl(resolveUrl)
-            },
-          )
-        }
-
-        OutlinedTextField(
-          value = fileName,
-          onValueChange = {
-            fileName = it
-            fileNameEditedByUser = it.isNotBlank()
-          },
-          modifier = Modifier.fillMaxWidth(),
-          label = { Text("Save as") },
-          singleLine = true,
-          placeholder = {
-            if (resolved?.suggestedFileName != null) {
-              Text(resolved.suggestedFileName!!)
-            } else {
-              Text("Auto-detected from server")
-            }
-          },
-          supportingText = if (fileName.isBlank() &&
-            url.isNotBlank()
-          ) {
-            { Text("Will be determined by server") }
-          } else {
-            null
-          }
-        )
-
-        // Toggle icon row
-        Row(
-          horizontalArrangement =
-            Arrangement.spacedBy(4.dp),
-          verticalAlignment =
-            Alignment.CenterVertically
-        ) {
-          SpeedLimitIcon(
-            active =
-              !selectedSpeed.isUnlimited,
-            selected =
-              expanded == DialogPanel.SpeedLimit,
-            onClick = {
-              expanded = if (expanded ==
-                DialogPanel.SpeedLimit
-              ) {
-                DialogPanel.None
-              } else {
-                DialogPanel.SpeedLimit
-              }
-            }
-          )
-          PriorityIcon(
-            active = selectedPriority !=
-              DownloadPriority.NORMAL,
-            selected =
-              expanded == DialogPanel.Priority,
-            onClick = {
-              expanded = if (expanded ==
-                DialogPanel.Priority
-              ) {
-                DialogPanel.None
-              } else {
-                DialogPanel.Priority
-              }
-            }
-          )
-          ScheduleIcon(
-            selected =
-              expanded == DialogPanel.Schedule,
-            onClick = {
-              expanded = if (expanded ==
-                DialogPanel.Schedule
-              ) {
-                DialogPanel.None
-              } else {
-                DialogPanel.Schedule
-              }
-            }
-          )
-        }
-
-        // Expanded panel
-        AnimatedContent(
-          targetState = expanded,
-          transitionSpec = {
-            expandVertically() togetherWith
-              shrinkVertically()
-          }
-        ) { panel ->
-          when (panel) {
-            DialogPanel.SpeedLimit ->
-              SpeedLimitSelector(
-                value = selectedSpeed,
-                onValueChange = {
-                  selectedSpeed = it
-                }
-              )
-            DialogPanel.Priority ->
-              PrioritySelector(
-                value = selectedPriority,
-                onValueChange = {
-                  selectedPriority = it
-                }
-              )
-            DialogPanel.Schedule ->
-              ScheduleSelector(
-                value = selectedSchedule,
-                onValueChange = {
-                  selectedSchedule = it
-                }
-              )
-            DialogPanel.None -> {}
-          }
-        }
-      }
-    },
-    confirmButton = {
-      val hasMultipleFiles = resolved != null &&
-        resolved.files.size > 1
-      Button(
-        onClick = {
-          val downloadUrl = buildResolveUrl()
-          if (downloadUrl.isNotEmpty()) {
-            val fileIds = if (hasMultipleFiles) {
-              selectedFileIds.toSet()
-            } else {
-              emptySet()
-            }
-            onDownload(
-              downloadUrl, fileName.trim(),
-              selectedSpeed, selectedPriority,
-              selectedSchedule, resolved, fileIds,
+          is ResolveState.Resolved -> {
+            Icon(
+              Icons.Filled.CheckCircle,
+              contentDescription = "Resolved",
+              tint = MaterialTheme.colorScheme.primary,
+              modifier = Modifier.size(20.dp),
             )
           }
-        },
-        enabled = url.isNotBlank() &&
-          (!hasMultipleFiles || selectedFileIds.isNotEmpty()),
-      ) {
-        Text("Download")
-      }
-    },
-    dismissButton = {
-      TextButton(
-        onClick = {
-          onResetResolve()
-          onDismiss()
+          is ResolveState.Error -> {
+            IconButton(
+              onClick = {
+                if (url.isNotBlank()) {
+                  val resolveUrl = buildResolveUrl()
+                  lastResolvedSource = resolveUrl
+                  onResolveUrl(resolveUrl)
+                }
+              }
+            ) {
+              Icon(
+                Icons.Filled.Refresh,
+                contentDescription = "Retry",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp),
+              )
+            }
+          }
+          is ResolveState.Idle -> {}
         }
-      ) {
-        Text("Cancel")
+      },
+      supportingText = null,
+    )
+
+    // Resolve result section
+    ResolveInfoSection(resolveState)
+
+    // File selector for multi-file sources (e.g., torrent)
+    AnimatedVisibility(
+      visible = hasMultipleFiles,
+      enter = expandVertically() + fadeIn(),
+      exit = shrinkVertically() + fadeOut(),
+    ) {
+      if (resolved != null && resolved.files.size > 1) {
+        FileSelector(
+          files = resolved.files,
+          selectedIds = selectedFileIds,
+          onToggle = { id ->
+            if (id in selectedFileIds) {
+              selectedFileIds.remove(id)
+            } else {
+              selectedFileIds.add(id)
+            }
+          },
+          onSelectAll = {
+            selectedFileIds.clear()
+            selectedFileIds.addAll(
+              resolved.files.map { it.id }
+            )
+          },
+          onDeselectAll = {
+            selectedFileIds.clear()
+          },
+        )
       }
     }
+
+    // Credential fields shown on authentication failure
+    AnimatedVisibility(
+      visible = needsAuth,
+      enter = expandVertically() + fadeIn(),
+      exit = shrinkVertically() + fadeOut(),
+    ) {
+      CredentialFields(
+        username = username,
+        password = password,
+        onUsernameChange = { username = it },
+        onPasswordChange = { password = it },
+        onRetry = {
+          val resolveUrl = buildResolveUrl()
+          lastResolvedSource = resolveUrl
+          onResolveUrl(resolveUrl)
+        },
+      )
+    }
+
+    OutlinedTextField(
+      value = fileName,
+      onValueChange = {
+        fileName = it
+        fileNameEditedByUser = it.isNotBlank()
+      },
+      modifier = Modifier.fillMaxWidth(),
+      label = { Text("Save as") },
+      singleLine = true,
+      placeholder = {
+        if (resolved?.suggestedFileName != null) {
+          Text(resolved.suggestedFileName!!)
+        } else {
+          Text("Auto-detected from server")
+        }
+      },
+      supportingText = if (fileName.isBlank() &&
+        url.isNotBlank()
+      ) {
+        { Text("Will be determined by server") }
+      } else {
+        null
+      },
+    )
+
+    // Toggle icon row
+    Row(
+      horizontalArrangement = Arrangement.spacedBy(4.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      SpeedLimitIcon(
+        active = !selectedSpeed.isUnlimited,
+        selected = expanded == DialogPanel.SpeedLimit,
+        onClick = {
+          expanded = if (expanded == DialogPanel.SpeedLimit) {
+            DialogPanel.None
+          } else {
+            DialogPanel.SpeedLimit
+          }
+        },
+      )
+      PriorityIcon(
+        active = selectedPriority != DownloadPriority.NORMAL,
+        selected = expanded == DialogPanel.Priority,
+        onClick = {
+          expanded = if (expanded == DialogPanel.Priority) {
+            DialogPanel.None
+          } else {
+            DialogPanel.Priority
+          }
+        },
+      )
+      ScheduleIcon(
+        selected = expanded == DialogPanel.Schedule,
+        onClick = {
+          expanded = if (expanded == DialogPanel.Schedule) {
+            DialogPanel.None
+          } else {
+            DialogPanel.Schedule
+          }
+        },
+      )
+    }
+
+    // Expanded panel
+    AnimatedContent(
+      targetState = expanded,
+      transitionSpec = {
+        expandVertically() togetherWith shrinkVertically()
+      },
+    ) { panel ->
+      when (panel) {
+        DialogPanel.SpeedLimit ->
+          SpeedLimitSelector(
+            value = selectedSpeed,
+            onValueChange = { selectedSpeed = it },
+          )
+        DialogPanel.Priority ->
+          PrioritySelector(
+            value = selectedPriority,
+            onValueChange = { selectedPriority = it },
+          )
+        DialogPanel.Schedule ->
+          ScheduleSelector(
+            value = selectedSchedule,
+            onValueChange = { selectedSchedule = it },
+          )
+        DialogPanel.None -> {}
+      }
+    }
+  }
+
+  val confirmAction: @Composable () -> Unit = {
+    Button(
+      onClick = {
+        val downloadUrl = buildResolveUrl()
+        if (downloadUrl.isNotEmpty()) {
+          val fileIds = if (hasMultipleFiles) {
+            selectedFileIds.toSet()
+          } else {
+            emptySet()
+          }
+          onDownload(
+            downloadUrl, fileName.trim(),
+            selectedSpeed, selectedPriority,
+            selectedSchedule, resolved, fileIds,
+          )
+        }
+      },
+      enabled = url.isNotBlank() &&
+        (!hasMultipleFiles || selectedFileIds.isNotEmpty()),
+    ) {
+      Text("Download")
+    }
+  }
+
+  val cancelAction: @Composable () -> Unit = {
+    TextButton(onClick = onCancel) {
+      Text("Cancel")
+    }
+  }
+
+  AdaptiveModal(
+    onDismissRequest = onCancel,
+    title = { Text("Add download") },
+    confirmButton = confirmAction,
+    dismissButton = cancelAction,
+    content = formContent,
   )
 }
 
