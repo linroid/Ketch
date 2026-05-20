@@ -38,7 +38,7 @@ val generateVersion by tasks.registering {
 }
 
 kotlin {
-  androidLibrary {
+  android {
     namespace = "com.linroid.ketch.api"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
