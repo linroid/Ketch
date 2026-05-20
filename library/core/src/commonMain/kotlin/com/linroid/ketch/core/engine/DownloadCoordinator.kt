@@ -145,11 +145,17 @@ internal class DownloadCoordinator(
   suspend fun cancel(handle: TaskHandle) {
     val taskId = handle.taskId
     log.i { "Canceling download for taskId=$taskId" }
-    mutex.withLock {
+    val job = mutex.withLock {
       val entry = activeDownloads[taskId]
       entry?.job?.cancel()
       activeDownloads.remove(taskId)
+      entry?.job
     }
+    // Await the job's finally chain (including FileAccessor.close)
+    // before returning, so callers can safely follow up with file
+    // cleanup. Joining must happen outside the mutex because the
+    // job's own finally re-acquires it to clean up activeDownloads.
+    job?.join()
     handle.mutableState.value = DownloadState.Canceled
     handle.record.update {
       it.copy(
