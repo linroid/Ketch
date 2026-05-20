@@ -311,6 +311,34 @@ class TorrentDownloadSource(
     }
   }
 
+  override suspend fun cleanup(
+    context: DownloadContext,
+    resumeState: SourceResumeState?,
+  ) {
+    if (resumeState == null) {
+      log.d { "Skipping torrent cleanup: no resume state" }
+      return
+    }
+    val state = try {
+      Json.decodeFromString<TorrentResumeState>(resumeState.data)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Throwable) {
+      log.w(e) { "Skipping torrent cleanup: corrupt resume state" }
+      return
+    }
+    try {
+      getEngine().removeTorrent(state.infoHash, deleteFiles = true)
+      log.i { "Removed torrent and files: infoHash=${state.infoHash}" }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Throwable) {
+      log.w(e) {
+        "Failed to remove torrent infoHash=${state.infoHash}"
+      }
+    }
+  }
+
   /**
    * Monitors torrent download progress and maps it to Ketch
    * segment progress until download completes or is canceled.

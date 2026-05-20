@@ -20,6 +20,7 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.resources.delete
 import io.ktor.client.plugins.resources.post
 import io.ktor.client.plugins.resources.put
+import io.ktor.client.request.parameter
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -84,9 +85,11 @@ internal class RemoteDownloadTask(
     update(response.body())
   }
 
-  override suspend fun remove() {
-    log.d { "Remove taskId=$taskId" }
-    val response = httpClient.delete(byId)
+  override suspend fun remove(deleteFiles: Boolean) {
+    log.d { "Remove taskId=$taskId, deleteFiles=$deleteFiles" }
+    val response = httpClient.delete(byId) {
+      if (deleteFiles) parameter("deleteFiles", "true")
+    }
     checkSuccess(response)
     onRemoved(taskId)
   }

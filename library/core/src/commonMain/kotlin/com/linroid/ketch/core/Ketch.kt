@@ -35,6 +35,7 @@ import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -226,12 +227,21 @@ class Ketch(
       coordinator.cancel(handle)
     }
 
-    override suspend fun remove(handle: TaskHandle) {
+    override suspend fun remove(handle: TaskHandle, deleteFiles: Boolean) {
       val taskId = handle.taskId
-      log.i { "Removing task: taskId=$taskId" }
+      log.i { "Removing task: taskId=$taskId, deleteFiles=$deleteFiles" }
       scheduler.cancel(taskId)
       queue.dequeue(taskId)
       coordinator.cancel(handle)
+      if (deleteFiles) {
+        try {
+          coordinator.cleanup(handle)
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Throwable) {
+          log.w(e) { "Cleanup failed for taskId=$taskId" }
+        }
+      }
       taskStore.remove(taskId)
       tasksMutex.withLock {
         _tasks.value = _tasks.value.filter { it.taskId != taskId }
