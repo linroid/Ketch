@@ -15,10 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.StatusFilter
@@ -32,15 +30,11 @@ fun DownloadList(
   isFilterEmpty: Boolean,
   selectedFilter: StatusFilter,
   scope: CoroutineScope,
-  onAddClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   when {
     isEmpty -> {
-      EmptyState(
-        modifier = modifier.fillMaxSize(),
-        onAddClick = onAddClick,
-      )
+      EmptyState(modifier = modifier.fillMaxSize())
     }
     isFilterEmpty -> {
       EmptyFilterState(
@@ -74,10 +68,7 @@ fun DownloadList(
 }
 
 @Composable
-private fun EmptyState(
-  modifier: Modifier = Modifier,
-  onAddClick: () -> Unit,
-) {
+private fun EmptyState(modifier: Modifier = Modifier) {
   Box(
     modifier = modifier,
     contentAlignment = Alignment.Center,
@@ -96,18 +87,6 @@ private fun EmptyState(
         text = "No downloads yet",
         style = KetchTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
         color = KetchTheme.colors.onBackground,
-      )
-      Text(
-        text = "Click \"New Task\" to start downloading",
-        style = KetchTheme.typography.bodyMedium,
-        color = KetchTheme.colors.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-      )
-      Spacer(modifier = Modifier.height(16.dp))
-      KetchButton(
-        text = "New Task",
-        onClick = onAddClick,
-        leadingIcon = KetchIcon.Plus,
       )
     }
   }

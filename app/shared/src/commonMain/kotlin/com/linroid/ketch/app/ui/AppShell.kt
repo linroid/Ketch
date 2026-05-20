@@ -314,9 +314,6 @@ fun AppShell(
                 sortedTasks.isNotEmpty(),
               selectedFilter = appState.statusFilter,
               scope = scope,
-              onAddClick = {
-                appState.requestAddDownload()
-              },
               modifier = Modifier.weight(1f),
             )
           }
