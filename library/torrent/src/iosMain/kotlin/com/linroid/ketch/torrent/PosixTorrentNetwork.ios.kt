@@ -23,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import okio.IOException
 import platform.posix.AF_INET
 import platform.posix.AF_INET6
 import platform.posix.AF_UNSPEC
@@ -85,7 +86,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
       if (operations.load() == 0) dispose()
     }
     fun close() = lease.close()
-    fun checkOpen() = check(!closed.load()) { "Torrent socket closed" }
+    fun checkOpen() = ioCheck(!closed.load()) { "Torrent socket closed" }
 
     // Defer descriptor recycling until any in-flight nonblocking syscall returns.
     fun <T> operation(block: () -> T): T {
@@ -116,7 +117,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
         hints.ai_family = AF_UNSPEC
         hints.ai_socktype = type
         val result = alloc<CPointerVar<addrinfo>>()
-        check(getaddrinfo(endpoint.host, endpoint.port.toString(), hints.ptr, result.ptr) == 0) {
+        ioCheck(getaddrinfo(endpoint.host, endpoint.port.toString(), hints.ptr, result.ptr) == 0) {
           "Cannot resolve torrent endpoint"
         }
         val first = checkNotNull(result.value)
@@ -143,17 +144,17 @@ internal class PosixTorrentNetwork : TorrentNetwork {
 
   private fun create(family: Int, type: Int): Handle {
     val fd = socket(family, type, 0)
-    check(fd >= 0) { "Cannot create torrent socket: $errno" }
+    ioCheck(fd >= 0) { "Cannot create torrent socket: $errno" }
     return configure(fd)
   }
 
   private fun configure(fd: Int): Handle {
     try {
-      check(fcntl(fd, F_SETFL, O_NONBLOCK) == 0) { "Cannot set nonblocking socket" }
+      ioCheck(fcntl(fd, F_SETFL, O_NONBLOCK) == 0) { "Cannot set nonblocking socket" }
       memScoped {
         val enabled = alloc<IntVar>()
         enabled.value = 1
-        check(setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, enabled.ptr, sizeOf<IntVar>().toUInt()) == 0)
+        ioCheck(setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, enabled.ptr, sizeOf<IntVar>().toUInt()) == 0)
       }
     } catch (e: Throwable) {
       close(fd)
@@ -177,7 +178,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
           handle.operation { connect(handle.fd, pointer, size) }
         }
         if (status != 0) {
-          check(errno == EINPROGRESS || errno == EINTR) { "Torrent connect failed: $errno" }
+          ioCheck(errno == EINPROGRESS || errno == EINTR) { "Torrent connect failed: $errno" }
           while (true) {
             handle.checkOpen()
             val ready = memScoped {
@@ -196,8 +197,8 @@ internal class PosixTorrentNetwork : TorrentNetwork {
             val result = handle.operation {
               getsockopt(handle.fd, SOL_SOCKET, SO_ERROR, error.ptr, size.ptr)
             }
-            check(result == 0)
-            check(error.value == 0) { "Torrent connect failed: ${error.value}" }
+            ioCheck(result == 0)
+            ioCheck(error.value == 0) { "Torrent connect failed: ${error.value}" }
           }
         }
       }
@@ -215,8 +216,8 @@ internal class PosixTorrentNetwork : TorrentNetwork {
       val bound = address.use { pointer, size ->
         handle.operation { bind(handle.fd, pointer, size) }
       }
-      check(bound == 0)
-      check(handle.operation { listen(handle.fd, 64) } == 0)
+      ioCheck(bound == 0)
+      ioCheck(handle.operation { listen(handle.fd, 64) } == 0)
       return object : TorrentListener {
         override val local = localEndpoint(handle)
         override suspend fun accept(): TorrentConnection {
@@ -234,7 +235,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
                   val result = accepted.operation {
                     getpeername(fd, storage.ptr.reinterpret(), size.ptr)
                   }
-                  check(result == 0)
+                  ioCheck(result == 0)
                   endpoint(storage.ptr.reinterpret())
                 }
                 return connection(accepted, remote)
@@ -261,7 +262,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
       val bound = address.use { pointer, size ->
         handle.operation { bind(handle.fd, pointer, size) }
       }
-      check(bound == 0)
+      ioCheck(bound == 0)
       return object : TorrentDatagramSocket {
         override val local = localEndpoint(handle)
         override suspend fun send(remote: PeerEndpoint, bytes: ByteArray) {
@@ -278,7 +279,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
               }
             }
             if (written >= 0) {
-              check(written.toInt() == bytes.size) { "Short datagram write" }
+              ioCheck(written.toInt() == bytes.size) { "Short datagram write" }
               return
             }
             retry()
@@ -328,7 +329,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
           val count = bytes.usePinned {
             handle.operation { recv(handle.fd, it.addressOf(offset), (size - offset).toULong(), 0) }
           }
-          check(count != 0L) { "Torrent peer disconnected" }
+          ioCheck(count != 0L) { "Torrent peer disconnected" }
           if (count < 0) retry() else offset += count.toInt()
         }
         return bytes
@@ -344,7 +345,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
             }
           }
           if (count < 0) retry() else {
-            check(count > 0) { "Short torrent socket write" }
+            ioCheck(count > 0) { "Short torrent socket write" }
             offset += count.toInt()
           }
         }
@@ -354,7 +355,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
 
   private suspend fun retry() {
     val error = errno
-    check(error == EAGAIN || error == EWOULDBLOCK || error == EINTR) {
+    ioCheck(error == EAGAIN || error == EWOULDBLOCK || error == EINTR) {
       "Torrent socket I/O failed: $error"
     }
     delay(5)
@@ -364,7 +365,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
     val storage = alloc<sockaddr_storage>()
     val size = alloc<socklen_tVar>()
     size.value = sizeOf<sockaddr_storage>().toUInt()
-    check(handle.operation { getsockname(handle.fd, storage.ptr.reinterpret(), size.ptr) } == 0)
+    ioCheck(handle.operation { getsockname(handle.fd, storage.ptr.reinterpret(), size.ptr) } == 0)
     endpoint(storage.ptr.reinterpret())
   }
 
@@ -386,4 +387,11 @@ internal class PosixTorrentNetwork : TorrentNetwork {
   }
 
   override fun close() = resources.close()
+}
+
+private inline fun ioCheck(
+  value: Boolean,
+  message: () -> String = { "Torrent socket I/O failed" },
+) {
+  if (!value) throw IOException(message())
 }
