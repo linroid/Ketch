@@ -9,6 +9,7 @@ import okio.ByteString.Companion.toByteString
 internal class DhtRoutingTable(
   val localId: ByteString,
   private val nowMs: () -> Long = monotonicClock(),
+  private val enforceDiversity: Boolean = false,
 ) {
   private data class Entry(val contact: DhtContact, var seen: Long, var failures: Int = 0)
   private data class Bucket(
@@ -30,6 +31,16 @@ internal class DhtRoutingTable(
     if (contact.id == localId) return@withLock null
     while (true) {
       val bucket = buckets.first { it.contains(contact.id) }
+      if (enforceDiversity) {
+        val address = requireNotNull(numericAddress(contact.endpoint.host))
+        val prefix = address.copyOf(if (address.size == 4) 3 else 8).toByteString()
+        val sameNetwork = bucket.entries.count {
+          val other = requireNotNull(numericAddress(it.contact.endpoint.host))
+          it.contact.id != contact.id && other.size == address.size &&
+            other.copyOf(if (other.size == 4) 3 else 8).toByteString() == prefix
+        }
+        if (sameNetwork >= 2) return@withLock null
+      }
       val existing = bucket.entries.firstOrNull { it.contact.id == contact.id }
       if (existing != null) {
         bucket.entries.remove(existing)

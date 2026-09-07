@@ -11,6 +11,8 @@ internal class TrackerDiscovery(
   private val onPrivateTrackerChanged: suspend () -> Unit = {},
   private val nowMs: () -> Long = monotonicClock(),
 ) {
+  init { if (metadata.isPrivate) trackers.preferCurrentTracker() }
+
   private var nextAnnounce = 0L
   private var started = false
   private var completed = false
