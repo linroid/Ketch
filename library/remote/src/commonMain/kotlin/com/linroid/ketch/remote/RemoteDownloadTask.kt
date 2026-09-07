@@ -32,13 +32,17 @@ import kotlin.time.Instant
 
 internal class RemoteDownloadTask(
   override val taskId: String,
-  override val request: DownloadRequest,
+  request: DownloadRequest,
   override val createdAt: Instant,
   initialState: DownloadState,
   initialSegments: List<Segment>,
   private val httpClient: HttpClient,
   private val onRemoved: suspend (String) -> Unit,
 ) : DownloadTask {
+  private val mutableRequest = MutableStateFlow(request)
+  override val requestState: StateFlow<DownloadRequest> = mutableRequest.asStateFlow()
+  override val request: DownloadRequest get() = requestState.value
+
   private val log = KetchLogger("RemoteTask")
 
   private val _state = MutableStateFlow(initialState)
@@ -48,7 +52,13 @@ internal class RemoteDownloadTask(
   override val segments: StateFlow<List<Segment>> =
     _segments.asStateFlow()
 
-  internal fun updateState(newState: DownloadState) {
+  internal fun updateState(
+    newState: DownloadState,
+    request: DownloadRequest? = null,
+    segments: List<Segment>? = null,
+  ) {
+    request?.let { mutableRequest.value = it }
+    segments?.let { _segments.value = it }
     log.d { "State update for taskId=$taskId: $newState" }
     _state.value = newState
   }
@@ -137,8 +147,7 @@ internal class RemoteDownloadTask(
   }
 
   private fun update(response: TaskSnapshot) {
-    _state.value = response.state
-    _segments.value = response.segments
+    updateState(response.state, response.request, response.segments)
   }
 
   private fun checkSuccess(

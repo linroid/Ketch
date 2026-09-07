@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchFileTypeChip
@@ -79,16 +80,17 @@ fun DownloadListItem(
   scope: CoroutineScope,
   modifier: Modifier = Modifier,
 ) {
+  val request by task.requestState.collectAsState()
   val state by task.state.collectAsState()
   val segments by task.segments.collectAsState()
-  val dest = task.request.destination
-  val fileName = remember(task.taskId, dest, task.request.url) {
+  val dest = request.destination
+  val fileName = remember(task.taskId, dest, request.url) {
     val raw = when {
       dest != null && dest.isName() -> dest.value
       dest != null -> extractFilename(dest.value).ifBlank { null }
       else -> null
     }
-    raw ?: extractFilename(task.request.url).ifBlank { "download" }
+    raw ?: extractFilename(request.url).ifBlank { "download" }
   }
 
   var expanded by remember { mutableStateOf(false) }
@@ -193,6 +195,7 @@ private fun DownloadRow(
   expanded: Boolean,
   onToggle: () -> Unit,
 ) {
+  val request by task.requestState.collectAsState()
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val progress = stateProgress(state)
@@ -225,9 +228,9 @@ private fun DownloadRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
           )
-          if (task.request.priority != DownloadPriority.NORMAL) {
+          if (request.priority != DownloadPriority.NORMAL) {
             Spacer(Modifier.width(8.dp))
-            PriorityBadge(task.request.priority)
+            PriorityBadge(request.priority)
           }
         }
         if (state is DownloadState.Downloading || state is DownloadState.Paused) KetchProgressBar(
@@ -237,14 +240,14 @@ private fun DownloadRow(
         if (compact) {
           FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             StatusPill(state = state, foreground = stateColors.foreground)
-            PrimaryMetric(state = state)
+            PrimaryMetric(state = state, speedLimit = request.speedLimit)
           }
         }
       }
 
       // Primary metric (mono)
       if (!compact) {
-        PrimaryMetric(state = state)
+        PrimaryMetric(state = state, speedLimit = request.speedLimit)
         StatusPill(state = state, foreground = stateColors.foreground)
       }
 
@@ -255,13 +258,18 @@ private fun DownloadRow(
 }
 
 @Composable
-private fun PrimaryMetric(state: DownloadState) {
+private fun PrimaryMetric(state: DownloadState, speedLimit: SpeedLimit) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val text = when (state) {
     is DownloadState.Downloading -> {
       val p = state.progress
-      val speed = if (p.bytesPerSecond > 0) "${formatBytes(p.bytesPerSecond)}/s" else "--"
+      val speed = buildString {
+        append(if (p.bytesPerSecond > 0) "${formatBytes(p.bytesPerSecond)}/s" else "--")
+        if (!speedLimit.isUnlimited) {
+          append(" (limit: ${formatBytes(speedLimit.bytesPerSecond)}/s)")
+        }
+      }
       val eta = if (p.bytesPerSecond > 0 && p.totalBytes > 0) {
         val remaining = (p.totalBytes - p.downloadedBytes).coerceAtLeast(0)
         formatEta(remaining / p.bytesPerSecond)
@@ -374,6 +382,7 @@ private fun ExpandedSettingsRow(
   onRemoveRequest: () -> Unit,
   onCancel: () -> Unit,
 ) {
+  val request by task.requestState.collectAsState()
   val state by task.state.collectAsState()
   val canConfigure = state is DownloadState.Downloading ||
     state is DownloadState.Paused ||
@@ -395,12 +404,12 @@ private fun ExpandedSettingsRow(
   ) {
     if (canConfigure) {
       SpeedLimitIcon(
-        active = !task.request.speedLimit.isUnlimited,
+        active = !request.speedLimit.isUnlimited,
         selected = subPanel == ExpandedSubPanel.SpeedLimit,
         onClick = { toggle(ExpandedSubPanel.SpeedLimit) },
       )
       PriorityIcon(
-        active = task.request.priority != DownloadPriority.NORMAL,
+        active = request.priority != DownloadPriority.NORMAL,
         selected = subPanel == ExpandedSubPanel.Priority,
         onClick = { toggle(ExpandedSubPanel.Priority) },
       )

@@ -17,7 +17,7 @@ import kotlin.time.Instant
 
 internal class RealDownloadTask(
   override val taskId: String,
-  override val request: DownloadRequest,
+  request: DownloadRequest,
   override val createdAt: Instant,
   initialState: DownloadState,
   initialSegments: List<Segment>,
@@ -25,13 +25,20 @@ internal class RealDownloadTask(
   taskStore: TaskStore,
   record: TaskRecord,
 ) : DownloadTask, TaskHandle {
+  private val mutableRequest = MutableStateFlow(request)
+  override val requestState: StateFlow<DownloadRequest> = mutableRequest.asStateFlow()
+  override val request: DownloadRequest get() = requestState.value
+
   override val mutableState = MutableStateFlow(initialState)
   override val mutableSegments = MutableStateFlow(initialSegments)
 
   override val state: StateFlow<DownloadState> = mutableState.asStateFlow()
   override val segments: StateFlow<List<Segment>> = mutableSegments.asStateFlow()
 
-  override val record = AtomicSaver(record) { taskStore.save(it) }
+  override val record = AtomicSaver(record) {
+    taskStore.save(it)
+    mutableRequest.value = it.request
+  }
 
   private val log = KetchLogger("DownloadTask")
 

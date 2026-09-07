@@ -8,7 +8,8 @@ import kotlin.time.Instant
  * Represents a download task with reactive state and control methods.
  *
  * @property taskId Unique identifier for this download task
- * @property request The download request configuration
+ * @property request The current download request configuration
+ * @property requestState Observable download request configuration, including runtime changes
  * @property createdAt Timestamp when the task was created
  * @property state Observable download state
  * @property segments Observable list of download segments with their progress
@@ -16,6 +17,7 @@ import kotlin.time.Instant
 interface DownloadTask {
   val taskId: String
   val request: DownloadRequest
+  val requestState: StateFlow<DownloadRequest>
   val createdAt: Instant
   val state: StateFlow<DownloadState>
   val segments: StateFlow<List<Segment>>
