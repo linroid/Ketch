@@ -14,6 +14,8 @@ internal interface TorrentEngine {
   /** Stops the engine and releases all resources. */
   suspend fun stop()
 
+  fun close() {}
+
   /** Whether the engine is currently running. */
   val isRunning: Boolean
 
@@ -47,6 +49,11 @@ internal interface TorrentEngine {
     resumeData: ByteArray? = null,
   ): TorrentSession
 
+  suspend fun addTask(spec: TorrentTaskSpec): TorrentSession = addTorrent(
+    spec.metadata.infoHash.hex, spec.outputPath, spec.magnetUri, spec.metadata.metainfoBytes,
+    spec.selected, spec.resumeData
+  )
+
   /**
    * Removes a torrent from the engine.
    *
@@ -72,3 +79,13 @@ internal interface TorrentEngine {
    */
   fun setUploadRateLimit(bytesPerSecond: Long)
 }
+
+internal data class TorrentTaskSpec(
+  val taskId: String,
+  val metadata: TorrentMetadata,
+  val outputPath: String,
+  val selected: Set<Int>,
+  val magnetUri: String? = null,
+  val resumeData: ByteArray? = null,
+  val throttle: suspend (Int) -> Unit = {},
+)

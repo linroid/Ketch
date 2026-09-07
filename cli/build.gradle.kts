@@ -86,6 +86,7 @@ dependencies {
   implementation(projects.library.sqlite)
   implementation(projects.library.ktor)
   implementation(projects.library.ftp)
+  implementation(projects.library.torrent)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.ktor.client.cio)

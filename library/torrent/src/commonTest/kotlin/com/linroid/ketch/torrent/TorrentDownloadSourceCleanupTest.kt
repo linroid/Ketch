@@ -54,15 +54,14 @@ class TorrentDownloadSourceCleanupTest {
     )
 
   @Test
-  fun cleanup_callsRemoveTorrentWithDeleteFilesTrue() = runTest {
+  fun cleanup_legacyStateDoesNotStartEngineOrGuessOwnership() = runTest {
     val engine = FakeTorrentEngine()
     val source = buildSource(engine)
 
     source.cleanup(buildContext(), resumeStateFor(infoHash))
 
-    assertEquals(1, engine.removedTorrents.size)
-    assertEquals(infoHash, engine.removedTorrents[0].first)
-    assertEquals(true, engine.removedTorrents[0].second)
+    assertTrue(engine.removedTorrents.isEmpty())
+    assertTrue(!engine.started)
   }
 
   @Test
@@ -94,7 +93,7 @@ class TorrentDownloadSourceCleanupTest {
     // Must not propagate.
     source.cleanup(buildContext(), resumeStateFor(infoHash))
 
-    assertEquals(1, engine.removeAttempts)
+    assertEquals(0, engine.removeAttempts)
   }
 
   private class ThrowingFakeEngine : TorrentEngine {

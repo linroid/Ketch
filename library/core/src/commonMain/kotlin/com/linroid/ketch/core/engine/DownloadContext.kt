@@ -49,4 +49,6 @@ class DownloadContext(
   var pendingResegment: Int = 0,
   /** Final destination resolved by Ketch, including default directory and deduplication. */
   val outputPath: String? = null,
+  /** Optional payload speed for sources whose verified progress advances in whole pieces. */
+  val reportedSpeed: MutableStateFlow<Long?> = MutableStateFlow(null),
 )
