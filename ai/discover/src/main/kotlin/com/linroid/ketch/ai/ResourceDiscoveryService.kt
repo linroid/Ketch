@@ -2,8 +2,9 @@ package com.linroid.ketch.ai
 
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.tools.ToolRegistry
+import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
-import ai.koog.prompt.executor.llms.all.simpleOpenAIExecutor
+import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import com.linroid.ketch.ai.agent.AgentOutputParser
 import com.linroid.ketch.ai.agent.DeviceSafetyFilter
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
@@ -83,7 +84,7 @@ class ResourceDiscoveryService internal constructor(
     )
 
     val agent = AIAgent(
-      promptExecutor = simpleOpenAIExecutor(config.llm.apiKey),
+      promptExecutor = MultiLLMPromptExecutor(OpenAILLMClient(config.llm.apiKey)),
       llmModel = OpenAIModels.Chat.GPT4o,
       systemPrompt = SYSTEM_PROMPT,
       toolRegistry = ToolRegistry { tools(toolSet) },
