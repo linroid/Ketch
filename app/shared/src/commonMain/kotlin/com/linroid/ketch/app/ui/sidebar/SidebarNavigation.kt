@@ -1,6 +1,9 @@
 package com.linroid.ketch.app.ui.sidebar
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,185 +18,212 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.linroid.ketch.app.components.KetchSidebarItem
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.remote.ConnectionState
 
-private val SIDEBAR_WIDTH = 200.dp
+private val SIDEBAR_WIDTH = 216.dp
 
 @Composable
 fun SidebarNavigation(
   selectedFilter: StatusFilter,
+  discoverySelected: Boolean,
+  onDiscoverySelect: () -> Unit,
   taskCounts: Map<StatusFilter, Int>,
   onFilterSelect: (StatusFilter) -> Unit,
-  onAddClick: () -> Unit,
+  activeInstance: InstanceEntry?,
+  connectionState: ConnectionState?,
+  onInstanceClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val colors = KetchTheme.colors
+
   Column(
     modifier = modifier
       .width(SIDEBAR_WIDTH)
       .fillMaxHeight()
-      .background(MaterialTheme.colorScheme.surfaceContainerLow)
-      .padding(vertical = 12.dp),
+      .background(colors.surfaceVariant),
   ) {
-    // Add download button
-    FloatingActionButton(
-      onClick = onAddClick,
+    // Brand header — keeps the macOS traffic-light insets that desktop windows
+    // inject. Padding-left is generous so the wordmark clears the lights even
+    // when the host doesn't insert one.
+    Box(
       modifier = Modifier
-        .padding(horizontal = 16.dp)
-        .fillMaxWidth(),
-      containerColor = MaterialTheme.colorScheme.primary,
-      contentColor = MaterialTheme.colorScheme.onPrimary,
-      shape = RoundedCornerShape(12.dp),
+        .fillMaxWidth()
+        .height(80.dp)
+        .padding(horizontal = 24.dp),
+      contentAlignment = Alignment.CenterStart,
     ) {
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        Icon(
-          Icons.Filled.Add,
-          contentDescription = null,
-          modifier = Modifier.size(20.dp),
-        )
-        Text(
-          text = "New Task",
-          style = MaterialTheme.typography.labelLarge,
-          fontWeight = FontWeight.SemiBold,
+      Wordmark()
+    }
+
+    // Connection pill (clickable → instance selector).
+    InstancePill(
+      activeInstance = activeInstance,
+      connectionState = connectionState,
+      onClick = onInstanceClick,
+      modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+    )
+
+    Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+      Spacer(Modifier.height(12.dp))
+
+      // Queue group.
+      SectionLabel("Library")
+      StatusFilter.entries.forEach { filter ->
+        val count = taskCounts[filter] ?: 0
+        KetchSidebarItem(
+          label = filter.label,
+          icon = filterIcon(filter),
+          selected = !discoverySelected && selectedFilter == filter,
+          onClick = { onFilterSelect(filter) },
+          count = if (count > 0) count else null,
         )
       }
-    }
 
-    Spacer(modifier = Modifier.height(16.dp))
+      Spacer(Modifier.height(16.dp))
+      SectionLabel("Discover")
+      KetchSidebarItem(
+        label = "AI discovery",
+        icon = KetchIcon.Ai,
+        selected = discoverySelected,
+        onClick = onDiscoverySelect,
+      )
+
+    }
     HorizontalDivider(
       modifier = Modifier.padding(horizontal = 16.dp),
-      color = MaterialTheme.colorScheme.outlineVariant,
+      color = colors.outlineVariant,
     )
-    Spacer(modifier = Modifier.height(8.dp))
-
-    // Category label
-    Text(
-      text = "TASKS",
-      style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      fontWeight = FontWeight.SemiBold,
-      modifier = Modifier.padding(
-        horizontal = 20.dp, vertical = 8.dp,
-      )
-    )
-
-    // Navigation items
-    StatusFilter.entries.forEach { filter ->
-      val count = taskCounts[filter] ?: 0
-      SidebarItem(
-        icon = filterIcon(filter),
-        label = filter.label,
-        count = count,
-        selected = selectedFilter == filter,
-        onClick = { onFilterSelect(filter) },
-      )
-    }
   }
 }
 
 @Composable
-private fun SidebarItem(
-  icon: ImageVector,
-  label: String,
-  count: Int,
-  selected: Boolean,
-  onClick: () -> Unit,
-) {
-  val bgColor = if (selected) {
-    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-  } else {
-    MaterialTheme.colorScheme.surfaceContainerLow
-  }
-  val contentColor = if (selected) {
-    MaterialTheme.colorScheme.primary
-  } else {
-    MaterialTheme.colorScheme.onSurfaceVariant
-  }
-
+private fun Wordmark() {
+  val colors = KetchTheme.colors
   Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = 8.dp, vertical = 1.dp)
-      .clip(RoundedCornerShape(8.dp))
-      .background(bgColor)
-      .clickable(onClick = onClick)
-      .padding(horizontal = 12.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    Icon(
-      imageVector = icon,
-      contentDescription = label,
-      modifier = Modifier.size(20.dp),
-      tint = contentColor,
-    )
-    Text(
-      text = label,
-      style = MaterialTheme.typography.bodyMedium,
-      color = if (selected) {
-        MaterialTheme.colorScheme.onSurface
-      } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-      },
-      fontWeight = if (selected) {
-        FontWeight.SemiBold
-      } else {
-        FontWeight.Normal
-      },
-      modifier = Modifier.weight(1f),
-    )
-    if (count > 0) {
-      Box(
-        modifier = Modifier
-          .background(
-            color = if (selected) {
-              MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-            } else {
-              MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-            shape = CircleShape,
-          )
-          .padding(horizontal = 8.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center,
-      ) {
-        Text(
-          text = count.toString(),
-          style = MaterialTheme.typography.labelSmall,
-          color = contentColor,
-          fontWeight = FontWeight.SemiBold,
-        )
-      }
+    Box(
+      contentAlignment = Alignment.Center,
+      modifier = Modifier
+        .size(32.dp)
+        .clip(RoundedCornerShape(10.dp))
+        .background(colors.primary),
+    ) {
+      Text(
+        text = "K",
+        style = KetchTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+        color = androidx.compose.ui.graphics.Color.White,
+      )
     }
+    Text(
+      text = "Ketch",
+      style = KetchTheme.typography.displaySmall.copy(
+        fontSize = 20.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = (-0.3).sp,
+      ),
+      color = colors.onBackground,
+    )
   }
 }
 
-internal fun filterIcon(filter: StatusFilter): ImageVector {
-  return when (filter) {
-    StatusFilter.All -> Icons.Filled.Folder
-    StatusFilter.Downloading -> Icons.Filled.ArrowDownward
-    StatusFilter.Paused -> Icons.Filled.Pause
-    StatusFilter.Completed -> Icons.Filled.CheckCircle
-    StatusFilter.Failed -> Icons.Filled.ErrorOutline
+@Composable
+private fun InstancePill(
+  activeInstance: InstanceEntry?,
+  connectionState: ConnectionState?,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val colors = KetchTheme.colors
+  val type = KetchTheme.typography
+  val (kindLabel, addressLabel) = when (activeInstance) {
+    is RemoteInstance -> "Remote server" to "${activeInstance.host}:${activeInstance.port}"
+    is EmbeddedInstance -> "This device" to (activeInstance.label.ifBlank { "in-process" })
+    else -> "Not connected" to "Connect a server"
   }
+  val dotColor = when (connectionState) {
+    is ConnectionState.Connected -> colors.success
+    is ConnectionState.Connecting -> colors.warning
+    is ConnectionState.Disconnected -> colors.error
+    is ConnectionState.Unauthorized -> colors.error
+    null -> if (activeInstance is EmbeddedInstance) colors.success else colors.onSurfaceDim
+  }
+
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    modifier = modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(10.dp))
+      .background(colors.background)
+      .border(1.dp, colors.outline, RoundedCornerShape(10.dp))
+      .clickable(onClick = onClick)
+      .padding(horizontal = 10.dp, vertical = 6.dp),
+  ) {
+    Box(
+      modifier = Modifier
+        .size(7.dp)
+        .clip(CircleShape)
+        .background(dotColor)
+        .border(3.dp, dotColor.copy(alpha = 0.18f), CircleShape),
+    )
+    Column(modifier = Modifier.weight(1f)) {
+      Text(
+        text = kindLabel,
+        style = type.labelSmall,
+        color = colors.onSurfaceDim,
+      )
+      Text(
+        text = addressLabel,
+        style = type.bodyMedium.copy(fontWeight = FontWeight.Medium),
+        color = colors.onBackground,
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+      )
+    }
+    KetchIconImage(
+      icon = KetchIcon.ChevronDown,
+      size = 12.dp,
+      tint = colors.onSurfaceDim,
+    )
+  }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+  Text(
+    text = text.uppercase(),
+    style = KetchTheme.typography.labelSmall.copy(
+      fontWeight = FontWeight.SemiBold,
+      letterSpacing = 0.6.sp,
+    ),
+    color = KetchTheme.colors.onSurfaceDim,
+    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+  )
+}
+
+internal fun filterIcon(filter: StatusFilter): KetchIcon = when (filter) {
+  StatusFilter.All -> KetchIcon.All
+  StatusFilter.Downloading -> KetchIcon.Active
+  StatusFilter.Paused -> KetchIcon.Pause
+  StatusFilter.Completed -> KetchIcon.Done
+  StatusFilter.Failed -> KetchIcon.Failed
 }

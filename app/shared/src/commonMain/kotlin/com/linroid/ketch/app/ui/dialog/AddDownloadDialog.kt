@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -36,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +57,10 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.ResolveState
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.common.PriorityIcon
@@ -66,6 +69,7 @@ import com.linroid.ketch.app.ui.common.ScheduleIcon
 import com.linroid.ketch.app.ui.common.ScheduleSelector
 import com.linroid.ketch.app.ui.common.SpeedLimitIcon
 import com.linroid.ketch.app.ui.common.SpeedLimitSelector
+import com.linroid.ketch.app.util.priorityLabel
 import com.linroid.ketch.app.util.formatBytes
 import kotlinx.coroutines.delay
 
@@ -292,7 +296,7 @@ fun AddDownloadDialog(
         fileNameEditedByUser = it.isNotBlank()
       },
       modifier = Modifier.fillMaxWidth(),
-      label = { Text("Save as") },
+      label = { Text("File name (optional)") },
       singleLine = true,
       placeholder = {
         if (resolved?.suggestedFileName != null) {
@@ -311,11 +315,12 @@ fun AddDownloadDialog(
     )
 
     // Toggle icon row
-    Row(
+    FlowRow(
       horizontalArrangement = Arrangement.spacedBy(4.dp),
-      verticalAlignment = Alignment.CenterVertically,
+      verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
       SpeedLimitIcon(
+        label = if (selectedSpeed.isUnlimited) "Speed limit" else "${formatBytes(selectedSpeed.bytesPerSecond)}/s",
         active = !selectedSpeed.isUnlimited,
         selected = expanded == DialogPanel.SpeedLimit,
         onClick = {
@@ -327,6 +332,7 @@ fun AddDownloadDialog(
         },
       )
       PriorityIcon(
+        label = if (selectedPriority == DownloadPriority.NORMAL) "Priority" else "${priorityLabel(selectedPriority)} priority",
         active = selectedPriority != DownloadPriority.NORMAL,
         selected = expanded == DialogPanel.Priority,
         onClick = {
@@ -338,6 +344,11 @@ fun AddDownloadDialog(
         },
       )
       ScheduleIcon(
+        label = when (val schedule = selectedSchedule) {
+          DownloadSchedule.Immediate -> "Schedule"
+          is DownloadSchedule.AfterDelay -> "In ${schedule.delay}"
+          is DownloadSchedule.AtTime -> "Scheduled"
+        },
         selected = expanded == DialogPanel.Schedule,
         onClick = {
           expanded = if (expanded == DialogPanel.Schedule) {
@@ -378,7 +389,8 @@ fun AddDownloadDialog(
   }
 
   val confirmAction: @Composable () -> Unit = {
-    Button(
+    KetchButton(
+      text = if (selectedSchedule == DownloadSchedule.Immediate) "Download" else "Schedule download",
       onClick = {
         val downloadUrl = buildResolveUrl()
         if (downloadUrl.isNotEmpty()) {
@@ -396,15 +408,15 @@ fun AddDownloadDialog(
       },
       enabled = url.isNotBlank() &&
         (!hasMultipleFiles || selectedFileIds.isNotEmpty()),
-    ) {
-      Text("Download")
-    }
+    )
   }
 
   val cancelAction: @Composable () -> Unit = {
-    TextButton(onClick = onCancel) {
-      Text("Cancel")
-    }
+    KetchButton(
+      text = "Cancel",
+      onClick = onCancel,
+      variant = KetchButtonVariant.Ghost,
+    )
   }
 
   AdaptiveModal(
@@ -653,13 +665,12 @@ private fun CredentialFields(
           PasswordVisualTransformation(),
       )
     }
-    Button(
+    KetchButton(
+      text = "Retry with credentials",
       onClick = onRetry,
       enabled = username.isNotBlank(),
       modifier = Modifier.align(Alignment.End),
-    ) {
-      Text("Retry with credentials")
-    }
+    )
   }
 }
 
@@ -696,26 +707,20 @@ private fun FileSelector(
           horizontalArrangement =
             Arrangement.spacedBy(4.dp),
         ) {
-          TextButton(
+          KetchButton(
+            text = "All",
             onClick = onSelectAll,
             enabled = selectedIds.size < files.size,
-          ) {
-            Text(
-              text = "All",
-              style =
-                MaterialTheme.typography.labelSmall,
-            )
-          }
-          TextButton(
+            variant = KetchButtonVariant.Ghost,
+            size = KetchButtonSize.Small,
+          )
+          KetchButton(
+            text = "None",
             onClick = onDeselectAll,
             enabled = selectedIds.isNotEmpty(),
-          ) {
-            Text(
-              text = "None",
-              style =
-                MaterialTheme.typography.labelSmall,
-            )
-          }
+            variant = KetchButtonVariant.Ghost,
+            size = KetchButtonSize.Small,
+          )
         }
       }
 

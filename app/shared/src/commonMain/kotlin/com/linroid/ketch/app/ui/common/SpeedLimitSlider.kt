@@ -54,24 +54,17 @@ fun SpeedLimitIcon(
   selected: Boolean,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
+  label: String = "Speed limit",
 ) {
-  IconButton(
+  com.linroid.ketch.app.components.KetchButton(
+    text = label,
+    leadingIcon = com.linroid.ketch.app.icons.KetchIcon.Speed,
+    variant = if (active || selected) com.linroid.ketch.app.components.KetchButtonVariant.Secondary
+      else com.linroid.ketch.app.components.KetchButtonVariant.Ghost,
+    size = com.linroid.ketch.app.components.KetchButtonSize.Small,
+    modifier = modifier,
     onClick = onClick,
-    modifier = modifier.size(28.dp),
-    colors = IconButtonDefaults.iconButtonColors(
-      contentColor = if (active || selected) {
-        MaterialTheme.colorScheme.primary
-      } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-      }
-    )
-  ) {
-    Icon(
-      Icons.Filled.Speed,
-      contentDescription = "Speed limit",
-      modifier = Modifier.size(16.dp),
-    )
-  }
+  )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

@@ -1,5 +1,9 @@
 package com.linroid.ketch.app.ui.common
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -19,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.platform.isMobilePlatform
 
 /**
@@ -48,6 +53,7 @@ fun AdaptiveModal(
     ModalBottomSheet(
       onDismissRequest = onDismissRequest,
       sheetState = sheetState,
+      containerColor = KetchTheme.colors.surface,
       modifier = modifier,
     ) {
       Column(
@@ -61,7 +67,11 @@ fun AdaptiveModal(
             title()
           }
         }
-        content()
+        Column(
+          modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+          verticalArrangement = Arrangement.spacedBy(contentSpacing),
+          content = content,
+        )
         Row(
           modifier = Modifier
             .fillMaxWidth()
@@ -81,8 +91,12 @@ fun AdaptiveModal(
     AlertDialog(
       onDismissRequest = onDismissRequest,
       title = title,
+      containerColor = KetchTheme.colors.surface,
+      tonalElevation = 0.dp,
+      shape = RoundedCornerShape(20.dp),
       text = {
         Column(
+          modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
           verticalArrangement = Arrangement.spacedBy(contentSpacing),
           content = content,
         )

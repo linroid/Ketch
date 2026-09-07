@@ -3,77 +3,72 @@ package com.linroid.ketch.app.theme
 import androidx.compose.ui.graphics.Color
 import com.linroid.ketch.api.DownloadState
 
-// Surface palette (neutral dark)
-val KetchBackground = Color(0xFF101010)
-val KetchSurface = Color(0xFF1A1A1A)
-val KetchSurfaceVariant = Color(0xFF252525)
-val KetchSurfaceContainer = Color(0xFF1F1F1F)
-val KetchSurfaceContainerHigh = Color(0xFF2A2A2A)
-val KetchOnSurface = Color(0xFFE8E8E8)
-val KetchOnSurfaceVariant = Color(0xFF999999)
-val KetchOutline = Color(0xFF4A4A4A)
-val KetchOutlineVariant = Color(0xFF303030)
+// Dark scheme — neutral surfaces (hue 250, low chroma) + Signal blue accent.
+val KetchBackground = KetchPalette.Dark.bg
+val KetchSurface = KetchPalette.Dark.bgElev
+val KetchSurfaceVariant = KetchPalette.Dark.panel
+val KetchSurfaceContainer = KetchPalette.Dark.panel
+val KetchSurfaceContainerHigh = KetchPalette.Dark.bgHover
+val KetchOnSurface = KetchPalette.Dark.text
+val KetchOnSurfaceVariant = KetchPalette.Dark.textSec
+val KetchOutline = KetchPalette.Dark.line
+val KetchOutlineVariant = KetchPalette.Dark.lineSoft
 
-// Primary (teal — from logo)
-val KetchPrimary = Color(0xFF00BCD4)
-val KetchPrimaryContainer = Color(0xFF003840)
-val KetchOnPrimary = Color(0xFF000000)
-val KetchOnPrimaryContainer = Color(0xFFB2EBF2)
+// Primary — Signal blue (default accent)
+val KetchPrimary = KetchPalette.SignalDark.primary
+val KetchPrimaryContainer = KetchPalette.SignalDark.container
+val KetchOnPrimary = Color(0xFFFFFFFF)
+val KetchOnPrimaryContainer = KetchPalette.SignalDark.onContainer
 
-// Secondary (deep teal — from logo hull)
-val KetchSecondary = Color(0xFF0097A7)
-val KetchSecondaryContainer = Color(0xFF002E33)
+// Secondary — reuse accent container for tonal surface roles
+val KetchSecondary = KetchPalette.SignalDark.onContainer
+val KetchSecondaryContainer = KetchPalette.SignalDark.container
 val KetchOnSecondary = Color(0xFF000000)
-val KetchOnSecondaryContainer = Color(0xFF80DEEA)
+val KetchOnSecondaryContainer = KetchPalette.SignalDark.onContainer
 
-// Tertiary (success/green)
-val KetchTertiary = Color(0xFF66BB6A)
-val KetchTertiaryContainer = Color(0xFF1B3A2B)
-val KetchOnTertiary = Color(0xFF0F1419)
-val KetchOnTertiaryContainer = Color(0xFFA5D6A7)
+// Tertiary — success/green
+val KetchTertiary = KetchPalette.Dark.success
+val KetchTertiaryContainer = Color(0xFF003F17)
+val KetchOnTertiary = Color(0xFFFFFFFF)
+val KetchOnTertiaryContainer = Color(0xFF6FD087)
 
-// Error (red)
-val KetchError = Color(0xFFEF5350)
+// Error — danger
+val KetchError = KetchPalette.Dark.danger
 val KetchErrorContainer = Color(0xFF3A1B1B)
-val KetchOnError = Color(0xFF0F1419)
-val KetchOnErrorContainer = Color(0xFFEF9A9A)
+val KetchOnError = Color(0xFFFFFFFF)
+val KetchOnErrorContainer = Color(0xFFF3A2A2)
 
-// Light theme surface palette (neutral light)
-val KetchLightBackground = Color(0xFFFAFAFA)
-val KetchLightSurface = Color(0xFFFFFFFF)
-val KetchLightSurfaceVariant = Color(0xFFE8E8E8)
-val KetchLightSurfaceContainer = Color(0xFFF2F2F2)
-val KetchLightSurfaceContainerHigh = Color(0xFFE8E8E8)
-val KetchLightOnSurface = Color(0xFF1A1A1A)
-val KetchLightOnSurfaceVariant = Color(0xFF555555)
-val KetchLightOutline = Color(0xFF999999)
-val KetchLightOutlineVariant = Color(0xFFCCCCCC)
+// Light scheme — neutral surfaces + Signal blue accent.
+val KetchLightBackground = KetchPalette.Light.bg
+val KetchLightSurface = KetchPalette.Light.bgElev
+val KetchLightSurfaceVariant = KetchPalette.Light.panel
+val KetchLightSurfaceContainer = KetchPalette.Light.panel
+val KetchLightSurfaceContainerHigh = KetchPalette.Light.bgHover
+val KetchLightOnSurface = KetchPalette.Light.text
+val KetchLightOnSurfaceVariant = KetchPalette.Light.textSec
+val KetchLightOutline = KetchPalette.Light.line
+val KetchLightOutlineVariant = KetchPalette.Light.lineSoft
 
-// Light primary (teal — from logo, darker for readability)
-val KetchLightPrimary = Color(0xFF00838F)
-val KetchLightPrimaryContainer = Color(0xFFB2EBF2)
+val KetchLightPrimary = KetchPalette.SignalLight.primary
+val KetchLightPrimaryContainer = KetchPalette.SignalLight.container
 val KetchLightOnPrimary = Color(0xFFFFFFFF)
-val KetchLightOnPrimaryContainer = Color(0xFF006064)
+val KetchLightOnPrimaryContainer = KetchPalette.SignalLight.onContainer
 
-// Light secondary (deep teal)
-val KetchLightSecondary = Color(0xFF00695C)
-val KetchLightSecondaryContainer = Color(0xFFB2DFDB)
+val KetchLightSecondary = KetchPalette.SignalLight.onContainer
+val KetchLightSecondaryContainer = KetchPalette.SignalLight.container
 val KetchLightOnSecondary = Color(0xFFFFFFFF)
-val KetchLightOnSecondaryContainer = Color(0xFF004D40)
+val KetchLightOnSecondaryContainer = KetchPalette.SignalLight.onContainer
 
-// Light tertiary
-val KetchLightTertiary = Color(0xFF2E7D32)
-val KetchLightTertiaryContainer = Color(0xFFA5D6A7)
+val KetchLightTertiary = KetchPalette.Light.success
+val KetchLightTertiaryContainer = Color(0xFFD9F3DD)
 val KetchLightOnTertiary = Color(0xFFFFFFFF)
-val KetchLightOnTertiaryContainer = Color(0xFF1B5E20)
+val KetchLightOnTertiaryContainer = Color(0xFF007717)
 
-// Light error
-val KetchLightError = Color(0xFFC62828)
-val KetchLightErrorContainer = Color(0xFFEF9A9A)
+val KetchLightError = KetchPalette.Light.danger
+val KetchLightErrorContainer = Color(0xFFFCE4E5)
 val KetchLightOnError = Color(0xFFFFFFFF)
-val KetchLightOnErrorContainer = Color(0xFF8B0000)
+val KetchLightOnErrorContainer = Color(0xFF7E1F20)
 
-// State-specific color pairs
 data class StateColorPair(
   val foreground: Color,
   val background: Color,
@@ -102,49 +97,21 @@ data class DownloadStateColors(
 }
 
 val DarkStateColors = DownloadStateColors(
-  downloading = StateColorPair(
-    Color(0xFF00BCD4), Color(0xFF003840)
-  ),
-  queued = StateColorPair(
-    Color(0xFF90A4AE), Color(0xFF2A2D35)
-  ),
-  scheduled = StateColorPair(
-    Color(0xFF90A4AE), Color(0xFF2A2D35)
-  ),
-  paused = StateColorPair(
-    Color(0xFFFFB74D), Color(0xFF3A2E1B)
-  ),
-  completed = StateColorPair(
-    Color(0xFF66BB6A), Color(0xFF1B3A2B)
-  ),
-  failed = StateColorPair(
-    Color(0xFFEF5350), Color(0xFF3A1B1B)
-  ),
-  canceled = StateColorPair(
-    Color(0xFF78909C), Color(0xFF2A2D35)
-  ),
+  downloading = StateColorPair(KetchPalette.SignalDark.primary, KetchPalette.SignalDark.container),
+  queued = StateColorPair(KetchPalette.Dark.textSec, KetchPalette.Dark.bgHover),
+  scheduled = StateColorPair(KetchPalette.Dark.textSec, KetchPalette.Dark.bgHover),
+  paused = StateColorPair(KetchPalette.Dark.warning, Color(0xFF3A2E1B)),
+  completed = StateColorPair(KetchPalette.Dark.success, Color(0xFF163A22)),
+  failed = StateColorPair(KetchPalette.Dark.danger, Color(0xFF3A1B1B)),
+  canceled = StateColorPair(KetchPalette.Dark.textDim, KetchPalette.Dark.bgHover),
 )
 
 val LightStateColors = DownloadStateColors(
-  downloading = StateColorPair(
-    Color(0xFF00838F), Color(0xFFE0F7FA)
-  ),
-  queued = StateColorPair(
-    Color(0xFF546E7A), Color(0xFFECEFF1)
-  ),
-  scheduled = StateColorPair(
-    Color(0xFF546E7A), Color(0xFFECEFF1)
-  ),
-  paused = StateColorPair(
-    Color(0xFFEF6C00), Color(0xFFFFF3E0)
-  ),
-  completed = StateColorPair(
-    Color(0xFF2E7D32), Color(0xFFE8F5E9)
-  ),
-  failed = StateColorPair(
-    Color(0xFFC62828), Color(0xFFFFEBEE)
-  ),
-  canceled = StateColorPair(
-    Color(0xFF78909C), Color(0xFFECEFF1)
-  ),
+  downloading = StateColorPair(KetchPalette.SignalLight.primary, KetchPalette.SignalLight.container),
+  queued = StateColorPair(KetchPalette.Light.textSec, KetchPalette.Light.bgHover),
+  scheduled = StateColorPair(KetchPalette.Light.textSec, KetchPalette.Light.bgHover),
+  paused = StateColorPair(KetchPalette.Light.warning, Color(0xFFFFF0D6)),
+  completed = StateColorPair(KetchPalette.Light.success, Color(0xFFDCF3E1)),
+  failed = StateColorPair(KetchPalette.Light.danger, Color(0xFFFCE4E5)),
+  canceled = StateColorPair(KetchPalette.Light.textDim, KetchPalette.Light.bgHover),
 )

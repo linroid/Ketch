@@ -2,22 +2,18 @@ package com.linroid.ketch.app.ui.list
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.theme.KetchTheme
 
 @Composable
 fun TaskActionButtons(
@@ -28,6 +24,11 @@ fun TaskActionButtons(
   onRetry: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val isCompact = !currentWindowAdaptiveInfo().windowSizeClass
+    .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+  val size = if (isCompact) KetchButtonSize.Large else KetchButtonSize.Medium
+  val colors = KetchTheme.colors
+
   Row(
     modifier = modifier,
     horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -35,41 +36,16 @@ fun TaskActionButtons(
   ) {
     when (state) {
       is DownloadState.Downloading -> {
-        ActionIcon(
-          icon = Icons.Filled.Pause,
-          description = "Pause",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-          onClick = onPause,
-        )
-        ActionIcon(
-          icon = Icons.Filled.Close,
-          description = "Cancel",
-          tint = MaterialTheme.colorScheme.error,
-          onClick = onCancel,
-        )
+        Action(KetchIcon.Pause, colors.onSurfaceVariant, size, onPause)
+        Action(KetchIcon.Close, colors.error, size, onCancel)
       }
       is DownloadState.Paused -> {
-        ActionIcon(
-          icon = Icons.Filled.PlayArrow,
-          description = "Resume",
-          tint = MaterialTheme.colorScheme.primary,
-          onClick = onResume,
-        )
-        ActionIcon(
-          icon = Icons.Filled.Close,
-          description = "Cancel",
-          tint = MaterialTheme.colorScheme.error,
-          onClick = onCancel,
-        )
+        Action(KetchIcon.Play, colors.primary, size, onResume)
+        Action(KetchIcon.Close, colors.error, size, onCancel)
       }
       is DownloadState.Failed,
       is DownloadState.Canceled -> {
-        ActionIcon(
-          icon = Icons.Filled.Refresh,
-          description = "Retry",
-          tint = MaterialTheme.colorScheme.primary,
-          onClick = onRetry,
-        )
+        Action(KetchIcon.Retry, colors.primary, size, onRetry)
       }
       is DownloadState.Completed,
       is DownloadState.Scheduled,
@@ -79,29 +55,11 @@ fun TaskActionButtons(
 }
 
 @Composable
-private fun ActionIcon(
-  icon: androidx.compose.ui.graphics.vector.ImageVector,
-  description: String,
-  tint: androidx.compose.ui.graphics.Color,
+private fun Action(
+  icon: KetchIcon,
+  tint: Color,
+  size: KetchButtonSize,
   onClick: () -> Unit,
 ) {
-  val windowSizeClass =
-    currentWindowAdaptiveInfo().windowSizeClass
-  val isCompact = !windowSizeClass
-    .isWidthAtLeastBreakpoint(
-      WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
-    )
-  val buttonSize = if (isCompact) 48.dp else 32.dp
-  val iconSize = if (isCompact) 22.dp else 18.dp
-  IconButton(
-    onClick = onClick,
-    modifier = Modifier.size(buttonSize),
-  ) {
-    Icon(
-      imageVector = icon,
-      contentDescription = description,
-      modifier = Modifier.size(iconSize),
-      tint = tint,
-    )
-  }
+  KetchIconButton(icon = icon, onClick = onClick, size = size, tint = tint)
 }

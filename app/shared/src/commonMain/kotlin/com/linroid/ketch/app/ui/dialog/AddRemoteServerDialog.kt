@@ -12,16 +12,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.theme.KetchTheme
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,11 +60,14 @@ fun AddRemoteServerDialog(
   }
 
   AlertDialog(
+    containerColor = KetchTheme.colors.surface,
+    tonalElevation = 0.dp,
+    shape = RoundedCornerShape(20.dp),
     onDismissRequest = onDismiss,
     title = {
       Text(
-        if (authRequired) "Authentication Required"
-        else "Add Remote Server"
+        if (authRequired) "Authentication required"
+        else "Add remote server"
       )
     },
     text = {
@@ -107,36 +110,29 @@ fun AddRemoteServerDialog(
           }
         )
         OutlinedTextField(
+          visualTransformation = PasswordVisualTransformation(),
           value = token,
           onValueChange = { token = it },
           modifier = Modifier.fillMaxWidth(),
-          label = { Text("API Token") },
+          label = { Text("API token") },
           singleLine = true,
           placeholder = { Text("Optional") },
         )
         if (discovering) {
-          OutlinedButton(
+          KetchButton(
+            text = "Stop",
             onClick = onStopDiscovery,
+            variant = KetchButtonVariant.Secondary,
             modifier = Modifier.fillMaxWidth(),
-          ) {
-            CircularProgressIndicator(
-              modifier = Modifier
-                .padding(end = 8.dp)
-                .size(16.dp),
-              strokeWidth = 2.dp,
-            )
-            Text("Stop")
-          }
+          )
         } else {
-          Button(
-            onClick = {
-              onDiscover(port.toIntOrNull() ?: 8642)
-            },
+          KetchButton(
+            text = "Find nearby servers",
+            variant = KetchButtonVariant.Secondary,
+            onClick = { onDiscover(port.toIntOrNull() ?: 8642) },
             enabled = isValidPort,
             modifier = Modifier.fillMaxWidth(),
-          ) {
-            Text("Discover on LAN")
-          }
+          )
         }
         if (discoveryState is DiscoveryState.Error) {
           Text(
@@ -198,23 +194,24 @@ fun AddRemoteServerDialog(
       }
     },
     confirmButton = {
-      Button(
+      KetchButton(
+        text = if (authRequired) "Connect" else "Add",
         onClick = {
           onAdd(
             host.trim(),
             port.toIntOrNull() ?: 8642,
-            token.trim().ifBlank { null }
+            token.trim().ifBlank { null },
           )
         },
         enabled = isValidHost && isValidPort,
-      ) {
-        Text(if (authRequired) "Connect" else "Add")
-      }
+      )
     },
     dismissButton = {
-      TextButton(onClick = onDismiss) {
-        Text("Cancel")
-      }
+      KetchButton(
+        text = "Cancel",
+        onClick = onDismiss,
+        variant = KetchButtonVariant.Ghost,
+      )
     }
   )
 }

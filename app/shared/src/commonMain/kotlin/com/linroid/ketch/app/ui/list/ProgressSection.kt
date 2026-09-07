@@ -3,14 +3,14 @@ package com.linroid.ketch.app.ui.list
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.components.KetchProgressBar
+import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.LocalDownloadStateColors
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.formatEta
@@ -21,17 +21,18 @@ fun ProgressSection(
   speedLimit: SpeedLimit,
 ) {
   val stateColors = LocalDownloadStateColors.current
+  val type = KetchTheme.typography
+  val colors = KetchTheme.colors
 
   when (state) {
     is DownloadState.Downloading -> {
       val progress = state.progress
       val pct = (progress.percent * 100).coerceIn(0f, 100f)
-      val colors = stateColors.downloading
-      LinearProgressIndicator(
-        progress = { progress.percent },
+      val active = stateColors.downloading
+      KetchProgressBar(
+        progress = progress.percent,
         modifier = Modifier.fillMaxWidth(),
-        color = colors.foreground,
-        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        fillColor = active.foreground,
       )
       Row(
         modifier = Modifier.fillMaxWidth(),
@@ -40,93 +41,83 @@ fun ProgressSection(
         Text(
           text = buildString {
             append("${pct.toInt()}%")
-            append(
-              " \u00b7 ${formatBytes(progress.downloadedBytes)}"
-            )
+            append(" · ${formatBytes(progress.downloadedBytes)}")
             append(" / ${formatBytes(progress.totalBytes)}")
           },
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          style = type.monoSmall,
+          color = colors.onSurfaceVariant,
         )
         Text(
           text = buildString {
             if (progress.bytesPerSecond > 0) {
-              append(
-                "${formatBytes(progress.bytesPerSecond)}/s"
-              )
+              append("${formatBytes(progress.bytesPerSecond)}/s")
               if (progress.totalBytes > 0) {
-                val remaining = progress.totalBytes -
-                  progress.downloadedBytes
-                val eta =
-                  remaining / progress.bytesPerSecond
+                val remaining = progress.totalBytes - progress.downloadedBytes
+                val eta = remaining / progress.bytesPerSecond
                 val etaStr = formatEta(eta)
                 if (etaStr.isNotEmpty()) {
-                  append(" \u00b7 $etaStr")
+                  append(" · $etaStr")
                 }
               }
             }
             if (!speedLimit.isUnlimited) {
-              append(" (limit: " + formatBytes(speedLimit.bytesPerSecond) + "/s)")
+              append(" (limit: ${formatBytes(speedLimit.bytesPerSecond)}/s)")
             }
           },
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          style = type.monoSmall,
+          color = colors.onSurfaceVariant,
         )
       }
     }
     is DownloadState.Paused -> {
       val progress = state.progress
-      val colors = stateColors.paused
+      val pausedColors = stateColors.paused
       if (progress.totalBytes > 0) {
-        val pct =
-          (progress.percent * 100).coerceIn(0f, 100f)
-        LinearProgressIndicator(
-          progress = { progress.percent },
+        val pct = (progress.percent * 100).coerceIn(0f, 100f)
+        KetchProgressBar(
+          progress = progress.percent,
           modifier = Modifier.fillMaxWidth(),
-          color = colors.foreground,
-          trackColor =
-            MaterialTheme.colorScheme.surfaceVariant
+          fillColor = pausedColors.foreground,
         )
         Text(
-          text = "Paused \u00b7 ${pct.toInt()}%" +
-            " \u00b7 " + formatBytes(progress.downloadedBytes) +
-            " / ${formatBytes(progress.totalBytes)}",
-          style = MaterialTheme.typography.bodySmall,
-          color = colors.foreground,
+          text = "Paused · ${pct.toInt()}% · " +
+            "${formatBytes(progress.downloadedBytes)} / ${formatBytes(progress.totalBytes)}",
+          style = type.bodySmall,
+          color = pausedColors.foreground,
         )
       } else {
         Text(
           text = "Paused",
-          style = MaterialTheme.typography.bodySmall,
-          color = colors.foreground,
+          style = type.bodySmall,
+          color = pausedColors.foreground,
         )
       }
     }
     is DownloadState.Queued -> {
       Text(
-        text = "Queued \u2014 waiting for download slot\u2026",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        text = "Queued — waiting for download slot…",
+        style = type.bodySmall,
+        color = colors.onSurfaceVariant,
       )
     }
     is DownloadState.Scheduled -> {
       Text(
-        text = "Scheduled \u2014 waiting for start time\u2026",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        text = "Scheduled — waiting for start time…",
+        style = type.bodySmall,
+        color = colors.onSurfaceVariant,
       )
     }
     is DownloadState.Completed -> {
       Text(
         text = "Download complete",
-        style = MaterialTheme.typography.bodySmall,
+        style = type.bodySmall,
         color = stateColors.completed.foreground,
       )
     }
     is DownloadState.Failed -> {
       Text(
         text = "Failed: ${state.error.message}",
-        style = MaterialTheme.typography.bodySmall,
+        style = type.bodySmall,
         color = stateColors.failed.foreground,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
@@ -135,8 +126,8 @@ fun ProgressSection(
     is DownloadState.Canceled -> {
       Text(
         text = "Canceled",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = type.bodySmall,
+        color = colors.onSurfaceVariant,
       )
     }
   }
