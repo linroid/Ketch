@@ -9,6 +9,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.core.KetchDispatchers
+import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
@@ -22,13 +23,19 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
@@ -87,4 +94,77 @@ class SelfManagedExecutionTest {
     assertEquals(1, calls)
     assertEquals("final", handle.record.value.sourceResumeState?.data)
   }
+
+  @Test
+  fun immediateResumeWaitsForPausedSourceCheckpointAndClosure() = runTest {
+    val started = CompletableDeferred<Unit>()
+    val checkpointEntered = CompletableDeferred<Unit>()
+    val allowCheckpoint = CompletableDeferred<Unit>()
+    val resumed = CompletableDeferred<Unit>()
+    var saved = false
+    val source = object : DownloadSource {
+      override val type = "fixture"
+      override val managesOwnFileIo = true
+      override fun canHandle(url: String) = true
+      override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+        url = url, sourceType = type, totalBytes = 4, supportsResume = true,
+        suggestedFileName = "fixture", maxSegments = 1,
+      )
+      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
+        SourceResumeState(type, "initial")
+      override suspend fun updateResumeState(context: DownloadContext) =
+        SourceResumeState(type, if (saved) "final" else "initial")
+      override suspend fun download(context: DownloadContext) {
+        context.segments.value = listOf(Segment(0, 0, 3, 1))
+        started.complete(Unit)
+        try { awaitCancellation() } finally {
+          withContext(NonCancellable) {
+            checkpointEntered.complete(Unit)
+            allowCheckpoint.await()
+            saved = true
+          }
+        }
+      }
+      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
+        assertEquals("final", resumeState.data)
+        assertTrue(saved)
+        context.segments.value = listOf(Segment(0, 0, 3, 4))
+        resumed.complete(Unit)
+      }
+    }
+    val now = Clock.System.now()
+    val request = DownloadRequest("fixture:input",
+      destination = Destination("/tmp/ketch-pause-handoff"))
+    val handle = object : TaskHandle {
+      override val taskId = "handoff"
+      override val request = request
+      override val createdAt = now
+      override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
+      override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
+      override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
+        createdAt = now, updatedAt = now)) {}
+    }
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val coordinator = DownloadCoordinator(SourceResolver(listOf(source)),
+      DownloadConfig(saveIntervalMs = 60_000), DefaultFileNameResolver(),
+      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher))
+    try {
+      coordinator.start(handle)
+      started.await()
+      val pause = launch { coordinator.pause(handle.taskId) }
+      checkpointEntered.await()
+      val resume = async { coordinator.resume(handle) }
+      yield()
+      assertFalse(pause.isCompleted)
+      assertFalse(resume.isCompleted)
+      allowCheckpoint.complete(Unit)
+      pause.join()
+      assertTrue(resume.await())
+      resumed.await()
+    } finally {
+      allowCheckpoint.complete(Unit)
+      coordinator.close()
+    }
+  }
+
 }

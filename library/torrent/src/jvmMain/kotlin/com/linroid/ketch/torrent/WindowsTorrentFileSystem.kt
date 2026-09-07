@@ -60,6 +60,27 @@ internal object WindowsTorrentFileSystem : ForwardingFileSystem(FileSystem.SYSTE
     }
   }
 
+  /** Windows NIO may return a null fileKey; use volume/index/creation identity from the handle. */
+  fun identity(path: Path): String? {
+    val handle = function("CreateFileW").invokePointer(arrayOf(WString(path.toString()),
+      0x80, 7, null, 3, 0x02200000, null))
+    if (handle == null || Pointer.nativeValue(handle) == -1L) {
+      val error = Native.getLastError()
+      if (error == 2 || error == 3) return null
+      throw IOException("Cannot read torrent file identity (error=$error)")
+    }
+    try {
+      return Memory(52).use { info ->
+        if (function("GetFileInformationByHandle").invokeInt(arrayOf(handle, info)) == 0) {
+          throw IOException("Cannot read torrent file identity (error=${Native.getLastError()})")
+        }
+        if (info.getInt(0) and 0x400 != 0) null else {
+          listOf(28L, 44L, 48L, 4L, 8L).joinToString(":") { info.getInt(it).toUInt().toString() }
+        }
+      }
+    } finally { function("CloseHandle").invokeInt(arrayOf(handle)) }
+  }
+
   override fun openReadOnly(file: Path): FileHandle = openFile(file, false, false, true)
   override fun openReadWrite(file: Path, mustCreate: Boolean, mustExist: Boolean): FileHandle =
     openFile(file, true, mustCreate, mustExist)

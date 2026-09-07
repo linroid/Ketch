@@ -70,7 +70,11 @@ class TorrentRemoteTest {
           assertTrue(task.segments.value.sumOf { it.downloadedBytes } < 131_072)
           task.setSpeedLimit(SpeedLimit.Unlimited)
           task.resume()
-          task.await().getOrThrow()
+          val result = task.await()
+          if (result.isFailure) {
+            val failed = ketch.tasks.value.first().state.value as? DownloadState.Failed
+            throw AssertionError("Local torrent failed: ${failed?.error}", failed?.error)
+          }
           assertEquals(131_072L, task.segments.value.sumOf { it.downloadedBytes })
           assertFalse(output.resolve("skip").exists())
           assertContentEquals(bytes.copyOfRange(131_072, bytes.size),

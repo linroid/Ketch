@@ -108,6 +108,8 @@ tasks.register("verifyNoNativeTorrentRuntime") {
         component.dependencies.forEach { dependency ->
           if (dependency is org.gradle.api.artifacts.result.ResolvedDependencyResult) {
             pending.add(dependency.selected)
+          } else if (dependency is org.gradle.api.artifacts.result.UnresolvedDependencyResult) {
+            throw dependency.failure
           }
         }
       }

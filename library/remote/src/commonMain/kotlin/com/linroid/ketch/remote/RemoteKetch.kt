@@ -127,7 +127,10 @@ class RemoteKetch(
     }
     checkSuccess(response)
     val task = createRemoteTask(response.body())
-    return taskMutex.withLock { addOrUpdate(task) }
+    return taskMutex.withLock {
+      // SSE may already have delivered newer progress or completion before this POST returns.
+      taskMap[task.taskId] ?: addOrUpdate(task)
+    }
   }
 
   override suspend fun resolve(

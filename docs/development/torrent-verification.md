@@ -30,6 +30,7 @@ an AGP connected-test task can otherwise succeed without running instrumentation
 - Torrent and core JVM, Android host and actual arm64 iOS simulator suites passed.
 - Repository `jvmTest`, `testDebugUnitTest`, `iosSimulatorArm64Test`, and `jsNodeTest` passed.
 - Actual Android 36 arm64 emulator: metainfo/magnet payload transfer and owned cleanup passed.
+  The packaged Android app launched and reached its empty Downloads screen.
 - Independent libtorrent: controlled DHT discovery through metadata to exact payload bytes.
   Independent Transmission 4.1.3: magnet metadata and 512 KiB + 37 bytes, exact output.
 - Both packaged JVM and Graal CLIs completed Transmission payload downloads and local empty
@@ -39,6 +40,12 @@ an AGP connected-test task can otherwise succeed without running instrumentation
 - A real local HTTPS fixture verifies metainfo and tracker exchanges, plus rejection of an
   untrusted certificate. This TLS fixture runs on JVM.
 - Mixed HTTP/torrent tests verify shared bandwidth and removal of live task/global limits.
+- A real daemon/RemoteKetch fixture resolves a magnet, selects file 1, observes verified progress,
+  pauses and resumes to exact output. Remote task identity is preserved across SSE add events.
+- Desktop distributable startup initialized Ketch with FTP/torrent sources and an isolated SQLite
+  profile. Desktop visual inspection was unavailable while the host Mac was locked.
+- Runtime graph audit and 404 packaged JVM/desktop/APK archives contained no libtorrent binaries,
+  classes or torrent loader. JNA remains solely for JVM OS filesystem calls.
 - Sparse output above 2 GiB, selected boundary pieces, corrupt data, hostile protocol input,
   symlink replacement, ownership isolation and kill/restart checkpoints have dedicated tests.
 - Twelve repeated 64 KiB transfers and source shutdowns: open descriptors remained
@@ -68,3 +75,14 @@ both peers contribute to the transfer CPU; this is not a device release-build be
 Security boundaries, migration behavior and explicitly deferred protocols are documented in
 [the support guide](../torrent.md). Treat the throughput/memory numbers as a baseline to improve,
 not a performance guarantee.
+
+The final local torrent counts were 275 JVM tests, 265 Android host tests, 266 iOS simulator tests,
+and one Android device test, with zero failures. Core counts before the added pause-handoff regression were 202 JVM and 199 each on Android
+host, iOS simulator and JS. The server suite passed 42 tests. Counts include opt-in JVM fixture
+methods, which return early when their required environment variables are absent; the recorded
+independent-client runs explicitly set those variables.
+
+Desktop packaging can select a non-Homebrew JDK with `-PdesktopJavaHome=/path/to/jdk`.
+The Graal CLI build is `:cli:nativeCompile`; JVM distribution is `:cli:installDist`.
+Local package checks reused the original checkout's built web assets through `-PprebuiltWebDir`;
+web source was not changed by this work.
