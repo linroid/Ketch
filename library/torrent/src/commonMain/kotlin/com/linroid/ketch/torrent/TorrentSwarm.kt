@@ -67,6 +67,7 @@ internal class TorrentSwarm(
     }
     val active = mutableMapOf<PeerEndpoint, Job>()
     val attempts = linkedMapOf<PeerEndpoint, Int>()
+    val attemptedAt = mutableMapOf<PeerEndpoint, Long>()
     val pending = ArrayDeque<PeerEndpoint>()
     val results = Channel<Pair<PeerEndpoint, Throwable?>>(512)
     val progressEvents = Channel<Unit>(Channel.CONFLATED)
@@ -92,6 +93,7 @@ internal class TorrentSwarm(
     ) {
       val id = nextId++
       attempts[endpoint] = (attempts[endpoint] ?: 0) + 1
+      attemptedAt[endpoint] = now()
       active[endpoint] = launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
         try {
@@ -125,6 +127,10 @@ internal class TorrentSwarm(
           complete = true
         }
         if (complete && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) break
+        val expired = attemptedAt.filter { (endpoint, time) ->
+          now() - time >= 300_000 && endpoint !in active && endpoint !in pending
+        }.keys
+        expired.forEach { attempts.remove(it); attemptedAt.remove(it); retryAt.remove(it) }
         val limit = connections().coerceIn(1, 512)
         active.entries.drop(limit).forEach { it.value.cancel() }
         var candidates = pending.size
@@ -162,6 +168,7 @@ internal class TorrentSwarm(
             while (true) (incoming?.tryReceive()?.getOrNull() ?: break).close()
             pending.clear()
             attempts.clear()
+            attemptedAt.clear()
             retryAt.clear()
             done.complete(Unit)
           }
@@ -216,7 +223,9 @@ internal class TorrentSwarm(
         val extensions = PeerExtensions()
         var metadataServed = 0
         var metadataWindow = TimeSource.Monotonic.markNow()
-        if (handshake.extensions) wire.send(PeerExtensions.handshake(store.metadata, pex = !store.metadata.isPrivate))
+        if (handshake.extensions) {
+          wire.send(PeerExtensions.handshake(store.metadata, pex = !store.metadata.isPrivate))
+        }
         val state = PeerProtocolState(store.pieceCount, maxPending = 16)
         val advertised = store.verifiedPieces()
         var version = -1L
@@ -240,6 +249,7 @@ internal class TorrentSwarm(
         var received = BooleanArray(0)
         var requested = BooleanArray(0)
         var receivedBytes = 0
+        var lastUsefulPayload = TimeSource.Monotonic.markNow()
         var lastBlock = TimeSource.Monotonic.markNow()
         var lastWrite = TimeSource.Monotonic.markNow()
         try {
@@ -252,7 +262,9 @@ internal class TorrentSwarm(
               if (message is PeerMessage.Piece) {
                 val throttling = TimeSource.Monotonic.markNow()
                 downloadPayload(message.bytes.size)
-                lastBlock += throttling.elapsedNow()
+                val paused = throttling.elapsedNow()
+                lastBlock += paused
+                lastUsefulPayload += paused
               }
               val accepted = state.received(message)
               when (message) {
@@ -279,6 +291,7 @@ internal class TorrentSwarm(
                   received[block] = true
                   receivedBytes += message.bytes.size
                   lastBlock = TimeSource.Monotonic.markNow()
+                  lastUsefulPayload = TimeSource.Monotonic.markNow()
                   if (receivedBytes == current.bytes.size) {
                     val valid = storage { store.commit(current.index, current.bytes) }
                     require(valid) { "Peer sent a corrupt piece" }
@@ -324,7 +337,9 @@ internal class TorrentSwarm(
                       }
                     }
                   } else if (message.id == PeerExtensions.PEX) {
-                    require(!store.metadata.isPrivate) { "Private torrent peer exchange is forbidden" }
+                    require(!store.metadata.isPrivate) {
+                      "Private torrent peer exchange is forbidden"
+                    }
                     val update = exchange.receive(message.payload)
                     val added = update.added.filter { peer ->
                       allowLocalDiscovery ||
@@ -366,6 +381,9 @@ internal class TorrentSwarm(
               }
               scheduler.release(id)
               claim = null
+            }
+            if (!store.completed() && lastUsefulPayload.elapsedNow().inWholeSeconds >= 90) {
+              throw IOException("Peer made no useful download progress")
             }
             if (state.requests.isNotEmpty() && lastBlock.elapsedNow().inWholeSeconds >= 20) {
               error("Peer block deadline exceeded")

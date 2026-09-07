@@ -87,6 +87,7 @@ internal class DownloadExecution(
     }
     val current = taskLimiter.delegate
     if (limit.isUnlimited) {
+      (current as? TokenBucket)?.updateRate(0)
       taskLimiter.delegate = SpeedLimiter.Unlimited
     } else if (current is TokenBucket) {
       current.updateRate(limit.bytesPerSecond)

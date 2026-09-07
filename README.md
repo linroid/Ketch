@@ -46,7 +46,7 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Remote control** `✅` -- Manage a remote server from any client (mobile, desktop, web, or CLI)
 - **Pluggable architecture** `✅` -- Swap out HTTP engines, storage backends, and download sources
 - **FTP/FTPS** `✅` -- Download from FTP servers with segmented parallel transfers and resume
-- **BitTorrent & Magnet** `🚧` -- Peer-to-peer file sharing with .torrent files and magnet links
+- **BitTorrent & Magnet** -- [Pure Kotlin v1 downloads](docs/torrent.md) on JVM, Android, and iOS
 - **Metalink** `🔜` -- Multi-source downloads with mirrors, checksums, and chunk verification
 - **WebDAV** `🔜` -- Download from WebDAV servers with resume support
 - **HLS streaming** `🔜` -- Download and merge HTTP Live Streaming videos

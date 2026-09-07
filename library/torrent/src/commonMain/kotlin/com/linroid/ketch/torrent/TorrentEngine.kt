@@ -3,9 +3,7 @@ package com.linroid.ketch.torrent
 /**
  * Internal interface for the torrent engine backend.
  *
- * Abstracts the libtorrent4j session manager to allow future
- * platform-specific implementations (e.g., iOS via cinterop).
- * Only KMP-portable types are used in the interface.
+ * Owns the common Kotlin runtime and exposes portable types for source integration and tests.
  */
 internal interface TorrentEngine {
   /** Starts the engine. Must be called before any other operations. */

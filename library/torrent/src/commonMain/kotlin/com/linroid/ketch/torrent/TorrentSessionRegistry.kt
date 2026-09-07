@@ -29,6 +29,8 @@ internal class TorrentSessionRegistry {
     entries[taskId]?.session
   }
 
+  suspend fun isReserved(taskId: String): Boolean = mutex.withLock { taskId in entries }
+
   suspend fun release(taskId: String) = mutex.withLock {
     entries.remove(taskId)
     Unit

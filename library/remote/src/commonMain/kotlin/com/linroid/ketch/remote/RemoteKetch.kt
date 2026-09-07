@@ -127,8 +127,7 @@ class RemoteKetch(
     }
     checkSuccess(response)
     val task = createRemoteTask(response.body())
-    taskMutex.withLock { addOrUpdate(task) }
-    return task
+    return taskMutex.withLock { addOrUpdate(task) }
   }
 
   override suspend fun resolve(
@@ -217,7 +216,7 @@ class RemoteKetch(
     }
   }
 
-  private suspend fun fetchAllTasks() {
+  private suspend fun fetchAllTasks() = taskMutex.withLock {
     log.i { "Fetch all tasks" }
     val response = httpClient.get(Api.Tasks())
     log.i { "Status: ${response.status}" }
@@ -228,11 +227,10 @@ class RemoteKetch(
       val snapshots: TasksResponse = response.body()
       log.i { "Fetched ${snapshots.tasks.size} tasks" }
       val tasks = snapshots.tasks.map(::createRemoteTask)
-      taskMutex.withLock {
-        taskMap.clear()
-        tasks.forEach { taskMap[it.taskId] = it }
-        _tasks.value = tasks
-      }
+      val ids = tasks.map { it.taskId }.toSet()
+      taskMap.keys.retainAll(ids)
+      tasks.forEach { addOrUpdate(it) }
+      _tasks.value = taskMap.values.toList()
       log.i { "Fetched ${snapshots.tasks.size} tasks -> ${tasks.size}" }
     }
   }
@@ -293,10 +291,18 @@ class RemoteKetch(
     )
   }
 
-  private fun addOrUpdate(task: RemoteDownloadTask) {
+  private fun addOrUpdate(task: RemoteDownloadTask): RemoteDownloadTask {
     log.i { "Add or update: ${task.taskId}" }
-    taskMap[task.taskId] = task
+    // POST responses, TaskAdded events and reconnect snapshots can describe the same task.
+    // Preserve the instance already returned to callers so its StateFlows keep receiving SSE.
+    val current = taskMap[task.taskId]
+    if (current != null) {
+      current.updateState(task.state.value, task.request, task.segments.value)
+    } else {
+      taskMap[task.taskId] = task
+    }
     _tasks.update { taskMap.values.toList() }
+    return current ?: task
   }
 
   private fun removeTask(taskId: String) {

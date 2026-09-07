@@ -19,7 +19,8 @@ internal class TorrentOwnershipJournal(
   fun load(): List<Pair<Boolean, TorrentOwnedPath>> {
     position = 0
     if (!fileSystem.exists(path)) return emptyList()
-    require(fileSystem.metadata(path).isRegularFile && fileSystem.metadata(path).symlinkTarget == null)
+    val metadata = fileSystem.metadata(path)
+    require(metadata.isRegularFile && metadata.symlinkTarget == null)
     val size = fileSystem.metadata(path).size ?: 0
     require(size <= MAX_BYTES)
     val bytes = fileSystem.read(path) { readByteArray() }
@@ -105,7 +106,7 @@ internal class TorrentOwnershipJournal(
         }
         frame(binding)
         val current = records.filter { it.second.path != path.toString() } +
-          (false to TorrentOwnedPath(path.toString(), identity!!))
+          (false to TorrentOwnedPath(path.toString(), identity))
         for ((directory, owned) in current) {
           frame(Bencode.encode(mapOf("directory" to if (directory) 1L else 0L,
             "path" to owned.path, "identity" to owned.identity)))

@@ -11,6 +11,9 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SourceResumeState
 import io.ktor.http.Url
 import io.ktor.http.decodeURLPart
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -134,6 +137,9 @@ class TorrentDownloadSource(
         TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
       }
       return resolved(url, metadata)
+    } catch (e: TimeoutCancellationException) {
+      currentCoroutineContext().ensureActive()
+      throw KetchError.Network(Exception("Torrent operation timed out"))
     } catch (e: CancellationException) { throw e
     } catch (e: Exception) {
       if (e is KetchError) throw e
@@ -199,7 +205,9 @@ class TorrentDownloadSource(
     val bytes = decodeBase64(requireNotNull(resolved.metadata[META_METAINFO]))
     val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
     require(metadata.infoHash.hex == hash) { "Resolved torrent hash mismatch" }
-    val selectedIds = previous?.selectedFileIds ?: context.request.selectedFileIds
+    val selectedIds = context.request.selectedFileIds.ifEmpty {
+      previous?.selectedFileIds ?: emptySet()
+    }
     val selected = if (selectedIds.isEmpty()) metadata.files.indices.toSet() else {
       selectedIds.map { id ->
         requireNotNull(id.toIntOrNull()).also { require(it in metadata.files.indices) }
@@ -218,7 +226,11 @@ class TorrentDownloadSource(
       stateMutex.withLock {
         // Finished snapshots are bounded; persisted task state and the ownership journal recover
         // tasks after eviction. Active entries must remain until the final core snapshot.
-        while (states.size >= 64) states.remove(states.keys.first())
+        while (states.size >= 128 && context.taskId !in states) {
+          val finished = states.keys.firstOrNull { !tasks.isReserved(it) }
+          check(finished != null) { "Too many pending torrent tasks" }
+          states.remove(finished)
+        }
         states[context.taskId] = state
       }
       val runtime = getEngine()

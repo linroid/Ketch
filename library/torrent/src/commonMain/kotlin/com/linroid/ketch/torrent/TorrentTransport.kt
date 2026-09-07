@@ -126,8 +126,11 @@ internal class KtorTorrentNetwork(private val connectTimeoutMs: Long = 10_000) :
   override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
     val socket = aSocket(selector).udp().bind(local.host, local.port)
     val lease = resources.register { socket.close() }
+    val bound = endpoint(socket.localAddress as InetSocketAddress)
+    // JVM dual-stack UDP may report :: even when the requested wildcard is IPv4.
+    val logicalLocal = if (local.host == "0.0.0.0") bound.copy(host = "0.0.0.0") else bound
     return object : TorrentDatagramSocket {
-      override val local = endpoint(socket.localAddress as InetSocketAddress)
+      override val local = logicalLocal
       override suspend fun send(remote: PeerEndpoint, bytes: ByteArray) {
         require(bytes.size <= 65507 && remote.port != 0)
         val packet = Buffer().apply { write(bytes) }
