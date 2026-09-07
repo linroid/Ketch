@@ -22,7 +22,31 @@ data class TorrentConfig(
   val connectionsPerTorrent: Int = 100,
   val enableUpload: Boolean = false,
   val listenPort: Int = 0,
+  /** Explicit policy; null preserves the legacy [enableUpload] setting. */
+  val uploadPolicy: TorrentUploadPolicy? = null,
+  /** Maximum metainfo bytes accepted from HTTP or peers. */
+  val maxMetadataBytes: Int = 4 * 1024 * 1024,
+  /** Maximum simultaneously buffered piece data across the engine. */
+  val maxBufferedBytes: Int = 32 * 1024 * 1024,
+
 ) {
+  init {
+    require(maxActiveTorrents > 0) { "maxActiveTorrents must be positive" }
+    require(connectionsPerTorrent > 0) { "connectionsPerTorrent must be positive" }
+    require(metadataTimeoutSeconds >= 0) { "metadata timeout must be non-negative" }
+    require(listenPort in 0..65535) { "listenPort must be in 0..65535" }
+    require(maxMetadataBytes > 0) { "maxMetadataBytes must be positive" }
+    require(maxBufferedBytes >= 16384) { "maxBufferedBytes must hold a protocol block" }
+  }
+
+  /** Effective policy, including compatibility with the legacy boolean. */
+  val effectiveUploadPolicy: TorrentUploadPolicy
+    get() = uploadPolicy ?: if (enableUpload) {
+      TorrentUploadPolicy.SEED_AFTER_COMPLETION
+    } else {
+      TorrentUploadPolicy.DISABLED
+    }
+
   /** Metadata fetch timeout as a [Duration]. */
   val metadataTimeout: Duration
     get() = metadataTimeoutSeconds.seconds

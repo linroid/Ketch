@@ -46,6 +46,33 @@ class SourceResolverTest {
   }
 
   @Test
+  fun close_duplicateInstance_closedOnceAndCannotResolve() {
+    var closeCount = 0
+    val source = object : DownloadSource by fakeSource {
+      override fun close() { closeCount++ }
+    }
+    val resolver = SourceResolver(listOf(source, source))
+    resolver.close()
+    resolver.close()
+    assertEquals(1, closeCount)
+    assertFailsWith<IllegalStateException> { resolver.resolve("magnet:test") }
+    assertFailsWith<IllegalStateException> { resolver.resolveByType("magnet") }
+  }
+
+  @Test
+  fun close_failingSource_otherSourcesStillClose() {
+    var closed = false
+    val failing = object : DownloadSource by fakeSource {
+      override fun close() { error("close failed") }
+    }
+    val succeeding = object : DownloadSource by fakeSource {
+      override fun close() { closed = true }
+    }
+    SourceResolver(listOf(failing, succeeding)).close()
+    assertTrue(closed)
+  }
+
+  @Test
   fun resolve_httpUrl_returnsHttpSource() {
     val resolver = SourceResolver(listOf(httpSource))
     val source = resolver.resolve("https://example.com/file.zip")

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, "codex/torrent-*" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -53,7 +53,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Run Android unit tests
-        run: ./gradlew testDebugUnitTest
+        run: ./gradlew testDebugUnitTest :library:torrent:testAndroidHostTest :library:core:testAndroidHostTest
 
       - name: Upload test results
         if: always()
@@ -79,7 +79,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Run iOS simulator tests
-        run: ./gradlew iosSimulatorArm64Test
+        run: ./gradlew iosSimulatorArm64Test -PenableIosSimulatorTests=true
 
       - name: Upload test results
         if: always()

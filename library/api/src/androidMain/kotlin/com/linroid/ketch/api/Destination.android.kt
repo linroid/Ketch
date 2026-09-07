@@ -9,6 +9,7 @@ actual fun Destination.isFile(): Boolean =
   !isName() && !isDirectory()
 
 actual fun Destination.isDirectory(): Boolean {
+  if (':' !in value) return value.endsWith('/') || value.endsWith('\\')
   val uri = Uri.parse(value)
   if (uri.scheme == "content") {
     return DocumentsContract.isTreeUri(uri)
@@ -17,6 +18,7 @@ actual fun Destination.isDirectory(): Boolean {
 }
 
 actual fun Destination.isName(): Boolean {
+  if (':' !in value) return '/' !in value && '\\' !in value
   val uri = Uri.parse(value)
   if (uri.scheme != null) return false
   return !value.contains('/') && !value.contains('\\')

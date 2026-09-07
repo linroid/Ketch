@@ -18,6 +18,8 @@ actual fun createFileAccessor(
   path: String,
   ioDispatcher: CoroutineDispatcher,
 ): FileAccessor {
+  // A URI scheme requires a colon. Keep ordinary paths independent of Android APIs.
+  if (':' !in path) return PathFileAccessor(path, ioDispatcher)
   val uri = Uri.parse(path)
   return if (uri.isRelative) {
     PathFileAccessor(path, ioDispatcher)

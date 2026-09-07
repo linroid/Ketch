@@ -33,6 +33,7 @@ class DownloadCoordinatorCleanupTest {
     override val type: String = "rec",
     override val managesOwnFileIo: Boolean = false,
   ) : DownloadSource {
+    var lastOutputPath: String? = null
     var cleanupCalls = 0
     var lastResumeState: SourceResumeState? = null
     var lastFileAccessorType: String? = null
@@ -55,6 +56,7 @@ class DownloadCoordinatorCleanupTest {
       context: DownloadContext,
       resumeState: SourceResumeState?,
     ) {
+      lastOutputPath = context.outputPath
       cleanupCalls++
       lastResumeState = resumeState
       lastFileAccessorType =
@@ -121,6 +123,7 @@ class DownloadCoordinatorCleanupTest {
 
     assertEquals(1, source.cleanupCalls)
     assertEquals(resume, source.lastResumeState)
+    assertEquals("/tmp/file.zip", source.lastOutputPath)
   }
 
   @Test
