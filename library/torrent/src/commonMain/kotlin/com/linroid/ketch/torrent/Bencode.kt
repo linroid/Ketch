@@ -29,16 +29,21 @@ internal object Bencode {
 
   fun decode(data: ByteArray): Any = parse(data).legacyValue()
 
-  fun parse(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024): Node {
-    val node = parsePrefix(data, maxBytes)
+  fun parse(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024, maxNodes: Int = 100_000): Node {
+    val node = parsePrefix(data, maxBytes, maxNodes)
     require(node.end == data.size) { "Trailing bencode data" }
     return node
   }
 
   /** Parses a header followed by binary payload (BEP 9). */
-  fun parsePrefix(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024): Node {
+  fun parsePrefix(
+    data: ByteArray,
+    maxBytes: Int = 4 * 1024 * 1024,
+    maxNodes: Int = 100_000,
+  ): Node {
     require(data.size <= maxBytes) { "Bencode exceeds size limit" }
-    return Parser(data).read(0)
+    require(maxNodes in 1..1_000_000)
+    return Parser(data, maxNodes).read(0)
   }
 
   fun encode(value: Any): ByteArray {
@@ -47,12 +52,12 @@ internal object Bencode {
     return buffer.readByteArray()
   }
 
-  private class Parser(private val data: ByteArray) {
+  private class Parser(private val data: ByteArray, private val maxNodes: Int) {
     private var cursor = 0
     private var nodes = 0
 
     fun read(depth: Int): Node {
-      require(depth < 64 && ++nodes <= 100_000) { "Bencode structure exceeds limits" }
+      require(depth < 64 && ++nodes <= maxNodes) { "Bencode structure exceeds limits" }
       require(cursor < data.size) { "Unexpected end of bencode" }
       val start = cursor
       val value: Any = when (data[cursor].toInt().toChar()) {
