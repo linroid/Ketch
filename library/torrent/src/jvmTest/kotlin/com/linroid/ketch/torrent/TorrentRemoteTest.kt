@@ -28,18 +28,18 @@ class TorrentRemoteTest {
     withContext(Dispatchers.Default) {
       withTimeout(30_000) {
         val root = Files.createTempDirectory("ketch-remote-torrent").toFile()
-        val bytes = ByteArray(128 * 1024) { (it * 11).toByte() }
+        val bytes = ByteArray(256 * 1024) { (it * 11).toByte() }
         val hashes = bytes.asList().chunked(16_384).fold(ByteArray(0)) { value, chunk ->
           value + sha1Digest(chunk.toByteArray())
         }
         val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
           "name" to "bundle", "piece length" to 16_384L, "pieces" to hashes,
-          "files" to listOf(mapOf("length" to 65_536L, "path" to listOf("skip")),
-            mapOf("length" to 65_536L, "path" to listOf("keep")))
+          "files" to listOf(mapOf("length" to 131_072L, "path" to listOf("skip")),
+            mapOf("length" to 131_072L, "path" to listOf("keep")))
         ))))
         val seedDir = root.resolve("seed").apply { mkdirs() }
-        seedDir.resolve("skip").writeBytes(bytes.copyOfRange(0, 65_536))
-        seedDir.resolve("keep").writeBytes(bytes.copyOfRange(65_536, bytes.size))
+        seedDir.resolve("skip").writeBytes(bytes.copyOfRange(0, 131_072))
+        seedDir.resolve("keep").writeBytes(bytes.copyOfRange(131_072, bytes.size))
         val seed = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
           uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
         val ketch = Ketch(KtorHttpEngine(), additionalSources = listOf(
@@ -67,13 +67,13 @@ class TorrentRemoteTest {
           while (task.segments.value.sumOf { it.downloadedBytes } == 0L) delay(25)
           task.pause()
           task.state.first { it is DownloadState.Paused }
-          assertTrue(task.segments.value.sumOf { it.downloadedBytes } < 65_536)
+          assertTrue(task.segments.value.sumOf { it.downloadedBytes } < 131_072)
           task.setSpeedLimit(SpeedLimit.Unlimited)
           task.resume()
           task.await().getOrThrow()
-          assertEquals(65_536L, task.segments.value.sumOf { it.downloadedBytes })
+          assertEquals(131_072L, task.segments.value.sumOf { it.downloadedBytes })
           assertFalse(output.resolve("skip").exists())
-          assertContentEquals(bytes.copyOfRange(65_536, bytes.size),
+          assertContentEquals(bytes.copyOfRange(131_072, bytes.size),
             output.resolve("keep").readBytes())
         } finally {
           remote.close()

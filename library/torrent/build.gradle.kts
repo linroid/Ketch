@@ -92,18 +92,33 @@ tasks.withType<Test>().configureEach {
 
 // Independent-client test dependencies must never escape into published runtime variants.
 tasks.register("verifyNoNativeTorrentRuntime") {
-  notCompatibleWithConfigurationCache("Audits resolved publication runtime configurations")
-  val runtime = configurations.matching {
+  val runtimeModules = configurations.filter {
     it.isCanBeResolved && it.name.endsWith("RuntimeClasspath") &&
       !it.name.contains("test", ignoreCase = true)
-  }
-  doLast {
-    check(runtime.isNotEmpty()) { "No product runtime configurations were checked" }
-    runtime.forEach { configuration ->
-      val forbidden = configuration.incoming.resolutionResult.allComponents.filter {
-        it.moduleVersion?.group == "org.libtorrent4j"
+  }.map { configuration ->
+    configuration.incoming.resolutionResult.rootComponent.map { root ->
+      val visited = mutableSetOf<org.gradle.api.artifacts.component.ComponentIdentifier>()
+      val groups = mutableSetOf<String>()
+      val pending = ArrayDeque<org.gradle.api.artifacts.result.ResolvedComponentResult>()
+      pending.add(root)
+      while (pending.isNotEmpty()) {
+        val component = pending.removeFirst()
+        if (!visited.add(component.id)) continue
+        component.moduleVersion?.group?.let { groups.add(it) }
+        component.dependencies.forEach { dependency ->
+          if (dependency is org.gradle.api.artifacts.result.ResolvedDependencyResult) {
+            pending.add(dependency.selected)
+          }
+        }
       }
-      check(forbidden.isEmpty()) { "Torrent native dependency in ${configuration.name}: $forbidden" }
+      groups
+    }
+  }
+  inputs.property("runtimeModuleGroups", providers.provider { runtimeModules.map { it.get() } })
+  doLast {
+    check(runtimeModules.isNotEmpty()) { "No product runtime configurations were checked" }
+    check(runtimeModules.none { "org.libtorrent4j" in it.get() }) {
+      "Torrent native dependency in a product runtime configuration"
     }
   }
 }
