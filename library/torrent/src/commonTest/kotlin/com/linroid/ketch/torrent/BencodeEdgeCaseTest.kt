@@ -200,10 +200,9 @@ class BencodeEdgeCaseTest {
   }
 
   @Test
-  fun encode_listWithNulls_skipsNulls() {
+  fun encode_listWithNulls_rejectsNulls() {
     val list = listOf("a", null, "b")
-    val encoded = Bencode.encode(list)
-    assertEquals("l1:a1:be", encoded.decodeToString())
+    assertFailsWith<IllegalArgumentException> { Bencode.encode(list) }
   }
 
   @Test

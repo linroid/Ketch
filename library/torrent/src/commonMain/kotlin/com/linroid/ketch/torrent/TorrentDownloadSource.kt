@@ -9,6 +9,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
+import kotlin.io.encoding.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
@@ -467,7 +468,7 @@ internal expect fun createTorrentEngine(
 ): TorrentEngine
 
 /** Platform-specific base64 encoding. */
-internal expect fun encodeBase64(data: ByteArray): String
+internal fun encodeBase64(data: ByteArray): String = Base64.Default.encode(data)
 
 /** Platform-specific base64 decoding. */
-internal expect fun decodeBase64(data: String): ByteArray
+internal fun decodeBase64(data: String): ByteArray = Base64.Default.decode(data)
