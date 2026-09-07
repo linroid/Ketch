@@ -18,7 +18,7 @@ Approved scope: [roadmap](pure-kotlin-torrent-roadmap.md). Implementation checko
 | 11 Trackerless discovery and PEX | https://github.com/linroid/Ketch/pull/158 | IPv4/IPv6 multi-hop/warm DHT, PEX payload discovery, public identity quorum, private-source policy; independent DHT-to-metadata-to-payload JVM transfer |
 | 12 Durable resume | https://github.com/linroid/Ketch/pull/159 | Journal/checkpoint/identity recovery, concurrent session pause/resume and live limits pass on JVM/Android/iOS; JVM process-crash fixtures pass at write/checkpoint boundaries |
 | 13 Kotlin runtime and product integration | https://github.com/linroid/Ketch/pull/160 | Kotlin default on JVM/Android/iOS; CLI download/daemon registration; public-source selected boundary transfer and offline recovery, incoming seeding, connection reduction, and final checkpoint handoff |
-| 14 Hardening and native removal | Draft pending publication | Native product engine removed; independent clients, platform suites, secure filesystem adapters and resource measurements implemented; final CI/package checks in progress |
+| 14 Hardening and native removal | https://github.com/linroid/Ketch/pull/161 | Native product engine removed; independent clients, platform suites, secure filesystem adapters and resource measurements implemented; final CI/package checks in progress |
 
 No PR has been merged. Product torrent engines are Kotlin on JVM, Android and iOS. Libtorrent is
 retained only as a test fixture. JVM JNA calls provide OS filesystem services.

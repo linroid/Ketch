@@ -92,6 +92,7 @@ tasks.withType<Test>().configureEach {
 
 // Independent-client test dependencies must never escape into published runtime variants.
 tasks.register("verifyNoNativeTorrentRuntime") {
+  notCompatibleWithConfigurationCache("Audits resolved publication runtime configurations")
   val runtime = configurations.matching {
     it.isCanBeResolved && it.name.endsWith("RuntimeClasspath") &&
       !it.name.contains("test", ignoreCase = true)
