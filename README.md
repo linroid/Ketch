@@ -159,7 +159,13 @@ Supported platforms: **macOS** (arm64), **Linux** (x64, arm64), **Windows** (x64
 ## Contributing
 
 Contributions are welcome! Please open an issue to discuss your idea before submitting a PR.
-See the [code style rules](.claude/rules/code-style.md) for formatting guidelines.
+See the [code style rules](docs/development/code-style.md) and
+[testing rules](docs/development/testing.md) for development guidelines.
+
+Coding agents should start with [AGENTS.md](AGENTS.md), the shared instructions for all agents
+and editors. If your tool does not load it automatically, ask it to read `AGENTS.md` and its linked
+rules before making changes. Keep shared instructions in these files; tool-specific entry points
+should only reference them.
 
 ## License
 
