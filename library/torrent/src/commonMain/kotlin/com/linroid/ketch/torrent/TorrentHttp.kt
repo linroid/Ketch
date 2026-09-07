@@ -33,6 +33,6 @@ internal class TorrentHttp(
   }
 
   companion object {
-    fun default(): TorrentHttp = TorrentHttp(KtorHttpEngine(), ownsEngine = true)
+    fun default(): TorrentHttp = TorrentHttp(KtorHttpEngine(logRequests = false), ownsEngine = true)
   }
 }
