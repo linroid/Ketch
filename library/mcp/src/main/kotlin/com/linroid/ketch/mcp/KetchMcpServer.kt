@@ -1,7 +1,8 @@
 package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.mcp.server.startSseMcpServer
+import ai.koog.agents.mcp.server.McpServerTransportType
+import ai.koog.agents.mcp.server.startMcpServer
 import ai.koog.agents.mcp.server.startStdioMcpServer
 import com.linroid.ketch.api.KetchApi
 import io.ktor.server.engine.ApplicationEngineFactory
@@ -56,7 +57,13 @@ class KetchMcpServer(
     port: Int = 3001,
     host: String = "localhost",
   ) {
-    val server = startSseMcpServer(factory, port, host, toolRegistry)
+    val server = startMcpServer(
+      factory = factory,
+      tools = toolRegistry,
+      port = port,
+      host = host,
+      transport = McpServerTransportType.SSE,
+    )
     val done = Job()
     server.onClose { done.complete() }
     done.join()
