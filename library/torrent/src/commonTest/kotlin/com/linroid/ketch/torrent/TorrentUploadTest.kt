@@ -48,12 +48,14 @@ class TorrentUploadTest {
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
         val budget = TorrentBufferBudget(1024 * 1024)
         val completed = CompletableDeferred<Unit>()
+        val metadataServed = CompletableDeferred<Unit>()
         var uploaded = 0
         val server = launch {
           val connection = listener.accept()
           try {
             val wire = PeerWire(connection, metadata)
-            wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), false, false))
+            wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20),
+              policy == TorrentUploadPolicy.SEED_AFTER_COMPLETION, false))
             wire.send(PeerMessage.Bitfield(pieceBitfield(booleanArrayOf(false, true))))
             wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
             wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
@@ -75,6 +77,20 @@ class TorrentUploadTest {
                   assertContentEquals(first, message.bytes)
                   assertEquals(4, uploaded)
                   servedUpload = true
+                }
+                is PeerMessage.Extended -> {
+                  if (message.id == 0) {
+                    wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+                      "m" to mapOf("ut_metadata" to 7L)
+                    ))))
+                    wire.send(TorrentMetadataExchange.metadataMessage(1, 0, 0))
+                  } else {
+                    assertEquals(7, message.id)
+                    val header = Bencode.parsePrefix(message.payload)
+                    assertContentEquals(metadata.infoBytes,
+                      message.payload.copyOfRange(header.end, message.payload.size))
+                    metadataServed.complete(Unit)
+                  }
                 }
                 else -> Unit
               }
@@ -100,6 +116,7 @@ class TorrentUploadTest {
         try {
           completed.await()
           if (policy == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
+            metadataServed.await()
             assertFalse(download.isCompleted)
             download.cancelAndJoin()
           } else download.await()

@@ -148,8 +148,12 @@ internal class TorrentSwarm(
       val uploadCache = TorrentUploadCache(store, budget)
       try {
         val wire = PeerWire(connection, store.metadata)
-        val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, false, false))
+        val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true, false))
         require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
+        val extensions = PeerExtensions()
+        var metadataServed = 0
+        var metadataWindow = TimeSource.Monotonic.markNow()
+        if (handshake.extensions) wire.send(PeerExtensions.handshake(store.metadata))
         val state = PeerProtocolState(store.pieceCount, maxPending = 16)
         val advertised = store.verifiedPieces()
         var version = -1L
@@ -225,6 +229,30 @@ internal class TorrentSwarm(
                     wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
                     uploadSlots.release()
                     uploadSlot = false
+                  }
+                }
+                is PeerMessage.Extended -> {
+                  require(handshake.extensions) { "Unnegotiated peer extension" }
+                  if (message.id == 0) extensions.receive(message.payload, 4 * 1024 * 1024)
+                  else if (message.id == PeerExtensions.METADATA) {
+                    val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE)
+                    if (header["msg_type"]?.integer == 0L) {
+                      val index = requireNotNull(header["piece"]?.integer)
+                      require(index in 0..Int.MAX_VALUE.toLong())
+                      val remoteId = extensions.id("ut_metadata")
+                      if (remoteId != 0) {
+                        if (metadataWindow.elapsedNow().inWholeSeconds >= 60) {
+                          metadataServed = 0
+                          metadataWindow = TimeSource.Monotonic.markNow()
+                        }
+                        val limit = (store.metadata.infoBytes.size / 16_384 + 1) * 3
+                        val response = if (metadataServed < limit) {
+                          metadataServed++
+                          TorrentMetadataExchange.response(remoteId, index.toInt(), store.metadata)
+                        } else TorrentMetadataExchange.metadataMessage(remoteId, 2, index.toInt())
+                        wire.send(response)
+                      }
+                    }
                   }
                 }
                 else -> Unit
