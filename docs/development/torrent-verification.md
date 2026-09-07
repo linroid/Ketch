@@ -77,8 +77,7 @@ Security boundaries, migration behavior and explicitly deferred protocols are do
 not a performance guarantee.
 
 The final local torrent counts were 275 JVM tests, 265 Android host tests, 266 iOS simulator tests,
-and one Android device test, with zero failures. Core counts before the added pause-handoff regression were 202 JVM and 199 each on Android
-host, iOS simulator and JS. The server suite passed 42 tests. Counts include opt-in JVM fixture
+and one Android device test, with zero failures. Core counts were 203 JVM and 200 each on Android host, iOS simulator and JS. The server suite passed 42 tests. Counts include opt-in JVM fixture
 methods, which return early when their required environment variables are absent; the recorded
 independent-client runs explicitly set those variables.
 
@@ -86,3 +85,8 @@ Desktop packaging can select a non-Homebrew JDK with `-PdesktopJavaHome=/path/to
 The Graal CLI build is `:cli:nativeCompile`; JVM distribution is `:cli:installDist`.
 Local package checks reused the original checkout's built web assets through `-PprebuiltWebDir`;
 web source was not changed by this work.
+
+Windows filesystem CI passed after replacing Java's unavailable fileKey with OS handle identity.
+The deterministic core handoff fixture holds the old source checkpoint open while requesting
+resume, and requires both pause and resume to wait for checkpoint completion. The full local
+regression/package command passed again after that correction (418 Gradle tasks).

@@ -18,7 +18,7 @@ Approved scope: [roadmap](pure-kotlin-torrent-roadmap.md). Implementation checko
 | 11 Trackerless discovery and PEX | https://github.com/linroid/Ketch/pull/158 | IPv4/IPv6 multi-hop/warm DHT, PEX payload discovery, public identity quorum, private-source policy; independent DHT-to-metadata-to-payload JVM transfer |
 | 12 Durable resume | https://github.com/linroid/Ketch/pull/159 | Journal/checkpoint/identity recovery, concurrent session pause/resume and live limits pass on JVM/Android/iOS; JVM process-crash fixtures pass at write/checkpoint boundaries |
 | 13 Kotlin runtime and product integration | https://github.com/linroid/Ketch/pull/160 | Kotlin default on JVM/Android/iOS; CLI download/daemon registration; public-source selected boundary transfer and offline recovery, incoming seeding, connection reduction, and final checkpoint handoff |
-| 14 Hardening and native removal | https://github.com/linroid/Ketch/pull/161 | Native product engine removed; independent clients, platform suites, secure filesystem adapters and resource measurements implemented; final CI/package checks in progress |
+| 14 Hardening and native removal | https://github.com/linroid/Ketch/pull/161 | Native product engine removed; independent clients, verified remote control, JVM/Android/iOS suites, secure filesystem adapters, resource measurements and product package checks passed locally; expanded CI runs on this draft |
 
 No PR has been merged. Product torrent engines are Kotlin on JVM, Android and iOS. Libtorrent is
 retained only as a test fixture. JVM JNA calls provide OS filesystem services.
@@ -46,3 +46,9 @@ Implementation notes:
   destination must not be concurrently mutated by an untrusted process during cleanup.
 - Native/iOS socket disconnects now use IOException consistently, and shared parent-directory
   creation tolerates another torrent creating the same directory without claiming its ownership.
+
+Final hardening also fixes pause/resume checkpoint ordering in core and preserves remote task object
+identity across POST/SSE/reconnect responses. Windows ownership uses volume/file-index/creation
+identity from OS handles when Java fileKey is unavailable. The final Windows filesystem CI suite
+passed after this correction. The iOS disconnect error classification was backported to layer 10
+and layers 11–14 were restacked without changing the final implementation tree.
