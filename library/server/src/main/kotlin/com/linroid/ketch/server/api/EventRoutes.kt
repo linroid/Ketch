@@ -11,7 +11,8 @@ import io.ktor.server.sse.sse
 import io.ktor.sse.ServerSentEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -20,12 +21,12 @@ private val log = KetchLogger("EventRoutes")
 
 /**
  * Installs the `/api/events` SSE endpoint that streams real-time
- * download state changes to connected clients.
+ * download state, request configuration, and segment changes to connected clients.
  *
  * Events are sent for:
  * - [TaskEvent.TaskAdded]: a new task appears in the tasks list
  * - [TaskEvent.TaskRemoved]: a task is removed from the tasks list
- * - [TaskEvent.StateChanged]: a task's state changes
+ * - [TaskEvent.StateChanged]: state, settings, or segments change while not downloading
  * - [TaskEvent.Progress]: download progress update
  */
 internal fun Route.eventRoutes(ketch: KetchApi) {
@@ -76,12 +77,6 @@ internal fun Route.eventRoutes(ketch: KetchApi) {
       sendEvent(TaskEvent.Error(taskId = taskId))
       return@sse
     }
-    sendEvent(
-      TaskEvent.StateChanged(
-        taskId = task.taskId,
-        state = task.state.value,
-      ),
-    )
     trackTaskState(task)
   }
 }
@@ -89,22 +84,27 @@ internal fun Route.eventRoutes(ketch: KetchApi) {
 private suspend fun ServerSSESession.trackTaskState(
   task: DownloadTask,
 ) {
-  task.state.drop(1)
-    .collect { state ->
-      val event = when (state) {
-        is DownloadState.Downloading -> TaskEvent.Progress(
-          taskId = task.taskId,
-          state = state,
-        )
-
-        else -> TaskEvent.StateChanged(
-          taskId = task.taskId,
-          state = state,
-        )
-      }
-      sendEvent(event)
-    }
+  taskEvents(task).collect { sendEvent(it) }
 }
+
+internal fun taskEvents(task: DownloadTask): Flow<TaskEvent> =
+  combine(task.state, task.requestState, task.segments) { state, request, segments ->
+    when (state) {
+      is DownloadState.Downloading -> TaskEvent.Progress(
+        taskId = task.taskId,
+        state = state,
+        request = request,
+        segments = segments,
+      )
+
+      else -> TaskEvent.StateChanged(
+        taskId = task.taskId,
+        state = state,
+        request = request,
+        segments = segments,
+      )
+    }
+  }
 
 private suspend fun ServerSSESession.sendEvent(event: TaskEvent) {
   log.d { "SSE event: ${event.eventType.value} taskId=${event.taskId}" }

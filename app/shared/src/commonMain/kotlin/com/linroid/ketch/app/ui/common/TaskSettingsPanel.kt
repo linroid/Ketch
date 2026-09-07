@@ -51,6 +51,7 @@ fun TaskSettingsPanel(
   task: DownloadTask,
   modifier: Modifier = Modifier,
 ) {
+  val request by task.requestState.collectAsState()
   val segments by task.segments.collectAsState()
 
   Surface(
@@ -62,16 +63,16 @@ fun TaskSettingsPanel(
       modifier = Modifier.padding(12.dp),
       verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-      CopyableInfoRow("URL", task.request.url)
+      CopyableInfoRow("URL", request.url)
 
-      task.request.destination?.let { dest ->
+      request.destination?.let { dest ->
         InfoRow("Destination", dest.value)
       }
 
       InfoRow(
         "Connections",
-        if (task.request.connections > 0) {
-          task.request.connections.toString()
+        if (request.connections > 0) {
+          request.connections.toString()
         } else {
           "Auto"
         }
@@ -85,9 +86,9 @@ fun TaskSettingsPanel(
       }
       InfoRow(
         "Priority",
-        priorityLabel(task.request.priority)
+        priorityLabel(request.priority)
       )
-      val limit = task.request.speedLimit
+      val limit = request.speedLimit
       InfoRow(
         "Speed limit",
         if (limit.isUnlimited) "Unlimited"

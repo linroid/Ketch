@@ -263,14 +263,14 @@ class RemoteKetch(
         val task = taskMutex.withLock {
           taskMap[event.taskId]
         } ?: return
-        task.updateState(event.state)
+        task.updateState(event.state, event.request, event.segments)
       }
 
       is TaskEvent.Progress -> {
         val task = taskMutex.withLock {
           taskMap[event.taskId]
         } ?: return
-        task.updateState(event.state)
+        task.updateState(event.state, event.request, event.segments)
       }
 
       is TaskEvent.Error -> {

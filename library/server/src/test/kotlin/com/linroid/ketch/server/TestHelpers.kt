@@ -112,6 +112,7 @@ private class RecordingTask(
 ) : DownloadTask {
   override val taskId: String get() = delegate.taskId
   override val request: DownloadRequest get() = delegate.request
+  override val requestState: StateFlow<DownloadRequest> get() = delegate.requestState
   override val createdAt = delegate.createdAt
   override val state: StateFlow<DownloadState> get() = delegate.state
   override val segments: StateFlow<List<Segment>> get() = delegate.segments

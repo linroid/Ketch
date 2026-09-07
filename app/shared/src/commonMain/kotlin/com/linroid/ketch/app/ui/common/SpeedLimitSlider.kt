@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -193,8 +194,9 @@ fun SpeedLimitPanel(
   scope: CoroutineScope,
   modifier: Modifier = Modifier,
 ) {
+  val request by task.requestState.collectAsState()
   SpeedLimitSelector(
-    value = task.request.speedLimit,
+    value = request.speedLimit,
     onValueChange = { limit ->
       scope.launch { task.setSpeedLimit(limit) }
     },
