@@ -3,15 +3,21 @@ package com.linroid.ketch.app.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -35,37 +41,42 @@ fun KetchTextField(
   enabled: Boolean = true,
 ) {
   val colors = KetchTheme.colors
-  val shape = RoundedCornerShape(8.dp)
-  val textStyle: TextStyle =
-    (if (mono) KetchTheme.typography.monoSmall else KetchTheme.typography.bodyMedium)
-      .copy(color = colors.onBackground)
-
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+  val shape = RoundedCornerShape(10.dp)
+  var focused by remember { mutableStateOf(false) }
+  val textStyle = (if (mono) KetchTheme.typography.monoSmall else KetchTheme.typography.bodyMedium)
+    .copy(color = colors.onBackground)
+  BasicTextField(
+    value = value,
+    onValueChange = onValueChange,
+    enabled = enabled,
+    singleLine = true,
+    textStyle = textStyle,
+    cursorBrush = SolidColor(colors.primary),
     modifier = modifier
-      .defaultMinSize(minHeight = 36.dp)
+      .onFocusChanged { focused = it.isFocused }
+      .defaultMinSize(minHeight = 44.dp)
       .clip(shape)
       .background(colors.surface)
-      .border(1.dp, colors.outline, shape)
-      .padding(horizontal = 12.dp),
-  ) {
-    if (leadingIcon != null) {
-      KetchIconImage(leadingIcon, size = 14.dp, tint = colors.onSurfaceDim)
-    }
-    BasicTextField(
-      value = value,
-      onValueChange = onValueChange,
-      enabled = enabled,
-      textStyle = textStyle,
-      cursorBrush = SolidColor(colors.primary),
-      modifier = Modifier.defaultMinSize(minWidth = 120.dp),
-      decorationBox = { inner ->
-        if (value.isEmpty() && placeholder.isNotEmpty()) {
-          Text(placeholder, style = textStyle.copy(color = colors.onSurfaceDim))
+      .border(if (focused) 2.dp else 1.dp, if (focused) colors.primary else colors.outlineVariant, shape),
+    decorationBox = { inner ->
+      Row(
+        modifier = Modifier.padding(start = 14.dp, end = if (value.isEmpty()) 14.dp else 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+      ) {
+        if (leadingIcon != null) KetchIconImage(leadingIcon, size = 18.dp, tint = colors.onSurfaceVariant)
+        Box(Modifier.weight(1f).padding(vertical = 12.dp)) {
+          if (value.isEmpty()) Text(placeholder, style = textStyle, color = colors.onSurfaceDim)
+          inner()
         }
-        inner()
-      },
-    )
-  }
+        if (value.isNotEmpty()) KetchIconButton(
+          icon = KetchIcon.Close,
+          contentDescription = "Clear text",
+          size = KetchButtonSize.Small,
+          enabled = enabled,
+          onClick = { onValueChange("") },
+        )
+      }
+    },
+  )
 }

@@ -39,15 +39,15 @@ fun ketchTypography(
 ): KetchTypography = KetchTypography(
   displayLarge = TextStyle(
     fontFamily = sans, fontWeight = FontWeight.SemiBold,
-    fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.3).sp,
+    fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.3).sp,
   ),
   displayMedium = TextStyle(
     fontFamily = sans, fontWeight = FontWeight.SemiBold,
-    fontSize = 20.sp, lineHeight = 26.sp, letterSpacing = (-0.25).sp,
+    fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.25).sp,
   ),
   displaySmall = TextStyle(
     fontFamily = sans, fontWeight = FontWeight.SemiBold,
-    fontSize = 18.sp, lineHeight = 24.sp, letterSpacing = (-0.2).sp,
+    fontSize = 20.sp, lineHeight = 26.sp, letterSpacing = (-0.2).sp,
   ),
   bodyLarge = TextStyle(
     fontFamily = sans, fontWeight = FontWeight.Normal,

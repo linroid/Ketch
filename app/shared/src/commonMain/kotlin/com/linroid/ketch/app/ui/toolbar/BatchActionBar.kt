@@ -25,13 +25,13 @@ fun BatchActionBar(
     horizontalArrangement = Arrangement.spacedBy(2.dp),
   ) {
     if (hasActiveDownloads) {
-      KetchIconButton(icon = KetchIcon.Pause, onClick = onPauseAll)
+      KetchIconButton(icon = KetchIcon.Pause, contentDescription = "Pause all downloads", onClick = onPauseAll)
     }
     if (hasPausedDownloads) {
-      KetchIconButton(icon = KetchIcon.Play, onClick = onResumeAll)
+      KetchIconButton(icon = KetchIcon.Play, contentDescription = "Resume all downloads", onClick = onResumeAll)
     }
     if (hasCompletedDownloads) {
-      KetchIconButton(icon = KetchIcon.Trash, onClick = onClearCompleted)
+      KetchIconButton(icon = KetchIcon.Trash, contentDescription = "Clear completed downloads", onClick = onClearCompleted)
     }
   }
 }

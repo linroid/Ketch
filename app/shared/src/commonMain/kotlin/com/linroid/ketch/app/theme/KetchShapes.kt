@@ -7,8 +7,8 @@ import androidx.compose.ui.unit.dp
 
 @Immutable
 data class KetchShapes(
-  val xs: Shape = RoundedCornerShape(3.dp),
-  val sm: Shape = RoundedCornerShape(6.dp),
+  val xs: Shape = RoundedCornerShape(10.dp),
+  val sm: Shape = RoundedCornerShape(10.dp),
   val md: Shape = RoundedCornerShape(8.dp),
   val lg: Shape = RoundedCornerShape(10.dp),
   val xl: Shape = RoundedCornerShape(14.dp),

@@ -36,6 +36,7 @@ fun EmbeddedServerControls(
         )
         KetchIconButton(
           icon = KetchIcon.Close,
+          contentDescription = "Stop server",
           onClick = onStopServer,
           size = KetchButtonSize.Small,
           tint = KetchTheme.colors.error,
@@ -44,7 +45,7 @@ fun EmbeddedServerControls(
     }
     is ServerState.Stopped -> {
       KetchButton(
-        text = "Start Server",
+        text = "Start server",
         onClick = { onStartServer(8642, null) },
         leadingIcon = KetchIcon.Local,
         variant = KetchButtonVariant.Ghost,

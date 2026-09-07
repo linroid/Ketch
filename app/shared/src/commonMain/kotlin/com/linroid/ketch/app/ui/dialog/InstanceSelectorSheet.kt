@@ -1,40 +1,49 @@
 package com.linroid.ketch.app.ui.dialog
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.window.core.layout.WindowSizeClass
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.ConnectionStatusChip
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,148 +58,134 @@ fun InstanceSelectorSheet(
   onAddRemoteServer: () -> Unit,
   onDismiss: () -> Unit,
 ) {
-  val sheetState = rememberModalBottomSheetState()
   val instances by instanceManager.instances.collectAsState()
+  val colors = KetchTheme.colors
+  val type = KetchTheme.typography
+  val isCompact = !currentWindowAdaptiveInfo().windowSizeClass
+    .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
-  ModalBottomSheet(
-    onDismissRequest = onDismiss,
-    sheetState = sheetState,
-  ) {
+  val instanceList: @Composable () -> Unit = {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(bottom = 24.dp),
+        .heightIn(max = 400.dp)
+        .verticalScroll(rememberScrollState()),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
       Text(
-        text = "Select Instance",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(
-          horizontal = 24.dp, vertical = 8.dp,
-        )
+        "Choose where to manage your downloads.",
+        style = type.bodyMedium,
+        color = colors.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 6.dp),
       )
-
       instances.forEach { entry ->
         val isActive = entry == activeInstance
         val isSwitching = entry == switchingInstance
-
-        ListItem(
-          modifier = Modifier.clickable(
-            enabled = !isSwitching &&
-              switchingInstance == null,
+        val shape = RoundedCornerShape(10.dp)
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (isActive) colors.primaryContainer else colors.surface)
+            .border(1.dp, if (isActive) colors.primary else colors.outlineVariant, shape)
+            .selectable(
+              selected = isActive,
+              enabled = switchingInstance == null,
+              role = Role.RadioButton,
+              onClick = { onSelectInstance(entry) },
+            )
+            .padding(12.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          KetchIconImage(
+            icon = if (entry is EmbeddedInstance) KetchIcon.Local else KetchIcon.Remote,
+            size = 24.dp,
+            tint = if (isActive) colors.primary else colors.onSurfaceVariant,
+          )
+          Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
           ) {
-            onSelectInstance(entry)
-          },
-          headlineContent = {
             Text(
               text = entry.label,
-              fontWeight = if (isActive) {
-                FontWeight.SemiBold
-              } else {
-                FontWeight.Normal
-              }
+              style = type.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+              color = colors.onBackground,
+              maxLines = 2,
+              overflow = TextOverflow.Ellipsis,
             )
-          },
-          leadingContent = {
-            Icon(
-              imageVector = if (entry is EmbeddedInstance) {
-                Icons.Filled.PhoneAndroid
-              } else {
-                Icons.Filled.Cloud
-              },
-              contentDescription = entry.label,
-              tint = if (isActive) {
-                MaterialTheme.colorScheme.primary
-              } else {
-                MaterialTheme.colorScheme
-                  .onSurfaceVariant
-              }
+            Text(
+              text = if (entry is RemoteInstance) "${entry.host}:${entry.port}" else "This device",
+              style = type.bodySmall,
+              color = colors.onSurfaceVariant,
+              maxLines = 2,
+              overflow = TextOverflow.Ellipsis,
             )
-          },
-          supportingContent = {
-            Column {
-              if (entry is RemoteInstance) {
-                val entryConnectionState by
-                  entry.connectionState.collectAsState()
-                ConnectionStatusChip(
-                  state = entryConnectionState,
-                  isActive = isActive,
-                )
-              }
-              if (entry is EmbeddedInstance &&
-                instanceManager.isLocalServerSupported
-              ) {
-                EmbeddedServerControls(
-                  serverState = serverState,
-                  onStartServer = { port, _ ->
-                    instanceManager.startServer(port)
-                  },
-                  onStopServer = {
-                    instanceManager.stopServer()
-                  }
-                )
-              }
+            if (entry is RemoteInstance) {
+              val connectionState by entry.connectionState.collectAsState()
+              ConnectionStatusChip(state = connectionState, isActive = isActive)
             }
-          },
-          trailingContent = {
-            Row(
-              verticalAlignment =
-                Alignment.CenterVertically,
-              horizontalArrangement =
-                Arrangement.spacedBy(4.dp)
-            ) {
-              if (isSwitching) {
-                CircularProgressIndicator(
-                  modifier = Modifier.size(20.dp),
-                  strokeWidth = 2.dp,
-                )
-              } else if (isActive) {
-                Icon(
-                  imageVector = Icons.Filled.Check,
-                  contentDescription = "Active",
-                  tint =
-                    MaterialTheme.colorScheme.primary,
-                  modifier = Modifier.size(20.dp),
-                )
-              }
-              if (entry !is EmbeddedInstance) {
-                IconButton(
-                  onClick = {
-                    onRemoveInstance(entry)
-                  }
-                ) {
-                  Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Remove",
-                    tint = MaterialTheme.colorScheme
-                      .onSurfaceVariant
-                  )
-                }
-              }
+            if (entry is EmbeddedInstance && instanceManager.isLocalServerSupported) {
+              EmbeddedServerControls(
+                serverState = serverState,
+                onStartServer = { port, _ -> instanceManager.startServer(port) },
+                onStopServer = { instanceManager.stopServer() },
+              )
             }
           }
+          if (isSwitching) {
+            CircularProgressIndicator(
+              modifier = Modifier.size(20.dp).semantics { contentDescription = "Connecting" },
+              strokeWidth = 2.dp,
+            )
+          } else if (isActive) {
+            KetchIconImage(icon = KetchIcon.Check, size = 20.dp, tint = colors.primary)
+          }
+          if (entry is RemoteInstance) {
+            KetchIconButton(
+              icon = KetchIcon.Close,
+              contentDescription = "Remove ${entry.label}",
+              enabled = switchingInstance == null,
+              onClick = { onRemoveInstance(entry) },
+            )
+          }
+        }
+      }
+    }
+  }
+
+  if (isCompact) {
+    ModalBottomSheet(
+      onDismissRequest = onDismiss,
+      sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+      containerColor = colors.surface,
+    ) {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+      ) {
+        Text("Download instances", style = type.displaySmall, color = colors.onBackground)
+        instanceList()
+        KetchButton(
+          text = "Add remote server",
+          leadingIcon = KetchIcon.Plus,
+          onClick = onAddRemoteServer,
+          modifier = Modifier.fillMaxWidth(),
         )
       }
-
-      HorizontalDivider(
-        modifier = Modifier.padding(vertical = 8.dp),
-      )
-
-      ListItem(
-        modifier = Modifier.clickable {
-          onAddRemoteServer()
-        },
-        headlineContent = {
-          Text("Add Remote Server")
-        },
-        leadingContent = {
-          Icon(
-            imageVector = Icons.Filled.Add,
-            contentDescription = "Add remote server",
-            tint = MaterialTheme.colorScheme.primary,
-          )
-        }
-      )
     }
+  } else {
+    AlertDialog(
+      onDismissRequest = onDismiss,
+      containerColor = colors.surface,
+      title = { Text("Download instances", style = type.displaySmall, color = colors.onBackground) },
+      text = { instanceList() },
+      confirmButton = {
+        KetchButton(text = "Add remote server", leadingIcon = KetchIcon.Plus, onClick = onAddRemoteServer)
+      },
+      dismissButton = {
+        KetchButton(text = "Done", variant = KetchButtonVariant.Ghost, onClick = onDismiss)
+      },
+    )
   }
 }

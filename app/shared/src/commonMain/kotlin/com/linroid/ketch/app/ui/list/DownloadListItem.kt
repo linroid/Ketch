@@ -14,11 +14,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,6 +46,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.isName
+import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchProgressBar
 import com.linroid.ketch.app.icons.KetchIcon
@@ -91,18 +95,20 @@ fun DownloadListItem(
   var subPanel by remember { mutableStateOf(ExpandedSubPanel.None) }
   var showRemoveDialog by remember { mutableStateOf(false) }
 
+  LaunchedEffect(state::class) {
+    if (state.isTerminal) subPanel = ExpandedSubPanel.None
+  }
+
   val colors = KetchTheme.colors
-  val type = KetchTheme.typography
   val stateColors = LocalDownloadStateColors.current.forState(state)
-  val borderColor = if (expanded) colors.outline else colors.outlineVariant
+  val borderColor = if (expanded) colors.primary.copy(alpha = 0.35f) else colors.outlineVariant
 
   Column(
     modifier = modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(10.dp))
-      .background(if (expanded) colors.surface else colors.surface)
-      .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-      .clickable { expanded = !expanded },
+      .clip(RoundedCornerShape(14.dp))
+      .background(colors.surface)
+      .border(1.dp, borderColor, RoundedCornerShape(14.dp)),
   ) {
     DownloadRow(
       fileName = fileName,
@@ -110,6 +116,8 @@ fun DownloadListItem(
       stateColors = stateColors,
       task = task,
       scope = scope,
+      expanded = expanded,
+      onToggle = { expanded = !expanded },
     )
 
     AnimatedVisibility(
@@ -119,9 +127,11 @@ fun DownloadListItem(
     ) {
       Column {
         DownloadExpandedPanel(
+          fileName = fileName,
           state = state,
           segments = segments,
           task = task,
+          onRemoveRequest = { showRemoveDialog = true },
         )
 
         ExpandedSettingsRow(
@@ -129,6 +139,7 @@ fun DownloadListItem(
           subPanel = subPanel,
           onSubPanelChange = { subPanel = it },
           onRemoveRequest = { showRemoveDialog = true },
+          onCancel = { scope.launch { task.cancel() } },
         )
 
         AnimatedContent(
@@ -179,56 +190,67 @@ private fun DownloadRow(
   stateColors: StateColorPair,
   task: DownloadTask,
   scope: CoroutineScope,
+  expanded: Boolean,
+  onToggle: () -> Unit,
 ) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val progress = stateProgress(state)
   val animatedPct by animateFloatAsState(progress, tween(400), label = "row-progress")
 
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
-    modifier = Modifier
-      .fillMaxWidth()
-      .height(56.dp)
-      .padding(horizontal = 16.dp),
-  ) {
-    KetchFileTypeChip(fileName)
-
-    // Name + thin progress
-    Column(
-      verticalArrangement = Arrangement.spacedBy(6.dp),
-      modifier = Modifier.weight(1f),
+  BoxWithConstraints {
+    val compact = maxWidth < 600.dp
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+      modifier = Modifier
+        .fillMaxWidth()
+        .clickable(onClickLabel = if (expanded) "Hide download details" else "Show download details", onClick = onToggle)
+        .heightIn(min = 80.dp)
+        .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-          text = fileName,
-          style = type.bodyLarge.copy(fontWeight = FontWeight.Medium),
-          color = colors.onBackground,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.weight(1f, fill = false),
+      KetchFileTypeChip(fileName)
+
+      // Name + thin progress
+      Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.weight(1f),
+      ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(
+            text = fileName,
+            style = type.bodyLarge.copy(fontWeight = FontWeight.Medium),
+            color = colors.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+          )
+          if (task.request.priority != DownloadPriority.NORMAL) {
+            Spacer(Modifier.width(8.dp))
+            PriorityBadge(task.request.priority)
+          }
+        }
+        if (state is DownloadState.Downloading || state is DownloadState.Paused) KetchProgressBar(
+          progress = animatedPct,
+          fillColor = stateColors.foreground,
         )
-        if (task.request.priority != DownloadPriority.NORMAL) {
-          Spacer(Modifier.width(8.dp))
-          PriorityBadge(task.request.priority)
+        if (compact) {
+          FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            StatusPill(state = state, foreground = stateColors.foreground)
+            PrimaryMetric(state = state)
+          }
         }
       }
-      KetchProgressBar(
-        progress = animatedPct,
-        fillColor = if (state is DownloadState.Completed) Color.Transparent
-        else stateColors.foreground,
-      )
+
+      // Primary metric (mono)
+      if (!compact) {
+        PrimaryMetric(state = state)
+        StatusPill(state = state, foreground = stateColors.foreground)
+      }
+
+      // Single contextual action
+      ContextualAction(state = state, task = task, scope = scope, expanded = expanded, onToggle = onToggle)
     }
-
-    // Primary metric (mono)
-    PrimaryMetric(state = state)
-
-    // Status pill
-    StatusPill(state = state, foreground = stateColors.foreground)
-
-    // Single contextual action
-    ContextualAction(state = state, task = task, scope = scope)
   }
 }
 
@@ -249,14 +271,15 @@ private fun PrimaryMetric(state: DownloadState) {
     is DownloadState.Paused -> {
       val p = state.progress
       if (p.totalBytes > 0) "${formatBytes(p.downloadedBytes)} / ${formatBytes(p.totalBytes)}"
-      else "Paused"
+      else if (p.downloadedBytes > 0) formatBytes(p.downloadedBytes) else ""
     }
-    is DownloadState.Queued -> "Queued"
-    is DownloadState.Scheduled -> "Scheduled"
+    is DownloadState.Queued -> ""
+    is DownloadState.Scheduled -> ""
     is DownloadState.Completed -> ""
-    is DownloadState.Failed -> "Failed"
-    is DownloadState.Canceled -> "Canceled"
+    is DownloadState.Failed -> ""
+    is DownloadState.Canceled -> ""
   }
+  if (text.isEmpty()) return
   Text(
     text = text,
     style = type.monoSmall,
@@ -269,13 +292,12 @@ private fun PrimaryMetric(state: DownloadState) {
 
 @Composable
 private fun StatusPill(state: DownloadState, foreground: Color) {
-  val colors = KetchTheme.colors
   val type = KetchTheme.typography
 
   val (label, isLive) = when (state) {
     is DownloadState.Downloading -> {
       val pct = (state.progress.percent * 100).coerceIn(0f, 100f)
-      "${pct.toInt()}%" to true
+      (if (state.progress.totalBytes > 0) "${pct.toInt()}%" else "Downloading") to true
     }
     is DownloadState.Paused -> "Paused" to false
     is DownloadState.Queued -> "Queued" to false
@@ -288,7 +310,10 @@ private fun StatusPill(state: DownloadState, foreground: Color) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(6.dp),
-    modifier = Modifier.widthIn(min = 88.dp),
+    modifier = Modifier
+      .clip(RoundedCornerShape(6.dp))
+      .background(foreground.copy(alpha = 0.09f))
+      .padding(horizontal = 8.dp, vertical = 4.dp),
   ) {
     Box(
       modifier = Modifier
@@ -317,37 +342,27 @@ private fun ContextualAction(
   state: DownloadState,
   task: DownloadTask,
   scope: CoroutineScope,
+  expanded: Boolean,
+  onToggle: () -> Unit,
 ) {
-  val colors = KetchTheme.colors
-  Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-    when (state) {
-      is DownloadState.Downloading -> RowAction(KetchIcon.Pause, colors.onSurfaceVariant) {
-        scope.launch { task.pause() }
-      }
-      is DownloadState.Paused -> RowAction(KetchIcon.Play, colors.primary) {
-        scope.launch { task.resume() }
-      }
-      is DownloadState.Queued -> RowAction(KetchIcon.More, colors.onSurfaceVariant) {}
-      is DownloadState.Scheduled -> RowAction(KetchIcon.Scheduled, colors.warning) {}
-      is DownloadState.Completed -> RowAction(KetchIcon.Folder, colors.onSurfaceVariant) {}
-      is DownloadState.Failed,
-      is DownloadState.Canceled -> RowAction(KetchIcon.Retry, colors.primary) {
-        scope.launch { task.resume() }
-      }
-    }
-  }
-}
-
-@Composable
-private fun RowAction(icon: KetchIcon, tint: Color, onClick: () -> Unit) {
-  Box(
-    modifier = Modifier
-      .size(30.dp)
-      .clip(RoundedCornerShape(7.dp))
-      .clickable(onClick = onClick),
-    contentAlignment = Alignment.Center,
-  ) {
-    com.linroid.ketch.app.icons.KetchIconImage(icon = icon, size = 16.dp, tint = tint)
+  when (state) {
+    is DownloadState.Downloading -> KetchIconButton(
+      icon = KetchIcon.Pause, contentDescription = "Pause download",
+      onClick = { scope.launch { task.pause() } },
+    )
+    is DownloadState.Paused -> KetchIconButton(
+      icon = KetchIcon.Play, contentDescription = "Resume download",
+      onClick = { scope.launch { task.resume() } },
+    )
+    is DownloadState.Failed, is DownloadState.Canceled -> KetchIconButton(
+      icon = KetchIcon.Retry, contentDescription = "Retry download",
+      onClick = { scope.launch { task.resume() } },
+    )
+    else -> KetchIconButton(
+      icon = if (expanded) KetchIcon.ChevronDown else KetchIcon.Chevron,
+      contentDescription = if (expanded) "Hide download details" else "Show download details",
+      onClick = onToggle,
+    )
   }
 }
 
@@ -357,46 +372,53 @@ private fun ExpandedSettingsRow(
   subPanel: ExpandedSubPanel,
   onSubPanelChange: (ExpandedSubPanel) -> Unit,
   onRemoveRequest: () -> Unit,
+  onCancel: () -> Unit,
 ) {
   val state by task.state.collectAsState()
   val canConfigure = state is DownloadState.Downloading ||
     state is DownloadState.Paused ||
     state is DownloadState.Queued ||
     state is DownloadState.Scheduled
+
   if (!canConfigure) return
 
   fun toggle(target: ExpandedSubPanel) {
     onSubPanelChange(if (subPanel == target) ExpandedSubPanel.None else target)
   }
 
-  Row(
+  FlowRow(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+      .padding(horizontal = 12.dp, vertical = 8.dp),
     horizontalArrangement = Arrangement.spacedBy(4.dp),
-    verticalAlignment = Alignment.CenterVertically,
+    verticalArrangement = Arrangement.Center,
   ) {
-    SpeedLimitIcon(
-      active = !task.request.speedLimit.isUnlimited,
-      selected = subPanel == ExpandedSubPanel.SpeedLimit,
-      onClick = { toggle(ExpandedSubPanel.SpeedLimit) },
-    )
-    PriorityIcon(
-      active = task.request.priority != DownloadPriority.NORMAL,
-      selected = subPanel == ExpandedSubPanel.Priority,
-      onClick = { toggle(ExpandedSubPanel.Priority) },
-    )
-    ScheduleIcon(
-      selected = subPanel == ExpandedSubPanel.Schedule,
-      onClick = { toggle(ExpandedSubPanel.Schedule) },
-    )
-    TaskSettingsIcon(
-      selected = subPanel == ExpandedSubPanel.Settings,
-      onClick = { toggle(ExpandedSubPanel.Settings) },
-    )
-    Spacer(Modifier.weight(1f))
+    if (canConfigure) {
+      SpeedLimitIcon(
+        active = !task.request.speedLimit.isUnlimited,
+        selected = subPanel == ExpandedSubPanel.SpeedLimit,
+        onClick = { toggle(ExpandedSubPanel.SpeedLimit) },
+      )
+      PriorityIcon(
+        active = task.request.priority != DownloadPriority.NORMAL,
+        selected = subPanel == ExpandedSubPanel.Priority,
+        onClick = { toggle(ExpandedSubPanel.Priority) },
+      )
+      ScheduleIcon(
+        selected = subPanel == ExpandedSubPanel.Schedule,
+        onClick = { toggle(ExpandedSubPanel.Schedule) },
+      )
+      TaskSettingsIcon(
+        selected = subPanel == ExpandedSubPanel.Settings,
+        onClick = { toggle(ExpandedSubPanel.Settings) },
+      )
+    }
+    if (canConfigure) {
+      KetchIconButton(icon = KetchIcon.Stop, contentDescription = "Cancel download", onClick = onCancel)
+    }
     com.linroid.ketch.app.components.KetchIconButton(
       icon = KetchIcon.Trash,
+      contentDescription = "Remove download",
       onClick = onRemoveRequest,
     )
   }

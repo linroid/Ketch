@@ -19,7 +19,6 @@ import com.linroid.ketch.app.instance.LanServerDiscovery
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
-import com.linroid.ketch.app.ui.dialog.AiDiscoverState
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -105,7 +104,6 @@ class AppState(
   var showAddDialog by mutableStateOf(false)
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
-  var showAiDiscoverDialog by mutableStateOf(false)
   var aiDiscoverState by mutableStateOf<AiDiscoverState>(
     AiDiscoverState.Idle
   )
@@ -126,6 +124,7 @@ class AppState(
     DiscoveryState.Idle
   )
     private set
+  private var aiDiscoveryJob: Job? = null
   private var discoveryJob: Job? = null
   var switchingInstance by
     mutableStateOf<InstanceEntry?>(null)
@@ -329,6 +328,7 @@ class AppState(
   }
 
   fun aiDiscover(query: String, sites: String) {
+    aiDiscoveryJob?.cancel()
     if (embeddedAiProvider == null) {
       aiDiscoverState = AiDiscoverState.Error(
         "AI discovery is not available",
@@ -336,7 +336,7 @@ class AppState(
       return
     }
     aiDiscoverState = AiDiscoverState.Loading
-    scope.launch {
+    aiDiscoveryJob = scope.launch {
       runCatching {
         val siteList = sites.split(",", " ")
           .map { it.trim() }
@@ -352,6 +352,7 @@ class AppState(
           candidates = response.candidates,
         )
       }.onFailure { e ->
+        if (e is kotlinx.coroutines.CancellationException) throw e
         aiDiscoverState = AiDiscoverState.Error(
           e.message ?: "Discovery failed",
         )
@@ -360,8 +361,8 @@ class AppState(
   }
 
   fun aiDownloadSelected(candidates: List<AiCandidate>) {
-    showAiDiscoverDialog = false
-    aiDiscoverState = AiDiscoverState.Idle
+    showAddDialog = false
+    resetAiDiscover()
     scope.launch {
       runCatching {
         val api = activeApi.value
@@ -382,6 +383,8 @@ class AppState(
   }
 
   fun resetAiDiscover() {
+    aiDiscoveryJob?.cancel()
+    aiDiscoveryJob = null
     aiDiscoverState = AiDiscoverState.Idle
   }
 

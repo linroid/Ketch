@@ -20,6 +20,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.theme.KetchTheme
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,11 +60,14 @@ fun AddRemoteServerDialog(
   }
 
   AlertDialog(
+    containerColor = KetchTheme.colors.surface,
+    tonalElevation = 0.dp,
+    shape = RoundedCornerShape(20.dp),
     onDismissRequest = onDismiss,
     title = {
       Text(
-        if (authRequired) "Authentication Required"
-        else "Add Remote Server"
+        if (authRequired) "Authentication required"
+        else "Add remote server"
       )
     },
     text = {
@@ -105,10 +110,11 @@ fun AddRemoteServerDialog(
           }
         )
         OutlinedTextField(
+          visualTransformation = PasswordVisualTransformation(),
           value = token,
           onValueChange = { token = it },
           modifier = Modifier.fillMaxWidth(),
-          label = { Text("API Token") },
+          label = { Text("API token") },
           singleLine = true,
           placeholder = { Text("Optional") },
         )
@@ -121,7 +127,8 @@ fun AddRemoteServerDialog(
           )
         } else {
           KetchButton(
-            text = "Discover on LAN",
+            text = "Find nearby servers",
+            variant = KetchButtonVariant.Secondary,
             onClick = { onDiscover(port.toIntOrNull() ?: 8642) },
             enabled = isValidPort,
             modifier = Modifier.fillMaxWidth(),

@@ -56,24 +56,17 @@ fun ScheduleIcon(
   selected: Boolean,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
+  label: String = "Schedule",
 ) {
-  IconButton(
+  com.linroid.ketch.app.components.KetchButton(
+    text = label,
+    leadingIcon = com.linroid.ketch.app.icons.KetchIcon.Scheduled,
+    variant = if (selected) com.linroid.ketch.app.components.KetchButtonVariant.Secondary
+      else com.linroid.ketch.app.components.KetchButtonVariant.Ghost,
+    size = com.linroid.ketch.app.components.KetchButtonSize.Small,
+    modifier = modifier,
     onClick = onClick,
-    modifier = modifier.size(28.dp),
-    colors = IconButtonDefaults.iconButtonColors(
-      contentColor = if (selected) {
-        MaterialTheme.colorScheme.primary
-      } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-      }
-    )
-  ) {
-    Icon(
-      Icons.Filled.Schedule,
-      contentDescription = "Schedule",
-      modifier = Modifier.size(16.dp),
-    )
-  }
+  )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

@@ -1,8 +1,14 @@
 package com.linroid.ketch.app.components
 
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -19,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -95,14 +102,7 @@ fun KetchProgressBar(
   }
 }
 
-/**
- * Sidebar list item.
- *
- * Selected state stacks four cues: elevated card background, hairline border,
- * a 3dp accent rail on the leading edge, accent-tinted icon, and a heavier
- * label weight. Unselected items are flat-on-panel and switch to a neutral
- * hover background, so selected and hover stay visually distinct.
- */
+/** Sidebar destination with selected, hover, and keyboard-focus feedback. */
 @Composable
 fun KetchSidebarItem(
   label: String,
@@ -115,32 +115,28 @@ fun KetchSidebarItem(
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val shape = RoundedCornerShape(8.dp)
+  val interactions = remember { MutableInteractionSource() }
+  val hovered by interactions.collectIsHoveredAsState()
+  val focused by interactions.collectIsFocusedAsState()
 
   Box(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = 8.dp, vertical = 2.dp)
-      .height(38.dp)
+      .height(44.dp)
       .clip(shape)
-      .background(if (selected) colors.surface else Color.Transparent)
-      .let { if (selected) it.border(1.dp, colors.outline, shape) else it }
-      .clickable(onClick = onClick),
+      .background(if (selected) colors.primaryContainer else if (hovered) colors.surfaceHover else Color.Transparent)
+      .let { if (focused) it.border(2.dp, colors.primary, shape) else it }
+      .hoverable(interactions)
+      .selectable(selected = selected, role = Role.Tab, interactionSource = interactions,
+        indication = androidx.compose.foundation.LocalIndication.current, onClick = onClick),
   ) {
-    if (selected) {
-      Box(
-        Modifier
-          .padding(vertical = 9.dp)
-          .width(3.dp)
-          .fillMaxHeight()
-          .clip(RoundedCornerShape(2.dp))
-          .background(colors.primary),
-      )
-    }
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(12.dp),
       modifier = Modifier
         .fillMaxWidth()
+        .fillMaxHeight()
         .padding(horizontal = 14.dp),
     ) {
       KetchIconImage(
@@ -151,7 +147,7 @@ fun KetchSidebarItem(
       Text(
         text = label,
         style = type.bodyLarge.copy(
-          color = if (selected) colors.onBackground else colors.onSurfaceVariant,
+          color = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
           fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         ),
         modifier = Modifier.weight(1f),

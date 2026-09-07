@@ -24,20 +24,15 @@ import com.linroid.ketch.app.theme.KetchTheme
 fun KetchFileTypeChip(
   fileName: String,
   modifier: Modifier = Modifier,
-  size: Dp = 26.dp,
+  size: Dp = 36.dp,
 ) {
   val ext = fileName.substringAfterLast('.', "").lowercase()
-  val palette = KetchTheme.colors.segments
-  val color: Color = when (ext) {
-    "iso" -> palette[0]
-    "zip", "7z", "rar" -> palette[3]
-    "xz", "gz", "tar", "bz2" -> palette[2]
-    "parquet", "csv", "json" -> palette[4]
-    "safetensors", "ckpt", "bin", "pt", "h5" -> palette[5]
-    "mp4", "mkv", "webm", "mov", "avi" -> palette[1]
-    "mp3", "flac", "wav", "ogg", "m4a" -> palette[6]
-    "pdf", "epub", "djvu" -> palette[7]
-    else -> KetchTheme.colors.onSurfaceDim
+  val colors = KetchTheme.colors
+  val color = when (ext) {
+    "pdf", "epub", "djvu" -> colors.error
+    "mp4", "mkv", "webm", "mov", "avi", "mp3", "flac", "wav" -> colors.success
+    "zip", "7z", "rar", "iso", "gz", "tar", "xz" -> colors.primary
+    else -> colors.onSurfaceVariant
   }
   val label = ext.take(3).ifBlank { "·" }
 
@@ -45,7 +40,7 @@ fun KetchFileTypeChip(
     contentAlignment = Alignment.Center,
     modifier = modifier
       .size(size)
-      .clip(RoundedCornerShape(6.dp))
+      .clip(RoundedCornerShape(10.dp))
       .background(color.copy(alpha = 0.13f)),
   ) {
     Text(

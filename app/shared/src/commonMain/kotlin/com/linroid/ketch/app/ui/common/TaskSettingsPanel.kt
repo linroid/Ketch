@@ -35,23 +35,15 @@ fun TaskSettingsIcon(
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  IconButton(
+  com.linroid.ketch.app.components.KetchButton(
+    text = "Details",
+    leadingIcon = com.linroid.ketch.app.icons.KetchIcon.Settings,
+    variant = if (selected) com.linroid.ketch.app.components.KetchButtonVariant.Secondary
+      else com.linroid.ketch.app.components.KetchButtonVariant.Ghost,
+    size = com.linroid.ketch.app.components.KetchButtonSize.Small,
+    modifier = modifier,
     onClick = onClick,
-    modifier = modifier.size(28.dp),
-    colors = IconButtonDefaults.iconButtonColors(
-      contentColor = if (selected) {
-        MaterialTheme.colorScheme.primary
-      } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-      }
-    )
-  ) {
-    Icon(
-      Icons.Filled.Info,
-      contentDescription = "Task info",
-      modifier = Modifier.size(16.dp),
-    )
-  }
+  )
 }
 
 @Composable

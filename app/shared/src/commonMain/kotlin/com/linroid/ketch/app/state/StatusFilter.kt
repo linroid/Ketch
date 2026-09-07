@@ -4,7 +4,7 @@ import com.linroid.ketch.api.DownloadState
 
 enum class StatusFilter(val label: String) {
   All("All"),
-  Downloading("Downloading"),
+  Downloading("Active"),
   Completed("Completed"),
   Paused("Paused"),
   Failed("Failed");

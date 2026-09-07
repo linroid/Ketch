@@ -1,5 +1,7 @@
 package com.linroid.ketch.app.ui.sidebar
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,11 +37,13 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.remote.ConnectionState
 
-private val SIDEBAR_WIDTH = 220.dp
+private val SIDEBAR_WIDTH = 216.dp
 
 @Composable
 fun SidebarNavigation(
   selectedFilter: StatusFilter,
+  discoverySelected: Boolean,
+  onDiscoverySelect: () -> Unit,
   taskCounts: Map<StatusFilter, Int>,
   onFilterSelect: (StatusFilter) -> Unit,
   activeInstance: InstanceEntry?,
@@ -61,8 +65,8 @@ fun SidebarNavigation(
     Box(
       modifier = Modifier
         .fillMaxWidth()
-        .height(48.dp)
-        .padding(start = 78.dp, end = 12.dp),
+        .height(80.dp)
+        .padding(horizontal = 24.dp),
       contentAlignment = Alignment.CenterStart,
     ) {
       Wordmark()
@@ -76,22 +80,32 @@ fun SidebarNavigation(
       modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
     )
 
-    Spacer(Modifier.height(12.dp))
+    Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+      Spacer(Modifier.height(12.dp))
 
-    // Queue group.
-    SectionLabel("Queue")
-    StatusFilter.entries.forEach { filter ->
-      val count = taskCounts[filter] ?: 0
+      // Queue group.
+      SectionLabel("Library")
+      StatusFilter.entries.forEach { filter ->
+        val count = taskCounts[filter] ?: 0
+        KetchSidebarItem(
+          label = filter.label,
+          icon = filterIcon(filter),
+          selected = !discoverySelected && selectedFilter == filter,
+          onClick = { onFilterSelect(filter) },
+          count = if (count > 0) count else null,
+        )
+      }
+
+      Spacer(Modifier.height(16.dp))
+      SectionLabel("Discover")
       KetchSidebarItem(
-        label = filter.label,
-        icon = filterIcon(filter),
-        selected = selectedFilter == filter,
-        onClick = { onFilterSelect(filter) },
-        count = if (count > 0) count else null,
+        label = "AI discovery",
+        icon = KetchIcon.Ai,
+        selected = discoverySelected,
+        onClick = onDiscoverySelect,
       )
-    }
 
-    Spacer(Modifier.weight(1f))
+    }
     HorizontalDivider(
       modifier = Modifier.padding(horizontal = 16.dp),
       color = colors.outlineVariant,
@@ -109,8 +123,8 @@ private fun Wordmark() {
     Box(
       contentAlignment = Alignment.Center,
       modifier = Modifier
-        .size(20.dp)
-        .clip(RoundedCornerShape(6.dp))
+        .size(32.dp)
+        .clip(RoundedCornerShape(10.dp))
         .background(colors.primary),
     ) {
       Text(
@@ -122,7 +136,7 @@ private fun Wordmark() {
     Text(
       text = "Ketch",
       style = KetchTheme.typography.displaySmall.copy(
-        fontSize = 16.sp,
+        fontSize = 20.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = (-0.3).sp,
       ),
@@ -141,9 +155,9 @@ private fun InstancePill(
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val (kindLabel, addressLabel) = when (activeInstance) {
-    is RemoteInstance -> "Remote daemon" to "${activeInstance.host}:${activeInstance.port}"
-    is EmbeddedInstance -> "Local daemon" to (activeInstance.label.ifBlank { "in-process" })
-    else -> "Not connected" to "Tap to add a daemon"
+    is RemoteInstance -> "Remote server" to "${activeInstance.host}:${activeInstance.port}"
+    is EmbeddedInstance -> "This device" to (activeInstance.label.ifBlank { "in-process" })
+    else -> "Not connected" to "Connect a server"
   }
   val dotColor = when (connectionState) {
     is ConnectionState.Connected -> colors.success
@@ -158,9 +172,9 @@ private fun InstancePill(
     horizontalArrangement = Arrangement.spacedBy(8.dp),
     modifier = modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(6.dp))
+      .clip(RoundedCornerShape(10.dp))
       .background(colors.background)
-      .border(1.dp, colors.outline, RoundedCornerShape(6.dp))
+      .border(1.dp, colors.outline, RoundedCornerShape(10.dp))
       .clickable(onClick = onClick)
       .padding(horizontal = 10.dp, vertical = 6.dp),
   ) {

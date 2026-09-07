@@ -13,6 +13,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.linroid.ketch.app.theme.KetchTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +37,9 @@ fun RemoveDownloadDialog(
   var deleteFiles by remember { mutableStateOf(false) }
 
   AlertDialog(
+    containerColor = KetchTheme.colors.surface,
+    tonalElevation = 0.dp,
+    shape = RoundedCornerShape(20.dp),
     onDismissRequest = onDismiss,
     title = { Text("Remove download?") },
     text = {
