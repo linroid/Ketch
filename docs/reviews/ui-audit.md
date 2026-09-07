@@ -71,3 +71,9 @@ Review fixtures and the throttled HTTP server use `/private/tmp/ketch-ui-review`
 - A 1100 × 450 window exposed clipped sidebar destinations; the navigation group now scrolls while the device selector stays visible.
 
 - Verified the sidebar scroll fix in the production build at 1100 × 450 and the first-download action using a separate empty profile.
+
+## Medium-width navigation follow-up
+
+- Removed the automatic medium-width navigation rail: all windows below the full-sidebar breakpoint use the two-destination bottom bar, avoiding oversized labels and an empty left gutter.
+- Downloads now uses the download-to-tray glyph instead of the generic list glyph.
+- Visually checked the 640px layout and transition to the full desktop sidebar. JVM/Wasm compilation and desktop packaging pass.

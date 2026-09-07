@@ -16,7 +16,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchCard
@@ -153,8 +152,8 @@ fun AppShell(
     }
   }
 
-  // Determine layout type: None for Expanded (custom sidebar),
-  // scaffold handles Compact/Medium automatically.
+  // Use the full sidebar when it fits; otherwise keep two destinations in
+  // the bottom bar instead of a sparse rail that squeezes the content.
   var discoverySelected by rememberSaveable { mutableStateOf(false) }
   val aiDraft = remember { AiDiscoverDraft() }
   val adaptiveInfo = currentWindowAdaptiveInfo()
@@ -165,8 +164,7 @@ fun AppShell(
   val navLayoutType = if (isExpanded) {
     NavigationSuiteType.None
   } else {
-    NavigationSuiteScaffoldDefaults
-      .calculateFromAdaptiveInfo(adaptiveInfo)
+    NavigationSuiteType.NavigationBar
   }
 
   NavigationSuiteScaffold(
@@ -177,7 +175,7 @@ fun AppShell(
         onClick = { discoverySelected = false },
         icon = {
           KetchIconImage(
-            icon = KetchIcon.All, size = 24.dp,
+            icon = KetchIcon.Active, size = 24.dp,
             tint = if (!discoverySelected) KetchTheme.colors.primary
               else KetchTheme.colors.onSurfaceVariant,
           )
