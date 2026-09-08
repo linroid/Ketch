@@ -28,7 +28,7 @@ internal data class PeerHandshake(
 internal class PeerWire(
   private val connection: TorrentConnection,
   private val metadata: TorrentMetadata? = null,
-  private val idleTimeoutMs: Long = 120_000,
+  private val idleTimeoutMs: Long = 180_000,
 ) {
   suspend fun handshake(local: PeerHandshake): PeerHandshake = withTimeout(10_000) {
     connection.write(encodeHandshake(local))

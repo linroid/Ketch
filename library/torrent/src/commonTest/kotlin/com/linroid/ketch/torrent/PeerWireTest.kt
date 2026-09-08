@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import okio.Buffer
 import kotlin.test.Test
@@ -10,6 +11,20 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PeerWireTest {
+  @Test
+  fun acceptsTwoMinuteKeepaliveWithSchedulingSlack() = runTest {
+    val connection = object : TorrentConnection {
+      override val remote = PeerEndpoint("127.0.0.1", 1)
+      override suspend fun readExactly(size: Int): ByteArray {
+        if (size == 4) delay(125_000)
+        return ByteArray(size)
+      }
+      override suspend fun write(bytes: ByteArray) = Unit
+      override fun close() = Unit
+    }
+    assertEquals(PeerMessage.KeepAlive, PeerWire(connection).read())
+  }
+
   private val hash = InfoHash.fromBytes(ByteArray(20))
   private val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
     "name" to "file", "piece length" to 16384L, "length" to 16387L, "pieces" to ByteArray(40)
