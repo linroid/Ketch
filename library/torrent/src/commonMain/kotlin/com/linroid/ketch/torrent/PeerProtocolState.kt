@@ -22,18 +22,22 @@ internal class PeerProtocolState(pieceCount: Int, private val maxPending: Int = 
     require(pending.size < maxPending && request !in pending) {
       "Peer pipeline is full or duplicated"
     }
-    canceled.remove(request)
     pending.add(request)
   }
 
   fun cancel(request: PeerMessage.Request) {
     if (pending.remove(request)) {
-      canceled.add(request)
-      while (canceled.size > maxPending * 2) canceled.remove(canceled.first())
+      remember(request)
     }
   }
 
-  /** Returns false for a late response to a canceled request. */
+  private fun remember(request: PeerMessage.Request) {
+    canceled.remove(request)
+    canceled.add(request)
+    while (canceled.size > maxPending * 2) canceled.remove(canceled.first())
+  }
+
+  /** Returns false for a late response to a canceled or already completed request. */
   fun received(message: PeerMessage): Boolean {
     when (message) {
       is PeerMessage.Control -> when (message.signal) {
@@ -60,7 +64,10 @@ internal class PeerProtocolState(pieceCount: Int, private val maxPending: Int = 
       }
       is PeerMessage.Piece -> {
         val request = PeerMessage.Request(message.index, message.begin, message.bytes.size)
-        if (pending.remove(request)) return true
+        if (pending.remove(request)) {
+          remember(request)
+          return true
+        }
         if (request in canceled) return false
         throw IllegalArgumentException("Unsolicited or mismatched peer block")
       }

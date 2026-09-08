@@ -9,8 +9,9 @@ Approved scope: [roadmap](pure-kotlin-torrent-roadmap.md). Implementation checko
 | 02 Metainfo and hashing | https://github.com/linroid/Ketch/pull/148 | Draft; local JVM/Android/iOS gates passed |
 | 03 Portable I/O | https://github.com/linroid/Ketch/pull/149 | Draft; real IPv4/IPv6 TCP/UDP and filesystem tests passed on JVM/Android/iOS |
 | 04 Peer wire/state | https://github.com/linroid/Ketch/pull/150 | Draft; local JVM/Android/iOS gates passed |
-| 05 Verified storage | Pending | Validation in progress |
-| 06–14 | Pending | Not implemented yet |
+| 05 Verified storage | https://github.com/linroid/Ketch/pull/152 | Draft; local JVM/Android/iOS gates passed |
+| 06 First verified transfer | Pending PR | JVM independent libtorrent seeder passed; JVM/Android/iOS loopback transfer and corruption gates passed |
+| 07–14 | Pending | Not implemented yet |
 
 No PR has been merged. The default transfer engine is still libtorrent4j.
 
