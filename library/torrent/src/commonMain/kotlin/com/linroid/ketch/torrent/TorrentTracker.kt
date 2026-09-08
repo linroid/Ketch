@@ -215,15 +215,24 @@ internal class TrackerTiers(
 ) {
   private val tiers = tiers.map { it.distinct().shuffled().toMutableList() }
   private val ids = mutableMapOf<String, ByteArray>()
+  private var preferCurrent = false
+  private var current: String? = null
+
+  fun preferCurrentTracker() { preferCurrent = true }
 
   suspend fun announce(request: TrackerAnnounce): TrackerResponse {
-    for (tier in tiers) {
+    val ordered = if (preferCurrent && current != null) {
+      listOf(listOf(current!!)) + tiers.map { tier -> tier.filter { it != current } }
+    } else tiers
+    for (tier in ordered) {
       for (url in tier.toList()) {
         try {
           val result = announce(url, request, ids[url])
           result.trackerId?.let { ids[url] = it }
-          tier.remove(url)
-          tier.add(0, url)
+          val original = tiers.first { url in it }
+          original.remove(url)
+          original.add(0, url)
+          current = url
           return result.copy(source = url)
         } catch (_: TimeoutCancellationException) {
           currentCoroutineContext().ensureActive()

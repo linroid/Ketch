@@ -16,6 +16,8 @@ import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.IOException
@@ -33,8 +35,11 @@ internal class TorrentSwarm(
   private val uploadPayload: suspend (Int) -> Unit = {},
   private val onProgress: suspend (Long) -> Unit = {},
   private val onCompleted: suspend () -> Unit = {},
+  private val allowLocalDiscovery: Boolean = false,
 ) {
   private val uploadSlots = Semaphore(4)
+  private val connectedMutex = Mutex()
+  private val connected = mutableMapOf<Int, PeerEndpoint>()
 
   /** A closed peer stream fails once every candidate has exhausted its bounded retries. */
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -58,13 +63,28 @@ internal class TorrentSwarm(
     val pending = ArrayDeque<PeerEndpoint>()
     val results = Channel<Pair<PeerEndpoint, Throwable?>>(512)
     val progressEvents = Channel<Unit>(Channel.CONFLATED)
+    val pexEvents = Channel<Pair<PeerEndpoint, PexUpdate>>(64)
+    val pexDirectory = TorrentPeerDirectory(store.metadata.isPrivate)
     val retryAt = mutableMapOf<PeerEndpoint, Long>()
     val now = monotonicClock()
     var discoveryClosed = false
     var complete = false
     var nextId = 0
+    fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
+    pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
+      update.dropped)
+    for (endpoint in pexDirectory.candidates()) {
+      if (endpoint !in attempts && endpoint !in pending &&
+        attempts.size + pending.size < 4096) pending.addLast(endpoint)
+    }
+    }
     try {
       while (currentCoroutineContext().isActive) {
+        // A terminating introducer may have queued its last PEX before its result was selected.
+        repeat(64) {
+          val event = pexEvents.tryReceive().getOrNull() ?: return@repeat
+          acceptPex(event.first, event.second)
+        }
         if (store.completed() && !complete) {
           store.finish()
           onProgress(store.progress().sum())
@@ -91,13 +111,16 @@ internal class TorrentSwarm(
           active[endpoint] = launch(Dispatchers.Default) {
             var failure: Throwable? = null
             try {
-              peer(id, endpoint, scheduler, progressEvents)
+              peer(id, endpoint, scheduler, progressEvents, pexEvents)
             } catch (e: CancellationException) {
               throw e
             } catch (e: Exception) {
               failure = e
             } finally {
-              withContext(NonCancellable) { scheduler.remove(id) }
+              withContext(NonCancellable) {
+                scheduler.remove(id)
+                connectedMutex.withLock { connected.remove(id) }
+              }
               overhead.close()
               results.trySend(endpoint to failure)
             }
@@ -123,6 +146,7 @@ internal class TorrentSwarm(
               pending.addLast(endpoint)
             }
           }
+          pexEvents.onReceive { (source, update) -> acceptPex(source, update) }
           progressEvents.onReceive { onProgress(store.progress().sum()) }
           onTimeout(100) {}
         }
@@ -132,6 +156,7 @@ internal class TorrentSwarm(
       active.values.forEach { it.join() }
       results.close()
       progressEvents.close()
+      pexEvents.close()
     }
   }
 
@@ -141,6 +166,7 @@ internal class TorrentSwarm(
     endpoint: PeerEndpoint,
     scheduler: TorrentPieceScheduler,
     progressEvents: SendChannel<Unit>,
+    pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
   ) =
     supervisorScope {
       val connection = network.connect(endpoint)
@@ -150,10 +176,12 @@ internal class TorrentSwarm(
         val wire = PeerWire(connection, store.metadata)
         val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true, false))
         require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
+        connectedMutex.withLock { connected[id] = connection.remote }
+        val exchange = PeerExchange()
         val extensions = PeerExtensions()
         var metadataServed = 0
         var metadataWindow = TimeSource.Monotonic.markNow()
-        if (handshake.extensions) wire.send(PeerExtensions.handshake(store.metadata))
+        if (handshake.extensions) wire.send(PeerExtensions.handshake(store.metadata, pex = !store.metadata.isPrivate))
         val state = PeerProtocolState(store.pieceCount, maxPending = 16)
         val advertised = store.verifiedPieces()
         var version = -1L
@@ -253,6 +281,14 @@ internal class TorrentSwarm(
                         wire.send(response)
                       }
                     }
+                  } else if (message.id == PeerExtensions.PEX) {
+                    require(!store.metadata.isPrivate) { "Private torrent peer exchange is forbidden" }
+                    val update = exchange.receive(message.payload)
+                    val added = update.added.filter { peer ->
+                      allowLocalDiscovery ||
+                        numericAddress(peer.host)?.let(::publicTorrentAddress) == true
+                    }
+                    pexEvents.send(connection.remote to update.copy(added = added))
                   }
                 }
                 else -> Unit
@@ -263,6 +299,12 @@ internal class TorrentSwarm(
               uploadSlots.tryAcquire()) {
               uploadSlot = true
               wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+            }
+            if (!store.metadata.isPrivate && extensions.id("ut_pex") != 0 && exchange.due()) {
+              val contacts = connectedMutex.withLock { connected.values.toSet() }
+                .filter { it != connection.remote && (allowLocalDiscovery ||
+                  numericAddress(it.host)?.let(::publicTorrentAddress) == true) }.toSet()
+              exchange.message(extensions.id("ut_pex"), contacts)?.let { wire.send(it) }
             }
             scheduler.snapshot(version)?.let { (nextVersion, pieces) ->
               version = nextVersion

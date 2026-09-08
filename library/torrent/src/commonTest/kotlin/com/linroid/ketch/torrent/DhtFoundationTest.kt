@@ -68,7 +68,7 @@ class DhtFoundationTest {
   @Test
   fun routing_splitsOwnRangeKeepsHealthyIncumbentsAndReplacesFailedOnes() = runTest {
     var now = 0L
-    val table = DhtRoutingTable(ByteArray(20).toByteString()) { now }
+    val table = DhtRoutingTable(ByteArray(20).toByteString(), nowMs = { now })
     fun node(value: Int) = DhtContact(ByteArray(20).also { it[0] = value.toByte() }.toByteString(),
       PeerEndpoint("127.0.0.1", value + 1))
     for (value in 128..135) table.verified(node(value))

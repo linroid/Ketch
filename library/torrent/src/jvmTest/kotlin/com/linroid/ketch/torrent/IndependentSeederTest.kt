@@ -43,6 +43,7 @@ class IndependentSeederTest {
         }
         val manager = SessionManager()
         val network = createTorrentNetwork()
+        val dhtNodes = mutableListOf<DhtNode>()
         try {
           manager.start(SessionParams(settings))
           val info = TorrentInfo(data)
@@ -53,14 +54,24 @@ class IndependentSeederTest {
           }
           val output = root.resolve("download/fixture.bin")
           val expected = TorrentMetadata.fromBencode(data)
-          val metadata = TorrentMetadataExchange(network).fetch(expected.infoHash,
-            PeerEndpoint("127.0.0.1", manager.swig().listen_port()))
+          suspend fun dhtNode(): DhtNode = DhtNode(
+            network.bindUdp(PeerEndpoint("127.0.0.1", 0)), this,
+            allowLocalAddresses = true,
+          ).also { it.start(); dhtNodes += it }
+          val router = dhtNode()
+          val announcing = dhtNode()
+          val seeking = dhtNode()
+          announcing.bootstrap(listOf(router.local))
+          announcing.peers(expected.infoHash, announcePort = manager.swig().listen_port())
+          seeking.bootstrap(listOf(router.local))
+          val endpoint = seeking.peers(expected.infoHash).single()
+          val metadata = TorrentMetadataExchange(network).fetch(expected.infoHash, endpoint)
           assertContentEquals(expected.infoBytes, metadata.infoBytes)
           val store = TorrentPieceStore(metadata, output.absolutePath.toPath(), emptySet(), "interop")
           var received = 0L
           val progress = mutableListOf<Long>()
           val peers = Channel<PeerEndpoint>(1)
-          peers.send(PeerEndpoint("127.0.0.1", manager.swig().listen_port()))
+          peers.send(endpoint)
           peers.close()
           TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
             downloadPayload = { received += it }, onProgress = { progress.add(it) }).run(peers)
@@ -69,6 +80,7 @@ class IndependentSeederTest {
           assertEquals(payload.size.toLong(), progress.last())
           assertTrue(store.completed())
         } finally {
+          dhtNodes.forEach { it.close() }
           network.close()
           manager.stop()
           root.deleteRecursively()
