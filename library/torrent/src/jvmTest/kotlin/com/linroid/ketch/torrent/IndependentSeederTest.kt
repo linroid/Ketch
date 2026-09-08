@@ -52,7 +52,10 @@ class IndependentSeederTest {
             delay(20)
           }
           val output = root.resolve("download/fixture.bin")
-          val metadata = TorrentMetadata.fromBencode(data)
+          val expected = TorrentMetadata.fromBencode(data)
+          val metadata = TorrentMetadataExchange(network).fetch(expected.infoHash,
+            PeerEndpoint("127.0.0.1", manager.swig().listen_port()))
+          assertContentEquals(expected.infoBytes, metadata.infoBytes)
           val store = TorrentPieceStore(metadata, output.absolutePath.toPath(), emptySet(), "interop")
           var received = 0L
           val progress = mutableListOf<Long>()
