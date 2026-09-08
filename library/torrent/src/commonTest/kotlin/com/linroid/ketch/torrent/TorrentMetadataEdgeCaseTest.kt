@@ -28,7 +28,7 @@ class TorrentMetadataEdgeCaseTest {
     "name" to name,
     "piece length" to pieceLength,
     "length" to length,
-    "pieces" to ByteArray(20),
+    "pieces" to ByteArray(((length / pieceLength + if (length % pieceLength == 0L) 0 else 1) * 20).toInt()),
   )
 
   // -- Single file edge cases --

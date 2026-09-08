@@ -22,6 +22,12 @@ internal data class TorrentMetadata(
   val trackers: List<String> = emptyList(),
   val comment: String? = null,
   val createdBy: String? = null,
+  val infoBytes: ByteArray = ByteArray(0),
+  val pieceHashes: ByteArray = ByteArray(0),
+  val trackerTiers: List<List<String>> = trackers.map { listOf(it) },
+  val isPrivate: Boolean = false,
+  val metainfoBytes: ByteArray = ByteArray(0),
+  val isMultiFile: Boolean = files.size > 1,
 ) {
   /**
    * A single file within a torrent.
@@ -37,108 +43,99 @@ internal data class TorrentMetadata(
   )
 
   companion object {
-    /**
-     * Parses a bencoded .torrent file into [TorrentMetadata].
-     *
-     * @throws IllegalArgumentException if the torrent data is
-     *   malformed or missing required fields
-     */
-    @Suppress("UNCHECKED_CAST")
-    fun fromBencode(data: ByteArray): TorrentMetadata {
-      val root = Bencode.decode(data) as? Map<String, Any>
-        ?: throw IllegalArgumentException(
-          "Torrent root must be a dictionary"
-        )
-
-      val info = root["info"] as? Map<String, Any>
-        ?: throw IllegalArgumentException(
-          "Missing 'info' dictionary"
-        )
-
-      val name = (info["name"] as? ByteArray)?.decodeToString()
-        ?: throw IllegalArgumentException(
-          "Missing 'name' in info"
-        )
-
-      val pieceLength = info["piece length"] as? Long
-        ?: throw IllegalArgumentException(
-          "Missing 'piece length' in info"
-        )
-
-      // Calculate info hash from the raw bencoded info dict
-      val infoEncoded = Bencode.encode(info)
-      val infoHash = sha1Digest(infoEncoded)
-
-      val files = parseFiles(info, name)
-      val totalBytes = files.sumOf { it.size }
-
-      val trackers = parseTrackers(root)
-
-      val comment = (root["comment"] as? ByteArray)
-        ?.decodeToString()
-      val createdBy = (root["created by"] as? ByteArray)
-        ?.decodeToString()
-
+    fun fromBencode(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024): TorrentMetadata {
+      val root = Bencode.parse(data, maxBytes)
+      requireNotNull(root.dictionary) { "Torrent root must be a dictionary" }
+      val info = requireNotNull(root["info"]) { "Missing info dictionary" }
+      requireNotNull(info.dictionary) { "Info must be a dictionary" }
+      require(info["meta version"] == null) { "BitTorrent v2/hybrid is not supported" }
+      val name = requireNotNull(info["name"]?.text()) { "Missing name" }
+      validatePathComponent(name)
+      val pieceLength = requireNotNull(info["piece length"]?.integer) { "Missing piece length" }
+      require(pieceLength in 1..16L * 1024 * 1024) { "Unsupported piece length" }
+      val fileNodes = info["files"]
+      require(fileNodes == null || info["length"] == null) { "Conflicting file layouts" }
+      val files = if (fileNodes != null) {
+        val list = requireNotNull(fileNodes.list) { "Invalid file list" }
+        require(list.isNotEmpty() && list.size <= 10_000) { "Invalid file count" }
+        list.mapIndexed { index, file ->
+          require(file["attr"]?.text()?.contains('l') != true) { "Symlink files unsupported" }
+          val parts = requireNotNull(file["path"]?.list) { "Missing file path" }
+          require(parts.isNotEmpty() && parts.size <= 64) { "Invalid path depth" }
+          val names = parts.map { requireNotNull(it.text()) { "Invalid path component" } }
+          names.forEach(::validatePathComponent)
+          val size = requireNotNull(file["length"]?.integer) { "Missing file length" }
+          require(size >= 0) { "Negative file length" }
+          TorrentFile(index, (listOf(name) + names).joinToString("/"), size)
+        }
+      } else {
+        val size = requireNotNull(info["length"]?.integer) { "Missing file length" }
+        require(size >= 0) { "Negative file length" }
+        listOf(TorrentFile(0, name, size))
+      }
+      val paths = files.map { canonicalTorrentName(it.path).lowercase() }.toSet()
+      require(paths.size == files.size) { "Colliding torrent paths" }
+      for (path in paths) {
+        var parent = path.substringBeforeLast('/', "")
+        while (parent.isNotEmpty()) {
+          require(parent !in paths) { "File/directory collision" }
+          parent = parent.substringBeforeLast('/', "")
+        }
+      }
+      var total = 0L
+      for (file in files) {
+        require(file.size <= Long.MAX_VALUE - total) { "Torrent size overflow" }
+        total += file.size
+      }
+      val pieces = requireNotNull(info["pieces"]?.bytes) { "Missing piece hashes" }
+      val count = total / pieceLength + if (total % pieceLength == 0L) 0 else 1
+      require(pieces.size % 20 == 0 && count == pieces.size.toLong() / 20) {
+        "Piece hash count does not match file layout"
+      }
+      val tiers = root["announce-list"]?.let { node ->
+        requireNotNull(node.list) { "Invalid tracker tiers" }.map { tier ->
+          requireNotNull(tier.list) { "Invalid tracker tier" }.map { tracker ->
+            requireNotNull(tracker.text()) { "Invalid tracker URL" }
+          }.distinct()
+        }.filter { it.isNotEmpty() }
+      } ?: root["announce"]?.text()?.let { listOf(listOf(it)) }.orEmpty()
+      require(tiers.sumOf { it.size } <= 128) { "Too many trackers" }
+      val privateFlag = info["private"]?.integer
+      require(info["private"] == null || privateFlag == 0L || privateFlag == 1L) {
+        "Invalid private flag"
+      }
+      val rawInfo = data.copyOfRange(info.start, info.end)
       return TorrentMetadata(
-        infoHash = InfoHash.fromBytes(infoHash),
+        infoHash = InfoHash.fromBytes(sha1Digest(rawInfo)),
         name = name,
         pieceLength = pieceLength,
-        totalBytes = totalBytes,
+        totalBytes = total,
         files = files,
-        trackers = trackers,
-        comment = comment,
-        createdBy = createdBy,
+        trackers = tiers.flatten(),
+        comment = root["comment"]?.text(),
+        createdBy = root["created by"]?.text(),
+        infoBytes = rawInfo,
+        pieceHashes = pieces,
+        trackerTiers = tiers,
+        isPrivate = privateFlag == 1L,
+        metainfoBytes = data.copyOf(),
+        isMultiFile = fileNodes != null,
       )
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun parseFiles(
-      info: Map<String, Any>,
-      name: String,
-    ): List<TorrentFile> {
-      val filesList = info["files"] as? List<Map<String, Any>>
-      return if (filesList != null) {
-        // Multi-file torrent
-        filesList.mapIndexed { index, fileDict ->
-          val pathParts = (fileDict["path"] as? List<ByteArray>)
-            ?.map { it.decodeToString() }
-            ?: throw IllegalArgumentException(
-              "Missing 'path' in file entry $index"
-            )
-          val size = fileDict["length"] as? Long
-            ?: throw IllegalArgumentException(
-              "Missing 'length' in file entry $index"
-            )
-          TorrentFile(
-            index = index,
-            path = (listOf(name) + pathParts).joinToString("/"),
-            size = size,
-          )
-        }
-      } else {
-        // Single-file torrent
-        val length = info["length"] as? Long
-          ?: throw IllegalArgumentException(
-            "Missing 'length' in single-file torrent"
-          )
-        listOf(TorrentFile(index = 0, path = name, size = length))
+    internal fun validatePathComponent(value: String) {
+      require(value.isNotEmpty() && value != "." && value != "..") { "Unsafe torrent path" }
+      require(value.encodeToByteArray().size <= 255 && value.none { it < ' ' || it in "/\\:*?\"<>|" }) {
+        "Unsafe torrent path component"
       }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun parseTrackers(
-      root: Map<String, Any>,
-    ): List<String> {
-      val announceList =
-        root["announce-list"] as? List<List<ByteArray>>
-      if (announceList != null) {
-        return announceList.flatMap { tier ->
-          tier.map { it.decodeToString() }
-        }
-      }
-      val announce = (root["announce"] as? ByteArray)
-        ?.decodeToString()
-      return if (announce != null) listOf(announce) else emptyList()
+      require(!value.endsWith('.') && !value.endsWith(' ')) { "Unsafe trailing path character" }
+      val stem = value.substringBefore('.').uppercase()
+      require(stem !in setOf("CON", "PRN", "AUX", "NUL") &&
+        !(stem.length == 4 && (stem.startsWith("COM") || stem.startsWith("LPT")) &&
+          stem.last() in '1'..'9')) { "Reserved torrent path" }
     }
   }
 }
+
+/** Filesystem collision key; hashes use the original encoded bytes. */
+internal expect fun canonicalTorrentName(value: String): String

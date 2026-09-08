@@ -1,202 +1,166 @@
 package com.linroid.ketch.torrent
 
-/**
- * Bencode encoder/decoder for BitTorrent metadata.
- *
- * Supports the four bencode types:
- * - **Integers**: `i42e`
- * - **Byte strings**: `4:spam`
- * - **Lists**: `l...e`
- * - **Dictionaries**: `d...e` (keys are byte strings, sorted)
- */
+import okio.Buffer
+import okio.ByteString
+import okio.ByteString.Companion.encodeUtf8
+import okio.ByteString.Companion.toByteString
+
+/** Bounded bencode codec with byte-preserving keys and exact source ranges. */
 internal object Bencode {
+  internal data class Node(val value: Any, val start: Int, val end: Int) {
+    val bytes: ByteArray? get() = value as? ByteArray
+    val integer: Long? get() = value as? Long
+    @Suppress("UNCHECKED_CAST")
+    val list: List<Node>? get() = value as? List<Node>
+    @Suppress("UNCHECKED_CAST")
+    val dictionary: Map<ByteString, Node>? get() = value as? Map<ByteString, Node>
 
-  /**
-   * Decodes a bencoded [ByteArray] into a Kotlin object.
-   *
-   * @return one of: [Long], [ByteArray], [List], or [Map]
-   * @throws IllegalArgumentException on malformed input
-   */
-  fun decode(data: ByteArray): Any {
-    val result = decodeAt(data, 0)
-    return result.first
+    operator fun get(key: String): Node? = dictionary?.get(key.encodeUtf8())
+    fun text(): String? = bytes?.decodeToString(throwOnInvalidSequence = true)
+
+    fun legacyValue(): Any = when (val data = value) {
+      is List<*> -> list!!.map { it.legacyValue() }
+      is Map<*, *> -> dictionary!!.mapKeys {
+        it.key.toByteArray().decodeToString(throwOnInvalidSequence = true)
+      }.mapValues { it.value.legacyValue() }
+      else -> data
+    }
   }
 
-  /**
-   * Encodes a Kotlin object into a bencoded [ByteArray].
-   *
-   * Accepts: [Long], [Int], [ByteArray], [String], [List], or
-   * [Map] (with [String] or [ByteArray] keys).
-   */
+  fun decode(data: ByteArray): Any = parse(data).legacyValue()
+
+  fun parse(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024): Node {
+    val node = parsePrefix(data, maxBytes)
+    require(node.end == data.size) { "Trailing bencode data" }
+    return node
+  }
+
+  /** Parses a header followed by binary payload (BEP 9). */
+  fun parsePrefix(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024): Node {
+    require(data.size <= maxBytes) { "Bencode exceeds size limit" }
+    return Parser(data).read(0)
+  }
+
   fun encode(value: Any): ByteArray {
-    val buffer = mutableListOf<Byte>()
-    encodeInto(value, buffer)
-    return buffer.toByteArray()
+    val buffer = Buffer()
+    write(value, buffer, 0)
+    return buffer.readByteArray()
   }
 
-  // -- Decoding ----------------------------------------------------------
+  private class Parser(private val data: ByteArray) {
+    private var cursor = 0
+    private var nodes = 0
 
-  private fun decodeAt(data: ByteArray, offset: Int): Pair<Any, Int> {
-    require(offset < data.size) { "Unexpected end of data at $offset" }
-    return when (data[offset].toInt().toChar()) {
-      'i' -> decodeInt(data, offset)
-      'l' -> decodeList(data, offset)
-      'd' -> decodeDict(data, offset)
-      in '0'..'9' -> decodeString(data, offset)
-      else -> throw IllegalArgumentException(
-        "Unexpected byte '${data[offset].toInt().toChar()}' " +
-          "at offset $offset"
-      )
+    fun read(depth: Int): Node {
+      require(depth < 64 && ++nodes <= 100_000) { "Bencode structure exceeds limits" }
+      require(cursor < data.size) { "Unexpected end of bencode" }
+      val start = cursor
+      val value: Any = when (data[cursor].toInt().toChar()) {
+        'i' -> integer()
+        'l' -> {
+          cursor++
+          val items = mutableListOf<Node>()
+          while (!consumeEnd()) items.add(read(depth + 1))
+          items
+        }
+        'd' -> {
+          cursor++
+          val items = linkedMapOf<ByteString, Node>()
+          var previous: ByteString? = null
+          while (!consumeEnd()) {
+            val key = bytes().toByteString()
+            require(previous == null || previous < key) { "Unsorted or duplicate bencode key" }
+            previous = key
+            items[key] = read(depth + 1)
+          }
+          items
+        }
+        in '0'..'9' -> bytes()
+        else -> throw IllegalArgumentException("Invalid bencode tag at $cursor")
+      }
+      return Node(value, start, cursor)
+    }
+
+    private fun consumeEnd(): Boolean {
+      require(cursor < data.size) { "Unterminated bencode container" }
+      return if (data[cursor] == 'e'.code.toByte()) {
+        cursor++
+        true
+      } else false
+    }
+
+    private fun integer(): Long {
+      val start = ++cursor
+      while (cursor < data.size && data[cursor] != 'e'.code.toByte()) {
+        require(cursor - start < 20) { "Bencode integer exceeds Long" }
+        cursor++
+      }
+      require(cursor < data.size) { "Unterminated integer" }
+      val text = data.decodeToString(start, cursor++)
+      require(text.matches(Regex("0|-?[1-9][0-9]*"))) { "Noncanonical integer" }
+      return text.toLongOrNull() ?: throw IllegalArgumentException("Bencode integer overflow")
+    }
+
+    private fun bytes(): ByteArray {
+      val start = cursor
+      while (cursor < data.size && data[cursor] != ':'.code.toByte()) {
+        require(data[cursor] in '0'.code.toByte()..'9'.code.toByte()) { "Invalid string length" }
+        require(cursor - start < 10) { "String length overflow" }
+        cursor++
+      }
+      require(cursor < data.size && cursor > start) { "Missing string length" }
+      require(cursor - start == 1 || data[start] != '0'.code.toByte()) {
+        "Noncanonical string length"
+      }
+      val length = data.decodeToString(start, cursor++).toIntOrNull()
+        ?: throw IllegalArgumentException("String length overflow")
+      require(length <= data.size - cursor) { "Truncated byte string" }
+      val result = data.copyOfRange(cursor, cursor + length)
+      cursor += length
+      return result
     }
   }
 
-  private fun decodeInt(
-    data: ByteArray,
-    offset: Int,
-  ): Pair<Long, Int> {
-    var i = offset + 1 // skip 'i'
-    val end = data.indexOf('e'.code.toByte(), i)
-    require(end > i) { "Malformed integer at offset $offset" }
-    val str = data.decodeToString(i, end)
-    val value = str.toLongOrNull()
-      ?: throw IllegalArgumentException(
-        "Invalid integer '$str' at offset $offset"
-      )
-    return value to (end + 1)
-  }
-
-  private fun decodeString(
-    data: ByteArray,
-    offset: Int,
-  ): Pair<ByteArray, Int> {
-    val colon = data.indexOf(':'.code.toByte(), offset)
-    require(colon > offset) {
-      "Malformed string length at offset $offset"
-    }
-    val lenStr = data.decodeToString(offset, colon)
-    val len = lenStr.toIntOrNull()
-      ?: throw IllegalArgumentException(
-        "Invalid string length '$lenStr' at offset $offset"
-      )
-    val start = colon + 1
-    val end = start + len
-    require(end <= data.size) {
-      "String overflows data at offset $offset (len=$len)"
-    }
-    return data.copyOfRange(start, end) to end
-  }
-
-  private fun decodeList(
-    data: ByteArray,
-    offset: Int,
-  ): Pair<List<Any>, Int> {
-    val list = mutableListOf<Any>()
-    var i = offset + 1 // skip 'l'
-    while (i < data.size && data[i] != 'e'.code.toByte()) {
-      val (value, next) = decodeAt(data, i)
-      list.add(value)
-      i = next
-    }
-    require(i < data.size) { "Unterminated list at offset $offset" }
-    return list to (i + 1) // skip 'e'
-  }
-
-  private fun decodeDict(
-    data: ByteArray,
-    offset: Int,
-  ): Pair<Map<String, Any>, Int> {
-    val map = linkedMapOf<String, Any>()
-    var i = offset + 1 // skip 'd'
-    while (i < data.size && data[i] != 'e'.code.toByte()) {
-      val (keyBytes, afterKey) = decodeString(data, i)
-      val key = keyBytes.decodeToString()
-      val (value, afterValue) = decodeAt(data, afterKey)
-      map[key] = value
-      i = afterValue
-    }
-    require(i < data.size) {
-      "Unterminated dictionary at offset $offset"
-    }
-    return map to (i + 1) // skip 'e'
-  }
-
-  // -- Encoding ----------------------------------------------------------
-
-  private fun encodeInto(value: Any, buffer: MutableList<Byte>) {
+  private fun write(value: Any, out: Buffer, depth: Int) {
+    require(depth < 64 && out.size <= 4 * 1024 * 1024) { "Bencode exceeds limits" }
     when (value) {
-      is Long -> encodeInt(value, buffer)
-      is Int -> encodeInt(value.toLong(), buffer)
-      is ByteArray -> encodeBytes(value, buffer)
-      is String -> encodeBytes(value.encodeToByteArray(), buffer)
-      is List<*> -> encodeList(value, buffer)
-      is Map<*, *> -> encodeDict(value, buffer)
-      else -> throw IllegalArgumentException(
-        "Cannot bencode ${value::class.simpleName}"
-      )
-    }
-  }
-
-  private fun encodeInt(value: Long, buffer: MutableList<Byte>) {
-    buffer.add('i'.code.toByte())
-    value.toString().encodeToByteArray().forEach { buffer.add(it) }
-    buffer.add('e'.code.toByte())
-  }
-
-  private fun encodeBytes(
-    value: ByteArray,
-    buffer: MutableList<Byte>,
-  ) {
-    value.size.toString().encodeToByteArray()
-      .forEach { buffer.add(it) }
-    buffer.add(':'.code.toByte())
-    value.forEach { buffer.add(it) }
-  }
-
-  private fun encodeList(
-    value: List<*>,
-    buffer: MutableList<Byte>,
-  ) {
-    buffer.add('l'.code.toByte())
-    for (item in value) {
-      encodeInto(item ?: continue, buffer)
-    }
-    buffer.add('e'.code.toByte())
-  }
-
-  private fun encodeDict(
-    value: Map<*, *>,
-    buffer: MutableList<Byte>,
-  ) {
-    buffer.add('d'.code.toByte())
-    // Bencode dictionaries must have sorted keys
-    val sorted = value.entries.sortedBy { (k, _) ->
-      when (k) {
-        is String -> k
-        is ByteArray -> k.decodeToString()
-        else -> k.toString()
+      is Node -> write(value.value, out, depth)
+      is Int -> write(value.toLong(), out, depth)
+      is Long -> out.writeUtf8("i${value}e")
+      is String -> write(value.encodeToByteArray(), out, depth)
+      is ByteString -> write(value.toByteArray(), out, depth)
+      is ByteArray -> {
+        require(value.size <= 4 * 1024 * 1024) { "Bencode string exceeds limit" }
+        out.writeUtf8("${value.size}:")
+        out.write(value)
       }
-    }
-    for ((k, v) in sorted) {
-      val keyBytes = when (k) {
-        is String -> k.encodeToByteArray()
-        is ByteArray -> k
-        else -> k.toString().encodeToByteArray()
+      is List<*> -> {
+        out.writeByte('l'.code)
+        value.forEach { write(requireNotNull(it) { "Null bencode value" }, out, depth + 1) }
+        out.writeByte('e'.code)
       }
-      encodeBytes(keyBytes, buffer)
-      encodeInto(v ?: continue, buffer)
+      is Map<*, *> -> {
+        val entries = value.entries.map { (key, item) ->
+          val bytes = when (key) {
+            is String -> key.encodeUtf8()
+            is ByteArray -> key.toByteString()
+            is ByteString -> key
+            else -> throw IllegalArgumentException("Invalid bencode key")
+          }
+          bytes to requireNotNull(item) { "Null bencode value" }
+        }.sortedBy { it.first }
+        require(entries.zipWithNext().all { it.first.first != it.second.first }) {
+          "Duplicate binary bencode key"
+        }
+        out.writeByte('d'.code)
+        entries.forEach { (key, item) ->
+          write(key, out, depth + 1)
+          write(item, out, depth + 1)
+        }
+        out.writeByte('e'.code)
+      }
+      else -> throw IllegalArgumentException("Unsupported bencode value")
     }
-    buffer.add('e'.code.toByte())
-  }
-
-  // indexOf helper for ByteArray
-  private fun ByteArray.indexOf(byte: Byte, start: Int): Int {
-    for (i in start until size) {
-      if (this[i] == byte) return i
-    }
-    return -1
-  }
-
-  private fun ByteArray.decodeToString(start: Int, end: Int): String {
-    return copyOfRange(start, end).decodeToString()
+    require(out.size <= 4 * 1024 * 1024) { "Bencode exceeds size limit" }
   }
 }

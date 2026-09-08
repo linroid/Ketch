@@ -5,6 +5,29 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class TorrentMetadataTest {
+  @Test
+  fun rejectsCanonicallyEquivalentPaths() {
+    val info = mapOf(
+      "name" to "root",
+      "piece length" to 1L,
+      "pieces" to ByteArray(0),
+      "files" to listOf("é.txt", "e\u0301.txt").map {
+        mapOf("path" to listOf(it), "length" to 0L)
+      },
+    )
+    assertFailsWith<IllegalArgumentException> {
+      TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to info)))
+    }
+  }
+
+  @Test
+  fun boundsPathComponentsByEncodedBytes() {
+    TorrentMetadata.validatePathComponent("界".repeat(85))
+    assertFailsWith<IllegalArgumentException> {
+      TorrentMetadata.validatePathComponent("界".repeat(86))
+    }
+  }
+
 
   @Test
   fun fromBencode_singleFileTorrent() {

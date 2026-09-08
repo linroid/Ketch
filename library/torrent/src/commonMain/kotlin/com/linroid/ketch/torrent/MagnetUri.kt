@@ -1,5 +1,7 @@
 package com.linroid.ketch.torrent
 
+import okio.Buffer
+
 /**
  * Parsed magnet URI containing torrent identification and metadata.
  *
@@ -13,6 +15,7 @@ internal data class MagnetUri(
   val infoHash: InfoHash,
   val displayName: String? = null,
   val trackers: List<String> = emptyList(),
+  val explicitPeers: List<String> = emptyList(),
 ) {
 
   /** Reconstructs the magnet URI string. */
@@ -23,6 +26,7 @@ internal data class MagnetUri(
       append("&dn=")
       append(urlEncode(displayName))
     }
+    for (peer in explicitPeers) append("&x.pe=${urlEncode(peer)}")
     for (tracker in trackers) {
       append("&tr=")
       append(urlEncode(tracker))
@@ -40,12 +44,14 @@ internal data class MagnetUri(
       require(uri.lowercase().startsWith("magnet:?")) {
         "Not a magnet URI: $uri"
       }
+      require(uri.length <= 65536) { "Magnet URI exceeds limit" }
       val query = uri.substringAfter('?')
       val params = query.split('&')
 
       var infoHash: InfoHash? = null
       var displayName: String? = null
       val trackers = mutableListOf<String>()
+      val peers = mutableListOf<String>()
 
       for (param in params) {
         val (key, value) = param.split('=', limit = 2)
@@ -53,17 +59,22 @@ internal data class MagnetUri(
 
         when (key.lowercase()) {
           "xt" -> {
-            val lower = value.lowercase()
+            val decoded = urlDecode(value)
+            val lower = decoded.lowercase()
+            require(!lower.startsWith("urn:btmh:")) { "BitTorrent v2/hybrid unsupported" }
             if (lower.startsWith("urn:btih:")) {
-              val hash = value.substring(9)
-              infoHash = parseInfoHash(hash)
+              val candidate = parseInfoHash(decoded.substring(9))
+              require(infoHash == null || infoHash == candidate) { "Conflicting info hashes" }
+              infoHash = candidate
             }
           }
+          "x.pe" -> peers.add(urlDecode(value))
           "dn" -> displayName = urlDecode(value)
           "tr" -> trackers.add(urlDecode(value))
         }
       }
 
+      require(trackers.size <= 128 && peers.size <= 128) { "Too many magnet endpoints" }
       requireNotNull(infoHash) {
         "Magnet URI missing xt=urn:btih: parameter"
       }
@@ -71,7 +82,8 @@ internal data class MagnetUri(
       return MagnetUri(
         infoHash = infoHash,
         displayName = displayName,
-        trackers = trackers,
+        trackers = trackers.distinct(),
+        explicitPeers = peers.distinct(),
       )
     }
 
@@ -111,50 +123,32 @@ internal data class MagnetUri(
     }
 
     private fun urlDecode(value: String): String {
-      return buildString {
-        var i = 0
-        while (i < value.length) {
-          when {
-            value[i] == '%' && i + 2 < value.length -> {
-              val hex = value.substring(i + 1, i + 3)
-              val byte = hex.toIntOrNull(16)
-              if (byte != null) {
-                append(byte.toChar())
-                i += 3
-              } else {
-                append(value[i])
-                i++
-              }
-            }
-            value[i] == '+' -> {
-              append(' ')
-              i++
-            }
-            else -> {
-              append(value[i])
-              i++
-            }
-          }
+      val input = value.encodeToByteArray()
+      val output = Buffer()
+      var index = 0
+      while (index < input.size) {
+        val byte = input[index].toInt() and 255
+        val hex = if (byte == '%'.code && index + 2 < input.size) {
+          input.decodeToString(index + 1, index + 3).toIntOrNull(16)
+        } else null
+        when {
+          hex != null -> { output.writeByte(hex); index += 3 }
+          byte == '+'.code -> { output.writeByte(' '.code); index++ }
+          else -> { output.writeByte(byte); index++ }
         }
       }
+      return output.readByteArray().decodeToString(throwOnInvalidSequence = true)
     }
 
-    private fun urlEncode(value: String): String {
-      return buildString {
-        for (ch in value) {
-          when {
-            ch.isLetterOrDigit() || ch in "-._~" -> append(ch)
-            else -> {
-              val bytes = ch.toString().encodeToByteArray()
-              for (b in bytes) {
-                append('%')
-                append(
-                  (b.toInt() and 0xFF).toString(16)
-                    .uppercase().padStart(2, '0')
-                )
-              }
-            }
-          }
+    private fun urlEncode(value: String): String = buildString {
+      for (byte in value.encodeToByteArray()) {
+        val number = byte.toInt() and 255
+        val char = number.toChar()
+        if (char in 'a'..'z' || char in 'A'..'Z' || char in '0'..'9' || char in "-._~") {
+          append(char)
+        } else {
+          append('%')
+          append(number.toString(16).uppercase().padStart(2, '0'))
         }
       }
     }
