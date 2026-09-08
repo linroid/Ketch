@@ -25,6 +25,29 @@ CI runs JVM/Android host, iOS simulator and JS regression suites; extra macOS/Wi
 the OS filesystem adapters. The Android emulator job requires a nonzero executed test count, since
 an AGP connected-test task can otherwise succeed without running instrumentation.
 
+## Review regression evidence (2026-09-08)
+
+The first review pass added coverage for Unicode path aliases and encoded filename limits,
+DNS fallback after a stalled address, two-minute peer keepalives, canceled rechecks, request
+chatter and duplicate responses, upload caching and waiting peers, minimum-buffer completion,
+tracker-independent metadata caching, malformed DHT UTF-8, and PEX from an exiting introducer.
+Resume tests include a real 21-second limiter wait, a checkpoint larger than 4 MiB with the
+16 MiB ceiling enforced, and a 1,000-file ownership restore that bounds path reconstruction.
+RemoteKetch tests delay snapshots while creating/removing tasks and delivering newer SSE state.
+
+Validation of the reviewed stack passed:
+
+- Torrent: 290 JVM tests (including enabled Transmission interoperability), 280 Android host
+  tests, and 281 iOS simulator tests.
+- RemoteKetch: 3 JVM and 3 iOS simulator tests.
+- Android instrumentation: 1 test on the Android 36 `medium_phone` emulator.
+- Android app assembly, iOS device compilation, and CLI compilation.
+- Transitional native-engine configuration and each affected earlier layer passed JVM tests
+  before being propagated through the stack.
+
+BEP 41 URLData remains on UDP announce requests, beginning at offset 98. Moving it to the
+connect packet would contradict the [extension format](https://www.bittorrent.org/beps/bep_0041.html).
+
 ## Local evidence (2026-09-08)
 
 - Torrent and core JVM, Android host and actual arm64 iOS simulator suites passed.
