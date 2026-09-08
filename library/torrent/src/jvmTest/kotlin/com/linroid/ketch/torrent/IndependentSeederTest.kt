@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -55,10 +56,11 @@ class IndependentSeederTest {
           val store = TorrentPieceStore(metadata, output.absolutePath.toPath(), emptySet(), "interop")
           var received = 0L
           val progress = mutableListOf<Long>()
-          TorrentPeerDownloader(store, network, consumePayload = { received += it },
-            onProgress = { progress.add(it) }).download(
-            PeerEndpoint("127.0.0.1", manager.swig().listen_port())
-          )
+          val peers = Channel<PeerEndpoint>(1)
+          peers.send(PeerEndpoint("127.0.0.1", manager.swig().listen_port()))
+          peers.close()
+          TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+            downloadPayload = { received += it }, onProgress = { progress.add(it) }).run(peers)
           assertContentEquals(payload, output.readBytes())
           assertEquals(payload.size.toLong(), received)
           assertEquals(payload.size.toLong(), progress.last())
