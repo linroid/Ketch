@@ -45,6 +45,8 @@ kotlin {
     commonMain.dependencies {
       api(projects.library.core)
       implementation(libs.okio)
+      implementation(libs.ktor.network)
+      implementation(projects.library.ktor)
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.serialization.json)
     }
