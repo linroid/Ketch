@@ -16,10 +16,11 @@ Approved scope: [roadmap](pure-kotlin-torrent-roadmap.md). Implementation checko
 | 09 Magnet metadata | https://github.com/linroid/Ketch/pull/156 | Independent seeder metadata-to-payload transfer; common negotiation, hash/size/private validation and shared cache tests |
 | 10 DHT foundations | https://github.com/linroid/Ketch/pull/157 | Published BEP 42/CRC vectors, routing/token expiry, packet quotas and IPv4/IPv6 RPC correlation |
 | 11 Trackerless discovery and PEX | https://github.com/linroid/Ketch/pull/158 | IPv4/IPv6 multi-hop/warm DHT, PEX payload discovery, public identity quorum, private-source policy; independent DHT-to-metadata-to-payload JVM transfer |
-| 12 Durable resume | Pending PR | Journal/checkpoint/identity recovery, concurrent session pause/resume and live limits pass on JVM/Android/iOS; JVM process-crash fixtures pass at write/checkpoint boundaries |
-| 13–14 | Pending | Not implemented yet |
+| 12 Durable resume | https://github.com/linroid/Ketch/pull/159 | Journal/checkpoint/identity recovery, concurrent session pause/resume and live limits pass on JVM/Android/iOS; JVM process-crash fixtures pass at write/checkpoint boundaries |
+| 13 Kotlin runtime and product integration | Pending PR | Kotlin default on JVM/Android/iOS; CLI download/daemon registration; public-source selected boundary transfer and offline recovery, incoming seeding, connection reduction, and final checkpoint handoff |
+| 14 Hardening and native removal | Pending | Final interoperability, security/performance/artifact gates and removal remain |
 
-No PR has been merged. The default transfer engine is still libtorrent4j.
+No PR has been merged. The default transfer engine is now Kotlin; native code remains temporarily for comparison until layer 14.
 
 Implementation notes:
 
@@ -31,9 +32,9 @@ Implementation notes:
 - Bencode and SHA-1 use common Kotlin. Platform Unicode normalization is used only to reject
   filesystem name collisions; torrent identity hashes the original metainfo bytes.
 - The storage layer refuses symlink child paths and tracks files created by the task. Durable
-  ownership recovery and crash-safe resume remain layer 12 work.
+  ownership recovery and crash-safe resume are implemented in layer 12.
 - Common tests use hand-written fakes. Protocol interoperability with an independent seeder
-  starts at layer 06; production source/runtime integration remains gated until layer 13.
+  starts at layer 06; production source/runtime integration is implemented in layer 13.
 
 - Ownership records include OS file identity and are appended independently of TaskStore snapshots.
   Cleanup preserves paths whose identity cannot be proven. A process exit in the tiny interval

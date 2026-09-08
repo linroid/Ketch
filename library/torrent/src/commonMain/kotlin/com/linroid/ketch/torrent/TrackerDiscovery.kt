@@ -10,6 +10,7 @@ internal class TrackerDiscovery(
   private val trackers: TrackerTiers,
   private val onPrivateTrackerChanged: suspend () -> Unit = {},
   private val nowMs: () -> Long = monotonicClock(),
+  private val announceCompletion: Boolean = true,
 ) {
   init { if (metadata.isPrivate) trackers.preferCurrentTracker() }
 
@@ -34,7 +35,7 @@ internal class TrackerDiscovery(
       stopped && started -> TrackerEvent.STOPPED
       stopped -> return null
       !started -> TrackerEvent.STARTED
-      left == 0L && !completed -> TrackerEvent.COMPLETED
+      left == 0L && !completed && announceCompletion -> TrackerEvent.COMPLETED
       else -> TrackerEvent.NONE
     }
     if (event == TrackerEvent.NONE && nowMs() < nextAnnounce) return null

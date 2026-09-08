@@ -146,18 +146,6 @@ class TorrentDownloadSourceResolveTest {
 
   // -- resolve via .torrent URL --
 
-  @Test
-  fun resolve_torrentUrl_throwsSourceError() = runTest {
-    // Direct .torrent URL fetching is not yet supported
-    val error = assertFailsWith<KetchError.SourceError> {
-      source.resolve(
-        "https://example.com/file.torrent",
-        emptyMap(),
-      )
-    }
-    assertEquals("torrent", error.sourceType)
-  }
-
   // -- Engine lifecycle --
 
   @Test

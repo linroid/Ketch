@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
@@ -23,6 +24,7 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -127,7 +129,16 @@ internal class DownloadExecution(
       resolvedUrl = source.resolve(request.url, request.headers)
     }
 
-    val total = resolvedUrl.totalBytes
+    val total = if (resolvedUrl.selectionMode == FileSelectionMode.MULTIPLE &&
+      request.selectedFileIds.isNotEmpty()) {
+      require(request.selectedFileIds.all { id -> resolvedUrl.files.any { it.id == id } }) {
+        "Unknown selected file"
+      }
+      resolvedUrl.files.filter { it.id in request.selectedFileIds }.fold(0L) { sum, file ->
+        require(file.size >= 0 && sum <= Long.MAX_VALUE - file.size)
+        sum + file.size
+      }
+    } else resolvedUrl.totalBytes
     if (total < 0) {
       log.e { "Unknown file size for ${request.url}" }
       throw KetchError.SourceError(
@@ -149,7 +160,7 @@ internal class DownloadExecution(
     )
     log.d { "Resolved outputPath=$outputPath" }
 
-    if (total == 0L) {
+    if (total == 0L && !source.managesOwnFileIo) {
       completeZeroByteFile(outputPath, source.type)
       return
     }
@@ -258,7 +269,15 @@ internal class DownloadExecution(
         try {
           downloadWithRetry(ctx) { downloadBlock(ctx) }
         } finally {
-          saveJob.cancel()
+          withContext(NonCancellable) {
+            saveJob.cancelAndJoin()
+            val updatedResume = source.updateResumeState(ctx)
+            handle.record.update {
+              it.copy(segments = handle.mutableSegments.value,
+                sourceResumeState = updatedResume ?: it.sourceResumeState,
+                updatedAt = Clock.System.now())
+            }
+          }
         }
       }
 
@@ -434,6 +453,7 @@ internal class DownloadExecution(
     var lastBytes = 0L
     var lastMark = TimeSource.Monotonic.markNow()
     var speed = 0L
+    val reportedSpeed = MutableStateFlow<Long?>(null)
     return DownloadContext(
       taskId = taskId,
       url = request.url,
@@ -450,7 +470,7 @@ internal class DownloadExecution(
           lastMark = now
         }
         handle.mutableState.value = DownloadState.Downloading(
-          DownloadProgress(downloaded, total, speed),
+          DownloadProgress(downloaded, total, reportedSpeed.value ?: speed),
         )
       },
       throttle = { bytes ->
@@ -460,6 +480,7 @@ internal class DownloadExecution(
       headers = request.headers,
       preResolved = preResolved,
       outputPath = outputPath,
+      reportedSpeed = reportedSpeed,
       maxConnections = MutableStateFlow(
         request.connections.takeIf { it > 0 } ?: 0,
       ),

@@ -22,6 +22,14 @@ data class TorrentConfig(
   val connectionsPerTorrent: Int = 100,
   val enableUpload: Boolean = false,
   val listenPort: Int = 0,
+  /** Total TCP connections, including metadata requests and incoming peers. */
+  val maxConnections: Int = 200,
+  /** Optional directory for DHT routing snapshots. Contains no task payload. */
+  val stateDirectory: String? = null,
+  /** Bootstrap endpoints in host:port or [IPv6]:port form. */
+  val dhtBootstrap: List<String> = listOf(
+    "router.bittorrent.com:6881", "router.utorrent.com:6881", "dht.transmissionbt.com:6881"
+  ),
   /** Explicit policy; null preserves the legacy [enableUpload] setting. */
   val uploadPolicy: TorrentUploadPolicy? = null,
   /** Maximum metainfo bytes accepted from HTTP or peers. */
@@ -32,10 +40,12 @@ data class TorrentConfig(
 ) {
   init {
     require(maxActiveTorrents > 0) { "maxActiveTorrents must be positive" }
-    require(connectionsPerTorrent > 0) { "connectionsPerTorrent must be positive" }
+    require(connectionsPerTorrent in 1..512)
+    require(maxConnections in 1..4096)
+    require(dhtBootstrap.size <= 64)
     require(metadataTimeoutSeconds >= 0) { "metadata timeout must be non-negative" }
     require(listenPort in 0..65535) { "listenPort must be in 0..65535" }
-    require(maxMetadataBytes > 0) { "maxMetadataBytes must be positive" }
+    require(maxMetadataBytes in 1..4 * 1024 * 1024)
     require(maxBufferedBytes >= 16384) { "maxBufferedBytes must hold a protocol block" }
   }
 

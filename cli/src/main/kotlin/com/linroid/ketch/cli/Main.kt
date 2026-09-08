@@ -22,6 +22,7 @@ import com.linroid.ketch.config.defaultDbPath
 import com.linroid.ketch.config.generateConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.server.KetchServer
@@ -164,6 +165,7 @@ fun main(args: Array<String>) {
   val ketch = Ketch(
     httpEngine = KtorHttpEngine(),
     config = config,
+    additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
   )
 
   runBlocking {
@@ -431,7 +433,7 @@ private fun runServer(args: Array<String>) {
     config = downloadConfig,
     name = instanceName,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource())
+    additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource())
   )
   val server = KetchServer(
     ketch,
@@ -647,7 +649,7 @@ private fun runMcp(args: List<String>) {
     taskStore = taskStore,
     config = downloadConfig,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource()),
+    additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
   )
 
   Runtime.getRuntime().addShutdownHook(Thread {

@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,6 +20,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -32,6 +34,7 @@ internal class KotlinTorrentSession(
   connections: Int = 20,
   private val uploadPolicy: TorrentUploadPolicy = TorrentUploadPolicy.DISABLED,
   private val checkpoint: TorrentCheckpoint? = null,
+  private val peerId: ByteArray = torrentRandomBytes(20),
   private val discover: suspend (SendChannel<PeerEndpoint>, KotlinTorrentSession) -> Unit,
   private val downloadThrottle: suspend (Int) -> Unit = {},
   private val uploadThrottle: suspend (Int) -> Unit = {},
@@ -41,7 +44,30 @@ internal class KotlinTorrentSession(
   private val scope = CoroutineScope(parent.coroutineContext +
     SupervisorJob(parent.coroutineContext[Job]) + Dispatchers.Default)
   private val lifecycle = Mutex()
+  private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
+  private val resets = Channel<CompletableDeferred<Unit>>(1)
+
+  private val allowedPrivateHosts = AtomicReference<Set<String>>(emptySet())
+
+  fun trackerPeers(peers: List<PeerEndpoint>) {
+    allowedPrivateHosts.store(peers.map { it.host }.toSet())
+  }
+
+  fun accept(connection: TorrentConnection): Boolean {
+    if (_state.value != TorrentSessionState.DOWNLOADING &&
+      _state.value != TorrentSessionState.SEEDING) return false
+    if (store.metadata.isPrivate && connection.remote.host !in allowedPrivateHosts.load()) return false
+    return incoming.trySend(connection).isSuccess
+  }
+
+  suspend fun resetPeers() {
+    val done = CompletableDeferred<Unit>()
+    resets.send(done)
+    done.await()
+  }
+
   private val rate = TorrentRateLimiter()
+  private val uploadRate = TorrentRateLimiter()
   private val connectionLimit = AtomicInt(connections)
   private val received = AtomicLong(checkpoint?.receivedBytes ?: 0)
   private val uploaded = AtomicLong(checkpoint?.uploadedBytes ?: 0)
@@ -104,7 +130,7 @@ internal class KotlinTorrentSession(
             try { discover(peers, this@KotlinTorrentSession) } finally { peers.close() }
           }
           try {
-            TorrentSwarm(store, network, budget,
+            TorrentSwarm(store, network, budget, peerId = peerId,
               connections = { connectionLimit.load() }, uploadPolicy = uploadPolicy,
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes
@@ -121,6 +147,7 @@ internal class KotlinTorrentSession(
                 downloadThrottle(bytes)
               },
               uploadPayload = { bytes ->
+                uploadRate.acquire(bytes)
                 uploadThrottle(bytes)
                 uploaded.fetchAndAdd(bytes.toLong())
               },
@@ -131,7 +158,7 @@ internal class KotlinTorrentSession(
                   TorrentSessionState.SEEDING
                 } else TorrentSessionState.FINISHED
               },
-            ).run(peers)
+            ).run(peers, incoming, resets)
           } finally {
             withContext(NonCancellable) { discovery.cancelAndJoin(); peers.cancel() }
           }
@@ -149,6 +176,7 @@ internal class KotlinTorrentSession(
     if (closed) return@withLock
     job?.cancelAndJoin()
     job = null
+    while (true) (incoming.tryReceive().getOrNull() ?: break).close()
     _state.value = TorrentSessionState.PAUSED
     currentSpeed.store(0)
     if (store.isInitialized()) store.persistCheckpoint(received.load(), uploaded.load())
@@ -159,6 +187,8 @@ internal class KotlinTorrentSession(
   } else null
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = rate.set(bytesPerSecond)
+
+  fun setUploadRateLimit(value: Long) = uploadRate.set(value)
 
   fun setConnections(value: Int) {
     require(value in 1..512)
@@ -178,6 +208,8 @@ internal class KotlinTorrentSession(
     job?.cancelAndJoin()
     job = null
     scope.cancel()
+    incoming.cancel()
+    resets.cancel()
     _state.value = TorrentSessionState.STOPPED
     if (deleteFiles) {
       if (!recovered) checkpoint?.let { store.restore(it) }

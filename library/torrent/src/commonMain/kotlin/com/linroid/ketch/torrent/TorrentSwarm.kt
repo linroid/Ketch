@@ -1,5 +1,7 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,8 +44,13 @@ internal class TorrentSwarm(
   private val connected = mutableMapOf<Int, PeerEndpoint>()
 
   /** A closed peer stream fails once every candidate has exhausted its bounded retries. */
-  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-  suspend fun run(peers: ReceiveChannel<PeerEndpoint>) = supervisorScope {
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,
+    kotlinx.coroutines.DelicateCoroutinesApi::class)
+  suspend fun run(
+    peers: ReceiveChannel<PeerEndpoint>,
+    incoming: ReceiveChannel<TorrentConnection>? = null,
+    resets: ReceiveChannel<CompletableDeferred<Unit>>? = null,
+  ) = supervisorScope {
     store.initialize()
     if (store.completed() && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
       store.finish()
@@ -78,6 +85,32 @@ internal class TorrentSwarm(
           attempts.size + pending.size < 4096) pending.addLast(endpoint)
       }
     }
+    fun launchPeer(
+      endpoint: PeerEndpoint,
+      overhead: TorrentBufferBudget.Lease,
+      connection: TorrentConnection? = null,
+    ) {
+      val id = nextId++
+      attempts[endpoint] = (attempts[endpoint] ?: 0) + 1
+      active[endpoint] = launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
+        var failure: Throwable? = null
+        try {
+          peer(id, endpoint, scheduler, progressEvents, pexEvents, connection)
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          failure = e
+        } finally {
+          withContext(NonCancellable) {
+            scheduler.remove(id)
+            connectedMutex.withLock { connected.remove(id) }
+          }
+          connection?.close()
+          overhead.close()
+          results.trySend(endpoint to failure)
+        }
+      }
+    }
     try {
       while (currentCoroutineContext().isActive) {
         // A terminating introducer may have queued its last PEX before its result was selected.
@@ -106,31 +139,32 @@ internal class TorrentSwarm(
             pending.addFirst(endpoint)
             break
           }
-          val id = nextId++
-          attempts[endpoint] = (attempts[endpoint] ?: 0) + 1
-          active[endpoint] = launch(Dispatchers.Default) {
-            var failure: Throwable? = null
-            try {
-              peer(id, endpoint, scheduler, progressEvents, pexEvents)
-            } catch (e: CancellationException) {
-              throw e
-            } catch (e: Exception) {
-              failure = e
-            } finally {
-              withContext(NonCancellable) {
-                scheduler.remove(id)
-                connectedMutex.withLock { connected.remove(id) }
-              }
-              overhead.close()
-              results.trySend(endpoint to failure)
-            }
-          }
+          launchPeer(endpoint, overhead)
         }
-        if (discoveryClosed && pending.isEmpty() && active.isEmpty()) {
+        if (discoveryClosed && pending.isEmpty() && active.isEmpty() && incoming == null) {
           check(complete) { "No peer could complete the torrent" }
           break
         }
         select<Unit> {
+          incoming?.onReceive { connection ->
+            val overhead = if (active.size < limit && connection.remote !in active) {
+              budget.reserve(256 * 1024 + store.pieceCount * 4)
+            } else null
+            if (overhead == null) connection.close()
+            else launchPeer(connection.remote, overhead, connection)
+          }
+          resets?.onReceive { done ->
+            active.values.forEach { it.cancel() }
+            active.values.forEach { it.join() }
+            active.clear()
+            while (results.tryReceive().isSuccess) { }
+            while (peers.tryReceive().isSuccess) { }
+            while (true) (incoming?.tryReceive()?.getOrNull() ?: break).close()
+            pending.clear()
+            attempts.clear()
+            retryAt.clear()
+            done.complete(Unit)
+          }
           if (!discoveryClosed) peers.onReceiveCatching { result ->
             val endpoint = result.getOrNull()
             if (endpoint == null) discoveryClosed = true
@@ -167,9 +201,10 @@ internal class TorrentSwarm(
     scheduler: TorrentPieceScheduler,
     progressEvents: SendChannel<Unit>,
     pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
+    accepted: TorrentConnection? = null,
   ) =
     supervisorScope {
-      val connection = network.connect(endpoint)
+      val connection = accepted ?: network.connect(endpoint)
       var uploadSlot = false
       val uploadCache = TorrentUploadCache(store, budget)
       try {

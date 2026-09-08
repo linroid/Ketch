@@ -18,4 +18,6 @@ internal data class TorrentResumeState(
   val resumeData: String,
   val selectedFileIds: Set<String>,
   val savePath: String,
+  val metainfo: String = "",
+  val version: Int = 1,
 )
