@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.libtorrent4j.Address
 import org.libtorrent4j.AlertListener
 import org.libtorrent4j.Priority
 import org.libtorrent4j.SessionHandle
@@ -15,6 +16,7 @@ import org.libtorrent4j.TorrentInfo
 import org.libtorrent4j.alerts.Alert
 import org.libtorrent4j.alerts.AlertType
 import org.libtorrent4j.alerts.MetadataReceivedAlert
+import org.libtorrent4j.swig.ip_filter
 import org.libtorrent4j.swig.settings_pack
 import java.io.File
 import kotlin.coroutines.resume
@@ -77,6 +79,16 @@ internal class Libtorrent4jEngine(
     val params = SessionParams(settings)
     val mgr = SessionManager()
     mgr.start(params)
+    if (config.effectiveUploadPolicy == TorrentUploadPolicy.DISABLED) {
+      // The default local peer class bypasses choke slots. Keep only the global class
+      // for every address so LAN peers obey both the zero slots and global rate limits.
+      val classes = ip_filter()
+      classes.add_rule(Address.parseIp("0.0.0.0").swig(),
+        Address.parseIp("255.255.255.255").swig(), 1)
+      classes.add_rule(Address.parseIp("::").swig(),
+        Address.parseIp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff").swig(), 1)
+      mgr.swig().set_peer_class_filter(classes)
+    }
     session = mgr
     log.i { "Torrent engine started" }
   }
