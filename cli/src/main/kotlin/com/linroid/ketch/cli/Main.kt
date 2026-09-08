@@ -165,6 +165,7 @@ fun main(args: Array<String>) {
   val ketch = Ketch(
     httpEngine = KtorHttpEngine(),
     config = config,
+    additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
   )
 
   runBlocking {
