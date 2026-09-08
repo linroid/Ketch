@@ -71,12 +71,12 @@ internal class TorrentSwarm(
     var complete = false
     var nextId = 0
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
-    pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
-      update.dropped)
-    for (endpoint in pexDirectory.candidates()) {
-      if (endpoint !in attempts && endpoint !in pending &&
-        attempts.size + pending.size < 4096) pending.addLast(endpoint)
-    }
+      pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
+        update.dropped)
+      for (endpoint in pexDirectory.candidates()) {
+        if (endpoint !in attempts && endpoint !in pending &&
+          attempts.size + pending.size < 4096) pending.addLast(endpoint)
+      }
     }
     try {
       while (currentCoroutineContext().isActive) {
@@ -188,12 +188,14 @@ internal class TorrentSwarm(
         wire.send(PeerMessage.Bitfield(pieceBitfield(advertised)))
         wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
         val messages = Channel<PeerMessage>(1)
+        val consumed = Channel<Unit>(1)
         val reader = launch {
           try {
             while (isActive) {
               val message = wire.read()
-              if (message is PeerMessage.Piece) downloadPayload(message.bytes.size)
               messages.send(message)
+              // Do not start an idle read while the actor intentionally waits on a rate limiter.
+              consumed.receive()
             }
           } catch (e: Throwable) {
             messages.close(e)
@@ -212,6 +214,11 @@ internal class TorrentSwarm(
               onTimeout(100) { null }
             }
             if (message != null) {
+              if (message is PeerMessage.Piece) {
+                val throttling = TimeSource.Monotonic.markNow()
+                downloadPayload(message.bytes.size)
+                lastBlock += throttling.elapsedNow()
+              }
               val accepted = state.received(message)
               when (message) {
                 is PeerMessage.Bitfield, is PeerMessage.Have ->
@@ -294,6 +301,7 @@ internal class TorrentSwarm(
                 else -> Unit
               }
             }
+            if (message != null) consumed.trySend(Unit)
             uploadCache.expire()
             if (state.interested && !uploadSlot && uploadPolicy != TorrentUploadPolicy.DISABLED &&
               uploadSlots.tryAcquire()) {
@@ -368,6 +376,7 @@ internal class TorrentSwarm(
               }
             }
             messages.cancel()
+            consumed.cancel()
           }
         }
       } finally {

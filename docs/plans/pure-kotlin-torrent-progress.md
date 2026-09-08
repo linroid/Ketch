@@ -15,8 +15,9 @@ Approved scope: [roadmap](pure-kotlin-torrent-roadmap.md). Implementation checko
 | 08 Swarm and upload | https://github.com/linroid/Ketch/pull/155 | Rarity/pipelines, complementary peers, recovery, upload policies and seeding lifecycle on JVM/Android/iOS |
 | 09 Magnet metadata | https://github.com/linroid/Ketch/pull/156 | Independent seeder metadata-to-payload transfer; common negotiation, hash/size/private validation and shared cache tests |
 | 10 DHT foundations | https://github.com/linroid/Ketch/pull/157 | Published BEP 42/CRC vectors, routing/token expiry, packet quotas and IPv4/IPv6 RPC correlation |
-| 11 Trackerless discovery and PEX | Pending PR | IPv4/IPv6 multi-hop/warm DHT, PEX payload discovery, public identity quorum, private-source policy; independent DHT-to-metadata-to-payload JVM transfer |
-| 12–14 | Pending | Not implemented yet |
+| 11 Trackerless discovery and PEX | https://github.com/linroid/Ketch/pull/158 | IPv4/IPv6 multi-hop/warm DHT, PEX payload discovery, public identity quorum, private-source policy; independent DHT-to-metadata-to-payload JVM transfer |
+| 12 Durable resume | Pending PR | Journal/checkpoint/identity recovery, concurrent session pause/resume and live limits pass on JVM/Android/iOS; JVM process-crash fixtures pass at write/checkpoint boundaries |
+| 13–14 | Pending | Not implemented yet |
 
 No PR has been merged. The default transfer engine is still libtorrent4j.
 
@@ -33,3 +34,12 @@ Implementation notes:
   ownership recovery and crash-safe resume remain layer 12 work.
 - Common tests use hand-written fakes. Protocol interoperability with an independent seeder
   starts at layer 06; production source/runtime integration remains gated until layer 13.
+
+- Ownership records include OS file identity and are appended independently of TaskStore snapshots.
+  Cleanup preserves paths whose identity cannot be proven. A process exit in the tiny interval
+  between creating a file/directory and recording its identity can leave an unclaimed path;
+  recovery preserves it conservatively. Unknown temporary metadata files are also preserved.
+  Stronger descriptor-rooted protection against concurrent symlink replacement remains a final
+  storage hardening audit; current checks reject static symlink paths.
+- Native/iOS socket disconnects now use IOException consistently, and shared parent-directory
+  creation tolerates another torrent creating the same directory without claiming its ownership.

@@ -29,30 +29,36 @@ internal object Bencode {
 
   fun decode(data: ByteArray): Any = parse(data).legacyValue()
 
-  fun parse(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024): Node {
-    val node = parsePrefix(data, maxBytes)
+  fun parse(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024, maxNodes: Int = 100_000): Node {
+    val node = parsePrefix(data, maxBytes, maxNodes)
     require(node.end == data.size) { "Trailing bencode data" }
     return node
   }
 
   /** Parses a header followed by binary payload (BEP 9). */
-  fun parsePrefix(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024): Node {
+  fun parsePrefix(
+    data: ByteArray,
+    maxBytes: Int = 4 * 1024 * 1024,
+    maxNodes: Int = 100_000,
+  ): Node {
     require(data.size <= maxBytes) { "Bencode exceeds size limit" }
-    return Parser(data).read(0)
+    require(maxNodes in 1..1_000_000)
+    return Parser(data, maxNodes).read(0)
   }
 
-  fun encode(value: Any): ByteArray {
+  fun encode(value: Any, maxBytes: Int = 4 * 1024 * 1024): ByteArray {
+    require(maxBytes > 0)
     val buffer = Buffer()
-    write(value, buffer, 0)
+    write(value, buffer, 0, maxBytes)
     return buffer.readByteArray()
   }
 
-  private class Parser(private val data: ByteArray) {
+  private class Parser(private val data: ByteArray, private val maxNodes: Int) {
     private var cursor = 0
     private var nodes = 0
 
     fun read(depth: Int): Node {
-      require(depth < 64 && ++nodes <= 100_000) { "Bencode structure exceeds limits" }
+      require(depth < 64 && ++nodes <= maxNodes) { "Bencode structure exceeds limits" }
       require(cursor < data.size) { "Unexpected end of bencode" }
       val start = cursor
       val value: Any = when (data[cursor].toInt().toChar()) {
@@ -121,22 +127,22 @@ internal object Bencode {
     }
   }
 
-  private fun write(value: Any, out: Buffer, depth: Int) {
-    require(depth < 64 && out.size <= 4 * 1024 * 1024) { "Bencode exceeds limits" }
+  private fun write(value: Any, out: Buffer, depth: Int, maxBytes: Int) {
+    require(depth < 64 && out.size <= maxBytes) { "Bencode exceeds limits" }
     when (value) {
-      is Node -> write(value.value, out, depth)
-      is Int -> write(value.toLong(), out, depth)
+      is Node -> write(value.value, out, depth, maxBytes)
+      is Int -> write(value.toLong(), out, depth, maxBytes)
       is Long -> out.writeUtf8("i${value}e")
-      is String -> write(value.encodeToByteArray(), out, depth)
-      is ByteString -> write(value.toByteArray(), out, depth)
+      is String -> write(value.encodeToByteArray(), out, depth, maxBytes)
+      is ByteString -> write(value.toByteArray(), out, depth, maxBytes)
       is ByteArray -> {
-        require(value.size <= 4 * 1024 * 1024) { "Bencode string exceeds limit" }
+        require(value.size <= maxBytes) { "Bencode string exceeds limit" }
         out.writeUtf8("${value.size}:")
         out.write(value)
       }
       is List<*> -> {
         out.writeByte('l'.code)
-        value.forEach { write(requireNotNull(it) { "Null bencode value" }, out, depth + 1) }
+        value.forEach { write(requireNotNull(it) { "Null bencode value" }, out, depth + 1, maxBytes) }
         out.writeByte('e'.code)
       }
       is Map<*, *> -> {
@@ -154,13 +160,13 @@ internal object Bencode {
         }
         out.writeByte('d'.code)
         entries.forEach { (key, item) ->
-          write(key, out, depth + 1)
-          write(item, out, depth + 1)
+          write(key, out, depth + 1, maxBytes)
+          write(item, out, depth + 1, maxBytes)
         }
         out.writeByte('e'.code)
       }
       else -> throw IllegalArgumentException("Unsupported bencode value")
     }
-    require(out.size <= 4 * 1024 * 1024) { "Bencode exceeds size limit" }
+    require(out.size <= maxBytes) { "Bencode exceeds size limit" }
   }
 }

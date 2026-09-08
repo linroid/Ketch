@@ -18,7 +18,7 @@ internal class TorrentPieceStore(
   val metadata: TorrentMetadata,
   output: Path,
   selected: Set<Int>,
-  taskId: String,
+  private val taskId: String,
   private val fileSystem: FileSystem = torrentFileSystem,
 ) {
   private val mutex = Mutex()
@@ -29,10 +29,30 @@ internal class TorrentPieceStore(
   private val wanted = BooleanArray(verified.size)
   private val fileProgress = LongArray(metadata.files.size)
   private var remaining = 0
-  private val ownedFiles = linkedSetOf<Path>()
-  private val ownedDirectories = linkedSetOf<Path>()
+  private val ownedFiles = linkedMapOf<Path, String>()
+  private val ownedDirectories = linkedMapOf<Path, String>()
   private val sidecar: Path
+  private val allowedOutputFiles by lazy { this.selected.map(::filePath).toSet() }
+  private val allowedDirectories by lazy {
+    buildSet {
+      for (file in allowedOutputFiles + journalPath) {
+        var parent = file.parent
+        while (parent != null && parent != parent.root && add(parent)) parent = parent.parent
+      }
+    }
+  }
   private var initialized = false
+  private var journalReady = false
+  private var ownershipLoaded = false
+  private val pendingOwnership = mutableListOf<Pair<Boolean, TorrentOwnedPath>>()
+  private val journalPath: Path get() = sidecar / "ownership"
+  private val journal by lazy {
+    TorrentOwnershipJournal(journalPath, Bencode.encode(mapOf(
+      "hash" to metadata.infoHash.toBytes(), "task" to taskId, "output" to output.toString()
+    )), fileSystem)
+  }
+  val outputPath: String get() = output.toString()
+  val selectedIndices: Set<Int> get() = selected.toSet()
 
   val pieceCount: Int get() = verified.size
   val totalSelectedBytes: Long get() = selected.sumOf { metadata.files[it].size }
@@ -72,6 +92,20 @@ internal class TorrentPieceStore(
   suspend fun initialize() = mutex.withLock {
     withContext(Dispatchers.IO) {
       if (initialized) return@withContext
+      ensureDirectory(sidecar)
+      loadOwnership()
+      journal.initialize()
+      journalReady = true
+      for (path in ownedFiles.keys.toList()) {
+        if (path.parent == sidecar && Regex("checkpoint-[0-9a-f]{40}\\.tmp").matches(path.name) &&
+          torrentFileIdentity(path) == ownedFiles[path]) {
+          fileSystem.delete(path, mustExist = false)
+          ownedFiles.remove(path)
+        }
+      }
+      for ((directory, owned) in pendingOwnership) journal.append(directory, owned)
+      pendingOwnership.clear()
+      recordOwned(journalPath, directory = false)
       if (metadata.isMultiFile) ensureDirectory(output)
       for (index in selected) {
         val path = filePath(index)
@@ -79,7 +113,7 @@ internal class TorrentPieceStore(
         validateRegularPath(path)
         if (!fileSystem.exists(path)) {
           fileSystem.openReadWrite(path, mustCreate = true).use {
-            ownedFiles.add(path)
+            recordOwned(path, directory = false)
             it.flush()
           }
         }
@@ -154,6 +188,8 @@ internal class TorrentPieceStore(
 
   suspend fun progress(): LongArray = mutex.withLock { fileProgress.copyOf() }
 
+  suspend fun isInitialized(): Boolean = mutex.withLock { initialized }
+
   suspend fun completed(): Boolean = mutex.withLock { initialized && remaining == 0 }
 
   suspend fun finish() = mutex.withLock {
@@ -174,17 +210,18 @@ internal class TorrentPieceStore(
 
   suspend fun verifiedPieces(): BooleanArray = mutex.withLock { verified.copyOf() }
 
-  /** Cleanup is deliberately limited to files this instance created. */
+  /** Deletes only recorded paths whose OS identity still matches the task-owned file. */
   suspend fun cleanup() = mutex.withLock {
     withContext(Dispatchers.IO) {
-      for (path in ownedFiles.toList().asReversed()) {
+      val files = ownedFiles.toList().asReversed().sortedBy { it.first == journalPath }
+      for ((path, identity) in files) {
         validateRegularPath(path)
-        fileSystem.delete(path, mustExist = false)
+        if (torrentFileIdentity(path) == identity) fileSystem.delete(path, mustExist = false)
       }
-      for (path in ownedDirectories.toList().asReversed()) {
+      for ((path, identity) in ownedDirectories.toList().sortedByDescending { it.first.segments.size }) {
         validateParents(path)
         val directory = fileSystem.metadataOrNull(path)?.isDirectory == true
-        if (directory && fileSystem.list(path).isEmpty()) {
+        if (directory && torrentFileIdentity(path) == identity && fileSystem.list(path).isEmpty()) {
           fileSystem.delete(path)
         }
       }
@@ -194,7 +231,98 @@ internal class TorrentPieceStore(
   }
 
   suspend fun ownedPaths(): Pair<List<String>, List<String>> = mutex.withLock {
-    ownedFiles.map { it.toString() } to ownedDirectories.map { it.toString() }
+    ownedFiles.keys.map { it.toString() } to ownedDirectories.keys.map { it.toString() }
+  }
+
+  suspend fun recoverOwnership() = mutex.withLock {
+    withContext(Dispatchers.IO) { loadOwnership() }
+  }
+
+  private fun loadOwnership() {
+    if (ownershipLoaded || !fileSystem.exists(sidecar)) return
+    validateParents(journalPath)
+    for ((directory, owned) in journal.load()) restoreOwned(directory, owned)
+    ownershipLoaded = true
+  }
+
+  suspend fun checkpoint(): TorrentCheckpoint = mutex.withLock { snapshot() }
+
+  suspend fun restore(checkpoint: TorrentCheckpoint) = mutex.withLock {
+    require(checkpoint.taskId == taskId && checkpoint.metadata.infoHash == metadata.infoHash)
+    require(checkpoint.output == output.toString() &&
+      checkpoint.selected.ifEmpty { metadata.files.indices.toSet() } == selected)
+    for (owned in checkpoint.files) restoreOwned(false, owned)
+    for (owned in checkpoint.directories) restoreOwned(true, owned)
+    // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
+  }
+
+  /** Flushes a snapshot file before returning bytes for publication through TaskStore. */
+  suspend fun persistCheckpoint(receivedBytes: Long = 0, uploadedBytes: Long = 0): ByteArray =
+    mutex.withLock {
+    require(receivedBytes >= 0 && uploadedBytes >= 0)
+    check(initialized)
+    withContext(Dispatchers.IO) {
+      if (journal.needsCompaction) {
+        require(torrentFileIdentity(journalPath) == ownedFiles[journalPath])
+        val records = ownedDirectories.map { true to TorrentOwnedPath(it.key.toString(), it.value) } +
+          ownedFiles.map { false to TorrentOwnedPath(it.key.toString(), it.value) }
+        ownedFiles[journalPath] = journal.compact(records)
+      }
+      val checkpointPath = sidecar / "checkpoint"
+      validateRegularPath(checkpointPath)
+      if (fileSystem.exists(checkpointPath)) {
+        require(ownedFiles[checkpointPath] == torrentFileIdentity(checkpointPath)) {
+          "Checkpoint path is not owned by this task"
+        }
+      }
+      val temp = sidecar / ("checkpoint-" + InfoHash.fromBytes(torrentRandomBytes(20)).hex + ".tmp")
+      val data = snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
+      fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
+        recordOwned(temp, directory = false)
+        handle.write(0, data, 0, data.size)
+        handle.flush()
+      }
+      val identity = checkNotNull(ownedFiles[temp])
+      journal.append(false, TorrentOwnedPath(checkpointPath.toString(), identity))
+      fileSystem.atomicMove(temp, checkpointPath)
+      ownedFiles.remove(temp)
+      ownedFiles[checkpointPath] = identity
+      snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
+    }
+  }
+
+  private fun snapshot(): TorrentCheckpoint = TorrentCheckpoint(taskId, metadata,
+    output.toString(), selected, verified.copyOf(),
+    ownedFiles.map { TorrentOwnedPath(it.key.toString(), it.value) },
+    ownedDirectories.map { TorrentOwnedPath(it.key.toString(), it.value) })
+
+  private fun recordOwned(path: Path, directory: Boolean) {
+    val identity = requireNotNull(torrentFileIdentity(path)) { "Filesystem has no safe file identity" }
+    val paths = if (directory) ownedDirectories else ownedFiles
+    if (paths[path] == identity) return
+    paths[path] = identity
+    val owned = TorrentOwnedPath(path.toString(), identity)
+    if (journalReady) journal.append(directory, owned) else pendingOwnership += directory to owned
+  }
+
+  private fun restoreOwned(directory: Boolean, owned: TorrentOwnedPath) {
+    val path = owned.path.toPath()
+    require(path.isAbsolute && path == path.toString().toPath(normalize = true))
+    val allowed = if (directory) {
+      path in allowedDirectories
+    } else {
+      path in allowedOutputFiles || path.parent == sidecar && (
+        path.name == "ownership" || path.name == "checkpoint" ||
+          Regex("checkpoint-[0-9a-f]{40}\\.tmp").matches(path.name) ||
+          path.name.removeSuffix(".piece").toIntOrNull()?.let {
+            path.name == "$it.piece" && it in 0 until pieceCount && needed(it)
+          } == true)
+    }
+    require(allowed) { "Ownership path escapes torrent output" }
+    validateParents(path)
+    if (torrentFileIdentity(path) == owned.identity) {
+      (if (directory) ownedDirectories else ownedFiles)[path] = owned.identity
+    }
   }
 
   private fun readPiece(index: Int): ByteArray {
@@ -225,7 +353,7 @@ internal class TorrentPieceStore(
     validateRegularPath(path)
     val existed = fileSystem.exists(path)
     fileSystem.openReadWrite(path, mustCreate = !existed).use { handle ->
-      if (!existed) ownedFiles.add(path)
+      if (!existed) recordOwned(path, directory = false)
       handle.write(offset, bytes, 0, bytes.size)
       handle.flush()
     }
@@ -252,8 +380,15 @@ internal class TorrentPieceStore(
       val info = fileSystem.metadataOrNull(current)
       require(info?.symlinkTarget == null) { "Symlink destination is not supported" }
       if (info == null) {
-        fileSystem.createDirectory(current, mustCreate = true)
-        ownedDirectories.add(current)
+        val created = try {
+          fileSystem.createDirectory(current, mustCreate = true)
+          true
+        } catch (e: okio.IOException) {
+          val concurrent = fileSystem.metadataOrNull(current)
+          if (concurrent?.isDirectory != true || concurrent.symlinkTarget != null) throw e
+          false
+        }
+        if (created) recordOwned(current, directory = true)
       } else require(info.isDirectory) { "Destination parent is not a directory" }
     }
   }
