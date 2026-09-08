@@ -46,6 +46,7 @@ kotlin {
       api(projects.library.core)
       implementation(libs.okio)
       implementation(libs.ktor.network)
+      implementation(libs.ktor.http)
       implementation(projects.library.ktor)
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.serialization.json)
