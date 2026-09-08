@@ -79,6 +79,17 @@ class MetainfoValidationTest {
     assertTrue(magnet.toUri().contains("%F0%9F"))
   }
 
+  @Test
+  fun metainfo_unicodeNormalizationCollisionRejected() {
+    val files = listOf("é", "e\u0301").map { name ->
+      mapOf("path" to listOf(name), "length" to 0L)
+    }
+    val data = Bencode.encode(mapOf("info" to mapOf(
+      "name" to "pack", "files" to files, "piece length" to 16L, "pieces" to ByteArray(0)
+    )))
+    assertFailsWith<IllegalArgumentException> { TorrentMetadata.fromBencode(data) }
+  }
+
   private fun info(): Map<String, Any> = mapOf(
     "name" to "test", "length" to 3L, "piece length" to 16L,
     "pieces" to sha1Digest("abc".encodeToByteArray())
