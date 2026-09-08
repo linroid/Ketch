@@ -8,6 +8,24 @@ import kotlin.test.assertTrue
 
 class PeerProtocolStateTest {
   @Test
+  fun chokeRetryAcceptsOneResponseAndIgnoresItsLateDuplicate() {
+    val state = PeerProtocolState(1, maxPending = 1)
+    val request = PeerMessage.Request(0, 0, 16)
+    val response = PeerMessage.Piece(0, 0, ByteArray(16))
+    state.received(PeerMessage.Have(0))
+    state.received(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+    state.requested(request)
+    state.received(PeerMessage.Control(PeerMessage.Signal.CHOKE))
+    state.received(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+    state.requested(request)
+    assertTrue(state.received(response))
+    assertFalse(state.received(response))
+    assertFailsWith<IllegalArgumentException> {
+      state.received(PeerMessage.Piece(0, 16, ByteArray(16)))
+    }
+  }
+
+  @Test
   fun request_enforcesChokingAvailabilityAndPipeline() {
     val state = PeerProtocolState(2, maxPending = 1)
     val first = PeerMessage.Request(0, 0, 16)

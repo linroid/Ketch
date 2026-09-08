@@ -2,6 +2,9 @@ package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeout
+import okio.IOException
+import kotlin.time.TimeSource
 
 /** First peer-to-storage transfer path. Swarm scheduling composes this protocol in layer 08. */
 internal class TorrentPeerDownloader(
@@ -9,6 +12,7 @@ internal class TorrentPeerDownloader(
   private val network: TorrentNetwork,
   private val consumePayload: suspend (Int) -> Unit = {},
   private val onProgress: suspend (Long) -> Unit = {},
+  private val timeSource: TimeSource = TimeSource.Monotonic,
 ) {
   suspend fun download(endpoint: PeerEndpoint) {
     store.initialize()
@@ -30,12 +34,16 @@ internal class TorrentPeerDownloader(
       var piece = -1
       var assembled = ByteArray(0)
       var offset = 0
+      var lastProgress = timeSource.markNow()
       while (!store.completed()) {
         currentCoroutineContext().ensureActive()
-        val message = wire.read()
+        val remaining = 30_000 - lastProgress.elapsedNow().inWholeMilliseconds
+        if (remaining <= 0) throw IOException("Peer made no payload progress")
+        val message = withTimeout(remaining) { wire.read() }
         if (message is PeerMessage.Piece) consumePayload(message.bytes.size)
         val accepted = state.received(message)
         if (message is PeerMessage.Piece && accepted) {
+          lastProgress = timeSource.markNow()
           check(message.index == piece && message.begin == offset)
           message.bytes.copyInto(assembled, offset)
           offset += message.bytes.size

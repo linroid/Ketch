@@ -1,6 +1,9 @@
 package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import okio.Buffer
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
@@ -16,6 +19,46 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TorrentPeerDownloaderTest {
+  @Test
+  fun keepaliveChatterCannotExtendPayloadDeadline() = runTest {
+    val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+      "name" to "file", "piece length" to 1L, "length" to 1L,
+      "pieces" to sha1Digest(byteArrayOf(1))
+    ))))
+    val input = Buffer()
+      .write(PeerWire.encodeHandshake(PeerHandshake(metadata.infoHash, ByteArray(20), false, false)))
+      .write(PeerWire.encode(PeerMessage.Have(0)))
+      .write(PeerWire.encode(PeerMessage.Control(PeerMessage.Signal.UNCHOKE)))
+    var closed = false
+    val connection = object : TorrentConnection {
+      override val remote = PeerEndpoint("127.0.0.1", 1)
+      override suspend fun readExactly(size: Int): ByteArray {
+        if (input.size > 0) return input.readByteArray(size.toLong())
+        if (size > 0) delay(1_000)
+        return ByteArray(size)
+      }
+      override suspend fun write(bytes: ByteArray) = Unit
+      override fun close() { closed = true }
+    }
+    val delegate = createTorrentNetwork()
+    val network = object : TorrentNetwork by delegate {
+      override suspend fun connect(remote: PeerEndpoint) = connection
+    }
+    val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-chatter-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    try {
+      val store = TorrentPieceStore(metadata, root / "file", emptySet(), "test")
+      val downloader = TorrentPeerDownloader(store, network, timeSource = testScheduler.timeSource)
+      assertFailsWith<TimeoutCancellationException> { downloader.download(connection.remote) }
+      assertEquals(30_000L, testScheduler.currentTime)
+      assertTrue(closed)
+      assertFalse(store.completed())
+    } finally {
+      delegate.close()
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
   @Test
   fun download_selectedFilesAcrossPieceBoundaries_areVerified() = runTest {
     transfer(corrupt = false)
