@@ -70,8 +70,21 @@ internal class TorrentSwarm(
     var discoveryClosed = false
     var complete = false
     var nextId = 0
+    fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
+    pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
+      update.dropped)
+    for (endpoint in pexDirectory.candidates()) {
+      if (endpoint !in attempts && endpoint !in pending &&
+        attempts.size + pending.size < 4096) pending.addLast(endpoint)
+    }
+    }
     try {
       while (currentCoroutineContext().isActive) {
+        // A terminating introducer may have queued its last PEX before its result was selected.
+        repeat(64) {
+          val event = pexEvents.tryReceive().getOrNull() ?: return@repeat
+          acceptPex(event.first, event.second)
+        }
         if (store.completed() && !complete) {
           store.finish()
           onProgress(store.progress().sum())
@@ -133,14 +146,7 @@ internal class TorrentSwarm(
               pending.addLast(endpoint)
             }
           }
-          pexEvents.onReceive { (source, update) ->
-            pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
-              update.dropped)
-            for (endpoint in pexDirectory.candidates()) {
-              if (endpoint !in attempts && endpoint !in pending &&
-                attempts.size + pending.size < 4096) pending.addLast(endpoint)
-            }
-          }
+          pexEvents.onReceive { (source, update) -> acceptPex(source, update) }
           progressEvents.onReceive { onProgress(store.progress().sum()) }
           onTimeout(100) {}
         }

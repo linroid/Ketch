@@ -15,7 +15,12 @@ import kotlin.test.assertEquals
 
 class TorrentPexTransferTest {
   @Test
-  fun pexDiscoveredPeer_completesMissingPayload() = runTest {
+  fun pexDiscoveredPeer_completesMissingPayload() = runTest { transfer(false) }
+
+  @Test
+  fun lastIntroducerCanExitImmediatelyAfterAdvertisingPayloadPeer() = runTest { transfer(true) }
+
+  private suspend fun transfer(disconnect: Boolean) {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         coroutineScope {
@@ -44,6 +49,11 @@ class TorrentPexTransferTest {
                   wire.send(PeerMessage.Extended(2, Bencode.encode(mapOf(
                     "added" to DhtCodec.compactEndpoint(second.local)
                   ))))
+                  if (disconnect) {
+                    // A repeated bitfield ends this peer without retrying the introducer.
+                    wire.send(PeerMessage.Bitfield(byteArrayOf(0)))
+                    return@launch
+                  }
                 }
                 while (true) {
                   val message = wire.read()
