@@ -32,6 +32,15 @@ internal class TorrentPieceStore(
   private val ownedFiles = linkedMapOf<Path, String>()
   private val ownedDirectories = linkedMapOf<Path, String>()
   private val sidecar: Path
+  private val allowedOutputFiles by lazy { this.selected.map(::filePath).toSet() }
+  private val allowedDirectories by lazy {
+    buildSet {
+      for (file in allowedOutputFiles + journalPath) {
+        var parent = file.parent
+        while (parent != null && parent != parent.root && add(parent)) parent = parent.parent
+      }
+    }
+  }
   private var initialized = false
   private var journalReady = false
   private var ownershipLoaded = false
@@ -299,14 +308,10 @@ internal class TorrentPieceStore(
   private fun restoreOwned(directory: Boolean, owned: TorrentOwnedPath) {
     val path = owned.path.toPath()
     require(path.isAbsolute && path == path.toString().toPath(normalize = true))
-    val outputFiles = selected.map(::filePath)
     val allowed = if (directory) {
-      // Include only directories on an output/sidecar ancestry, never the filesystem root.
-      path != path.root && (outputFiles + journalPath).any { candidate ->
-        generateSequence(candidate.parent) { it.parent }.any { it == path }
-      }
+      path in allowedDirectories
     } else {
-      path in outputFiles || path.parent == sidecar && (
+      path in allowedOutputFiles || path.parent == sidecar && (
         path.name == "ownership" || path.name == "checkpoint" ||
           Regex("checkpoint-[0-9a-f]{40}\\.tmp").matches(path.name) ||
           path.name.removeSuffix(".piece").toIntOrNull()?.let {

@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import okio.Buffer
 import okio.FileSystem
 import okio.Path
+import okio.Path.Companion.toPath
 import okio.use
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -15,6 +16,58 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TorrentCheckpointTest {
+  @Test
+  fun checkpointAboveFourMiBRoundTripsAndStillRejectsSixteenMiBOverflow() {
+    val large = TorrentMetadata.fromBencode(Bencode.encode(mapOf(
+      "comment" to ByteArray(4 * 1024 * 1024 - 256),
+      "info" to mapOf("name" to "empty", "length" to 0L,
+        "piece length" to 1L, "pieces" to ByteArray(0))
+    )))
+    val owned = TorrentOwnedPath("/tmp/" + "a".repeat(500), "identity")
+    val checkpoint = TorrentCheckpoint("test", large, "/tmp/empty", emptySet(), BooleanArray(0),
+      List(10) { owned.copy(path = owned.path + it) }, emptyList())
+    val encoded = checkpoint.encode()
+    assertTrue(encoded.size > 4 * 1024 * 1024)
+    val decoded = assertNotNull(TorrentCheckpoint.decode(encoded))
+    assertEquals(large.infoHash, decoded.metadata.infoHash)
+    assertEquals(checkpoint.files, decoded.files)
+    assertFailsWith<IllegalArgumentException> {
+      checkpoint.copy(files = List(40_000) { owned }).encode()
+    }
+  }
+
+  @Test
+  fun restoringManyOwnedFilesBuildsOutputPathsOnce() = runTest {
+    val parsed = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+      "name" to "pack", "piece length" to 1L, "pieces" to ByteArray(0),
+      "files" to List(1000) { mapOf("path" to listOf("f$it"), "length" to 0L) }
+    ))))
+    var fileLookups = 0
+    val counted = parsed.copy(files = object : AbstractList<TorrentMetadata.TorrentFile>() {
+      override val size = parsed.files.size
+      override fun get(index: Int): TorrentMetadata.TorrentFile {
+        fileLookups++
+        return parsed.files[index]
+      }
+    })
+    val root = root()
+    try {
+      torrentFileSystem.createDirectories(root / "pack")
+      val store = TorrentPieceStore(counted, root / "pack", emptySet(), "test")
+      val records = List(1000) {
+        TorrentOwnedPath((store.outputPath.toPath() / "f$it").toString(), "not-owned")
+      }
+      val checkpoint = TorrentCheckpoint("test", counted, store.outputPath,
+        emptySet(), BooleanArray(0), records, emptyList())
+      fileLookups = 0
+      store.restore(checkpoint)
+      assertTrue(fileLookups < 5000, "Output paths were recomputed $fileLookups times")
+      assertTrue(store.checkpoint().files.isEmpty())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
   private val bytes = "0123456789".encodeToByteArray()
   private val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
     "name" to "pack", "piece length" to 4L,

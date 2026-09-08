@@ -25,7 +25,7 @@ internal data class TorrentCheckpoint(
     "verified" to pieceBitfield(verified),
     "files" to files.map { mapOf("path" to it.path, "identity" to it.identity) },
     "directories" to directories.map { mapOf("path" to it.path, "identity" to it.identity) }
-  )).let { MAGIC + it }.also { require(it.size <= MAX_BYTES) }
+  ), maxBytes = MAX_BYTES - MAGIC.size).let { MAGIC + it }.also { require(it.size <= MAX_BYTES) }
 
   companion object {
     const val MAX_BYTES = 16 * 1024 * 1024
