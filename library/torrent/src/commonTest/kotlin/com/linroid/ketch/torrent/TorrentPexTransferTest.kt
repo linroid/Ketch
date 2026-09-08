@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -18,7 +19,9 @@ class TorrentPexTransferTest {
   fun pexDiscoveredPeer_completesMissingPayload() = runTest { transfer(false) }
 
   @Test
-  fun lastIntroducerCanExitImmediatelyAfterAdvertisingPayloadPeer() = runTest { transfer(true) }
+  fun lastIntroducerCanExitImmediatelyAfterAdvertisingPayloadPeer() = runTest {
+    repeat(20) { transfer(true) }
+  }
 
   private suspend fun transfer(disconnect: Boolean) {
     withContext(Dispatchers.Default) {
@@ -36,6 +39,7 @@ class TorrentPexTransferTest {
           val first = network.listen(PeerEndpoint("127.0.0.1", 0))
           val second = network.listen(PeerEndpoint("127.0.0.1", 0))
           val budget = TorrentBufferBudget(2 * 1024 * 1024)
+          val introducerClosed = CompletableDeferred<Unit>()
           val servers = listOf(first, second).mapIndexed { index, listener ->
             launch {
               val connection = listener.accept()
@@ -52,13 +56,15 @@ class TorrentPexTransferTest {
                   if (disconnect) {
                     // A repeated bitfield ends this peer without retrying the introducer.
                     wire.send(PeerMessage.Bitfield(byteArrayOf(0)))
-                    return@launch
+                    // Keep draining until the client rejects the bitfield and closes. Closing
+                    // with unread client data can send a TCP reset and discard the queued PEX.
                   }
                 }
                 while (true) {
                   val message = wire.read()
                   if (message is PeerMessage.Request) {
                     assertEquals(1, index)
+                    if (disconnect) introducerClosed.await()
                     wire.send(PeerMessage.Piece(0, 0, bytes))
                   }
                 }
@@ -66,6 +72,7 @@ class TorrentPexTransferTest {
                 // Session completion closes these peers.
               } finally {
                 connection.close()
+                if (index == 0) introducerClosed.complete(Unit)
               }
             }
           }
