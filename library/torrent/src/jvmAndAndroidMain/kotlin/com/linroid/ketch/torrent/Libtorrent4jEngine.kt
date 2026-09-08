@@ -55,8 +55,18 @@ internal class Libtorrent4jEngine(
     )
     settings.setInteger(
       settings_pack.int_types.active_seeds.swigValue(),
-      if (config.enableUpload) config.maxActiveTorrents else 0,
+      if (config.effectiveUploadPolicy == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
+        config.maxActiveTorrents
+      } else {
+        0
+      },
     )
+    if (config.effectiveUploadPolicy == TorrentUploadPolicy.DISABLED) {
+      // A fixed zero slot count keeps all peers choked, including optimistic unchokes.
+      settings.setInteger(settings_pack.int_types.choking_algorithm.swigValue(), 0)
+      settings.setInteger(settings_pack.int_types.unchoke_slots_limit.swigValue(), 0)
+      settings.setInteger(settings_pack.int_types.num_optimistic_unchoke_slots.swigValue(), 0)
+    }
     if (config.listenPort > 0) {
       settings.setString(
         settings_pack.string_types.listen_interfaces.swigValue(),
@@ -65,7 +75,7 @@ internal class Libtorrent4jEngine(
     }
 
     val params = SessionParams(settings)
-    val mgr = SessionManager(config.enableUpload)
+    val mgr = SessionManager()
     mgr.start(params)
     session = mgr
     log.i { "Torrent engine started" }
