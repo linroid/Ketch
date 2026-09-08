@@ -109,7 +109,7 @@ internal class PosixTorrentNetwork : TorrentNetwork {
     }
   }
 
-  private suspend fun resolve(endpoint: PeerEndpoint, type: Int): Address =
+  private suspend fun resolveAll(endpoint: PeerEndpoint, type: Int): List<Address> =
     withContext(Dispatchers.IO) {
       memScoped {
         val hints = alloc<addrinfo>()
@@ -121,14 +121,25 @@ internal class PosixTorrentNetwork : TorrentNetwork {
         }
         val first = checkNotNull(result.value)
         try {
-          val info = first.pointed
-          val bytes = info.ai_addr!!.reinterpret<ByteVar>().readBytes(info.ai_addrlen.toInt())
-          Address(bytes, info.ai_family)
+          val addresses = mutableListOf<Address>()
+          var current: CPointer<addrinfo>? = first
+          while (current != null && addresses.size < 16) {
+            val info = current.pointed
+            if (info.ai_family == AF_INET || info.ai_family == AF_INET6) {
+              val bytes = info.ai_addr!!.reinterpret<ByteVar>().readBytes(info.ai_addrlen.toInt())
+              addresses += Address(bytes, info.ai_family)
+            }
+            current = info.ai_next
+          }
+          addresses
         } finally {
           freeaddrinfo(first)
         }
       }
     }
+
+  private suspend fun resolve(endpoint: PeerEndpoint, type: Int): Address =
+    resolveAll(endpoint, type).first()
 
   private fun create(family: Int, type: Int): Handle {
     val fd = socket(family, type, 0)
@@ -153,7 +164,12 @@ internal class PosixTorrentNetwork : TorrentNetwork {
 
   override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
     require(remote.port > 0)
-    val address = resolve(remote, SOCK_STREAM)
+    return connectTorrentCandidates(resolveAll(remote, SOCK_STREAM)) { address ->
+      connectAddress(remote, address)
+    }
+  }
+
+  private suspend fun connectAddress(remote: PeerEndpoint, address: Address): TorrentConnection {
     val handle = create(address.family, SOCK_STREAM)
     try {
       withTimeout(10_000) {
