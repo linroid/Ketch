@@ -40,6 +40,12 @@ internal class TorrentSwarm(
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
   suspend fun run(peers: ReceiveChannel<PeerEndpoint>) = supervisorScope {
     store.initialize()
+    if (store.completed() && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
+      store.finish()
+      onProgress(store.progress().sum())
+      onCompleted()
+      return@supervisorScope
+    }
     val scheduler = TorrentPieceScheduler(BooleanArray(store.pieceCount) { store.needed(it) },
       store.verifiedPieces(), store::pieceSize, budget)
     val largestPiece = (0 until store.pieceCount).filter { store.needed(it) }
@@ -139,8 +145,9 @@ internal class TorrentSwarm(
     supervisorScope {
       val connection = network.connect(endpoint)
       var uploadSlot = false
+      val uploadCache = TorrentUploadCache(store, budget)
       try {
-        val wire = PeerWire(connection, store.metadata, idleTimeoutMs = 60_000)
+        val wire = PeerWire(connection, store.metadata)
         val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, false, false))
         require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
         val state = PeerProtocolState(store.pieceCount, maxPending = 16)
@@ -182,14 +189,10 @@ internal class TorrentSwarm(
                     scheduler.release(id)
                     claim = null
                   }
-                  if (message.signal == PeerMessage.Signal.INTERESTED && !uploadSlot &&
-                    uploadPolicy != TorrentUploadPolicy.DISABLED && uploadSlots.tryAcquire()) {
-                    uploadSlot = true
-                    wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
-                  }
                   if (message.signal == PeerMessage.Signal.NOT_INTERESTED && uploadSlot) {
                     uploadSlots.release()
                     uploadSlot = false
+                    uploadCache.close()
                     wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
                   }
                 }
@@ -213,22 +216,11 @@ internal class TorrentSwarm(
                 }
                 is PeerMessage.Request -> if (uploadSlot && state.interested &&
                   scheduler.isVerified(message.index)) {
-                  val lease = budget.reserve(store.pieceSize(message.index))
-                  if (lease != null) {
-                    try {
-                      val bytes = storage { store.read(message.index) }
-                      if (!sha1Digest(bytes).contentEquals(store.metadata.pieceHashes.copyOfRange(
-                          message.index * 20, message.index * 20 + 20))) {
-                        throw TorrentStorageException(
-                          IOException("Verified torrent output changed")
-                        )
-                      }
-                      uploadPayload(message.length)
-                      wire.send(PeerMessage.Piece(message.index, message.begin,
-                        bytes.copyOfRange(message.begin, message.begin + message.length)))
-                    } finally {
-                      lease.close()
-                    }
+                  val bytes = storage { uploadCache.read(message.index) }
+                  if (bytes != null) {
+                    uploadPayload(message.length)
+                    wire.send(PeerMessage.Piece(message.index, message.begin,
+                      bytes.copyOfRange(message.begin, message.begin + message.length)))
                   } else {
                     wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
                     uploadSlots.release()
@@ -237,6 +229,12 @@ internal class TorrentSwarm(
                 }
                 else -> Unit
               }
+            }
+            uploadCache.expire()
+            if (state.interested && !uploadSlot && uploadPolicy != TorrentUploadPolicy.DISABLED &&
+              uploadSlots.tryAcquire()) {
+              uploadSlot = true
+              wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
             }
             scheduler.snapshot(version)?.let { (nextVersion, pieces) ->
               version = nextVersion
@@ -303,6 +301,7 @@ internal class TorrentSwarm(
           }
         }
       } finally {
+        uploadCache.close()
         if (uploadSlot) uploadSlots.release()
         connection.close()
       }
