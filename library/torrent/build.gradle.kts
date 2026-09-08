@@ -65,6 +65,7 @@ kotlin {
     }
     named("androidDeviceTest") {
       dependencies {
+        implementation(libs.kotlin.test)
         implementation(libs.androidx.testExt.junit)
         implementation("androidx.test:runner:1.7.0")
       }

@@ -18,6 +18,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TorrentPeerDownloaderTest {
   @Test
   fun keepaliveChatterCannotExtendPayloadDeadline() = runTest {

@@ -11,9 +11,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import okio.Path.Companion.toPath
-import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -62,7 +62,7 @@ class AndroidTorrentSmokeTest {
       )
       try {
         source.download(context)
-        assertArrayEquals(bytes, output.readBytes())
+        assertContentEquals(bytes, output.readBytes())
         assertEquals(4L, context.segments.value.single().downloadedBytes)
         source.cleanup(context, source.updateResumeState(context))
         assertEquals(false, output.exists())

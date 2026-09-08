@@ -13,6 +13,8 @@ import com.linroid.ketch.endpoints.model.TaskEvent
 import com.linroid.ketch.endpoints.model.TaskSnapshot
 import com.linroid.ketch.endpoints.model.TasksResponse
 import io.ktor.client.HttpClient
+import io.ktor.client.HttpClientConfig
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -55,12 +57,20 @@ import kotlinx.serialization.json.Json
  * @param apiToken optional Bearer token for authentication
  * @param secure use HTTPS instead of HTTP
  */
-class RemoteKetch(
+class RemoteKetch internal constructor(
   val host: String,
-  val port: Int = 8642,
-  private val apiToken: String? = null,
-  val secure: Boolean = false,
+  val port: Int,
+  private val apiToken: String?,
+  val secure: Boolean,
+  engine: HttpClientEngine?,
 ) : KetchApi {
+  constructor(
+    host: String,
+    port: Int = 8642,
+    apiToken: String? = null,
+    secure: Boolean = false,
+  ) : this(host, port, apiToken, secure, null)
+
 
   private val scheme = if (secure) "https" else "http"
   private val baseUrl = "$scheme://$host:$port"
@@ -76,7 +86,7 @@ class RemoteKetch(
     coerceInputValues = true
   }
 
-  internal val httpClient = HttpClient {
+  private val configureClient: HttpClientConfig<*>.() -> Unit = {
     install(HttpTimeout) {
       socketTimeoutMillis = Long.MAX_VALUE
       requestTimeoutMillis = Long.MAX_VALUE
@@ -96,6 +106,9 @@ class RemoteKetch(
     }
   }
 
+  internal val httpClient = if (engine == null) HttpClient(configureClient)
+    else HttpClient(engine, configureClient)
+
   private val _connectionState = MutableStateFlow<ConnectionState>(
     ConnectionState.Disconnected("Not started"),
   )
@@ -107,6 +120,7 @@ class RemoteKetch(
 
   private val taskMutex = Mutex()
   private val taskMap = mutableMapOf<String, RemoteDownloadTask>()
+  private var taskRevision = 0L
 
   private val _tasks = MutableStateFlow<List<DownloadTask>>(
     emptyList(),
@@ -219,26 +233,31 @@ class RemoteKetch(
     }
   }
 
-  private suspend fun fetchAllTasks() = taskMutex.withLock {
-    log.i { "Fetch all tasks" }
-    val response = httpClient.get(Api.Tasks())
-    log.i { "Status: ${response.status}" }
-    if (response.status.value == 401) {
-      throw UnauthorizedException()
-    }
-    if (response.status.isSuccess()) {
+  internal suspend fun fetchAllTasks() {
+    while (true) {
+      val revision = taskMutex.withLock { taskRevision }
+      log.i { "Fetch all tasks" }
+      val response = httpClient.get(Api.Tasks())
+      if (response.status.value == 401) throw UnauthorizedException()
+      checkSuccess(response)
       val snapshots: TasksResponse = response.body()
-      log.i { "Fetched ${snapshots.tasks.size} tasks" }
       val tasks = snapshots.tasks.map(::createRemoteTask)
-      val ids = tasks.map { it.taskId }.toSet()
-      taskMap.keys.retainAll(ids)
-      tasks.forEach { addOrUpdate(it) }
-      _tasks.value = taskMap.values.toList()
-      log.i { "Fetched ${snapshots.tasks.size} tasks -> ${tasks.size}" }
+      val applied = taskMutex.withLock {
+        // A concurrent POST, removal or SSE event makes this snapshot stale. Fetch again
+        // without holding the map lock so those operations can continue immediately.
+        if (taskRevision != revision) return@withLock false
+        val ids = tasks.map { it.taskId }.toSet()
+        taskMap.keys.retainAll(ids)
+        tasks.forEach { addOrUpdate(it) }
+        taskRevision++
+        _tasks.value = taskMap.values.toList()
+        true
+      }
+      if (applied) return
     }
   }
 
-  private suspend fun handleEvent(event: TaskEvent) {
+  internal suspend fun handleEvent(event: TaskEvent) {
     log.i { "Handle event: $event" }
     when (event) {
       is TaskEvent.TaskAdded -> {
@@ -261,17 +280,19 @@ class RemoteKetch(
       }
 
       is TaskEvent.StateChanged -> {
-        val task = taskMutex.withLock {
-          taskMap[event.taskId]
-        } ?: return
-        task.updateState(event.state, event.request, event.segments)
+        taskMutex.withLock {
+          val task = taskMap[event.taskId] ?: return
+          task.updateState(event.state, event.request, event.segments)
+          taskRevision++
+        }
       }
 
       is TaskEvent.Progress -> {
-        val task = taskMutex.withLock {
-          taskMap[event.taskId]
-        } ?: return
-        task.updateState(event.state, event.request, event.segments)
+        taskMutex.withLock {
+          val task = taskMap[event.taskId] ?: return
+          task.updateState(event.state, event.request, event.segments)
+          taskRevision++
+        }
       }
 
       is TaskEvent.Error -> {
@@ -296,6 +317,7 @@ class RemoteKetch(
 
   private fun addOrUpdate(task: RemoteDownloadTask): RemoteDownloadTask {
     log.i { "Add or update: ${task.taskId}" }
+    taskRevision++
     // POST responses, TaskAdded events and reconnect snapshots can describe the same task.
     // Preserve the instance already returned to callers so its StateFlows keep receiving SSE.
     val current = taskMap[task.taskId]
@@ -310,6 +332,7 @@ class RemoteKetch(
 
   private fun removeTask(taskId: String) {
     log.i { "Remove task $taskId" }
+    taskRevision++
     taskMap.remove(taskId)
     _tasks.update { taskMap.values.toList() }
   }
