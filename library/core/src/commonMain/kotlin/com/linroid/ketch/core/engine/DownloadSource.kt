@@ -14,6 +14,13 @@ import kotlinx.coroutines.CancellationException
  * download requests to the appropriate source based on URL matching.
  */
 interface DownloadSource {
+  /**
+   * Releases resources owned by this source. Called when Ketch closes.
+   * Implementations must be idempotent and stop accepting new work.
+   * Injected resources owned by the caller must not be closed here.
+   */
+  fun close() {}
+
   /** Unique identifier for this source type (e.g., "http", "torrent"). */
   val type: String
 

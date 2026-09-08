@@ -170,7 +170,7 @@ internal class DownloadExecution(
 
     taskLimiter.delegate = createLimiter(request.speedLimit)
 
-    val preResolved = if (resolved != null) resolvedUrl else null
+    val preResolved = resolvedUrl
     runDownload(outputPath, total, source, preResolved) { ctx ->
       source.download(ctx)
     }
@@ -236,7 +236,7 @@ internal class DownloadExecution(
 
     var completed = false
     try {
-      val ctx = buildContext(fa, total, preResolved)
+      val ctx = buildContext(fa, total, preResolved, outputPath)
       context = ctx
 
       coroutineScope {
@@ -429,6 +429,7 @@ internal class DownloadExecution(
     fileAccessor: FileAccessor,
     totalBytes: Long,
     preResolved: ResolvedSource? = null,
+    outputPath: String,
   ): DownloadContext {
     var lastBytes = 0L
     var lastMark = TimeSource.Monotonic.markNow()
@@ -458,6 +459,7 @@ internal class DownloadExecution(
       },
       headers = request.headers,
       preResolved = preResolved,
+      outputPath = outputPath,
       maxConnections = MutableStateFlow(
         request.connections.takeIf { it > 0 } ?: 0,
       ),

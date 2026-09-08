@@ -11,6 +11,7 @@ internal actual fun resolveChildPath(
   directory: String,
   fileName: String,
 ): String {
+  if (':' !in directory) return (directory.toPath() / fileName).toString()
   val uri = Uri.parse(directory)
   if (uri.scheme == "content") {
     val parentDocUri = if (DocumentsContract.isTreeUri(uri)) {

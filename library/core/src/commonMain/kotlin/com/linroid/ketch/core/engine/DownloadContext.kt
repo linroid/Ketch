@@ -47,4 +47,6 @@ class DownloadContext(
   val preResolved: ResolvedSource? = null,
   val maxConnections: MutableStateFlow<Int> = MutableStateFlow(0),
   var pendingResegment: Int = 0,
+  /** Final destination resolved by Ketch, including default directory and deduplication. */
+  val outputPath: String? = null,
 )

@@ -12,6 +12,7 @@ plugins {
 
 kotlin {
   android {
+    withHostTest {}
     namespace = "com.linroid.ketch.torrent"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()

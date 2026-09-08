@@ -281,6 +281,7 @@ internal class DownloadCoordinator(
       onProgress = { _, _ -> },
       throttle = { _ -> },
       headers = handle.request.headers,
+      outputPath = outputPath,
     )
     try {
       source.cleanup(ctx, record.sourceResumeState)

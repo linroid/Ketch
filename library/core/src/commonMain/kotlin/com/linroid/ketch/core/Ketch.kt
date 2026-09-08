@@ -425,9 +425,10 @@ class Ketch(
 
   override fun close() {
     log.i { "Closing Ketch" }
-    httpEngine.close()
     coordinator.close()
     scope.cancel()
+    sourceResolver.close()
+    httpEngine.close()
     dispatchers.close()
   }
 }

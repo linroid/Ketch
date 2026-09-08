@@ -21,6 +21,7 @@ kotlin {
   }
 
   android {
+    withHostTest {}
     namespace = "com.linroid.ketch.core"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
