@@ -22,6 +22,10 @@ internal class TokenBucket(
     var remaining = bytes.toLong()
     while (remaining > 0) {
       val waitMs = mutex.withLock {
+        if (rate == 0.0) {
+          remaining = 0
+          return@withLock 0L
+        }
         refill()
         if (tokens > 0) {
           val consumed = minOf(tokens, remaining)
@@ -35,12 +39,13 @@ internal class TokenBucket(
       }
       if (waitMs > 0) {
         log.v { "Throttling: waiting ${waitMs}ms for $remaining bytes" }
-        delay(waitMs)
+        delay(minOf(waitMs, 50))
       }
     }
   }
 
   suspend fun updateRate(newBytesPerSecond: Long) = mutex.withLock {
+    require(newBytesPerSecond >= 0)
     rate = newBytesPerSecond.toDouble()
     log.d { "Rate updated to $newBytesPerSecond bytes/sec" }
   }
@@ -50,9 +55,9 @@ internal class TokenBucket(
     val elapsed = now - lastRefillTime
     val elapsedMs = elapsed.inWholeMilliseconds
     if (elapsedMs <= 0) return
-    val newTokens = (elapsedMs * rate / 1000).toLong()
+    val newTokens = (elapsedMs.toDouble() * rate / 1000).toLong()
     if (newTokens > 0) {
-      tokens = (tokens + newTokens).coerceAtMost(burstSize)
+      tokens += minOf(newTokens, burstSize - tokens)
       lastRefillTime = now
     }
   }

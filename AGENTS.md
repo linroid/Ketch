@@ -34,7 +34,7 @@ library/
   core/       # In-process download engine -- published SDK module
   ktor/       # Ktor-based HttpEngine implementation -- published SDK module
   ftp/        # FTP/FTPS DownloadSource (Android, iOS, JVM only) -- published SDK module
-  torrent/    # BitTorrent/Magnet DownloadSource (Android, JVM only) -- published SDK module
+  torrent/    # BitTorrent/Magnet DownloadSource (Android, JVM, iOS) -- published SDK module
   kermit/     # Optional Kermit logging integration -- published SDK module
   sqlite/     # SQLite-backed TaskStore (Android, iOS, JVM only) -- published SDK module
   remote/     # Remote KetchApi client (HTTP + SSE) -- published SDK module
@@ -159,15 +159,12 @@ cli/          # JVM CLI entry point
 - Passive mode only (PASV/EPSV); FTP URL parsing with credentials
 - Platforms: Android, JVM, iOS (no WasmJs — requires raw TCP sockets)
 
-### BitTorrent/Magnet Support (`library:torrent`) — In Progress
-- `.torrent` files and `magnet:` URIs as a pluggable `DownloadSource`
-- libtorrent4j (v2.1.0-39) as the underlying engine
-- Multi-file selection: resolve returns file list, user selects subset
-- Resume with persisted resume data (base64-encoded libtorrent state)
-- Per-torrent speed limiting via `TorrentSession.setDownloadRateLimit()`
-- Metadata fetch from magnet links with configurable timeout
-- `managesOwnFileIo = true` — torrent engine handles its own file writes
-- Platforms: Android, JVM (no iOS, no WasmJs)
+### BitTorrent/Magnet Support (`library:torrent`)
+- Pure Kotlin BitTorrent v1 engine on Android, JVM and iOS; browser control through RemoteKetch
+- HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
+- Verified selected-file storage, ownership journal, restart rehash, live limits and explicit seeding
+- Native torrent engine dependencies exist only in interoperability tests
+- See [support and migration](docs/torrent.md) and [verification](docs/development/torrent-verification.md)
 
 ### AI-Driven Resource Discovery (`ai:discover`) — In Progress
 - LLM agent-driven discovery using Koog framework (v0.6.2)
@@ -265,7 +262,7 @@ cli/          # JVM CLI entry point
 2. iOS support is best-effort via expect/actual (iosArm64 + iosSimulatorArm64)
 3. `library:sqlite` does not support WasmJs -- use `InMemoryTaskStore` on that platform
 4. `library:ftp` does not support WasmJs (requires raw TCP sockets)
-5. `library:torrent` supports Android and JVM only (no iOS, no WasmJs)
+5. `library:torrent` has no browser-local engine; v2/hybrid, uTP and protocol encryption are deferred
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 7. `ai:discover` is JVM only (depends on Koog + Ktor CIO)

@@ -6,7 +6,7 @@ import kotlinx.cinterop.usePinned
 import okio.FileSystem
 import platform.posix.arc4random_buf
 
-internal actual val torrentFileSystem: FileSystem = FileSystem.SYSTEM
+internal actual val torrentFileSystem: FileSystem = SafeTorrentFileSystem
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun torrentRandomBytes(size: Int): ByteArray = ByteArray(size).also { bytes ->

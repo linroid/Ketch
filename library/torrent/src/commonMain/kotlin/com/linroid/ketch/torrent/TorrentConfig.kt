@@ -39,7 +39,7 @@ data class TorrentConfig(
 
 ) {
   init {
-    require(maxActiveTorrents > 0) { "maxActiveTorrents must be positive" }
+    require(maxActiveTorrents in 1..64) { "maxActiveTorrents must be in 1..64" }
     require(connectionsPerTorrent in 1..512)
     require(maxConnections in 1..4096)
     require(dhtBootstrap.size <= 64)

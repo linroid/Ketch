@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -36,6 +37,7 @@ internal class DownloadCoordinator(
   private val log = KetchLogger("Coordinator")
   private val mutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveEntry>()
+  private val stoppingDownloads = mutableMapOf<String, Job>()
 
   private data class ActiveEntry(
     val handle: TaskHandle,
@@ -54,8 +56,8 @@ internal class DownloadCoordinator(
   }
 
   suspend fun pause(taskId: String) {
-    mutex.withLock {
-      val entry = activeDownloads[taskId] ?: return
+    val job = mutex.withLock {
+      val entry = activeDownloads[taskId] ?: return@withLock stoppingDownloads[taskId]
       val handle = entry.handle
       val execution = entry.execution
       log.i { "Pausing download for taskId=$taskId" }
@@ -94,7 +96,11 @@ internal class DownloadCoordinator(
       }
 
       activeDownloads.remove(taskId)
+      stoppingDownloads[taskId] = entry.job
+      entry.job
     }
+    // Source checkpointing and file closure finish before an immediate resume can start.
+    job?.join()
   }
 
   suspend fun resume(
@@ -102,6 +108,7 @@ internal class DownloadCoordinator(
     destination: Destination? = null,
   ): Boolean {
     val taskId = handle.taskId
+    mutex.withLock { stoppingDownloads[taskId] }?.join()
     mutex.withLock {
       if (activeDownloads.containsKey(taskId)) {
         log.d {
@@ -147,9 +154,10 @@ internal class DownloadCoordinator(
     log.i { "Canceling download for taskId=$taskId" }
     val job = mutex.withLock {
       val entry = activeDownloads[taskId]
-      entry?.job?.cancel()
+      val stopping = entry?.job ?: stoppingDownloads[taskId]
+      stopping?.cancel()
       activeDownloads.remove(taskId)
-      entry?.job
+      stopping
     }
     // Await the job's finally chain (including FileAccessor.close)
     // before returning, so callers can safely follow up with file
@@ -220,8 +228,12 @@ internal class DownloadCoordinator(
           }
           handle.mutableState.value = DownloadState.Failed(error)
         } finally {
+          val finished = currentCoroutineContext()[Job]
           withContext(NonCancellable) {
-            mutex.withLock { activeDownloads.remove(taskId) }
+            mutex.withLock {
+              if (activeDownloads[taskId]?.execution === execution) activeDownloads.remove(taskId)
+              if (stoppingDownloads[taskId] === finished) stoppingDownloads.remove(taskId)
+            }
           }
         }
       }

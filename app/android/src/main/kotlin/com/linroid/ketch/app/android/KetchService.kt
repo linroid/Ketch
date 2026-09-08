@@ -81,9 +81,8 @@ class KetchService : Service() {
     )
     val config = configStore.load()
     val taskStore = createSqliteTaskStore(DriverFactory(this))
-    val downloadsDir = Environment
-      .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-      .absolutePath
+    val downloadsDir = (getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+      ?: filesDir.resolve("downloads")).absolutePath
     val downloadConfig = config.download.copy(
       defaultDirectory = config.download.defaultDirectory
         ?: downloadsDir,
@@ -102,7 +101,9 @@ class KetchService : Service() {
             logger = Logger.console(),
             additionalSources = listOf(
               FtpDownloadSource(),
-              TorrentDownloadSource(),
+              TorrentDownloadSource(com.linroid.ketch.torrent.TorrentConfig(
+                stateDirectory = filesDir.resolve("torrent-state").absolutePath,
+              )),
             ),
           )
         },

@@ -34,6 +34,9 @@ internal class KotlinTorrentEngine(
   private val config: TorrentConfig,
   rawNetwork: TorrentNetwork = createTorrentNetwork(),
   private val http: TorrentHttp = TorrentHttp.default(),
+  private val allowLocalDiscovery: Boolean = false,
+  private val discoveryIntervalMs: Long = 30_000,
+  private val nowMs: () -> Long = monotonicClock(),
 ) : TorrentEngine {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
@@ -184,7 +187,7 @@ internal class KotlinTorrentEngine(
       if (config.dhtEnabled) launch {
         while (isActive) {
           dhtPeers(magnet.infoHash, announce = false).forEach { output.send(it) }
-          delay(30_000)
+          delay(discoveryIntervalMs)
         }
       }
     }
@@ -209,14 +212,18 @@ internal class KotlinTorrentEngine(
     check(sessions.size < config.maxActiveTorrents) { "Too many active torrents" }
     val hash = spec.metadata.infoHash.hex
     check(hash !in sessions) { "Torrent already has an active owner" }
-    val output = FileSystem.SYSTEM.canonicalize(".".toPath()).resolve(spec.outputPath).normalized()
+    val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
+      .resolve(spec.outputPath).normalized()
+    val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId)
+    val output = store.outputPath.toPath()
     check(outputs.values.none { previous ->
       val path = previous.toPath()
-      output == path || output.toString().startsWith("$path/") ||
-        path.toString().startsWith("$output/")
+      val left = path.segments.map { canonicalTorrentName(it).lowercase() }
+      val right = output.segments.map { canonicalTorrentName(it).lowercase() }
+      path.root.toString().equals(output.root.toString(), ignoreCase = true) &&
+        (left.take(right.size) == right || right.take(left.size) == left)
     }) { "Torrent output overlaps another task" }
     val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
-    val store = TorrentPieceStore(spec.metadata, output, spec.selected, spec.taskId)
     val session = KotlinTorrentSession(store, network, budget, scope,
       connections = config.connectionsPerTorrent, uploadPolicy = config.effectiveUploadPolicy,
       checkpoint = checkpoint, peerId = peerId,
@@ -238,7 +245,9 @@ internal class KotlinTorrentEngine(
     if (metadata.trackerTiers.isNotEmpty()) launch {
       val discovery = TrackerDiscovery(metadata, peerId, port,
         TrackerTiers(metadata.trackerTiers, tracker::announce), session::resetPeers,
-        announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size)
+        nowMs = nowMs,
+        announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
+      )
       try {
         while (isActive) {
           attempt {
@@ -288,7 +297,9 @@ internal class KotlinTorrentEngine(
     nodes?.let { return@withLock it }
     val result = mutableListOf<DhtNode>()
     for (host in listOf("0.0.0.0", "::")) {
-      val node = attempt { DhtNode(network.bindUdp(PeerEndpoint(host, 0)), scope) } ?: continue
+      val node = attempt { DhtNode(network.bindUdp(PeerEndpoint(host, 0)), scope,
+        allowLocalAddresses = allowLocalDiscovery) } ?: continue
+      node.start()
       result.add(node)
       scope.launch {
         val snapshot = config.stateDirectory?.toPath()?.resolve(

@@ -409,6 +409,7 @@ class Ketch(
     val limit = config.speedLimit
     val current = globalLimiter.delegate
     if (limit.isUnlimited) {
+      (current as? TokenBucket)?.updateRate(0)
       globalLimiter.delegate = SpeedLimiter.Unlimited
     } else if (current is TokenBucket) {
       current.updateRate(limit.bytesPerSecond)

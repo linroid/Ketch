@@ -25,6 +25,7 @@ dependencies {
 compose.desktop {
   application {
     mainClass = "com.linroid.ketch.app.desktop.MainKt"
+    providers.gradleProperty("desktopJavaHome").orNull?.let { javaHome = it }
 
     buildTypes.release.proguard {
       configurationFiles.from(
