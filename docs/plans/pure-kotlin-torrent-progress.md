@@ -13,8 +13,9 @@ Approved scope: [roadmap](pure-kotlin-torrent-roadmap.md). Implementation checko
 | 06 First verified transfer | https://github.com/linroid/Ketch/pull/153 | JVM independent libtorrent seeder passed; JVM/Android/iOS loopback transfer and corruption gates passed |
 | 07 Tracker discovery | https://github.com/linroid/Ketch/pull/154 | Local HTTP parsing, IPv4/IPv6 UDP, tier and lifecycle validation |
 | 08 Swarm and upload | https://github.com/linroid/Ketch/pull/155 | Rarity/pipelines, complementary peers, recovery, upload policies and seeding lifecycle on JVM/Android/iOS |
-| 09 Magnet metadata | Pending PR | Independent seeder metadata-to-payload transfer; common negotiation, hash/size/private validation and shared cache tests |
-| 10–14 | Pending | Not implemented yet |
+| 09 Magnet metadata | https://github.com/linroid/Ketch/pull/156 | Independent seeder metadata-to-payload transfer; common negotiation, hash/size/private validation and shared cache tests |
+| 10 DHT foundations | Pending PR | Published BEP 42/CRC vectors, routing/token expiry, packet quotas and IPv4/IPv6 RPC correlation |
+| 11–14 | Pending | Not implemented yet |
 
 No PR has been merged. The default transfer engine is still libtorrent4j.
 
