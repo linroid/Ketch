@@ -73,7 +73,7 @@ internal data class TorrentMetadata(
         require(size >= 0) { "Negative file length" }
         listOf(TorrentFile(0, name, size))
       }
-      val paths = files.map { it.path.lowercase() }.toSet()
+      val paths = files.map { canonicalTorrentName(it.path).lowercase() }.toSet()
       require(paths.size == files.size) { "Colliding torrent paths" }
       for (path in paths) {
         var parent = path.substringBeforeLast('/', "")
@@ -125,7 +125,7 @@ internal data class TorrentMetadata(
 
     internal fun validatePathComponent(value: String) {
       require(value.isNotEmpty() && value != "." && value != "..") { "Unsafe torrent path" }
-      require(value.length <= 255 && value.none { it < ' ' || it in "/\\:*?\"<>|" }) {
+      require(value.encodeToByteArray().size <= 255 && value.none { it < ' ' || it in "/\\:*?\"<>|" }) {
         "Unsafe torrent path component"
       }
       require(!value.endsWith('.') && !value.endsWith(' ')) { "Unsafe trailing path character" }
@@ -136,3 +136,6 @@ internal data class TorrentMetadata(
     }
   }
 }
+
+/** Filesystem collision key; hashes use the original encoded bytes. */
+internal expect fun canonicalTorrentName(value: String): String
