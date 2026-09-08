@@ -40,6 +40,10 @@ class DhtRpcTest {
               spoofer.close()
             }
             server.send(packet.remote, DhtCodec.error(byteArrayOf(9).toByteString(), 201))
+            server.send(packet.remote, Bencode.encode(mapOf(
+              "t" to request.transaction.toByteArray(), "y" to byteArrayOf(-1),
+              "q" to "ping", "a" to mapOf("id" to ByteArray(20))
+            )))
             server.send(packet.remote, DhtCodec.response(request.transaction,
               mapOf("id" to ByteArray(20) { 7 }), packet.remote))
           }

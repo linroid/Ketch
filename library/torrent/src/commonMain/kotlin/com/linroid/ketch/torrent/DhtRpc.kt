@@ -14,6 +14,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.text.CharacterCodingException
 
 /** One receive loop, bounded correlated queries, and bounded responses to unsolicited traffic. */
 internal class DhtRpc(
@@ -41,6 +42,8 @@ internal class DhtRpc(
           currentCoroutineContext().ensureActive()
           if (!packets.admitQuery(packet.remote.host)) continue
           val message = try { DhtCodec.parse(packet.bytes) } catch (_: IllegalArgumentException) {
+            continue
+          } catch (_: CharacterCodingException) {
             continue
           }
           if (message.type != "q") {
