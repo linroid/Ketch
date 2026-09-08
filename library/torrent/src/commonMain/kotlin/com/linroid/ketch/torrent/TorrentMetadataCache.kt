@@ -37,7 +37,6 @@ internal class TorrentMetadataCache(
             val metadata = get(hash) ?: fetch()
             require(metadata.infoHash == hash)
             put(metadata)
-            metadata
           } finally {
             withContext(NonCancellable) { mutex.withLock { pending.remove(hash) } }
           }
@@ -47,17 +46,26 @@ internal class TorrentMetadataCache(
     return operation.await()
   }
 
-  suspend fun put(metadata: TorrentMetadata) = mutex.withLock {
+  suspend fun put(value: TorrentMetadata): TorrentMetadata = mutex.withLock {
+    // The info hash authenticates only the info dictionary, never caller tracker credentials.
+    val metadata = value.copy(
+      trackers = emptyList(),
+      trackerTiers = emptyList(),
+      comment = null,
+      createdBy = null,
+      metainfoBytes = metainfoFromInfo(value.infoBytes, emptyList()),
+    )
     scope.coroutineContext.ensureActive()
     val size = weight(metadata)
     entries.remove(metadata.infoHash)?.let { bytes -= weight(it) }
-    if (size > capacityBytes) return@withLock
+    if (size > capacityBytes) return@withLock metadata
     while (entries.isNotEmpty() && (bytes + size > capacityBytes || entries.size >= 8)) {
       val key = entries.keys.first()
       bytes -= weight(checkNotNull(entries.remove(key)))
     }
     entries[metadata.infoHash] = metadata
     bytes += size
+    metadata
   }
 
   private fun weight(metadata: TorrentMetadata): Long = metadata.metainfoBytes.size.toLong() +
