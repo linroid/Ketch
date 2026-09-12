@@ -468,3 +468,24 @@ can now commit under the default 32 MiB transfer budget. The full-size regressio
 this change with payload budget exhaustion and now verifies successful disk commit. Closing during
 an in-flight commit defers credit release until that commit unwinds, including cancellation while
 waiting for storage admission.
+
+### Deadline-aware inbox and reader ownership
+
+`PeerV2Inbox.run` owns one child frame reader and a channel with one queued frame. An additional
+sender-held frame can wait behind it; every decoded frame retains its transport reservation.
+The actor dispatches serially and closes delivered frames after use. `next` selects between the
+next frame and the earliest block/hash response deadline. Block expiry closes the connection;
+hash expiry returns exact expired tickets for rescheduling while leaving the healthy stream open.
+Backward hash clocks now expire ownership consistently instead of producing repeated zero-delay
+wakeups without releasing requests.
+
+Scope exit closes the transport and block exchange, cancels and joins the reader, and reclaims
+queued or undelivered frames. Already delivered frames remain explicitly consumer-owned. The
+runtime releases connection admission only after this scope finishes. Deadline selection uses
+channel select rather than wrapping resource return in a timeout scope. The real TCP assembly test
+now uses the inbox for frame handoff before committing authenticated payloads after reader shutdown.
+
+The actor still must offload long storage work and call the inbox while idle; this layer is not a
+background timer that makes arbitrary blocking actor callbacks safe. Scheduler/event-loop command
+wiring, upload/hash serving, full session integration and the remaining production gates remain
+required.
