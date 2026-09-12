@@ -35,8 +35,13 @@ internal fun sessionStateWeight(spec: TorrentTaskSpec): Long {
     pieces * 128 + metadata.files.sumOf { 512 + it.path.length * 4L } +
     largestPiece * 2 + (spec.resumeData?.size ?: 0) * 8L +
     spec.outputPath.length * 4L + (spec.magnetUri?.length ?: 0) * 4L +
-    spec.selected.size * 64L + 128 * 1024
+    spec.selected.size * 64L + 128 * 1024 + trackerControlStateWeight(metadata)
 }
+
+/** Dedicated per-session control pool is backed by the already-held admission lease. */
+internal fun trackerControlStateWeight(metadata: TorrentMetadata): Long =
+  if (metadata.trackerTiers.isEmpty()) 0L
+  else (metadata.trackerTiers.sumOf { it.size.toLong() } + 1) * 256 + 8192
 
 /** Runtime ownership ledger; a stopped-but-registered session remains charged after cleanup failure. */
 @OptIn(ExperimentalAtomicApi::class)

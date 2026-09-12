@@ -117,6 +117,20 @@ class TrackerStatusTest {
   }
 
   @Test
+  fun observerReceivesAttemptTransitionsAndConfigurationRevisionChanges() = runTest {
+    val snapshots = mutableListOf<List<TrackerStatus>>()
+    val tracker = TrackerTiers(listOf(listOf("a"))) { _, _, _ -> TrackerResponse(emptyList(), 60) }
+    tracker.observeStatus { snapshots += it }
+    tracker.announce(request)
+    tracker.replace(TrackerConfiguration.prepare(listOf(listOf("https://new/announce"))))
+    assertEquals(listOf(TrackerStatus.Outcome.NOT_CONTACTED, TrackerStatus.Outcome.ANNOUNCING,
+      TrackerStatus.Outcome.SUCCEEDED, TrackerStatus.Outcome.NOT_CONTACTED),
+      snapshots.map { it.single().outcome })
+    assertEquals(1L, snapshots.last().single().configurationRevision)
+    assertEquals(0L, snapshots.first().single().configurationRevision)
+  }
+
+  @Test
   fun cleanupFailureDoesNotInventAReplacementTrackerAttempt() = runTest {
     var failing = false
     val tracker = TrackerTiers(listOf(listOf("a"), listOf("b"))) { url, _, _ ->

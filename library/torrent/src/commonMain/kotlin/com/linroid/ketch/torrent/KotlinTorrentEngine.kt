@@ -244,10 +244,12 @@ internal class KotlinTorrentEngine(
           (left.take(right.size) == right || right.take(left.size) == left)
       }) { "Torrent output overlaps another task" }
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
+      val trackerState = TorrentBufferBudget(
+        maxOf(1, trackerControlStateWeight(spec.metadata).toInt()))
       val session = KotlinTorrentSession(store, network, budget, scope,
         connections = config.connectionsPerTorrent, uploadPolicy = config.effectiveUploadPolicy,
         checkpoint = checkpoint, peerId = peerId,
-        discover = { peers, owner -> discover(spec, peers, owner) },
+        discover = { peers, owner -> discover(spec, peers, owner, trackerState) },
         downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
         uploadThrottle = { uploadRate.acquire(it) },
       )
@@ -268,6 +270,7 @@ internal class KotlinTorrentEngine(
     spec: TorrentTaskSpec,
     output: SendChannel<PeerEndpoint>,
     session: KotlinTorrentSession,
+    trackerState: TorrentBufferBudget,
   ) = supervisorScope {
     val metadata = spec.metadata
     if (metadata.trackerTiers.isNotEmpty()) launch {
@@ -276,17 +279,28 @@ internal class KotlinTorrentEngine(
         nowMs = nowMs,
         announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
       )
+      discovery.observeStatus(session::updateTrackerStatus)
       try {
-        while (isActive) {
-          attempt {
-            discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes)
-          }?.peers?.let { peers ->
-            session.trackerPeers(peers)
-            peers.forEach { output.send(it) }
-          }
-          delay(1000)
+        TrackerControl.run(trackerState, operation = { manual ->
+          discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,
+            manual = manual)
+        }, publish = { response ->
+          session.trackerPeers(response.peers)
+          response.peers.forEach { output.send(it) }
+        }, readStatus = discovery::status,
+          publishStatus = session::updateTrackerStatus,
+        ) { control ->
+          session.attachTrackerControl(control)
+          try {
+            while (isActive) {
+              attempt { control.poll() }
+              delay(1000)
+            }
+          } finally { session.detachTrackerControl(control) }
         }
       } finally {
+        discovery.observeStatus {}
+        session.updateTrackerStatus(emptyList())
         withContext(NonCancellable) {
           withTimeoutOrNull(2000) {
             if (session.state.value == TorrentSessionState.FINISHED ||
