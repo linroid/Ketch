@@ -151,3 +151,28 @@ Recheck scans each non-empty selected file through one handle and flushes once i
 match. Its bitmap updates remain tentative under the store mutex until that file's flush and
 cancellation boundary succeed. Failure rolls back that file's tentative bits before unlocking;
 previously completed files remain verified. This avoids a durable flush for every small piece.
+
+## Bounded content catalog
+
+`TorrentContentCatalog` stores authenticated raw info and external piece layers under the full
+v2 hash in a caller-private catalog directory. Hybrid loads authenticate every requested topic.
+Serialization retains exact raw info bytes and omits caller context such as tracker URLs and
+comments. Existing entries are authenticated before reuse; corrupt objects are rejected rather
+than overwritten. Reads check a 32 MiB size bound before loading and reject growth during a read.
+
+Publication flushes a uniquely created temporary file before no-replace hard-link creation, retaining
+the I/O
+permit through completion. Failed publication removes only its own unchanged temporary file.
+A reopened catalog revalidates identities and layers instead of trusting its filenames. Tests
+exercise restart reads, hybrid topics/layers, corrupt/oversized entries and publication failure.
+
+This is the bounded in-memory catalog path. Runtime memory admission, streamed/spilled objects
+at full production layer limits, catalog reference accounting/garbage collection, directory-fsync
+power-loss guarantees and checkpoint v2 references remain pending. It does not yet persist task
+ownership, selections or progress and does not enable restart of a download by itself.
+
+Catalog publication uses the platform's atomic hard-link creation and never replaces an existing
+name. Both a new object and a competing winner are authenticated before returning its reference.
+JVM/Android use `Files.createLink`; iOS uses POSIX `link`. Filesystems without hard-link support
+fail explicitly; they need a separate provider adapter, not a replacing-move fallback. The
+publication-race regression inserts valid and invalid competing targets at the exact boundary.
