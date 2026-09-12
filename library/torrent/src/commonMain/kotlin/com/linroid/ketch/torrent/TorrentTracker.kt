@@ -50,6 +50,7 @@ internal data class TrackerResponse(
   val intervalSeconds: Long,
   val trackerId: ByteArray? = null,
   val source: String? = null,
+  val minimumIntervalSeconds: Long? = null,
 )
 
 /** BEP 3/15/41 tracker exchange. Error messages deliberately exclude URLs and tracker text. */
@@ -236,7 +237,8 @@ internal class TorrentTracker(
       root["peers6"]?.let { peers += compactPeers(requireNotNull(it.bytes), true) }
       val id = root["tracker id"]?.bytes
       require(id == null || id.size <= 1024)
-      return TrackerResponse(peers.distinct().take(4096), maxOf(interval, minimum), id)
+      return TrackerResponse(peers.distinct().take(4096), maxOf(interval, minimum), id,
+        minimumIntervalSeconds = minimum)
     }
 
     fun compactPeers(bytes: ByteArray, ipv6: Boolean): List<PeerEndpoint> {

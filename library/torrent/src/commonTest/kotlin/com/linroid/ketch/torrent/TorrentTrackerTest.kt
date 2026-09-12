@@ -63,6 +63,7 @@ class TorrentTrackerTest {
       "peers6" to (ByteArray(15) + byteArrayOf(1, 0x1a, 0xe1.toByte()))
     )))
     assertEquals(60L, response.intervalSeconds)
+    assertEquals(60L, response.minimumIntervalSeconds)
     assertEquals(listOf(PeerEndpoint("127.0.0.1", 6881),
       PeerEndpoint("0:0:0:0:0:0:0:1", 6881)), response.peers)
     assertFailsWith<IllegalArgumentException> {
@@ -72,6 +73,15 @@ class TorrentTrackerTest {
       TorrentTracker.parseHttp(Bencode.encode(mapOf("failure reason" to "secret passkey")))
     }
     assertEquals("Tracker rejected announce", error.message)
+  }
+
+  @Test
+  fun httpResponseRetainsAnEarlierManualMinimum() {
+    val response = TorrentTracker.parseHttp(Bencode.encode(mapOf(
+      "interval" to 3600L, "min interval" to 300L, "peers" to ByteArray(0)
+    )))
+    assertEquals(3600L, response.intervalSeconds)
+    assertEquals(300L, response.minimumIntervalSeconds)
   }
 
   @Test
