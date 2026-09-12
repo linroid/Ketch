@@ -698,3 +698,21 @@ hash rejects otherwise v2-valid payload without publishing progress or writing p
 These tests run in commonTest on JVM and iOS using the actual platform TCP adapter. Both ends use
 Ketch's protocol implementation, so this is loopback integration evidence, not independent-client
 v2/hybrid interoperability, throughput, physical-device lifecycle, or sustained-resource evidence.
+
+### Admitted outgoing v2 connections
+
+`PeerV2Connector` negotiates authorized endpoints outside the session actor. The shared authenticated
+layout now carries its full v2 info hash, which must match the document before any socket opens.
+Packed peer availability is admitted before connect and handshake. A separate handshake budget can
+preserve negotiation credit under payload saturation. Connect and handshake failures reclaim their
+admission and any acquired socket, including cancellation at the connect timeout's return boundary.
+
+The returned handle has one serialized owner. Successful pool attachment transfers transport, block
+pipeline, and availability admission; closing the old handle cannot close an attached peer. A full
+pool leaves the handle caller-owned and retryable. Availability credit remains held until joined
+terminal retirement or joined pool shutdown, including child-start/admission failures. Closed block
+exchanges discard protocol state, and transferred/closed connector handles drop their owned references.
+Actual pure-v2
+and upgraded-hybrid TCP session tests now use this connector. Global network policy/socket limits,
+metadata/layout admission, endpoint discovery, and public engine/session registration remain caller
+responsibilities and are not completed by this connector.

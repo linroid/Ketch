@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent
 
 /** File-aligned v2/hybrid addressing without allocating arrays proportional to piece count. */
 internal class TorrentContentLayout private constructor(
+  val infoHash: V2InfoHash,
   val pieceLength: Long,
   val protocolBytes: Long,
   val payloadBytes: Long,
@@ -71,7 +72,8 @@ internal class TorrentContentLayout private constructor(
       val total = hybrid?.totalV1Bytes ?: cursor
       require(total >= cursor)
       if (total > cursor) spans += Span(cursor, total, null)
-      return TorrentContentLayout(info.pieceLength, total, info.totalBytes, files.toList(),
+      return TorrentContentLayout(info.hash, info.pieceLength, total, info.totalBytes,
+        files.toList(),
         spans.toList())
     }
   }

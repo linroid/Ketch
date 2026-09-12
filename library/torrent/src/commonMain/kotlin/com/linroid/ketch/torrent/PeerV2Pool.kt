@@ -25,6 +25,7 @@ internal class PeerV2Pool private constructor(
   class Peer internal constructor(
     val blocks: PeerBlockExchange,
     internal val transport: PeerHashTransport,
+    internal val admission: TorrentBufferBudget.Lease? = null,
   ) {
     internal val stop = CompletableDeferred<Unit>()
     internal val terminal = CompletableDeferred<Event.Closed>()
@@ -53,15 +54,20 @@ internal class PeerV2Pool private constructor(
 
   /**
    * Caller admits availability before constructing blocks. Null leaves both objects caller-owned;
-   * success transfers them to this scope, even if the child is canceled before it starts.
+   * success transfers them and optional availability admission, including pre-start cancellation.
+   * Availability admission is released only on joined retirement or joined pool shutdown.
    */
-  fun attach(transport: PeerHashTransport, blocks: PeerBlockExchange): Peer? {
+  fun attach(
+    transport: PeerHashTransport,
+    blocks: PeerBlockExchange,
+    admission: TorrentBufferBudget.Lease? = null,
+  ): Peer? {
     check(!closed)
     require(members.keys.none { it.blocks === blocks || it.transport === transport }) {
       "Connection already belongs to this pool"
     }
     if (members.size == maxPeers) return null
-    val peer = Peer(blocks, transport)
+    val peer = Peer(blocks, transport, admission)
     val job = scope.launch(start = CoroutineStart.LAZY) {
       var cause = coroutineScope {
         val outcome = CompletableDeferred<Throwable?>()
@@ -118,7 +124,9 @@ internal class PeerV2Pool private constructor(
     check(!closed)
     if (!event.peer.terminal.isCompleted ||
       event.peer.terminal.getCompleted() !== event) return false
-    return members.remove(event.peer) != null
+    if (members.remove(event.peer) == null) return false
+    event.peer.admission?.close()
+    return true
   }
 
   private suspend fun shutdown() {
@@ -130,7 +138,7 @@ internal class PeerV2Pool private constructor(
     for (peer in members.keys) {
       try { closePeer(peer) } catch (error: Throwable) {
         if (failure == null) failure = error else failure.addSuppressed(error)
-      }
+      } finally { peer.admission?.close() }
     }
     members.clear()
     try { output.cancel() } finally { failure?.let { throw it } }

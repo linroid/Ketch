@@ -98,22 +98,19 @@ class TorrentV2SessionTcpTest {
             // Deliberately leave before the session's storage worker reports its result.
           } finally { connection.close() }
         }
-        var connection: TorrentConnection? = null
+        var connected: PeerV2Connector.Connected? = null
         try {
           store.initialize()
-          val client = network.connect(listener.local)
-          connection = client
-          val route = handshake.initiate(client,
-            if (hybrid) PeerIdentityHandshake.Mode.V1 else PeerIdentityHandshake.Mode.V2,
-            clientId, buffers, allowUpgrade = hybrid, expectedPeerId = serverId)
-          assertEquals(PeerIdentityHandshake.Mode.V2, route.mode)
-          assertEquals(doc.identity, route.identity)
+          val client = assertNotNull(PeerV2Connector.connect(network, listener.local, doc, layout,
+            clientId, buffers, state,
+            mode = if (hybrid) PeerIdentityHandshake.Mode.V1 else PeerIdentityHandshake.Mode.V2,
+            allowUpgrade = hybrid, expectedPeerId = serverId))
+          connected = client
+          assertEquals(PeerIdentityHandshake.Mode.V2, client.route.mode)
+          assertEquals(doc.identity, client.route.identity)
           suspend fun download() {
-            val transport = PeerHashTransport(client, PeerHashExchange(buffers, { null }), buffers,
-              pieceCount = 2)
-            val blocks = PeerBlockExchange(layout, transport, buffers)
             PeerV2Pool.run(state, maxPeers = 1) { pool ->
-              assertNotNull(pool.attach(transport, blocks))
+              assertNotNull(client.attach(pool))
               TorrentV2CommitWorker.run(store) { worker ->
                 TorrentV2SessionLoop.download(layout, setOf("0"), store, pool, worker,
                   buffers, state, maxPeers = 1)
@@ -135,7 +132,7 @@ class TorrentV2SessionTcpTest {
           server.await()
         } finally {
           withContext(NonCancellable) {
-            connection?.close()
+            connected?.close()
             listener.close()
             network.close()
             server.cancelAndJoin()
