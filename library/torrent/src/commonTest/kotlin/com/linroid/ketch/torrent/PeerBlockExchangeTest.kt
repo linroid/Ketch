@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.runTest
 import okio.Buffer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -148,6 +149,34 @@ class PeerBlockExchangeTest {
       assertEquals(0, f.frames.allocated)
       assertEquals(0, f.exchange.pendingCount)
     }
+  }
+
+  @Test
+  fun framePressureLeavesLiveRequestsAndUnsentCancelsUnchanged() = runTest {
+    val f = Fixture()
+    f.ready()
+    val first = assertNotNull(f.exchange.request(PeerMessage.Request(0, 0, 3)))
+    val retained = f.blocks.allocated
+    val written = f.connection.outgoing.size
+    val occupied = assertNotNull(f.frames.reserve(f.frames.capacity))
+    try {
+      assertNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
+      assertFalse(f.exchange.cancel(first))
+      assertEquals(1, f.exchange.pendingCount)
+      assertEquals(retained, f.blocks.allocated)
+      assertEquals(written, f.connection.outgoing.size)
+      assertFalse(f.connection.closed)
+    } finally { occupied.close() }
+    val delivered = assertIs<PeerBlockExchange.Response.Block>(
+      f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3))))
+    delivered.close()
+    val next = assertNotNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
+    assertTrue(f.exchange.cancel(next))
+    assertIs<PeerBlockExchange.Response.Canceled>(
+      f.receive(PeerMessage.Piece(1, 0, byteArrayOf(1, 2, 3, 4, 5))))
+    f.exchange.close()
+    assertEquals(0, f.blocks.allocated)
+    assertEquals(0, f.frames.allocated)
   }
 
   @Test

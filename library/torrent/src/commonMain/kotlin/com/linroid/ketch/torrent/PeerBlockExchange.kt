@@ -70,9 +70,16 @@ internal class PeerBlockExchange(
     val lease = budget.reserve(request.length * 2 + 256) ?: return null
     try {
       val value = Pending(Ticket(request), clock(), lease)
-      state.requested(request)
-      pending[request] = value
-      write(value) { transport.send(request) }
+      val sent = write(value) {
+        transport.trySend(request) {
+          state.requested(request)
+          pending[request] = value
+        }
+      }
+      if (!sent) {
+        lease.close()
+        return null
+      }
       return value.ticket
     } catch (error: Throwable) {
       lease.close()
@@ -81,17 +88,19 @@ internal class PeerBlockExchange(
     }
   }
 
-  /** A stale ticket cannot cancel a later request for the same coordinates. */
-  suspend fun cancel(ticket: Ticket) {
+  /** False means stale ownership or no frame credit; retry a live ticket when credit returns. */
+  suspend fun cancel(ticket: Ticket): Boolean {
     checkLive()
-    val value = pending[ticket.request] ?: return
-    if (value.ticket !== ticket || value.canceled) return
-    value.canceled = true
-    state.cancel(ticket.request)
+    val value = pending[ticket.request] ?: return false
+    if (value.ticket !== ticket) return false
+    if (value.canceled) return true
     try {
-      write(value) {
+      return write(value) {
         val request = ticket.request
-        transport.send(PeerMessage.Cancel(request.index, request.begin, request.length))
+        transport.trySend(PeerMessage.Cancel(request.index, request.begin, request.length)) {
+          value.canceled = true
+          state.cancel(ticket.request)
+        }
       }
     } catch (error: Throwable) {
       close()
@@ -99,11 +108,13 @@ internal class PeerBlockExchange(
     }
   }
 
-  private suspend fun write(value: Pending, block: suspend () -> Unit) {
-    val time = minOf(remaining(value), nextDeadlineMs() ?: 0)
+  private suspend fun <T> write(value: Pending, block: suspend () -> T): T {
+    val remaining = remaining(value)
+    val time = minOf(remaining, nextDeadlineMs() ?: remaining)
     check(time > 0) { "Peer block expired before write" }
-    withTimeout(time) { block() }
+    val result = withTimeout(time) { block() }
     check(!expire()) { "Peer block expired during write" }
+    return result
   }
 
   /** Caller closes the frame after dispatch; delivered blocks own separate retained credit. */

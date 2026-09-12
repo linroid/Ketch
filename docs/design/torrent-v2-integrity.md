@@ -437,3 +437,8 @@ availability array before constructing this actor-owned helper. The runtime must
 before releasing connection admission. Full event-loop/timer wiring, piece assembly and commit,
 upload/hash serving and scheduler integration remain required; this helper is not a complete v2
 session or production-capability claim.
+
+Outbound frame admission also precedes block request registration. Temporary frame pressure returns
+null for a new request without disturbing existing requests. Cancellation returns false when its
+frame cannot be admitted and leaves the request uncanceled, so the actor may retry after credit
+returns. Neither path emits bytes or resets deadlines; real partial writes still close the stream.
