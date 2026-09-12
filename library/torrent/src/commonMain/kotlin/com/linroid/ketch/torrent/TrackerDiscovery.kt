@@ -3,8 +3,10 @@ package com.linroid.ketch.torrent
 import kotlin.time.TimeSource
 
 /** Serialized per-session tracker lifecycle; callers supply whole-torrent verified state. */
-internal class TrackerDiscovery(
-  private val metadata: TorrentMetadata,
+internal class TrackerDiscovery private constructor(
+  private val topic: TrackerTopic,
+  private val privateTorrent: Boolean,
+  private val remaining: (BooleanArray) -> Long,
   private val peerId: ByteArray,
   private val port: Int,
   private val trackers: TrackerTiers,
@@ -12,7 +14,38 @@ internal class TrackerDiscovery(
   private val nowMs: () -> Long = monotonicClock(),
   private val announceCompletion: Boolean = true,
 ) {
-  init { if (metadata.isPrivate) trackers.preferCurrentTracker() }
+  constructor(
+    metadata: TorrentMetadata,
+    peerId: ByteArray,
+    port: Int,
+    trackers: TrackerTiers,
+    onPrivateTrackerChanged: suspend () -> Unit = {},
+    nowMs: () -> Long = monotonicClock(),
+    announceCompletion: Boolean = true,
+  ) : this(TrackerTopic.V1(metadata.infoHash), metadata.isPrivate, { verified ->
+    require(verified.size == metadata.pieceHashes.size / 20)
+    verified.indices.sumOf { index ->
+      if (verified[index]) 0L else minOf(metadata.pieceLength,
+        metadata.totalBytes - index.toLong() * metadata.pieceLength)
+    }
+  }, peerId, port, trackers, onPrivateTrackerChanged, nowMs, announceCompletion)
+
+  constructor(
+    document: TorrentV2Document,
+    layout: TorrentContentLayout,
+    peerId: ByteArray,
+    port: Int,
+    trackers: TrackerTiers,
+    onPrivateTrackerChanged: suspend () -> Unit = {},
+    nowMs: () -> Long = monotonicClock(),
+    announceCompletion: Boolean = true,
+  ) : this(TrackerTopic.V2(document.info.hash), document.info.privateTorrent,
+    layout::unverifiedPayloadBytes, peerId, port, trackers, onPrivateTrackerChanged,
+    nowMs, announceCompletion) {
+    require(layout.infoHash == document.info.hash) { "Tracker layout belongs to another torrent" }
+  }
+
+  init { if (privateTorrent) trackers.preferCurrentTracker() }
 
   private var nextAnnounce = 0L
   private var started = false
@@ -26,11 +59,7 @@ internal class TrackerDiscovery(
     uploaded: Long,
     stopped: Boolean = false,
   ): TrackerResponse? {
-    require(verified.size == metadata.pieceHashes.size / 20)
-    val left = verified.indices.sumOf { index ->
-      if (verified[index]) 0L else minOf(metadata.pieceLength,
-        metadata.totalBytes - index.toLong() * metadata.pieceLength)
-    }
+    val left = remaining(verified)
     val event = when {
       stopped && started -> TrackerEvent.STOPPED
       stopped -> return null
@@ -39,9 +68,9 @@ internal class TrackerDiscovery(
       else -> TrackerEvent.NONE
     }
     if (event == TrackerEvent.NONE && nowMs() < nextAnnounce) return null
-    val result = trackers.announce(TrackerAnnounce(metadata.infoHash, peerId, port, downloaded,
+    val result = trackers.announce(TrackerAnnounce(topic, peerId, port, downloaded,
       left, uploaded, event, key))
-    if (metadata.isPrivate && source != null && source != result.source) {
+    if (privateTorrent && source != null && source != result.source) {
       onPrivateTrackerChanged()
     }
     source = result.source

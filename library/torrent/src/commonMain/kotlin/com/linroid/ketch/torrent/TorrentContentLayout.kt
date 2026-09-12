@@ -39,6 +39,22 @@ internal class TorrentContentLayout private constructor(
     }
   }
 
+  /** Whole-torrent v2 tracker left excludes alignment gaps and includes unselected payload. */
+  fun unverifiedPayloadBytes(verified: BooleanArray): Long {
+    require(verified.size.toLong() == pieceCount)
+    var remaining = 0L
+    for (file in files) {
+      var index = (file.offset / pieceLength).toInt()
+      var bytes = file.length
+      while (bytes > 0) {
+        val length = minOf(pieceLength, bytes)
+        if (!verified[index++]) remaining += length
+        bytes -= length
+      }
+    }
+    return remaining
+  }
+
   /** V1 hybrid requests include zeros up to the next file or the recorded torrent end. */
   fun pieceExtents(index: Long): List<Extent> {
     require(index >= 0 && index < pieceCount)

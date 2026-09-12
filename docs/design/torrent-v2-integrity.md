@@ -733,3 +733,22 @@ rejected handles are closed. Stream completion removes the wait condition, so an
 fails instead of spinning. The caller joins the dialer and cancels its endpoint producer on exit.
 Actual pure-v2/hybrid TCP tests now start through this stream and include a mismatched-torrent arrival.
 Tracker/DHT endpoint production and public engine registration are still not wired to this path.
+
+
+## Typed tracker topics and v2 lifecycle
+
+Tracker announces retain the full SHA-1 or SHA-256 identity as a typed topic. HTTP and UDP
+serialization convert it to the 20-byte wire form required by
+[BEP 52](https://www.bittorrent.org/beps/bep_0052.html). A tracker tier instance binds to one
+full topic so tracker IDs and preferred endpoints cannot cross colliding wire prefixes or
+hash algorithms. Hybrid dual announcements must use independent tier state for each topic.
+
+V2 discovery validates the content layout identity and computes `left` from whole-torrent
+verified payload, including unselected files and excluding alignment gaps. Downloaded traffic
+is a separate counter. Existing start, interval, completion, stop, and private tracker failover
+semantics apply to both versions; an already complete start does not emit a completion event.
+
+Common tests cover HTTP and IPv4/IPv6 UDP serialization, colliding full topics, tracker ID
+isolation, payload accounting, lifecycle events, and private failover callbacks. This adds the
+tracker protocol and lifecycle building blocks; public v2 engine registration, endpoint
+production, hybrid dual announcements, and scrape remain separate work.
