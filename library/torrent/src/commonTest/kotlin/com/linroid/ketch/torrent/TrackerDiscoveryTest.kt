@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -130,6 +131,139 @@ class TrackerDiscoveryTest {
       ByteArray(20), 6881, tiers)
     assertFailsWith<IllegalArgumentException> { discovery.poll(booleanArrayOf(false), 0, 0) }
     assertEquals(0, calls)
+  }
+
+  @Test
+  fun manualReannounceRespectsTrackerMinimumAndLocalFloor() = runTest {
+    for (minimum in listOf(10L, 300L)) {
+      val requests = mutableListOf<TrackerAnnounce>()
+      var now = 0L
+      val tiers = TrackerTiers(listOf(listOf("a"))) { _, request, _ ->
+        requests += request
+        TrackerResponse(emptyList(), 3600, minimumIntervalSeconds = minimum)
+      }
+      val document = v2Document()
+      val discovery = TrackerDiscovery(document, TorrentContentLayout.from(document.info),
+        ByteArray(20), 6881, tiers, nowMs = { now })
+      val bits = booleanArrayOf(false, false)
+      discovery.poll(bits, 0, 0)
+      now = maxOf(60L, minimum) * 1000 - 1
+      assertNull(discovery.poll(bits, 0, 0, manual = true))
+      now++
+      assertNull(discovery.poll(bits, 0, 0))
+      discovery.poll(bits, 0, 0, manual = true)
+      assertEquals(listOf(TrackerEvent.STARTED, TrackerEvent.NONE), requests.map { it.event })
+      assertNull(discovery.poll(bits, 0, 0, manual = true))
+      now += 3_600_000
+      discovery.poll(bits, 0, 0)
+      assertEquals(3, requests.size)
+    }
+  }
+
+  @Test
+  fun shortAutomaticIntervalsDoNotDisableTheManualRateLimit() = runTest {
+    var now = 0L
+    var calls = 0
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, _, _ ->
+      calls++
+      TrackerResponse(emptyList(), 1, minimumIntervalSeconds = 1)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { now })
+    val bits = booleanArrayOf(false, false)
+    discovery.poll(bits, 0, 0)
+    now = 1000
+    assertNull(discovery.poll(bits, 0, 0, manual = true))
+    discovery.poll(bits, 0, 0)
+    assertEquals(2, calls)
+  }
+
+  @Test
+  fun missingMinimumUsesRegularIntervalForManualAnnounces() = runTest {
+    var now = 0L
+    var calls = 0
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, _, _ ->
+      calls++
+      TrackerResponse(emptyList(), 600)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { now })
+    val bits = booleanArrayOf(false, false)
+    discovery.poll(bits, 0, 0)
+    now = 599_999
+    assertNull(discovery.poll(bits, 0, 0, manual = true))
+    now++
+    discovery.poll(bits, 0, 0, manual = true)
+    assertEquals(2, calls)
+  }
+
+  @Test
+  fun failedAnnouncesBackOffExponentiallyAndSuccessResetsTheDelay() = runTest {
+    var now = 0L
+    var failing = true
+    var calls = 0
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, _, _ ->
+      calls++
+      if (failing) error("Offline")
+      TrackerResponse(emptyList(), 1)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { now })
+    val bits = booleanArrayOf(false, false)
+    for (delay in listOf(15, 30, 60, 120, 240, 480, 900, 900)) {
+      assertFailsWith<IllegalStateException> { discovery.poll(bits, 0, 0, manual = true) }
+      val before = calls
+      now += delay * 1000 - 1
+      assertNull(discovery.poll(bits, 0, 0, manual = true))
+      assertEquals(before, calls)
+      now++
+    }
+    failing = false
+    discovery.poll(bits, 0, 0)
+    failing = true
+    now += 1000
+    assertFailsWith<IllegalStateException> { discovery.poll(bits, 0, 0) }
+    now += 14_999
+    assertNull(discovery.poll(bits, 0, 0))
+    now++
+    failing = false
+    discovery.poll(bits, 0, 0)
+    assertEquals(11, calls)
+  }
+
+  @Test
+  fun stopBypassesFailureBackoffAndCompletionBypassesManualThrottle() = runTest {
+    var now = 0L
+    var failing = false
+    val events = mutableListOf<TrackerEvent>()
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, request, _ ->
+      if (failing) error("Offline")
+      events += request.event
+      TrackerResponse(emptyList(), 3600, minimumIntervalSeconds = 60)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { now })
+    discovery.poll(booleanArrayOf(false, false), 0, 0)
+    discovery.poll(booleanArrayOf(true, true), 7, 0)
+    assertEquals(listOf(TrackerEvent.STARTED, TrackerEvent.COMPLETED), events)
+    now = 60_000
+    failing = true
+    assertFailsWith<IllegalStateException> {
+      discovery.poll(booleanArrayOf(true, true), 7, 0, manual = true)
+    }
+    failing = false
+    discovery.poll(booleanArrayOf(true, true), 7, 0, stopped = true)
+    assertEquals(TrackerEvent.STOPPED, events.last())
+  }
+
+  @Test
+  fun cancellationDoesNotBecomeTrackerFailureBackoff() = runTest {
+    var calls = 0
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, _, _ ->
+      if (calls++ == 0) throw CancellationException("Canceled announce")
+      TrackerResponse(emptyList(), 60)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers, nowMs = { 0 })
+    val bits = booleanArrayOf(false, false)
+    assertFailsWith<CancellationException> { discovery.poll(bits, 0, 0) }
+    discovery.poll(bits, 0, 0)
+    assertEquals(2, calls)
   }
 
   private fun v2Document(name: String = "test"): TorrentV2Document =

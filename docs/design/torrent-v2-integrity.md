@@ -768,3 +768,19 @@ UDP counts are unsigned 32-bit values returned in request order; extension bytes
 Scrape statistics are tracker claims, not authenticated content or local download progress.
 Scrape does not start swarm participation or mutate announce lifecycle state. SDK exposure,
 policy admission, scheduling/caching, and independent tracker interoperability remain separate.
+
+
+## Tracker reannounce timing and failure backoff
+
+Tracker responses retain the advertised minimum separately from the regular polling interval.
+Serialized discovery accepts an explicit manual request; it may announce early after the minimum,
+with a 60-second local floor. When no minimum is advertised, the regular interval is used.
+Manual requests do not shorten the next automatic deadline and are not queued implicitly.
+Completion/start/stop events retain their lifecycle semantics independently of the manual throttle.
+
+An exhausted tracker announce advances a retry deadline from 15 seconds exponentially to a
+15-minute cap. Both automatic and manual polls honor it; a successful announce resets it.
+Cancellation propagates without changing retry state. Stop remains best-effort and can run during
+backoff so shutdown can notify the tracker. The existing v1 polling loop also uses this protection.
+The control is internal until SDK/session command wiring is added; per-tracker backoff, diagnostics,
+editing, and network-policy admission remain separate work.

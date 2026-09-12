@@ -1,5 +1,8 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.time.TimeSource
 
 /** Serialized per-session tracker lifecycle; callers supply whole-torrent verified state. */
@@ -48,6 +51,9 @@ internal class TrackerDiscovery private constructor(
   init { if (privateTorrent) trackers.preferCurrentTracker() }
 
   private var nextAnnounce = 0L
+  private var nextManualAnnounce = 0L
+  private var retryAt = 0L
+  private var retryDelayMs = 15_000L
   private var started = false
   private var completed = false
   private var source: String? = null
@@ -58,8 +64,10 @@ internal class TrackerDiscovery private constructor(
     downloaded: Long,
     uploaded: Long,
     stopped: Boolean = false,
+    manual: Boolean = false,
   ): TrackerResponse? {
     val left = remaining(verified)
+    if (!stopped && nowMs() < retryAt) return null
     val event = when {
       stopped && started -> TrackerEvent.STOPPED
       stopped -> return null
@@ -67,9 +75,21 @@ internal class TrackerDiscovery private constructor(
       left == 0L && !completed && announceCompletion -> TrackerEvent.COMPLETED
       else -> TrackerEvent.NONE
     }
-    if (event == TrackerEvent.NONE && nowMs() < nextAnnounce) return null
-    val result = trackers.announce(TrackerAnnounce(topic, peerId, port, downloaded,
-      left, uploaded, event, key))
+    if (event == TrackerEvent.NONE) {
+      val deadline = if (manual) nextManualAnnounce else nextAnnounce
+      if (nowMs() < deadline) return null
+    }
+    val result = try {
+      trackers.announce(TrackerAnnounce(topic, peerId, port, downloaded,
+        left, uploaded, event, key))
+    } catch (error: CancellationException) {
+      throw error
+    } catch (error: Exception) {
+      currentCoroutineContext().ensureActive()
+      retryAt = nowMs() + retryDelayMs
+      retryDelayMs = minOf(900_000L, retryDelayMs * 2)
+      throw error
+    }
     if (privateTorrent && source != null && source != result.source) {
       onPrivateTrackerChanged()
     }
@@ -78,7 +98,13 @@ internal class TrackerDiscovery private constructor(
     if (event == TrackerEvent.COMPLETED || (event == TrackerEvent.STARTED && left == 0L)) {
       completed = true
     }
-    nextAnnounce = nowMs() + result.intervalSeconds * 1000
+    retryAt = 0L
+    retryDelayMs = 15_000L
+    val now = nowMs()
+    nextAnnounce = now + result.intervalSeconds * 1000
+    // Without an advertised minimum (UDP), conservatively use the regular interval.
+    nextManualAnnounce = now + maxOf(60L,
+      result.minimumIntervalSeconds ?: result.intervalSeconds) * 1000
     return result
   }
 }
