@@ -6,6 +6,11 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /** Validated replacement, captured before lifecycle operations suspend. */
 internal class TrackerConfiguration private constructor(val tiers: List<List<String>>) {
+  // UTF-8 encoding and bencode's temporary copies coexist with the retained UTF-16 strings.
+  // The base session lease covers the unchanged metadata/ownership portion of the checkpoint.
+  val checkpointWorkspaceBytes: Int
+    get() = 64 * 1024 + tiers.sumOf { tier -> tier.sumOf { it.length * 32 + 512 } }
+
   /** Single-owner reservation. Transfer invalidates the old handle without releasing credit. */
   @OptIn(ExperimentalAtomicApi::class)
   class Owned private constructor() {

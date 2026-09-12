@@ -245,13 +245,14 @@ internal class KotlinTorrentEngine(
       }) { "Torrent output overlaps another task" }
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
       val trackerState = TorrentBufferBudget(
-        maxOf(1, trackerControlStateWeight(spec.metadata, spec.resumeData != null).toInt()))
+        maxOf(1, trackerControlStateWeight().toInt()))
       val session = KotlinTorrentSession(store, network, budget, scope,
         connections = config.connectionsPerTorrent, uploadPolicy = config.effectiveUploadPolicy,
         checkpoint = checkpoint, peerId = peerId,
         discover = { peers, owner -> discover(spec, peers, owner, trackerState) },
         downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
         uploadThrottle = { uploadRate.acquire(it) },
+        trackerConfigurationBudget = exchangeBudgets.sessions,
       )
       sessionLeases[hash] = lease
       sessions[hash] = session
@@ -273,7 +274,7 @@ internal class KotlinTorrentEngine(
     trackerState: TorrentBufferBudget,
   ) = supervisorScope {
     val metadata = spec.metadata
-    val trackerTiers = session.trackerTiers
+    val trackerTiers = session.trackerTiers()
     if (trackerTiers.isNotEmpty()) launch {
       val discovery = TrackerDiscovery(metadata, peerId, port,
         TrackerTiers(trackerTiers, tracker::announce), session::resetPeers,
