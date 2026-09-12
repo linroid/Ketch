@@ -6,9 +6,9 @@ import kotlinx.coroutines.withTimeout
 import okio.Buffer
 
 /**
- * Framed hash exchange on an already negotiated v2 connection. The actor owns request/accept/
- * expire/close; one separate reader may call read. Close unblocks the reader; the runtime must
- * then join that reader before releasing its connection admission.
+ * Framed exchange on an already negotiated v2 connection. The actor serializes all writes,
+ * accept, expire and close; one separate reader may call read. Close unblocks the reader; the
+ * runtime must then join that reader before releasing its connection admission.
  */
 internal class PeerHashTransport(
   private val connection: TorrentConnection,
@@ -56,6 +56,46 @@ internal class PeerHashTransport(
       throw error
     } finally {
       lease?.close()
+    }
+  }
+
+  /** Caller retains payload ownership until return; admission covers encoder copies and write. */
+  suspend fun send(message: PeerMessage) {
+    check(!closed)
+    // Hash requests must first register their response ownership through request().
+    require(message !is PeerMessage.Unknown || message.id !in 21..23) {
+      "Use request or respond for hash messages"
+    }
+    val size = PeerWire.encodedSize(message, pieceCount)
+    write(size) { PeerWire.encode(message, pieceCount = pieceCount) }
+  }
+
+  /** Hash serving owns proof generation and its buffer; this method admits serialization first. */
+  suspend fun respond(message: PeerHashMessage) {
+    check(!closed)
+    val payloadSize = when (message) {
+      is PeerHashMessage.Request -> error("Use request to register hash response ownership")
+      is PeerHashMessage.Reject -> 48
+      is PeerHashMessage.Hashes -> {
+        require(message.hashes.size == message.selector.hashCount * 32)
+        48 + message.hashes.size
+      }
+    }
+    write(payloadSize + 5) { PeerWire.encode(PeerHashWire.encode(message)) }
+  }
+
+  private suspend fun write(size: Int, encode: () -> ByteArray) {
+    val lease = checkNotNull(frames.reserve(size * 4 + 512)) {
+      "Peer write frame budget exhausted"
+    }
+    try {
+      withTimeout(timeoutMs) { connection.write(encode()) }
+    } catch (error: Throwable) {
+      // Partial frames cannot be retried on this byte stream. Pending hash tickets die with it.
+      close()
+      throw error
+    } finally {
+      lease.close()
     }
   }
 
