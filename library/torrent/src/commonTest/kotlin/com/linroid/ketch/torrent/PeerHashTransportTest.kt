@@ -36,7 +36,7 @@ class PeerHashTransportTest {
     var bodyDelay = 0L
     override suspend fun readExactly(size: Int): ByteArray {
       sizes += size
-      if (sizes.size > 1) delay(bodyDelay)
+      if (sizes.size > 2) delay(bodyDelay)
       return incoming.readByteArray(size.toLong())
     }
     override suspend fun write(bytes: ByteArray) {
@@ -122,7 +122,7 @@ class PeerHashTransportTest {
   @Test
   fun rejectsOversizedOrUnadmittedBodiesBeforeReadingThem() = runTest {
     for (size in listOf(Int.MAX_VALUE, 128)) {
-      val connection = Connection(Buffer().writeInt(size))
+      val connection = Connection(Buffer().writeInt(size).writeByte(0))
       val budget = TorrentBufferBudget(600)
       val transport = PeerHashTransport(connection, exchange(TorrentBufferBudget(32_768)), budget)
       if (size == Int.MAX_VALUE) {
@@ -130,7 +130,7 @@ class PeerHashTransportTest {
       } else {
         assertFailsWith<IllegalStateException> { transport.read() }
       }
-      assertEquals(listOf(4), connection.sizes)
+      assertEquals(if (size == Int.MAX_VALUE) listOf(4) else listOf(4, 1), connection.sizes)
       assertTrue(connection.closed)
       assertEquals(0, budget.allocated)
       transport.close()
