@@ -259,3 +259,17 @@ processes. Payload cleanup leaves private log disposal to the task-state owner, 
 cleanup. Runtime wiring, state admission, log lifecycle/compaction, process-kill coverage and
 power-loss guarantees remain pending; these tests exercise new store instances and injected I/O
 failures rather than claiming physical crash or mobile lifecycle coverage.
+
+### Controlled process-exit evidence
+
+`TorrentV2ProcessCrashTest` runs four independent JVM children that call `Runtime.halt` at actual
+storage boundaries, bypassing coroutine cleanup and shutdown hooks. Recovery rejects a partially
+written piece, rechecks a flushed piece without any checkpoint, preserves the old complete snapshot
+when exit occurs before atomic replacement, and reads the new snapshot after replacement. Each
+case then completes the payload, cleans up owned files and verifies an unrelated neighbor remains.
+The parent enforces a child deadline and joins forced termination before deleting test fixtures.
+
+These executed process-exit cases extend the injected-I/O tests. They do not prove power-loss
+ordering, directory-entry durability, physical mobile lifecycle behavior, or the still-pending v2
+runtime/network integration. The iOS simulator task requires `-PenableIosSimulatorTests=true`;
+a successful Gradle build without that flag skips simulator execution and is not test evidence.
