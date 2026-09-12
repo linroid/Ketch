@@ -1,7 +1,11 @@
 package com.linroid.ketch.torrent
 
 /** Per-connection availability and request ownership, independent of the swarm scheduler. */
-internal class PeerProtocolState(pieceCount: Int, private val maxPending: Int = 32) {
+internal class PeerProtocolState(
+  pieceCount: Int,
+  private val maxPending: Int = 32,
+  private val explicitRejects: Boolean = false,
+) {
   init {
     require(pieceCount in 0..1_000_000 && maxPending in 1..256)
   }
@@ -26,7 +30,9 @@ internal class PeerProtocolState(pieceCount: Int, private val maxPending: Int = 
   }
 
   fun cancel(request: PeerMessage.Request) {
-    if (pending.remove(request)) {
+    if (explicitRejects) {
+      if (request in pending) canceled.add(request)
+    } else if (pending.remove(request)) {
       remember(request)
     }
   }
@@ -37,13 +43,13 @@ internal class PeerProtocolState(pieceCount: Int, private val maxPending: Int = 
     while (canceled.size > maxPending * 2) canceled.remove(canceled.first())
   }
 
-  /** Returns false for a late response to a canceled or already completed request. */
+  /** V2 cancellation still requires a response; unsolicited v2 pieces always fail. */
   fun received(message: PeerMessage): Boolean {
     when (message) {
       is PeerMessage.Control -> when (message.signal) {
         PeerMessage.Signal.CHOKE -> {
           choking = true
-          pending.toList().forEach(::cancel)
+          if (!explicitRejects) pending.toList().forEach(::cancel)
         }
         PeerMessage.Signal.UNCHOKE -> choking = false
         PeerMessage.Signal.INTERESTED -> interested = true
@@ -65,11 +71,20 @@ internal class PeerProtocolState(pieceCount: Int, private val maxPending: Int = 
       is PeerMessage.Piece -> {
         val request = PeerMessage.Request(message.index, message.begin, message.bytes.size)
         if (pending.remove(request)) {
+          if (explicitRejects) return !canceled.remove(request)
           remember(request)
           return true
         }
-        if (request in canceled) return false
+        if (!explicitRejects && request in canceled) return false
         throw IllegalArgumentException("Unsolicited or mismatched peer block")
+      }
+      is PeerMessage.Reject -> {
+        if (explicitRejects) {
+          val request = PeerMessage.Request(message.index, message.begin, message.length)
+          require(pending.remove(request)) { "Unsolicited or mismatched reject" }
+          canceled.remove(request)
+          return false
+        }
       }
       else -> Unit
     }
