@@ -236,3 +236,26 @@ must load the persisted state instead of inferring publication from the caller's
 
 This adapter does not yet wire v2 state into `TaskStore` or the engine. Durable creation journals,
 state-memory admission, migration and directory-fsync power-loss recovery remain required work.
+
+### Creation-log recovery before a checkpoint
+
+A v2 store can receive a caller-private `creationLogPath` outside its payload root. Initialization
+publishes a complete task/content/output/selection/mapping-bound header before creating payload
+paths. Each created path's OS identity and kind are flushed in a checksummed, length-framed record;
+compact parent references avoid repeatedly serializing full prefixes. Replay bounds file size,
+record size, count and depth, discards a torn final append, and rejects complete checksum corruption.
+The log uses the same no-replace header publication primitive as the content catalog.
+
+Initialization can recover directly from this log without a checkpoint. All recovered claims must
+belong to the authenticated output mapping and match current filesystem identities before any are
+adopted. Checkpoint claims and log claims must agree when both exist. Missing uncreated files can
+then be created, and payload recheck rebuilds availability. A failed live append is retried before
+further creation. A process exit between creation and successful ownership recording can leave an
+unclaimed path; restart preserves it and refuses to adopt or delete it. This conservative boundary
+also applies to the existing v1 implementation.
+
+The log requires one task writer and a private state directory; it does not arbitrate independent
+processes. Payload cleanup leaves private log disposal to the task-state owner, after successful
+cleanup. Runtime wiring, state admission, log lifecycle/compaction, process-kill coverage and
+power-loss guarantees remain pending; these tests exercise new store instances and injected I/O
+failures rather than claiming physical crash or mobile lifecycle coverage.
