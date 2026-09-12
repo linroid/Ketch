@@ -1,0 +1,37 @@
+# Torrent v2 integrity primitives
+
+The common Kotlin integrity layer follows SHA-256 in
+[FIPS 180-4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf) and the file-tree rules in
+[BEP 52](https://www.bittorrent.org/beps/bep_0052.html). These internal primitives do not yet enable
+v2 downloads: metainfo identity, wire proof acquisition, proof caches, and verified storage commits
+must be integrated before advertising that capability.
+
+`Sha256` consumes caller-provided slices with fixed working buffers. Finalization is one-shot;
+invalid slices leave the accumulated message unchanged. The byte counter rejects input beyond the
+algorithm's unsigned 64-bit bit-length representation. No native torrent or crypto dependency is
+required by this implementation.
+
+`TorrentMerkleRoot` consumes the declared bytes of one non-empty file. It hashes 16 KiB blocks,
+retains only the incomplete block and a frontier of subtree roots, and folds that frontier at
+completion. Short final blocks use their actual bytes. Missing leaves use 32 zero bytes, with
+higher empty subtrees computed by hashing pairs of those zero hashes. Padding is never appended
+to the user's payload. Empty files have no pieces root and are handled by the metainfo layer.
+
+`verifyTorrentMerkleBlock` accepts an independently trusted file root, file length, block index,
+block payload, and a bottom-up sibling path. It checks the exact payload and path lengths before
+hashing, enforces zero-hash subtrees outside the file, and returns false for invalid input or a
+root mismatch. It retains no caller-owned proof or payload. The maximum path depth is determined
+by the declared file length, including lengths that cannot be materialized in memory.
+
+Incoming wire frames must be bounded before building a proof list. A successful proof does not
+publish download progress: the eventual storage integration must commit verified bytes under its
+generation/cancellation barrier first. Batched hash messages, piece-layer storage and validation,
+proof scheduling, hybrid cross-checks, and independent client interoperability remain work under
+the roadmap.
+
+Tests include published SHA-256 digests, every split of short known messages, a streamed million-
+byte vector, and JDK differential checks at padding and torrent-block boundaries. Merkle tests
+compare the frontier against an independent full tree, verify every block of uneven file shapes,
+and reject altered payloads, siblings, indices, sizes, and malformed padding even when the supplied
+root matches that malformed tree. These checks establish primitive behavior only after execution;
+they do not replace the v2 integration and release gates.
