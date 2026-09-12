@@ -752,3 +752,19 @@ Common tests cover HTTP and IPv4/IPv6 UDP serialization, colliding full topics, 
 isolation, payload accounting, lifecycle events, and private failover callbacks. This adds the
 tracker protocol and lifecycle building blocks; public v2 engine registration, endpoint
 production, hybrid dual announcements, and scrape remain separate work.
+
+
+## Bounded tracker scrape
+
+HTTP scrape derives a scrape endpoint from the announce path, retains passkey query parameters,
+and requests explicit binary hashes as specified by
+[BEP 48](https://www.bittorrent.org/beps/bep_0048.html). UDP scrape shares announce connection
+cookies, transaction/source validation, bounded retries, and cancellation cleanup under
+[BEP 15](https://www.bittorrent.org/beps/bep_0015.html). Each request contains 1–50 topics;
+duplicate wire hashes are rejected because neither protocol can disambiguate them. HTTP responses
+are limited to 64 KiB and 4096 bencode nodes. Missing HTTP entries remain absent, not zero counts.
+UDP counts are unsigned 32-bit values returned in request order; extension bytes are tolerated.
+
+Scrape statistics are tracker claims, not authenticated content or local download progress.
+Scrape does not start swarm participation or mutate announce lifecycle state. SDK exposure,
+policy admission, scheduling/caching, and independent tracker interoperability remain separate.
