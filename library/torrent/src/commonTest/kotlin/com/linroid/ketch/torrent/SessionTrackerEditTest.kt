@@ -164,6 +164,7 @@ class SessionTrackerEditTest {
       val retained = state.allocated
       session.resume()
       discoveries.first { it.size == 1 }
+      session.state.first { it == TorrentSessionState.SEEDING }
       provider.failMove = true
       assertFailsWith<IOException> { session.replaceTrackers(next) }
       discoveries.first { it.size == 2 }
@@ -238,7 +239,8 @@ class SessionTrackerEditTest {
       val joining = CompletableDeferred<Unit>()
       val release = CompletableDeferred<Unit>()
       cleanup = { joining.complete(Unit); release.await() }
-      val operation = async { session.replaceTrackers(next) }
+      // Forward caller cancellation synchronously before releasing the old discovery's gate.
+      val operation = async(Dispatchers.Unconfined) { session.replaceTrackers(next) }
       try {
         joining.await()
         operation.cancel()

@@ -90,12 +90,13 @@ internal class KotlinTorrentSession(
       val pending = scope.async {
         lifecycle.withLock {
           check(!closed) { "Torrent session is closed" }
-          val actualRevision = if (!recovered) checkpoint?.trackerRevision ?: 0
-            else store.trackerConfigurationSnapshot().revision
-          if (expectedRevision != null && expectedRevision != actualRevision) {
-            throw TrackerRevisionConflict(expectedRevision, actualRevision)
+          if (trackerCheckpointRecovered) {
+            val actualRevision = store.trackerConfigurationSnapshot().revision
+            if (expectedRevision != null && expectedRevision != actualRevision) {
+              throw TrackerRevisionConflict(expectedRevision, actualRevision)
+            }
+            check(actualRevision < Long.MAX_VALUE) { "Tracker configuration revision exhausted" }
           }
-          check(actualRevision < Long.MAX_VALUE) { "Tracker configuration revision exhausted" }
           val restart = job?.isActive == true
           val previousState = _state.value
           try {
@@ -104,7 +105,7 @@ internal class KotlinTorrentSession(
             recover()
             try {
               store.replaceTrackerConfiguration(candidate, received.load(), uploaded.load(),
-                actualRevision)
+                expectedRevision)
             } finally {
               withContext(NonCancellable) {
                 // Cancellation at the I/O return boundary does not imply that rename rolled back.

@@ -128,6 +128,44 @@ class TrackerCheckpointRecoveryTest {
   }
 
   @Test
+  fun firstEditUsesRecoveredRevisionAndHonorsOnlyExplicitConflicts() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        for (expected in listOf(null, 1L, 0L)) {
+          val root = root()
+          val initial = store(root)
+          initial.initialize()
+          val stale = initial.persistCheckpoint()
+          initial.replaceTrackerConfiguration(next)
+          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+          val replacement = listOf(listOf("https://edited/announce"))
+          try {
+            engine.start()
+            val session = engine.addTask(TorrentTaskSpec("recover", metadata,
+              (root / "seed").toString(), emptySet(), resumeData = stale))
+            if (expected == 0L) {
+              val conflict = assertFailsWith<TrackerRevisionConflict> {
+                session.replaceTrackers(replacement, expectedRevision = expected)
+              }
+              assertEquals(1L, conflict.actual)
+              assertEquals(TrackerConfigurationSnapshot(next.tiers, 1),
+                session.trackerConfiguration())
+            } else {
+              assertTrue(session.replaceTrackers(replacement, expectedRevision = expected))
+              assertEquals(TrackerConfigurationSnapshot(replacement, 2),
+                session.trackerConfiguration())
+            }
+          } finally {
+            engine.stop()
+            torrentFileSystem.deleteRecursively(root, mustExist = false)
+          }
+          assertEquals(0, engine.admittedSessionBytes)
+        }
+      }
+    }
+  }
+
+  @Test
   fun checkpointDecodeAdmissionAndCallbackCancellationReturnAllCredit() = runTest {
     val root = root()
     try {
