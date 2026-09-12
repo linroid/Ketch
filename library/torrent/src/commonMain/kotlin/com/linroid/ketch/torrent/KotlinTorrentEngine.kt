@@ -177,6 +177,7 @@ internal class KotlinTorrentEngine(
         }
       }
     }
+    require(magnet.identity.matchesInfo(metadata.infoBytes)) { "Exact topic hash mismatch" }
     // Cache the immutable info dictionary, retaining this caller's tracker list.
     return TorrentMetadata.fromBencode(metainfoFromInfo(metadata.infoBytes,
       magnet.trackers.map { listOf(it) }), config.maxMetadataBytes)
