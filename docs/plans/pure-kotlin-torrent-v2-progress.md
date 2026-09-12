@@ -12,7 +12,8 @@ span multiple PRs; it is complete only when all of its acceptance gates have evi
 | 01a | `torrent-v2-01-foundation` | Pinned reference clients, executed-scenario evidence, CI gate |
 | 01b | `torrent-v2-01-contracts` | Control/state/capability and compatibility contracts |
 | 01c | `torrent-v2-01-budgets` | Independent metadata/transfer partitions and aggregate ceiling |
-| 01d | Planned | Retained state admission, profiles, deterministic harness, baseline |
+| 01d | `torrent-v2-01-admission` | Retained metadata cache admission and lifecycle cleanup |
+| 01e | Planned | Session state admission, profiles, deterministic harness, baseline |
 
 Slice 01a covers two existing v1 interoperability scenarios. Missing Transmission fails required
 conformance mode; ordinary local runs omit unconfigured optional fixtures from the test plan.
@@ -59,3 +60,17 @@ exchanges while the transfer partition remains fully reserved.
 This is an exchange-buffer ceiling, not a total engine memory or process RSS claim. Retained
 metadata/cache entries, session indexes, proof layers, disk handles, and platform allocations still
 need their admission rules. Mobile/desktop production profiles and performance gates remain pending.
+
+## Slice 01d
+
+Cached metadata now holds a budget lease until eviction, replacement, or shutdown. Conservative
+weights include retained arrays, file records, strings, and a container allowance. Results that
+cannot be admitted are returned to the caller without being retained. Cache capacity is a separate
+partition within the same ceiling, preserving scratch headroom for metadata exchange even when
+cache and transfer partitions are full.
+
+Explicit shutdown rejects new cache work, cancels shared fetches, and awaits their finalizers
+outside the cache mutex. Owner cancellation also clears retained entries. Tests cover replacement,
+least-recently-used eviction, parent pressure, oversized entries, repeated close, pending fetch
+cancellation, and owner teardown. Caller-owned metadata, session state, and process overhead remain
+outside this cache-retention accounting; production profile and total-memory gates remain pending.
