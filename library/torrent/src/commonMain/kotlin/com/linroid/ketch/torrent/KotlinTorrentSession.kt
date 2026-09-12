@@ -80,8 +80,9 @@ internal class KotlinTorrentSession(
         lifecycle.withLock {
           check(!closed) { "Torrent session is closed" }
           val restart = job?.isActive == true
-          stopLocked()
+          val previousState = _state.value
           try {
+            stopLocked()
             currentCoroutineContext().ensureActive()
             recover()
             store.initialize()
@@ -99,6 +100,7 @@ internal class KotlinTorrentSession(
             }
           } finally {
             if (restart && currentCoroutineContext()[Job]?.isActive == true) resumeLocked()
+            else if (!restart) _state.value = previousState
           }
           true
         }

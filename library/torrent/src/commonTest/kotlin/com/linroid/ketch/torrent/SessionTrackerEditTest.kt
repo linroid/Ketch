@@ -7,6 +7,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -47,7 +48,10 @@ class SessionTrackerEditTest {
     }
   }
 
-  private inner class Fixture(parent: CoroutineScope) {
+  private inner class Fixture(
+    val parent: CoroutineScope,
+    uploadPolicy: TorrentUploadPolicy,
+  ) {
     val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-session-edit-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
     val provider = Provider()
@@ -57,7 +61,7 @@ class SessionTrackerEditTest {
     val discoveries = MutableStateFlow<List<List<List<String>>>>(emptyList())
     var cleanup: suspend () -> Unit = {}
     val session = KotlinTorrentSession(store, network, TorrentBufferBudget(1024 * 1024), parent,
-      uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION,
+      uploadPolicy = uploadPolicy,
       trackerConfigurationBudget = state,
       discover = { _, owner ->
         discoveries.value += listOf(owner.trackerTiers())
@@ -66,11 +70,14 @@ class SessionTrackerEditTest {
     )
   }
 
-  private suspend fun fixture(block: suspend Fixture.() -> Unit) =
+  private suspend fun fixture(
+    uploadPolicy: TorrentUploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION,
+    block: suspend Fixture.() -> Unit,
+  ) =
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         coroutineScope {
-          val fixture = Fixture(this)
+          val fixture = Fixture(this, uploadPolicy)
           torrentFileSystem.createDirectories(fixture.root)
           torrentFileSystem.write(fixture.root / "seed") { write(bytes) }
           try { fixture.block() } finally {
@@ -82,6 +89,23 @@ class SessionTrackerEditTest {
         }
       }
     }
+
+  @Test
+  fun editsOnFinishedNonSeedingSessionPreserveCompletion() = runTest {
+    fixture(TorrentUploadPolicy.DISABLED) {
+      val owner = checkNotNull(parent.coroutineContext[Job]).children.single()
+      session.resume()
+      session.state.first { it == TorrentSessionState.FINISHED }
+      owner.children.toList().forEach { it.join() }
+      provider.failMove = true
+      assertFailsWith<IOException> { session.replaceTrackers(next) }
+      assertEquals(TorrentSessionState.FINISHED, session.state.value)
+      provider.failMove = false
+      assertTrue(session.replaceTrackers(next))
+      assertEquals(TorrentSessionState.FINISHED, session.state.value)
+      assertEquals(next, session.trackerTiers())
+    }
+  }
 
   @Test
   fun failedEditKeepsOldOwnerAndResumesOldDiscovery() = runTest {
