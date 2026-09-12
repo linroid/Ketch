@@ -671,7 +671,9 @@ on every response. Rarity chooses new admitted pieces; existing assemblies keep 
 Responses fill assemblies and completed pieces transfer to the storage worker. Only successful
 verification/flush completions publish verified state; corrupt pieces become requestable again.
 Disk failures propagate and end the session. Peer departure releases assignments only after the
-pool's joined terminal event; remaining peers can retry them. If the last peer departs with an
+pool's joined terminal event; remaining peers can retry them. Unavailable partial assemblies with
+no live assignments are evicted so they cannot occupy every active slot. Completed assemblies
+retain their storage ownership. If the last peer departs with an
 already queued commit, the session still waits for that result. Exhaustion without pending commits
 fails explicitly. Admission pressure enables a bounded retry timer; normal idle peers do not poll.
 

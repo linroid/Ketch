@@ -179,6 +179,22 @@ internal class TorrentV2PieceScheduler private constructor(
     abandoned.forEach(assignments::remove)
   }
 
+  /** Evict unavailable partial pieces, preserving live assignments and completed assemblies. */
+  fun evictUnavailable(available: (Int) -> Boolean): Int {
+    check(!closed)
+    val discarded = mutableSetOf<Int>()
+    for ((index, assembly) in assemblies) {
+      if (!assembly.complete && !available(index)) discarded += index
+    }
+    // Scan assignments once rather than once per active piece.
+    for (request in assignments.keys) discarded.remove(request.index)
+    for (index in discarded) {
+      checkNotNull(assemblies.remove(index)).close()
+      markBusy(index, false)
+    }
+    return discarded.size
+  }
+
   /** Convenience cleanup for callers that also own this peer's pipeline. */
   fun removePeer(peer: PeerBlockExchange) {
     try { peer.close() } finally { detachPeer(peer) }

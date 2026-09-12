@@ -57,6 +57,38 @@ class TorrentV2PieceSchedulerTest {
   }
 
   @Test
+  fun unavailableEvictionPreservesLiveRequestsAndCompletedAssemblies() = runTest {
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      BooleanArray(2), buffers, state, maxActive = 1))
+    val peer = Peer(buffers, layout)
+    try {
+      peer.ready()
+      assertTrue(scheduler.begin(0))
+      val ticket = assertNotNull(scheduler.requestNext(peer.exchange))
+      assertEquals(0, scheduler.evictUnavailable { false })
+      assertFalse(scheduler.begin(1))
+      val request = ticket.request
+      assertTrue(scheduler.receive(peer.exchange, assertIs<PeerBlockExchange.Response.Block>(
+        peer.receive(PeerMessage.Piece(0, request.begin,
+          bytes.copyOfRange(request.begin, request.begin + request.length))))))
+      assertEquals(1, scheduler.evictUnavailable { false })
+      assertTrue(scheduler.begin(1))
+      assertNotNull(scheduler.requestNext(peer.exchange))
+      assertTrue(scheduler.receive(peer.exchange, assertIs<PeerBlockExchange.Response.Block>(
+        peer.receive(PeerMessage.Piece(1, 0, byteArrayOf(9))))))
+      assertEquals(0, scheduler.evictUnavailable { false })
+      assertEquals(1, scheduler.activeCount)
+    } finally {
+      scheduler.removePeer(peer.exchange)
+      scheduler.close()
+    }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
   fun reservationsDoNotWriteAndUnsentAcknowledgementsCannotReleaseNewerPlans() = runTest {
     val buffers = TorrentBufferBudget(200_000)
     val state = TorrentBufferBudget(2_000_000)

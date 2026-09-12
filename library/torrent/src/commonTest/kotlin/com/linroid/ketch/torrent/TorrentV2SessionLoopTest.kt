@@ -1,5 +1,7 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -7,6 +9,8 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okio.Buffer
 import okio.FileHandle
 import okio.FileSystem
@@ -35,7 +39,7 @@ class TorrentV2SessionLoopTest {
   ), "piece layers" to emptyMap<String, Any>())))
   private val layout = TorrentContentLayout.from(document.info)
 
-  private inner class Connection : TorrentConnection {
+  private inner class Connection(bitfield: Int) : TorrentConnection {
     override val remote = PeerEndpoint("127.0.0.1", 1)
     private val input = Channel<ByteArray>(Channel.UNLIMITED)
     private val pending = Buffer()
@@ -44,14 +48,19 @@ class TorrentV2SessionLoopTest {
     var readers = 0
     var corruptOnce = false
     var failRequests = false
+    var failAfterResponses = Int.MAX_VALUE
+    var announceAAfterB = false
+    var startGate: CompletableDeferred<Unit>? = null
+    var responseSignal: CompletableDeferred<Unit>? = null
     var closeAfterResponses = Int.MAX_VALUE
     init {
-      add(PeerMessage.Bitfield(byteArrayOf(192.toByte())))
+      add(PeerMessage.Bitfield(byteArrayOf(bitfield.toByte())))
       add(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
     }
     override suspend fun readExactly(size: Int): ByteArray {
       readers++
       try {
+        startGate?.await()
         while (pending.size < size) pending.write(input.receive())
         return pending.readByteArray(size.toLong())
       } finally { readers-- }
@@ -63,7 +72,9 @@ class TorrentV2SessionLoopTest {
       val message = PeerWire.decode(buffer.readByteArray(size.toLong()))
       if (message is PeerMessage.Request) {
         requests += message
-        if (failRequests) throw IOException("Peer request write failed")
+        if (failRequests || requests.size > failAfterResponses) {
+          throw IOException("Peer request write failed")
+        }
         val source = if (message.index == 0) this@TorrentV2SessionLoopTest.bytes else last
         val payload = source.copyOfRange(message.begin, message.begin + message.length)
         if (corruptOnce) {
@@ -71,6 +82,8 @@ class TorrentV2SessionLoopTest {
           corruptOnce = false
         }
         add(PeerMessage.Piece(message.index, message.begin, payload))
+        responseSignal?.complete(Unit)
+        if (announceAAfterB && message.index == 1) add(PeerMessage.Have(0))
         if (requests.size == closeAfterResponses) input.close()
       }
     }
@@ -95,8 +108,13 @@ class TorrentV2SessionLoopTest {
     val store = TorrentV2PieceStore(document, output, selected, "test", buffers, slots,
       fileSystem)
     val connections = mutableListOf<Connection>()
-    fun attach(pool: PeerV2Pool, clock: () -> Long, configure: (Connection) -> Unit = {}) {
-      val connection = Connection()
+    fun attach(
+      pool: PeerV2Pool,
+      clock: () -> Long,
+      bitfield: Int = 192,
+      configure: (Connection) -> Unit = {},
+    ) {
+      val connection = Connection(bitfield)
       configure(connection)
       connections += connection
       val transport = PeerHashTransport(connection, PeerHashExchange(buffers, { null }), buffers,
@@ -161,6 +179,41 @@ class TorrentV2SessionLoopTest {
       assertContentEquals(last, torrentFileSystem.read(f.output / "b") { readByteArray() })
       f.checkReleased()
     } finally { f.store.cleanup() }
+  }
+
+  @Test
+  fun unavailablePartialPieceReleasesTheActiveSlotForPiecesOtherPeersCanSupply() = runTest {
+    // This sequential-piece case crosses real file I/O between requests. Keep network timers on
+    // the real dispatcher so virtual-time skipping cannot expire a healthy peer during disk I/O.
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val f = Fixture(emptySet())
+        try {
+          f.store.initialize()
+          PeerV2Pool.run(f.state, maxPeers = 2) { pool ->
+            val partial = CompletableDeferred<Unit>()
+            f.attach(pool, monotonicClock(), bitfield = 128) {
+              it.failAfterResponses = 1
+              it.responseSignal = partial
+            }
+            f.attach(pool, monotonicClock(), bitfield = 64) {
+              it.startGate = partial
+              it.announceAAfterB = true
+            }
+            TorrentV2CommitWorker.run(f.store) { worker ->
+              TorrentV2SessionLoop.download(layout, emptySet(), f.store, pool, worker,
+                f.buffers, f.state, maxPeers = 2, maxActive = 1)
+            }
+          }
+          assertTrue(f.store.completed())
+          assertEquals(2, f.connections.first().requests.size)
+          assertEquals(1, f.connections.last().requests.first().index)
+          assertContentEquals(bytes, torrentFileSystem.read(f.output / "a") { readByteArray() })
+          assertContentEquals(last, torrentFileSystem.read(f.output / "b") { readByteArray() })
+          f.checkReleased()
+        } finally { f.store.cleanup() }
+      }
+    }
   }
 
   @Test

@@ -173,6 +173,7 @@ internal object TorrentV2SessionLoop {
                 peers.remove(peerEvent.peer)
                 rarity.remove(peerEvent.peer)
                 pieces.detachPeer(peerEvent.peer.blocks)
+                pieces.evictUnavailable { rarity.hasAny(it) }
                 check(pool.retire(peerEvent))
                 wakeAdmission()
               }

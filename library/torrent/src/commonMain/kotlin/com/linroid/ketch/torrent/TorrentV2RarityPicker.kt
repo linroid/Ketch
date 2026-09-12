@@ -46,6 +46,12 @@ internal class TorrentV2RarityPicker<P : Any> private constructor(
     return true
   }
 
+  fun hasAny(index: Int): Boolean {
+    check(!closed)
+    require(index in 0 until pieceCount)
+    return counts[index] > 0
+  }
+
   fun has(peer: P, index: Int): Boolean {
     check(!closed)
     require(index in 0 until pieceCount)
