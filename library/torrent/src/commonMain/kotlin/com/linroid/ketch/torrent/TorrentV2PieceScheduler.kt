@@ -3,7 +3,7 @@ package com.linroid.ketch.torrent
 /** One session actor owns assignments; peers and the commit worker retain their separate leases. */
 internal class TorrentV2PieceScheduler private constructor(
   private val layout: TorrentContentLayout,
-  private var selected: Set<String>,
+  private var wanted: BooleanArray,
   private var verified: BooleanArray,
   private val buffers: TorrentBufferBudget,
   private val maxActive: Int,
@@ -13,6 +13,7 @@ internal class TorrentV2PieceScheduler private constructor(
   private val assemblies = linkedMapOf<Int, TorrentV2PieceAssembly>()
   private val assignments = mutableMapOf<PeerMessage.Request, Assignment>()
   private val commits = mutableMapOf<TorrentV2CommitWorker.Ticket, Int>()
+  private var busy = ByteArray((verified.size + 7) / 8)
   private var closed = false
   val activeCount: Int get() = assemblies.size + commits.size
 
@@ -21,15 +22,31 @@ internal class TorrentV2PieceScheduler private constructor(
     return verified[index]
   }
 
-  /** The piece-selection policy calls this after choosing a candidate; false means no admission. */
+  fun canBegin(index: Int): Boolean {
+    check(!closed)
+    return index in verified.indices && wanted[index] && !verified[index] &&
+      busy[index / 8].toInt() and (128 ushr (index % 8)) == 0 && activeCount < maxActive
+  }
+
+  fun beginNext(
+    peer: PeerBlockExchange,
+    picker: TorrentV2RarityPicker<PeerBlockExchange>,
+  ): Boolean {
+    check(!closed)
+    require(picker.pieceCount == verified.size)
+    if (activeCount == maxActive) return false
+    val index = picker.pick(peer) { canBegin(it) && peer.canRequest(it) } ?: return false
+    return begin(index)
+  }
+
+  /** False means no eligible piece or no assembly admission; caller retries after state changes. */
   fun begin(index: Int): Boolean {
     check(!closed)
     require(index in verified.indices)
-    val file = layout.v2Piece(index.toLong()).fileId
-    if ((selected.isNotEmpty() && file !in selected) || verified[index] ||
-      index in assemblies || index in commits.values || activeCount == maxActive) return false
+    if (!canBegin(index)) return false
     val assembly = TorrentV2PieceAssembly.create(layout, index, buffers) ?: return false
     assemblies[index] = assembly
+    markBusy(index, true)
     return true
   }
 
@@ -106,9 +123,17 @@ internal class TorrentV2PieceScheduler private constructor(
   fun completed(completion: TorrentV2CommitWorker.Completion): Boolean {
     if (closed) return false
     val index = commits.remove(completion.ticket) ?: return false
+    markBusy(index, false)
     verified[index] = completion is TorrentV2CommitWorker.Completion.Committed &&
       completion.verified
     return true
+  }
+
+  private fun markBusy(index: Int, value: Boolean) {
+    val byte = index / 8
+    val mask = 128 ushr (index % 8)
+    busy[byte] = if (value) (busy[byte].toInt() or mask).toByte() else
+      (busy[byte].toInt() and mask.inv()).toByte()
   }
 
   /** The outer runtime joins peers and the worker; this closes only actor-owned assembly/state. */
@@ -119,7 +144,8 @@ internal class TorrentV2PieceScheduler private constructor(
     assemblies.clear()
     assignments.clear()
     commits.clear()
-    selected = emptySet()
+    busy = ByteArray(0)
+    wanted = BooleanArray(0)
     verified = BooleanArray(0)
     lease.close()
   }
@@ -135,19 +161,29 @@ internal class TorrentV2PieceScheduler private constructor(
       maxActive: Int = 2,
     ): TorrentV2PieceScheduler? {
       require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
-      require(verified.size.toLong() == layout.pieceCount && maxActive in 1..16)
+      require(verified.size.toLong() == layout.pieceCount && maxActive in 1..1024)
       require(layout.files.size <= 100_000 && selectedIds.size <= layout.files.size)
-      // Availability copy, selection validation/copy, and up to 1024 assignment records per piece.
-      val bytes = verified.size * 2 + layout.files.size * 64 + selectedIds.size * 64 +
-        maxActive * 262_144 + 1024
+      // Wanted/verified/busy indexes, selection validation and actual maximum blocks per piece.
+      val blockCount = (layout.pieceLength / PeerWire.BLOCK_SIZE).toInt()
+      val perPiece = 256 + blockCount * 256
+      val bytes = verified.size * 2 + (verified.size + 7) / 8 +
+        layout.files.size * 64 + selectedIds.size * 64 +
+        maxActive * perPiece + 1024
       val lease = state.reserve(bytes) ?: return null
       try {
         val fileIds = layout.files.map { it.id }.toSet()
         require(fileIds.containsAll(selectedIds)) {
           "Unknown selected file"
         }
-        return TorrentV2PieceScheduler(layout, selectedIds.toSet(), verified.copyOf(), buffers,
-          maxActive, lease)
+        val wanted = BooleanArray(verified.size)
+        for (file in layout.files) {
+          if (selectedIds.isNotEmpty() && file.id !in selectedIds) continue
+          val first = (file.offset / layout.pieceLength).toInt()
+          val count = file.length / layout.pieceLength +
+            if (file.length % layout.pieceLength == 0L) 0 else 1
+          wanted.fill(true, first, first + count.toInt())
+        }
+        return TorrentV2PieceScheduler(layout, wanted, verified.copyOf(), buffers, maxActive, lease)
       } catch (error: Throwable) {
         lease.close()
         throw error

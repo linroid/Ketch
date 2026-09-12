@@ -566,3 +566,24 @@ Tests cover byte boundaries, input/snapshot isolation, invalid spare bits withou
 publication, empty torrents and the final index of the million-piece profile. This removes one
 large per-peer allocation obstacle. Aggregate peer admission, the legacy scheduler's retained
 snapshots, process RSS and the full simultaneous production resource profiles still need validation.
+
+### Admitted rarity and automatic candidates
+
+`TorrentV2RarityPicker` admits its count index before allocation and charges each retained compact
+peer snapshot separately. Bitfield replacement, duplicate have messages and peer removal maintain
+rarity without aliasing caller buffers. Peer keys identify connection lifetimes. It chooses the
+rarest eligible piece available from the requested peer, rotating equal-rarity choices and avoiding
+candidate-list allocations. A rarity of one permits an early return; other choices may scan the
+full bounded piece index. Runtime selection should be driven by state changes, with large-swarm
+CPU/throughput measurements still required.
+
+The piece scheduler now exposes automatic `beginNext` and uses admitted wanted/verified arrays plus
+a packed busy index for allocation-free candidate eligibility. State allowance scales with actual
+blocks per piece instead of always charging the 16 MiB maximum; up to 1024 active pieces can be
+requested subject to state and payload admission. A test admits 128 small pieces within bounded
+state/payload budgets. This is admission evidence, not a completed simultaneous-peer performance gate.
+
+Tests cover exact rarity choices, rotating ties, replacements/removal, duplicate haves, malformed
+and unadmitted snapshots, empty/million-piece indexes and automatic scheduler integration. Full
+peer/session availability routing, generation barriers, adaptive streaming/endgame policy, upload/
+hash serving, independent-client interoperability and all remaining production gates are unfinished.
