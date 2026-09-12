@@ -658,3 +658,29 @@ attach leaves the connection with the caller. The caller admits availability bef
 The pool and the existing scheduler/commit worker now have compatible ownership boundaries. Automatic
 session scheduling from availability and completion events, connection discovery, full hash serving,
 and production runtime registration still need implementation and end-to-end validation.
+
+### Automatic full-metainfo download session
+
+`TorrentV2SessionLoop` consumes the peer pool and commit worker on one session actor. It builds its
+own packed availability index and choke/interest/pipeline state from ordered events, then dispatches
+interest and canonical block plans using nonblocking command sends. Peer actors retain exclusive
+access to their mutable protocol state and socket writes. Interest counts update from availability
+and successful commits; completion uses a remaining-piece counter rather than scanning the torrent
+on every response. Rarity chooses new admitted pieces; existing assemblies keep their assignments.
+
+Responses fill assemblies and completed pieces transfer to the storage worker. Only successful
+verification/flush completions publish verified state; corrupt pieces become requestable again.
+Disk failures propagate and end the session. Peer departure releases assignments only after the
+pool's joined terminal event; remaining peers can retry them. Unavailable partial assemblies with
+no live assignments are evicted so they cannot occupy every active slot. Completed assemblies
+retain their storage ownership. If the last peer departs with an
+already queued commit, the session still waits for that result. Exhaustion without pending commits
+fails explicitly. Admission pressure enables a bounded retry timer; normal idle peers do not poll.
+
+The caller supplies matching authenticated layout/selection and initialized storage, with verified
+bits taken from the store, and owns the surrounding pool/worker scopes. Tests exercise selected
+output, corruption retry, connection failure/reassignment, disk failure, final-peer departure during
+blocked storage, and an already verified selection without peers. These use deterministic framed
+connections and real file storage. Independent-client v2 interoperability and throughput gates remain
+unproven. Discovery/connection orchestration, magnet resolution, complete hash serving, seeding,
+corrupt-peer reputation, and public runtime registration remain outstanding.

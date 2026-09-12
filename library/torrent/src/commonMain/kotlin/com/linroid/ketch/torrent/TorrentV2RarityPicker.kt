@@ -46,6 +46,19 @@ internal class TorrentV2RarityPicker<P : Any> private constructor(
     return true
   }
 
+  fun hasAny(index: Int): Boolean {
+    check(!closed)
+    require(index in 0 until pieceCount)
+    return counts[index] > 0
+  }
+
+  fun has(peer: P, index: Int): Boolean {
+    check(!closed)
+    require(index in 0 until pieceCount)
+    val current = peers[peer] ?: return false
+    return current.bits[index / 8].toInt() and (128 ushr (index % 8)) != 0
+  }
+
   /** Eligibility is an actor-local lookup; no I/O or allocation should run in this callback. */
   fun pick(peer: P, eligible: (Int) -> Boolean): Int? {
     check(!closed)
