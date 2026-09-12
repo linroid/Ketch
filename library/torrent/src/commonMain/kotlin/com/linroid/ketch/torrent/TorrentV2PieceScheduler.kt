@@ -19,6 +19,8 @@ internal class TorrentV2PieceScheduler private constructor(
   private val commits = mutableMapOf<TorrentV2CommitWorker.Ticket, Int>()
   private var busy = ByteArray((verified.size + 7) / 8)
   private var closed = false
+  private var remaining = wanted.indices.count { wanted[it] && !verified[it] }
+  val pendingCommitCount: Int get() = commits.size
   val activeCount: Int get() = assemblies.size + commits.size
 
   fun isVerified(index: Int): Boolean {
@@ -58,6 +60,21 @@ internal class TorrentV2PieceScheduler private constructor(
   fun needsPeer(peer: PeerBlockExchange): Boolean {
     check(!closed)
     return verified.indices.any { wanted[it] && !verified[it] && peer.hasPiece(it) }
+  }
+
+  fun isNeeded(index: Int): Boolean {
+    check(!closed)
+    return wanted[index] && !verified[index]
+  }
+
+  fun neededCount(available: (Int) -> Boolean): Int {
+    check(!closed)
+    return verified.indices.count { wanted[it] && !verified[it] && available(it) }
+  }
+
+  fun completed(): Boolean {
+    check(!closed)
+    return remaining == 0
   }
 
   /** Call after availability/verification changes; false means retry when frame credit returns. */
@@ -188,6 +205,7 @@ internal class TorrentV2PieceScheduler private constructor(
     markBusy(index, false)
     verified[index] = completion is TorrentV2CommitWorker.Completion.Committed &&
       completion.verified
+    if (verified[index]) remaining--
     return true
   }
 
