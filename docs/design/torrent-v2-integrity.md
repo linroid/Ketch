@@ -812,3 +812,18 @@ The session regression holds an old peer in cancellation cleanup, verifies old h
 before reset finishes and afterward, then admits a host from the replacement tracker. It also
 checks the old peer closes and all session buffer credit returns after shutdown. Public v2 session
 registration and its corresponding provenance/admission policy remain separate work.
+
+
+## Credential-free tracker status snapshots
+
+Serialized tracker tiers retain one status record per unique configured URL, with stable IDs based
+on the original tier traversal order. Tier promotion does not change these IDs. Records expose
+attempt counts, lifetime/consecutive failure counts, the current outcome, and peer count/intervals
+from the last successful response. Outcomes distinguish uncontacted, in-flight, successful, failed,
+timed-out, and canceled attempts. Cancellation does not increment tracker failure counters.
+
+Snapshots contain no URLs, tracker IDs, peers, raw tracker text, or exceptions. A trusted caller can
+associate an ID with its existing configuration separately. Read snapshots on the session owner;
+returned immutable records do not change during subsequent announces. No event history is retained.
+Private cleanup failure occurs before a replacement attempt, so it does not create false diagnostics.
+SDK/daemon/UI publication and per-tracker scheduling/backoff remain separate roadmap work.
