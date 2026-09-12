@@ -553,3 +553,16 @@ Scheduler request failures now remove the failed peer's earlier assignments befo
 error. The pipeline may already have closed itself after a partial write; the ledger must still
 release its unanswered blocks so a replacement peer can request them. The regression injects a
 failure on the second request and verifies the replacement starts with the first abandoned block.
+
+### Compact peer availability
+
+Peer protocol state now retains the packed bitfield instead of a BooleanArray per piece. At the
+one-million-piece ceiling, its availability payload is 125,000 bytes per peer. V2 scheduling and
+single-peer lookup read bits directly; the legacy swarm scheduler explicitly requests a detached
+Boolean snapshot for its existing interface. Input bitfields are copied, and snapshots cannot mutate
+protocol state. Have updates and spare-bit validation operate on the same packed representation.
+
+Tests cover byte boundaries, input/snapshot isolation, invalid spare bits without partial state
+publication, empty torrents and the final index of the million-piece profile. This removes one
+large per-peer allocation obstacle. Aggregate peer admission, the legacy scheduler's retained
+snapshots, process RSS and the full simultaneous production resource profiles still need validation.

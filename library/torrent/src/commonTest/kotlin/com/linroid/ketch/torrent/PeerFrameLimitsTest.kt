@@ -33,7 +33,7 @@ class PeerFrameLimitsTest {
       assertContentEquals(bits, decoded.bytes)
       val state = PeerProtocolState(count)
       state.received(decoded)
-      assertTrue(state.available[0] && state.available[count - 1])
+      assertTrue(state.hasPiece(0) && state.hasPiece(count - 1))
       assertEquals(listOf(4, 1, bits.size), connection.reads)
       assertFailsWith<IllegalArgumentException> {
         PeerWire.decode(encoded.copyOfRange(4, encoded.size))
