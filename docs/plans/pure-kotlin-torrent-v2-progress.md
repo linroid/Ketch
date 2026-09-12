@@ -11,7 +11,8 @@ span multiple PRs; it is complete only when all of its acceptance gates have evi
 | --- | --- | --- |
 | 01a | `torrent-v2-01-foundation` | Pinned reference clients, executed-scenario evidence, CI gate |
 | 01b | `torrent-v2-01-contracts` | Control/state/capability and compatibility contracts |
-| 01c | Planned | Resource admission profiles, deterministic harness, performance baseline |
+| 01c | `torrent-v2-01-budgets` | Independent metadata/transfer partitions and aggregate ceiling |
+| 01d | Planned | Retained state admission, profiles, deterministic harness, baseline |
 
 Slice 01a covers two existing v1 interoperability scenarios. Missing Transmission fails required
 conformance mode; ordinary local runs omit unconfigured optional fixtures from the test plan.
@@ -46,3 +47,15 @@ continue their legacy behavior until the runtime adapters are implemented.
 Validation: API tests pass on JVM and JavaScript; core and remote JVM implementations compile.
 Mutation implementations, paginated detail endpoints, operation ledgers, and runtime adapters
 remain pending; their declarations and tests ship with the respective implementation slices.
+
+## Slice 01c
+
+Metadata exchange now has an independent scratch reservation instead of competing with active
+piece buffers. Both partitions account against a shared exchange ceiling. Configuration rejects
+ceilings that cannot hold both partitions, so payload saturation cannot prevent one metadata
+exchange from progressing. The existing metadata wire fixture exercises successful and failed
+exchanges while the transfer partition remains fully reserved.
+
+This is an exchange-buffer ceiling, not a total engine memory or process RSS claim. Retained
+metadata/cache entries, session indexes, proof layers, disk handles, and platform allocations still
+need their admission rules. Mobile/desktop production profiles and performance gates remain pending.

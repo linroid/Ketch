@@ -40,7 +40,8 @@ internal class KotlinTorrentEngine(
 ) : TorrentEngine {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
-  private val budget = TorrentBufferBudget(config.maxBufferedBytes)
+  private val exchangeBudgets = TorrentExchangeBudgets(config)
+  private val budget = exchangeBudgets.transfer
   private val cache = TorrentMetadataCache(scope)
   private val tracker = TorrentTracker(http, network)
   private val peerId = torrentRandomBytes(20)
@@ -146,7 +147,7 @@ internal class KotlinTorrentEngine(
               if (attempted.size > 4096) error("Metadata peer limit exceeded")
               try {
                 return@coroutineScope TorrentMetadataExchange(network, config.maxMetadataBytes,
-                  budget = budget).fetch(magnet.infoHash, endpoint)
+                  budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint)
               } catch (e: PrivateTorrentMagnetException) {
                 throw e
               } catch (e: CancellationException) {

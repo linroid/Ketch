@@ -2,34 +2,6 @@ package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
-
-/** Shared across sessions; reservations precede allocating piece and connection buffers. */
-@OptIn(ExperimentalAtomicApi::class)
-internal class TorrentBufferBudget(val capacity: Int) {
-  private val used = AtomicInt(0)
-  val allocated: Int get() = used.load()
-
-  init { require(capacity > 0) }
-
-  inner class Lease(val bytes: Int) {
-    private val closed = AtomicBoolean(false)
-    fun close() {
-      if (closed.compareAndSet(false, true)) used.fetchAndAdd(-bytes)
-    }
-  }
-
-  fun reserve(bytes: Int): Lease? {
-    require(bytes > 0)
-    while (true) {
-      val current = used.load()
-      if (bytes > capacity - current) return null
-      if (used.compareAndSet(current, current + bytes)) return Lease(bytes)
-    }
-  }
-}
 
 /** Serialized rarity and ownership state. No disk or network operation runs under its lock. */
 internal class TorrentPieceScheduler(

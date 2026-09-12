@@ -36,6 +36,11 @@ data class TorrentConfig(
   val maxMetadataBytes: Int = 4 * 1024 * 1024,
   /** Maximum simultaneously buffered piece data across the engine. */
   val maxBufferedBytes: Int = 32 * 1024 * 1024,
+  /**
+   * Combined ceiling for transfer buffers and metadata exchange scratch space. This is not a
+   * process RSS limit; retained metadata, session indexes, and platform overhead are separate.
+   */
+  val maxExchangeBytes: Int = 64 * 1024 * 1024,
 
 ) {
   init {
@@ -47,7 +52,14 @@ data class TorrentConfig(
     require(listenPort in 0..65535) { "listenPort must be in 0..65535" }
     require(maxMetadataBytes in 1..4 * 1024 * 1024)
     require(maxBufferedBytes >= 16384) { "maxBufferedBytes must hold a protocol block" }
+    require(maxBufferedBytes.toLong() + metadataExchangeBytes <= maxExchangeBytes.toLong()) {
+      "maxExchangeBytes must cover transfer buffers and an independent metadata exchange"
+    }
   }
+
+  /** One metadata exchange, including parse copies and bounded wire overhead. */
+  internal val metadataExchangeBytes: Int
+    get() = maxMetadataBytes * 4 + 256 * 1024
 
   /** Effective policy, including compatibility with the legacy boolean. */
   val effectiveUploadPolicy: TorrentUploadPolicy
