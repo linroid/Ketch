@@ -4,6 +4,7 @@ import com.sun.management.UnixOperatingSystemMXBean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -47,13 +48,12 @@ class TorrentBenchmarkTest {
     val revision = checkNotNull(System.getenv("KETCH_BENCHMARK_REVISION"))
     require(revision.matches(Regex("[0-9a-f]{40}")))
     withContext(Dispatchers.IO) {
-      NativeLibraryLoader.ensureLoaded()
-      assertEquals(ConformanceClients.version("libtorrent4j"), LibTorrent.libtorrent4jVersion())
       val results = mutableListOf<BenchmarkRun>()
       val report = BenchmarkReport(revision, System.getProperty("os.name"),
         System.getProperty("os.version"), System.getProperty("os.arch"),
         System.getProperty("java.runtime.version"), Runtime.getRuntime().availableProcessors(),
-        LibTorrent.libtorrent4jVersion(), sizes, runs)
+        ConformanceClients.version("libtorrent4j"), ConformanceClients.version("transmission"),
+        sizes, runs)
       var failureDetails: String? = null
       fun save(complete: Boolean) {
         reportFile.writeText(Json.encodeToString(report.copy(
@@ -63,7 +63,7 @@ class TorrentBenchmarkTest {
       save(false)
       for (size in sizes) {
         val root = Files.createTempDirectory("ketch-benchmark").toFile()
-        val manager = SessionManager()
+        val seeder = TorrentBenchmarkSeeder(root)
         try {
           require(root.usableSpace >= size * 2 + 2L * 1024 * 1024 * 1024) {
             "Benchmark needs space for one seed, one download, and 2 GiB headroom"
@@ -77,12 +77,7 @@ class TorrentBenchmarkTest {
           }
           root.resolve("fixture.torrent").writeBytes(fixture.metainfo)
           val seeding = TimeSource.Monotonic.markNow()
-          manager.start(SessionParams(referenceSettings()))
-          val info = TorrentInfo(fixture.metainfo)
-          manager.download(info, seed)
-          withTimeout(120_000) {
-            while (manager.find(info.infoHash())?.status()?.isSeeding() != true) delay(20)
-          }
+          seeder.start(fixture.metainfo, seed)
           val seedMs = seeding.elapsedNow().inWholeMilliseconds
           val urls = generateSequence(javaClass.classLoader) { it.parent }
             .filterIsInstance<URLClassLoader>().flatMap { it.urLs.asSequence() }
@@ -98,7 +93,7 @@ class TorrentBenchmarkTest {
               val process = ProcessBuilder(java, "-Xmx256m", "-cp", classpath,
                 "com.linroid.ketch.torrent.TorrentBenchmarkProcess", mode,
                 root.resolve("fixture.torrent").absolutePath, output.absolutePath,
-                manager.swig().listen_port().toString())
+                seeder.peerPort.toString(), size.toString())
                 .redirectErrorStream(true).redirectOutput(log).start()
               var idleRss = -1L
               var peakRss = 0L
@@ -155,7 +150,7 @@ class TorrentBenchmarkTest {
           save(false)
           throw failure
         } finally {
-          manager.stop()
+          seeder.close()
           root.deleteRecursively()
         }
       }
@@ -167,7 +162,7 @@ class TorrentBenchmarkTest {
 @Serializable
 internal data class BenchmarkReport(
   val revision: String, val os: String, val osVersion: String, val arch: String,
-  val java: String, val processors: Int, val libtorrent4j: String,
+  val java: String, val processors: Int, val libtorrent4j: String, val transmission: String,
   val sizes: List<Long>, val runs: Int, val complete: Boolean = false,
   val results: List<BenchmarkRun> = emptyList(), val failure: String? = null,
 )
@@ -181,7 +176,8 @@ internal data class BenchmarkRun(
 
 @Serializable
 internal data class BenchmarkMetrics(
-  val initializationMs: Long, val transferMs: Long, val cpuMs: Long, val idleHeapBytes: Long,
+  val initializationMs: Long, val transferMs: Long, val firstVerifiedMs: Long,
+  val firstVerifiedBytes: Long, val cpuMs: Long, val idleHeapBytes: Long,
   val peakHeapBytes: Long, val idleFds: Long, val peakFds: Long, val finalFds: Long,
 )
 
@@ -202,10 +198,13 @@ internal object TorrentBenchmarkProcess {
       val data = File(args[1]).readBytes()
       val output = File(args[2])
       val port = args[3].toInt()
+      val payloadBytes = args[4].toLong()
+      var nativeInfo: TorrentInfo? = null
       val os = ManagementFactory.getOperatingSystemMXBean() as? UnixOperatingSystemMXBean
       val memory = ManagementFactory.getMemoryMXBean()
       val native = if (args[0] == "native") {
         NativeLibraryLoader.ensureLoaded()
+        check(LibTorrent.libtorrent4jVersion() == ConformanceClients.version("libtorrent4j"))
         SessionManager().also { it.start(SessionParams(referenceSettings())) }
       } else null
       val kotlin = if (native == null) KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
@@ -230,25 +229,44 @@ internal object TorrentBenchmarkProcess {
         }
         val cpuStart = os?.processCpuTime ?: -1
         val transfer = TimeSource.Monotonic.markNow()
+        var firstVerifiedMs = -1L
+        var firstVerifiedBytes = 0L
+        fun verified(bytes: Long) {
+          if (bytes > 0 && firstVerifiedMs < 0) {
+            firstVerifiedMs = transfer.elapsedNow().inWholeMilliseconds
+            firstVerifiedBytes = bytes
+          }
+        }
         try {
           if (native != null) {
             val info = TorrentInfo(data)
+            nativeInfo = info
             native.download(info, output)
             while (native.find(info.infoHash()) == null) delay(10)
             val handle = native.find(info.infoHash())!!
             handle.swig().connect_peer(TcpEndpoint("127.0.0.1", port).swig())
-            while (!handle.status().isSeeding()) delay(10)
+            while (true) {
+              val status = handle.status()
+              verified(minOf(payloadBytes,
+                status.numPieces().toLong() * TorrentBenchmarkFixture.PIECE_BYTES))
+              if (status.isSeeding()) break
+              delay(10)
+            }
           } else {
             val metadata = TorrentMetadata.fromBencode(data)
             val magnet = MagnetUri(metadata.infoHash,
               explicitPeers = listOf("127.0.0.1:$port")).toUri()
             val session = checkNotNull(kotlin).addTask(TorrentTaskSpec("benchmark", metadata,
               output.resolve("payload").absolutePath, emptySet(), magnet))
-            session.resume()
-            val state = session.state.first {
-              it == TorrentSessionState.FINISHED || it == TorrentSessionState.STOPPED
-            }
-            check(state == TorrentSessionState.FINISHED) { session.failure.value.toString() }
+            val progress = launch { session.downloadedBytes.collect { verified(it) } }
+            try {
+              session.resume()
+              val state = session.state.first {
+                it == TorrentSessionState.FINISHED || it == TorrentSessionState.STOPPED
+              }
+              verified(session.downloadedBytes.value)
+              check(state == TorrentSessionState.FINISHED) { session.failure.value.toString() }
+            } finally { progress.cancel(); progress.join() }
           }
         } finally { monitor.cancel(); monitor.join() }
         val elapsed = transfer.elapsedNow().inWholeMilliseconds
@@ -256,10 +274,15 @@ internal object TorrentBenchmarkProcess {
           (checkNotNull(os).processCpuTime - cpuStart) / 1_000_000
         native?.stop()
         kotlin?.stop()
-        val metrics = BenchmarkMetrics(initializationMs, elapsed, cpuMs, idleHeap,
+        val metrics = BenchmarkMetrics(initializationMs, elapsed, firstVerifiedMs,
+          firstVerifiedBytes, cpuMs, idleHeap,
           peakHeap, idleFds, peakFds, os?.openFileDescriptorCount ?: -1)
         println("BENCHMARK_METRICS ${Json.encodeToString(metrics)}")
-      } finally { native?.stop(); kotlin?.stop() }
+      } finally {
+        native?.stop()
+        kotlin?.stop()
+        java.lang.ref.Reference.reachabilityFence(nativeInfo)
+      }
     }
   }
 }

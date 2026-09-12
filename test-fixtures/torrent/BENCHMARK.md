@@ -1,7 +1,7 @@
 # Direct TCP baseline
 
 The benchmark compares isolated Kotlin and libtorrent4j downloader JVMs against the same pinned
-libtorrent seeder, on loopback TCP. uTP and public discovery are disabled. Payloads are deterministic
+Transmission seeder, on loopback TCP. uTP and public discovery are disabled. Payloads are deterministic
 pseudorandom data from Java Random seed 162, generated one 256 KiB piece at a time. The independent
 fixture builder uses JDK SHA-1 and SHA-256. Output verification streams SHA-256 and checks file length.
 Neither generation nor verification allocates a payload-sized byte array.
@@ -11,6 +11,7 @@ retained at a time. Each size needs twice the payload size plus 2 GiB free space
 OS, runtime, filesystem, and competing workloads must be recorded alongside the JSON results.
 
 ```shell
+TRANSMISSION_DAEMON=/tmp/ketch-transmission/build/daemon/transmission-daemon \
 KETCH_TORRENT_BENCHMARK=1 \
 KETCH_BENCHMARK_BYTES=1073741824,10737418240 \
 KETCH_BENCHMARK_RUNS=5 \
@@ -27,7 +28,7 @@ Report all raw samples and the median/spread, including failures; do not select 
 The seeder has a 120-second readiness deadline. Each child has a 600-second execution deadline and
 the parent enforces a 630-second wall-clock deadline including readiness and sampling. A stuck
 child is forcibly terminated, with a five-second termination deadline. These bounds are fixed
-before measurement. A failure leaves `complete: false` and previously completed samples in the report.
+before measurement. Only `complete: true` proves completion. Failures preserve previously completed samples.
 A complete 1/10 GiB baseline requires twenty verified child runs, not just a successful smoke test.
 
 Both child JVMs have a 256 MiB heap ceiling. The Kotlin engine uses one peer, disabled uploads and
@@ -48,3 +49,15 @@ This baseline does not certify the 80% sustained-throughput release target. Matc
 and durability policy, separating overlapping hash/disk/network costs, shaped swarms, many files,
 partial selection, mobile hardware, energy, lifecycle, and soak measurements remain release work.
 No target is relaxed to accommodate a slow run.
+
+The first verified-progress timestamp separates connection/unchoke wait from subsequent transfer.
+Native progress is sampled every 10 ms using complete-piece counts; the final short piece can
+overestimate its first byte count by less than one piece in smoke fixtures. The 1/10 GiB fixtures
+contain only full pieces. Report both end-to-end and post-first-piece rates, without calling either
+one a complete release benchmark.
+
+An initial run at `560ba380` used an in-process libtorrent seeder and its parent JVM crashed with
+SIGSEGV on the Java Finalizer thread after one verified Kotlin 1 GiB sample. It is incomplete and
+excluded from aggregate comparisons. The crash does not establish a root cause in the downloader.
+The harness now uses an external pinned Transmission seeder and keeps native torrent bindings
+inside the isolated reference downloader process. No timeout or performance target was raised.
