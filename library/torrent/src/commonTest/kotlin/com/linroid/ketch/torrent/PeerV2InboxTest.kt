@@ -2,10 +2,14 @@ package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okio.Buffer
+import okio.FileSystem
 import okio.ByteString.Companion.toByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -157,4 +161,71 @@ class PeerV2InboxTest {
     assertEquals(0, next.budget.allocated)
     assertEquals(0, next.connection.activeReads)
   }
+
+  @Test
+  fun readyCommandsAndFramesAlternateWithoutTransferringQueuedCommandOwnership() = runTest {
+    val f = Fixture { testScheduler.currentTime }
+    repeat(4) { f.connection.add(PeerMessage.KeepAlive) }
+    val commands = Channel<Int>(2)
+    commands.send(10)
+    commands.send(20)
+    try {
+      PeerV2Inbox.run(f.transport, f.blocks) { inbox ->
+        runCurrent()
+        assertEquals(10, assertIs<PeerV2Inbox.Event.Command<Int>>(inbox.next(commands)).value)
+        assertIs<PeerV2Inbox.Event.Frame>(inbox.next(commands)).value.close()
+        assertEquals(20, assertIs<PeerV2Inbox.Event.Command<Int>>(inbox.next(commands)).value)
+        assertIs<PeerV2Inbox.Event.Frame>(inbox.next(commands)).value.close()
+      }
+    } finally { commands.cancel() }
+    assertEquals(0, f.budget.allocated)
+  }
+
+  @Test
+  fun blockedStorageDoesNotPreventTheActorFromEnforcingPeerDeadlines() = runTest {
+    val f = Fixture { testScheduler.currentTime }
+    f.ready()
+    val bytes = byteArrayOf(1, 2, 3)
+    val document = TorrentV2Document.parse(Bencode.encode(mapOf("info" to mapOf(
+      "meta version" to 2L, "piece length" to 16_384L, "file tree" to mapOf(
+        "a" to mapOf("" to mapOf("length" to 3L, "pieces root" to sha256Digest(bytes))))
+    ), "piece layers" to emptyMap<String, Any>())))
+    val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-inbox-worker-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val slots = Semaphore(1)
+    val store = TorrentV2PieceStore(document, path, emptySet(), "test", f.budget, slots)
+    val assembly = assertNotNull(TorrentV2PieceAssembly.create(
+      TorrentContentLayout.from(document.info), 0, f.budget))
+    assembly.accept(PeerBlockExchange.Response.Block(PeerBlockExchange.Ticket(assembly.request(0)),
+      bytes, assertNotNull(f.budget.reserve(512))))
+    try {
+      store.initialize()
+      slots.acquire()
+      try {
+        assertFailsWith<IllegalStateException> {
+          TorrentV2CommitWorker.run(
+            store = store,
+            dispatcher = StandardTestDispatcher(testScheduler),
+          ) { worker ->
+            PeerV2Inbox.run(f.transport, f.blocks) { inbox ->
+              f.ready(inbox)
+              assertNotNull(f.blocks.request(PeerMessage.Request(0, 0, 3)))
+              assertTrue(worker.trySubmit(assembly))
+              runCurrent()
+              assertTrue(worker.completions.tryReceive().isFailure)
+              inbox.next(worker.completions)
+            }
+          }
+        }
+      } finally { slots.release() }
+      assertEquals(10L, testScheduler.currentTime)
+      assertTrue(f.connection.closed)
+      assertFalse(store.completed())
+      assertEquals(0, f.budget.allocated)
+    } finally {
+      assembly.close()
+      store.cleanup()
+    }
+  }
+
 }
