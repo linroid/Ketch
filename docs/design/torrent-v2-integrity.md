@@ -827,3 +827,20 @@ associate an ID with its existing configuration separately. Read snapshots on th
 returned immutable records do not change during subsequent announces. No event history is retained.
 Private cleanup failure occurs before a replacement attempt, so it does not create false diagnostics.
 SDK/daemon/UI publication and per-tracker scheduling/backoff remain separate roadmap work.
+
+
+## Serialized tracker configuration replacement
+
+Discovery validates and snapshots replacement tiers before suspension, bounds a best-effort stop
+against the old configuration, and awaits private peer cleanup before installation. Parent
+cancellation or cleanup failure prevents installation. A successful edit clears cached tracker IDs,
+resets lifecycle/backoff timing, and uses a fresh started event on the next poll. Full topic binding
+is retained. Removing all trackers is supported and does not enable public discovery for private data.
+
+Replacement lists are limited to 256 entries/tiers and 8192 characters per absolute HTTP(S)/UDP URL;
+unsupported schemes and UDP user-info are rejected before old tracker contact. Endpoint policy
+and SSRF/proxy authorization remain the caller's responsibility. Status IDs are paired with an
+increasing configuration revision, so clients cannot confuse reused ordinal IDs across edits.
+Tests cover stop/cleanup/start ordering, credential state, mutable input, deadlines, cancellation,
+invalid edits, empty configurations, and topic isolation. SDK/daemon/UI edit commands and persistent
+configuration storage remain separate work.
