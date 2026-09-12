@@ -619,3 +619,22 @@ A rejected acknowledgement requires the issuing actor to cancel or close any tic
 After a peer actor closes and joins its pipeline and reader, the session owner calls `detachPeer`
 to release abandoned reservations. The synchronous adapters remain for callers owning both objects.
 Full per-peer/session actor wiring and production throughput validation remain outstanding.
+
+### Per-peer download actor
+
+`PeerV2DownloadActor` owns a negotiated transport, block exchange, and inbox reader. The session
+uses bounded commands for interest, block requests/cancels, and hash requests/rejections. Events
+carry exact request acknowledgements, block responses, validated availability/control frames,
+and hash results/timeouts. Acknowledgements enter the event queue before responses for that ticket.
+Only the peer actor reads or mutates its protocol state. Session availability is updated from events.
+
+Queue metadata is admitted before allocation (including bounded hash-timeout ticket lists); retained
+frames and delivered blocks keep separate payload leases. Every consumer closes every event.
+Queued and canceled-send events are reclaimed automatically, while already delivered events remain
+consumer-owned after actor shutdown. Command and event waits cannot outlive an earlier pending
+block/hash deadline. A stalled consumer also has a finite dispatch timeout. Failure closes only this
+peer's event stream with its cause after joining the reader; session shutdown joins the actor before
+releasing queue admission. The caller retains transport ownership if queue admission fails.
+
+This is an internal actor integration building block. Shared session event multiplexing, complete
+hash serving, seeding, and end-to-end production v2 runtime registration remain outstanding.
