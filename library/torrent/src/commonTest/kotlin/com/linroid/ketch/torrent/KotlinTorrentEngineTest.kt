@@ -17,6 +17,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 
 class KotlinTorrentEngineTest {
   @OptIn(ExperimentalAtomicApi::class)
@@ -93,6 +94,78 @@ class KotlinTorrentEngineTest {
           FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
         }
         assertEquals(0, engine.admittedSessionBytes)
+      }
+    }
+  }
+
+  @Test
+  fun restoredTrackerOverrideReplacesMetainfoTrackersAndPersistsAgain() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        for (trackerOverride in listOf(listOf(listOf("https://new/announce")), emptyList())) {
+          val requests = MutableStateFlow<List<String>>(emptyList())
+          val http = TorrentHttp(object : HttpEngine {
+            override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+              error("Unused")
+            override suspend fun download(
+              url: String,
+              range: LongRange?,
+              headers: Map<String, String>,
+              onData: suspend (ByteArray) -> Unit,
+            ) {
+              requests.value += url
+              onData(Bencode.encode(mapOf("interval" to 3600L, "peers" to ByteArray(0))))
+            }
+            override fun close() = Unit
+          })
+          val bytes = byteArrayOf(1, 2, 3, 4)
+          val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf(
+            "announce" to "https://old/announce", "info" to mapOf("name" to "seed",
+              "length" to 4L, "piece length" to 4L, "pieces" to sha1Digest(bytes), "private" to 1L)
+          )))
+          val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+            "ketch-tracker-restore-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+          FileSystem.SYSTEM.createDirectories(root)
+          FileSystem.SYSTEM.write(root / "seed") { write(bytes) }
+          val store = TorrentPieceStore(metadata, root / "seed", emptySet(), "tracker-restored")
+          store.initialize()
+          val checkpoint = store.checkpoint().copy(
+            trackerConfiguration = TrackerConfiguration.prepare(trackerOverride)).encode()
+          val spec = TorrentTaskSpec("tracker-restored", metadata, (root / "seed").toString(),
+            emptySet(), resumeData = checkpoint)
+          val limit = sessionStateWeight(spec).toInt()
+          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
+            maxSessionStateBytes = limit, uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION),
+            http = http)
+          try {
+            engine.start()
+            val session = engine.addTask(spec)
+            session.resume()
+            val restoredState = session.state.first {
+              it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+            }
+            assertEquals(TorrentSessionState.SEEDING, restoredState,
+              session.failure.value?.stackTraceToString())
+            if (trackerOverride.isNotEmpty()) {
+              session.trackerStatus.first {
+                it.singleOrNull()?.outcome == TrackerStatus.Outcome.SUCCEEDED
+              }
+              assertTrue(requests.value.single().startsWith("https://new/announce?"))
+            } else {
+              assertFalse(session.reannounceTrackers())
+              assertTrue(requests.value.isEmpty())
+            }
+            assertEquals(limit, engine.admittedSessionBytes)
+            session.pause()
+            val saved = assertNotNull(TorrentCheckpoint.decode(
+              assertNotNull(session.saveResumeData())))
+            assertEquals(trackerOverride, assertNotNull(saved.trackerConfiguration).tiers)
+          } finally {
+            engine.stop()
+            FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+          }
+          assertEquals(0, engine.admittedSessionBytes)
+        }
       }
     }
   }

@@ -252,6 +252,8 @@ internal class TorrentPieceStore(
     ownershipLoaded = true
   }
 
+  private var trackerConfiguration: TrackerConfiguration? = null
+
   suspend fun checkpoint(): TorrentCheckpoint = mutex.withLock { snapshot() }
 
   suspend fun restore(checkpoint: TorrentCheckpoint) = mutex.withLock {
@@ -260,6 +262,7 @@ internal class TorrentPieceStore(
       checkpoint.selected.ifEmpty { metadata.files.indices.toSet() } == selected)
     for (owned in checkpoint.files) restoreOwned(false, owned)
     for (owned in checkpoint.directories) restoreOwned(true, owned)
+    trackerConfiguration = checkpoint.trackerConfiguration
     // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
   }
 
@@ -307,7 +310,8 @@ internal class TorrentPieceStore(
   private fun snapshot(): TorrentCheckpoint = TorrentCheckpoint(taskId, metadata,
     output.toString(), selected, verified.copyOf(),
     ownedFiles.map { TorrentOwnedPath(it.key.toString(), it.value) },
-    ownedDirectories.map { TorrentOwnedPath(it.key.toString(), it.value) })
+    ownedDirectories.map { TorrentOwnedPath(it.key.toString(), it.value) },
+    trackerConfiguration = trackerConfiguration)
 
   private fun recordOwned(path: Path, directory: Boolean) {
     val identity = requireNotNull(torrentFileIdentity(path)) { "Filesystem has no safe file identity" }
