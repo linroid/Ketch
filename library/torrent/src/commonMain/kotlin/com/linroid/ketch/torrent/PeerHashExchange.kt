@@ -52,6 +52,15 @@ internal class PeerHashExchange(
     }
   }
 
+  /** Remaining response time for this exact local ticket; stale or expired tickets return zero. */
+  fun remainingMs(ticket: Ticket): Long {
+    val current = pending[ticket.selector] ?: return 0
+    if (current.ticket !== ticket) return 0
+    val now = clock()
+    if (now < current.started) return 0
+    return maxOf(0, timeoutMs - (now - current.started))
+  }
+
   /** A stale send/cancel callback cannot release a newer request for the same coordinates. */
   fun cancel(ticket: Ticket) {
     val current = pending[ticket.selector] ?: return

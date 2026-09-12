@@ -31,6 +31,8 @@ class PeerHashTransportTest {
     val sizes = mutableListOf<Int>()
     var closed = false
     var failWrite = false
+    var writeDelay = 0L
+    var afterWrite: () -> Unit = {}
     var bodyDelay = 0L
     override suspend fun readExactly(size: Int): ByteArray {
       sizes += size
@@ -38,8 +40,10 @@ class PeerHashTransportTest {
       return incoming.readByteArray(size.toLong())
     }
     override suspend fun write(bytes: ByteArray) {
+      delay(writeDelay)
       if (failWrite) throw IOException("Injected partial write failure")
       outgoing.write(bytes)
+      afterWrite()
     }
     override fun close() { closed = true }
   }
@@ -131,6 +135,33 @@ class PeerHashTransportTest {
       assertEquals(0, budget.allocated)
       transport.close()
     }
+  }
+
+  @Test
+  fun backpressuredWritesCannotReturnAnExpiredExchangeTicket() = runTest {
+    val frames = TorrentBufferBudget(65_536)
+    val hashesBudget = TorrentBufferBudget(32_768)
+    val connection = Connection().also { it.writeDelay = 20 }
+    val exchange = PeerHashExchange(hashesBudget, { if (it == root) 16_385L else null },
+      timeoutMs = 10, clock = { testScheduler.currentTime })
+    val transport = PeerHashTransport(connection, exchange, frames, timeoutMs = 100)
+    assertFailsWith<kotlinx.coroutines.TimeoutCancellationException> {
+      transport.request(selector)
+    }
+    assertEquals(10L, testScheduler.currentTime)
+    assertTrue(connection.closed)
+    assertEquals(0, frames.allocated)
+    assertEquals(0, hashesBudget.allocated)
+
+    var now = 0L
+    val late = Connection().also { it.afterWrite = { now = 10 } }
+    val nextExchange = PeerHashExchange(hashesBudget, { if (it == root) 16_385L else null },
+      timeoutMs = 10, clock = { now })
+    val next = PeerHashTransport(late, nextExchange, frames, timeoutMs = 100)
+    assertFailsWith<IllegalStateException> { next.request(selector) }
+    assertTrue(late.closed)
+    assertEquals(0, frames.allocated)
+    assertEquals(0, hashesBudget.allocated)
   }
 
   @Test

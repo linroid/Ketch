@@ -40,9 +40,12 @@ internal class PeerHashTransport(
     var lease: TorrentBufferBudget.Lease? = null
     try {
       lease = checkNotNull(frames.reserve(512)) { "Hash request frame budget exhausted" }
-      withTimeout(timeoutMs) {
+      val remaining = exchange.remainingMs(ticket)
+      check(remaining > 0) { "Hash request expired before write" }
+      withTimeout(minOf(timeoutMs, remaining)) {
         connection.write(PeerWire.encode(PeerHashWire.encode(PeerHashMessage.Request(selector))))
       }
+      check(exchange.remainingMs(ticket) > 0) { "Hash request expired during write" }
       return ticket
     } catch (error: Throwable) {
       exchange.cancel(ticket)
