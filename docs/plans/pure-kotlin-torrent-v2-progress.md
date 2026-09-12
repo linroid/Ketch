@@ -13,7 +13,8 @@ span multiple PRs; it is complete only when all of its acceptance gates have evi
 | 01b | `torrent-v2-01-contracts` | Control/state/capability and compatibility contracts |
 | 01c | `torrent-v2-01-budgets` | Independent metadata/transfer partitions and aggregate ceiling |
 | 01d | `torrent-v2-01-admission` | Retained metadata cache admission and lifecycle cleanup |
-| 01e | Planned | Session state admission, profiles, deterministic harness, baseline |
+| 01e | `torrent-v2-01-session-admission` | Session admission before storage/index construction |
+| Remaining 01 | Planned | Production profiles, deterministic harness, performance baseline |
 
 Slice 01a covers two existing v1 interoperability scenarios. Missing Transmission fails required
 conformance mode; ordinary local runs omit unconfigured optional fixtures from the test plan.
@@ -74,3 +75,27 @@ outside the cache mutex. Owner cancellation also clears retained entries. Tests 
 least-recently-used eviction, parent pressure, oversized entries, repeated close, pending fetch
 cancellation, and owner teardown. Caller-owned metadata, session state, and process overhead remain
 outside this cache-retention accounting; production profile and total-memory gates remain pending.
+
+## Slice 01e
+
+Session admission applies file count, piece count, per-session estimated size, and aggregate state
+capacity before constructing storage or decoding a checkpoint. The allowance covers retained
+metadata, file/path indexes, scheduler arrays/candidate lists, checkpoint parsing, and checking
+scratch buffers. Existing peer/wire reservations remain in the transfer partition.
+
+Reservations survive pause and failed deletion, return on construction failure, and return after
+successful detachment on removal or after the entire runtime's jobs finish during shutdown. Tests verify rejection before filesystem creation,
+aggregate exhaustion, failed-construction rollback, pause retention, removal/readmission, and
+non-suspending shutdown. The combined ceiling includes session admission while preserving metadata
+headroom even if every other partition is full.
+
+These are conservative admission allowances, not measured total heap or RSS bounds. New format
+limits, runtime profiles, platform overhead, deterministic transport fault coverage, and baseline
+performance evidence still require the remaining roadmap work. No production release gate is
+checked off from these admission tests alone.
+
+Review follow-up for 01e: closing a session's network jobs does not end runtime ownership when
+file cleanup fails. A runtime ledger now retains admission until successful map detachment.
+Failed deletion remains retryable instead of being treated as already completed on the next call.
+The regression test proves two failed cleanup attempts remain charged and block new admission,
+while explicit keep-data removal returns credit without touching storage.

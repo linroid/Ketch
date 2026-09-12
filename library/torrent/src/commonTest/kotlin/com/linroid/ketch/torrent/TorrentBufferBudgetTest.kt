@@ -44,12 +44,15 @@ class TorrentBufferBudgetTest {
     val metadata = budgets.metadata
     val payload = assertNotNull(transfer.reserve(transfer.capacity))
     val cached = assertNotNull(budgets.cache.reserve(budgets.cache.capacity))
+    val state = assertNotNull(budgets.sessions.reserve(budgets.sessions.capacity))
     val info = assertNotNull(metadata.reserve(metadata.capacity))
     assertNull(transfer.reserve(1))
-    assertEquals(transfer.capacity + metadata.capacity + budgets.cache.capacity, budgets.allocated)
+    assertEquals(transfer.capacity + metadata.capacity + budgets.cache.capacity +
+      budgets.sessions.capacity, budgets.allocated)
     info.close()
     payload.close()
     cached.close()
+    state.close()
     assertEquals(0, budgets.allocated)
   }
 
