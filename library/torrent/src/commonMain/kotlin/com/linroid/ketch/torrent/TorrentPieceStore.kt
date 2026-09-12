@@ -266,12 +266,30 @@ internal class TorrentPieceStore(
     // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
   }
 
+  /** Borrowed committed configuration; a canceled caller can inspect the commit outcome. */
+  suspend fun currentTrackerConfiguration(): TrackerConfiguration? = mutex.withLock {
+    trackerConfiguration
+  }
+
   /** Flushes a snapshot file before returning bytes for publication through TaskStore. */
   suspend fun persistCheckpoint(receivedBytes: Long = 0, uploadedBytes: Long = 0): ByteArray =
-    mutex.withLock {
+    mutex.withLock { persistSnapshot(receivedBytes, uploadedBytes, trackerConfiguration) }
+
+  /** The caller retains admission for the configuration while the store uses it. */
+  suspend fun replaceTrackerConfiguration(
+    configuration: TrackerConfiguration,
+    receivedBytes: Long = 0,
+    uploadedBytes: Long = 0,
+  ): ByteArray = mutex.withLock { persistSnapshot(receivedBytes, uploadedBytes, configuration) }
+
+  private suspend fun persistSnapshot(
+    receivedBytes: Long,
+    uploadedBytes: Long,
+    configuration: TrackerConfiguration?,
+  ): ByteArray {
     require(receivedBytes >= 0 && uploadedBytes >= 0)
     check(initialized)
-    storageOperation {
+    return storageOperation {
       if (journal.needsCompaction) {
         require(torrentFileIdentity(journalPath) == ownedFiles[journalPath])
         val records = ownedDirectories.map { true to TorrentOwnedPath(it.key.toString(), it.value) } +
@@ -286,7 +304,8 @@ internal class TorrentPieceStore(
         }
       }
       val temp = sidecar / ("checkpoint-" + InfoHash.fromBytes(torrentRandomBytes(20)).hex + ".tmp")
-      val data = snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
+      val data = snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes,
+        trackerConfiguration = configuration).encode()
       fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
         recordOwned(temp, directory = false)
         handle.write(0, data, 0, data.size)
@@ -294,9 +313,11 @@ internal class TorrentPieceStore(
       }
       val identity = checkNotNull(ownedFiles[temp])
       journal.append(false, TorrentOwnedPath(checkpointPath.toString(), identity))
+      currentCoroutineContext().ensureActive()
       fileSystem.atomicMove(temp, checkpointPath)
       ownedFiles.remove(temp)
       ownedFiles[checkpointPath] = identity
+      trackerConfiguration = configuration
       snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
     }
   }

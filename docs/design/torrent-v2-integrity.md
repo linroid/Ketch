@@ -900,3 +900,19 @@ the existing resume-data allowance. Real engine tests use exact admission capaci
 and empty tracker lists, and save the override again on pause. Codec/store tests cover versions,
 validation, and repeated persistence. Commands that create/edit overrides in live sessions and public
 SDK/daemon/UI exposure remain separate work.
+
+
+## Tracker configuration checkpoint commit
+
+The piece store can replace tracker configuration through the same flushed temporary checkpoint and
+atomic rename used for ordinary persistence. The proposed configuration is encoded into the temporary
+file while the old in-memory configuration remains current. A cancellation check precedes rename;
+after rename succeeds, the store publishes the new committed configuration and ownership metadata.
+Ordinary checkpoints choose configuration under the store mutex, so a queued save cannot restore a
+stale default captured before another edit.
+
+A caller canceled after rename may not receive the return value even though the commit succeeded.
+The committed configuration remains queryable under the store mutex for ownership reconciliation.
+The caller retains admission while the store uses the configuration. Tests verify repeated saves,
+injected rename failure preserving the old file/state, successful retry, and cancellation precisely
+after rename. Session edit commands and their retained-owner reconciliation remain separate work.
