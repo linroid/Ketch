@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -16,7 +17,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class TorrentV2SessionTcpTest {
@@ -25,9 +25,13 @@ class TorrentV2SessionTcpTest {
   private val pieceRoot = sha256Digest(sha256Digest(bytes.copyOfRange(0, 16_384)) +
     sha256Digest(bytes.copyOfRange(16_384, bytes.size)))
 
-  private fun document(hybrid: Boolean, invalidV1: Boolean): TorrentV2Document {
+  private fun document(
+    hybrid: Boolean,
+    invalidV1: Boolean,
+    name: String = "pack",
+  ): TorrentV2Document {
     val info = mutableMapOf<String, Any>(
-      "meta version" to 2L, "piece length" to 32_768L, "name" to "pack",
+      "meta version" to 2L, "piece length" to 32_768L, "name" to name,
       "file tree" to mapOf(
         "a" to mapOf("" to mapOf("length" to bytes.size.toLong(), "pieces root" to pieceRoot)),
         "b" to mapOf("" to mapOf("length" to last.size.toLong(),
@@ -62,16 +66,28 @@ class TorrentV2SessionTcpTest {
     exercise(hybrid = true, invalidV1 = true)
   }
 
-  private suspend fun exercise(hybrid: Boolean, invalidV1: Boolean = false) {
+  @Test
+  fun rejectsAnArrivingConnectionForAnotherTorrent() = runTest {
+    exercise(hybrid = false, wrongSession = true)
+  }
+
+  private suspend fun exercise(
+    hybrid: Boolean,
+    invalidV1: Boolean = false,
+    wrongSession: Boolean = false,
+  ) {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         val doc = document(hybrid, invalidV1)
-        val layout = TorrentContentLayout.from(doc.info)
+        val peerLayout = TorrentContentLayout.from(doc.info)
+        val sessionDoc = if (wrongSession) document(hybrid, invalidV1, "other") else doc
+        val layout = if (wrongSession) TorrentContentLayout.from(sessionDoc.info) else peerLayout
         val output = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
           "ketch-session-tcp-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
         val buffers = TorrentBufferBudget(1_000_000)
         val state = TorrentBufferBudget(4_000_000)
-        val store = TorrentV2PieceStore(doc, output, setOf("0"), "test", buffers, Semaphore(1))
+        val store = TorrentV2PieceStore(sessionDoc, output, setOf("0"), "test",
+          buffers, Semaphore(1))
         val network = createTorrentNetwork()
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
         val handshake = PeerIdentityHandshake(doc.identity)
@@ -84,6 +100,7 @@ class TorrentV2SessionTcpTest {
             assertEquals(PeerIdentityHandshake.Mode.V2, route.mode)
             assertEquals(doc.identity, route.identity)
             assertEquals(clientId, route.peerId)
+            if (wrongSession) return@async
             val wire = PeerWire(connection, pieceCount = 2)
             wire.send(PeerMessage.Bitfield(byteArrayOf(192.toByte())))
             wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
@@ -98,26 +115,37 @@ class TorrentV2SessionTcpTest {
             // Deliberately leave before the session's storage worker reports its result.
           } finally { connection.close() }
         }
-        var connected: PeerV2Connector.Connected? = null
+        val endpoints = Channel<PeerEndpoint>(1)
+        endpoints.send(listener.local)
+        endpoints.close()
         try {
           store.initialize()
-          val client = assertNotNull(PeerV2Connector.connect(network, listener.local, doc, layout,
-            clientId, buffers, state,
-            mode = if (hybrid) PeerIdentityHandshake.Mode.V1 else PeerIdentityHandshake.Mode.V2,
-            allowUpgrade = hybrid, expectedPeerId = serverId))
-          connected = client
-          assertEquals(PeerIdentityHandshake.Mode.V2, client.route.mode)
-          assertEquals(doc.identity, client.route.identity)
           suspend fun download() {
             PeerV2Pool.run(state, maxPeers = 1) { pool ->
-              assertNotNull(client.attach(pool))
-              TorrentV2CommitWorker.run(store) { worker ->
-                TorrentV2SessionLoop.download(layout, setOf("0"), store, pool, worker,
-                  buffers, state, maxPeers = 1)
+              PeerV2Dialer.run(
+                endpoints = endpoints,
+                state = state,
+                parallelism = 1,
+                connect = { remote ->
+                  val mode = if (hybrid) PeerIdentityHandshake.Mode.V1 else
+                    PeerIdentityHandshake.Mode.V2
+                  PeerV2Connector.connect(network, remote, doc, peerLayout, clientId, buffers,
+                    state, mode = mode, allowUpgrade = hybrid, expectedPeerId = serverId)
+                },
+              ) { dialer ->
+                TorrentV2CommitWorker.run(store) { worker ->
+                  TorrentV2SessionLoop.download(layout, setOf("0"), store, pool, worker,
+                    buffers, state, maxPeers = 1, connections = dialer.connections)
+                }
               }
             }
           }
-          if (invalidV1) {
+          if (wrongSession) {
+            val failure = assertFailsWith<IllegalArgumentException> { download() }
+            assertEquals("Wrong incoming torrent", failure.message)
+            assertFalse(store.completed())
+            assertEquals(0L, store.progress().getValue("0"))
+          } else if (invalidV1) {
             val failure = assertFailsWith<IllegalStateException> { download() }
             assertEquals("All torrent peers disconnected before completion", failure.message)
             assertFalse(store.completed())
@@ -132,7 +160,7 @@ class TorrentV2SessionTcpTest {
           server.await()
         } finally {
           withContext(NonCancellable) {
-            connected?.close()
+            endpoints.cancel()
             listener.close()
             network.close()
             server.cancelAndJoin()
