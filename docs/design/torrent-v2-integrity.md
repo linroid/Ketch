@@ -638,3 +638,23 @@ releasing queue admission. The caller retains transport ownership if queue admis
 
 This is an internal actor integration building block. Shared session event multiplexing, complete
 hash serving, seeding, and end-to-end production v2 runtime registration remain outstanding.
+
+### Dynamic peer pool and shared events
+
+`PeerV2Pool` adds and stops negotiated peers while one session actor owns membership. Each peer
+publishes `Ready`, then ordered actor events, then one `Closed` event into an admitted shared queue.
+The `Closed` event is sent only after its actor and reader have joined; the session can then detach
+scheduler assignments and retire the exact connection lifetime. Capacity is retained until that
+terminal event is retired. Duplicate or stale terminal events cannot retire a replacement peer.
+
+The pool admits bounded membership and one forwarding event per peer, in addition to shared queue
+capacity. Payloads retain their existing leases through forwarding. Failed/canceled sends and queued
+events close automatically; delivered events remain consumer-owned after pool shutdown. A failed
+peer does not cancel its siblings. Stop requests are nonblocking, while full shutdown cancels and
+joins all members before releasing state admission. A successful attach transfers connection cleanup
+responsibility even when actor queue admission fails or cancellation precedes child startup; a null
+attach leaves the connection with the caller. The caller admits availability before constructing peers.
+
+The pool and the existing scheduler/commit worker now have compatible ownership boundaries. Automatic
+session scheduling from availability and completion events, connection discovery, full hash serving,
+and production runtime registration still need implementation and end-to-end validation.
