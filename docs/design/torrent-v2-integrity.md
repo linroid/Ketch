@@ -413,3 +413,27 @@ backpressure/cancellation, partial writes, typed replies and a two-way TCP hash 
 
 This supplies the outbound path for the forthcoming v2 payload actor. Proof generation, incoming
 request ownership, choking/seeding policy, block deadlines and runtime integration remain required.
+
+### V2 block response ownership and deadlines
+
+`PeerBlockExchange` connects the explicit-response state to admitted transport writes and the
+file-aligned content layout. Requests cannot cross a real file tail into alignment padding. It
+reserves pending/retained-block credit before registering or sending a request, and bounds duplicate
+requests and pipeline slots. Chokes and cancels retain that ownership until a matching response;
+repeated or stale cancellation tickets cannot cancel a later request with the same coordinates.
+
+Every request has an absolute response deadline, including time spent writing. Writes are bounded
+by the earliest pending deadline, so a blocked new request or cancel cannot conceal an older expired
+request. Control traffic and cancellation do not refresh deadlines. The actor schedules the next
+expiry using `nextDeadlineMs` and calls `expire`; inbound dispatch also checks expiry. Expiry, invalid
+responses and failed/partial writes close the transport and release all pending blocks. Closing a
+connection instead of recycling its timed-out request slots prevents late responses from silently
+being attributed to a retry on that same stream.
+
+Delivered blocks are explicitly unverified and retain their own credit after the input frame closes
+and even after connection shutdown. The consumer closes the block only after verifying or copying
+it into an independently admitted piece assembly buffer. Session admission still must cover the
+availability array before constructing this actor-owned helper. The runtime must join the reader
+before releasing connection admission. Full event-loop/timer wiring, piece assembly and commit,
+upload/hash serving and scheduler integration remain required; this helper is not a complete v2
+session or production-capability claim.
