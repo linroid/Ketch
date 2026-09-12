@@ -62,6 +62,33 @@ class TorrentV2PieceAssemblyTest {
   }
 
   @Test
+  fun transferredOwnershipCannotBeClosedByTheActorOrAStaleClaim() {
+    val budget = TorrentBufferBudget(40_000)
+    val assembly = assertNotNull(TorrentV2PieceAssembly.create(layout, 0, budget))
+    for (slot in assembly.missingBlocks()) {
+      val request = assembly.request(slot)
+      assembly.accept(block(request, bytes.copyOfRange(request.begin,
+        request.begin + request.length), budget))
+    }
+    val first = assembly.transfer()
+    val retained = budget.allocated
+    assembly.close()
+    assertFalse(assembly.complete)
+    assertEquals(retained, budget.allocated)
+    assertFailsWith<IllegalStateException> { assembly.transfer() }
+    assertFailsWith<IllegalStateException> { assembly.request(0) }
+    first.restore()
+    assertTrue(assembly.complete)
+    val second = assembly.transfer()
+    first.close()
+    assertFailsWith<IllegalStateException> { first.restore() }
+    assertEquals(retained, budget.allocated)
+    second.close()
+    assertEquals(0, budget.allocated)
+    assertFalse(assembly.complete)
+  }
+
+  @Test
   fun invalidOrDuplicateBlocksCannotMarkMissingRangesCompleteAndAlwaysReleaseDeliveryCredit() {
     val assemblies = TorrentBufferBudget(20_000)
     val incoming = TorrentBufferBudget(20_000)

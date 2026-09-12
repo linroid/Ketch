@@ -8,8 +8,12 @@ import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
+import kotlin.test.assertNotSame
 import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -50,10 +54,14 @@ class TorrentV2CommitWorkerTest {
           store = store,
           dispatcher = StandardTestDispatcher(testScheduler),
         ) { worker ->
-          assertTrue(worker.trySubmit(first))
+          assertNotNull(worker.trySubmit(first))
+          val retained = budget.allocated
+          first.close()
+          assertEquals(retained, budget.allocated)
+          assertFailsWith<IllegalStateException> { worker.trySubmit(first) }
           runCurrent()
-          assertTrue(worker.trySubmit(second))
-          assertFalse(worker.trySubmit(rejected))
+          assertNotNull(worker.trySubmit(second))
+          assertNull(worker.trySubmit(rejected))
           assertTrue(rejected.complete)
           assertTrue(worker.completions.tryReceive().isFailure)
           assertTrue(budget.allocated > 0)
@@ -82,15 +90,19 @@ class TorrentV2CommitWorkerTest {
     try {
       store.initialize()
       TorrentV2CommitWorker.run(store) { worker ->
-        assertTrue(worker.trySubmit(assembly(budget, corrupt = true)))
+        val first = assertNotNull(worker.trySubmit(assembly(budget, corrupt = true)))
         val rejected = assertIs<TorrentV2CommitWorker.Completion.Committed>(
           worker.completions.receive())
+        assertSame(first, rejected.ticket)
         assertFalse(rejected.verified)
         assertFalse(store.completed())
         assertEquals(0, budget.allocated)
-        assertTrue(worker.trySubmit(assembly(budget)))
+        val second = assertNotNull(worker.trySubmit(assembly(budget)))
         val committed = assertIs<TorrentV2CommitWorker.Completion.Committed>(
           worker.completions.receive())
+        assertSame(second, committed.ticket)
+        assertEquals(first.index, second.index)
+        assertNotSame(first, second)
         assertTrue(committed.verified)
         assertTrue(store.completed())
         assertEquals(3L, torrentFileSystem.metadata(path / "a").size)
@@ -98,7 +110,7 @@ class TorrentV2CommitWorkerTest {
       }
       store.close()
       TorrentV2CommitWorker.run(store) { worker ->
-        assertTrue(worker.trySubmit(assembly(budget)))
+        assertNotNull(worker.trySubmit(assembly(budget)))
         assertIs<TorrentV2CommitWorker.Completion.Failed>(worker.completions.receive())
         assertEquals(0, budget.allocated)
       }
