@@ -528,3 +528,23 @@ Tests exercise duplicate submission before the worker runs, actor close after tr
 on queue pressure, stale claims after a second handoff, and exact ticket identity across corrupt
 and successful submissions of the same piece. This strengthens scheduler-facing ownership; full
 scheduler/session routing and the remaining production gates are still required.
+
+### Bounded multi-peer piece ledger
+
+`TorrentV2PieceScheduler` reserves state before copying verified/selection inputs or creating
+assignment maps. The active-piece ceiling includes assemblies already transferred to the commit
+worker. Candidate pieces must be selected, unverified and admitted; canonical missing blocks are
+assigned once across peer pipelines. Unavailable/full/choked peers are skipped and each scheduling
+call bounds outbound admission attempts. Piece selection policy remains separate from this ledger.
+
+Removing a peer closes its pipeline before freeing unanswered assignments for reassignment. Late
+callbacks must match both peer identity and the exact request ticket; stale delivered blocks release
+their credit without displacing a replacement. Completed assemblies stay admitted during commit
+queue pressure. Only a known commit ticket updates scheduler verification; corrupt/failed commits
+make the piece retryable, while unknown or repeated completions cannot publish state.
+
+Tests connect two peer pipelines to one assembly and the real store/worker, exercise replacement
+and late callbacks, selected-file and state/payload admission, queue pressure and corrupt-piece
+retry. Scheduler shutdown releases actor-owned state and assemblies; outer session ownership still
+joins peer readers and storage workers. Automatic piece-selection policy, transport/session wiring,
+generation barriers, upload/hash serving and remaining production capabilities/gates are unfinished.
