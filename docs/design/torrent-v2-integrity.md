@@ -83,6 +83,10 @@ authenticated piece-layer hash; short final pieces are expanded with zero-hash s
 layer's height. Hybrid pieces must also match their v1 SHA-1 hash, including virtual alignment
 zeros generated in bounded chunks. Callers provide only actual payload bytes.
 
+Construction enforces the current runtime's 16 MiB piece ceiling before allocating a layout or
+hashing virtual bytes. Metainfo parsing retains larger protocol-valid dimensions, but those
+cannot enter runtime verification. This also bounds hybrid padding work for tiny payloads.
+
 Verification retains hashing state rather than a full piece buffer. It rejects excess input,
 allows incomplete input to be completed, and finalizes once. A successful result authorizes no
 progress publication by itself: storage must retain or stage the same bytes, commit them under

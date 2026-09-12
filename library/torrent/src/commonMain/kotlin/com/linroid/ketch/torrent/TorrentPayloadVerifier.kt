@@ -2,6 +2,12 @@ package com.linroid.ketch.torrent
 
 /** Authenticates streamed payload before storage may commit it or advertise availability. */
 internal class TorrentPayloadVerifier(private val document: TorrentV2Document) {
+  init {
+    // Match the current v1 runtime ceiling before layout allocation or virtual-padding hashing.
+    // Metainfo parsing may describe larger pieces, but runtime verification cannot admit them.
+    require(document.info.pieceLength <= 16L * 1024 * 1024) { "Unsupported runtime piece length" }
+  }
+
   val layout = TorrentContentLayout.from(document.info, document.hybrid)
   private val filesById = layout.files.associateBy { it.id }
 

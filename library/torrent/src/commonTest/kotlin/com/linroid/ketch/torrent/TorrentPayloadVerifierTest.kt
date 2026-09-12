@@ -66,6 +66,27 @@ class TorrentPayloadVerifierTest {
   }
 
   @Test
+  fun rejectsOversizedRuntimePiecesBeforeHashingVirtualPadding() {
+    val payload = byteArrayOf(9)
+    val pieceLength = 1L shl 62
+    val info = mapOf("meta version" to 2L, "piece length" to pieceLength, "name" to "pack",
+      "file tree" to mapOf("a" to mapOf("" to mapOf("length" to 1L,
+        "pieces root" to sha256Digest(payload)))),
+      "files" to listOf(mapOf("path" to listOf("a"), "length" to 1L),
+        mapOf("attr" to "p", "length" to pieceLength - 1)), "pieces" to ByteArray(20))
+    val document = TorrentV2Document.parse(Bencode.encode(mapOf("info" to info,
+      "piece layers" to emptyMap<String, Any>())))
+    assertFailsWith<IllegalArgumentException> { TorrentPayloadVerifier(document) }
+    assertFailsWith<IllegalArgumentException> {
+      TorrentPayloadVerifier(document(payload, 32L * 1024 * 1024, sha256Digest(payload)))
+    }
+    val allowed = TorrentPayloadVerifier(
+      document(payload, 16L * 1024 * 1024, sha256Digest(payload))).piece(0)
+    allowed.update(payload)
+    assertTrue(allowed.verify())
+  }
+
+  @Test
   fun hybridHashesVirtualPaddingWithoutRequiringItFromTheCaller() {
     val payload = byteArrayOf(9)
     val paddedHash = sha1Digest(payload + ByteArray(16_383))
