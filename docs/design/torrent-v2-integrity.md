@@ -381,3 +381,18 @@ A loopback test negotiates direct v2 from a validated document before sending a 
 the admitted transport and authenticating the reply. This connects the primitives over real TCP;
 it does not establish independent-client interoperability, a complete payload actor, global listener
 routing, magnet resolution or the remaining production release gates.
+
+### Explicit payload-request responses
+
+The wire codec recognizes reject messages (ID 16) with the same bounded index/begin/length fields
+as requests. `PeerProtocolState` has an explicit-response mode for v2: choking retains outstanding
+requests, and local cancellation marks their eventual payload for discard without freeing a pipeline
+slot. Only the matching piece or rejection completes that request. Mismatched/unsolicited rejections
+and unsolicited or duplicate v2 pieces fail; the legacy mode preserves its existing choke and late
+duplicate behavior.
+
+This follows [BEP 52's request/cancel/reject rules](
+https://raw.githubusercontent.com/bittorrent/bittorrent.org/master/beps/bep_0052.rst).
+The v2 actor must select this mode, transmit cancellation/rejection frames as required, and enforce
+request deadlines/connection teardown. This state slice does not yet implement that actor or the
+remaining optional Fast Extension messages.

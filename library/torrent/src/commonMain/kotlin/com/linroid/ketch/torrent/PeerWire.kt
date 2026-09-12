@@ -12,6 +12,7 @@ internal sealed interface PeerMessage {
   data class Request(val index: Int, val begin: Int, val length: Int) : PeerMessage
   data class Piece(val index: Int, val begin: Int, val bytes: ByteArray) : PeerMessage
   data class Cancel(val index: Int, val begin: Int, val length: Int) : PeerMessage
+  data class Reject(val index: Int, val begin: Int, val length: Int) : PeerMessage
   data class Port(val port: Int) : PeerMessage
   data class Extended(val id: Int, val payload: ByteArray) : PeerMessage
   data class Unknown(val id: Int, val payload: ByteArray) : PeerMessage
@@ -100,13 +101,14 @@ internal class PeerWire(
           PeerMessage.Have(input.readInt())
         }
         5 -> PeerMessage.Bitfield(input.readByteArray())
-        6, 8 -> {
+        6, 8, 16 -> {
           exact(12)
           val index = input.readInt()
           val begin = input.readInt()
           val length = input.readInt()
           if (id == 6) PeerMessage.Request(index, begin, length)
-          else PeerMessage.Cancel(index, begin, length)
+          else if (id == 8) PeerMessage.Cancel(index, begin, length)
+          else PeerMessage.Reject(index, begin, length)
         }
         7 -> {
           require(input.size >= 9) { "Empty or truncated peer block" }
@@ -144,6 +146,8 @@ internal class PeerWire(
           .writeInt(message.begin).write(message.bytes)
         is PeerMessage.Cancel -> out.writeByte(8).writeInt(message.index)
           .writeInt(message.begin).writeInt(message.length)
+        is PeerMessage.Reject -> out.writeByte(16).writeInt(message.index)
+          .writeInt(message.begin).writeInt(message.length)
         is PeerMessage.Port -> out.writeByte(9).writeShort(message.port)
         is PeerMessage.Extended -> out.writeByte(20).writeByte(message.id).write(message.payload)
         is PeerMessage.Unknown -> out.writeByte(message.id).write(message.payload)
@@ -160,6 +164,7 @@ internal class PeerWire(
         is PeerMessage.Request -> message.index
         is PeerMessage.Cancel -> message.index
         is PeerMessage.Piece -> message.index
+        is PeerMessage.Reject -> message.index
         else -> null
       }
       if (index != null && pieceCount != null) require(index in 0 until pieceCount)
@@ -168,6 +173,8 @@ internal class PeerWire(
         is PeerMessage.Request ->
           validateBlock(message.index, message.begin, message.length, metadata)
         is PeerMessage.Cancel ->
+          validateBlock(message.index, message.begin, message.length, metadata)
+        is PeerMessage.Reject ->
           validateBlock(message.index, message.begin, message.length, metadata)
         is PeerMessage.Piece ->
           validateBlock(message.index, message.begin, message.bytes.size, metadata)
