@@ -176,3 +176,23 @@ name. Both a new object and a competing winner are authenticated before returnin
 JVM/Android use `Files.createLink`; iOS uses POSIX `link`. Filesystems without hard-link support
 fail explicitly; they need a separate provider adapter, not a replacing-move fallback. The
 publication-race regression inserts valid and invalid competing targets at the exact boundary.
+
+## Version 2 checkpoint format
+
+`TorrentV2Checkpoint` references a full v2 catalog identity and retains the v1 topic for hybrids.
+It records task/output binding, mapping policy version, explicit selections, layout/selection
+generations, transfer counters and a piece-bitfield hint. Ownership records use prior-parent
+references with one component per row, avoiding repeated long prefixes. File/directory kind is
+encoded in the sign of the parent reference; the root is an explicit owned directory.
+
+Decoding bounds the document to 32 MiB, 220,000 ownership rows and 100,000 selections. It rejects
+future format/mapping versions, invalid UTF-8, duplicate paths/selections, missing or non-directory
+parents, forward references, traversal and negative counters. After catalog resolution,
+`validateContent` verifies the full identity, logical selections, mapped ownership paths and exact
+bitfield size/padding. Version 1 state continues through its existing decoder; version 2 is not
+mistaken for a legacy native blob.
+
+This is the codec and binding layer, not task recovery. Before using ownership claims, recovery
+must also match the expected task and caller-authorized root, verify current OS identities, and
+rehash files instead of trusting hint bits. TaskStore publication, ownership journals, v1 migration,
+resume wiring, streaming large state and full-profile admission/power-loss tests remain pending.
