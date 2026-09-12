@@ -178,38 +178,51 @@ internal class TorrentV2PieceStore(
       verified.fill(false)
       progress.fill(0)
       val context = currentCoroutineContext()
-      for (index in verified.indices) {
+      for (layoutFile in verifier.layout.files) {
         context.ensureActive()
-        val extent = verifier.layout.v2Piece(index.toLong())
-        val file = filesById.getValue(checkNotNull(extent.fileId))
-        if (file.id !in selected) continue
-        val valid = try {
-          storageOperation {
+        if (layoutFile.id !in selected || layoutFile.length == 0L) continue
+        val file = filesById.getValue(layoutFile.id)
+        val first = (layoutFile.offset / verifier.layout.pieceLength).toInt()
+        val count = ((layoutFile.length - 1) / verifier.layout.pieceLength + 1).toInt()
+        var published = false
+        try {
+          val matchedBytes = storageOperation {
             val path = destination(file)
             validateOwned(path, directory = false)
-            val verification = verifier.piece(index.toLong())
             fileSystem.openReadWrite(path, mustExist = true).use { handle ->
-              var offset = 0L
-              while (offset < extent.length) {
+              var matched = 0L
+              for (index in first until first + count) {
                 context.ensureActive()
-                val count = minOf(scratch.size.toLong(), extent.length - offset).toInt()
-                readFully(handle, extent.fileOffset + offset, scratch, count, context)
-                verification.update(scratch, 0, count)
-                offset += count
+                val extent = verifier.layout.v2Piece(index.toLong())
+                val verification = verifier.piece(index.toLong())
+                val valid = try {
+                  var offset = 0L
+                  while (offset < extent.length) {
+                    val size = minOf(scratch.size.toLong(), extent.length - offset).toInt()
+                    readFully(handle, extent.fileOffset + offset, scratch, size, context)
+                    verification.update(scratch, 0, size)
+                    offset += size
+                  }
+                  verification.verify()
+                } catch (_: IOException) {
+                  false
+                }
+                // Tentative under the mutex; finally clears these if flush/return is interrupted.
+                verified[index] = valid
+                if (valid) matched += extent.length
               }
-              val matches = verification.verify()
-              // A previous canceled/failed write may have left bytes without a completed flush.
-              if (matches) handle.flush()
-              matches
+              if (matched > 0) handle.flush()
+              validateOwned(path, directory = false)
+              matched
             }
           }
+          context.ensureActive()
+          progress[file.v2Index] = matchedBytes
+          published = true
         } catch (_: IOException) {
-          false
-        }
-        context.ensureActive()
-        if (valid) {
-          verified[index] = true
-          progress[file.v2Index] += extent.length
+          // A failed file flush cannot authorize any of this file's tentative pieces.
+        } finally {
+          if (!published) verified.fill(false, first, first + count)
         }
       }
       verified.copyOf()

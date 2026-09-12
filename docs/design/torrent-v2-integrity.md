@@ -146,3 +146,8 @@ interrupted write, and publishes each piece only after returning through the can
 A canceled scan can be retried; it never trusts the old committed bitmap. Rechecks do not adopt
 preexisting roots or override ownership changes. Wire proof serving and restart/import integration
 remain separate work.
+
+Recheck scans each non-empty selected file through one handle and flushes once if any pieces
+match. Its bitmap updates remain tentative under the store mutex until that file's flush and
+cancellation boundary succeed. Failure rolls back that file's tentative bits before unlocking;
+previously completed files remain verified. This avoids a durable flush for every small piece.
