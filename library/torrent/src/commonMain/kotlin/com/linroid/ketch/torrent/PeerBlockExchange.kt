@@ -45,6 +45,9 @@ internal class PeerBlockExchange(
   private var closed = false
   val pendingCount: Int get() = pending.size
 
+  fun canRequest(index: Int): Boolean = !closed && pending.size < maxPending && !state.choking &&
+    index in state.available.indices && state.available[index]
+
   /** Relative delay for the actor's timer; control traffic and cancels never extend deadlines. */
   fun nextDeadlineMs(): Long? = pending.values.minOfOrNull { remaining(it) }
 
