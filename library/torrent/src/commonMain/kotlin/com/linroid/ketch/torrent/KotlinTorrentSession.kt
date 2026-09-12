@@ -38,11 +38,16 @@ internal class KotlinTorrentSession(
   private val discover: suspend (SendChannel<PeerEndpoint>, KotlinTorrentSession) -> Unit,
   private val downloadThrottle: suspend (Int) -> Unit = {},
   private val uploadThrottle: suspend (Int) -> Unit = {},
+  private val stateLease: TorrentBufferBudget.Lease? = null,
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
   private val scope = CoroutineScope(parent.coroutineContext +
     SupervisorJob(parent.coroutineContext[Job]) + Dispatchers.Default)
+  init {
+    // Parent cancellation also ends ownership; wait for all session children before returning credit.
+    checkNotNull(scope.coroutineContext[Job]).invokeOnCompletion { stateLease?.close() }
+  }
   private val lifecycle = Mutex()
   private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
   private val resets = Channel<CompletableDeferred<Unit>>(1)

@@ -37,12 +37,18 @@ data class TorrentConfig(
   /** Maximum simultaneously buffered piece data across the engine. */
   val maxBufferedBytes: Int = 32 * 1024 * 1024,
   /**
-   * Combined ceiling for transfer buffers, metadata exchange scratch space, and cached metadata.
-   * This is not a process RSS limit; session indexes and platform overhead are separate.
+   * Combined admission ceiling for buffers, metadata exchange, cache entries, and session state.
+   * This is not a process RSS limit; platform allocations and caller-owned state are separate.
    */
   val maxExchangeBytes: Int = 64 * 1024 * 1024,
   /** Cache retention ceiling, including conservative file/index and string allowances. */
   val maxCachedMetadataBytes: Int = 4 * 1024 * 1024,
+  /** Aggregate admission allowance for session metadata, indexes, and checking scratch space. */
+  val maxSessionStateBytes: Int = 8 * 1024 * 1024,
+  /** File count ceiling applied before constructing a session's storage indexes. */
+  val maxFilesPerTorrent: Int = 10_000,
+  /** Logical piece ceiling applied before constructing session and scheduler arrays. */
+  val maxPiecesPerTorrent: Int = 250_000,
 
 ) {
   init {
@@ -54,10 +60,13 @@ data class TorrentConfig(
     require(listenPort in 0..65535) { "listenPort must be in 0..65535" }
     require(maxMetadataBytes in 1..4 * 1024 * 1024)
     require(maxBufferedBytes >= 16384) { "maxBufferedBytes must hold a protocol block" }
-    require(maxCachedMetadataBytes > 0)
-    require(maxBufferedBytes.toLong() + metadataExchangeBytes + maxCachedMetadataBytes <=
+    require(maxCachedMetadataBytes > 0 && maxSessionStateBytes > 0)
+    require(maxFilesPerTorrent in 1..100_000)
+    require(maxPiecesPerTorrent in 1..1_000_000)
+    require(maxBufferedBytes.toLong() + metadataExchangeBytes + maxCachedMetadataBytes +
+      maxSessionStateBytes <=
       maxExchangeBytes.toLong()) {
-      "maxExchangeBytes must cover transfers, metadata exchange, and cached metadata"
+      "maxExchangeBytes must cover transfers, metadata exchange, cache, and session state"
     }
   }
 
