@@ -966,3 +966,27 @@ Tests cover stale edits without discovery interruption or retained credit, pre-r
 store persistence/restore, version validation, revision exhaustion, failed edits, cancellation after
 rename, and diagnostic revision wiring. Command idempotency, public conflict responses, and recovery
 when TaskStore resume data lags the on-disk checkpoint remain follow-up integration requirements.
+
+## Recovering edits ahead of TaskStore
+
+Before starting discovery, sessions inspect the checkpoint whose OS identity is recorded in the
+ownership journal. Recovery validates the task, authenticated info hash, output root, and selected
+files, bounds the read by the checkpoint ceiling, and reserves temporary decoding credit before
+allocating its bytes. File identity and size are checked around the bounded read. Unowned, replaced,
+malformed, or differently bound checkpoints fail recovery without being consumed as session state.
+
+A newer tracker revision is adopted with fresh configuration and future-encoding reservations;
+positive equal revisions with different tiers are rejected. Older disk revisions cannot roll back
+TaskStore's configuration. Received/uploaded counters retain the larger authenticated-task value,
+including checkpoints with the same tracker revision. Verified bits and ownership arrays from this
+read are not adopted: the existing journal and payload recheck remain authoritative for ownership
+and progress. Callback failure/cancellation returns decoding credit, and configuration adoption
+reconciles ownership in non-cancellable cleanup.
+
+If recovery fails, pause, save, and shutdown cannot overwrite the newer file with stale in-memory
+state. The committed file remains available for a later retry. This reader decodes a bounded complete
+checkpoint and may reject it when the configured session pool cannot admit that decoding operation;
+streaming recovery and large-profile memory/performance evidence remain required follow-up work.
+Tests exercise a real engine with stale TaskStore data, corrupted payloads, same-revision counters,
+replacement/binding rejection, cancellation/admission cleanup, and a failed-recovery shutdown
+regression that overwrote the committed bytes before the write guard was added.
