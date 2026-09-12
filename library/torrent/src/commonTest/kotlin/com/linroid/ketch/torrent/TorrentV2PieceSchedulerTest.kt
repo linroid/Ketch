@@ -225,6 +225,58 @@ class TorrentV2PieceSchedulerTest {
   }
 
   @Test
+  fun raritySelectionFeedsAdmittedPiecesAndSkipsActiveOrUnavailableCandidates() = runTest {
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      BooleanArray(2), buffers, state))
+    val picker = assertNotNull(TorrentV2RarityPicker.create<PeerBlockExchange>(2, state))
+    val peer = Peer(buffers, layout)
+    val other = Peer(buffers, layout)
+    try {
+      peer.ready()
+      assertTrue(picker.update(peer.exchange, byteArrayOf(192.toByte())))
+      assertTrue(picker.update(other.exchange, byteArrayOf(128.toByte())))
+      assertTrue(scheduler.beginNext(peer.exchange, picker))
+      assertFalse(scheduler.canBegin(1))
+      assertTrue(scheduler.canBegin(0))
+      assertEquals(1, assertNotNull(scheduler.requestNext(peer.exchange)).request.index)
+      assertFalse(scheduler.beginNext(peer.exchange, picker))
+      assertTrue(scheduler.receive(peer.exchange, assertIs<PeerBlockExchange.Response.Rejected>(
+        peer.receive(PeerMessage.Reject(1, 0, 1)))))
+      assertTrue(scheduler.beginNext(peer.exchange, picker))
+      assertEquals(2, scheduler.activeCount)
+    } finally {
+      picker.close()
+      scheduler.removePeer(peer.exchange)
+      scheduler.removePeer(other.exchange)
+      scheduler.close()
+    }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
+  fun smallPieceAdmissionScalesToManyActivePeersWithoutChargingMaximumSizedPieces() {
+    val tree = (0 until 128).associate { index ->
+      index.toString().padStart(3, '0') to mapOf("" to mapOf("length" to 1L,
+        "pieces root" to sha256Digest(byteArrayOf(1))))
+    }
+    val info = TorrentV2Info.parse(Bencode.encode(mapOf("meta version" to 2L,
+      "piece length" to 16_384L, "file tree" to tree)))
+    val buffers = TorrentBufferBudget(100_000)
+    val state = TorrentBufferBudget(100_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(TorrentContentLayout.from(info),
+      emptySet(), BooleanArray(128), buffers, state, maxActive = 128))
+    try {
+      repeat(128) { assertTrue(scheduler.begin(it)) }
+      assertEquals(128, scheduler.activeCount)
+    } finally { scheduler.close() }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
   fun selectionVerifiedSnapshotsAndBothBudgetsGatePieceAdmission() {
     val buffers = TorrentBufferBudget(1024)
     val state = TorrentBufferBudget(2_000_000)
