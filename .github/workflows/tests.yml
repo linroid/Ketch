@@ -204,7 +204,7 @@ jobs:
   required-checks:
     name: Required Checks
     runs-on: ubuntu-24.04
-    needs: [ jvm-tests, android-tests, ios-tests, js-tests, torrent-desktop-tests, torrent-device-tests ]
+    needs: [ jvm-tests, android-tests, ios-tests, js-tests, torrent-desktop-tests, torrent-device-tests, publish-results ]
     if: always()
     steps:
       - name: Require every test job to succeed on this revision
@@ -229,9 +229,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: test-results-*
-          merge-multiple: true
+          # Host jobs use identical report paths. Keep each artifact in its own directory.
+          merge-multiple: false
 
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           files: '**/TEST-*.xml'
+          action_fail: true
+          action_fail_on_inconclusive: true
