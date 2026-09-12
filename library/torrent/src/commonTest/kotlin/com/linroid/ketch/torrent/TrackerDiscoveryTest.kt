@@ -2,6 +2,9 @@ package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -264,6 +267,81 @@ class TrackerDiscoveryTest {
     assertFailsWith<CancellationException> { discovery.poll(bits, 0, 0) }
     discovery.poll(bits, 0, 0)
     assertEquals(2, calls)
+  }
+
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun privateFailoverWaitsForOldPeersBeforeContactingReplacement() = runTest {
+    var now = 0L
+    var online = true
+    var contactedReplacement = false
+    val closing = CompletableDeferred<Unit>()
+    val closed = CompletableDeferred<Unit>()
+    val tiers = TrackerTiers(listOf(listOf("a"), listOf("b"))) { url, _, _ ->
+      if (url == "a" && !online) error("Offline")
+      if (url == "b") contactedReplacement = true
+      TrackerResponse(emptyList(), 1)
+    }
+    val document = v2Document()
+    val discovery = TrackerDiscovery(document, TorrentContentLayout.from(document.info),
+      ByteArray(20), 6881, tiers, onPrivateTrackerChanged = {
+        closing.complete(Unit)
+        closed.await()
+      }, nowMs = { now })
+    val bits = booleanArrayOf(false, false)
+    discovery.poll(bits, 0, 0)
+    online = false
+    now = 1000
+    val switching = async { discovery.poll(bits, 0, 0) }
+    closing.await()
+    runCurrent()
+    assertEquals(false, contactedReplacement)
+    closed.complete(Unit)
+    assertEquals("b", switching.await()?.source)
+    assertEquals(true, contactedReplacement)
+  }
+
+  @Test
+  fun privateCleanupFailurePreventsReplacementAnnounce() = runTest {
+    var now = 0L
+    var online = true
+    var replacementCalls = 0
+    val tiers = TrackerTiers(listOf(listOf("a"), listOf("b"))) { url, _, _ ->
+      if (url == "a" && !online) error("Offline")
+      if (url == "b") replacementCalls++
+      TrackerResponse(emptyList(), 1)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+      onPrivateTrackerChanged = { error("Cleanup failed") }, nowMs = { now })
+    val bits = booleanArrayOf(false, false)
+    discovery.poll(bits, 0, 0)
+    online = false
+    now = 1000
+    val error = assertFailsWith<IllegalStateException> { discovery.poll(bits, 0, 0) }
+    assertEquals("Cleanup failed", error.message)
+    assertEquals(0, replacementCalls)
+  }
+
+  @Test
+  fun privateFailoverClosesOldPeersOnceAcrossFailedCandidates() = runTest {
+    var now = 0L
+    var firstOnline = true
+    var cleanups = 0
+    val tiers = TrackerTiers(listOf(listOf("a"), listOf("b"), listOf("c"))) { url, _, _ ->
+      if ((url == "a" && !firstOnline) || url == "b") error("Offline")
+      TrackerResponse(emptyList(), 1)
+    }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+      onPrivateTrackerChanged = { cleanups++ }, nowMs = { now })
+    val bits = booleanArrayOf(false, false)
+    discovery.poll(bits, 0, 0)
+    firstOnline = false
+    now = 1000
+    assertEquals("c", discovery.poll(bits, 0, 0)?.source)
+    assertEquals(1, cleanups)
+    now = 2000
+    assertEquals("c", discovery.poll(bits, 0, 0)?.source)
+    assertEquals(1, cleanups)
   }
 
   private fun v2Document(name: String = "test"): TorrentV2Document =
