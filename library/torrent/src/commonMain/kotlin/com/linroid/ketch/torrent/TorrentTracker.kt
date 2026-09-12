@@ -1,6 +1,8 @@
 package com.linroid.ketch.torrent
 
 import io.ktor.http.Url
+import io.ktor.http.URLBuilder
+import io.ktor.http.encodedPath
 import io.ktor.network.sockets.InetSocketAddress
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +84,66 @@ internal class TorrentTracker(
     }
   }
 
-  private suspend fun udp(url: Url, request: TrackerAnnounce): TrackerResponse {
+  suspend fun scrape(
+    url: String,
+    requestedTopics: List<TrackerTopic>,
+  ): Map<TrackerTopic, TrackerScrape> {
+    require(url.length <= 8192 && requestedTopics.size in 1..50)
+    val topics = requestedTopics.toList()
+    TrackerScrape.validate(topics)
+    val parsed = Url(url)
+    return when (parsed.protocol.name.lowercase()) {
+      "http", "https" -> {
+        val path = parsed.encodedPath
+        val endpoint = path.lastIndexOf("announce")
+        require(endpoint >= 0) { "Tracker has no derived scrape endpoint" }
+        val base = URLBuilder(url).apply {
+          encodedPath = path.replaceRange(endpoint, endpoint + "announce".length, "scrape")
+          fragment = ""
+        }.buildString()
+        val separator = if ('?' in base) "&" else "?"
+        val query = topics.joinToString("&") { "info_hash=" + binaryQuery(it.wireBytes()) }
+        TrackerScrape.parseHttp(http.fetch(base + separator + query, 64 * 1024), topics)
+      }
+      "udp" -> udpExchange(parsed, 2, 8 + topics.size * 12, { packet ->
+        topics.forEach { packet.write(it.wireBytes()) }
+      }) { bytes -> TrackerScrape.parseUdp(bytes.bytes, topics) }
+      else -> error("Unsupported tracker protocol")
+    }
+  }
+
+  private suspend fun udp(url: Url, request: TrackerAnnounce): TrackerResponse =
+    udpExchange(url, 1, 20, { packet ->
+      packet.write(request.topic.wireBytes()).write(request.peerId)
+        .writeLong(request.downloaded).writeLong(request.left).writeLong(request.uploaded)
+        .writeInt(request.event.code).writeInt(0).writeInt(request.key).writeInt(200)
+        .writeShort(request.port)
+      val path = url.encodedPathAndQuery.encodeToByteArray()
+      if (path.isNotEmpty() && !path.contentEquals(byteArrayOf('/'.code.toByte()))) {
+        var offset = 0
+        while (offset < path.size) {
+          val length = minOf(255, path.size - offset)
+          packet.writeByte(2).writeByte(length).write(path, offset, length)
+          offset += length
+        }
+        packet.writeByte(0)
+      }
+    }) { reply ->
+      val header = Buffer().write(reply.bytes, 8, 12)
+      val interval = header.readInt().toLong() and 0xffffffffL
+      TrackerResponse(compactPeers(reply.bytes.copyOfRange(20, reply.bytes.size), reply.ipv6),
+        checkedInterval(interval))
+    }
+
+  private data class UdpReply(val bytes: ByteArray, val ipv6: Boolean)
+
+  private suspend fun <T> udpExchange(
+    url: Url,
+    action: Int,
+    minimum: Int,
+    encode: (Buffer) -> Unit,
+    decode: (UdpReply) -> T,
+  ): T {
     require(url.port in 1..65535 && url.user == null && url.password == null)
     val remote = resolve(PeerEndpoint(url.host.removeSurrounding("[", "]"), url.port))
     val socket = network.bindUdp(PeerEndpoint(if (':' in remote.host) "::" else "0.0.0.0", 0))
@@ -96,27 +157,11 @@ internal class TorrentTracker(
           val connected = response(socket, remote, connectId, 0, 16)
           val cookie = Buffer().write(connected, 8, 8).readLong()
           val transaction = randomInt()
-          val packet = Buffer().writeLong(cookie).writeInt(1).writeInt(transaction)
-            .write(request.topic.wireBytes()).write(request.peerId)
-            .writeLong(request.downloaded).writeLong(request.left).writeLong(request.uploaded)
-            .writeInt(request.event.code).writeInt(0).writeInt(request.key).writeInt(200)
-            .writeShort(request.port)
-          val path = url.encodedPathAndQuery.encodeToByteArray()
-          if (path.isNotEmpty() && !path.contentEquals(byteArrayOf('/'.code.toByte()))) {
-            var offset = 0
-            while (offset < path.size) {
-              val length = minOf(255, path.size - offset)
-              packet.writeByte(2).writeByte(length).write(path, offset, length)
-              offset += length
-            }
-            packet.writeByte(0)
-          }
+          val packet = Buffer().writeLong(cookie).writeInt(action).writeInt(transaction)
+          encode(packet)
           socket.send(remote, packet.readByteArray())
-          val reply = response(socket, remote, transaction, 1, 20)
-          val header = Buffer().write(reply, 8, 12)
-          val interval = header.readInt().toLong() and 0xffffffffL
-          TrackerResponse(compactPeers(reply.copyOfRange(20, reply.size), ':' in remote.host),
-            checkedInterval(interval))
+          val reply = response(socket, remote, transaction, action, minimum)
+          decode(UdpReply(reply, ':' in remote.host))
         }
         if (result != null) return result
       }
@@ -140,7 +185,7 @@ internal class TorrentTracker(
       val header = Buffer().write(reply.bytes, 0, 8)
       val receivedAction = header.readInt()
       if (header.readInt() != transaction) continue
-      require(receivedAction != 3) { "Tracker rejected announce" }
+      require(receivedAction != 3) { "Tracker rejected request" }
       if (receivedAction != action || reply.bytes.size < minimum) continue
       return reply.bytes
     }
