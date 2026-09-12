@@ -11,6 +11,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.File
 import java.net.ServerSocket
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -19,7 +21,10 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 /** Out-of-process reference seeder: no native torrent library is loaded into the measuring JVM. */
-internal class TorrentBenchmarkSeeder(private val root: File) {
+internal class TorrentBenchmarkSeeder(
+  private val root: File,
+  val dataHost: String = benchmarkAddress(),
+) {
   private val rpcPort = ServerSocket(0).use { it.localPort }
   val peerPort: Int = ServerSocket(0).use { it.localPort }
   private val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
@@ -27,7 +32,11 @@ internal class TorrentBenchmarkSeeder(private val root: File) {
   private var process: Process? = null
   private val log = root.resolve("transmission.log")
 
-  suspend fun start(metainfo: ByteArray, seed: File) = withTimeout(120_000) {
+  val pid: Long get() = checkNotNull(process).pid()
+  val cpuNanos: Long get() = checkNotNull(process).info().totalCpuDuration()
+    .map { it.toNanos() }.orElse(-1L)
+
+  suspend fun start(metainfo: ByteArray?, seed: File) = withTimeout(120_000) {
     val binary = checkNotNull(System.getenv("TRANSMISSION_DAEMON")?.takeIf { it.isNotBlank() })
     val version = ProcessBuilder(binary, "--version").redirectErrorStream(true).start()
     if (!version.waitFor(5, TimeUnit.SECONDS)) {
@@ -40,7 +49,8 @@ internal class TorrentBenchmarkSeeder(private val root: File) {
     process = ProcessBuilder(binary, "--foreground", "--config-dir",
       root.resolve("config").absolutePath, "--download-dir", seed.absolutePath,
       "--port", rpcPort.toString(), "--peerport", peerPort.toString(),
-      "--rpc-bind-address", "127.0.0.1", "--bind-address-ipv4", "127.0.0.1",
+      "--rpc-bind-address", "127.0.0.1", "--bind-address-ipv4", dataHost,
+      "--bind-address-ipv6", "::1",
       "--no-auth", "--no-dht", "--no-lpd", "--no-portmap", "--no-utp",
       "--encryption-tolerated", "--no-global-seedratio")
       .redirectErrorStream(true).redirectOutput(log).start()
@@ -48,17 +58,25 @@ internal class TorrentBenchmarkSeeder(private val root: File) {
       check(checkNotNull(process).isAlive) { log.readText() }
       try { rpc("session-get"); break } catch (_: java.io.IOException) { delay(50) }
     }
-    rpc("torrent-add", buildJsonObject {
-      put("metainfo", encodeBase64(metainfo)); put("download-dir", seed.absolutePath)
-    })
-    while (true) {
-      check(checkNotNull(process).isAlive) { log.readText() }
-      val torrents = rpc("torrent-get", Json.parseToJsonElement(
-        "{\"fields\":[\"percentDone\"]}").jsonObject)["torrents"]!!.jsonArray
-      if (torrents.firstOrNull()?.jsonObject?.get("percentDone")?.jsonPrimitive
-          ?.content?.toDouble() == 1.0) break
-      delay(50)
+    if (metainfo != null) {
+      addTorrent(metainfo, seed)
+      val size = TorrentMetadata.fromBencode(metainfo).totalBytes
+      while (verifiedBytes() != size) delay(50)
     }
+  }
+
+  fun addTorrent(metainfo: ByteArray, output: File) {
+    rpc("torrent-add", buildJsonObject {
+      put("metainfo", encodeBase64(metainfo)); put("download-dir", output.absolutePath)
+    })
+  }
+
+  fun verifiedBytes(): Long {
+    check(checkNotNull(process).isAlive) { log.readText() }
+    val torrents = rpc("torrent-get", Json.parseToJsonElement(
+      "{\"fields\":[\"haveValid\"]}").jsonObject)["torrents"]!!.jsonArray
+    return torrents.firstOrNull()?.jsonObject?.get("haveValid")?.jsonPrimitive
+      ?.content?.toLong() ?: 0
   }
 
   fun close() {
@@ -89,4 +107,12 @@ internal class TorrentBenchmarkSeeder(private val root: File) {
     }
     error("Transmission RPC session negotiation failed")
   }
+}
+
+/** Transmission rejects loopback tracker peers; select an address actually assigned to this host. */
+internal fun benchmarkAddress(): String = NetworkInterface.networkInterfaces().use { interfaces ->
+  interfaces.filter { it.isUp && !it.isLoopback }.flatMap { it.inetAddresses.asIterator().asSequence()
+    .filter { address -> address is Inet4Address && address.isSiteLocalAddress }.toList().stream()
+  }.findFirst().orElseThrow { IllegalStateException("Benchmark needs a private IPv4 host interface") }
+    .hostAddress
 }

@@ -1,7 +1,10 @@
 # Direct TCP baseline
 
-The benchmark compares isolated Kotlin and libtorrent4j downloader JVMs against the same pinned
-Transmission seeder, on loopback TCP. uTP and public discovery are disabled. Payloads are deterministic
+The benchmark compares an isolated Kotlin JVM with the pinned native Transmission downloader,
+using a separate pinned Transmission seeder. A loopback-only tracker advertises a private IPv4
+address assigned to this host. Transmission rejects loopback tracker peers, so data sockets bind
+to that host address; all data still travels between processes on the same machine. uTP and public
+discovery are disabled. Payloads are deterministic
 pseudorandom data from Java Random seed 162, generated one 256 KiB piece at a time. The independent
 fixture builder uses JDK SHA-1 and SHA-256. Output verification streams SHA-256 and checks file length.
 Neither generation nor verification allocates a payload-sized byte array.
@@ -31,13 +34,17 @@ child is forcibly terminated, with a five-second termination deadline. These bou
 before measurement. Only `complete: true` proves completion. Failures preserve previously completed samples.
 A complete 1/10 GiB baseline requires twenty verified child runs, not just a successful smoke test.
 
-Both child JVMs have a 256 MiB heap ceiling. The Kotlin engine uses one peer, disabled uploads and
+The Kotlin JVM has a 256 MiB heap ceiling. The native engine is the Transmission executable; its
+small JVM RPC controller is excluded from native RSS/CPU measurements. Unsupported native heap/FD
+and CPU counters are reported as -1, never as zero. The Kotlin engine uses one peer, disabled uploads and
 DHT, 64 MiB transfer capacity, 64 MiB session capacity, and a 256 MiB combined admission ceiling;
-other limits retain their defaults. The native reference uses `referenceSettings()` and remaining
-libtorrent defaults. One local seeder is available to either downloader, with no upload recipients.
+other limits retain their defaults. The native reference disables DHT, LPD, NAT mapping and uTP, uses the same fixture tracker, and
+otherwise retains Transmission defaults. One local seeder is available to either downloader, with no upload recipients.
 These are explicit benchmark settings, not a completed production resource profile.
 
-An initialized child prints readiness and waits for the parent to sample idle RSS before transfer.
+An initialized controller reports the measured engine PID and waits for the parent to sample idle
+RSS before transfer. The parent verifies that the PID belongs to the controller or its descendants.
+Forced timeout cleanup also terminates controller descendants.
 The report includes runtime/platform identity, fixture SHA-256, fixture creation time, seeder readiness,
 child initialization, download-to-verified-completion time, CPU time, heap/RSS samples, descriptor
 counts, and independent output verification time. RSS is sampled every 100 ms; heap/FDs every 20 ms,
@@ -51,9 +58,8 @@ partial selection, mobile hardware, energy, lifecycle, and soak measurements rem
 No target is relaxed to accommodate a slow run.
 
 The first verified-progress timestamp separates connection/unchoke wait from subsequent transfer.
-Native progress is sampled every 10 ms using complete-piece counts; the final short piece can
-overestimate its first byte count by less than one piece in smoke fixtures. The 1/10 GiB fixtures
-contain only full pieces. Report both end-to-end and post-first-piece rates, without calling either
+Native verified bytes are polled through RPC every 100 ms and may also be delayed by Transmission's
+own statistics refresh. The 1/10 GiB fixtures contain only full pieces. Report both end-to-end and post-first-piece rates, without calling either
 one a complete release benchmark.
 
 An initial run at `560ba380` used an in-process libtorrent seeder and its parent JVM crashed with
@@ -61,3 +67,9 @@ SIGSEGV on the Java Finalizer thread after one verified Kotlin 1 GiB sample. It 
 excluded from aggregate comparisons. The crash does not establish a root cause in the downloader.
 The harness now uses an external pinned Transmission seeder and keeps native torrent bindings
 inside the isolated reference downloader process. No timeout or performance target was raised.
+
+A second attempt at `d92566d8` isolated the Transmission seeder but the libtorrent4j downloader JVM
+also exited with SIGSEGV on its first 1 GiB sample. That incomplete report is retained separately.
+The current native baseline uses the pinned Transmission executable directly, with no torrent JNI
+binding in any measurement JVM. Existing libtorrent4j interoperability tests remain separate; the
+large-fixture binding crash is not a successful compatibility or performance result.
