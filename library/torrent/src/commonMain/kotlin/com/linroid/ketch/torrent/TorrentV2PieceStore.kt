@@ -27,6 +27,7 @@ internal class TorrentV2PieceStore(
   private val buffers: TorrentBufferBudget,
   private val storageSlots: Semaphore,
   private val fileSystem: FileSystem = torrentFileSystem,
+  private val creationLogPath: Path? = null,
 ) {
   private val verifier = TorrentPayloadVerifier(document)
   private val mapping = TorrentOutputMapping.from(document)
@@ -42,6 +43,7 @@ internal class TorrentV2PieceStore(
   private var receivedCounter = 0L
   private var uploadedCounter = 0L
   private var root: Path? = null
+  private var creationLog: TorrentV2CreationLog? = null
   private var initialized = false
   private var closed = false
   private val totalSelected = document.info.files.indices.sumOf { index ->
@@ -63,6 +65,7 @@ internal class TorrentV2PieceStore(
     if (initialized) return@withLock
     storageOperation {
       val destination = root ?: (fileSystem.canonicalize(checkNotNull(output.parent)) / output.name)
+      prepareCreationLog(destination)
       if (root == null) {
         fileSystem.createDirectory(destination, mustCreate = true)
         root = destination
@@ -300,15 +303,7 @@ internal class TorrentV2PieceStore(
     val recovered = storageOperation {
       val destination = fileSystem.canonicalize(checkNotNull(output.parent)) / output.name
       require(checkpoint.output == destination.toString()) { "Checkpoint output mismatch" }
-      val records = linkedMapOf<Path, Ownership>()
-      for (entry in checkpoint.owned.sortedBy { it.components.size }) {
-        val path = entry.components.fold(destination) { parent, component -> parent / component }
-        val metadata = fileSystem.metadataOrNull(path)
-        require(metadata != null && metadata.symlinkTarget == null &&
-          (if (entry.directory) metadata.isDirectory else metadata.isRegularFile) &&
-          torrentFileIdentity(path) == entry.identity) { "Checkpoint ownership changed" }
-        records[path] = Ownership(entry.identity, entry.directory)
-      }
+      val records = validateRecords(destination, checkpoint.owned)
       destination to records
     }
     currentCoroutineContext().ensureActive()
@@ -358,9 +353,72 @@ internal class TorrentV2PieceStore(
   private fun destination(file: TorrentOutputMapping.File): Path =
     file.components.fold(checkNotNull(root)) { path, component -> path / component }
 
+  private fun validateRecords(
+    destination: Path,
+    entries: List<TorrentV2Checkpoint.Owned>,
+  ): LinkedHashMap<Path, Ownership> {
+    val records = linkedMapOf<Path, Ownership>()
+    for (entry in entries.sortedBy { it.components.size }) {
+      val path = entry.components.fold(destination) { parent, component -> parent / component }
+      val metadata = fileSystem.metadataOrNull(path)
+      require(metadata != null && metadata.symlinkTarget == null &&
+        (if (entry.directory) metadata.isDirectory else metadata.isRegularFile) &&
+        torrentFileIdentity(path) == entry.identity) { "Checkpoint ownership changed" }
+      records[path] = Ownership(entry.identity, entry.directory)
+    }
+    return records
+  }
+
+  private fun prepareCreationLog(destination: Path) {
+    val requested = creationLogPath ?: return
+    if (creationLog == null) {
+      require(requested.isAbsolute && requested.parent != null)
+      TorrentMetadata.validatePathComponent(requested.name)
+      val path = fileSystem.canonicalize(checkNotNull(requested.parent)) / requested.name
+      require(path.segments.take(destination.segments.size) != destination.segments) {
+        "Creation log must be outside payload storage"
+      }
+      val binding = sha256Digest(Bencode.encode(mapOf(
+        "kind" to "ketch-v2-creation", "mapping" to 1L, "task" to taskId,
+        "v2" to document.info.hash.toBytes(),
+        "v1" to (document.identity.v1?.toBytes() ?: ByteArray(0)),
+        "output" to destination.toString(), "selected" to selected.sorted()
+      )))
+      val candidate = TorrentV2CreationLog(path, binding, fileSystem)
+      val entries = linkedMapOf<List<String>, TorrentV2Checkpoint.Owned>()
+      for (entry in candidate.open() + owned.map { (path, claim) ->
+        ownershipRecord(destination, path, claim)
+      }) {
+        val previous = entries.put(entry.components, entry)
+        require(previous == null || previous == entry) { "Checkpoint and creation log disagree" }
+      }
+      if (entries.isNotEmpty()) {
+        val records = entries.values.toList()
+        TorrentV2Checkpoint.create(document, taskId, destination.toString(), selected, records,
+          ByteArray((verified.size + 7) / 8).toByteString())
+        val recovered = validateRecords(destination, records)
+        owned.putAll(recovered)
+        root = destination
+      }
+      creationLog = candidate
+    }
+    // Retry any failed append from this live instance before creating additional paths.
+    for ((path, claim) in owned) {
+      checkNotNull(creationLog).append(ownershipRecord(destination, path, claim))
+    }
+  }
+
+  private fun ownershipRecord(destination: Path, path: Path, claim: Ownership) =
+    TorrentV2Checkpoint.Owned(
+      if (path == destination) emptyList() else path.relativeTo(destination).segments,
+      claim.identity, claim.directory
+    )
+
   private fun record(path: Path, directory: Boolean) {
     val identity = requireNotNull(torrentFileIdentity(path)) { "Filesystem has no safe identity" }
-    owned[path] = Ownership(identity, directory)
+    val claim = Ownership(identity, directory)
+    owned[path] = claim
+    creationLog?.append(ownershipRecord(checkNotNull(root), path, claim))
   }
 
   private fun validateParents(path: Path) {
