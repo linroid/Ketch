@@ -17,6 +17,7 @@ internal class TorrentContentCatalog(
   private val directory: Path,
   private val fileSystem: FileSystem = torrentFileSystem,
   private val slots: Semaphore = Semaphore(1),
+  private val publish: (Path, Path) -> Boolean = ::torrentPublishCatalogObject,
 ) {
   private val mutex = Mutex()
   private var rootIdentity: String? = null
@@ -54,8 +55,9 @@ internal class TorrentContentCatalog(
           handle.flush()
         }
         checkNotNull(root(create = false))
-        // Another catalog instance may already have published the same authenticated object.
-        if (read(target, identity) == null) fileSystem.atomicMove(temp, target)
+        // Publication cannot replace a competing entry, even if it appeared after our read.
+        publish(temp, target)
+        requireNotNull(read(target, identity)) { "Published catalog object disappeared" }
         identity
       } finally {
         if (tempIdentity != null && torrentFileIdentity(temp) == tempIdentity) {
@@ -122,3 +124,6 @@ internal class TorrentContentCatalog(
     const val MAX_BYTES = 32 * 1024 * 1024
   }
 }
+
+/** Atomically adds a name for the complete file; false means the destination already exists. */
+internal expect fun torrentPublishCatalogObject(source: Path, target: Path): Boolean

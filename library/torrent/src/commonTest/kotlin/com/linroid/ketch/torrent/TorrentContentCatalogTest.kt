@@ -3,7 +3,6 @@ package com.linroid.ketch.torrent
 import kotlinx.coroutines.test.runTest
 import okio.ByteString.Companion.toByteString
 import okio.FileSystem
-import okio.ForwardingFileSystem
 import okio.IOException
 import okio.Path
 import kotlin.test.Test
@@ -105,13 +104,10 @@ class TorrentContentCatalogTest {
   fun failedPublicationRemovesOnlyItsTemporaryObjectAndCanRetry() = runTest {
     val root = directory()
     var fail = true
-    val provider = object : ForwardingFileSystem(torrentFileSystem) {
-      override fun atomicMove(source: Path, target: Path) {
-        if (fail) throw IOException("Injected publication failure")
-        super.atomicMove(source, target)
-      }
-    }
-    val catalog = TorrentContentCatalog(root, provider)
+    val catalog = TorrentContentCatalog(root, publish = { source, target ->
+      if (fail) throw IOException("Injected publication failure")
+      torrentPublishCatalogObject(source, target)
+    })
     try {
       assertFailsWith<IOException> { catalog.put(document()) }
       assertEquals(emptyList(), torrentFileSystem.list(root))
@@ -122,6 +118,31 @@ class TorrentContentCatalogTest {
       assertEquals(1, torrentFileSystem.list(root).size)
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun targetAppearingDuringPublicationIsAuthenticatedWithoutReplacement() = runTest {
+    for (valid in listOf(false, true)) {
+      val root = directory()
+      val doc = document()
+      val winner = if (valid) Bencode.encode(mapOf("info" to info,
+        "piece layers" to emptyMap<String, Any>())) else "competing data".encodeToByteArray()
+      val catalog = TorrentContentCatalog(root, publish = { source, target ->
+        torrentFileSystem.write(target, mustCreate = true) { write(winner) }
+        assertFalse(torrentPublishCatalogObject(source, target))
+        false
+      })
+      try {
+        if (valid) assertEquals(doc.identity, catalog.put(doc)) else {
+          assertFailsWith<IllegalArgumentException> { catalog.put(doc) }
+        }
+        val target = root / "${doc.info.hash.hex}.torrent"
+        assertContentEquals(winner, torrentFileSystem.read(target) { readByteArray() })
+        assertEquals(1, torrentFileSystem.list(root).size)
+      } finally {
+        torrentFileSystem.deleteRecursively(root, mustExist = false)
+      }
     }
   }
 
