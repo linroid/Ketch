@@ -90,22 +90,22 @@ internal class KotlinTorrentSession(
       val pending = scope.async {
         lifecycle.withLock {
           check(!closed) { "Torrent session is closed" }
-          val actualRevision = if (!recovered) checkpoint?.trackerRevision ?: 0
-            else store.trackerConfigurationSnapshot().revision
-          if (expectedRevision != null && expectedRevision != actualRevision) {
-            throw TrackerRevisionConflict(expectedRevision, actualRevision)
+          if (trackerCheckpointRecovered) {
+            val actualRevision = store.trackerConfigurationSnapshot().revision
+            if (expectedRevision != null && expectedRevision != actualRevision) {
+              throw TrackerRevisionConflict(expectedRevision, actualRevision)
+            }
+            check(actualRevision < Long.MAX_VALUE) { "Tracker configuration revision exhausted" }
           }
-          check(actualRevision < Long.MAX_VALUE) { "Tracker configuration revision exhausted" }
           val restart = job?.isActive == true
           val previousState = _state.value
           try {
             stopLocked()
             currentCoroutineContext().ensureActive()
             recover()
-            store.initialize()
             try {
               store.replaceTrackerConfiguration(candidate, received.load(), uploaded.load(),
-                actualRevision)
+                expectedRevision)
             } finally {
               withContext(NonCancellable) {
                 // Cancellation at the I/O return boundary does not imply that rename rolled back.
@@ -191,6 +191,7 @@ internal class KotlinTorrentSession(
   private var closed = false
   private var filesDeleted = false
   private var recovered = false
+  private var trackerCheckpointRecovered = false
   private val _state = MutableStateFlow(TorrentSessionState.PAUSED)
   private val _downloadedBytes = MutableStateFlow(0L)
   private val _failure = MutableStateFlow<Throwable?>(null)
@@ -219,7 +220,6 @@ internal class KotlinTorrentSession(
       try {
         _state.value = TorrentSessionState.CHECKING_FILES
         recover()
-        store.initialize()
         store.recheck()
         _downloadedBytes.value = store.progress().sum()
         if (store.completed() && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -287,6 +287,46 @@ internal class KotlinTorrentSession(
       checkpoint?.let { store.restore(it) }
       recovered = true
     }
+    store.initialize()
+    if (trackerCheckpointRecovered) return
+    val state = trackerConfigurationBudget ?: return
+    store.withPersistedCheckpoint(state) { saved ->
+      val current = store.trackerConfigurationSnapshot()
+      if (saved.trackerRevision > current.revision) {
+        val proposal = checkNotNull(TrackerConfiguration.admit(
+          checkNotNull(saved.trackerConfiguration).tiers, state)) {
+          "Recovered tracker configuration budget exhausted"
+        }
+        var workspace: TorrentBufferBudget.Lease? = null
+        val candidate = proposal.configuration
+        try {
+          workspace = checkNotNull(state.reserve(candidate.checkpointWorkspaceBytes)) {
+            "Recovered tracker checkpoint workspace exhausted"
+          }
+          try { store.adoptTrackerCheckpoint(saved, candidate) } finally {
+            withContext(NonCancellable) {
+              if (store.currentTrackerConfiguration() === candidate) {
+                trackerOwner.exchange(proposal.transfer())?.close()
+                trackerWorkspace.exchange(checkNotNull(workspace))?.close()
+                workspace = null
+                received.store(maxOf(received.load(), saved.receivedBytes))
+                uploaded.store(maxOf(uploaded.load(), saved.uploadedBytes))
+              }
+            }
+          }
+        } finally {
+          proposal.close()
+          workspace?.close()
+        }
+      } else if (saved.trackerRevision == current.revision && current.revision > 0) {
+        require(saved.trackerConfiguration?.tiers == current.tiers) {
+          "Conflicting tracker configurations at the same revision"
+        }
+      }
+      received.store(maxOf(received.load(), saved.receivedBytes))
+      uploaded.store(maxOf(uploaded.load(), saved.uploadedBytes))
+    }
+    trackerCheckpointRecovered = true
   }
 
   private suspend fun stopLocked() = withContext(NonCancellable) {
@@ -298,6 +338,9 @@ internal class KotlinTorrentSession(
     currentSpeed.store(0)
   }
 
+  private suspend fun canSaveCheckpoint(): Boolean = store.isInitialized() &&
+    (trackerConfigurationBudget == null || trackerCheckpointRecovered)
+
   override suspend fun pause() {
     if (scope.coroutineContext[Job]?.isActive != true) {
       lifecycle.withLock { if (!closed) stopLocked() }
@@ -307,7 +350,7 @@ internal class KotlinTorrentSession(
       lifecycle.withLock {
         if (!closed) {
           stopLocked()
-          if (store.isInitialized()) store.persistCheckpoint(received.load(), uploaded.load())
+          if (canSaveCheckpoint()) store.persistCheckpoint(received.load(), uploaded.load())
         }
       }
     }
@@ -320,7 +363,7 @@ internal class KotlinTorrentSession(
     if (scope.coroutineContext[Job]?.isActive != true) return null
     val pending = scope.async {
       lifecycle.withLock {
-        if (closed || !store.isInitialized()) null
+        if (closed || !canSaveCheckpoint()) null
         else store.persistCheckpoint(received.load(), uploaded.load())
       }
     }

@@ -258,14 +258,79 @@ internal class TorrentPieceStore(
   suspend fun checkpoint(): TorrentCheckpoint = mutex.withLock { snapshot() }
 
   suspend fun restore(checkpoint: TorrentCheckpoint) = mutex.withLock {
-    require(checkpoint.taskId == taskId && checkpoint.metadata.infoHash == metadata.infoHash)
-    require(checkpoint.output == output.toString() &&
-      checkpoint.selected.ifEmpty { metadata.files.indices.toSet() } == selected)
+    validateCheckpoint(checkpoint)
     for (owned in checkpoint.files) restoreOwned(false, owned)
     for (owned in checkpoint.directories) restoreOwned(true, owned)
     trackerConfiguration = checkpoint.trackerConfiguration
     trackerRevision = checkpoint.trackerRevision
     // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
+  }
+
+  /** Decode only a journal-owned checkpoint; the callback borrows its admitted state. */
+  suspend fun withPersistedCheckpoint(
+    budget: TorrentBufferBudget,
+    block: suspend (TorrentCheckpoint) -> Unit,
+  ) {
+    var lease: TorrentBufferBudget.Lease? = null
+    var decoded: TorrentCheckpoint? = null
+    try {
+      mutex.withLock {
+        check(initialized)
+        storageOperation {
+          val path = sidecar / "checkpoint"
+          validateRegularPath(path)
+          if (!fileSystem.exists(path)) return@storageOperation
+          val identity = requireNotNull(ownedFiles[path]) { "Checkpoint is not owned by this task" }
+          require(torrentFileIdentity(path) == identity) { "Checkpoint identity changed" }
+          fileSystem.openReadOnly(path).use { handle ->
+            val size = handle.size()
+            require(size in 1..TorrentCheckpoint.MAX_BYTES.toLong())
+            // Retain raw-byte, decoded-graph, and metainfo validation credit through the callback.
+            val weight = size * 16 + 64 * 1024
+            check(weight <= budget.capacity) { "Checkpoint recovery exceeds admission capacity" }
+            lease = checkNotNull(budget.reserve(weight.toInt())) {
+              "Checkpoint recovery budget exhausted"
+            }
+            val bytes = ByteArray(size.toInt())
+            var offset = 0
+            while (offset < bytes.size) {
+              val count = handle.read(offset.toLong(), bytes, offset, bytes.size - offset)
+              if (count <= 0) throw EOFException("Truncated torrent checkpoint")
+              offset += count
+            }
+            require(handle.size() == size && torrentFileIdentity(path) == identity) {
+              "Checkpoint changed during recovery"
+            }
+            val checkpoint = requireNotNull(TorrentCheckpoint.decode(bytes))
+            validateCheckpoint(checkpoint)
+            decoded = checkpoint
+          }
+        }
+      }
+      decoded?.let { block(it) }
+    } finally {
+      decoded = null
+      lease?.close()
+    }
+  }
+
+  /** Installs admitted tracker state; progress and ownership never come from this hint. */
+  suspend fun adoptTrackerCheckpoint(
+    checkpoint: TorrentCheckpoint,
+    configuration: TrackerConfiguration,
+  ) = mutex.withLock {
+    validateCheckpoint(checkpoint)
+    require(checkpoint.trackerRevision > trackerRevision)
+    require(configuration.tiers == checkpoint.trackerConfiguration?.tiers)
+    currentCoroutineContext().ensureActive()
+    trackerConfiguration = configuration
+    trackerRevision = checkpoint.trackerRevision
+  }
+
+  private fun validateCheckpoint(checkpoint: TorrentCheckpoint) {
+    require(checkpoint.taskId == taskId && checkpoint.metadata.infoHash == metadata.infoHash)
+    require(checkpoint.output == output.toString() &&
+      checkpoint.selected.ifEmpty { metadata.files.indices.toSet() } == selected)
   }
 
   /** Owner shutdown only, after joining all operations; the persisted checkpoint is untouched. */
