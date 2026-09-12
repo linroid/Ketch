@@ -361,3 +361,23 @@ The hash transport reserves all frame/decode credit for the larger body before r
 retains that credit through dispatch. This removes the wire-size obstacle to the desktop target.
 Aggregate session/peer admission, complete v2 runtime integration and measured production resource
 gates still need verification; accepting a large bitfield alone does not prove those gates.
+
+### Full-identity handshake routes
+
+`PeerIdentityHandshake` retains the caller's full v1/v2 identity while using a separate 20-byte tag
+only for the wire handshake. It supports direct v1/v2 initiation and response, plus explicitly
+offered hybrid upgrades using BEP 52's reserved-byte flag. An upgrade can be accepted only when it
+was offered; a v2 initiation cannot silently downgrade. Incoming tags matching both local aliases
+are rejected as ambiguous. Protocol framing, self-connections and optional expected peer IDs are
+validated. The handshake reserves bounded scratch before I/O, has a ten-second deadline and closes
+the connection on admission, validation, cancellation or I/O failure.
+
+A handshake tag remains a routing hint, not authentication of the remote's full content identity.
+Metainfo and payload/hash proofs still have to satisfy the full expected topics. A multi-torrent
+listener must also reject ambiguous registry matches before selecting a route. Extension/DHT flags
+default off and must only be enabled by a runtime that implements and permits those capabilities.
+
+A loopback test negotiates direct v2 from a validated document before sending a hash request through
+the admitted transport and authenticating the reply. This connects the primitives over real TCP;
+it does not establish independent-client interoperability, a complete payload actor, global listener
+routing, magnet resolution or the remaining production release gates.
