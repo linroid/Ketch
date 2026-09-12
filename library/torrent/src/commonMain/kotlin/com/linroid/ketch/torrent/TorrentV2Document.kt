@@ -4,14 +4,17 @@ import okio.ByteString
 import okio.ByteString.Companion.toByteString
 
 /**
- * Authenticated content metadata from a bounded in-memory v2-only metainfo document.
+ * Authenticated content metadata from a bounded in-memory v2 or hybrid metainfo document.
  * Caller context (trackers, credentials, display hints) is deliberately outside this value.
  * Large imports need the future streaming/spilled loader; this path never raises its byte limit.
  */
 internal class TorrentV2Document private constructor(
   val info: TorrentV2Info,
   val pieceLayers: Map<ByteString, ByteString>,
+  val hybrid: TorrentHybridLayout?,
 ) {
+  val identity: TorrentIdentity get() = hybrid?.identity ?: TorrentIdentity(v2 = info.hash)
+
   companion object {
     fun parse(
       document: ByteArray,
@@ -32,11 +35,10 @@ internal class TorrentV2Document private constructor(
       require(infoNode.end - infoNode.start <= maxInfoBytes) { "Raw info exceeds byte limit" }
       val rawInfo = document.copyOfRange(infoNode.start, infoNode.end)
       val info = TorrentV2Info.parse(rawInfo, maxInfoBytes, maxFiles, maxNodes, expectedIdentity)
-      require(infoNode["pieces"] == null && infoNode["files"] == null &&
-        infoNode["length"] == null) {
-        "Hybrid documents require v1/v2 layout consistency validation"
+      val hybrid = TorrentHybridLayout.parse(infoNode, info)
+      require(expectedIdentity?.v1 == null || hybrid != null) {
+        "A v1 topic cannot identify a v2-only document"
       }
-      require(expectedIdentity?.v1 == null) { "A v1 topic cannot identify a v2-only document" }
       val nodes = requireNotNull(envelope["piece layers"]?.dictionary) {
         "Imported metainfo requires a piece layers dictionary"
       }
@@ -50,7 +52,7 @@ internal class TorrentV2Document private constructor(
           put(root, hashes.toByteString())
         }
       }
-      return TorrentV2Document(info, info.validatePieceLayers(layers, maxLayerBytes))
+      return TorrentV2Document(info, info.validatePieceLayers(layers, maxLayerBytes), hybrid)
     }
   }
 }

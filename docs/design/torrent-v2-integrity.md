@@ -56,3 +56,21 @@ The dictionary adapter receives already loaded immutable byte strings under a to
 limit. It does not provide disk spilling or the streaming metainfo loader. Those resource paths
 must be added before importing documents at the full production profile limits. The incremental
 verifier can consume hashes from those future bounded streams without retaining the entire layer.
+
+## Bounded document and hybrid validation
+
+`TorrentV2Document` requires an enclosing info dictionary and a valid piece-layer dictionary;
+BEP 9 info-only data cannot accidentally pass through the document import path. Envelope, raw-info,
+node, file, and layer-byte limits apply together. This in-memory path is for bounded documents;
+large streamed/spilled imports and runtime resource admission remain separate work.
+
+When v1 fields are present, `TorrentHybridLayout` compares raw filenames, order, lengths, piece
+alignment, and v1 piece-hash counts against the v2 file tree. It rejects partial or conflicting v1
+layouts and symlinks. BEP 47 padding is retained as virtual zero spans, including optional trailing
+padding; padding paths may be omitted and never become output destinations. Real files retain
+their original v1 file indices so migrated selections can map through the hybrid layout.
+
+These are metadata consistency checks. Hash strings alone cannot prove that a hybrid's payload
+matches both formats. The download/storage integration must verify both integrity schemes before
+publishing shared availability or committed progress. Filesystem path mapping and the complete
+v1/v2 runtime input adapter are still required before advertising v2/hybrid download support.
