@@ -15,6 +15,7 @@ internal class PeerHashTransport(
   private val exchange: PeerHashExchange,
   private val frames: TorrentBufferBudget,
   private val timeoutMs: Long = 180_000,
+  private val pieceCount: Int? = null,
 ) {
   class Frame internal constructor(
     val message: PeerMessage,
@@ -29,6 +30,7 @@ internal class PeerHashTransport(
     data class Verified(val result: PeerHashExchange.Verified) : Event
   }
 
+  private val limits = PeerFrameLimits(pieceCount)
   private val reads = Mutex()
   private var closed = false
 
@@ -63,10 +65,16 @@ internal class PeerHashTransport(
     try {
       val message = withTimeout(timeoutMs) {
         val size = Buffer().write(connection.readExactly(4)).readInt()
-        require(size in 0..PeerWire.MAX_FRAME_SIZE) { "Peer frame exceeds limit" }
+        limits.validateSize(size)
+        val id = if (size == 0) null else connection.readExactly(1).single().toInt() and 255
+        if (id != null) limits.validateType(size, id)
         // Covers raw body, generic decode, hash decode and dispatch copies, plus small headers.
         lease = checkNotNull(frames.reserve(size * 4 + 512)) { "Peer frame budget exhausted" }
-        PeerWire.decode(connection.readExactly(size))
+        if (id == null) PeerMessage.KeepAlive else {
+          val payload = Buffer().writeByte(id).write(connection.readExactly(size - 1))
+            .readByteArray()
+          PeerWire.decode(payload, pieceCount = pieceCount)
+        }
       }
       Frame(message, checkNotNull(lease)).also { lease = null }
     } catch (error: Throwable) {

@@ -3,7 +3,7 @@ package com.linroid.ketch.torrent
 /** Per-connection availability and request ownership, independent of the swarm scheduler. */
 internal class PeerProtocolState(pieceCount: Int, private val maxPending: Int = 32) {
   init {
-    require(pieceCount in 0..209_715 && maxPending in 1..256)
+    require(pieceCount in 0..1_000_000 && maxPending in 1..256)
   }
 
   val available: BooleanArray = BooleanArray(pieceCount)

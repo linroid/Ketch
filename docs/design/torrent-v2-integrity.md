@@ -343,6 +343,21 @@ boundaries. They do not perform v2 handshake negotiation or independent-client i
 The full runtime actor, handshake routing, timer wiring, reply serving and payload integration are
 still required before this adapter becomes a supported torrent capability.
 
-The inherited generic 64 KiB frame ceiling is sufficient for these bounded hash messages but not
-for a desktop-profile one-million-piece bitfield (125,000 bytes plus its message ID). Runtime
-integration must make ordinary frame bounds profile-aware; this slice does not relax that target.
+Trusted piece-count frame bounds now permit the desktop-profile one-million-piece bitfield
+(125,000 bytes plus its message ID). Unrelated messages retain the ordinary 64 KiB ceiling.
+
+
+### Piece-count-aware frame bounds
+
+`PeerFrameLimits` derives exact bitfield size from a known piece count up to one million. Generic
+peer decoding defaults to the existing 64 KiB ceiling when no count is known. With a known count,
+only bitfield frames can exceed that ceiling; extended, unknown and hash messages retain it.
+Both peer readers inspect the ID and exact bitfield length before reading the remaining body.
+Spare bits and piece indices are validated against the count, and availability state supports the
+same one-million-piece ceiling. V1 metadata supplies its own count; v2 callers supply the authenticated
+layout count without synthesizing SHA-1 hashes.
+
+The hash transport reserves all frame/decode credit for the larger body before reading it and
+retains that credit through dispatch. This removes the wire-size obstacle to the desktop target.
+Aggregate session/peer admission, complete v2 runtime integration and measured production resource
+gates still need verification; accepting a large bitfield alone does not prove those gates.
