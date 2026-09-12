@@ -131,3 +131,23 @@ metadata, mapping and index state before construction; its payload-copy leases a
 the total memory profile. Persistent ownership, checkpoint v2, resume/import/recheck, committed
 read/proof-serving APIs, generation-tagged session integration, and alternate destination providers
 remain pending. Fresh-root ownership is intentionally not inferred from preexisting directories.
+
+## Committed reads and bounded rechecks
+
+The v2 store serves only committed pieces. Each read copies owned-file bytes under a buffer lease
+and authenticates the snapshot before returning it. The consumer retains the lease until closing
+the returned buffer. Changed, truncated or replaced files revoke the affected piece's availability
+and selected progress; foreign replacements are not read or adopted. Cancellation releases the
+read reservation after any active provider operation returns.
+
+Recheck clears prior availability and scans selected owned files with at most 64 KiB of payload
+scratch. It verifies the same v2/hybrid hashes as commit, flushes matching data left by any earlier
+interrupted write, and publishes each piece only after returning through the cancellation boundary.
+A canceled scan can be retried; it never trusts the old committed bitmap. Rechecks do not adopt
+preexisting roots or override ownership changes. Wire proof serving and restart/import integration
+remain separate work.
+
+Recheck scans each non-empty selected file through one handle and flushes once if any pieces
+match. Its bitmap updates remain tentative under the store mutex until that file's flush and
+cancellation boundary succeed. Failure rolls back that file's tentative bits before unlocking;
+previously completed files remain verified. This avoids a durable flush for every small piece.
