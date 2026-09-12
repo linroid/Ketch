@@ -9,9 +9,13 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import okio.EOFException
+import okio.FileHandle
 import okio.FileSystem
+import okio.IOException
 import okio.Path
 import okio.use
+import kotlin.coroutines.CoroutineContext
 
 /** Fresh-directory v2/hybrid storage. Existing destinations require the future import path. */
 internal class TorrentV2PieceStore(
@@ -114,6 +118,119 @@ internal class TorrentV2PieceStore(
       true
     } finally {
       lease.close()
+    }
+  }
+
+  /** The consumer owns this reservation until it finishes using [bytes]. */
+  class ReadBuffer internal constructor(
+    val bytes: ByteArray,
+    private val lease: TorrentBufferBudget.Lease,
+  ) {
+    fun close() = lease.close()
+  }
+
+  /** Only committed pieces are readable; returned bytes are authenticated again from disk. */
+  suspend fun read(index: Int): ReadBuffer = mutex.withLock {
+    check(initialized && !closed)
+    require(index in verified.indices)
+    check(verified[index]) { "Piece is not committed" }
+    val extent = verifier.layout.v2Piece(index.toLong())
+    val file = filesById.getValue(checkNotNull(extent.fileId))
+    val lease = checkNotNull(buffers.reserve(extent.length.toInt())) { "Read budget exhausted" }
+    try {
+      val bytes = ByteArray(extent.length.toInt())
+      try {
+        val context = currentCoroutineContext()
+        storageOperation {
+          val path = destination(file)
+          validateOwned(path, directory = false)
+          fileSystem.openReadOnly(path).use { handle ->
+            readFully(handle, extent.fileOffset, bytes, bytes.size, context)
+          }
+        }
+        currentCoroutineContext().ensureActive()
+        val verification = verifier.piece(index.toLong())
+        verification.update(bytes)
+        if (!verification.verify()) throw IOException("Committed torrent payload changed")
+      } catch (error: Exception) {
+        if (error is IOException || error is IllegalArgumentException) {
+          verified[index] = false
+          progress[file.v2Index] -= extent.length
+        }
+        throw error
+      }
+      ReadBuffer(bytes, lease)
+    } catch (error: Throwable) {
+      lease.close()
+      throw error
+    }
+  }
+
+  /** Rebuilds committed availability from owned files with at most 64 KiB of payload scratch. */
+  suspend fun recheck(): BooleanArray = mutex.withLock {
+    check(initialized && !closed)
+    val largest = verifier.layout.files.filter { it.id in selected }.maxOfOrNull { it.length } ?: 0
+    val scratchSize = minOf(largest, verifier.layout.pieceLength, 65_536L).toInt()
+    val lease = if (scratchSize == 0) null else
+      checkNotNull(buffers.reserve(scratchSize)) { "Recheck budget exhausted" }
+    try {
+      val scratch = ByteArray(scratchSize)
+      verified.fill(false)
+      progress.fill(0)
+      val context = currentCoroutineContext()
+      for (index in verified.indices) {
+        context.ensureActive()
+        val extent = verifier.layout.v2Piece(index.toLong())
+        val file = filesById.getValue(checkNotNull(extent.fileId))
+        if (file.id !in selected) continue
+        val valid = try {
+          storageOperation {
+            val path = destination(file)
+            validateOwned(path, directory = false)
+            val verification = verifier.piece(index.toLong())
+            fileSystem.openReadWrite(path, mustExist = true).use { handle ->
+              var offset = 0L
+              while (offset < extent.length) {
+                context.ensureActive()
+                val count = minOf(scratch.size.toLong(), extent.length - offset).toInt()
+                readFully(handle, extent.fileOffset + offset, scratch, count, context)
+                verification.update(scratch, 0, count)
+                offset += count
+              }
+              val matches = verification.verify()
+              // A previous canceled/failed write may have left bytes without a completed flush.
+              if (matches) handle.flush()
+              matches
+            }
+          }
+        } catch (_: IOException) {
+          false
+        }
+        context.ensureActive()
+        if (valid) {
+          verified[index] = true
+          progress[file.v2Index] += extent.length
+        }
+      }
+      verified.copyOf()
+    } finally {
+      lease?.close()
+    }
+  }
+
+  private fun readFully(
+    handle: FileHandle,
+    offset: Long,
+    bytes: ByteArray,
+    count: Int,
+    context: CoroutineContext,
+  ) {
+    var position = 0
+    while (position < count) {
+      context.ensureActive()
+      val size = handle.read(offset + position, bytes, position, count - position)
+      if (size <= 0) throw EOFException("Truncated torrent payload")
+      position += size
     }
   }
 
