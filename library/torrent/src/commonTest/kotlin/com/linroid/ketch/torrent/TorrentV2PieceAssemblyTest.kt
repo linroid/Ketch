@@ -7,6 +7,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okio.ByteString.Companion.toByteString
 import okio.FileSystem
@@ -119,7 +120,7 @@ class TorrentV2PieceAssemblyTest {
   }
 
   @Test
-  fun storageAdmissionFailureReleasesTheConsumedAssemblyWithoutPublishing() = runTest {
+  fun sealedAssemblyCommitsWithoutRequiringASecondPayloadReservation() = runTest {
     val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-assembly-pressure-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
     val budget = TorrentBufferBudget(20_000)
@@ -133,12 +134,80 @@ class TorrentV2PieceAssemblyTest {
         assembly.accept(block(request, bytes.copyOfRange(request.begin,
           request.begin + request.length), incoming))
       }
-      assertFailsWith<IllegalStateException> { assembly.commit(store) }
+      assertTrue(assembly.commit(store))
       assertFalse(assembly.complete)
-      assertFalse(store.completed())
-      assertEquals(0L, torrentFileSystem.metadata(path / "a").size)
+      assertTrue(store.completed())
+      assertEquals(bytes.size.toLong(), torrentFileSystem.metadata(path / "a").size)
       assertEquals(0, budget.allocated)
       assertEquals(0, incoming.allocated)
+    } finally {
+      assembly.close()
+      store.cleanup()
+    }
+  }
+
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun closingAnAssemblyDuringCommitRetainsAdmissionUntilTheCommitUnwinds() = runTest {
+    val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-assembly-sealed-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val budget = TorrentBufferBudget(20_000)
+    val incoming = TorrentBufferBudget(20_000)
+    val slots = Semaphore(1)
+    val store = TorrentV2PieceStore(document, path, emptySet(), "test", budget, slots)
+    val assembly = assertNotNull(TorrentV2PieceAssembly.create(layout, 0, budget))
+    try {
+      store.initialize()
+      for (slot in assembly.missingBlocks()) {
+        val request = assembly.request(slot)
+        assembly.accept(block(request, bytes.copyOfRange(request.begin,
+          request.begin + request.length), incoming))
+      }
+      slots.acquire()
+      try {
+        val commit = async { assembly.commit(store) }
+        runCurrent()
+        assembly.close()
+        assertTrue(budget.allocated > 0)
+        assertFailsWith<IllegalStateException> {
+          assembly.accept(block(PeerMessage.Request(0, 0, 3), byteArrayOf(1, 2, 3), incoming))
+        }
+        assertEquals(0, incoming.allocated)
+        commit.cancelAndJoin()
+        assertEquals(0, budget.allocated)
+      } finally { slots.release() }
+      assertFalse(store.completed())
+    } finally {
+      assembly.close()
+      store.cleanup()
+    }
+  }
+
+  @Test
+  fun fullSixteenMiBPieceCommitsWithinTheDefaultThirtyTwoMiBTransferBudget() = runTest {
+    val length = 16 * 1024 * 1024
+    val data = ByteArray(PeerWire.BLOCK_SIZE) { it.toByte() }
+    val merkle = TorrentMerkleRoot(length.toLong())
+    repeat(length / data.size) { merkle.update(data) }
+    val doc = TorrentV2Document.parse(Bencode.encode(mapOf("info" to mapOf(
+      "meta version" to 2L, "piece length" to length.toLong(), "file tree" to mapOf(
+        "a" to mapOf("" to mapOf("length" to length.toLong(), "pieces root" to merkle.digest())))
+    ), "piece layers" to emptyMap<String, Any>())))
+    val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-assembly-full-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val budget = TorrentBufferBudget(32 * 1024 * 1024)
+    val store = TorrentV2PieceStore(doc, path, emptySet(), "test", budget, Semaphore(1))
+    val assembly = assertNotNull(TorrentV2PieceAssembly.create(
+      TorrentContentLayout.from(doc.info), 0, budget))
+    try {
+      store.initialize()
+      for (slot in assembly.missingBlocks()) {
+        assembly.accept(block(assembly.request(slot), data, budget))
+      }
+      assertTrue(assembly.commit(store))
+      assertTrue(store.completed())
+      assertEquals(length.toLong(), torrentFileSystem.metadata(path / "a").size)
+      assertEquals(0, budget.allocated)
     } finally {
       assembly.close()
       store.cleanup()

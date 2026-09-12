@@ -9,8 +9,9 @@ internal class TorrentV2PieceAssembly private constructor(
 ) {
   private var count = 0
   private var closed = false
+  private var committing = false
   val blockCount: Int get() = received.size
-  val complete: Boolean get() = !closed && count == received.size
+  val complete: Boolean get() = !closed && !committing && count == received.size
 
   fun request(block: Int): PeerMessage.Request {
     check(!closed)
@@ -27,7 +28,7 @@ internal class TorrentV2PieceAssembly private constructor(
   /** Always consumes the delivered block's credit, including duplicate and invalid responses. */
   fun accept(block: PeerBlockExchange.Response.Block) {
     try {
-      check(!closed)
+      check(!closed && !committing)
       val request = block.ticket.request
       require(request.index == index && request.begin >= 0 &&
         request.begin % PeerWire.BLOCK_SIZE == 0) { "Block is outside this assembly" }
@@ -45,19 +46,21 @@ internal class TorrentV2PieceAssembly private constructor(
 
   /**
    * Consumes a complete assembly on success, hash rejection, cancellation or storage failure.
-   * Only the store may publish verified progress, after validating and flushing its private copy.
+   * Only the store may publish verified progress, after validating and flushing this sealed buffer.
    */
   suspend fun commit(store: TorrentV2PieceStore): Boolean {
     check(complete) { "Assembly is closed or incomplete" }
+    committing = true
     try {
-      return store.commit(index, bytes)
+      return store.commitOwned(index, bytes)
     } finally {
+      committing = false
       close()
     }
   }
 
   fun close() {
-    if (closed) return
+    if (closed || committing) return
     closed = true
     lease.close()
   }

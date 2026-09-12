@@ -451,12 +451,20 @@ blocks populate distinct slots; wrong pieces, noncanonical ranges, size mismatch
 cannot mark a missing slot complete. Every accepted or rejected delivered block releases its own
 credit after copying/validation, while the independent assembly reservation remains held.
 
-Only a complete assembly can invoke the v2 store. The store verifies its own admitted private copy
-and flushes before publishing progress; hash rejection, storage failure or cancellation consumes
-and releases the assembly without bypassing that barrier. Incomplete assemblies remain available
+Only a complete assembly can invoke the v2 store. The assembly seals its admitted buffer against
+further mutation and retains credit until the store's validation/write/flush operation unwinds.
+Hash rejection, storage failure or cancellation consumes and releases the assembly without bypassing
+that barrier. Ordinary mutable caller buffers still use a privately admitted store copy. Incomplete assemblies remain available
 for further blocks. A real TCP test joins full-identity v2 negotiation, bounded block requests,
 reverse-order replies, assembly, verification and disk commit, checking all buffer credit returns.
 
 This is component integration against a controlled peer, not independent-client v2 interoperability
 or the finished runtime. The concurrent event loop and timers, multi-peer scheduling, hash serving,
 seeding, session admission/wiring and all remaining production gates still require completion.
+
+
+The sealed assembly path avoids reserving a second full payload: a 16 MiB piece plus bookkeeping
+can now commit under the default 32 MiB transfer budget. The full-size regression failed before
+this change with payload budget exhaustion and now verifies successful disk commit. Closing during
+an in-flight commit defers credit release until that commit unwinds, including cancellation while
+waiting for storage admission.
