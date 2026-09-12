@@ -215,3 +215,24 @@ are neither adopted nor deleted.
 This supports checkpoint-backed live-store recovery, not the complete engine resume path. Atomic
 TaskStore publication, durable creation journals for files created after the last snapshot,
 missing-file repair/import, v1 migration, state admission and power-loss qualification remain open.
+
+### Atomic checkpoint files
+
+`TorrentCheckpointFile` publishes task snapshots in an existing caller-private state directory.
+It validates the snapshot against its document and publishes authenticated catalog content first.
+A unique temporary file is written and flushed before atomic replacement of the task's state file;
+failed writes, flushes or replacement retain the previous complete checkpoint. Temporary cleanup
+checks the identity of the file created by this attempt. Loads distinguish missing state from
+malformed state, reject oversized files before allocation, check the task binding, and authenticate
+the referenced catalog document before returning recovery inputs. Store recovery still checks the
+expected output/selection and OS ownership; loaded bitfields remain hints.
+
+Replacement rejects changed content/output bindings, regressed counters or generations, and a
+selection change without a new selection generation. A runtime task owner must serialize writers
+through one adapter instance; cross-process arbitration is not provided. Cancellation observed
+before replacement discards the staged file. Cancellation concurrent with atomic replacement can
+leave the complete new snapshot persisted even though the coroutine returns cancellation; recovery
+must load the persisted state instead of inferring publication from the caller's return value.
+
+This adapter does not yet wire v2 state into `TaskStore` or the engine. Durable creation journals,
+state-memory admission, migration and directory-fsync power-loss recovery remain required work.
