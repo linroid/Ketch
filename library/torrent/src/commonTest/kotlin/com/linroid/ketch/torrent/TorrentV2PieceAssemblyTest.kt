@@ -250,16 +250,20 @@ class TorrentV2PieceAssemblyTest {
             pieceCount = 1)
           val peer = PeerBlockExchange(layout, transport, budget)
           exchange = peer
-          repeat(2) {
-            val frame = transport.read()
-            try { assertNull(peer.receive(frame)) } finally { frame.close() }
-          }
-          for (slot in assembly.missingBlocks()) assertNotNull(peer.request(assembly.request(slot)))
-          repeat(2) {
-            val frame = transport.read()
-            try {
-              assembly.accept(assertIs<PeerBlockExchange.Response.Block>(peer.receive(frame)))
-            } finally { frame.close() }
+          PeerV2Inbox.run(transport, peer) { inbox ->
+            repeat(2) {
+              val frame = assertIs<PeerV2Inbox.Event.Frame>(inbox.next()).value
+              try { assertNull(peer.receive(frame)) } finally { frame.close() }
+            }
+            for (slot in assembly.missingBlocks()) {
+              assertNotNull(peer.request(assembly.request(slot)))
+            }
+            repeat(2) {
+              val frame = assertIs<PeerV2Inbox.Event.Frame>(inbox.next()).value
+              try {
+                assembly.accept(assertIs<PeerBlockExchange.Response.Block>(peer.receive(frame)))
+              } finally { frame.close() }
+            }
           }
           assertTrue(assembly.complete)
           assertFalse(store.completed())
