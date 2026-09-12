@@ -45,6 +45,8 @@ data class TorrentConfig(
   val maxCachedMetadataBytes: Int = 4 * 1024 * 1024,
   /** Aggregate admission allowance for session metadata, indexes, and checking scratch space. */
   val maxSessionStateBytes: Int = 8 * 1024 * 1024,
+  /** Aggregate open payload-file ceiling. Storage waits before opening another payload handle. */
+  val maxOpenPayloadFiles: Int = 32,
   /** File count ceiling applied before constructing a session's storage indexes. */
   val maxFilesPerTorrent: Int = 10_000,
   /** Logical piece ceiling applied before constructing session and scheduler arrays. */
@@ -61,6 +63,7 @@ data class TorrentConfig(
     require(maxMetadataBytes in 1..4 * 1024 * 1024)
     require(maxBufferedBytes >= 16384) { "maxBufferedBytes must hold a protocol block" }
     require(maxCachedMetadataBytes > 0 && maxSessionStateBytes > 0)
+    require(maxOpenPayloadFiles in 1..128)
     require(maxFilesPerTorrent in 1..100_000)
     require(maxPiecesPerTorrent in 1..1_000_000)
     require(maxBufferedBytes.toLong() + metadataExchangeBytes + maxCachedMetadataBytes +

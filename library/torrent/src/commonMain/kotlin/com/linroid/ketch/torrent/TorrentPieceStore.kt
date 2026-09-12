@@ -1,10 +1,13 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import okio.EOFException
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -20,6 +23,7 @@ internal class TorrentPieceStore(
   selected: Set<Int>,
   private val taskId: String,
   private val fileSystem: FileSystem = torrentFileSystem,
+  private val storageSlots: Semaphore = Semaphore(32),
 ) {
   private val mutex = Mutex()
   private val output = absolute(output)
@@ -90,8 +94,8 @@ internal class TorrentPieceStore(
   fun needed(index: Int): Boolean = wanted[index]
 
   suspend fun initialize() = mutex.withLock {
-    withContext(Dispatchers.IO) {
-      if (initialized) return@withContext
+    storageOperation {
+      if (initialized) return@storageOperation
       ensureDirectory(sidecar)
       loadOwnership()
       journal.initialize()
@@ -128,7 +132,7 @@ internal class TorrentPieceStore(
     require(bytes.size == pieceSize(index) && needed(index))
     if (!matches(index, bytes)) return@withLock false
     if (verified[index]) return@withLock true
-    withContext(Dispatchers.IO) {
+    storageOperation {
       val start = index * metadata.pieceLength
       val end = start + bytes.size
       val spans = overlappingFiles(index).filter { it in selected }
@@ -155,12 +159,12 @@ internal class TorrentPieceStore(
 
   /** Reads selected spans from the output and skipped boundary spans from owned sidecars. */
   suspend fun read(index: Int): ByteArray = mutex.withLock {
-    withContext(Dispatchers.IO) { readPiece(index) }
+    storageOperation { readPiece(index) }
   }
 
   suspend fun recheck(): BooleanArray = mutex.withLock {
     check(initialized)
-    withContext(Dispatchers.IO) {
+    storageOperation {
       verified.fill(false)
       fileProgress.fill(0)
       remaining = wanted.count { it }
@@ -194,7 +198,7 @@ internal class TorrentPieceStore(
 
   suspend fun finish() = mutex.withLock {
     check(initialized && remaining == 0) { "Selected torrent files are incomplete" }
-    withContext(Dispatchers.IO) {
+    storageOperation {
       for (file in selected) {
         val path = filePath(file)
         validateRegularPath(path)
@@ -212,7 +216,7 @@ internal class TorrentPieceStore(
 
   /** Deletes only recorded paths whose OS identity still matches the task-owned file. */
   suspend fun cleanup() = mutex.withLock {
-    withContext(Dispatchers.IO) {
+    storageOperation {
       val files = ownedFiles.toList().asReversed().sortedBy { it.first == journalPath }
       for ((path, identity) in files) {
         validateRegularPath(path)
@@ -235,7 +239,7 @@ internal class TorrentPieceStore(
   }
 
   suspend fun recoverOwnership() = mutex.withLock {
-    withContext(Dispatchers.IO) { loadOwnership() }
+    storageOperation { loadOwnership() }
   }
 
   private fun loadOwnership() {
@@ -261,7 +265,7 @@ internal class TorrentPieceStore(
     mutex.withLock {
     require(receivedBytes >= 0 && uploadedBytes >= 0)
     check(initialized)
-    withContext(Dispatchers.IO) {
+    storageOperation {
       if (journal.needsCompaction) {
         require(torrentFileIdentity(journalPath) == ownedFiles[journalPath])
         val records = ownedDirectories.map { true to TorrentOwnedPath(it.key.toString(), it.value) } +
@@ -290,6 +294,12 @@ internal class TorrentPieceStore(
       snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
     }
   }
+
+  // A store opens at most one payload handle at a time. Acquire before dispatching blocking I/O;
+  // retain the slot until that I/O actually returns, including cancellation and provider failures.
+  // Journals/checkpoints may open extra non-payload handles and are outside this payload ceiling.
+  private suspend fun <T> storageOperation(block: suspend CoroutineScope.() -> T): T =
+    storageSlots.withPermit { withContext(Dispatchers.IO, block) }
 
   private fun snapshot(): TorrentCheckpoint = TorrentCheckpoint(taskId, metadata,
     output.toString(), selected, verified.copyOf(),
