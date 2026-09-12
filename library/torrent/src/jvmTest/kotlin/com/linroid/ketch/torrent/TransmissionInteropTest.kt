@@ -30,13 +30,20 @@ import kotlin.test.assertTrue
 class TransmissionInteropTest {
   @Test
   fun publicSource_resolvesTrackerlessMagnetAndDownloadsFromTransmission() = runTest {
-    val binary = System.getenv("TRANSMISSION_DAEMON")?.takeIf { it.isNotBlank() } ?: return@runTest
+    val binary = checkNotNull(System.getenv("TRANSMISSION_DAEMON")?.takeIf { it.isNotBlank() }) {
+      "Transmission conformance requires TRANSMISSION_DAEMON; see test-fixtures/torrent/README.md"
+    }
     withContext(Dispatchers.IO) {
       withTimeout(60_000) {
         val version = ProcessBuilder(binary, "--version").redirectErrorStream(true).start()
-        val versionText = version.inputStream.bufferedReader().readText()
-        assertTrue(version.waitFor(5, TimeUnit.SECONDS))
-        assertTrue("4.1.3" in versionText || "4.0.5" in versionText, versionText)
+        val exited = version.waitFor(5, TimeUnit.SECONDS)
+        if (!exited) version.destroyForcibly().waitFor()
+        assertTrue(exited, "Transmission version check timed out")
+        val versionText = version.inputStream.bufferedReader().readText().trim()
+        assertEquals(0, version.exitValue(), versionText)
+        val expected = ConformanceClients.version("transmission")
+        assertTrue(versionText.startsWith("transmission-daemon $expected "), versionText)
+        println("CONFORMANCE_CLIENT $versionText")
         val root = Files.createTempDirectory("ketch-transmission").toFile()
         val seed = root.resolve("seed").apply { mkdirs() }
         val payload = ByteArray(512 * 1024 + 37) { (it * 31 + 17).toByte() }
