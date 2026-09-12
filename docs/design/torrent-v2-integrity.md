@@ -587,3 +587,20 @@ Tests cover exact rarity choices, rotating ties, replacements/removal, duplicate
 and unadmitted snapshots, empty/million-piece indexes and automatic scheduler integration. Full
 peer/session availability routing, generation barriers, adaptive streaming/endgame policy, upload/
 hash serving, independent-client interoperability and all remaining production gates are unfinished.
+
+### Interest signaling before unchoke
+
+The scheduler derives interest from selected, unverified pieces advertised by the peer, independently
+of choke state, pipeline capacity and assembly admission. Its request path establishes initial
+interest even when candidate admission is waiting for unchoke. The actor calls `updateInterest` after
+availability or verification changes to clear interest once no wanted advertised pieces remain.
+Already interested request pipelines avoid rescanning the piece index for each block.
+
+The block exchange writes interested/not-interested through frame admission, suppresses duplicate
+updates and changes its local flag only after a successful write. Frame pressure leaves the flag
+unchanged for retry. Writes honor existing response deadlines plus their own time bound; partial,
+canceled or late writes close the pipeline. Scheduler write failures remove abandoned assignments.
+
+Tests cover the advertised-piece/interested/unchoke/request order, selected-file completion, frame
+pressure, duplicate suppression and blocked/non-suspending late writes. Full actor event routing,
+upload/hash serving and remaining production capabilities and release gates remain unfinished.

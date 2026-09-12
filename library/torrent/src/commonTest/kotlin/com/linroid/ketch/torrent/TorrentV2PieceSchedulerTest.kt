@@ -32,11 +32,13 @@ class TorrentV2PieceSchedulerTest {
   ) {
     var failWrite = false
     val input = Buffer()
+    val output = Buffer()
     private val connection = object : TorrentConnection {
       override val remote = PeerEndpoint("127.0.0.1", 1)
       override suspend fun readExactly(size: Int): ByteArray = input.readByteArray(size.toLong())
       override suspend fun write(bytes: ByteArray) {
         if (failWrite) throw okio.IOException("Partial request write")
+        output.write(bytes)
       }
       override fun close() = Unit
     }
@@ -272,6 +274,53 @@ class TorrentV2PieceSchedulerTest {
       repeat(128) { assertTrue(scheduler.begin(it)) }
       assertEquals(128, scheduler.activeCount)
     } finally { scheduler.close() }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
+  fun interestStartsWhileChokedAndStopsWhenSelectedPiecesAreVerified() = runTest {
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, setOf("1"),
+      BooleanArray(2), buffers, state))
+    val picker = assertNotNull(TorrentV2RarityPicker.create<PeerBlockExchange>(2, state))
+    val peer = Peer(buffers, layout)
+    try {
+      peer.receive(PeerMessage.Bitfield(byteArrayOf(192.toByte())))
+      picker.update(peer.exchange, byteArrayOf(192.toByte()))
+      assertTrue(scheduler.needsPeer(peer.exchange))
+      assertFalse(scheduler.beginNext(peer.exchange, picker))
+      assertNull(scheduler.requestNext(peer.exchange))
+      assertTrue(peer.exchange.localInterested)
+      val size = peer.output.readInt()
+      assertEquals(PeerMessage.Control(PeerMessage.Signal.INTERESTED),
+        PeerWire.decode(peer.output.readByteArray(size.toLong())))
+      peer.receive(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+      assertTrue(scheduler.beginNext(peer.exchange, picker))
+      assertEquals(1, assertNotNull(scheduler.requestNext(peer.exchange)).request.index)
+      val requestSize = peer.output.readInt()
+      val sent = PeerWire.decode(peer.output.readByteArray(requestSize.toLong()))
+      assertIs<PeerMessage.Request>(sent)
+      assertEquals(0L, peer.output.size)
+    } finally {
+      scheduler.removePeer(peer.exchange)
+      picker.close()
+      scheduler.close()
+    }
+    val finished = assertNotNull(TorrentV2PieceScheduler.create(layout, setOf("1"),
+      booleanArrayOf(false, true), buffers, state))
+    val next = Peer(buffers, layout)
+    try {
+      next.ready()
+      assertTrue(next.exchange.setInterested(true))
+      assertFalse(finished.needsPeer(next.exchange))
+      assertTrue(finished.updateInterest(next.exchange))
+      assertFalse(next.exchange.localInterested)
+    } finally {
+      finished.removePeer(next.exchange)
+      finished.close()
+    }
     assertEquals(0, buffers.allocated)
     assertEquals(0, state.allocated)
   }

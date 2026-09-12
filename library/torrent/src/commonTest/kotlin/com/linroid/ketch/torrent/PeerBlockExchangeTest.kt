@@ -192,6 +192,53 @@ class PeerBlockExchangeTest {
     assertEquals(0, f.exchange.pendingCount)
   }
 
+  @Test
+  fun interestIsAdmittedRetriedAndDeduplicatedWithoutDependingOnRemoteChokeState() = runTest {
+    val f = Fixture()
+    val occupied = assertNotNull(f.frames.reserve(f.frames.capacity))
+    assertFalse(f.exchange.setInterested(true))
+    assertFalse(f.exchange.localInterested)
+    assertEquals(0L, f.connection.outgoing.size)
+    occupied.close()
+    assertTrue(f.exchange.setInterested(true))
+    assertTrue(f.exchange.localInterested)
+    val written = f.connection.outgoing.size
+    assertTrue(f.exchange.setInterested(true))
+    assertEquals(written, f.connection.outgoing.size)
+    assertTrue(f.exchange.setInterested(false))
+    for (signal in listOf(PeerMessage.Signal.INTERESTED, PeerMessage.Signal.NOT_INTERESTED)) {
+      val size = f.connection.outgoing.readInt()
+      assertEquals(PeerMessage.Control(signal),
+        PeerWire.decode(f.connection.outgoing.readByteArray(size.toLong())))
+    }
+    f.exchange.close()
+    assertEquals(0, f.frames.allocated)
+  }
+
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun interestWritesCannotConcealPendingDeadlinesOrReportLateSuccess() = runTest {
+    val f = Fixture()
+    f.ready()
+    assertNotNull(f.exchange.request(PeerMessage.Request(0, 0, 3)))
+    f.now = 8
+    f.connection.writing = { awaitCancellation() }
+    assertFailsWith<kotlinx.coroutines.TimeoutCancellationException> {
+      f.exchange.setInterested(true)
+    }
+    assertEquals(2L, testScheduler.currentTime)
+    assertTrue(f.connection.closed)
+    assertFalse(f.exchange.localInterested)
+    assertEquals(0, f.frames.allocated)
+    assertEquals(0, f.blocks.allocated)
+    val late = Fixture()
+    late.connection.writing = { late.now = 10 }
+    assertFailsWith<IllegalStateException> { late.exchange.setInterested(true) }
+    assertTrue(late.connection.closed)
+    assertFalse(late.exchange.localInterested)
+    assertEquals(0, late.frames.allocated)
+  }
+
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
   @Test
   fun backpressuredWritesUseTheOldestPendingDeadlineAndLateWritesCannotReturnTickets() = runTest {

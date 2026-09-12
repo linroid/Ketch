@@ -43,10 +43,42 @@ internal class PeerBlockExchange(
     explicitRejects = true)
   private val pending = mutableMapOf<PeerMessage.Request, Pending>()
   private var closed = false
+  var localInterested: Boolean = false
+    private set
   val pendingCount: Int get() = pending.size
 
   fun canRequest(index: Int): Boolean = !closed && pending.size < maxPending && !state.choking &&
     state.hasPiece(index)
+
+  fun hasPiece(index: Int): Boolean = !closed && state.hasPiece(index)
+
+  /** Admission failure leaves interest unchanged for retry; repeated updates emit no frame. */
+  suspend fun setInterested(value: Boolean): Boolean {
+    checkLive()
+    if (localInterested == value) return true
+    try {
+      val time = nextDeadlineMs() ?: timeoutMs
+      check(time > 0) { "Peer block expired before interest write" }
+      val started = clock()
+      val sent = withTimeout(time) {
+        transport.trySend(PeerMessage.Control(if (value) PeerMessage.Signal.INTERESTED else
+          PeerMessage.Signal.NOT_INTERESTED))
+      }
+      checkLive()
+      if (sent) {
+        val finished = clock()
+        val elapsed = finished - started
+        check(finished >= started && elapsed >= 0 && elapsed < time) {
+          "Peer interest write expired"
+        }
+        localInterested = value
+      }
+      return sent
+    } catch (error: Throwable) {
+      close()
+      throw error
+    }
+  }
 
   /** Relative delay for the actor's timer; control traffic and cancels never extend deadlines. */
   fun nextDeadlineMs(): Long? = pending.values.minOfOrNull { remaining(it) }

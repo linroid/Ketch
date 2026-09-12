@@ -50,9 +50,27 @@ internal class TorrentV2PieceScheduler private constructor(
     return true
   }
 
+  /** Interest ignores choke/pipeline state so an available choked peer can choose to unchoke us. */
+  fun needsPeer(peer: PeerBlockExchange): Boolean {
+    check(!closed)
+    return verified.indices.any { wanted[it] && !verified[it] && peer.hasPiece(it) }
+  }
+
+  /** Call after availability/verification changes; false means retry when frame credit returns. */
+  suspend fun updateInterest(peer: PeerBlockExchange): Boolean {
+    check(!closed)
+    try {
+      return peer.setInterested(needsPeer(peer))
+    } catch (error: Throwable) {
+      try { removePeer(peer) } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
+      throw error
+    }
+  }
+
   /** One assignment per canonical block; peers can fill different blocks in parallel. */
   suspend fun requestNext(peer: PeerBlockExchange): PeerBlockExchange.Ticket? {
     check(!closed)
+    if (!peer.localInterested && !updateInterest(peer)) return null
     var attempts = 0
     for (assembly in assemblies.values) {
       if (!peer.canRequest(assembly.index)) continue
