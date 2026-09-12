@@ -74,3 +74,17 @@ These are metadata consistency checks. Hash strings alone cannot prove that a hy
 matches both formats. The download/storage integration must verify both integrity schemes before
 publishing shared availability or committed progress. Filesystem path mapping and the complete
 v1/v2 runtime input adapter are still required before advertising v2/hybrid download support.
+
+## Payload authentication before commit
+
+`TorrentPayloadVerifier` binds streamed piece bytes to an authenticated `TorrentV2Document` and
+its content layout. Small files use their file root directly. Larger files use the imported,
+authenticated piece-layer hash; short final pieces are expanded with zero-hash subtrees to that
+layer's height. Hybrid pieces must also match their v1 SHA-1 hash, including virtual alignment
+zeros generated in bounded chunks. Callers provide only actual payload bytes.
+
+Verification retains hashing state rather than a full piece buffer. It rejects excess input,
+allows incomplete input to be completed, and finalizes once. A successful result authorizes no
+progress publication by itself: storage must retain or stage the same bytes, commit them under
+its cancellation/generation barrier, and only then publish availability. That storage adapter,
+network proof acquisition, and v2 interoperability remain pending.
