@@ -266,6 +266,9 @@ internal class TorrentPieceStore(
     // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
   }
 
+  /** Owner shutdown only, after joining all operations; the persisted checkpoint is untouched. */
+  fun discardTrackerConfiguration() { trackerConfiguration = null }
+
   /** Borrowed committed configuration; a canceled caller can inspect the commit outcome. */
   suspend fun currentTrackerConfiguration(): TrackerConfiguration? = mutex.withLock {
     trackerConfiguration

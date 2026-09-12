@@ -35,16 +35,15 @@ internal fun sessionStateWeight(spec: TorrentTaskSpec): Long {
     pieces * 128 + metadata.files.sumOf { 512 + it.path.length * 4L } +
     largestPiece * 2 + (spec.resumeData?.size ?: 0) * 8L +
     spec.outputPath.length * 4L + (spec.magnetUri?.length ?: 0) * 4L +
-    spec.selected.size * 64L + 128 * 1024 + trackerControlStateWeight(metadata, spec.resumeData != null)
+    spec.selected.size * 64L + 128 * 1024 + trackerControlStateWeight()
 }
 
-/** Dedicated per-session control pool is backed by the already-held admission lease. */
-internal fun trackerControlStateWeight(metadata: TorrentMetadata, restoring: Boolean = false): Long {
-  val configured = metadata.trackerTiers.sumOf { it.size.toLong() }
-  // Reserve before decoding checkpoint overrides; their validated ceiling is 256 entries.
-  val entries = if (restoring) maxOf(256L, configured) else configured
-  return if (entries == 0L) 0L else (entries + 1) * 256 + 8192
-}
+/**
+ * Dedicated control pool is backed by the held session lease. Reserve the 256-entry edit ceiling
+ * even for empty metainfo lists, so a later admitted edit can always start its control worker.
+ */
+internal fun trackerControlStateWeight(): Long = (256L + 1) * 256 + 8192
+
 
 /** Runtime ownership ledger; a stopped-but-registered session remains charged after cleanup failure. */
 @OptIn(ExperimentalAtomicApi::class)

@@ -922,3 +922,28 @@ still matches, then remove the in-memory temporary ownership entry. Cleanup runs
 the I/O slot and preserves the original failure if cleanup also fails. Ownership journal records
 remain bounded by the existing compaction mechanism. Repeated canceled replacements are tested on
 the same store, preserving the committed checkpoint and allowing a later successful retry.
+
+## Session tracker edits
+
+The internal session command admits and snapshots a replacement before suspension and allows one
+pending edit. It serializes with pause, resume, and resume-data saves. An active session joins its
+old discovery and peer jobs, revokes private incoming admission, and drains queued connections before
+persisting the replacement. Success restarts a previously active session with the committed tiers;
+ordinary persistence failure restarts with the old tiers. Cancellation can leave the session paused.
+An empty list explicitly disables trackers and remains empty across resume; it never changes the
+metainfo's private flag or enables public discovery.
+
+The command reconciles the store's commit point in non-cancellable cleanup. A rename that completed
+before cancellation transfers the new configuration reservation to the session; otherwise the old
+owner remains. New configuration state and checkpoint encoding allowance are reserved from the
+shared session budget before stopping discovery, while the old allowance is still held. The committed
+allowance remains held for subsequent saves. All sessions reserve control capacity for the validated
+256-entry replacement ceiling, including sessions whose original tracker list was empty.
+
+Edits, saves, and pause persistence are children of the session scope. Closing joins those operations,
+clears the store's in-memory override, and releases its reservations; persisted data remains intact.
+Resume-data saves after closure return null. Caller cancellation joins an outstanding edit before
+returning its uncommitted credit. Tests cover real-engine stop/start ordering and empty overrides,
+failed persistence and retry, post-rename cancellation, snapshot isolation while old discovery joins,
+and admission rejection without interrupting the active session. Public SDK/daemon/UI commands and
+revision conflict handling remain separate work.
