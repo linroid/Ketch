@@ -35,3 +35,24 @@ compare the frontier against an independent full tree, verify every block of une
 and reject altered payloads, siblings, indices, sizes, and malformed padding even when the supplied
 root matches that malformed tree. These checks establish primitive behavior only after execution;
 they do not replace the v2 integration and release gates.
+
+## Raw info and imported piece layers
+
+`TorrentV2Info.parse` decodes the v2 fields of an exact info dictionary with byte, node, and file
+limits. It preserves original binary path components and raw info bytes, validates the v2 version,
+piece geometry, file/directory separation, lengths, and per-file roots, and can authenticate all
+supplied magnet topics before tree decoding. These paths are metadata, not filesystem paths;
+normalization, collision handling, and destination mapping still belong to the storage boundary.
+The parser does not validate a hybrid's v1 layout or an enclosing `.torrent` document.
+
+`TorrentPieceLayerVerifier` consumes individual hashes from the piece-size layer and folds them
+with a bounded Merkle frontier. Missing branches use the zero hash for that layer, rather than
+an all-zero hash at every tree height. `validatePieceLayers` checks an imported layer dictionary
+against the files that require layers, rejects missing/unreferenced roots and wrong byte counts,
+and authenticates each distinct root/topology once. Repeated files with identical roots reuse
+one layer without repeating its hash work. Unauthenticated layers are never returned on failure.
+
+The dictionary adapter receives already loaded immutable byte strings under a total layer-byte
+limit. It does not provide disk spilling or the streaming metainfo loader. Those resource paths
+must be added before importing documents at the full production profile limits. The incremental
+verifier can consume hashes from those future bounded streams without retaining the entire layer.
