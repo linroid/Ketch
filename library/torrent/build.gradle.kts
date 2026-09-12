@@ -95,8 +95,9 @@ tasks.withType<Test>().configureEach {
   val conformance = torrentConformance.get()
   inputs.property("torrentConformance", conformance)
   // Required evidence must describe this execution, not restored/cached XML from an earlier run.
-  outputs.upToDateWhen { !conformance }
-  outputs.cacheIf { !conformance }
+  val benchmark = providers.environmentVariable("KETCH_TORRENT_BENCHMARK").orNull == "1"
+  outputs.upToDateWhen { !conformance && !benchmark }
+  outputs.cacheIf { !conformance && !benchmark }
   if (!conformance && providers.environmentVariable("TRANSMISSION_DAEMON").orNull.isNullOrBlank()) {
     filter.excludeTestsMatching("*TransmissionInteropTest")
   }
@@ -104,7 +105,8 @@ tasks.withType<Test>().configureEach {
     filter.excludeTestsMatching("*TorrentBenchmarkTest")
   }
   for (name in listOf("TRANSMISSION_DAEMON", "KETCH_TORRENT_BENCHMARK",
-    "KETCH_NATIVE_CLI", "KETCH_JVM_CLI")) {
+    "KETCH_NATIVE_CLI", "KETCH_JVM_CLI", "KETCH_BENCHMARK_BYTES", "KETCH_BENCHMARK_RUNS",
+    "KETCH_BENCHMARK_REVISION", "KETCH_BENCHMARK_REPORT")) {
     val value = providers.environmentVariable(name).orElse("")
     inputs.property(name, value)
     environment(name, value.get())
