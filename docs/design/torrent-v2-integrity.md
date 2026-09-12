@@ -604,3 +604,18 @@ canceled or late writes close the pipeline. Scheduler write failures remove aban
 Tests cover the advertised-piece/interested/unchoke/request order, selected-file completion, frame
 pressure, duplicate suppression and blocked/non-suspending late writes. Full actor event routing,
 upload/hash serving and remaining production capabilities and release gates remain unfinished.
+
+### Request handoff between actors
+
+The piece scheduler can reserve a canonical block with `planNext` without reading mutable peer
+state or writing to a socket. Its availability callback must use the session actor's own snapshot.
+Reservations prevent duplicate assignment while a peer actor waits for outbound admission.
+The peer actor sends the request, then queues `resolve(plan, ticket)` before any response event
+for that ticket. Null acknowledges an unsent request and releases its reservation.
+
+Plans and issued tickets have separate identities: a stale acknowledgement cannot bind or release
+a replacement reservation, and a ticket from another connection cannot bind matching coordinates.
+A rejected acknowledgement requires the issuing actor to cancel or close any ticket it created.
+After a peer actor closes and joins its pipeline and reader, the session owner calls `detachPeer`
+to release abandoned reservations. The synchronous adapters remain for callers owning both objects.
+Full per-peer/session actor wiring and production throughput validation remain outstanding.

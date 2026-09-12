@@ -15,7 +15,10 @@ internal class PeerBlockExchange(
   private val timeoutMs: Long = 30_000,
   private val clock: () -> Long = monotonicClock(),
 ) {
-  class Ticket internal constructor(val request: PeerMessage.Request)
+  class Ticket internal constructor(
+    val request: PeerMessage.Request,
+    internal val owner: Any? = null,
+  )
   sealed interface Response {
     class Block internal constructor(
       val ticket: Ticket,
@@ -42,6 +45,7 @@ internal class PeerBlockExchange(
   private val state = PeerProtocolState(layout.pieceCount.toInt(), maxPending,
     explicitRejects = true)
   private val pending = mutableMapOf<PeerMessage.Request, Pending>()
+  private val identity = Any()
   private var closed = false
   var localInterested: Boolean = false
     private set
@@ -49,6 +53,8 @@ internal class PeerBlockExchange(
 
   fun canRequest(index: Int): Boolean = !closed && pending.size < maxPending && !state.choking &&
     state.hasPiece(index)
+
+  fun owns(ticket: Ticket): Boolean = ticket.owner === identity
 
   fun hasPiece(index: Int): Boolean = !closed && state.hasPiece(index)
 
@@ -104,7 +110,7 @@ internal class PeerBlockExchange(
       pending.size == maxPending) return null
     val lease = budget.reserve(request.length * 2 + 256) ?: return null
     try {
-      val value = Pending(Ticket(request), clock(), lease)
+      val value = Pending(Ticket(request, identity), clock(), lease)
       val sent = write(value) {
         transport.trySend(request) {
           state.requested(request)

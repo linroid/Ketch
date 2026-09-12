@@ -57,6 +57,77 @@ class TorrentV2PieceSchedulerTest {
   }
 
   @Test
+  fun reservationsDoNotWriteAndUnsentAcknowledgementsCannotReleaseNewerPlans() = runTest {
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      BooleanArray(2), buffers, state))
+    val first = Peer(buffers, layout)
+    val second = Peer(buffers, layout)
+    try {
+      assertTrue(scheduler.begin(0))
+      assertNull(scheduler.planNext(first.exchange) { false })
+      val a = assertNotNull(scheduler.planNext(first.exchange) { true })
+      val b = assertNotNull(scheduler.planNext(second.exchange) { true })
+      assertEquals(0, a.request.begin)
+      assertEquals(16_384, b.request.begin)
+      assertNull(scheduler.planNext(second.exchange) { true })
+      assertEquals(0L, first.output.size)
+      assertEquals(0L, second.output.size)
+      assertTrue(scheduler.resolve(a, null))
+      val retry = assertNotNull(scheduler.planNext(second.exchange) { true })
+      assertEquals(a.request, retry.request)
+      assertFalse(scheduler.resolve(a, null))
+      assertNull(scheduler.planNext(first.exchange) { true })
+      assertTrue(scheduler.resolve(retry, null))
+    } finally {
+      scheduler.removePeer(first.exchange)
+      scheduler.removePeer(second.exchange)
+      scheduler.close()
+    }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
+  fun acknowledgementsRequireTheIssuingPeerAndDetachedPlansCannotBindReplacementTickets() = runTest {
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      BooleanArray(2), buffers, state))
+    val first = Peer(buffers, layout)
+    val second = Peer(buffers, layout)
+    try {
+      first.ready()
+      second.ready()
+      assertTrue(scheduler.begin(1))
+      val old = assertNotNull(scheduler.planNext(first.exchange) { true })
+      val wrong = assertNotNull(second.exchange.request(old.request))
+      assertFailsWith<IllegalArgumentException> { scheduler.resolve(old, wrong) }
+      val ticket = assertNotNull(first.exchange.request(old.request))
+      assertTrue(scheduler.resolve(old, ticket))
+      assertFalse(scheduler.resolve(old, null))
+      first.exchange.close()
+      scheduler.detachPeer(first.exchange)
+      val replacement = assertNotNull(scheduler.planNext(second.exchange) { true })
+      assertFalse(scheduler.resolve(old, ticket))
+      assertTrue(scheduler.resolve(replacement, wrong))
+      assertFalse(scheduler.resolve(replacement, wrong))
+      val response = assertIs<PeerBlockExchange.Response.Block>(second.receive(
+        PeerMessage.Piece(1, 0, byteArrayOf(9))))
+      assertTrue(scheduler.receive(second.exchange, response))
+      scheduler.close()
+      assertFalse(scheduler.resolve(replacement, wrong))
+    } finally {
+      scheduler.removePeer(first.exchange)
+      scheduler.removePeer(second.exchange)
+      scheduler.close()
+    }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
   fun twoPeersFillDifferentBlocksAndOnlyTheMatchingCommitPublishesVerifiedState() = runTest {
     val buffers = TorrentBufferBudget(200_000)
     val state = TorrentBufferBudget(2_000_000)
