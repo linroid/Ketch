@@ -101,6 +101,23 @@ class PeerV2PoolTest {
   }
 
   @Test
+  fun requestedStopAfterStartupPublishesACleanJoinedClosure() = runTest {
+    val state = TorrentBufferBudget(2_000_000)
+    val f = Fixture { testScheduler.currentTime }
+    PeerV2Pool.run(state, maxPeers = 1) { pool ->
+      val peer = assertNotNull(pool.attach(f.transport, f.blocks))
+      assertIs<PeerV2Pool.Event.Ready>(pool.events.receive())
+      repeat(2) { assertIs<PeerV2Pool.Event.Message>(pool.events.receive()).close() }
+      assertTrue(pool.stop(peer))
+      val terminal = assertIs<PeerV2Pool.Event.Closed>(pool.events.receive())
+      assertNull(terminal.cause)
+      f.checkClosed()
+      assertTrue(pool.retire(terminal))
+    }
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
   fun malformedPeerIsIsolatedWhileAnotherDeliversOrderedAcknowledgementAndPayload() = runTest {
     val state = TorrentBufferBudget(2_000_000)
     val bad = Fixture(ready = false) { testScheduler.currentTime }

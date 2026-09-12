@@ -1,12 +1,12 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
@@ -43,6 +43,8 @@ internal class PeerV2Pool private constructor(
     /** All peer I/O has stopped and its reader has joined before this event is published. */
     class Closed internal constructor(override val peer: Peer, val cause: Throwable?) : Event
   }
+
+  private class RequestedStop : CancellationException("Peer stopped by session")
 
   private val members = mutableMapOf<Peer, Job>()
   private var closed = false
@@ -83,8 +85,10 @@ internal class PeerV2Pool private constructor(
         select {
           owner.onAwait { it }
           peer.stop.onAwait {
-            owner.cancelAndJoin()
-            if (outcome.isCompleted) outcome.await() else null
+            owner.cancel(RequestedStop())
+            owner.join()
+            val failure = if (outcome.isCompleted) outcome.await() else null
+            if (failure is RequestedStop && failure.suppressedExceptions.isEmpty()) null else failure
           }
         }
       }
