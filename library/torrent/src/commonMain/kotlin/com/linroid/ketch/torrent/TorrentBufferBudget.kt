@@ -46,5 +46,6 @@ internal class TorrentExchangeBudgets(config: TorrentConfig) {
   private val root = TorrentBufferBudget(config.maxExchangeBytes)
   val transfer = TorrentBufferBudget(config.maxBufferedBytes, root)
   val metadata = TorrentBufferBudget(config.metadataExchangeBytes, root)
+  val cache = TorrentBufferBudget(config.maxCachedMetadataBytes, root)
   val allocated: Int get() = root.allocated
 }

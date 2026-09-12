@@ -42,7 +42,8 @@ internal class KotlinTorrentEngine(
   private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
   private val exchangeBudgets = TorrentExchangeBudgets(config)
   private val budget = exchangeBudgets.transfer
-  private val cache = TorrentMetadataCache(scope)
+  private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
+    exchangeBudgets.cache)
   private val tracker = TorrentTracker(http, network)
   private val peerId = torrentRandomBytes(20)
   private val mutex = Mutex()
@@ -125,8 +126,9 @@ internal class KotlinTorrentEngine(
         nodes?.forEach { it.close() }
       } finally {
         scope.cancel()
-        network.close()
-        http.close()
+        try { network.close() } finally {
+          try { http.close() } finally { cache.close() }
+        }
       }
     }
   }
