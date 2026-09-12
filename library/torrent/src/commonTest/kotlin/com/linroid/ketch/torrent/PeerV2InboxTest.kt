@@ -210,7 +210,7 @@ class PeerV2InboxTest {
             PeerV2Inbox.run(f.transport, f.blocks) { inbox ->
               f.ready(inbox)
               assertNotNull(f.blocks.request(PeerMessage.Request(0, 0, 3)))
-              assertTrue(worker.trySubmit(assembly))
+              assertNotNull(worker.trySubmit(assembly))
               runCurrent()
               assertTrue(worker.completions.tryReceive().isFailure)
               inbox.next(worker.completions)

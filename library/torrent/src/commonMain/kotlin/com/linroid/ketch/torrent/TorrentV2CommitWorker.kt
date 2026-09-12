@@ -11,20 +11,33 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** One storage worker; queued assemblies already hold admission and transfer ownership on submit. */
+/** One storage worker; admitted assemblies transfer ownership on successful submission. */
 internal class TorrentV2CommitWorker private constructor(
-  private val input: Channel<TorrentV2PieceAssembly>,
+  private val input: Channel<Submission>,
   val completions: ReceiveChannel<Completion>,
 ) {
+  /** Opaque identity for one submission; the actor associates it with its session generation. */
+  class Ticket internal constructor(val index: Int)
+  private class Submission(val ticket: Ticket, val claim: TorrentV2PieceAssembly.Claim)
+
   sealed interface Completion {
-    data class Committed(val index: Int, val verified: Boolean) : Completion
-    data class Failed(val index: Int, val cause: Throwable) : Completion
+    val ticket: Ticket
+    data class Committed(override val ticket: Ticket, val verified: Boolean) : Completion
+    data class Failed(override val ticket: Ticket, val cause: Throwable) : Completion
   }
 
-  /** Success transfers the complete assembly; failure leaves it owned by the actor for retry. */
-  fun trySubmit(assembly: TorrentV2PieceAssembly): Boolean {
-    check(assembly.complete) { "Only complete assemblies can be submitted" }
-    return input.trySend(assembly).isSuccess
+  /** Non-null transfers ownership; saturation restores actor ownership without creating work. */
+  fun trySubmit(assembly: TorrentV2PieceAssembly): Ticket? {
+    val claim = assembly.transfer()
+    try {
+      val ticket = Ticket(claim.index)
+      if (input.trySend(Submission(ticket, claim)).isSuccess) return ticket
+      claim.restore()
+      return null
+    } catch (error: Throwable) {
+      claim.restore()
+      throw error
+    }
   }
 
   companion object {
@@ -36,19 +49,19 @@ internal class TorrentV2CommitWorker private constructor(
       body: suspend (TorrentV2CommitWorker) -> T,
     ): T = coroutineScope {
       require(capacity in 1..16)
-      val input = Channel<TorrentV2PieceAssembly>(capacity, onUndeliveredElement = { it.close() })
+      val input = Channel<Submission>(capacity, onUndeliveredElement = { it.claim.close() })
       val output = Channel<Completion>(capacity)
       val worker = launch(dispatcher) {
         try {
-          for (assembly in input) {
+          for (submission in input) {
             val result = try {
-              Completion.Committed(assembly.index, assembly.commit(store))
+              Completion.Committed(submission.ticket, submission.claim.commit(store))
             } catch (error: CancellationException) {
               throw error
             } catch (error: Throwable) {
-              Completion.Failed(assembly.index, error)
+              Completion.Failed(submission.ticket, error)
             } finally {
-              assembly.close()
+              submission.claim.close()
             }
             output.send(result)
           }

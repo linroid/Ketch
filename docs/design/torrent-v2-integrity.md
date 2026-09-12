@@ -509,3 +509,22 @@ These components supply worker dispatch and completion plumbing. The production 
 must create/admit assemblies, route completions across peer/session lifetimes, retry queue pressure,
 and reconcile checkpoint/progress generations. Full upload/hash serving, session integration and
 all remaining capabilities and release gates remain required.
+
+### Commit handoff identity
+
+Commit submission now returns an opaque ticket, and every completion carries that exact ticket.
+The ticket contains only the piece index, without retaining an assembly or payload. The scheduler
+can associate it with its current session/selection generation and distinguish later submissions
+for the same piece. Generation reconciliation still belongs to the runtime integration.
+
+Assembly ownership moves atomically from the actor to a unique queue claim, then to the committing
+worker and finally to closed. A queued assembly cannot be submitted twice, mutated, directly
+committed, or released through its old actor handle. If queue admission fails, the exact claim
+restores actor ownership. A stale claim cannot restore or close a newer handoff. Cancellation and
+undelivered queue cleanup close only the current claim, and an in-flight commit retains its lease
+until the store operation unwinds.
+
+Tests exercise duplicate submission before the worker runs, actor close after transfer, restoration
+on queue pressure, stale claims after a second handoff, and exact ticket identity across corrupt
+and successful submissions of the same piece. This strengthens scheduler-facing ownership; full
+scheduler/session routing and the remaining production gates are still required.
