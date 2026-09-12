@@ -442,3 +442,21 @@ Outbound frame admission also precedes block request registration. Temporary fra
 null for a new request without disturbing existing requests. Cancellation returns false when its
 frame cannot be admitted and leaves the request uncanceled, so the actor may retry after credit
 returns. Neither path emits bytes or resets deadlines; real partial writes still close the stream.
+
+### Admitted piece assembly and verified commit
+
+`TorrentV2PieceAssembly` reserves payload and bounded block-index capacity before allocation. It
+uses canonical 16 KiB requests with a short final block matching the real file tail. Out-of-order
+blocks populate distinct slots; wrong pieces, noncanonical ranges, size mismatches and duplicates
+cannot mark a missing slot complete. Every accepted or rejected delivered block releases its own
+credit after copying/validation, while the independent assembly reservation remains held.
+
+Only a complete assembly can invoke the v2 store. The store verifies its own admitted private copy
+and flushes before publishing progress; hash rejection, storage failure or cancellation consumes
+and releases the assembly without bypassing that barrier. Incomplete assemblies remain available
+for further blocks. A real TCP test joins full-identity v2 negotiation, bounded block requests,
+reverse-order replies, assembly, verification and disk commit, checking all buffer credit returns.
+
+This is component integration against a controlled peer, not independent-client v2 interoperability
+or the finished runtime. The concurrent event loop and timers, multi-peer scheduling, hash serving,
+seeding, session admission/wiring and all remaining production gates still require completion.
