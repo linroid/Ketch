@@ -10,7 +10,7 @@ span multiple PRs; it is complete only when all of its acceptance gates have evi
 | Slice | Branch | Scope |
 | --- | --- | --- |
 | 01a | `torrent-v2-01-foundation` | Pinned reference clients, executed-scenario evidence, CI gate |
-| 01b | `torrent-v2-01-contracts` (planned) | Control/state/capability and compatibility contracts |
+| 01b | `torrent-v2-01-contracts` | Control/state/capability and compatibility contracts |
 | 01c | Planned | Resource admission profiles, deterministic harness, performance baseline |
 
 Slice 01a covers two existing v1 interoperability scenarios. Missing Transmission fails required
@@ -34,3 +34,15 @@ Steps 02–30 remain pending. Runtime behavior and the legacy upload default are
 
 CI artifacts provide revision-specific results. Local fixture timings are correctness test durations,
 not throughput or memory benchmarks; the production performance baseline is still pending.
+
+## Slice 01b
+
+The [control protocol contract](../design/torrent-control-contract.md) specifies capabilities,
+revision/reconnect ordering, completion generations, mutation semantics, and compatibility gates.
+The API module supplies bounded inspection models, capability negotiation, command preconditions,
+and revision merge decisions. `KetchApi.torrents` defaults to null; existing local/remote backends
+continue their legacy behavior until the runtime adapters are implemented.
+
+Validation: API tests pass on JVM and JavaScript; core and remote JVM implementations compile.
+Mutation implementations, paginated detail endpoints, operation ledgers, and runtime adapters
+remain pending; their declarations and tests ship with the respective implementation slices.
