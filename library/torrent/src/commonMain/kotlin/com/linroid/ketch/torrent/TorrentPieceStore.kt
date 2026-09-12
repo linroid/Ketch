@@ -253,6 +253,7 @@ internal class TorrentPieceStore(
   }
 
   private var trackerConfiguration: TrackerConfiguration? = null
+  private var trackerRevision = 0L
 
   suspend fun checkpoint(): TorrentCheckpoint = mutex.withLock { snapshot() }
 
@@ -263,32 +264,52 @@ internal class TorrentPieceStore(
     for (owned in checkpoint.files) restoreOwned(false, owned)
     for (owned in checkpoint.directories) restoreOwned(true, owned)
     trackerConfiguration = checkpoint.trackerConfiguration
+    trackerRevision = checkpoint.trackerRevision
     // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
   }
 
   /** Owner shutdown only, after joining all operations; the persisted checkpoint is untouched. */
-  fun discardTrackerConfiguration() { trackerConfiguration = null }
+  fun discardTrackerConfiguration() {
+    trackerConfiguration = null
+    trackerRevision = 0
+  }
 
   /** Borrowed committed configuration; a canceled caller can inspect the commit outcome. */
   suspend fun currentTrackerConfiguration(): TrackerConfiguration? = mutex.withLock {
     trackerConfiguration
   }
 
+  suspend fun trackerConfigurationSnapshot(): TrackerConfigurationSnapshot = mutex.withLock {
+    TrackerConfigurationSnapshot(trackerConfiguration?.tiers ?: metadata.trackerTiers,
+      trackerRevision)
+  }
+
   /** Flushes a snapshot file before returning bytes for publication through TaskStore. */
   suspend fun persistCheckpoint(receivedBytes: Long = 0, uploadedBytes: Long = 0): ByteArray =
-    mutex.withLock { persistSnapshot(receivedBytes, uploadedBytes, trackerConfiguration) }
+    mutex.withLock {
+      persistSnapshot(receivedBytes, uploadedBytes, trackerConfiguration, trackerRevision)
+    }
 
   /** The caller retains admission for the configuration while the store uses it. */
   suspend fun replaceTrackerConfiguration(
     configuration: TrackerConfiguration,
     receivedBytes: Long = 0,
     uploadedBytes: Long = 0,
-  ): ByteArray = mutex.withLock { persistSnapshot(receivedBytes, uploadedBytes, configuration) }
+    expectedRevision: Long? = null,
+  ): ByteArray = mutex.withLock {
+    require(expectedRevision == null || expectedRevision >= 0)
+    if (expectedRevision != null && expectedRevision != trackerRevision) {
+      throw TrackerRevisionConflict(expectedRevision, trackerRevision)
+    }
+    check(trackerRevision < Long.MAX_VALUE) { "Tracker configuration revision exhausted" }
+    persistSnapshot(receivedBytes, uploadedBytes, configuration, trackerRevision + 1)
+  }
 
   private suspend fun persistSnapshot(
     receivedBytes: Long,
     uploadedBytes: Long,
     configuration: TrackerConfiguration?,
+    revision: Long,
   ): ByteArray {
     require(receivedBytes >= 0 && uploadedBytes >= 0)
     check(initialized)
@@ -308,7 +329,7 @@ internal class TorrentPieceStore(
       }
       val temp = sidecar / ("checkpoint-" + InfoHash.fromBytes(torrentRandomBytes(20)).hex + ".tmp")
       val data = snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes,
-        trackerConfiguration = configuration).encode()
+        trackerConfiguration = configuration, trackerRevision = revision).encode()
       try {
         fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
           recordOwned(temp, directory = false)
@@ -322,6 +343,7 @@ internal class TorrentPieceStore(
         ownedFiles.remove(temp)
         ownedFiles[checkpointPath] = identity
         trackerConfiguration = configuration
+        trackerRevision = revision
         snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
       } catch (failure: Throwable) {
         // Blocking cleanup stays inside the admitted I/O operation, even on cancellation.
@@ -353,7 +375,7 @@ internal class TorrentPieceStore(
     output.toString(), selected, verified.copyOf(),
     ownedFiles.map { TorrentOwnedPath(it.key.toString(), it.value) },
     ownedDirectories.map { TorrentOwnedPath(it.key.toString(), it.value) },
-    trackerConfiguration = trackerConfiguration)
+    trackerConfiguration = trackerConfiguration, trackerRevision = trackerRevision)
 
   private fun recordOwned(path: Path, directory: Boolean) {
     val identity = requireNotNull(torrentFileIdentity(path)) { "Filesystem has no safe file identity" }

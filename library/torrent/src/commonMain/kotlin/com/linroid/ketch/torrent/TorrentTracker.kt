@@ -288,6 +288,18 @@ internal class TrackerTiers(
   private var oldPeersClosed = false
   private var beforeSwitch: suspend () -> Unit = {}
 
+  constructor(
+    tiers: List<List<String>>,
+    announce: suspend (String, TrackerAnnounce, ByteArray?) -> TrackerResponse,
+    revision: Long,
+  ) : this(tiers, announce) {
+    require(revision >= 0)
+    configurationRevision = revision
+    for ((url, status) in statuses.toMap()) {
+      statuses[url] = status.copy(configurationRevision = revision)
+    }
+  }
+
   /** Caller serializes replacement with announces. Topic binding is deliberately retained. */
   suspend fun replace(configuration: TrackerConfiguration) {
     check(configurationRevision < Long.MAX_VALUE)

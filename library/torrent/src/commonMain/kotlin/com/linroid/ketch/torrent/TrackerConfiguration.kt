@@ -85,3 +85,10 @@ internal class TrackerConfiguration private constructor(val tiers: List<List<Str
     }
   }
 }
+
+/** A consistent configuration snapshot; revision zero represents metainfo or legacy overrides. */
+internal data class TrackerConfigurationSnapshot(val tiers: List<List<String>>, val revision: Long)
+
+/** A stale command is rejected before changing the active session or its persisted state. */
+internal class TrackerRevisionConflict(val expected: Long, val actual: Long) :
+  IllegalStateException("Tracker revision conflict: expected $expected, actual $actual")
