@@ -1,5 +1,8 @@
 package com.linroid.ketch.torrent
 
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+
 /** Apply every limit together before storage construction or checkpoint decoding allocates indexes. */
 internal fun admitSession(
   spec: TorrentTaskSpec,
@@ -33,4 +36,35 @@ internal fun sessionStateWeight(spec: TorrentTaskSpec): Long {
     largestPiece * 2 + (spec.resumeData?.size ?: 0) * 8L +
     spec.outputPath.length * 4L + (spec.magnetUri?.length ?: 0) * 4L +
     spec.selected.size * 64L + 128 * 1024
+}
+
+/** Runtime ownership ledger; a stopped-but-registered session remains charged after cleanup failure. */
+@OptIn(ExperimentalAtomicApi::class)
+internal class TorrentAdmissionLedger(private val budget: TorrentBufferBudget) {
+  private val entries = AtomicReference<List<TorrentBufferBudget.Lease>?>(emptyList())
+
+  fun admit(spec: TorrentTaskSpec, config: TorrentConfig): TorrentBufferBudget.Lease {
+    val lease = admitSession(spec, config, budget)
+    while (true) {
+      val current = entries.load()
+      if (current == null) {
+        lease.close()
+        error("Torrent admission is closed")
+      }
+      if (entries.compareAndSet(current, current + lease)) return lease
+    }
+  }
+
+  fun release(lease: TorrentBufferBudget.Lease) {
+    while (true) {
+      val current = entries.load() ?: break
+      if (lease !in current || entries.compareAndSet(current, current.filter { it !== lease })) break
+    }
+    lease.close()
+  }
+
+  /** Called only after the owning runtime's jobs have finished. No new admission is possible. */
+  fun close() {
+    entries.exchange(null)?.forEach { it.close() }
+  }
 }

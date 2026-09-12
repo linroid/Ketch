@@ -83,8 +83,8 @@ capacity before constructing storage or decoding a checkpoint. The allowance cov
 metadata, file/path indexes, scheduler arrays/candidate lists, checkpoint parsing, and checking
 scratch buffers. Existing peer/wire reservations remain in the transfer partition.
 
-Reservations survive pause, return on construction failure, and return after a session's child jobs
-finish on removal or runtime shutdown. Tests verify rejection before filesystem creation,
+Reservations survive pause and failed deletion, return on construction failure, and return after
+successful detachment on removal or after the entire runtime's jobs finish during shutdown. Tests verify rejection before filesystem creation,
 aggregate exhaustion, failed-construction rollback, pause retention, removal/readmission, and
 non-suspending shutdown. The combined ceiling includes session admission while preserving metadata
 headroom even if every other partition is full.
@@ -93,3 +93,9 @@ These are conservative admission allowances, not measured total heap or RSS boun
 limits, runtime profiles, platform overhead, deterministic transport fault coverage, and baseline
 performance evidence still require the remaining roadmap work. No production release gate is
 checked off from these admission tests alone.
+
+Review follow-up for 01e: closing a session's network jobs does not end runtime ownership when
+file cleanup fails. A runtime ledger now retains admission until successful map detachment.
+Failed deletion remains retryable instead of being treated as already completed on the next call.
+The regression test proves two failed cleanup attempts remain charged and block new admission,
+while explicit keep-data removal returns credit without touching storage.

@@ -88,6 +88,57 @@ class TorrentSessionAdmissionTest {
     }
   }
 
+  @Test
+  fun failedDeletionRemainsChargedAndCannotSilentlySucceedOnRetry() = runTest {
+    withContext(Dispatchers.Default) {
+      val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+        "admission-removal-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+      val metadata = fixture("a")
+      val output = (root / "payload").toString()
+      val checkpoint = TorrentCheckpoint("different-task", metadata, output, emptySet(),
+        BooleanArray(1), emptyList(), emptyList()).encode()
+      val spec = TorrentTaskSpec("task", metadata, output, emptySet(), resumeData = checkpoint)
+      val size = sessionStateWeight(spec).toInt()
+      val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false, maxSessionStateBytes = size))
+      try {
+        engine.start()
+        engine.addTask(spec)
+        repeat(2) {
+          assertFailsWith<IllegalArgumentException> {
+            engine.removeTorrent(metadata.infoHash.hex, deleteFiles = true)
+          }
+          assertEquals(size, engine.admittedSessionBytes)
+        }
+        val other = TorrentTaskSpec("other", fixture("b"), (root / "other").toString(), emptySet())
+        assertFailsWith<IllegalStateException> { engine.addTask(other) }
+        assertFalse(FileSystem.SYSTEM.exists(root))
+        engine.removeTorrent(metadata.infoHash.hex, deleteFiles = false)
+        assertEquals(0, engine.admittedSessionBytes)
+        engine.addTask(other)
+      } finally {
+        engine.stop()
+        FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+      }
+      assertEquals(0, engine.admittedSessionBytes)
+    }
+  }
+
+  @Test
+  fun closedRuntimeLedgerRejectsNewAdmissionAndReturnsCreditOnce() {
+    val config = TorrentConfig()
+    val budget = TorrentBufferBudget(config.maxSessionStateBytes)
+    val ledger = TorrentAdmissionLedger(budget)
+    val spec = TorrentTaskSpec("task", fixture("a"), "/tmp/admission-ledger", emptySet())
+    val lease = ledger.admit(spec, config)
+    assertTrue(budget.allocated > 0)
+    ledger.close()
+    ledger.release(lease)
+    ledger.close()
+    assertEquals(0, budget.allocated)
+    assertFailsWith<IllegalStateException> { ledger.admit(spec, config) }
+    assertEquals(0, budget.allocated)
+  }
+
   private fun fixture(name: String): TorrentMetadata = TorrentMetadata.fromBencode(
     Bencode.encode(mapOf("info" to mapOf(
       "name" to name, "length" to 1L, "piece length" to 1L,

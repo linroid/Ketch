@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -42,6 +43,7 @@ internal class KotlinTorrentEngine(
   private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
   private val exchangeBudgets = TorrentExchangeBudgets(config)
   private val budget = exchangeBudgets.transfer
+  private val admissions = TorrentAdmissionLedger(exchangeBudgets.sessions)
   internal val admittedSessionBytes: Int get() = exchangeBudgets.sessions.allocated
   private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
     exchangeBudgets.cache)
@@ -51,6 +53,7 @@ internal class KotlinTorrentEngine(
   private val dhtMutex = Mutex()
   private val sessions = mutableMapOf<String, KotlinTorrentSession>()
   private val outputs = mutableMapOf<String, String>()
+  private val sessionLeases = mutableMapOf<String, TorrentBufferBudget.Lease>()
   private val running = AtomicBoolean(false)
   private var closed = false
   private var port = 0
@@ -59,6 +62,10 @@ internal class KotlinTorrentEngine(
   private val downloadRate = TorrentRateLimiter()
   private val uploadRate = TorrentRateLimiter()
   override val isRunning: Boolean get() = running.load()
+
+  init {
+    checkNotNull(scope.coroutineContext[Job]).invokeOnCompletion { admissions.close() }
+  }
 
   override suspend fun start() = mutex.withLock {
     check(!closed) { "Torrent runtime is closed" }
@@ -119,7 +126,7 @@ internal class KotlinTorrentEngine(
       if (closed) return
       closed = true
       running.store(false)
-      sessions.values.toList().also { sessions.clear(); outputs.clear() }
+      sessions.values.toList().also { sessions.clear(); outputs.clear(); sessionLeases.clear() }
     }
     withContext(NonCancellable) {
       try {
@@ -128,7 +135,10 @@ internal class KotlinTorrentEngine(
       } finally {
         scope.cancel()
         try { network.close() } finally {
-          try { http.close() } finally { cache.close() }
+          try { http.close() } finally {
+            cache.close()
+            checkNotNull(scope.coroutineContext[Job]).join()
+          }
         }
       }
     }
@@ -216,7 +226,7 @@ internal class KotlinTorrentEngine(
     check(sessions.size < config.maxActiveTorrents) { "Too many active torrents" }
     val hash = spec.metadata.infoHash.hex
     check(hash !in sessions) { "Torrent already has an active owner" }
-    val lease = admitSession(spec, config, exchangeBudgets.sessions)
+    val lease = admissions.admit(spec, config)
     try {
       val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
         .resolve(spec.outputPath).normalized()
@@ -236,13 +246,16 @@ internal class KotlinTorrentEngine(
         discover = { peers, owner -> discover(spec, peers, owner) },
         downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
         uploadThrottle = { uploadRate.acquire(it) },
-        stateLease = lease,
       )
+      sessionLeases[hash] = lease
       sessions[hash] = session
       outputs[hash] = output.toString()
       session
     } catch (failure: Throwable) {
-      lease.close()
+      sessions.remove(hash)
+      outputs.remove(hash)
+      sessionLeases.remove(hash)
+      admissions.release(lease)
       throw failure
     }
   }
@@ -345,6 +358,7 @@ internal class KotlinTorrentEngine(
       sessions[infoHash]?.close(deleteFiles)
       sessions.remove(infoHash)
       outputs.remove(infoHash)
+      sessionLeases.remove(infoHash)?.let(admissions::release)
     }
   }
 

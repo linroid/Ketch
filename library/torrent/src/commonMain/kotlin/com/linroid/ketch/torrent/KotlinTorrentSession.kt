@@ -38,16 +38,11 @@ internal class KotlinTorrentSession(
   private val discover: suspend (SendChannel<PeerEndpoint>, KotlinTorrentSession) -> Unit,
   private val downloadThrottle: suspend (Int) -> Unit = {},
   private val uploadThrottle: suspend (Int) -> Unit = {},
-  private val stateLease: TorrentBufferBudget.Lease? = null,
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
   private val scope = CoroutineScope(parent.coroutineContext +
     SupervisorJob(parent.coroutineContext[Job]) + Dispatchers.Default)
-  init {
-    // Parent cancellation also ends ownership; wait for all session children before returning credit.
-    checkNotNull(scope.coroutineContext[Job]).invokeOnCompletion { stateLease?.close() }
-  }
   private val lifecycle = Mutex()
   private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
   private val resets = Channel<CompletableDeferred<Unit>>(1)
@@ -84,6 +79,7 @@ internal class KotlinTorrentSession(
   private val lastPayload = AtomicLong(0)
   private var job: Job? = null
   private var closed = false
+  private var filesDeleted = false
   private var recovered = false
   private val _state = MutableStateFlow(TorrentSessionState.PAUSED)
   private val _downloadedBytes = MutableStateFlow(0L)
@@ -208,18 +204,20 @@ internal class KotlinTorrentSession(
   }
 
   suspend fun close(deleteFiles: Boolean = false) = lifecycle.withLock {
-    if (closed) return@withLock
-    closed = true
-    job?.cancelAndJoin()
-    job = null
-    scope.cancel()
-    incoming.cancel()
-    resets.cancel()
-    _state.value = TorrentSessionState.STOPPED
-    if (deleteFiles) {
+    if (!closed) {
+      job?.cancelAndJoin()
+      job = null
+      scope.cancel()
+      incoming.cancel()
+      resets.cancel()
+      closed = true
+      _state.value = TorrentSessionState.STOPPED
+    }
+    if (deleteFiles && !filesDeleted) {
       if (!recovered) checkpoint?.let { store.restore(it) }
       store.recoverOwnership()
       store.cleanup()
+      filesDeleted = true
     }
   }
 }
