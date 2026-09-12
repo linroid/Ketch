@@ -230,6 +230,67 @@ class TorrentCheckpointTest {
     } finally { torrentFileSystem.deleteRecursively(root, mustExist = false) }
   }
 
+  @Test
+  fun trackerRevisionUsesVersionThreeAndSurvivesStoreRestore() = runTest {
+    val root = root()
+    try {
+      val initial = store(root)
+      initial.initialize()
+      val snapshot = initial.checkpoint().copy(
+        trackerConfiguration = TrackerConfiguration.prepare(emptyList()),
+        trackerRevision = 42,
+      )
+      val encoded = snapshot.encode()
+      val prefix = "KETCH-TORRENT\n".encodeToByteArray()
+      val data = Bencode.parse(encoded.copyOfRange(prefix.size, encoded.size))
+      assertEquals(3L, data["version"]?.integer)
+      val restored = store(root)
+      restored.restore(assertNotNull(TorrentCheckpoint.decode(encoded)))
+      restored.initialize()
+      assertEquals(42L, restored.trackerConfigurationSnapshot().revision)
+      assertEquals(42L, assertNotNull(TorrentCheckpoint.decode(
+        restored.persistCheckpoint())).trackerRevision)
+      assertFailsWith<TrackerRevisionConflict> {
+        restored.replaceTrackerConfiguration(TrackerConfiguration.prepare(emptyList()),
+          expectedRevision = 41)
+      }
+      assertEquals(42L, restored.trackerConfigurationSnapshot().revision)
+      val updated = assertNotNull(TorrentCheckpoint.decode(restored.replaceTrackerConfiguration(
+        TrackerConfiguration.prepare(emptyList()), expectedRevision = 42)))
+      assertEquals(43L, updated.trackerRevision)
+    } finally { torrentFileSystem.deleteRecursively(root, mustExist = false) }
+  }
+
+  @Test
+  fun trackerRevisionRejectsDowngradeInvalidMissingFieldsAndOverflow() = runTest {
+    val root = root()
+    try {
+      val store = store(root)
+      store.initialize()
+      val snapshot = store.checkpoint().copy(
+        trackerConfiguration = TrackerConfiguration.prepare(emptyList()),
+        trackerRevision = Long.MAX_VALUE,
+      )
+      val encoded = snapshot.encode()
+      val prefix = "KETCH-TORRENT\n".encodeToByteArray()
+      @Suppress("UNCHECKED_CAST")
+      val data = Bencode.parse(encoded.copyOfRange(prefix.size, encoded.size)).legacyValue()
+        as Map<String, Any>
+      val invalid = listOf(data + ("version" to 2L), data + ("version" to 4L),
+        data - "tracker-revision", data - "tracker-tiers", data + ("tracker-revision" to 0L),
+        data + ("tracker-revision" to -1L), data + ("tracker-revision" to "1"))
+      for (fields in invalid) assertFailsWith<IllegalArgumentException> {
+        TorrentCheckpoint.decode(prefix + Bencode.encode(fields))
+      }
+      store.restore(assertNotNull(TorrentCheckpoint.decode(encoded)))
+      assertFailsWith<IllegalStateException> {
+        store.replaceTrackerConfiguration(TrackerConfiguration.prepare(emptyList()),
+          expectedRevision = Long.MAX_VALUE)
+      }
+      assertEquals(Long.MAX_VALUE, store.trackerConfigurationSnapshot().revision)
+    } finally { torrentFileSystem.deleteRecursively(root, mustExist = false) }
+  }
+
   private fun root(): Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
     "ketch-checkpoint-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
 

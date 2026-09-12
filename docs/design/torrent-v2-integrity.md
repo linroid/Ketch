@@ -947,3 +947,22 @@ returning its uncommitted credit. Tests cover real-engine stop/start ordering an
 failed persistence and retry, post-rename cancellation, snapshot isolation while old discovery joins,
 and admission rejection without interrupting the active session. Public SDK/daemon/UI commands and
 revision conflict handling remain separate work.
+
+## Tracker configuration revisions
+
+Tracker edits now commit a monotonic revision with their checkpoint. Metainfo defaults and legacy
+version-1/version-2 checkpoints start at zero. A committed edit writes checkpoint version 3 with a
+positive `tracker-revision` and the complete override, including explicit empty lists. Old-version
+revision fields, missing/invalid version-3 fields, unknown versions, and exhausted revisions fail
+closed. Ordinary checkpoint saves preserve the revision; failures before rename do not advance it.
+
+Sessions expose a consistent internal tiers/revision snapshot, including before first resume from
+provided checkpoint data. An optional expected revision rejects stale edits before stopping active
+discovery, and the store checks the same revision again under its persistence mutex. Cancellation
+after rename retains the incremented revision together with the committed configuration owner.
+Discovery diagnostics start at the committed revision instead of resetting it to zero on resume.
+
+Tests cover stale edits without discovery interruption or retained credit, pre-resume restoration,
+store persistence/restore, version validation, revision exhaustion, failed edits, cancellation after
+rename, and diagnostic revision wiring. Command idempotency, public conflict responses, and recovery
+when TaskStore resume data lags the on-disk checkpoint remain follow-up integration requirements.

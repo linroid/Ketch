@@ -17,16 +17,26 @@ internal data class TorrentCheckpoint(
   val receivedBytes: Long = 0,
   val uploadedBytes: Long = 0,
   val trackerConfiguration: TrackerConfiguration? = null,
+  val trackerRevision: Long = 0,
 ) {
+  init {
+    require(trackerRevision >= 0)
+    require(trackerRevision == 0L || trackerConfiguration != null)
+  }
+
+  private val version: Long
+    get() = if (trackerRevision > 0) 3L else if (trackerConfiguration != null) 2L else 1L
+
   fun encode(): ByteArray = Bencode.encode(mapOf(
     "received" to receivedBytes, "uploaded" to uploadedBytes,
-    "kind" to KIND, "version" to (if (trackerConfiguration == null) 1L else 2L), "task" to taskId,
+    "kind" to KIND, "version" to version, "task" to taskId,
     "metainfo" to metadata.metainfoBytes, "hash" to metadata.infoHash.toBytes(),
     "output" to output, "selected" to selected.sorted().map { it.toLong() },
     "verified" to pieceBitfield(verified),
     "files" to files.map { mapOf("path" to it.path, "identity" to it.identity) },
     "directories" to directories.map { mapOf("path" to it.path, "identity" to it.identity) }
-  ) + (trackerConfiguration?.let { mapOf("tracker-tiers" to it.tiers) } ?: emptyMap()),
+  ) + (trackerConfiguration?.let { mapOf("tracker-tiers" to it.tiers) } ?: emptyMap()) +
+    (if (trackerRevision > 0) mapOf("tracker-revision" to trackerRevision) else emptyMap()),
     maxBytes = MAX_BYTES - MAGIC.size).let { MAGIC + it }.also { require(it.size <= MAX_BYTES) }
 
   companion object {
@@ -43,8 +53,16 @@ internal data class TorrentCheckpoint(
       val root = Bencode.parse(bytes.copyOfRange(MAGIC.size, bytes.size), MAX_BYTES, 1_000_000)
       require(root["kind"]?.text() == KIND)
       val version = root["version"]?.integer
-      require(version == 1L || version == 2L) { "Unsupported torrent checkpoint version" }
-      val trackerConfiguration = if (version == 2L) {
+      require(version in 1L..3L) { "Unsupported torrent checkpoint version" }
+      val trackerRevision = if (version == 3L) {
+        requireNotNull(root["tracker-revision"]?.integer).also { require(it > 0) }
+      } else {
+        require(root["tracker-revision"] == null) {
+          "Tracker revision requires checkpoint version 3"
+        }
+        0L
+      }
+      val trackerConfiguration = if (version == 2L || version == 3L) {
         val tiers = requireNotNull(root["tracker-tiers"]?.list)
         require(tiers.size <= 256)
         var entries = 0
@@ -95,7 +113,7 @@ internal data class TorrentCheckpoint(
       require(receivedBytes >= 0 && uploadedBytes >= 0)
       return TorrentCheckpoint(task, metadata, output, selected, verified,
         owned("files"), owned("directories"), receivedBytes, uploadedBytes,
-        trackerConfiguration)
+        trackerConfiguration, trackerRevision)
     }
   }
 }

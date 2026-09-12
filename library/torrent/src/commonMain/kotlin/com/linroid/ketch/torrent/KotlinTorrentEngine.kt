@@ -274,10 +274,11 @@ internal class KotlinTorrentEngine(
     trackerState: TorrentBufferBudget,
   ) = supervisorScope {
     val metadata = spec.metadata
-    val trackerTiers = session.trackerTiers()
+    val configuration = session.trackerConfiguration()
+    val trackerTiers = configuration.tiers
     if (trackerTiers.isNotEmpty()) launch {
       val discovery = TrackerDiscovery(metadata, peerId, port,
-        TrackerTiers(trackerTiers, tracker::announce), session::resetPeers,
+        TrackerTiers(trackerTiers, tracker::announce, configuration.revision), session::resetPeers,
         nowMs = nowMs,
         announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
       )

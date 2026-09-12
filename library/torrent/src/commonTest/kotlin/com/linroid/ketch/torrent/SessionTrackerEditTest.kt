@@ -108,6 +108,56 @@ class SessionTrackerEditTest {
   }
 
   @Test
+  fun staleEditDoesNotStopDiscoveryOrChangePersistedRevision() = runTest {
+    fixture {
+      assertEquals(0L, session.trackerConfiguration().revision)
+      assertTrue(session.replaceTrackers(old, expectedRevision = 0))
+      val retained = state.allocated
+      session.resume()
+      discoveries.first { it.isNotEmpty() }
+      val conflict = assertFailsWith<TrackerRevisionConflict> {
+        session.replaceTrackers(next, expectedRevision = 0)
+      }
+      assertEquals(0L, conflict.expected)
+      assertEquals(1L, conflict.actual)
+      assertEquals(1, discoveries.value.size)
+      assertEquals(retained, state.allocated)
+      assertEquals(TrackerConfigurationSnapshot(old, 1), session.trackerConfiguration())
+      assertTrue(session.replaceTrackers(next, expectedRevision = 1))
+      assertEquals(TrackerConfigurationSnapshot(next, 2), session.trackerConfiguration())
+      session.pause()
+      assertEquals(2L, assertNotNull(TorrentCheckpoint.decode(
+        assertNotNull(session.saveResumeData()))).trackerRevision)
+    }
+  }
+
+  @Test
+  fun restoredSessionChecksRevisionBeforeFirstResume() = runTest {
+    fixture {
+      assertTrue(session.replaceTrackers(next, expectedRevision = 0))
+      val saved = assertNotNull(TorrentCheckpoint.decode(assertNotNull(session.saveResumeData())))
+      session.close()
+      val restored = KotlinTorrentSession(
+        TorrentPieceStore(metadata, root / "seed", emptySet(), "edited"),
+        network, TorrentBufferBudget(1024 * 1024), parent,
+        checkpoint = saved,
+        trackerConfigurationBudget = state,
+        discover = { _, _ -> awaitCancellation() },
+      )
+      try {
+        assertEquals(TrackerConfigurationSnapshot(next, 1), restored.trackerConfiguration())
+        assertFailsWith<TrackerRevisionConflict> {
+          restored.replaceTrackers(old, expectedRevision = 0)
+        }
+        assertEquals(TorrentSessionState.PAUSED, restored.state.value)
+        assertEquals(0, state.allocated)
+        assertTrue(restored.replaceTrackers(emptyList(), expectedRevision = 1))
+        assertEquals(TrackerConfigurationSnapshot(emptyList(), 2), restored.trackerConfiguration())
+      } finally { restored.close() }
+    }
+  }
+
+  @Test
   fun failedEditKeepsOldOwnerAndResumesOldDiscovery() = runTest {
     fixture {
       assertTrue(session.replaceTrackers(old))
@@ -120,6 +170,7 @@ class SessionTrackerEditTest {
       assertEquals(listOf(old, old), discoveries.value)
       assertEquals(retained, state.allocated)
       assertEquals(old, session.trackerTiers())
+      assertEquals(1L, session.trackerConfiguration().revision)
       provider.failMove = false
       assertTrue(session.replaceTrackers(next))
       discoveries.first { it.size == 3 }
@@ -137,6 +188,7 @@ class SessionTrackerEditTest {
       operation.start()
       assertFailsWith<CancellationException> { operation.await() }
       provider.afterMove = null
+      assertEquals(2L, session.trackerConfiguration().revision)
       assertEquals(next, session.trackerTiers())
       assertTrue(state.allocated > 0)
       session.resume()
@@ -269,6 +321,9 @@ class SessionTrackerEditTest {
           requests.first { it.any { url -> url.startsWith("https://next/") } }
           val oldStop = requests.value.indexOfFirst {
             it.startsWith("https://old/") && "event=stopped" in it
+          }
+          session.trackerStatus.first {
+            it.singleOrNull()?.configurationRevision == 1L
           }
           val newStart = requests.value.indexOfFirst { it.startsWith("https://next/") }
           assertTrue(oldStop >= 0 && oldStop < newStart)
