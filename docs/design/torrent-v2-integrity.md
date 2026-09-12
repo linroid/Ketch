@@ -273,3 +273,18 @@ These executed process-exit cases extend the injected-I/O tests. They do not pro
 ordering, directory-entry durability, physical mobile lifecycle behavior, or the still-pending v2
 runtime/network integration. The iOS simulator task requires `-PenableIosSimulatorTests=true`;
 a successful Gradle build without that flag skips simulator execution and is not test evidence.
+
+### BEP 52 hash-message wire codec
+
+`PeerHashWire` encodes and decodes hash request (21), hashes (22), and hash reject (23) payloads
+through the existing bounded `PeerWire` frames. It preserves full file-root hashes and unsigned
+32-bit indices, requires aligned power-of-two ranges, and checks exact response lengths before
+copying hash bytes. The response count omits the first `log2(length)-1` proof layers while retaining
+the requested proof-layer count in the selector, as specified by
+[BEP 52](https://raw.githubusercontent.com/bittorrent/bittorrent.org/master/beps/bep_0052.rst).
+
+This adapter limits requests to 512 hashes, following BEP 52's recommended maximum, and bounds
+layer fields to 63. Authenticated file-tree bounds, supported base-layer policy, outstanding-request
+correlation, buffer admission, response proof authentication and hash serving remain required
+connection-handler work. The codec alone does not authorize any hashes or payload progress.
+It is separate from the v1 runtime: later v2 negotiation must explicitly route these frames to it.
