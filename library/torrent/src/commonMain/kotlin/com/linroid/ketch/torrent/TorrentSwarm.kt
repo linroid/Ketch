@@ -269,7 +269,7 @@ internal class TorrentSwarm(
               val accepted = state.received(message)
               when (message) {
                 is PeerMessage.Bitfield, is PeerMessage.Have ->
-                  scheduler.availability(id, state.available)
+                  scheduler.availability(id, state.availabilitySnapshot())
                 is PeerMessage.Control -> {
                   if (message.signal == PeerMessage.Signal.CHOKE) {
                     scheduler.release(id)

@@ -46,7 +46,7 @@ internal class PeerBlockExchange(
   val pendingCount: Int get() = pending.size
 
   fun canRequest(index: Int): Boolean = !closed && pending.size < maxPending && !state.choking &&
-    index in state.available.indices && state.available[index]
+    state.hasPiece(index)
 
   /** Relative delay for the actor's timer; control traffic and cancels never extend deadlines. */
   fun nextDeadlineMs(): Long? = pending.values.minOfOrNull { remaining(it) }
@@ -68,7 +68,7 @@ internal class PeerBlockExchange(
     PeerWire.encodedSize(request, layout.pieceCount.toInt())
     val length = layout.v2Piece(request.index.toLong()).length
     require(request.begin.toLong() + request.length <= length) { "Block crosses v2 file tail" }
-    if (state.choking || !state.available[request.index] || request in pending ||
+    if (state.choking || !state.hasPiece(request.index) || request in pending ||
       pending.size == maxPending) return null
     val lease = budget.reserve(request.length * 2 + 256) ?: return null
     try {
