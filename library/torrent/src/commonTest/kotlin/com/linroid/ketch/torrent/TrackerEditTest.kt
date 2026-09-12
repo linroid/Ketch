@@ -1,6 +1,10 @@
 package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
@@ -124,6 +128,18 @@ class TrackerEditTest {
     assertEquals(0L, tiers.status().single().configurationRevision)
     discovery.poll(bits, 0, 0)
     assertEquals(listOf(old, old, old), calls)
+  }
+
+  @Test
+  fun cancellationAtCleanupReturnDoesNotCommitReplacement() = runTest {
+    val tiers = TrackerTiers(listOf(listOf(old))) { _, _, _ -> TrackerResponse(emptyList(), 60) }
+    val discovery = TrackerDiscovery(metadata(), ByteArray(20), 6881, tiers,
+      onPrivateTrackerChanged = { currentCoroutineContext().cancel() })
+    discovery.poll(bits, 0, 0)
+    val replacement = async { discovery.replaceTrackers(listOf(listOf(next)), bits, 0, 0) }
+    assertFailsWith<CancellationException> { replacement.await() }
+    assertEquals(0L, tiers.status().single().configurationRevision)
+    assertEquals(2L, tiers.status().single().attempts)
   }
 
   @Test

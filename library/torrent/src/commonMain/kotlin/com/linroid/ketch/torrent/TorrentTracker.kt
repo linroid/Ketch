@@ -291,6 +291,7 @@ internal class TrackerTiers(
   suspend fun replace(configuration: TrackerConfiguration) {
     check(configurationRevision < Long.MAX_VALUE)
     if (preferCurrent && current != null && !oldPeersClosed) beforeSwitch()
+    currentCoroutineContext().ensureActive()
     val replacement = configuration.tiers.map { it.shuffled().toMutableList() }
     tiers = replacement
     configurationRevision++
