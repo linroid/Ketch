@@ -43,7 +43,12 @@ internal class TorrentV2PieceScheduler private constructor(
         val request = assembly.request(slot)
         if (request in assignments) continue
         if (attempts++ == 128) return null
-        val ticket = peer.request(request) ?: continue
+        val ticket = try {
+          peer.request(request)
+        } catch (error: Throwable) {
+          try { removePeer(peer) } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
+          throw error
+        } ?: continue
         assignments[request] = Assignment(peer, ticket)
         return ticket
       }

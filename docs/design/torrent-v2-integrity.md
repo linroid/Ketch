@@ -548,3 +548,8 @@ and late callbacks, selected-file and state/payload admission, queue pressure an
 retry. Scheduler shutdown releases actor-owned state and assemblies; outer session ownership still
 joins peer readers and storage workers. Automatic piece-selection policy, transport/session wiring,
 generation barriers, upload/hash serving and remaining production capabilities/gates are unfinished.
+
+Scheduler request failures now remove the failed peer's earlier assignments before propagating the
+error. The pipeline may already have closed itself after a partial write; the ledger must still
+release its unanswered blocks so a replacement peer can request them. The regression injects a
+failure on the second request and verifies the replacement starts with the first abandoned block.

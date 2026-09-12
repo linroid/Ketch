@@ -8,6 +8,7 @@ import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -24,17 +25,24 @@ class TorrentV2PieceSchedulerTest {
   ), "piece layers" to emptyMap<String, Any>())))
   private val layout = TorrentContentLayout.from(document.info)
 
-  private class Peer(budget: TorrentBufferBudget, layout: TorrentContentLayout) {
+  private class Peer(
+    budget: TorrentBufferBudget,
+    layout: TorrentContentLayout,
+    maxPending: Int = 1,
+  ) {
+    var failWrite = false
     val input = Buffer()
     private val connection = object : TorrentConnection {
       override val remote = PeerEndpoint("127.0.0.1", 1)
       override suspend fun readExactly(size: Int): ByteArray = input.readByteArray(size.toLong())
-      override suspend fun write(bytes: ByteArray) = Unit
+      override suspend fun write(bytes: ByteArray) {
+        if (failWrite) throw okio.IOException("Partial request write")
+      }
       override fun close() = Unit
     }
     val transport = PeerHashTransport(connection, PeerHashExchange(budget, { null }), budget,
       pieceCount = 2)
-    val exchange = PeerBlockExchange(layout, transport, budget, maxPending = 1)
+    val exchange = PeerBlockExchange(layout, transport, budget, maxPending = maxPending)
     suspend fun receive(message: PeerMessage): PeerBlockExchange.Response? {
       input.write(PeerWire.encode(message, pieceCount = 2))
       val frame = transport.read()
@@ -184,6 +192,33 @@ class TorrentV2PieceSchedulerTest {
       scheduler.removePeer(peer.exchange)
       scheduler.close()
       store.cleanup()
+    }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
+  fun requestWriteFailureReleasesEarlierAssignmentsForAnotherPeer() = runTest {
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      BooleanArray(2), buffers, state))
+    val failing = Peer(buffers, layout, maxPending = 2)
+    val replacement = Peer(buffers, layout)
+    try {
+      failing.ready()
+      replacement.ready()
+      assertTrue(scheduler.begin(0))
+      val first = assertNotNull(scheduler.requestNext(failing.exchange))
+      failing.failWrite = true
+      assertFailsWith<okio.IOException> { scheduler.requestNext(failing.exchange) }
+      assertEquals(0, failing.exchange.pendingCount)
+      val retry = assertNotNull(scheduler.requestNext(replacement.exchange))
+      assertEquals(first.request, retry.request)
+    } finally {
+      scheduler.removePeer(failing.exchange)
+      scheduler.removePeer(replacement.exchange)
+      scheduler.close()
     }
     assertEquals(0, buffers.allocated)
     assertEquals(0, state.allocated)
