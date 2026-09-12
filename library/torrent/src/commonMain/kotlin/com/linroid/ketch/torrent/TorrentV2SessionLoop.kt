@@ -1,5 +1,7 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.channels.ChannelResult
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
@@ -18,12 +20,14 @@ internal object TorrentV2SessionLoop {
   private sealed interface Event {
     data class Peer(val value: PeerV2Pool.Event) : Event
     data class Commit(val value: TorrentV2CommitWorker.Completion) : Event
+    data class Connection(val value: ChannelResult<PeerV2Connector.Connected>) : Event
     data object Retry : Event
   }
 
   /**
-   * Downloads selected files using an initialized matching store and already attached peers.
-   * Caller owns pool/worker scopes and joins them on return or failure. Initial verification comes
+   * Downloads selected files using matching storage and attached or asynchronously arriving peers.
+   * Caller joins pool/worker/dialer scopes on return or failure. The optional connection
+   * stream must reclaim undelivered handles on cancellation. Initial verification comes
    * only from the store. This full-metainfo path does not resolve magnet metadata or serve hashes.
    */
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -38,6 +42,7 @@ internal object TorrentV2SessionLoop {
     maxPeers: Int = 100,
     maxActive: Int = 2,
     pipeline: Int = 32,
+    connections: ReceiveChannel<PeerV2Connector.Connected>? = null,
   ) {
     require(maxPeers in 1..500 && pipeline in 1..256)
     val lease = checkNotNull(state.reserve(maxPeers * 512 + 1024)) {
@@ -135,21 +140,38 @@ internal object TorrentV2SessionLoop {
         }
       }
 
-      var preferCommits = true
+      var preference = 0
+      var acceptingConnections = connections != null
       while (!pieces.completed()) {
         pump()
-        check(pool.size > 0 || pieces.pendingCommitCount > 0) {
+        check(pool.size > 0 || pieces.pendingCommitCount > 0 || acceptingConnections) {
           "All torrent peers disconnected before completion"
         }
         val event = select<Event> {
-          if (preferCommits) worker.completions.onReceive { Event.Commit(it) }
-          pool.events.onReceive { Event.Peer(it) }
-          if (!preferCommits) worker.completions.onReceive { Event.Commit(it) }
+          repeat(3) { offset ->
+            when ((preference + offset) % 3) {
+              0 -> worker.completions.onReceive { Event.Commit(it) }
+              1 -> pool.events.onReceive { Event.Peer(it) }
+              2 -> if (acceptingConnections && pool.size < maxPeers && pool.remainingCapacity > 0) {
+                checkNotNull(connections).onReceiveCatching { Event.Connection(it) }
+              }
+            }
+          }
           // Only admission pressure enables a retry timer; healthy idle peers do not poll.
           if (peers.values.any { it.admissionBlocked }) onTimeout(250) { Event.Retry }
         }
-        preferCommits = event !is Event.Commit
+        preference = (preference + 1) % 3
         when (event) {
+          is Event.Connection -> {
+            val connected = event.value.getOrNull()
+            if (connected == null) {
+              acceptingConnections = false
+              event.value.exceptionOrNull()?.let { throw it }
+            } else try {
+              require(connected.route.identity.v2 == layout.infoHash) { "Wrong incoming torrent" }
+              checkNotNull(connected.attach(pool)) { "Peer capacity changed during admission" }
+            } finally { connected.close() }
+          }
           is Event.Commit -> {
             check(pieces.completed(event.value)) { "Unknown commit completion" }
             if (event.value is TorrentV2CommitWorker.Completion.Failed) throw event.value.cause

@@ -51,6 +51,7 @@ internal class PeerV2Pool private constructor(
   private var closed = false
   val events: ReceiveChannel<Event> get() = output
   val size: Int get() = members.size
+  val remainingCapacity: Int get() = maxPeers - members.size
 
   /**
    * Caller admits availability before constructing blocks. Null leaves both objects caller-owned;

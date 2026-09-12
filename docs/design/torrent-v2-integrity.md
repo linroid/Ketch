@@ -716,3 +716,20 @@ Actual pure-v2
 and upgraded-hybrid TCP session tests now use this connector. Global network policy/socket limits,
 metadata/layout admission, endpoint discovery, and public engine/session registration remain caller
 responsibilities and are not completed by this connector.
+
+### Live peer arrivals and bounded dialing
+
+`PeerV2Dialer` consumes an upstream endpoint stream with admitted worker and result-queue limits.
+Handshakes run outside the session actor. Null admission retries the same endpoint after a bounded
+wait; ordinary failures, including a peer's own timeout, are recorded without canceling later attempts.
+Session cancellation still cancels and joins all workers. A failed endpoint stream closes results with
+its cause after queued connections; undelivered and blocked-send handles are closed on shutdown.
+Endpoint authorization, deduplication, and network retry/backoff policy remain upstream responsibilities.
+
+The session loop can start with no attached peers while a connection stream remains open. It rotates
+selection among arrivals, peer events, and storage completions. Arrivals wait for pool capacity, and
+only the session actor attaches them. Every arrival's full v2 identity must match the session layout;
+rejected handles are closed. Stream completion removes the wait condition, so an exhausted session
+fails instead of spinning. The caller joins the dialer and cancels its endpoint producer on exit.
+Actual pure-v2/hybrid TCP tests now start through this stream and include a mismatched-torrent arrival.
+Tracker/DHT endpoint production and public engine registration are still not wired to this path.
