@@ -196,3 +196,22 @@ This is the codec and binding layer, not task recovery. Before using ownership c
 must also match the expected task and caller-authorized root, verify current OS identities, and
 rehash files instead of trusting hint bits. TaskStore publication, ownership journals, v1 migration,
 resume wiring, streaming large state and full-profile admission/power-loss tests remain pending.
+
+## Store snapshots and ownership recovery
+
+The v2 store now has an explicit task identity. `checkpoint` publishes authenticated catalog
+content first, then captures its owned files/directories, selections, generations, counters and
+hint bits under the store mutex. Transfer counters cannot move backwards. The returned codec
+object still needs atomic publication by the task-state layer.
+
+`restore` accepts only an untouched store and checks the expected task, caller-authorized output,
+selection and authenticated content mapping. It validates every recorded OS identity and kind
+before adopting any records, so a failed restore leaves the store empty and retryable. Successful
+restore retains generations/counters but discards all availability hints. Initialization handles
+only validated owned paths or exclusive new creation, and recheck/commit prove bytes before
+progress. Fully verified owned files are trimmed to their declared lengths; foreign replacements
+are neither adopted nor deleted.
+
+This supports checkpoint-backed live-store recovery, not the complete engine resume path. Atomic
+TaskStore publication, durable creation journals for files created after the last snapshot,
+missing-file repair/import, v1 migration, state admission and power-loss qualification remain open.
