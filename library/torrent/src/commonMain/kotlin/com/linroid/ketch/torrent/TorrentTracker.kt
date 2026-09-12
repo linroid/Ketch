@@ -95,9 +95,10 @@ internal class TorrentTracker(
     return when (parsed.protocol.name.lowercase()) {
       "http", "https" -> {
         val path = parsed.encodedPath
-        require("announce" in path) { "Tracker has no derived scrape endpoint" }
+        val endpoint = path.lastIndexOf("announce")
+        require(endpoint >= 0) { "Tracker has no derived scrape endpoint" }
         val base = URLBuilder(url).apply {
-          encodedPath = path.replaceFirst("announce", "scrape")
+          encodedPath = path.replaceRange(endpoint, endpoint + "announce".length, "scrape")
           fragment = ""
         }.buildString()
         val separator = if ('?' in base) "&" else "?"

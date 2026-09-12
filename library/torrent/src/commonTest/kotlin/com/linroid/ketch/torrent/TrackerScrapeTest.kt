@@ -46,9 +46,10 @@ class TrackerScrapeTest {
     val network = createTorrentNetwork()
     try {
       val result = TorrentTracker(TorrentHttp(engine), network).scrape(
-        "https://tracker/announce.php?passkey=a%2Bb#ignored", topics)
+        "https://tracker/announce-proxy/v1/announce.php?passkey=a%2Bb#ignored", topics)
       val url = engine.requested!!
-      assertTrue(url.startsWith("https://tracker/scrape.php?passkey=a%2Bb&info_hash=%00%01%02"))
+      assertTrue(url.startsWith("https://tracker/announce-proxy/v1/scrape.php?passkey=a%2Bb&"))
+      assertTrue("info_hash=%00%01%02" in url)
       assertTrue("&info_hash=%ff%fe%fd" in url)
       assertTrue('#' !in url)
       assertEquals(mapOf<TrackerTopic, TrackerScrape>(v2 to TrackerScrape(7, 9, 11)), result)
