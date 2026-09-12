@@ -61,13 +61,21 @@ internal class PeerHashTransport(
 
   /** Caller retains payload ownership until return; admission covers encoder copies and write. */
   suspend fun send(message: PeerMessage) {
+    check(trySend(message)) { "Peer write frame budget exhausted" }
+  }
+
+  /** Register caller ownership only after frame admission; false means no bytes were emitted. */
+  suspend fun trySend(message: PeerMessage, onAdmitted: () -> Unit = {}): Boolean {
     check(!closed)
     // Hash requests must first register their response ownership through request().
     require(message !is PeerMessage.Unknown || message.id !in 21..23) {
       "Use request or respond for hash messages"
     }
     val size = PeerWire.encodedSize(message, pieceCount)
-    write(size) { PeerWire.encode(message, pieceCount = pieceCount) }
+    return write(size) {
+      onAdmitted()
+      PeerWire.encode(message, pieceCount = pieceCount)
+    }
   }
 
   /** Hash serving owns proof generation and its buffer; this method admits serialization first. */
@@ -81,15 +89,16 @@ internal class PeerHashTransport(
         48 + message.hashes.size
       }
     }
-    write(payloadSize + 5) { PeerWire.encode(PeerHashWire.encode(message)) }
-  }
-
-  private suspend fun write(size: Int, encode: () -> ByteArray) {
-    val lease = checkNotNull(frames.reserve(size * 4 + 512)) {
+    check(write(payloadSize + 5) { PeerWire.encode(PeerHashWire.encode(message)) }) {
       "Peer write frame budget exhausted"
     }
+  }
+
+  private suspend fun write(size: Int, encode: () -> ByteArray): Boolean {
+    val lease = frames.reserve(size * 4 + 512) ?: return false
     try {
       withTimeout(timeoutMs) { connection.write(encode()) }
+      return true
     } catch (error: Throwable) {
       // Partial frames cannot be retried on this byte stream. Pending hash tickets die with it.
       close()
