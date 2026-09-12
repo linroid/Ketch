@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TrackerStatusTest {
   private val request = TrackerAnnounce(InfoHash.fromBytes(ByteArray(20)), ByteArray(20), 6881, 0, 1)
 
@@ -55,6 +56,33 @@ class TrackerStatusTest {
     assertEquals(TrackerStatus.Outcome.TIMED_OUT, status[0].outcome)
     assertEquals(1L, status[0].failures)
     assertEquals(TrackerStatus.Outcome.SUCCEEDED, status[1].outcome)
+  }
+
+  @Test
+  fun exhaustedUdpRetriesAreReportedAsATimeout() = runTest {
+    var closed = false
+    val socket = object : TorrentDatagramSocket {
+      override val local = PeerEndpoint("127.0.0.1", 1234)
+      override suspend fun send(remote: PeerEndpoint, bytes: ByteArray) = Unit
+      override suspend fun receive(): TorrentDatagram = awaitCancellation()
+      override fun close() { closed = true }
+    }
+    val network = object : TorrentNetwork {
+      override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket = socket
+      override suspend fun connect(remote: PeerEndpoint): TorrentConnection = error("Unused")
+      override suspend fun listen(local: PeerEndpoint): TorrentListener = error("Unused")
+      override fun close() = socket.close()
+    }
+    val http = TorrentHttp.default()
+    try {
+      val protocol = TorrentTracker(http, network, resolve = { it }, retryDelaysMs = listOf(1, 2))
+      val tiers = TrackerTiers(listOf(listOf("udp://127.0.0.1:80")), protocol::announce)
+      assertFailsWith<IllegalStateException> { tiers.announce(request) }
+      assertEquals(TrackerStatus.Outcome.TIMED_OUT, tiers.status().single().outcome)
+      assertEquals(1L, tiers.status().single().failures)
+      assertEquals(3L, testScheduler.currentTime)
+      assertEquals(true, closed)
+    } finally { http.close(); network.close() }
   }
 
   @Test

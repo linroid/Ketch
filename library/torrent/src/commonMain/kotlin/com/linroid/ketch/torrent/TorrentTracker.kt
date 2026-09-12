@@ -14,6 +14,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okio.Buffer
 import kotlin.coroutines.cancellation.CancellationException
 
+internal class TrackerTimeoutException : IllegalStateException("Tracker did not respond")
+
 internal enum class TrackerEvent(val code: Int) {
   NONE(0), COMPLETED(1), STARTED(2), STOPPED(3)
 }
@@ -166,7 +168,7 @@ internal class TorrentTracker(
         }
         if (result != null) return result
       }
-      error("Tracker did not respond")
+      throw TrackerTimeoutException()
     } finally {
       socket.close()
     }
@@ -330,6 +332,9 @@ internal class TrackerTiers(
             lastMinimumIntervalSeconds = result.minimumIntervalSeconds,
           )
           return result.copy(source = url)
+        } catch (_: TrackerTimeoutException) {
+          currentCoroutineContext().ensureActive()
+          failed(url, TrackerStatus.Outcome.TIMED_OUT)
         } catch (_: TimeoutCancellationException) {
           currentCoroutineContext().ensureActive()
           failed(url, TrackerStatus.Outcome.TIMED_OUT)
