@@ -9,7 +9,11 @@ internal class TorrentV2PieceScheduler private constructor(
   private val maxActive: Int,
   private val lease: TorrentBufferBudget.Lease,
 ) {
-  private class Assignment(val peer: PeerBlockExchange, val ticket: PeerBlockExchange.Ticket)
+  class RequestPlan internal constructor(
+    val peer: PeerBlockExchange,
+    val request: PeerMessage.Request,
+  )
+  private class Assignment(val plan: RequestPlan, var ticket: PeerBlockExchange.Ticket? = null)
   private val assemblies = linkedMapOf<Int, TorrentV2PieceAssembly>()
   private val assignments = mutableMapOf<PeerMessage.Request, Assignment>()
   private val commits = mutableMapOf<TorrentV2CommitWorker.Ticket, Int>()
@@ -67,7 +71,42 @@ internal class TorrentV2PieceScheduler private constructor(
     }
   }
 
-  /** One assignment per canonical block; peers can fill different blocks in parallel. */
+  /** Reserve without network I/O. Availability must be an actor-owned view of the peer's state. */
+  fun planNext(peer: PeerBlockExchange, available: (Int) -> Boolean): RequestPlan? {
+    check(!closed)
+    for (assembly in assemblies.values) {
+      if (!available(assembly.index)) continue
+      for (slot in assembly.missingBlocks()) {
+        val request = assembly.request(slot)
+        if (request !in assignments) return reserve(peer, request)
+      }
+    }
+    return null
+  }
+
+  private fun reserve(peer: PeerBlockExchange, request: PeerMessage.Request): RequestPlan {
+    val plan = RequestPlan(peer, request)
+    assignments[request] = Assignment(plan)
+    return plan
+  }
+
+  /**
+   * Null acknowledges an unsent/unadmitted request. A stale acknowledgement cannot bind a newer
+   * plan; false means the issuing peer actor must cancel or close any ticket it already created.
+   * The peer actor must enqueue this acknowledgement before forwarding responses for the ticket.
+   */
+  fun resolve(plan: RequestPlan, ticket: PeerBlockExchange.Ticket?): Boolean {
+    if (closed) return false
+    val assignment = assignments[plan.request] ?: return false
+    if (assignment.plan !== plan || assignment.ticket != null) return false
+    if (ticket == null) assignments.remove(plan.request) else {
+      require(ticket.request == plan.request && plan.peer.owns(ticket)) { "Wrong request issuer" }
+      assignment.ticket = ticket
+    }
+    return true
+  }
+
+  /** Synchronous adapter for an owner of both scheduler and peer; session actors use plan/resolve. */
   suspend fun requestNext(peer: PeerBlockExchange): PeerBlockExchange.Ticket? {
     check(!closed)
     if (!peer.localInterested && !updateInterest(peer)) return null
@@ -78,13 +117,15 @@ internal class TorrentV2PieceScheduler private constructor(
         val request = assembly.request(slot)
         if (request in assignments) continue
         if (attempts++ == 128) return null
+        val plan = reserve(peer, request)
         val ticket = try {
           peer.request(request)
         } catch (error: Throwable) {
           try { removePeer(peer) } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
           throw error
-        } ?: continue
-        assignments[request] = Assignment(peer, ticket)
+        }
+        check(resolve(plan, ticket)) { "Request plan changed during synchronous dispatch" }
+        if (ticket == null) continue
         return ticket
       }
     }
@@ -99,7 +140,7 @@ internal class TorrentV2PieceScheduler private constructor(
       is PeerBlockExchange.Response.Canceled -> response.ticket
     }
     val assignment = assignments[ticket.request]
-    if (closed || assignment == null || assignment.peer !== peer || assignment.ticket !== ticket) {
+    if (closed || assignment == null || assignment.plan.peer !== peer || assignment.ticket !== ticket) {
       if (response is PeerBlockExchange.Response.Block) response.close()
       return false
     }
@@ -115,12 +156,15 @@ internal class TorrentV2PieceScheduler private constructor(
     return true
   }
 
-  /** Close the departing pipeline before making its unanswered blocks available to other peers. */
+  /** Session actors call this after the peer actor has closed and joined its pipeline/reader. */
+  fun detachPeer(peer: PeerBlockExchange) {
+    val abandoned = assignments.filterValues { it.plan.peer === peer }.keys
+    abandoned.forEach(assignments::remove)
+  }
+
+  /** Convenience cleanup for callers that also own this peer's pipeline. */
   fun removePeer(peer: PeerBlockExchange) {
-    try { peer.close() } finally {
-      val abandoned = assignments.filterValues { it.peer === peer }.keys
-      abandoned.forEach(assignments::remove)
-    }
+    try { peer.close() } finally { detachPeer(peer) }
   }
 
   /** Queue pressure leaves completed assemblies here for retry, without accepting more blocks. */
