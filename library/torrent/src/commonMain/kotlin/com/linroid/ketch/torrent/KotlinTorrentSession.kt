@@ -41,6 +41,7 @@ internal class KotlinTorrentSession(
   private val downloadThrottle: suspend (Int) -> Unit = {},
   private val uploadThrottle: suspend (Int) -> Unit = {},
   private val trackerConfigurationBudget: TorrentBufferBudget? = null,
+  private val privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
@@ -149,6 +150,8 @@ internal class KotlinTorrentSession(
 
   fun updateTrackerStatus(status: List<TrackerStatus>) { _trackerStatus.value = status }
 
+  private val trackerRestricted = store.metadata.isPrivate ||
+    privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY
   private val privateAdmission = Mutex()
   private var allowedPrivateHosts: Set<String> = emptySet()
 
@@ -160,7 +163,7 @@ internal class KotlinTorrentSession(
   fun accept(connection: TorrentConnection): Boolean {
     if (_state.value != TorrentSessionState.DOWNLOADING &&
       _state.value != TorrentSessionState.SEEDING) return false
-    if (!store.metadata.isPrivate) return incoming.trySend(connection).isSuccess
+    if (!trackerRestricted) return incoming.trySend(connection).isSuccess
     if (!privateAdmission.tryLock()) return false
     try {
       if (connection.remote.host !in allowedPrivateHosts) return false
@@ -242,6 +245,7 @@ internal class KotlinTorrentSession(
           try {
             TorrentSwarm(store, network, budget, peerId = peerId,
               connections = { connectionLimit.load() }, uploadPolicy = uploadPolicy,
+              trackerOnly = trackerRestricted,
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes
                 val now = clock()

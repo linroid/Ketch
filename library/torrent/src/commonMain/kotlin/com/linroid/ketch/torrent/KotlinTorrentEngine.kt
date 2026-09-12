@@ -14,6 +14,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -146,11 +147,25 @@ internal class KotlinTorrentEngine(
     }
   }
 
-  override suspend fun fetchMetadata(magnetUri: String): TorrentMetadata? {
+  override suspend fun fetchMetadata(magnetUri: String): TorrentMetadata? =
+    fetchMetadata(magnetUri, TorrentDiscoveryPrivacy.PUBLIC)
+
+  override suspend fun fetchMetadata(
+    magnetUri: String,
+    privacy: TorrentDiscoveryPrivacy,
+  ): TorrentMetadata? {
     check(isRunning)
     val magnet = MagnetUri.parse(magnetUri)
+    val restrictedTiers = if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+      TrackerConfiguration.prepare(magnet.trackers.map { listOf(it) }).tiers.also {
+        require(it.isNotEmpty()) { "Tracker-only magnets require supplied trackers" }
+      }
+    } else emptyList()
     val metadata = cache.resolve(magnet.infoHash) {
       withTimeout(config.metadataTimeout) {
+        if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+          return@withTimeout fetchTrackerOnly(magnet, restrictedTiers)
+        }
         coroutineScope {
           val peers = Channel<PeerEndpoint>(256)
           val discovery = launch { discoverMagnet(magnet, peers) }
@@ -178,9 +193,59 @@ internal class KotlinTorrentEngine(
       }
     }
     require(magnet.identity.matchesInfo(metadata.infoBytes)) { "Exact topic hash mismatch" }
+    // A cache hit must not bypass this caller's pre-discovery privacy choice.
+    if (metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+      throw PrivateTorrentMagnetException()
+    }
     // Cache the immutable info dictionary, retaining this caller's tracker list.
     return TorrentMetadata.fromBencode(metainfoFromInfo(metadata.infoBytes,
       magnet.trackers.map { listOf(it) }), config.maxMetadataBytes)
+  }
+
+  private suspend fun fetchTrackerOnly(
+    magnet: MagnetUri,
+    trackerTiers: List<List<String>>,
+  ): TorrentMetadata {
+    val tiers = TrackerTiers(trackerTiers, tracker::announce)
+    // Resolution is sequential: every metadata connection closes before a tracker can switch.
+    tiers.preferCurrentTracker()
+    var contacted = false
+    var attempts = 0
+    try {
+      while (currentCoroutineContext().isActive) {
+        val result = attempt {
+          tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
+            event = if (contacted) TrackerEvent.NONE else TrackerEvent.STARTED))
+        }
+        if (result != null) {
+          contacted = true
+          for (endpoint in result.peers.distinct()) {
+            check(++attempts <= 4096) { "Metadata peer limit exceeded" }
+            try {
+              return TorrentMetadataExchange(network, config.maxMetadataBytes,
+                budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint, trackerTiers,
+                  TorrentDiscoveryPrivacy.TRACKER_ONLY)
+            } catch (error: CancellationException) {
+              if (!currentCoroutineContext().isActive) throw error
+            } catch (_: Exception) {
+              // Only other peers returned by these trackers are eligible retries.
+            }
+          }
+        }
+        delay((result?.intervalSeconds ?: 30) * 1000)
+      }
+      currentCoroutineContext().ensureActive()
+      error("Metadata resolution stopped")
+    } finally {
+      if (contacted) withContext(NonCancellable) {
+        withTimeoutOrNull(2000) {
+          attempt {
+            tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
+              event = TrackerEvent.STOPPED))
+          }
+        }
+      }
+    }
   }
 
   private suspend fun discoverMagnet(magnet: MagnetUri, output: SendChannel<PeerEndpoint>) =
@@ -253,6 +318,7 @@ internal class KotlinTorrentEngine(
         downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
         uploadThrottle = { uploadRate.acquire(it) },
         trackerConfigurationBudget = exchangeBudgets.sessions,
+        privacy = spec.privacy,
       )
       sessionLeases[hash] = lease
       sessions[hash] = session
@@ -317,7 +383,7 @@ internal class KotlinTorrentEngine(
         }
       }
     }
-    if (!metadata.isPrivate) {
+    if (!metadata.isPrivate && spec.privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       spec.magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { text ->
           resolveEndpoint(text).forEach { output.send(it) }
