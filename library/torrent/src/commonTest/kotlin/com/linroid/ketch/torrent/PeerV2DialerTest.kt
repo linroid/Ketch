@@ -140,6 +140,27 @@ class PeerV2DialerTest {
   }
 
   @Test
+  fun discoveryFailureEndsAdmissionRetries() = runTest {
+    val f = Fixture()
+    val input = Channel<PeerEndpoint>(1)
+    input.send(PeerEndpoint("127.0.0.1", 1))
+    var attempts = 0
+    PeerV2Dialer.run(input, f.state, parallelism = 1, connect = {
+      attempts++
+      null
+    }) { dialer ->
+      runCurrent()
+      assertEquals(1, attempts)
+      input.close(IOException("Discovery failed during admission"))
+      val result = withTimeout(1000) { dialer.connections.receiveCatching() }
+      assertIs<IOException>(result.exceptionOrNull())
+      assertEquals("Discovery failed during admission", result.exceptionOrNull()?.message)
+      assertEquals(1, attempts)
+    }
+    f.released()
+  }
+
+  @Test
   fun endpointStreamFailureFollowsAlreadyQueuedConnections() = runTest {
     val f = Fixture()
     val input = Channel<PeerEndpoint>(1)

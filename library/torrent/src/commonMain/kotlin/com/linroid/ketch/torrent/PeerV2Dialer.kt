@@ -27,6 +27,7 @@ internal class PeerV2Dialer private constructor(
      * Ordinary connection failures are recorded and isolated; a failed endpoint stream is fatal.
      * Caller owns the endpoint producer. This scope joins dial workers and closes queued handles.
      */
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     suspend fun <T> run(
       endpoints: ReceiveChannel<PeerEndpoint>,
       state: TorrentBufferBudget,
@@ -61,7 +62,14 @@ internal class PeerV2Dialer private constructor(
                       failure.value = Failure(endpoint, error)
                       break
                     }
-                    if (connected == null) delay(250)
+                    if (connected == null) {
+                      delay(250)
+                      // A drained stream can fail while every worker is retrying admission.
+                      // Normal closure still allows its already consumed endpoints to connect.
+                      if (endpoints.isClosedForReceive) {
+                        endpoints.receiveCatching().exceptionOrNull()?.let { throw it }
+                      }
+                    }
                   }
                   if (connected != null) output.send(connected)
                 }
