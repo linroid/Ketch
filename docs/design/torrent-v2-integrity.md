@@ -396,3 +396,20 @@ https://raw.githubusercontent.com/bittorrent/bittorrent.org/master/beps/bep_0052
 The v2 actor must select this mode, transmit cancellation/rejection frames as required, and enforce
 request deadlines/connection teardown. This state slice does not yet implement that actor or the
 remaining optional Fast Extension messages.
+
+### Admitted outbound peer frames
+
+The v2 transport now sends ordinary peer messages and typed hash responses. It validates and
+computes encoded size without copying the payload, reserves encoder/write scratch before encoding,
+and holds that credit until the write unwinds. Hash responses reserve before converting immutable
+proof bytes into a generic wire frame. Generic sends reject hash IDs so outgoing hash requests
+cannot bypass the exchange's pending-request registration.
+
+Admission or input validation failure emits no bytes and leaves the stream usable. A write failure,
+timeout or cancellation may have emitted a partial frame, so it closes the stream and releases all
+pending hash tickets. The actor serializes all writes and retains ownership of supplied payload
+buffers until the call returns; this adapter does not admit those preexisting buffers. Tests cover
+backpressure/cancellation, partial writes, typed replies and a two-way TCP hash exchange.
+
+This supplies the outbound path for the forthcoming v2 payload actor. Proof generation, incoming
+request ownership, choking/seeding policy, block deadlines and runtime integration remain required.

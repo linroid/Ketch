@@ -86,12 +86,19 @@ class PeerHashTransportTest {
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
         val server = async {
           val connection = listener.accept()
+          val serverBudget = TorrentBufferBudget(65_536)
+          val wire = PeerHashTransport(connection, exchange(serverBudget), serverBudget)
           try {
-            val wire = PeerWire(connection)
-            val request = assertIs<PeerMessage.Unknown>(wire.read())
-            assertEquals(PeerHashMessage.Request(selector), PeerHashWire.decode(request))
-            wire.send(PeerHashWire.encode(PeerHashMessage.Hashes(selector, hashes)))
-          } finally { connection.close() }
+            val frame = wire.read()
+            try {
+              val request = assertIs<PeerHashTransport.Event.Request>(wire.accept(frame))
+              assertEquals(PeerHashMessage.Request(selector), request.request)
+              wire.respond(PeerHashMessage.Hashes(selector, hashes))
+            } finally { frame.close() }
+          } finally {
+            wire.close()
+            assertEquals(0, serverBudget.allocated)
+          }
         }
         var transport: PeerHashTransport? = null
         val frames = TorrentBufferBudget(65_536)

@@ -128,6 +128,24 @@ internal class PeerWire(
       return message
     }
 
+    /** Validates before computing bounded encoder scratch, without copying any payload. */
+    fun encodedSize(message: PeerMessage, pieceCount: Int? = null): Int {
+      validate(message, null, pieceCount)
+      val body = when (message) {
+        PeerMessage.KeepAlive -> 0
+        is PeerMessage.Control -> 1
+        is PeerMessage.Have -> 5
+        is PeerMessage.Bitfield -> 1 + message.bytes.size
+        is PeerMessage.Request, is PeerMessage.Cancel, is PeerMessage.Reject -> 13
+        is PeerMessage.Piece -> 9 + message.bytes.size
+        is PeerMessage.Port -> 3
+        is PeerMessage.Extended -> 2 + message.payload.size
+        is PeerMessage.Unknown -> 1 + message.payload.size
+      }
+      PeerFrameLimits(pieceCount).validateSize(body)
+      return body + 4
+    }
+
     fun encode(
       message: PeerMessage,
       metadata: TorrentMetadata? = null,
