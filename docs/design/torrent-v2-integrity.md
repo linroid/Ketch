@@ -868,3 +868,18 @@ already full shared partition. Status observers receive attempt transitions befo
 suspension and configuration revisions on replacement; the observer is detached on shutdown.
 The engine regression now runs at exactly its admitted weight and holds the HTTP response until
 ANNOUNCING is observed, then verifies pause/resume and final admission release.
+## Retained tracker configuration admission
+
+Tracker configuration can be admitted against a shared buffer budget before URL parsing and
+snapshot allocation. The reservation conservatively includes UTF-16 string backing and per-entry
+list/map/status overhead, charging shared strings in full. It is bounded by the existing 256-entry
+and 8192-character limits. Validation failure releases the reservation; exhausted admission returns
+null without parsing or capturing configuration.
+
+An owned handle retains the configuration and credit until close. Transfer invalidates the old
+handle without releasing credit, and close is idempotent. The destination is allocated before
+ownership moves. Configuration references are borrowed by the current owner and must not outlive
+close/transfer. Old and proposed configurations may be admitted concurrently so a failed install
+can discard the proposal while retaining the old state. Tests cover these transitions and the
+largest allowed configuration. Wiring this ownership into persistent/live tracker edits remains
+separate work; the existing unadmitted preparation API is unchanged.
