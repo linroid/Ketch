@@ -306,19 +306,37 @@ internal class TorrentPieceStore(
       val temp = sidecar / ("checkpoint-" + InfoHash.fromBytes(torrentRandomBytes(20)).hex + ".tmp")
       val data = snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes,
         trackerConfiguration = configuration).encode()
-      fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
-        recordOwned(temp, directory = false)
-        handle.write(0, data, 0, data.size)
-        handle.flush()
+      try {
+        fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
+          recordOwned(temp, directory = false)
+          handle.write(0, data, 0, data.size)
+          handle.flush()
+        }
+        val identity = checkNotNull(ownedFiles[temp])
+        journal.append(false, TorrentOwnedPath(checkpointPath.toString(), identity))
+        currentCoroutineContext().ensureActive()
+        fileSystem.atomicMove(temp, checkpointPath)
+        ownedFiles.remove(temp)
+        ownedFiles[checkpointPath] = identity
+        trackerConfiguration = configuration
+        snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
+      } catch (failure: Throwable) {
+        // Blocking cleanup stays inside the admitted I/O operation, even on cancellation.
+        // After a successful rename the temporary path is no longer in ownedFiles.
+        try {
+          val identity = ownedFiles[temp]
+          if (identity != null) {
+            validateRegularPath(temp)
+            if (torrentFileIdentity(temp) == identity) {
+              fileSystem.delete(temp, mustExist = false)
+            }
+            ownedFiles.remove(temp)
+          }
+        } catch (cleanupFailure: Throwable) {
+          failure.addSuppressed(cleanupFailure)
+        }
+        throw failure
       }
-      val identity = checkNotNull(ownedFiles[temp])
-      journal.append(false, TorrentOwnedPath(checkpointPath.toString(), identity))
-      currentCoroutineContext().ensureActive()
-      fileSystem.atomicMove(temp, checkpointPath)
-      ownedFiles.remove(temp)
-      ownedFiles[checkpointPath] = identity
-      trackerConfiguration = configuration
-      snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
     }
   }
 

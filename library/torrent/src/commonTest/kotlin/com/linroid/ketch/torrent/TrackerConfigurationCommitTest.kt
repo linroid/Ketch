@@ -15,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
 
 class TrackerConfigurationCommitTest {
@@ -84,6 +85,31 @@ class TrackerConfigurationCommitTest {
       provider.beforeMove = null
       store.replaceTrackerConfiguration(next)
       assertEquals(next.tiers, assertNotNull(store.currentTrackerConfiguration()).tiers)
+    } finally { torrentFileSystem.deleteRecursively(root, mustExist = false) }
+  }
+
+  @Test
+  fun repeatedCanceledReplacementsRemoveStagedFilesAndKeepCommittedCheckpoint() = runTest {
+    val root = root()
+    try {
+      val provider = Provider()
+      val store = TorrentPieceStore(metadata, root / "file", emptySet(), "test", provider)
+      store.initialize()
+      val saved = checkpoint(store.replaceTrackerConfiguration(old))
+      val path = saved.files.single { it.path.toPath().name == "checkpoint" }.path.toPath()
+      val original = torrentFileSystem.read(path) { readByteArray() }
+      provider.beforeMove = { _, _ -> throw CancellationException("Canceled before rename") }
+      repeat(3) {
+        assertFailsWith<CancellationException> { store.replaceTrackerConfiguration(next) }
+        assertTrue(torrentFileSystem.list(assertNotNull(path.parent)).none {
+          it.name.startsWith("checkpoint-") && it.name.endsWith(".tmp")
+        })
+        assertTrue(store.checkpoint().files.none { it.path.endsWith(".tmp") })
+        assertContentEquals(original, torrentFileSystem.read(path) { readByteArray() })
+        assertEquals(old.tiers, assertNotNull(store.currentTrackerConfiguration()).tiers)
+      }
+      provider.beforeMove = null
+      store.replaceTrackerConfiguration(next)
     } finally { torrentFileSystem.deleteRecursively(root, mustExist = false) }
   }
 

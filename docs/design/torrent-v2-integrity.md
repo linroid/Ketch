@@ -916,3 +916,9 @@ The committed configuration remains queryable under the store mutex for ownershi
 The caller retains admission while the store uses the configuration. Tests verify repeated saves,
 injected rename failure preserving the old file/state, successful retry, and cancellation precisely
 after rename. Session edit commands and their retained-owner reconciliation remain separate work.
+
+Failed or canceled pre-rename writes remove their staged file only when its recorded OS identity
+still matches, then remove the in-memory temporary ownership entry. Cleanup runs before releasing
+the I/O slot and preserves the original failure if cleanup also fails. Ownership journal records
+remain bounded by the existing compaction mechanism. Repeated canceled replacements are tested on
+the same store, preserving the committed checkpoint and allowing a later successful retry.
