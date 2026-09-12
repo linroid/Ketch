@@ -276,8 +276,13 @@ internal class TrackerTiers(
   private var topic: TrackerTopic? = null
   private var preferCurrent = false
   private var current: String? = null
+  private var oldPeersClosed = false
+  private var beforeSwitch: suspend () -> Unit = {}
 
-  fun preferCurrentTracker() { preferCurrent = true }
+  fun preferCurrentTracker(beforeSwitch: suspend () -> Unit = {}) {
+    preferCurrent = true
+    this.beforeSwitch = beforeSwitch
+  }
 
   suspend fun announce(request: TrackerAnnounce): TrackerResponse {
     require(topic == null || topic == request.topic) { "Tracker tiers belong to another topic" }
@@ -287,6 +292,11 @@ internal class TrackerTiers(
     } else tiers
     for (tier in ordered) {
       for (url in tier.toList()) {
+        if (preferCurrent && current != null && current != url && !oldPeersClosed) {
+          // Cleanup failure must escape, not be treated as a failed tracker candidate.
+          beforeSwitch()
+          oldPeersClosed = true
+        }
         try {
           val result = announce(url, request, ids[url])
           result.trackerId?.let { ids[url] = it }
@@ -294,6 +304,7 @@ internal class TrackerTiers(
           original.remove(url)
           original.add(0, url)
           current = url
+          oldPeersClosed = false
           return result.copy(source = url)
         } catch (_: TimeoutCancellationException) {
           currentCoroutineContext().ensureActive()

@@ -784,3 +784,17 @@ Cancellation propagates without changing retry state. Stop remains best-effort a
 backoff so shutdown can notify the tracker. The existing v1 polling loop also uses this protection.
 The control is internal until SDK/session command wiring is added; per-tracker backoff, diagnostics,
 editing, and network-policy admission remain separate work.
+
+
+## Private tracker failover barrier
+
+A private discovery session installs its peer-reset callback on the serialized tracker tiers.
+When the current tracker fails, tiers await that callback before contacting any different tracker.
+Cleanup failures and cancellation escape immediately, so the failover cannot silently continue.
+A successful cleanup is retained across failed replacement candidates and reset only after an
+announce succeeds, avoiding duplicate cleanup of the same old peer set.
+
+Common tests hold cleanup open and prove no replacement announce occurs, reject cleanup failure,
+and verify one cleanup across multiple failed candidates. This corrects tracker exchange ordering
+for both v1 and v2 discovery. The callback owner still must provide a joined peer/queued-endpoint
+barrier; comprehensive concurrent incoming admission and v2 session policy wiring remain separate.

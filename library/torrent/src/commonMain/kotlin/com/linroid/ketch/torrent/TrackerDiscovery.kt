@@ -13,7 +13,7 @@ internal class TrackerDiscovery private constructor(
   private val peerId: ByteArray,
   private val port: Int,
   private val trackers: TrackerTiers,
-  private val onPrivateTrackerChanged: suspend () -> Unit = {},
+  onPrivateTrackerChanged: suspend () -> Unit = {},
   private val nowMs: () -> Long = monotonicClock(),
   private val announceCompletion: Boolean = true,
 ) {
@@ -48,7 +48,7 @@ internal class TrackerDiscovery private constructor(
     require(layout.infoHash == document.info.hash) { "Tracker layout belongs to another torrent" }
   }
 
-  init { if (privateTorrent) trackers.preferCurrentTracker() }
+  init { if (privateTorrent) trackers.preferCurrentTracker(onPrivateTrackerChanged) }
 
   private var nextAnnounce = 0L
   private var nextManualAnnounce = 0L
@@ -56,7 +56,6 @@ internal class TrackerDiscovery private constructor(
   private var retryDelayMs = 15_000L
   private var started = false
   private var completed = false
-  private var source: String? = null
   private val key = okio.Buffer().write(torrentRandomBytes(4)).readInt()
 
   suspend fun poll(
@@ -90,10 +89,6 @@ internal class TrackerDiscovery private constructor(
       retryDelayMs = minOf(900_000L, retryDelayMs * 2)
       throw error
     }
-    if (privateTorrent && source != null && source != result.source) {
-      onPrivateTrackerChanged()
-    }
-    source = result.source
     started = event != TrackerEvent.STOPPED
     if (event == TrackerEvent.COMPLETED || (event == TrackerEvent.STARTED && left == 0L)) {
       completed = true
