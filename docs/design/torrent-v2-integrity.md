@@ -288,3 +288,18 @@ layer fields to 63. Authenticated file-tree bounds, supported base-layer policy,
 correlation, buffer admission, response proof authentication and hash serving remain required
 connection-handler work. The codec alone does not authorize any hashes or payload progress.
 It is separate from the v1 runtime: later v2 negotiation must explicitly route these frames to it.
+
+### Authenticating peer hash responses
+
+`verifyPeerHashes` checks exact selector correlation and authenticates a bounded response against a
+file root supplied by trusted metadata. It validates the tree dimensions from file length, rejects
+out-of-tree ranges and proofs that do not reach the root, reduces the aligned base-hash group,
+and incorporates uncle hashes in the correct left/right order. Any supplied node covering only
+padding must equal the canonical zero subtree at its layer, even if a noncanonical tree would
+otherwise match the supplied root. Tree arithmetic supports the signed 64-bit file-length range
+without allocating a tree proportional to file size.
+
+This verifier accepts complete proofs to a trusted root. Intermediate cached anchors, outstanding
+request ownership, hash-byte admission/caching and connection handling remain separate work. A
+successful hash proof authenticates metadata hashes; actual payload still requires verification
+and the storage commit barrier before availability is published.
