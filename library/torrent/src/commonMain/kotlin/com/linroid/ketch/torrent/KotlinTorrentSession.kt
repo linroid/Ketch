@@ -20,7 +20,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -47,20 +46,28 @@ internal class KotlinTorrentSession(
   private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
   private val resets = Channel<CompletableDeferred<Unit>>(1)
 
-  private val allowedPrivateHosts = AtomicReference<Set<String>>(emptySet())
+  private val privateAdmission = Mutex()
+  private var allowedPrivateHosts: Set<String> = emptySet()
 
-  fun trackerPeers(peers: List<PeerEndpoint>) {
-    allowedPrivateHosts.store(peers.map { it.host }.toSet())
+  suspend fun trackerPeers(peers: List<PeerEndpoint>) {
+    val hosts = peers.map { it.host }.toSet()
+    privateAdmission.withLock { allowedPrivateHosts = hosts }
   }
 
   fun accept(connection: TorrentConnection): Boolean {
     if (_state.value != TorrentSessionState.DOWNLOADING &&
       _state.value != TorrentSessionState.SEEDING) return false
-    if (store.metadata.isPrivate && connection.remote.host !in allowedPrivateHosts.load()) return false
-    return incoming.trySend(connection).isSuccess
+    if (!store.metadata.isPrivate) return incoming.trySend(connection).isSuccess
+    if (!privateAdmission.tryLock()) return false
+    try {
+      if (connection.remote.host !in allowedPrivateHosts) return false
+      return incoming.trySend(connection).isSuccess
+    } finally { privateAdmission.unlock() }
   }
 
   suspend fun resetPeers() {
+    // Admission and enqueue share the lock: every old-host enqueue precedes this revocation.
+    privateAdmission.withLock { allowedPrivateHosts = emptySet() }
     val done = CompletableDeferred<Unit>()
     resets.send(done)
     done.await()
