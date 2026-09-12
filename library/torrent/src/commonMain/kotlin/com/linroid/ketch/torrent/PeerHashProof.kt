@@ -16,17 +16,11 @@ internal fun verifyPeerHashes(
 ): Boolean {
   if (fileLength <= 0 || trustedRoot.size != 32 || response.selector != requested ||
     requested.root != trustedRoot || response.hashes.size != requested.hashCount * 32) return false
+  peerHashProofHeight(requested, fileLength) ?: return false
   val blocks = (fileLength - 1) / TorrentMerkleRoot.BLOCK_BYTES + 1
-  var height = 0
-  var width = 1L
-  while (width < blocks) { width *= 2; height++ }
   val base = requested.baseLayer
-  if (base >= height || requested.proofLayers > height - base - 1) return false
-  val layerWidth = width shr base
-  if (requested.index + requested.length > layerWidth) return false
   val groupHeight = requested.length.countTrailingZeroBits()
   val uncles = requested.hashCount - requested.length
-  if (base + groupHeight + uncles != height) return false
 
   fun parent(left: ByteArray, right: ByteArray): ByteArray =
     Sha256().update(left).update(right).digest()
@@ -54,4 +48,19 @@ internal fun verifyPeerHashes(
     level++
   }
   return result.toByteString() == trustedRoot
+}
+
+/** Returns the root height only when this bounded request can carry a complete file-root proof. */
+internal fun peerHashProofHeight(request: PeerHashSelector, fileLength: Long): Int? {
+  if (fileLength <= 0) return null
+  val blocks = (fileLength - 1) / TorrentMerkleRoot.BLOCK_BYTES + 1
+  var height = 0
+  var width = 1L
+  while (width < blocks) { width *= 2; height++ }
+  val base = request.baseLayer
+  if (base >= height || request.proofLayers > height - base - 1) return null
+  if (request.index + request.length > (width shr base)) return null
+  val groupHeight = request.length.countTrailingZeroBits()
+  val uncles = request.hashCount - request.length
+  return height.takeIf { base + groupHeight + uncles == height }
 }

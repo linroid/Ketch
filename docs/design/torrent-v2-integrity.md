@@ -303,3 +303,23 @@ This verifier accepts complete proofs to a trusted root. Intermediate cached anc
 request ownership, hash-byte admission/caching and connection handling remain separate work. A
 successful hash proof authenticates metadata hashes; actual payload still requires verification
 and the storage commit barrier before availability is published.
+
+### Hash exchange ownership and admission
+
+`PeerHashExchange` belongs to one connection event loop. Its root-to-length lookup must be restricted
+to authenticated metainfo. It validates complete-proof tree bounds and reserves shared hash-exchange
+credit before returning a request ticket. Duplicate requests, pipeline saturation and exhausted
+credit cannot grow the pending set. The allowance covers three hash-byte representations plus
+bounded verification scratch; unsolicited-frame parser admission remains the reader's responsibility.
+
+Replies must match an outstanding selector and arrive before its deadline. Full-root proof
+verification precedes delivery; rejection, invalid proof, expiry, cancellation and connection close
+release pending credit. Local ticket identity prevents a stale send/cancel callback from releasing a
+new request at the same coordinates. A successful result carries its reservation until the consumer
+closes it, including after connection shutdown. Consumers must drop retained hash bytes before
+releasing that reservation. The connection timer must invoke expiry even while payloads are choked.
+
+Wire replies have no transaction identifier beyond their selector. A delayed response matching a
+new request for the same immutable root/coordinates can satisfy it only after proof authentication;
+it cannot change the trusted content. Live connection routing, timers, parser admission and hash
+cache ownership still need runtime integration. This does not mark step 08 complete.
