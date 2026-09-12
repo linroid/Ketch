@@ -42,8 +42,9 @@ internal class PeerBlockExchange(
     require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
     require(maxPending in 1..256 && timeoutMs in 1..180_000)
   }
-  private val state = PeerProtocolState(layout.pieceCount.toInt(), maxPending,
-    explicitRejects = true)
+  private var protocol: PeerProtocolState? = PeerProtocolState(
+    layout.pieceCount.toInt(), maxPending, explicitRejects = true)
+  private val state: PeerProtocolState get() = checkNotNull(protocol)
   private val pending = mutableMapOf<PeerMessage.Request, Pending>()
   private val identity = Any()
   private var closed = false
@@ -198,6 +199,7 @@ internal class PeerBlockExchange(
     try { transport.close() } finally {
       pending.values.forEach { it.lease.close() }
       pending.clear()
+      protocol = null
     }
   }
 }
