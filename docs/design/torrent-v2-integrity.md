@@ -684,3 +684,17 @@ blocked storage, and an already verified selection without peers. These use dete
 connections and real file storage. Independent-client v2 interoperability and throughput gates remain
 unproven. Discovery/connection orchestration, magnet resolution, complete hash serving, seeding,
 corrupt-peer reputation, and public runtime registration remain outstanding.
+
+### Full session loopback TCP validation
+
+The complete session path is exercised through `createTorrentNetwork` loopback sockets, handshake
+negotiation, bounded peer actors/pool, automatic request scheduling, and real verified file storage.
+Tests cover a pure-v2 handshake and a hybrid v1 handshake upgrading to v2. The seeder checks interest
+and canonical requests, sends both blocks in reverse order, and disconnects before storage completion.
+The selected file is verified byte-for-byte, the unselected file is absent, and both buffer/state
+budgets return to zero after joined cleanup. A hybrid case with a deliberately mismatched v1 piece
+hash rejects otherwise v2-valid payload without publishing progress or writing payload bytes.
+
+These tests run in commonTest on JVM and iOS using the actual platform TCP adapter. Both ends use
+Ketch's protocol implementation, so this is loopback integration evidence, not independent-client
+v2/hybrid interoperability, throughput, physical-device lifecycle, or sustained-resource evidence.
