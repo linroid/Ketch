@@ -92,3 +92,22 @@ allows incomplete input to be completed, and finalizes once. A successful result
 progress publication by itself: storage must retain or stage the same bytes, commit them under
 its cancellation/generation barrier, and only then publish availability. That storage adapter,
 network proof acquisition, and v2 interoperability remain pending.
+
+## Versioned output mapping
+
+`TorrentOutputMapping` policy version 1 maps the complete authenticated file tree before file
+selection. Logical IDs remain separate from paths; hybrids keep their original v1 file indices
+and never map padding into output files. Ordinary valid UTF-8 components of at most 240 bytes
+are preserved. Unsafe components, reserved device names, invalid UTF-8, and names containing the
+policy's `%`/`~` markers are encoded byte-for-byte; larger components use a full SHA-256 name.
+
+Sibling names are compared after canonical Unicode normalization and conservative case folding.
+Colliding siblings receive deterministic full-hash suffixes, including directory/file collisions.
+Residual collisions fail rather than alias two destinations. Shared directories are mapped once,
+so changing selections cannot rename their parents. Raw names remain in authenticated metadata.
+The device-name rules follow [Microsoft's naming guidance](https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file).
+
+This computes relative components only. Destination provider capabilities, full-path limits,
+existing files/aliases, symlink and ownership checks, persistent mapping migration, and joining
+under a trusted caller root remain responsibilities of the storage adapter. The mapper does not
+rename existing v1 downloads or authorize overwriting an existing destination.
