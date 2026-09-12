@@ -178,6 +178,58 @@ class TorrentCheckpointTest {
     }
   }
 
+  @Test
+  fun trackerOverridesUseANewVersionAndPreserveExplicitEmptyConfiguration() {
+    val original = TorrentCheckpoint("test", metadata, "/tmp/pack", setOf(0, 2),
+      BooleanArray(metadata.pieceHashes.size / 20), emptyList(), emptyList())
+    assertNull(assertNotNull(TorrentCheckpoint.decode(original.encode())).trackerConfiguration)
+    for (tiers in listOf(emptyList(), listOf(listOf("https://tracker/announce?key=secret")))) {
+      val encoded = original.copy(
+        trackerConfiguration = TrackerConfiguration.prepare(tiers)).encode()
+      val decoded = assertNotNull(TorrentCheckpoint.decode(encoded))
+      assertEquals(tiers, assertNotNull(decoded.trackerConfiguration).tiers)
+      assertEquals(original.metadata.infoHash, decoded.metadata.infoHash)
+      val prefix = "KETCH-TORRENT\n".encodeToByteArray()
+      val data = Bencode.parse(encoded.copyOfRange(prefix.size, encoded.size))
+      assertEquals(2L, data["version"]?.integer)
+    }
+  }
+
+  @Test
+  fun trackerOverrideRejectsDowngradesMissingFieldsAndOversizedLists() {
+    val original = TorrentCheckpoint("test", metadata, "/tmp/pack", setOf(0, 2),
+      BooleanArray(metadata.pieceHashes.size / 20), emptyList(), emptyList()).encode()
+    val prefix = "KETCH-TORRENT\n".encodeToByteArray()
+    @Suppress("UNCHECKED_CAST")
+    val data = Bencode.parse(original.copyOfRange(prefix.size, original.size)).legacyValue()
+      as Map<String, Any>
+    for (extra in listOf(mapOf("version" to 2L), mapOf("version" to 3L),
+      mapOf("tracker-tiers" to emptyList<Any>()),
+      mapOf("version" to 2L, "tracker-tiers" to List(257) { emptyList<Any>() }),
+      mapOf("version" to 2L, "tracker-tiers" to listOf(listOf("file:///private"))))) {
+      assertFailsWith<IllegalArgumentException> {
+        TorrentCheckpoint.decode(prefix + Bencode.encode(data + extra))
+      }
+    }
+  }
+
+  @Test
+  fun restoredTrackerOverrideSurvivesAnotherPersistedCheckpoint() = runTest {
+    val root = root()
+    try {
+      val initial = store(root)
+      initial.initialize()
+      val tiers = listOf(listOf("https://tracker/announce?key=secret"))
+      val snapshot = initial.checkpoint().copy(
+        trackerConfiguration = TrackerConfiguration.prepare(tiers))
+      val restored = store(root)
+      restored.restore(assertNotNull(TorrentCheckpoint.decode(snapshot.encode())))
+      restored.initialize()
+      val saved = assertNotNull(TorrentCheckpoint.decode(restored.persistCheckpoint()))
+      assertEquals(tiers, assertNotNull(saved.trackerConfiguration).tiers)
+    } finally { torrentFileSystem.deleteRecursively(root, mustExist = false) }
+  }
+
   private fun root(): Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
     "ketch-checkpoint-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
 

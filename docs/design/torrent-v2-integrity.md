@@ -883,3 +883,20 @@ close/transfer. Old and proposed configurations may be admitted concurrently so 
 can discard the proposal while retaining the old state. Tests cover these transitions and the
 largest allowed configuration. Wiring this ownership into persistent/live tracker edits remains
 separate work; the existing unadmitted preparation API is unchanged.
+
+
+## Checkpoint tracker overrides
+
+Task checkpoints may carry a validated tracker override independently of authenticated metainfo.
+Absent configuration retains metainfo trackers; an explicit empty list disables them. Checkpoints
+without overrides keep format version 1. Overrides require format version 2 so an older reader rejects
+the state instead of silently restoring the original tracker policy. Both formats remain readable;
+version-1 overrides, missing version-2 fields, unknown versions, and oversized/invalid lists fail closed.
+
+Store restore and later checkpoints preserve the override. Session discovery uses it without merging
+metainfo trackers, and private discovery rules remain unchanged. Admission reserves the maximum
+allowed override control allowance before decoding resume data; retained decoded state is covered by
+the existing resume-data allowance. Real engine tests use exact admission capacity, verify replacement
+and empty tracker lists, and save the override again on pause. Codec/store tests cover versions,
+validation, and repeated persistence. Commands that create/edit overrides in live sessions and public
+SDK/daemon/UI exposure remain separate work.

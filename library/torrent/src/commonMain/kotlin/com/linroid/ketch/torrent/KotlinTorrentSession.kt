@@ -47,6 +47,9 @@ internal class KotlinTorrentSession(
   private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
   private val resets = Channel<CompletableDeferred<Unit>>(1)
 
+  val trackerTiers: List<List<String>>
+    get() = checkpoint?.trackerConfiguration?.tiers ?: store.metadata.trackerTiers
+
   private val trackerControl = AtomicReference<TrackerControl?>(null)
   private val _trackerStatus = MutableStateFlow<List<TrackerStatus>>(emptyList())
   val trackerStatus: StateFlow<List<TrackerStatus>> = _trackerStatus
