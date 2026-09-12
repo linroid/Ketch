@@ -111,3 +111,23 @@ This computes relative components only. Destination provider capabilities, full-
 existing files/aliases, symlink and ownership checks, persistent mapping migration, and joining
 under a trusted caller root remain responsibilities of the storage adapter. The mapper does not
 rename existing v1 downloads or authorize overwriting an existing destination.
+
+## Fresh-directory v2 storage adapter
+
+`TorrentV2PieceStore` connects the document, output mapping, layout and dual payload verifier for
+fresh filesystem downloads. Initialization exclusively creates a new caller-named directory;
+an existing destination is rejected, not adopted. Empty selected files are created. Writes target
+only selected logical files, with v2 file-relative offsets and no padding files. A buffer lease
+precedes copying received bytes, and verification and I/O consume that same private copy.
+
+A shared payload-handle permit spans blocking I/O, including cancellation. Files are flushed before
+the operation returns through the coroutine cancellation boundary; only then does the store mark
+the piece committed and increment selected progress under its mutex. Duplicate commits do not
+count twice. Closing joins outstanding operations through that mutex. Live cleanup checks recorded
+OS identities and removes only created files and empty owned directories.
+
+This adapter is not yet installed in the download engine. Session admission must cover its
+metadata, mapping and index state before construction; its payload-copy leases alone do not prove
+the total memory profile. Persistent ownership, checkpoint v2, resume/import/recheck, committed
+read/proof-serving APIs, generation-tagged session integration, and alternate destination providers
+remain pending. Fresh-root ownership is intentionally not inferred from preexisting directories.
