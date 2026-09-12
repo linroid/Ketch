@@ -798,3 +798,17 @@ Common tests hold cleanup open and prove no replacement announce occurs, reject 
 and verify one cleanup across multiple failed candidates. This corrects tracker exchange ordering
 for both v1 and v2 discovery. The callback owner still must provide a joined peer/queued-endpoint
 barrier; comprehensive concurrent incoming admission and v2 session policy wiring remain separate.
+
+
+## Private incoming admission during peer reset
+
+The v1 session revokes tracker-authorized hosts before requesting the swarm's joined peer reset.
+Authorization checks and incoming queue insertion share a short mutex with revocation, so every
+accepted old-host enqueue precedes revocation and is covered by the subsequent swarm drain.
+Incoming admission uses `tryLock` and rejects on contention; the engine retains and closes a
+rejected connection. No network or suspend operation runs under the incoming admission lock.
+
+The session regression holds an old peer in cancellation cleanup, verifies old hosts are rejected
+before reset finishes and afterward, then admits a host from the replacement tracker. It also
+checks the old peer closes and all session buffer credit returns after shutdown. Public v2 session
+registration and its corresponding provenance/admission policy remain separate work.
