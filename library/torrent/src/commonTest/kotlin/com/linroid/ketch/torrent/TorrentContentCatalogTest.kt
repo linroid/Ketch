@@ -5,6 +5,7 @@ import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.IOException
 import okio.Path
+import okio.use
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
