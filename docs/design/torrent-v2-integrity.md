@@ -489,3 +489,23 @@ The actor still must offload long storage work and call the inbox while idle; th
 background timer that makes arbitrary blocking actor callbacks safe. Scheduler/event-loop command
 wiring, upload/hash serving, full session integration and the remaining production gates remain
 required.
+
+### Bounded commit workers and actor commands
+
+`TorrentV2CommitWorker` owns a bounded assembly queue, a bounded completion queue and one child
+worker. Successful submission transfers an already admitted complete assembly; queue saturation
+leaves ownership with the actor for retry. The worker defaults to `Dispatchers.Default`, moving
+piece verification off the actor, while store I/O still uses its storage admission/provider path.
+It reports verified/rejected commits only after the store returns, and storage failures as explicit
+completion values. Scope exit cancels and joins the worker and closes every undelivered assembly.
+
+The inbox can now select a typed actor-command queue alongside frames and response deadlines.
+When both queues stay ready it alternates preference, preventing either stream from starving the
+other. Command queue ownership stays with its producer; commit completions contain no retained
+payload lease. A shared test blocks storage admission while the actor waits on both peer input and
+worker completion: the pending block still expires at its deadline and teardown returns all credit.
+
+These components supply worker dispatch and completion plumbing. The production scheduler still
+must create/admit assemblies, route completions across peer/session lifetimes, retry queue pressure,
+and reconcile checkpoint/progress generations. Full upload/hash serving, session integration and
+all remaining capabilities and release gates remain required.

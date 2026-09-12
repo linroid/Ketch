@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.onTimeout
@@ -15,15 +16,23 @@ internal class PeerV2Inbox private constructor(
   private val transport: PeerHashTransport,
   private val blocks: PeerBlockExchange,
 ) {
-  sealed interface Event {
+  private var preferCommands = true
+
+  sealed interface Event<out C> {
     /** The actor must close the frame after dispatch, including when dispatch throws. */
-    data class Frame(val value: PeerHashTransport.Frame) : Event
-    data class HashTimeout(val tickets: List<PeerHashExchange.Ticket>) : Event
+    data class Frame(val value: PeerHashTransport.Frame) : Event<Nothing>
+    data class HashTimeout(val tickets: List<PeerHashExchange.Ticket>) : Event<Nothing>
+    data class Command<C>(val value: C) : Event<C>
   }
 
   /** Wait for a frame or response expiry; peer silence cannot postpone a pending deadline. */
+  suspend fun next(): Event<Nothing> = receive(null)
+
+  /** Commands come from an actor-owned bounded queue; its sender defines payload ownership. */
+  suspend fun <C> next(commands: ReceiveChannel<C>): Event<C> = receive(commands)
+
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-  suspend fun next(): Event {
+  private suspend fun <C> receive(commands: ReceiveChannel<C>?): Event<C> {
     while (true) {
       check(!blocks.expire()) { "Peer block response deadline expired" }
       val expired = transport.expire()
@@ -37,11 +46,17 @@ internal class PeerV2Inbox private constructor(
       }
       // Channel cancellation owns any undelivered frame. Avoid a withTimeout return boundary
       // that could discard a successfully received frame without releasing its reservation.
-      val frame = select {
-        frames.onReceive { it }
+      val event = select<Event<C>?> {
+        // Alternate ready queues so neither peer traffic nor completion bursts starve the other.
+        if (preferCommands && commands != null) commands.onReceive { Event.Command(it) }
+        frames.onReceive { Event.Frame(it) }
+        if (!preferCommands && commands != null) commands.onReceive { Event.Command(it) }
         if (delay != null) onTimeout(delay) { null }
       }
-      if (frame != null) return Event.Frame(frame)
+      if (event != null) {
+        preferCommands = event !is Event.Command
+        return event
+      }
     }
   }
 
