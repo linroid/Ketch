@@ -28,7 +28,9 @@ import kotlin.time.TimeSource
 class TorrentBenchmarkTest {
   @Test
   fun compareKotlinAndNativeDownloaders() = runTest {
-    if (System.getenv("KETCH_TORRENT_BENCHMARK") != "1") return@runTest
+    check(System.getenv("KETCH_TORRENT_BENCHMARK") == "1") {
+      "Benchmark execution requires KETCH_TORRENT_BENCHMARK=1"
+    }
     withContext(Dispatchers.IO) {
       NativeLibraryLoader.ensureLoaded()
       val root = Files.createTempDirectory("ketch-benchmark").toFile()

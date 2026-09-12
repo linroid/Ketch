@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.Path.Companion.toPath
+import org.libtorrent4j.LibTorrent
 import org.libtorrent4j.SessionManager
 import org.libtorrent4j.SessionParams
 import org.libtorrent4j.SettingsPack
@@ -25,6 +26,9 @@ class IndependentSeederTest {
     withContext(Dispatchers.Default) {
       withTimeout(20_000) {
         NativeLibraryLoader.ensureLoaded()
+        assertEquals(ConformanceClients.version("libtorrent4j"), LibTorrent.libtorrent4jVersion())
+        println("CONFORMANCE_CLIENT libtorrent ${LibTorrent.version()} " +
+          "libtorrent4j ${LibTorrent.libtorrent4jVersion()}")
         val root = Files.createTempDirectory("ketch-interop").toFile()
         val seed = root.resolve("seed").apply { mkdirs() }
         val payload = ByteArray(80_037) { (it * 31 + 17).toByte() }

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main, "codex/torrent-*" ]
+    branches: [ main, "codex/torrent-*", "torrent-v2-*" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,7 +18,7 @@ permissions:
 jobs:
   jvm-tests:
     name: JVM Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -29,13 +29,41 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: Install independent torrent client
-        run: sudo apt-get update && sudo apt-get install -y transmission-daemon
+      - name: Install fixture build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libcurl4-openssl-dev libssl-dev
+
+      - name: Cache pinned Transmission fixture
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ketch-transmission
+          key: transmission-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('test-fixtures/torrent/clients.properties', 'tools/torrent/build_transmission.py') }}
+
+      - name: Build authenticated independent torrent client
+        run: python3 tools/torrent/build_transmission.py --output "$RUNNER_TEMP/ketch-transmission"
+
+      - name: Verify conformance gate behavior
+        run: python3 -m unittest discover -s tools/torrent -p 'test_*.py'
 
       - name: Run JVM tests
         env:
-          TRANSMISSION_DAEMON: /usr/bin/transmission-daemon
-        run: ./gradlew jvmTest :library:torrent:verifyNoNativeTorrentRuntime
+          TRANSMISSION_DAEMON: ${{ runner.temp }}/ketch-transmission/build/daemon/transmission-daemon
+        run: ./gradlew jvmTest :library:torrent:verifyNoNativeTorrentRuntime -PtorrentConformance=true
+
+      - name: Require executed interoperability scenarios
+        run: |
+          python3 tools/torrent/verify_conformance.py \
+            --reports library/torrent/build/test-results/jvmTest \
+            --revision "$GITHUB_SHA" \
+            --output library/torrent/build/reports/conformance/executed.json
+
+      - name: Upload conformance evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: torrent-conformance
+          path: library/torrent/build/reports/conformance/executed.json
+          if-no-files-found: error
 
       - name: Upload test results
         if: always()
@@ -172,6 +200,24 @@ jobs:
         with:
           name: test-results-torrent-device
           path: library/torrent/build/outputs/androidTest-results/**/TEST-*.xml
+
+  required-checks:
+    name: Required Checks
+    runs-on: ubuntu-24.04
+    needs: [ jvm-tests, android-tests, ios-tests, js-tests, torrent-desktop-tests, torrent-device-tests ]
+    if: always()
+    steps:
+      - name: Require every test job to succeed on this revision
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          results = json.loads(os.environ['JOB_RESULTS'])
+          failed = {name: value['result'] for name, value in results.items()
+                    if value['result'] != 'success'}
+          assert results and not failed, f'Required checks did not pass: {failed}'
+          PY
 
   publish-results:
     name: Publish Test Results
