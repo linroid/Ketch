@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.TimeSource
 
 /** Serialized per-session tracker lifecycle; callers supply whole-torrent verified state. */
@@ -57,6 +58,36 @@ internal class TrackerDiscovery private constructor(
   private var started = false
   private var completed = false
   private val key = okio.Buffer().write(torrentRandomBytes(4)).readInt()
+
+  /** Replace on the session owner; endpoint authorization is the caller's responsibility. */
+  suspend fun replaceTrackers(
+    tiers: List<List<String>>,
+    verified: BooleanArray,
+    downloaded: Long,
+    uploaded: Long,
+    stopTimeoutMs: Long = 2000,
+  ) {
+    require(stopTimeoutMs in 1..30_000 && downloaded >= 0 && uploaded >= 0)
+    val replacement = TrackerConfiguration.prepare(tiers)
+    remaining(verified) // Validate state before contacting the old configuration.
+    if (started) withTimeoutOrNull(stopTimeoutMs) {
+      try {
+        poll(verified, downloaded, uploaded, stopped = true)
+      } catch (error: CancellationException) {
+        throw error
+      } catch (_: Exception) {
+        currentCoroutineContext().ensureActive()
+      }
+    }
+    currentCoroutineContext().ensureActive()
+    trackers.replace(replacement)
+    started = false
+    completed = false
+    nextAnnounce = 0L
+    nextManualAnnounce = 0L
+    retryAt = 0L
+    retryDelayMs = 15_000L
+  }
 
   suspend fun poll(
     verified: BooleanArray,

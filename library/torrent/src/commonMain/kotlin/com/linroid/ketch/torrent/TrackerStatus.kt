@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 /** Credential-free snapshot; id indexes unique URLs in the original tier traversal order. */
 internal data class TrackerStatus(
   val id: Int,
+  val configurationRevision: Long = 0,
   val outcome: Outcome = Outcome.NOT_CONTACTED,
   val attempts: Long = 0,
   val failures: Long = 0,

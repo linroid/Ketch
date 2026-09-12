@@ -278,13 +278,31 @@ internal class TrackerTiers(
       if (url !in this) put(url, TrackerStatus(size))
     }
   }
-  private val tiers = tiers.map { it.distinct().shuffled().toMutableList() }
+  private var tiers = tiers.map { it.distinct().shuffled().toMutableList() }
+  private var configurationRevision = 0L
   private val ids = mutableMapOf<String, ByteArray>()
   private var topic: TrackerTopic? = null
   private var preferCurrent = false
   private var current: String? = null
   private var oldPeersClosed = false
   private var beforeSwitch: suspend () -> Unit = {}
+
+  /** Caller serializes replacement with announces. Topic binding is deliberately retained. */
+  suspend fun replace(configuration: TrackerConfiguration) {
+    check(configurationRevision < Long.MAX_VALUE)
+    if (preferCurrent && current != null && !oldPeersClosed) beforeSwitch()
+    currentCoroutineContext().ensureActive()
+    val replacement = configuration.tiers.map { it.shuffled().toMutableList() }
+    tiers = replacement
+    configurationRevision++
+    ids.clear()
+    statuses.clear()
+    for (tier in configuration.tiers) for (url in tier) {
+      if (url !in statuses) statuses[url] = TrackerStatus(statuses.size, configurationRevision)
+    }
+    current = null
+    oldPeersClosed = false
+  }
 
   /** Read on the session owner; snapshots remain unchanged across later announces. */
   fun status(): List<TrackerStatus> = statuses.values.toList()
