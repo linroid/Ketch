@@ -271,6 +271,11 @@ internal class TrackerTiers(
   tiers: List<List<String>>,
   private val announce: suspend (String, TrackerAnnounce, ByteArray?) -> TrackerResponse,
 ) {
+  private val statuses = linkedMapOf<String, TrackerStatus>().apply {
+    for (tier in tiers) for (url in tier) {
+      if (url !in this) put(url, TrackerStatus(size))
+    }
+  }
   private val tiers = tiers.map { it.distinct().shuffled().toMutableList() }
   private val ids = mutableMapOf<String, ByteArray>()
   private var topic: TrackerTopic? = null
@@ -278,6 +283,15 @@ internal class TrackerTiers(
   private var current: String? = null
   private var oldPeersClosed = false
   private var beforeSwitch: suspend () -> Unit = {}
+
+  /** Read on the session owner; snapshots remain unchanged across later announces. */
+  fun status(): List<TrackerStatus> = statuses.values.toList()
+
+  private fun failed(url: String, outcome: TrackerStatus.Outcome) {
+    val previous = statuses.getValue(url)
+    statuses[url] = previous.copy(outcome = outcome, failures = previous.failures + 1,
+      consecutiveFailures = previous.consecutiveFailures + 1)
+  }
 
   fun preferCurrentTracker(beforeSwitch: suspend () -> Unit = {}) {
     preferCurrent = true
@@ -297,6 +311,9 @@ internal class TrackerTiers(
           beforeSwitch()
           oldPeersClosed = true
         }
+        val previous = statuses.getValue(url)
+        statuses[url] = previous.copy(outcome = TrackerStatus.Outcome.ANNOUNCING,
+          attempts = previous.attempts + 1)
         try {
           val result = announce(url, request, ids[url])
           result.trackerId?.let { ids[url] = it }
@@ -305,13 +322,27 @@ internal class TrackerTiers(
           original.add(0, url)
           current = url
           oldPeersClosed = false
+          statuses[url] = statuses.getValue(url).copy(
+            outcome = TrackerStatus.Outcome.SUCCEEDED,
+            consecutiveFailures = 0,
+            lastPeerCount = result.peers.size,
+            lastIntervalSeconds = result.intervalSeconds,
+            lastMinimumIntervalSeconds = result.minimumIntervalSeconds,
+          )
           return result.copy(source = url)
         } catch (_: TimeoutCancellationException) {
           currentCoroutineContext().ensureActive()
+          failed(url, TrackerStatus.Outcome.TIMED_OUT)
         } catch (e: CancellationException) {
           throw e
         } catch (_: Exception) {
           currentCoroutineContext().ensureActive()
+          failed(url, TrackerStatus.Outcome.FAILED)
+        } finally {
+          val latest = statuses.getValue(url)
+          if (latest.outcome == TrackerStatus.Outcome.ANNOUNCING) {
+            statuses[url] = latest.copy(outcome = TrackerStatus.Outcome.CANCELED)
+          }
         }
       }
     }
