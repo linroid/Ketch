@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -45,6 +46,22 @@ internal class KotlinTorrentSession(
   private val lifecycle = Mutex()
   private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
   private val resets = Channel<CompletableDeferred<Unit>>(1)
+
+  private val trackerControl = AtomicReference<TrackerControl?>(null)
+  private val _trackerStatus = MutableStateFlow<List<TrackerStatus>>(emptyList())
+  val trackerStatus: StateFlow<List<TrackerStatus>> = _trackerStatus
+
+  suspend fun reannounceTrackers(): Boolean = trackerControl.load()?.reannounce() ?: false
+
+  fun attachTrackerControl(control: TrackerControl) {
+    check(trackerControl.compareAndSet(null, control))
+  }
+
+  fun detachTrackerControl(control: TrackerControl) {
+    check(trackerControl.compareAndSet(control, null))
+  }
+
+  fun updateTrackerStatus(status: List<TrackerStatus>) { _trackerStatus.value = status }
 
   private val privateAdmission = Mutex()
   private var allowedPrivateHosts: Set<String> = emptySet()

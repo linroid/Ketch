@@ -277,16 +277,25 @@ internal class KotlinTorrentEngine(
         announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
       )
       try {
-        while (isActive) {
-          attempt {
-            discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes)
-          }?.peers?.let { peers ->
-            session.trackerPeers(peers)
-            peers.forEach { output.send(it) }
-          }
-          delay(1000)
+        TrackerControl.run(exchangeBudgets.sessions, operation = { manual ->
+          discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,
+            manual = manual)
+        }, publish = { response ->
+          session.trackerPeers(response.peers)
+          response.peers.forEach { output.send(it) }
+        }, readStatus = discovery::status,
+          publishStatus = session::updateTrackerStatus,
+        ) { control ->
+          session.attachTrackerControl(control)
+          try {
+            while (isActive) {
+              attempt { control.poll() }
+              delay(1000)
+            }
+          } finally { session.detachTrackerControl(control) }
         }
       } finally {
+        session.updateTrackerStatus(emptyList())
         withContext(NonCancellable) {
           withTimeoutOrNull(2000) {
             if (session.state.value == TorrentSessionState.FINISHED ||

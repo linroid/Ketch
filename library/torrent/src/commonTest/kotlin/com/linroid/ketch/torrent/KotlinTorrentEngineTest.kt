@@ -1,6 +1,11 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.ServerInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -9,8 +14,71 @@ import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class KotlinTorrentEngineTest {
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun liveTrackerControlsFollowSessionPauseAndResume() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val requests = MutableStateFlow<List<String>>(emptyList())
+        val http = TorrentHttp(object : HttpEngine {
+          override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+            error("Unused")
+          override suspend fun download(
+            url: String,
+            range: LongRange?,
+            headers: Map<String, String>,
+            onData: suspend (ByteArray) -> Unit,
+          ) {
+            requests.value += url
+            onData(Bencode.encode(mapOf("interval" to 3600L, "min interval" to 60L,
+              "peers" to ByteArray(0))))
+          }
+          override fun close() = Unit
+        })
+        val clock = AtomicLong(0)
+        val bytes = byteArrayOf(1, 2, 3, 4)
+        val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf(
+          "announce" to "https://tracker/announce", "info" to mapOf("name" to "seed",
+            "length" to 4L, "piece length" to 4L, "pieces" to sha1Digest(bytes))
+        )))
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-tracker-control-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        FileSystem.SYSTEM.createDirectories(root)
+        FileSystem.SYSTEM.write(root / "seed") { write(bytes) }
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), http = http,
+          nowMs = { clock.load() })
+        try {
+          engine.start()
+          val session = engine.addTask(TorrentTaskSpec("tracker-control", metadata,
+            (root / "seed").toString(), emptySet()))
+          assertFalse(session.reannounceTrackers())
+          session.resume()
+          session.trackerStatus.first { it.singleOrNull()?.attempts == 1L }
+          assertFalse(session.reannounceTrackers())
+          clock.store(60_000)
+          assertTrue(session.reannounceTrackers())
+          assertEquals(2L, session.trackerStatus.value.single().attempts)
+          session.pause()
+          assertFalse(session.reannounceTrackers())
+          assertTrue(session.trackerStatus.value.isEmpty())
+          assertEquals(1, requests.value.count { "event=stopped" in it })
+          session.resume()
+          session.trackerStatus.first { it.singleOrNull()?.attempts == 1L }
+          assertEquals(2, requests.value.count { "event=started" in it })
+        } finally {
+          engine.stop()
+          FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+        }
+        assertEquals(0, engine.admittedSessionBytes)
+      }
+    }
+  }
+
   @Test
   fun completedTorrent_acceptsNewIncomingPeerAndSeedsVerifiedBytes() = runTest {
     withContext(Dispatchers.Default) {

@@ -844,3 +844,19 @@ increasing configuration revision, so clients cannot confuse reused ordinal IDs 
 Tests cover stop/cleanup/start ordering, credential state, mutable input, deadlines, cancellation,
 invalid edits, empty configurations, and topic isolation. SDK/daemon/UI edit commands and persistent
 configuration storage remain separate work.
+
+
+## Live session tracker controls
+
+The existing Kotlin session now exposes internal manual reannounce and tracker status flows.
+Periodic discovery and manual requests use one serialized control; only one manual operation may
+be outstanding, and busy/rate-limited requests return false. The discovery lifetime owns manual
+jobs. Caller cancellation cancels and joins its job; discovery shutdown detaches the session handle,
+joins remaining manual cleanup, clears captured callbacks, and returns reserved session-state credit.
+Peer publication follows the same serialized path for automatic and manual responses.
+
+A real engine test verifies tracker HTTP events, manual throttling, status publication, pause/stop,
+fresh controls on resume, and final admission release. Deterministic tests cover serialization,
+bounded manual admission, caller cancellation, owner shutdown barriers, and insufficient budget.
+Status is cleared when discovery stops. SDK/daemon/UI exposure, tracker-edit persistence across
+pause/resume, and public v2 registration remain separate roadmap work.

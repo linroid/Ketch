@@ -59,6 +59,8 @@ internal class TrackerDiscovery private constructor(
   private var completed = false
   private val key = okio.Buffer().write(torrentRandomBytes(4)).readInt()
 
+  fun status(): List<TrackerStatus> = trackers.status()
+
   /** Replace on the session owner; endpoint authorization is the caller's responsibility. */
   suspend fun replaceTrackers(
     tiers: List<List<String>>,
