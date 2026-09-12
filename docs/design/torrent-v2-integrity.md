@@ -323,3 +323,26 @@ Wire replies have no transaction identifier beyond their selector. A delayed res
 new request for the same immutable root/coordinates can satisfy it only after proof authentication;
 it cannot change the trusted content. Live connection routing, timers, parser admission and hash
 cache ownership still need runtime integration. This does not mark step 08 complete.
+
+### Bounded transport dispatch
+
+`PeerHashTransport` connects request ownership to frame issuance, bounded body reads and actor
+response dispatch on an already negotiated v2 connection. It reserves body/decode credit after
+checking the length prefix and before reading the body; consumers keep frame credit until dispatch
+finishes. Authenticated results retain their separate exchange reservation. Ordinary peer messages
+remain available to other actor handlers, and incoming hash requests are surfaced for serving.
+
+Write failure or cancellation closes the possibly partial stream and releases pending exchange
+credit. Read failure, timeout or inability to admit a body closes the stream and releases its frame
+credit; the actor must then close the transport and join the reader. A frame reservation is handed
+off only after the timeout scope returns, preventing cancellation at that boundary from losing its
+lease. Request/accept/expiry/close belong to one actor, with one separately serialized reader.
+
+Tests exercise framed exchange over loopback TCP as well as injected failures and timeout/budget
+boundaries. They do not perform v2 handshake negotiation or independent-client interoperability.
+The full runtime actor, handshake routing, timer wiring, reply serving and payload integration are
+still required before this adapter becomes a supported torrent capability.
+
+The inherited generic 64 KiB frame ceiling is sufficient for these bounded hash messages but not
+for a desktop-profile one-million-piece bitfield (125,000 bytes plus its message ID). Runtime
+integration must make ordinary frame bounds profile-aware; this slice does not relax that target.
