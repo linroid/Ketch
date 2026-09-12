@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -43,6 +44,7 @@ internal class KotlinTorrentEngine(
   private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
   private val exchangeBudgets = TorrentExchangeBudgets(config)
   private val budget = exchangeBudgets.transfer
+  private val storageSlots = Semaphore(config.maxOpenPayloadFiles)
   private val admissions = TorrentAdmissionLedger(exchangeBudgets.sessions)
   internal val admittedSessionBytes: Int get() = exchangeBudgets.sessions.allocated
   private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
@@ -230,7 +232,8 @@ internal class KotlinTorrentEngine(
     try {
       val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
         .resolve(spec.outputPath).normalized()
-      val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId)
+      val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId,
+        storageSlots = storageSlots)
       val output = store.outputPath.toPath()
       check(outputs.values.none { previous ->
         val path = previous.toPath()

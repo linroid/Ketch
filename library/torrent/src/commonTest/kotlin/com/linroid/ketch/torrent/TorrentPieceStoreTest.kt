@@ -1,6 +1,10 @@
 package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.runTest
 import okio.FileSystem
 import okio.FileHandle
@@ -41,6 +45,54 @@ class TorrentPieceStoreTest {
       }
       assertTrue(store.completed())
       assertContentEquals(longArrayOf(3, 4, 3, 0), store.progress())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun canceledStorageWaitDoesNotTouchDiskOrConsumeSharedSlot() = runTest {
+    val slots = Semaphore(1)
+    val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-storage-wait-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val waiting = TorrentPieceStore(metadata, root / "first", emptySet(), "first",
+      storageSlots = slots)
+    val next = TorrentPieceStore(metadata, root / "second", emptySet(), "second",
+      storageSlots = slots)
+    try {
+      slots.acquire()
+      val initialization = async(start = CoroutineStart.UNDISPATCHED) { waiting.initialize() }
+      assertFalse(initialization.isCompleted)
+      assertFalse(torrentFileSystem.exists(root))
+      initialization.cancelAndJoin()
+      slots.release()
+      next.initialize()
+      assertTrue(next.isInitialized())
+      assertFalse(torrentFileSystem.exists(root / "first"))
+      assertEquals(1, slots.availablePermits)
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun failedStorageOperationReturnsSlotToOtherTorrent() = runTest {
+    val slots = Semaphore(1)
+    val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-storage-failure-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val failing = object : ForwardingFileSystem(torrentFileSystem) {
+      override fun openReadWrite(file: Path, mustCreate: Boolean, mustExist: Boolean): FileHandle {
+        throw IOException("Provider unavailable")
+      }
+    }
+    val first = TorrentPieceStore(metadata, root / "first", emptySet(), "first", failing, slots)
+    val next = TorrentPieceStore(metadata, root / "second", emptySet(), "second",
+      storageSlots = slots)
+    try {
+      assertFailsWith<IOException> { first.initialize() }
+      assertEquals(1, slots.availablePermits)
+      next.initialize()
+      assertTrue(next.isInitialized())
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }
