@@ -7,6 +7,7 @@ import okio.FileSystem
 import okio.ForwardingFileSystem
 import okio.IOException
 import okio.Path
+import okio.use
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
