@@ -65,6 +65,7 @@ internal data class TorrentV2Info(
           files += File(path, length, root)
           total += length
         } else {
+          require(entries.isNotEmpty()) { "Empty directory node in file tree" }
           for ((component, child) in entries) visit(child, path + component)
         }
       }

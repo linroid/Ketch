@@ -79,6 +79,17 @@ class TorrentV2InfoTest {
   }
 
   @Test
+  fun rejectsEmptyDirectoryNodesBesideValidFiles() {
+    for (emptyDirectory in listOf(emptyMap<String, Any>(),
+      mapOf("nested" to emptyMap<String, Any>()))) {
+      val raw = encoded(mapOf("valid" to file(1), "empty" to emptyDirectory))
+      assertFailsWith<IllegalArgumentException> { TorrentV2Info.parse(raw) }
+    }
+    val emptyFile = encoded(mapOf("valid" to file(1), "empty" to file(0, null)))
+    assertEquals(2, TorrentV2Info.parse(emptyFile).files.size)
+  }
+
+  @Test
   fun enforcesByteNodeAndFileLimitsBeforeReturningMetadata() {
     val raw = encoded(mapOf("a" to file(1), "b" to file(1)))
     assertFailsWith<IllegalArgumentException> { TorrentV2Info.parse(raw, maxBytes = raw.size - 1) }
