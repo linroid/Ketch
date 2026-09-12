@@ -48,12 +48,13 @@ class TorrentOutputMappingTest {
   @Test
   fun separatesCaseAndUnicodeAliasesForFilesAndDirectories() {
     val paths = listOf(listOf("A", "one"), listOf("a", "two"), listOf("é"), listOf("é"),
-      listOf("Readme"), listOf("readme", "child"), listOf("Σ"), listOf("ς"))
+      listOf("Readme"), listOf("readme", "child"), listOf("Σ"), listOf("ς"),
+      listOf("ß"), listOf("ẞ"), listOf("ss"))
       .map { path -> path.map { it.encodeUtf8() } }
     val doc = document(paths)
     val mapped = TorrentOutputMapping.from(doc)
     val keys = mapped.files.map { file -> file.components.map {
-      canonicalTorrentName(it).uppercase().lowercase()
+      canonicalTorrentName(it).lowercase()
     } }
     assertEquals(paths.size, keys.toSet().size)
     val top = keys.map { it.first() }

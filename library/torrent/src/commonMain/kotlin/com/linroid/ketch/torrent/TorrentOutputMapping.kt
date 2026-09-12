@@ -82,7 +82,7 @@ internal class TorrentOutputMapping private constructor(val files: List<File>) {
     }
 
     private fun collisionKey(value: String): String =
-      canonicalTorrentName(value).uppercase().lowercase()
+      canonicalTorrentName(canonicalTorrentName(value).lowercase().uppercase().lowercase())
 
     private fun digest(raw: ByteString): String =
       sha256Digest(raw.toByteArray()).toByteString().hex()
