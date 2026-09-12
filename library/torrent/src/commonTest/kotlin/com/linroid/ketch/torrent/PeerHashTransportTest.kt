@@ -137,6 +137,7 @@ class PeerHashTransportTest {
     }
   }
 
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
   @Test
   fun backpressuredWritesCannotReturnAnExpiredExchangeTicket() = runTest {
     val frames = TorrentBufferBudget(65_536)
