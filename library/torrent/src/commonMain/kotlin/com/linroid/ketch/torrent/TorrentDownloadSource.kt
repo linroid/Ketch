@@ -99,17 +99,28 @@ class TorrentDownloadSource(
   }
 
   /** Resolve metainfo supplied by a file picker or SDK caller without making a network request. */
-  fun resolveMetainfo(bytes: ByteArray): ResolvedSource {
+  fun resolveMetainfo(
+    bytes: ByteArray,
+    privacy: TorrentDiscoveryPrivacy = config.discoveryPrivacy,
+  ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
     val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
-    return resolved("torrent:${metadata.infoHash.hex}", metadata)
+    return resolved("torrent:${metadata.infoHash.hex}", metadata, privacy)
   }
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource {
+  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+    resolve(url, config.discoveryPrivacy, properties)
+
+  /** Resolve with an explicit privacy choice before any discovery or metadata request starts. */
+  suspend fun resolve(
+    url: String,
+    privacy: TorrentDiscoveryPrivacy,
+    properties: Map<String, String> = emptyMap(),
+  ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
     try {
       val metadata = if (url.startsWith("magnet:", true)) {
-        getEngine().fetchMetadata(url) ?: throw KetchError.Network(
+        getEngine().fetchMetadata(url, privacy) ?: throw KetchError.Network(
           Exception("Torrent metadata resolution timed out"))
       } else {
         val bytes = if (url.startsWith("https://", true) || url.startsWith("http://", true)) {
@@ -136,7 +147,7 @@ class TorrentDownloadSource(
         }
         TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
       }
-      return resolved(url, metadata)
+      return resolved(url, metadata, privacy)
     } catch (e: TimeoutCancellationException) {
       currentCoroutineContext().ensureActive()
       throw KetchError.Network(Exception("Torrent operation timed out"))
@@ -147,7 +158,11 @@ class TorrentDownloadSource(
     }
   }
 
-  private fun resolved(url: String, metadata: TorrentMetadata): ResolvedSource = ResolvedSource(
+  private fun resolved(
+    url: String,
+    metadata: TorrentMetadata,
+    privacy: TorrentDiscoveryPrivacy,
+  ): ResolvedSource = ResolvedSource(
     url = url, sourceType = TYPE, totalBytes = metadata.totalBytes, supportsResume = true,
     suggestedFileName = metadata.name, maxSegments = metadata.files.size,
     metadata = buildMap {
@@ -155,6 +170,7 @@ class TorrentDownloadSource(
       put(META_NAME, metadata.name)
       put(META_PIECE_LENGTH, metadata.pieceLength.toString())
       put(META_METAINFO, encodeBase64(metadata.metainfoBytes))
+      put(META_PRIVACY, privacy.name)
       metadata.comment?.let { put(META_COMMENT, it) }
     },
     files = metadata.files.map { SourceFile(it.index.toString(), it.path, it.size,
@@ -164,7 +180,11 @@ class TorrentDownloadSource(
 
   override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
     encode(TorrentResumeState(resolved.metadata[META_INFO_HASH] ?: "", totalBytes, "",
-      resolved.files.map { it.id }.toSet(), "", resolved.metadata[META_METAINFO] ?: ""))
+      resolved.files.map { it.id }.toSet(), "", resolved.metadata[META_METAINFO] ?: "",
+      version = 2, privacy = resolvedPrivacy(resolved)))
+
+  private fun resolvedPrivacy(resolved: ResolvedSource): TorrentDiscoveryPrivacy =
+    resolved.metadata[META_PRIVACY]?.let(TorrentDiscoveryPrivacy::valueOf) ?: config.discoveryPrivacy
 
   override suspend fun updateResumeState(context: DownloadContext): SourceResumeState? {
     val owner = tasks.session(context.taskId)
@@ -187,10 +207,11 @@ class TorrentDownloadSource(
     } catch (e: Exception) { throw KetchError.CorruptResumeState(e.message, e) }
     val checkpoint = if (state.resumeData.isEmpty()) null else
       TorrentCheckpoint.decode(decodeBase64(state.resumeData))
+    val privacy = state.privacy ?: config.discoveryPrivacy
     val resolved = when {
-      state.metainfo.isNotEmpty() -> resolveMetainfo(decodeBase64(state.metainfo))
-      checkpoint != null -> resolved(context.url, checkpoint.metadata)
-      else -> resolve(context.url, context.headers)
+      state.metainfo.isNotEmpty() -> resolveMetainfo(decodeBase64(state.metainfo), privacy)
+      checkpoint != null -> resolved(context.url, checkpoint.metadata, privacy)
+      else -> resolve(context.url, privacy, context.headers)
     }
     require(resolved.metadata[META_INFO_HASH] == state.infoHash) { "Resume torrent changed" }
     execute(context, resolved, state)
@@ -217,8 +238,10 @@ class TorrentDownloadSource(
       ?: error("Torrent output path has not been resolved")
     require(!output.contains("://")) { "Torrent output requires a filesystem path" }
     val total = metadata.files.filter { it.index in selected }.sumOf { it.size }
+    val privacy = previous?.privacy ?: resolvedPrivacy(resolved)
     val state = TorrentResumeState(hash, total, previous?.resumeData ?: "",
-      selected.map { it.toString() }.toSet(), output, encodeBase64(bytes))
+      selected.map { it.toString() }.toSet(), output, encodeBase64(bytes),
+      version = 2, privacy = privacy)
     tasks.reserve(context.taskId, hash)
     var session: TorrentSession? = null
     var keepSeeding = false
@@ -236,7 +259,8 @@ class TorrentDownloadSource(
       val runtime = getEngine()
       session = runtime.addTask(TorrentTaskSpec(context.taskId, metadata, output, selected,
         context.url.takeIf { it.startsWith("magnet:", true) },
-        previous?.resumeData?.takeIf { it.isNotEmpty() }?.let(::decodeBase64), context.throttle))
+        previous?.resumeData?.takeIf { it.isNotEmpty() }?.let(::decodeBase64), context.throttle,
+        privacy = privacy))
       tasks.attach(context.taskId, session)
       coroutineScope {
         val connections = launch {
@@ -321,6 +345,7 @@ class TorrentDownloadSource(
     internal const val META_PIECE_LENGTH = "pieceLength"
     internal const val META_COMMENT = "comment"
     internal const val META_METAINFO = "metainfo"
+    internal const val META_PRIVACY = "discoveryPrivacy"
 
     fun buildResumeState(
       infoHash: String,

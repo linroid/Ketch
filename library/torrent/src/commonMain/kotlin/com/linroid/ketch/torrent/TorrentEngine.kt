@@ -53,10 +53,11 @@ internal interface TorrentEngine {
     resumeData: ByteArray? = null,
   ): TorrentSession
 
-  suspend fun addTask(spec: TorrentTaskSpec): TorrentSession = addTorrent(
-    spec.metadata.infoHash.hex, spec.outputPath, spec.magnetUri, spec.metadata.metainfoBytes,
-    spec.selected, spec.resumeData
-  )
+  suspend fun addTask(spec: TorrentTaskSpec): TorrentSession {
+    require(spec.privacy == TorrentDiscoveryPrivacy.PUBLIC) { "Tracker-only tasks are unsupported" }
+    return addTorrent(spec.metadata.infoHash.hex, spec.outputPath, spec.magnetUri,
+      spec.metadata.metainfoBytes, spec.selected, spec.resumeData)
+  }
 
   /**
    * Removes a torrent from the engine.

@@ -1022,3 +1022,22 @@ within the same resolution round. Each tracker's metadata connections close befo
 best-effort stopped announce and the next tracker starts. Empty responses and failed metadata
 peers both have regression coverage; neither can pin resolution to the first responding tracker.
 The metadata deadline and total peer-attempt bound still apply.
+
+## Source privacy selection and persistence
+
+`TorrentDiscoveryPrivacy` is now a public serializable enum. `TorrentConfig.discoveryPrivacy`
+provides the default for newly resolved inputs. Typed source resolve/metainfo overloads capture an
+explicit choice in `ResolvedSource.metadata`, and execution passes it into `TorrentTaskSpec`.
+Fallback engine adapters reject unsupported tracker-only requests instead of silently using public
+behavior.
+
+Source resume version 2 requires a privacy value and retains it for metadata reuse, refetch, and
+subsequent execution regardless of the new source default. Legacy version 1 omits privacy, follows
+the configured default, and migrates on the next save. Missing version-2 privacy, downgraded values,
+unknown enum values, and unsupported versions fail before the engine starts. The inner checkpoint's
+payload verification and tracker revision rules are unchanged.
+
+Source tests verify default/explicit selection, resolution-to-download handoff, restored metadata
+and metadata refetch, legacy migration, and pre-engine rejection of malformed state. Engine/peer-wire
+privacy tests from the preceding stack remain applicable. Remote negotiation, controller commands,
+and public v2-only magnet proof acquisition remain separate roadmap requirements.

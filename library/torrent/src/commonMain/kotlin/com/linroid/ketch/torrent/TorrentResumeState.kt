@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
  *
  * @property infoHash hex-encoded info hash
  * @property totalBytes total selected bytes
- * @property resumeData base64-encoded libtorrent resume data
+ * @property resumeData base64-encoded engine checkpoint
  * @property selectedFileIds set of selected file index strings
  * @property savePath directory where files are saved
  */
@@ -20,4 +20,10 @@ internal data class TorrentResumeState(
   val savePath: String,
   val metainfo: String = "",
   val version: Int = 1,
-)
+  val privacy: TorrentDiscoveryPrivacy? = null,
+) {
+  init {
+    require(version == 1 || version == 2) { "Unsupported torrent resume version" }
+    require((version == 1) == (privacy == null)) { "Invalid torrent resume privacy" }
+  }
+}
