@@ -31,15 +31,17 @@ Report all raw samples and the median/spread, including failures; do not select 
 The seeder has a 120-second readiness deadline. Each child has a 600-second execution deadline and
 the parent enforces a 630-second wall-clock deadline including readiness and sampling. A stuck
 child is forcibly terminated, with a five-second termination deadline. These bounds are fixed
-before measurement. Only `complete: true` proves completion. Failures preserve previously completed samples.
+before measurement. Only `complete: true` proves completion. Failures preserve previously completed
+samples.
 A complete 1/10 GiB baseline requires twenty verified child runs, not just a successful smoke test.
 
 The Kotlin JVM has a 256 MiB heap ceiling. The native engine is the Transmission executable; its
 small JVM RPC controller is excluded from native RSS/CPU measurements. Unsupported native heap/FD
-and CPU counters are reported as -1, never as zero. The Kotlin engine uses one peer, disabled uploads and
-DHT, 64 MiB transfer capacity, 64 MiB session capacity, and a 256 MiB combined admission ceiling;
-other limits retain their defaults. The native reference disables DHT, LPD, NAT mapping and uTP, uses the same fixture tracker, and
-otherwise retains Transmission defaults. One local seeder is available to either downloader, with no upload recipients.
+and CPU counters are reported as -1, never as zero. The Kotlin engine uses one peer, disabled uploads
+and DHT, 64 MiB transfer capacity, 64 MiB session capacity, and a 256 MiB combined admission ceiling;
+other limits retain their defaults. The native reference disables DHT, LPD, NAT mapping and uTP,
+uses the same fixture tracker, and otherwise retains Transmission defaults. One local seeder is
+available to either downloader, with no upload recipients.
 These are explicit benchmark settings, not a completed production resource profile.
 
 An initialized controller reports the measured engine PID and waits for the parent to sample idle
@@ -59,14 +61,14 @@ No target is relaxed to accommodate a slow run.
 
 The first verified-progress timestamp separates connection/unchoke wait from subsequent transfer.
 Native verified bytes are polled through RPC every 100 ms and may also be delayed by Transmission's
-own statistics refresh. The 1/10 GiB fixtures contain only full pieces. Report both end-to-end and post-first-piece rates, without calling either
-one a complete release benchmark.
+own statistics refresh. The 1/10 GiB fixtures contain only full pieces. Report both end-to-end and
+post-first-piece rates, without calling either one a complete release benchmark.
 
 An initial run at `560ba380` used an in-process libtorrent seeder and its parent JVM crashed with
 SIGSEGV on the Java Finalizer thread after one verified Kotlin 1 GiB sample. It is incomplete and
 excluded from aggregate comparisons. The crash does not establish a root cause in the downloader.
-The harness now uses an external pinned Transmission seeder and keeps native torrent bindings
-inside the isolated reference downloader process. No timeout or performance target was raised.
+The next attempt moved the seeder to an external pinned Transmission process and isolated native
+torrent bindings in the reference downloader JVM. No timeout or performance target was raised.
 
 A second attempt at `d92566d8` isolated the Transmission seeder but the libtorrent4j downloader JVM
 also exited with SIGSEGV on its first 1 GiB sample. That incomplete report is retained separately.
