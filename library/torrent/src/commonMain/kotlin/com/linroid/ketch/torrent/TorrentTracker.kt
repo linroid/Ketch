@@ -17,7 +17,7 @@ internal enum class TrackerEvent(val code: Int) {
 }
 
 internal data class TrackerAnnounce(
-  val infoHash: InfoHash,
+  val topic: TrackerTopic,
   val peerId: ByteArray,
   val port: Int,
   val downloaded: Long,
@@ -26,6 +26,17 @@ internal data class TrackerAnnounce(
   val event: TrackerEvent = TrackerEvent.NONE,
   val key: Int = 0,
 ) {
+  constructor(
+    infoHash: InfoHash,
+    peerId: ByteArray,
+    port: Int,
+    downloaded: Long,
+    left: Long,
+    uploaded: Long = 0,
+    event: TrackerEvent = TrackerEvent.NONE,
+    key: Int = 0,
+  ) : this(TrackerTopic.V1(infoHash), peerId, port, downloaded, left, uploaded, event, key)
+
   init {
     require(peerId.size == 20 && port in 1..65535)
     require(downloaded >= 0 && left >= 0 && uploaded >= 0)
@@ -86,7 +97,7 @@ internal class TorrentTracker(
           val cookie = Buffer().write(connected, 8, 8).readLong()
           val transaction = randomInt()
           val packet = Buffer().writeLong(cookie).writeInt(1).writeInt(transaction)
-            .write(request.infoHash.toBytes()).write(request.peerId)
+            .write(request.topic.wireBytes()).write(request.peerId)
             .writeLong(request.downloaded).writeLong(request.left).writeLong(request.uploaded)
             .writeInt(request.event.code).writeInt(0).writeInt(request.key).writeInt(200)
             .writeShort(request.port)
@@ -141,7 +152,7 @@ internal class TorrentTracker(
       val separator = if ('?' in base) "&" else "?"
       return buildString {
         append(base).append(separator)
-        append("info_hash=").append(binaryQuery(request.infoHash.toBytes()))
+        append("info_hash=").append(binaryQuery(request.topic.wireBytes()))
         append("&peer_id=").append(binaryQuery(request.peerId))
         append("&port=").append(request.port)
         append("&downloaded=").append(request.downloaded)
@@ -215,12 +226,15 @@ internal class TrackerTiers(
 ) {
   private val tiers = tiers.map { it.distinct().shuffled().toMutableList() }
   private val ids = mutableMapOf<String, ByteArray>()
+  private var topic: TrackerTopic? = null
   private var preferCurrent = false
   private var current: String? = null
 
   fun preferCurrentTracker() { preferCurrent = true }
 
   suspend fun announce(request: TrackerAnnounce): TrackerResponse {
+    require(topic == null || topic == request.topic) { "Tracker tiers belong to another topic" }
+    topic = request.topic
     val ordered = if (preferCurrent && current != null) {
       listOf(listOf(current!!)) + tiers.map { tier -> tier.filter { it != current } }
     } else tiers
