@@ -860,3 +860,11 @@ fresh controls on resume, and final admission release. Deterministic tests cover
 bounded manual admission, caller cancellation, owner shutdown barriers, and insufficient budget.
 Status is cleared when discovery stops. SDK/daemon/UI exposure, tracker-edit persistence across
 pause/resume, and public v2 registration remain separate roadmap work.
+
+
+Live-control admission includes the tracker control allowance in the session's initial weight.
+A bounded per-session pool is backed by that held lease, avoiding a second reservation from an
+already full shared partition. Status observers receive attempt transitions before network
+suspension and configuration revisions on replacement; the observer is detached on shutdown.
+The engine regression now runs at exactly its admitted weight and holds the HTTP response until
+ANNOUNCING is observed, then verifies pause/resume and final admission release.

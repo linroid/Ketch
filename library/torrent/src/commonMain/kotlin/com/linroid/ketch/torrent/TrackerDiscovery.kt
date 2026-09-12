@@ -61,6 +61,8 @@ internal class TrackerDiscovery private constructor(
 
   fun status(): List<TrackerStatus> = trackers.status()
 
+  fun observeStatus(listener: (List<TrackerStatus>) -> Unit) = trackers.observeStatus(listener)
+
   /** Replace on the session owner; endpoint authorization is the caller's responsibility. */
   suspend fun replaceTrackers(
     tiers: List<List<String>>,

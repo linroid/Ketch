@@ -244,10 +244,12 @@ internal class KotlinTorrentEngine(
           (left.take(right.size) == right || right.take(left.size) == left)
       }) { "Torrent output overlaps another task" }
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
+      val trackerState = TorrentBufferBudget(
+        maxOf(1, trackerControlStateWeight(spec.metadata).toInt()))
       val session = KotlinTorrentSession(store, network, budget, scope,
         connections = config.connectionsPerTorrent, uploadPolicy = config.effectiveUploadPolicy,
         checkpoint = checkpoint, peerId = peerId,
-        discover = { peers, owner -> discover(spec, peers, owner) },
+        discover = { peers, owner -> discover(spec, peers, owner, trackerState) },
         downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
         uploadThrottle = { uploadRate.acquire(it) },
       )
@@ -268,6 +270,7 @@ internal class KotlinTorrentEngine(
     spec: TorrentTaskSpec,
     output: SendChannel<PeerEndpoint>,
     session: KotlinTorrentSession,
+    trackerState: TorrentBufferBudget,
   ) = supervisorScope {
     val metadata = spec.metadata
     if (metadata.trackerTiers.isNotEmpty()) launch {
@@ -276,8 +279,9 @@ internal class KotlinTorrentEngine(
         nowMs = nowMs,
         announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
       )
+      discovery.observeStatus(session::updateTrackerStatus)
       try {
-        TrackerControl.run(exchangeBudgets.sessions, operation = { manual ->
+        TrackerControl.run(trackerState, operation = { manual ->
           discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,
             manual = manual)
         }, publish = { response ->
@@ -295,6 +299,7 @@ internal class KotlinTorrentEngine(
           } finally { session.detachTrackerControl(control) }
         }
       } finally {
+        discovery.observeStatus {}
         session.updateTrackerStatus(emptyList())
         withContext(NonCancellable) {
           withTimeoutOrNull(2000) {
