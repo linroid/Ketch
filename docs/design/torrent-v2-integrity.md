@@ -1092,3 +1092,22 @@ Lifecycle admission also compares the complete layout to storage's canonical hyb
 file IDs/indices, offsets and lengths, piece length, and protocol/payload totals. Matching only the
 full info hash is insufficient because omitting hybrid mapping changes IDs after padding entries.
 A regression now rejects that mismatch before I/O while accepting the canonical selected-file ID.
+
+## Engine-owned v2 download lifetimes
+
+`KotlinTorrentEngine.withV2Download` runs the full-metainfo lifecycle as an engine-owned child.
+The engine admits retained content and storage/layout indexes before construction, enforces the
+configured file/piece/info limits, and uses its shared connection, transfer, session, and payload
+handle pools. Caller cancellation joins the owned child; engine shutdown cancels and joins it
+before the registered metadata admission is released. No output files are deleted by owner exit.
+
+V1 and v2 registrations share the active-task ceiling and canonical output-overlap checks. Full
+v2 hashes identify registrations; a hybrid's v1 identity cannot also own a legacy session, in
+either registration order. Legacy removal cannot release a live v2 output claim. Failed admission
+or registration returns its memory and leaves no output ownership behind. Hybrid layouts are
+constructed with their authenticated v1 padding/index mapping, including selected files after gaps.
+
+The scoped engine path takes policy-authorized endpoints from its caller. Tracker/DHT integration,
+incoming full-identity routing, source/SDK v2 resolution, checkpoint/TaskStore restore, rate controls,
+and seeding remain pending. It is not advertised by the public engine/source API. Real TCP tests
+exercise both a pure v2 file and a hybrid selected file after padding; both peers are Ketch fixtures.
