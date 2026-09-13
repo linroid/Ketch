@@ -990,3 +990,35 @@ streaming recovery and large-profile memory/performance evidence remain required
 Tests exercise a real engine with stale TaskStore data, corrupted payloads, same-revision counters,
 replacement/binding rejection, cancellation/admission cleanup, and a failed-recovery shutdown
 regression that overwrote the committed bytes before the write guard was added.
+
+## Explicit tracker-only engine discovery
+
+The internal engine accepts a privacy choice before resolving a magnet. Public remains the legacy
+default. Tracker-only resolution requires validated supplied trackers, ignores explicit `x.pe`
+endpoints, and does not start DHT discovery. It announces through one preferred tracker at a time,
+tries returned metadata peers sequentially, and closes each metadata connection before a tracker
+can switch. Cancellation does not fall back to public discovery. A successful tracker contact gets
+a bounded best-effort stopped announce when metadata resolution ends.
+
+Only the tracker-only path permits a hash-verified private info dictionary. Public callers still
+reject private metadata, including cache hits populated by an earlier tracker-only request. Cached
+info bytes do not supply endpoints or replace the current caller's tracker list. An explicit task
+privacy field also disables public discovery when the resolved metadata itself is public. Peer
+exchange is neither advertised nor accepted, and incoming hosts must come from tracker responses.
+
+Real TCP tests verify tracker-authorized private metadata, failover from an unavailable tracker,
+ignored explicit peers, no DHT socket attempts, private-cache rejection for public callers, missing
+or invalid tracker rejection before discovery, cancellation while awaiting peers, and the task
+privacy guard after public metadata resolution, including PEX rejection and incoming admission.
+This is engine wiring: source/SDK selection and
+persisted privacy, v2-only magnet metadata/proofs, and the broader network-policy gates remain open.
+The protocol basis is [BEP 27](https://www.bittorrent.org/beps/bep_0027.html) and the info-dictionary
+transfer described by [BEP 9](https://www.bittorrent.org/beps/bep_0009.html).
+
+### Tracker-only metadata fallback review
+
+A successful announce with no usable metadata peers now advances to the next supplied tracker
+within the same resolution round. Each tracker's metadata connections close before a bounded
+best-effort stopped announce and the next tracker starts. Empty responses and failed metadata
+peers both have regression coverage; neither can pin resolution to the first responding tracker.
+The metadata deadline and total peer-attempt bound still apply.
