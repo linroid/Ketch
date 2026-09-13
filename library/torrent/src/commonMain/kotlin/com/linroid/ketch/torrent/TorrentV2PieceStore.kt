@@ -60,6 +60,14 @@ internal class TorrentV2PieceStore(
     verified = BooleanArray(verifier.layout.pieceCount.toInt())
   }
 
+  /** Validate session wiring before starting any filesystem or network operation. */
+  fun requireBinding(identity: TorrentIdentity, ids: Set<String>) {
+    require(document.identity == identity) { "Store belongs to another torrent" }
+    require(if (ids.isEmpty()) selected.size == mapping.files.size else ids == selected) {
+      "Store selection differs from session selection"
+    }
+  }
+
   suspend fun initialize() = mutex.withLock {
     check(!closed)
     if (initialized) return@withLock
