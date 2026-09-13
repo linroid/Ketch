@@ -59,59 +59,82 @@ class TrackerOnlyMagnetTest {
 
   @Test
   fun trackerOnlyPrivateResolutionUsesTrackerPeersAndPublicCacheRetryStillRejectsIt() = runTest {
-    withContext(Dispatchers.Default) {
-      withTimeout(15_000) {
-        val metadata = metadata(true)
-        val network = Network()
-        val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
-        val requests = MutableStateFlow<List<String>>(emptyList())
-        val engine = KotlinTorrentEngine(TorrentConfig(), rawNetwork = network,
-          http = http { url ->
-            requests.value += url
-            if (url.startsWith("https://unavailable/")) throw IOException("Tracker unavailable")
-            assertTrue(url.startsWith("https://trusted/"))
-            Bencode.encode(mapOf("interval" to 3600L, "peers" to byteArrayOf(127, 0, 0, 1,
-              (listener.local.port ushr 8).toByte(), listener.local.port.toByte())))
-          })
-        val server = async {
-          val connection = listener.accept()
-          try {
-            val wire = PeerWire(connection)
-            wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
-            val hello = wire.read() as PeerMessage.Extended
-            assertEquals(null, Bencode.parse(hello.payload)["m"]?.get("ut_pex"))
-            wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
-              "m" to mapOf("ut_metadata" to 7L), "metadata_size" to metadata.infoBytes.size.toLong()
-            ))))
-            val request = wire.read() as PeerMessage.Extended
-            assertEquals(7, request.id)
-            wire.send(TorrentMetadataExchange.response(1, 0, metadata))
-          } finally { connection.close() }
-        }
+    resolution("failure")
+  }
+
+  @Test
+  fun trackerOnlyFallsBackAfterAnEmptyPeerResponse() = runTest { resolution("empty") }
+
+  @Test
+  fun trackerOnlyFallsBackAfterMetadataPeersFail() = runTest { resolution("bad-peer") }
+
+  private suspend fun resolution(firstResult: String) = withContext(Dispatchers.Default) {
+    withTimeout(15_000) {
+      val metadata = metadata(true)
+      val network = Network()
+      val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+      val requests = MutableStateFlow<List<String>>(emptyList())
+      val engine = KotlinTorrentEngine(TorrentConfig(), rawNetwork = network,
+        http = http { url ->
+          requests.value += url
+          if (url.startsWith("https://unavailable/")) {
+            if (firstResult == "failure") throw IOException("Tracker unavailable")
+            val peers = if (firstResult == "empty") ByteArray(0)
+              else byteArrayOf(127, 0, 0, 2, 0, 9)
+            return@http Bencode.encode(mapOf("interval" to 3600L, "peers" to peers))
+          }
+          assertTrue(url.startsWith("https://trusted/"))
+          Bencode.encode(mapOf("interval" to 3600L, "peers" to byteArrayOf(127, 0, 0, 1,
+            (listener.local.port ushr 8).toByte(), listener.local.port.toByte())))
+        })
+      val server = async {
+        val connection = listener.accept()
         try {
-          engine.start()
-          val magnet = "magnet:?xt=urn:btih:${metadata.infoHash.hex}" +
-            "&tr=https%3A%2F%2Funavailable%2Fannounce&tr=https%3A%2F%2Ftrusted%2Fannounce" +
-            "&x.pe=127.0.0.2:9"
-          val resolved = assertNotNull(engine.fetchMetadata(magnet,
-            TorrentDiscoveryPrivacy.TRACKER_ONLY))
-          assertTrue(resolved.isPrivate)
-          assertContentEquals(metadata.infoBytes, resolved.infoBytes)
-          server.await()
-          assertEquals(listOf(listener.local), network.connections.value)
-          assertEquals(0, network.udp.load())
-          assertTrue(requests.value.any { "event=stopped" in it })
-          val previousRequests = requests.value
-          assertFailsWith<PrivateTorrentMagnetException> { engine.fetchMetadata(magnet) }
-          assertEquals(previousRequests, requests.value)
-          assertEquals(listOf(listener.local), network.connections.value)
-          assertEquals(0, network.udp.load())
-        } finally {
-          engine.stop()
-          server.cancelAndJoin()
-          listener.close()
-          network.close()
+          val wire = PeerWire(connection)
+          wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
+          val hello = wire.read() as PeerMessage.Extended
+          assertEquals(null, Bencode.parse(hello.payload)["m"]?.get("ut_pex"))
+          wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+            "m" to mapOf("ut_metadata" to 7L), "metadata_size" to metadata.infoBytes.size.toLong()
+          ))))
+          val request = wire.read() as PeerMessage.Extended
+          assertEquals(7, request.id)
+          wire.send(TorrentMetadataExchange.response(1, 0, metadata))
+        } finally { connection.close() }
+      }
+      try {
+        engine.start()
+        val magnet = "magnet:?xt=urn:btih:${metadata.infoHash.hex}" +
+          "&tr=https%3A%2F%2Funavailable%2Fannounce&tr=https%3A%2F%2Ftrusted%2Fannounce" +
+          "&x.pe=127.0.0.2:9"
+        val resolved = assertNotNull(engine.fetchMetadata(magnet,
+          TorrentDiscoveryPrivacy.TRACKER_ONLY))
+        assertTrue(resolved.isPrivate)
+        assertContentEquals(metadata.infoBytes, resolved.infoBytes)
+        server.await()
+        val expected = if (firstResult == "bad-peer") {
+          listOf(PeerEndpoint("127.0.0.2", 9), listener.local)
+        } else listOf(listener.local)
+        assertEquals(expected, network.connections.value)
+        assertEquals(0, network.udp.load())
+        assertTrue(requests.value.any { "event=stopped" in it })
+        if (firstResult != "failure") {
+          val stopped = requests.value.indexOfFirst {
+            it.startsWith("https://unavailable/") && "event=stopped" in it
+          }
+          val fallback = requests.value.indexOfFirst { it.startsWith("https://trusted/") }
+          assertTrue(stopped >= 0 && stopped < fallback)
         }
+        val previousRequests = requests.value
+        assertFailsWith<PrivateTorrentMagnetException> { engine.fetchMetadata(magnet) }
+        assertEquals(previousRequests, requests.value)
+        assertEquals(expected, network.connections.value)
+        assertEquals(0, network.udp.load())
+      } finally {
+        engine.stop()
+        server.cancelAndJoin()
+        listener.close()
+        network.close()
       }
     }
   }

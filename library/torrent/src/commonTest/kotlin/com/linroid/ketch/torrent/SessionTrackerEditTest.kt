@@ -40,8 +40,13 @@ class SessionTrackerEditTest {
 
   private class Provider : ForwardingFileSystem(torrentFileSystem) {
     var failMove = false
+    var failNextMove = false
     var afterMove: (() -> Unit)? = null
     override fun atomicMove(source: Path, target: Path) {
+      if (target.name == "checkpoint" && failNextMove) {
+        failNextMove = false
+        throw IOException("Injected one-time rename failure")
+      }
       if (target.name == "checkpoint" && failMove) throw IOException("Injected rename failure")
       super.atomicMove(source, target)
       if (target.name == "checkpoint") afterMove?.invoke()
@@ -165,14 +170,14 @@ class SessionTrackerEditTest {
       session.resume()
       discoveries.first { it.size == 1 }
       session.state.first { it == TorrentSessionState.SEEDING }
-      provider.failMove = true
+      // Fail only the edit; the restarted session must be able to checkpoint again.
+      provider.failNextMove = true
       assertFailsWith<IOException> { session.replaceTrackers(next) }
       discoveries.first { it.size == 2 }
       assertEquals(listOf(old, old), discoveries.value)
       assertEquals(retained, state.allocated)
       assertEquals(old, session.trackerTiers())
       assertEquals(1L, session.trackerConfiguration().revision)
-      provider.failMove = false
       assertTrue(session.replaceTrackers(next))
       discoveries.first { it.size == 3 }
       assertEquals(next, discoveries.value.last())

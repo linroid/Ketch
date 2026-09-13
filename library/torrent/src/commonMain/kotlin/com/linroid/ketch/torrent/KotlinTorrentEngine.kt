@@ -206,19 +206,22 @@ internal class KotlinTorrentEngine(
     magnet: MagnetUri,
     trackerTiers: List<List<String>>,
   ): TorrentMetadata {
-    val tiers = TrackerTiers(trackerTiers, tracker::announce)
-    // Resolution is sequential: every metadata connection closes before a tracker can switch.
-    tiers.preferCurrentTracker()
-    var contacted = false
+    val urls = trackerTiers.flatten().distinct()
     var attempts = 0
-    try {
-      while (currentCoroutineContext().isActive) {
-        val result = attempt {
-          tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
-            event = if (contacted) TrackerEvent.NONE else TrackerEvent.STARTED))
-        }
-        if (result != null) {
+    while (currentCoroutineContext().isActive) {
+      var retrySeconds = 30L
+      for (url in urls) {
+        currentCoroutineContext().ensureActive()
+        // Each connection closes before switching trackers, including unsuccessful peer sets.
+        val tiers = TrackerTiers(listOf(listOf(url)), tracker::announce)
+        var contacted = false
+        try {
+          val result = attempt {
+            tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
+              event = TrackerEvent.STARTED))
+          } ?: continue
           contacted = true
+          retrySeconds = maxOf(retrySeconds, result.intervalSeconds)
           for (endpoint in result.peers.distinct()) {
             check(++attempts <= 4096) { "Metadata peer limit exceeded" }
             try {
@@ -231,21 +234,21 @@ internal class KotlinTorrentEngine(
               // Only other peers returned by these trackers are eligible retries.
             }
           }
-        }
-        delay((result?.intervalSeconds ?: 30) * 1000)
-      }
-      currentCoroutineContext().ensureActive()
-      error("Metadata resolution stopped")
-    } finally {
-      if (contacted) withContext(NonCancellable) {
-        withTimeoutOrNull(2000) {
-          attempt {
-            tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
-              event = TrackerEvent.STOPPED))
+        } finally {
+          if (contacted) withContext(NonCancellable) {
+            withTimeoutOrNull(2000) {
+              attempt {
+                tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
+                  event = TrackerEvent.STOPPED))
+              }
+            }
           }
         }
       }
+      delay(retrySeconds.coerceAtMost(Long.MAX_VALUE / 1000) * 1000)
     }
+    currentCoroutineContext().ensureActive()
+    error("Metadata resolution stopped")
   }
 
   private suspend fun discoverMagnet(magnet: MagnetUri, output: SendChannel<PeerEndpoint>) =

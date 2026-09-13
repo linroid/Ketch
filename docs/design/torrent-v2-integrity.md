@@ -1014,3 +1014,11 @@ This is engine wiring: source/SDK selection and
 persisted privacy, v2-only magnet metadata/proofs, and the broader network-policy gates remain open.
 The protocol basis is [BEP 27](https://www.bittorrent.org/beps/bep_0027.html) and the info-dictionary
 transfer described by [BEP 9](https://www.bittorrent.org/beps/bep_0009.html).
+
+### Tracker-only metadata fallback review
+
+A successful announce with no usable metadata peers now advances to the next supplied tracker
+within the same resolution round. Each tracker's metadata connections close before a bounded
+best-effort stopped announce and the next tracker starts. Empty responses and failed metadata
+peers both have regression coverage; neither can pin resolution to the first responding tracker.
+The metadata deadline and total peer-attempt bound still apply.
