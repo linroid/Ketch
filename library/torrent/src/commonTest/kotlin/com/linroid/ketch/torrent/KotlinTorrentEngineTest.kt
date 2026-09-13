@@ -67,6 +67,7 @@ class KotlinTorrentEngineTest {
           (root / "seed").toString(), emptySet())
         val limit = sessionStateWeight(spec).toInt()
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
+          maxMetadataBytes = 64 * 1024,
           maxSessionStateBytes = limit,
           uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), http = http,
           nowMs = { clock.load() })

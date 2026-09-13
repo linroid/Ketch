@@ -71,13 +71,13 @@ data class TorrentConfig(
     require(maxBufferedBytes.toLong() + metadataExchangeBytes + maxCachedMetadataBytes +
       maxSessionStateBytes <=
       maxExchangeBytes.toLong()) {
-      "maxExchangeBytes must cover transfers, metadata exchange, cache, and session state"
+      "maxExchangeBytes must cover transfers, metadata/scrape exchange, cache, and session state"
     }
   }
 
-  /** One metadata exchange, including parse copies and bounded wire overhead. */
+  /** One metadata or tracker scrape exchange, including parse copies and bounded wire overhead. */
   internal val metadataExchangeBytes: Int
-    get() = maxMetadataBytes * 4 + 256 * 1024
+    get() = maxOf(maxMetadataBytes * 4 + 256 * 1024, TRACKER_SCRAPE_WORKSPACE_BYTES)
 
   /** Effective policy, including compatibility with the legacy boolean. */
   val effectiveUploadPolicy: TorrentUploadPolicy

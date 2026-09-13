@@ -363,7 +363,7 @@ internal class KotlinTorrentEngine(
           publishStatus = session::updateTrackerStatus,
           scrape = scrape@{
             // Admit the bounded HTTP body, parse tree, URL copies, and UDP workspace before I/O.
-            val lease = exchangeBudgets.metadata.reserve(64 * 1024 * 17)
+            val lease = exchangeBudgets.metadata.reserve(TRACKER_SCRAPE_WORKSPACE_BYTES)
               ?: return@scrape false
             try { discovery.scrape(tracker::scrape) } finally { lease.close() }
           },

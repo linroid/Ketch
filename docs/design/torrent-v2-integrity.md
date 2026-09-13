@@ -1059,3 +1059,8 @@ scrapes. Missing torrent entries clear estimates instead of inventing zero count
 retain earlier estimates with an explicit failed outcome. These counts never modify local payload
 progress, announce counters, or peer admission. Public controller/remote scrape commands, durable
 request throttling across session restarts, and broader tracker/network-policy gates remain open.
+
+The metadata exchange partition has a minimum of `TRACKER_SCRAPE_WORKSPACE_BYTES`, independent
+of the accepted metainfo-size limit. Small valid metainfo limits therefore retain scrape capability.
+Configuration validation includes this floor in the aggregate exchange ceiling; an explicitly
+undersized aggregate budget fails at construction instead of silently disabling every scrape.
