@@ -51,6 +51,8 @@ data class TorrentConfig(
   val maxFilesPerTorrent: Int = 10_000,
   /** Logical piece ceiling applied before constructing session and scheduler arrays. */
   val maxPiecesPerTorrent: Int = 250_000,
+  /** Default for newly resolved inputs; persisted tasks retain their saved privacy choice. */
+  val discoveryPrivacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
 
 ) {
   init {
