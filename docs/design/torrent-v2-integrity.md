@@ -1111,3 +1111,10 @@ The scoped engine path takes policy-authorized endpoints from its caller. Tracke
 incoming full-identity routing, source/SDK v2 resolution, checkpoint/TaskStore restore, rate controls,
 and seeding remain pending. It is not advertised by the public engine/source API. Real TCP tests
 exercise both a pure v2 file and a hybrid selected file after padding; both peers are Ketch fixtures.
+
+Engine shutdown uses one shared cleanup operation outside the engine job tree. Calls from an
+engine-owned callback request that operation without joining their own ancestor; external callers
+await the same operation as the full cleanup barrier. Concurrent close/stop calls cannot create
+multiple cleanup owners, and start rejects a runtime whose shutdown has been requested. Callback
+regressions cover both the scoped v2 body and its discovery producer, followed by an external
+stop that proves all registration admission has returned.

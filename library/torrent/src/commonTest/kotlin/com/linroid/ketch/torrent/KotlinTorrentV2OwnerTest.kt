@@ -1,5 +1,8 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -139,6 +142,46 @@ class KotlinTorrentV2OwnerTest {
           owner.cancelAndJoin()
           engine.stop()
           torrentFileSystem.deleteRecursively(output, mustExist = false)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun callbacksCanRequestShutdownWithoutJoiningTheirOwnJob() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        for (fromDiscovery in listOf(false, true)) {
+          val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false))
+          val output = output()
+          val returned = CompletableDeferred<Unit>()
+          engine.start()
+          try {
+            try {
+              engine.withV2Download("v2", document(), output.toString(), discover = {
+                engine.stop()
+                returned.complete(Unit)
+              }) { session ->
+                if (fromDiscovery) {
+                  session.resume()
+                  awaitCancellation()
+                } else {
+                  engine.stop()
+                  returned.complete(Unit)
+                }
+              }
+            } catch (_: CancellationException) {
+              currentCoroutineContext().ensureActive()
+            }
+            returned.await()
+            engine.stop()
+            assertFalse(engine.isRunning)
+            assertEquals(0, engine.admittedSessionBytes)
+            assertFailsWith<IllegalStateException> { engine.start() }
+          } finally {
+            engine.stop()
+            torrentFileSystem.deleteRecursively(output, mustExist = false)
+          }
         }
       }
     }
