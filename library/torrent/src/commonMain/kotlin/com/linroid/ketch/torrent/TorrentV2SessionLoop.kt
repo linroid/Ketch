@@ -43,6 +43,7 @@ internal object TorrentV2SessionLoop {
     maxActive: Int = 2,
     pipeline: Int = 32,
     connections: ReceiveChannel<PeerV2Connector.Connected>? = null,
+    onProgress: suspend () -> Unit = {},
   ) {
     require(maxPeers in 1..500 && pipeline in 1..256)
     val lease = checkNotNull(state.reserve(maxPeers * 512 + 1024)) {
@@ -140,6 +141,7 @@ internal object TorrentV2SessionLoop {
         }
       }
 
+      onProgress()
       var preference = 0
       var acceptingConnections = connections != null
       while (!pieces.completed()) {
@@ -181,6 +183,7 @@ internal object TorrentV2SessionLoop {
                 view.needed--
               }
             }
+            onProgress()
             wakeAdmission()
           }
           is Event.Retry -> wakeAdmission()

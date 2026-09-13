@@ -1064,3 +1064,31 @@ The metadata exchange partition has a minimum of `TRACKER_SCRAPE_WORKSPACE_BYTES
 of the accepted metainfo-size limit. Small valid metainfo limits therefore retain scrape capability.
 Configuration validation includes this floor in the aggregate exchange ceiling; an explicitly
 undersized aggregate budget fails at construction instead of silently disabling every scrape.
+
+## V2 download lifecycle ownership
+
+`TorrentV2DownloadSession` composes the verified full-metainfo pipeline under one scoped owner.
+Resume initializes/rechecks owned storage before discovery and resets published verification
+progress during checking. Each run owns the endpoint producer, bounded dialer, peer pool, and
+commit worker; terminal completion is published only after those scopes finish cleanup.
+
+Pause joins the active run, including discovery and provider writes, before acknowledging the
+paused state. Owner exit also joins the lifetime and closes storage before returning admission.
+Ordinary failures publish a stopped state and can be retried; immediate retries join the prior
+terminal job. Metadata identity and normalized selection must match the store before any I/O.
+Progress notifications use committed/rechecked storage bytes, not bytes received from peers.
+
+Real TCP coverage downloads a v2 file, alters its payload while paused, and verifies that resume
+rechecks and repairs it before reporting completion. Additional tests cover delayed discovery
+cleanup, repeated failure/retry, store-selection rejection before filesystem creation, and owner
+shutdown admission ordering. Both TCP endpoints are Ketch fixtures, not independent v2 interop.
+
+The engine must still admit document/layout/store indexes before constructing this owner and keep
+that admission until it returns. Engine registration, full-identity incoming routing, public source
+v2 resolution, checkpoints/TaskStore wiring, rate controls, seeding, and tracker/public discovery
+integration remain required follow-up work. This owner does not advertise public v2 support.
+
+Lifecycle admission also compares the complete layout to storage's canonical hybrid-aware layout:
+file IDs/indices, offsets and lengths, piece length, and protocol/payload totals. Matching only the
+full info hash is insufficient because omitting hybrid mapping changes IDs after padding entries.
+A regression now rejects that mismatch before I/O while accepting the canonical selected-file ID.
