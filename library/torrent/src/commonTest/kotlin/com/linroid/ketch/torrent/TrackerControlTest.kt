@@ -18,6 +18,32 @@ import kotlin.test.assertTrue
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TrackerControlTest {
   @Test
+  fun scrapeSharesManualAdmissionAndCancellationReleasesPeriodicPolling() = runTest {
+    val budget = TorrentBufferBudget(100_000)
+    val entered = CompletableDeferred<Unit>()
+    var cleaned = false
+    TrackerControl.run(budget, operation = { TrackerResponse(emptyList(), 60) },
+      publish = {}, readStatus = { emptyList() }, publishStatus = {}, scrape = {
+        entered.complete(Unit)
+        try { awaitCancellation() } finally { cleaned = true }
+      },
+    ) { control ->
+      val request = launch { control.scrape() }
+      entered.await()
+      assertFalse(control.scrape())
+      assertFalse(control.reannounce())
+      val periodic = async { control.poll() }
+      runCurrent()
+      assertFalse(periodic.isCompleted)
+      request.cancelAndJoin()
+      assertTrue(cleaned)
+      assertTrue(periodic.await())
+      assertTrue(control.reannounce())
+    }
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
   fun rejectsInsufficientBudgetBeforePublishingAControl() = runTest {
     val budget = TorrentBufferBudget(1)
     var entered = false

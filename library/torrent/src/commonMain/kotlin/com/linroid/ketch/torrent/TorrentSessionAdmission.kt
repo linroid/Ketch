@@ -42,7 +42,11 @@ internal fun sessionStateWeight(spec: TorrentTaskSpec): Long {
  * Dedicated control pool is backed by the held session lease. Reserve the 256-entry edit ceiling
  * even for empty metainfo lists, so a later admitted edit can always start its control worker.
  */
-internal fun trackerControlStateWeight(): Long = (256L + 1) * 256 + 8192
+internal fun trackerControlStateWeight(trackers: Int = 256): Long {
+  require(trackers in 0..256)
+  // Includes announce diagnostics, scrape estimates, cooldown entries, and snapshot references.
+  return (trackers.toLong() + 1) * 384 + 8192
+}
 
 
 /** Runtime ownership ledger; a stopped-but-registered session remains charged after cleanup failure. */

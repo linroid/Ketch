@@ -285,6 +285,7 @@ internal class TrackerTiers(
   private var topic: TrackerTopic? = null
   private var preferCurrent = false
   private var current: String? = null
+  private val scrapeRetryAt = mutableMapOf<String, Long>()
   private var oldPeersClosed = false
   private var beforeSwitch: suspend () -> Unit = {}
 
@@ -309,6 +310,7 @@ internal class TrackerTiers(
     tiers = replacement
     configurationRevision++
     ids.clear()
+    scrapeRetryAt.clear()
     statuses.clear()
     for (tier in configuration.tiers) for (url in tier) {
       if (url !in statuses) statuses[url] = TrackerStatus(statuses.size, configurationRevision)
@@ -340,6 +342,41 @@ internal class TrackerTiers(
   fun preferCurrentTracker(beforeSwitch: suspend () -> Unit = {}) {
     preferCurrent = true
     this.beforeSwitch = beforeSwitch
+  }
+
+  /** Serialized with announces; never contacts a fallback tracker just for statistics. */
+  suspend fun scrapeCurrent(
+    nowMs: Long,
+    scrape: suspend (String, List<TrackerTopic>) -> Map<TrackerTopic, TrackerScrape>,
+  ): Boolean {
+    val url = current ?: return false
+    val identity = topic ?: return false
+    if (nowMs < (scrapeRetryAt[url] ?: Long.MIN_VALUE)) return false
+    // Charge the cooldown before I/O, including failed and canceled attempts.
+    scrapeRetryAt[url] = if (nowMs > Long.MAX_VALUE - 60_000) Long.MAX_VALUE else nowMs + 60_000
+    updateStatus(url, statuses.getValue(url).copy(
+      scrapeOutcome = TrackerStatus.ScrapeOutcome.REQUESTING,
+    ))
+    try {
+      val result = scrape(url, listOf(identity))[identity]
+      updateStatus(url, statuses.getValue(url).copy(
+        scrapeOutcome = if (result == null) TrackerStatus.ScrapeOutcome.MISSING
+          else TrackerStatus.ScrapeOutcome.SUCCEEDED,
+        scrape = result,
+      ))
+      return true
+    } catch (error: CancellationException) {
+      updateStatus(url, statuses.getValue(url).copy(
+        scrapeOutcome = TrackerStatus.ScrapeOutcome.CANCELED,
+      ))
+      throw error
+    } catch (error: Exception) {
+      currentCoroutineContext().ensureActive()
+      updateStatus(url, statuses.getValue(url).copy(
+        scrapeOutcome = TrackerStatus.ScrapeOutcome.FAILED,
+      ))
+      throw error
+    }
   }
 
   suspend fun announce(request: TrackerAnnounce): TrackerResponse {

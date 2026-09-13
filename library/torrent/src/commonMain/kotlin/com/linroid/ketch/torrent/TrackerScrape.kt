@@ -3,6 +3,9 @@ package com.linroid.ketch.torrent
 import okio.Buffer
 import okio.ByteString.Companion.toByteString
 
+/** Shared exchange allowance for bounded scrape bodies, parse nodes, URL copies, and UDP scratch. */
+internal const val TRACKER_SCRAPE_WORKSPACE_BYTES: Int = 64 * 1024 * 17
+
 /** Tracker-reported swarm counts; these are not authenticated content or local progress. */
 internal data class TrackerScrape(val complete: Long, val downloaded: Long, val incomplete: Long) {
   init { require(complete >= 0 && downloaded >= 0 && incomplete >= 0) }
