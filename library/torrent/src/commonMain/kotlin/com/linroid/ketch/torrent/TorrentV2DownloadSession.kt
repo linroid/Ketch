@@ -149,7 +149,7 @@ internal class TorrentV2DownloadSession private constructor(
     ): T = coroutineScope {
       require(layout.infoHash == document.info.hash && peerId.size == 20)
       require(maxPeers in 1..500)
-      store.requireBinding(document.identity, selected)
+      store.requireBinding(document.identity, selected, layout)
       val lease = checkNotNull(state.reserve(maxPeers * 512 + 4096)) {
         "Session lifecycle state budget exhausted"
       }

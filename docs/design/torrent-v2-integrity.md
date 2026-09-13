@@ -1087,3 +1087,8 @@ The engine must still admit document/layout/store indexes before constructing th
 that admission until it returns. Engine registration, full-identity incoming routing, public source
 v2 resolution, checkpoints/TaskStore wiring, rate controls, seeding, and tracker/public discovery
 integration remain required follow-up work. This owner does not advertise public v2 support.
+
+Lifecycle admission also compares the complete layout to storage's canonical hybrid-aware layout:
+file IDs/indices, offsets and lengths, piece length, and protocol/payload totals. Matching only the
+full info hash is insufficient because omitting hybrid mapping changes IDs after padding entries.
+A regression now rejects that mismatch before I/O while accepting the canonical selected-file ID.

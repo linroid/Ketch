@@ -61,8 +61,13 @@ internal class TorrentV2PieceStore(
   }
 
   /** Validate session wiring before starting any filesystem or network operation. */
-  fun requireBinding(identity: TorrentIdentity, ids: Set<String>) {
+  fun requireBinding(identity: TorrentIdentity, ids: Set<String>, layout: TorrentContentLayout) {
     require(document.identity == identity) { "Store belongs to another torrent" }
+    val canonical = verifier.layout
+    require(layout.infoHash == canonical.infoHash && layout.pieceLength == canonical.pieceLength &&
+      layout.protocolBytes == canonical.protocolBytes &&
+      layout.payloadBytes == canonical.payloadBytes &&
+      layout.files == canonical.files) { "Session layout differs from storage layout" }
     require(if (ids.isEmpty()) selected.size == mapping.files.size else ids == selected) {
       "Store selection differs from session selection"
     }

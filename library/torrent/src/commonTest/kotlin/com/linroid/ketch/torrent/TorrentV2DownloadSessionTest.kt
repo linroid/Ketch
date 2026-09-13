@@ -192,6 +192,39 @@ class TorrentV2DownloadSessionTest {
   }
 
   @Test
+  fun rejectsHybridLayoutThatChangesSelectedV1FileIdsBeforeIo() = runTest {
+    val hybrid = TorrentV2Document.parse(Bencode.encode(mapOf("info" to mapOf(
+      "name" to "hybrid", "meta version" to 2L, "piece length" to 16_384L,
+      "file tree" to mapOf(
+        "a" to mapOf("" to mapOf("length" to 4L, "pieces root" to sha256Digest(bytes))),
+        "b" to mapOf("" to mapOf("length" to 4L, "pieces root" to sha256Digest(bytes)))),
+      "files" to listOf(mapOf("path" to listOf("a"), "length" to 4L),
+        mapOf("attr" to "p", "length" to 16_380L),
+        mapOf("path" to listOf("b"), "length" to 4L)),
+      "pieces" to (sha1Digest(bytes + ByteArray(16_380)) + sha1Digest(bytes))
+    ), "piece layers" to emptyMap<String, Any>())))
+    val output = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-layout-bind-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val buffers = TorrentBufferBudget(1024 * 1024)
+    val state = TorrentBufferBudget(1024 * 1024)
+    val network = createTorrentNetwork()
+    val store = TorrentV2PieceStore(hybrid, output, setOf("2"), "hybrid", buffers, Semaphore(1))
+    try {
+      assertFailsWith<IllegalArgumentException> {
+        TorrentV2DownloadSession.run(hybrid, TorrentContentLayout.from(hybrid.info), setOf("2"),
+          store, network, peerId, buffers, state, discover = { error("Unexpected discovery") }) {
+          error("Accepted a layout with the wrong file IDs")
+        }
+      }
+      assertFalse(torrentFileSystem.exists(output))
+      assertEquals(0, state.allocated)
+      TorrentV2DownloadSession.run(hybrid, TorrentContentLayout.from(hybrid.info, hybrid.hybrid),
+        setOf("2"), store, network, peerId, buffers, state, discover = {}) {}
+    } finally { network.close(); store.cleanup() }
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
   fun selectionMismatchRejectsBeforeCreatingFilesOrStartingDiscovery() = runTest {
     fixture {
       assertFailsWith<IllegalArgumentException> {
