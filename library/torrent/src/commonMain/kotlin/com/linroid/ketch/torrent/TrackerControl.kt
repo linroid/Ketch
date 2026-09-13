@@ -19,16 +19,23 @@ internal class TrackerControl private constructor(
   private var publish: (suspend (TrackerResponse) -> Unit)?,
   private var readStatus: (() -> List<TrackerStatus>)?,
   private var publishStatus: ((List<TrackerStatus>) -> Unit)?,
+  private var scrapeOperation: (suspend () -> Boolean)?,
 ) {
   private val mutex = Mutex()
   private val manual = Semaphore(1)
 
   suspend fun poll(): Boolean = perform(false)
 
-  suspend fun reannounce(): Boolean {
+  suspend fun reannounce(): Boolean = manual { perform(true) }
+
+  suspend fun scrape(): Boolean = manual {
+    mutex.withLock { checkNotNull(scrapeOperation) { "Tracker control is closed" }.invoke() }
+  }
+
+  private suspend fun manual(action: suspend () -> Boolean): Boolean {
     if (!manual.tryAcquire()) return false
     try {
-      val pending = scope.async { perform(true) }
+      val pending = scope.async { action() }
       try { return pending.await() } finally {
         withContext(NonCancellable) { pending.cancelAndJoin() }
       }
@@ -53,17 +60,19 @@ internal class TrackerControl private constructor(
       publish: suspend (TrackerResponse) -> Unit,
       readStatus: () -> List<TrackerStatus>,
       publishStatus: (List<TrackerStatus>) -> Unit,
+      scrape: suspend () -> Boolean = { false },
       body: suspend (TrackerControl) -> T,
     ): T = coroutineScope {
-      val bytes = (readStatus().size.toLong() + 1) * 256 + 8192
+      val bytes = trackerControlStateWeight(readStatus().size)
       require(bytes <= Int.MAX_VALUE)
       val lease = checkNotNull(state.reserve(bytes.toInt())) { "Tracker control budget exhausted" }
       val job = SupervisorJob(coroutineContext[Job])
       val control = TrackerControl(CoroutineScope(coroutineContext + job), operation, publish,
-        readStatus, publishStatus)
+        readStatus, publishStatus, scrape)
       try { body(control) } finally {
         withContext(NonCancellable) {
           try { job.cancelAndJoin() } finally {
+            control.scrapeOperation = null
             control.operation = null
             control.publish = null
             control.readStatus = null

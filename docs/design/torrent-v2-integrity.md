@@ -1041,3 +1041,21 @@ Source tests verify default/explicit selection, resolution-to-download handoff, 
 and metadata refetch, legacy migration, and pre-engine rejection of malformed state. Engine/peer-wire
 privacy tests from the preceding stack remain applicable. Remote negotiation, controller commands,
 and public v2-only magnet proof acquisition remain separate roadmap requirements.
+
+## Session-owned tracker scrape
+
+Active sessions can request a scrape through their existing tracker control. It shares the single
+manual command slot and serialization mutex with reannounce and periodic discovery. Caller
+cancellation joins the owned request; shutdown joins it before releasing control state. The engine
+admits a bounded response/decoding workspace from the shared metadata exchange pool before I/O.
+
+Only the most recently successful announce endpoint is eligible. Scrape cannot select a fallback
+tracker, switch private peers, or authorize new peers. Each endpoint has a 60-second minimum request
+interval within the discovery lifetime, charged before I/O even for failure or cancellation.
+Configuration replacement clears estimates and cooldowns and requires a new successful announce.
+
+Credential-free status snapshots distinguish requested, successful, missing, failed, and canceled
+scrapes. Missing torrent entries clear estimates instead of inventing zero counts. Failed requests
+retain earlier estimates with an explicit failed outcome. These counts never modify local payload
+progress, announce counters, or peer admission. Public controller/remote scrape commands, durable
+request throttling across session restarts, and broader tracker/network-policy gates remain open.

@@ -28,6 +28,7 @@ class KotlinTorrentEngineTest {
         val requests = MutableStateFlow<List<String>>(emptyList())
         val announced = CompletableDeferred<Unit>()
         val reply = CompletableDeferred<Unit>()
+        var scrapeHash = ByteArray(0)
         val http = TorrentHttp(object : HttpEngine {
           override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
             error("Unused")
@@ -38,6 +39,12 @@ class KotlinTorrentEngineTest {
             onData: suspend (ByteArray) -> Unit,
           ) {
             requests.value += url
+            if ("/scrape?" in url) {
+              onData(Bencode.encode(mapOf("files" to mapOf(scrapeHash to mapOf(
+                "complete" to 11L, "downloaded" to 22L, "incomplete" to 33L
+              )))))
+              return
+            }
             announced.complete(Unit)
             reply.await()
             onData(Bencode.encode(mapOf("interval" to 3600L, "min interval" to 60L,
@@ -51,6 +58,7 @@ class KotlinTorrentEngineTest {
           "announce" to "https://tracker/announce", "info" to mapOf("name" to "seed",
             "length" to 4L, "piece length" to 4L, "pieces" to sha1Digest(bytes))
         )))
+        scrapeHash = metadata.infoHash.toBytes()
         val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
           "ketch-tracker-control-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
         FileSystem.SYSTEM.createDirectories(root)
@@ -65,6 +73,7 @@ class KotlinTorrentEngineTest {
         try {
           engine.start()
           val session = engine.addTask(spec)
+          assertFalse(session.scrapeTracker())
           assertFalse(session.reannounceTrackers())
           session.resume()
           announced.await()
@@ -77,10 +86,14 @@ class KotlinTorrentEngineTest {
             it.singleOrNull()?.outcome == TrackerStatus.Outcome.SUCCEEDED
           }
           assertFalse(session.reannounceTrackers())
+          assertTrue(session.scrapeTracker())
+          assertEquals(TrackerScrape(11, 22, 33), session.trackerStatus.value.single().scrape)
+          assertFalse(session.scrapeTracker())
           clock.store(60_000)
           assertTrue(session.reannounceTrackers())
           assertEquals(2L, session.trackerStatus.value.single().attempts)
           session.pause()
+          assertFalse(session.scrapeTracker())
           assertFalse(session.reannounceTrackers())
           assertTrue(session.trackerStatus.value.isEmpty())
           assertEquals(1, requests.value.count { "event=stopped" in it })

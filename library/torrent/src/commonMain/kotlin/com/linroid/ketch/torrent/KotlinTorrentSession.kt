@@ -140,6 +140,8 @@ internal class KotlinTorrentSession(
 
   suspend fun reannounceTrackers(): Boolean = trackerControl.load()?.reannounce() ?: false
 
+  suspend fun scrapeTracker(): Boolean = trackerControl.load()?.scrape() ?: false
+
   fun attachTrackerControl(control: TrackerControl) {
     check(trackerControl.compareAndSet(null, control))
   }

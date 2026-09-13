@@ -59,6 +59,10 @@ internal class TrackerDiscovery private constructor(
   private var completed = false
   private val key = okio.Buffer().write(torrentRandomBytes(4)).readInt()
 
+  suspend fun scrape(
+    request: suspend (String, List<TrackerTopic>) -> Map<TrackerTopic, TrackerScrape>,
+  ): Boolean = trackers.scrapeCurrent(nowMs(), request)
+
   fun status(): List<TrackerStatus> = trackers.status()
 
   fun observeStatus(listener: (List<TrackerStatus>) -> Unit) = trackers.observeStatus(listener)

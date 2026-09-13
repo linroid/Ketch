@@ -8,9 +8,13 @@ internal data class TrackerStatus(
   val attempts: Long = 0,
   val failures: Long = 0,
   val consecutiveFailures: Long = 0,
+  val scrapeOutcome: ScrapeOutcome = ScrapeOutcome.NOT_REQUESTED,
+  val scrape: TrackerScrape? = null,
   val lastPeerCount: Int? = null,
   val lastIntervalSeconds: Long? = null,
   val lastMinimumIntervalSeconds: Long? = null,
 ) {
+  enum class ScrapeOutcome { NOT_REQUESTED, REQUESTING, SUCCEEDED, MISSING, FAILED, CANCELED }
+
   enum class Outcome { NOT_CONTACTED, ANNOUNCING, SUCCEEDED, FAILED, TIMED_OUT, CANCELED }
 }
