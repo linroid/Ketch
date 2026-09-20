@@ -48,7 +48,11 @@ interface DownloadTask {
 
   /**
    * Updates the queue priority for this download task.
-   * If the task is currently queued, it may be re-ordered or promoted.
+   * Persists the new priority and publishes it through [requestState].
+   * Queued tasks are reordered; [DownloadPriority.URGENT] can pause a lower-priority
+   * active task to start immediately, subject to concurrency and per-host limits.
+   * Active tasks retain the new priority for future preemption decisions.
+   * Priority does not allocate bandwidth or bypass schedules and conditions.
    *
    * @param priority the new priority level
    */

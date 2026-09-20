@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -142,6 +144,7 @@ private fun SectionEyebrow(text: String) {
 
 @Composable
 private fun MetadataGrid(task: DownloadTask, state: DownloadState, fileName: String) {
+  val request by task.requestState.collectAsState()
   val colors = KetchTheme.colors
   SelectionContainer {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -149,7 +152,7 @@ private fun MetadataGrid(task: DownloadTask, state: DownloadState, fileName: Str
       MetaRow("URL", task.request.url)
       MetaRow(
         "Priority",
-        priorityLabel(task.request.priority),
+        priorityLabel(request.priority),
       )
       val dest = (state as? DownloadState.Completed)?.outputPath ?: task.request.destination?.value
       if (!dest.isNullOrBlank()) MetaRow("Saved to", dest)

@@ -91,15 +91,17 @@ internal class DownloadQueue(
     entry: QueueEntry,
     host: String,
   ) {
+    val hostIsFull = hostConnectionCount.getOrElse(host) { 0 } >= maxPerHost
     val victim = activeEntries.values
       .filter { it.priority < DownloadPriority.URGENT }
+      .filter { !hostIsFull || extractHost(it.handle.request.url) == host }
       .minByOrNull { it.priority.ordinal }
 
     if (victim == null) {
       insertSorted(entry)
       entry.handle.mutableState.value = DownloadState.Queued
       log.i {
-        "Cannot preempt: all active tasks are URGENT. " +
+        "Cannot preempt: no eligible lower-priority active task. " +
           "Queuing taskId=${entry.taskId}"
       }
       return
@@ -176,26 +178,31 @@ internal class DownloadQueue(
 
   suspend fun setPriority(taskId: String, priority: DownloadPriority) {
     mutex.withLock {
-      val index = queuedEntries.indexOfFirst { it.taskId == taskId }
-      if (index < 0) {
-        log.d {
-          "setPriority: taskId=$taskId not in queue " +
-            "(may be active)"
+      activeEntries[taskId]?.let { entry ->
+        entry.priority = priority
+        promoteNext()
+        val urgentEntries = queuedEntries.filter { it.priority == DownloadPriority.URGENT }
+        for (urgent in urgentEntries) {
+          queuedEntries.remove(urgent)
+          tryPreemptAndStart(urgent, extractHost(urgent.handle.request.url))
         }
         return
       }
+      val index = queuedEntries.indexOfFirst { it.taskId == taskId }
+      if (index < 0) return
       val entry = queuedEntries.removeAt(index)
       entry.priority = priority
-      insertSorted(entry)
-      log.i {
-        "Priority updated: taskId=$taskId, " +
-          "priority=$priority, " +
-          "newPosition=${
-            queuedEntries.indexOfFirst {
-              it.taskId == taskId
-            } + 1
-          }/${queuedEntries.size}"
+      val host = extractHost(entry.handle.request.url)
+      if (activeEntries.size < maxConcurrent &&
+        hostConnectionCount.getOrElse(host) { 0 } < maxPerHost
+      ) {
+        startTask(entry, host)
+      } else if (priority == DownloadPriority.URGENT) {
+        tryPreemptAndStart(entry, host)
+      } else {
+        insertSorted(entry)
       }
+      log.i { "Priority updated: taskId=$taskId, priority=$priority" }
       promoteNext()
     }
   }

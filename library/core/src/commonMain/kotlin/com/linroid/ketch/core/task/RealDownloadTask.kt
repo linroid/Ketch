@@ -13,6 +13,9 @@ import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 internal class RealDownloadTask(
@@ -25,6 +28,7 @@ internal class RealDownloadTask(
   taskStore: TaskStore,
   record: TaskRecord,
 ) : DownloadTask, TaskHandle {
+  private val priorityMutex = Mutex()
   private val mutableRequest = MutableStateFlow(request)
   override val requestState: StateFlow<DownloadRequest> = mutableRequest.asStateFlow()
   override val request: DownloadRequest get() = requestState.value
@@ -71,7 +75,10 @@ internal class RealDownloadTask(
     controller.setSpeedLimit(taskId, limit)
   }
 
-  override suspend fun setPriority(priority: DownloadPriority) {
+  override suspend fun setPriority(priority: DownloadPriority): Unit = priorityMutex.withLock {
+    record.update {
+      it.copy(request = it.request.copy(priority = priority), updatedAt = Clock.System.now())
+    }
     controller.setPriority(taskId, priority)
   }
 

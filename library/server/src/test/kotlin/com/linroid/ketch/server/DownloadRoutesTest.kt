@@ -464,6 +464,44 @@ class DownloadRoutesTest {
     }
 
   @Test
+  fun `PUT priority returns and retains updated request`() =
+    testApplication {
+      val ketch = createKetch()
+      application {
+        val server = createTestServer(ketch = ketch)
+        with(server) { configureServer() }
+      }
+      val client = createClient {
+        install(ContentNegotiation) { json(json) }
+      }
+      val createResponse = client.post("/api/tasks") {
+        contentType(ContentType.Application.Json)
+        setBody(
+          DownloadRequest(
+            url = "https://example.com/file.zip",
+            destination = Destination("/tmp/"),
+          )
+        )
+      }
+      val created = json.decodeFromString<TaskSnapshot>(
+        createResponse.bodyAsText()
+      )
+
+      val response = client.put(
+        "/api/tasks/${created.taskId}/priority"
+      ) {
+        contentType(ContentType.Application.Json)
+        setBody(PriorityRequest(priority = DownloadPriority.HIGH))
+      }
+      assertEquals(HttpStatusCode.OK, response.status)
+      val updated = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+      assertEquals(DownloadPriority.HIGH, updated.request.priority)
+      val fetched = client.get("/api/tasks/${created.taskId}")
+      val snapshot = json.decodeFromString<TaskSnapshot>(fetched.bodyAsText())
+      assertEquals(DownloadPriority.HIGH, snapshot.request.priority)
+    }
+
+  @Test
   fun `PUT priority with invalid value returns 400`() =
     testApplication {
       val ketch = createKetch()

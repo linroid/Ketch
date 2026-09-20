@@ -5,7 +5,8 @@ import kotlinx.serialization.Serializable
 /**
  * Priority level for download tasks in the queue.
  * Higher-priority tasks are started before lower-priority ones
- * when download slots become available.
+ * when download slots become available. Priority does not weight bandwidth allocation;
+ * use task and global speed limits to control transfer rates.
  *
  * Ordinal comparison: [LOW] < [NORMAL] < [HIGH] < [URGENT].
  */
@@ -19,7 +20,8 @@ enum class DownloadPriority {
   HIGH,
   /**
    * Highest priority. When no slot is available, the scheduler
-   * pauses the lowest-priority running download to make room.
+   * pauses the lowest-priority eligible running download to make room, respecting
+   * per-host limits. Other URGENT tasks cannot be preempted.
    * The preempted task is re-queued and resumes automatically
    * when a slot opens.
    */

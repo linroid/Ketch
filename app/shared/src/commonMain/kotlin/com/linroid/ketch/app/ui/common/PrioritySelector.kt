@@ -14,9 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadPriority
@@ -78,13 +76,10 @@ fun PriorityPanel(
   scope: CoroutineScope,
   modifier: Modifier = Modifier,
 ) {
-  var currentPriority by remember {
-    mutableStateOf(task.request.priority)
-  }
+  val request by task.requestState.collectAsState()
   PrioritySelector(
-    value = currentPriority,
+    value = request.priority,
     onValueChange = { priority ->
-      currentPriority = priority
       scope.launch { task.setPriority(priority) }
     },
     modifier = modifier,
