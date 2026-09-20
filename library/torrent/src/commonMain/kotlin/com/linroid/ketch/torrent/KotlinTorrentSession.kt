@@ -79,6 +79,7 @@ internal class KotlinTorrentSession(
   private val lastPayload = AtomicLong(0)
   private var job: Job? = null
   private var closed = false
+  private var filesDeleted = false
   private var recovered = false
   private val _state = MutableStateFlow(TorrentSessionState.PAUSED)
   private val _downloadedBytes = MutableStateFlow(0L)
@@ -203,18 +204,20 @@ internal class KotlinTorrentSession(
   }
 
   suspend fun close(deleteFiles: Boolean = false) = lifecycle.withLock {
-    if (closed) return@withLock
-    closed = true
-    job?.cancelAndJoin()
-    job = null
-    scope.cancel()
-    incoming.cancel()
-    resets.cancel()
-    _state.value = TorrentSessionState.STOPPED
-    if (deleteFiles) {
+    if (!closed) {
+      job?.cancelAndJoin()
+      job = null
+      scope.cancel()
+      incoming.cancel()
+      resets.cancel()
+      closed = true
+      _state.value = TorrentSessionState.STOPPED
+    }
+    if (deleteFiles && !filesDeleted) {
       if (!recovered) checkpoint?.let { store.restore(it) }
       store.recoverOwnership()
       store.cleanup()
+      filesDeleted = true
     }
   }
 }

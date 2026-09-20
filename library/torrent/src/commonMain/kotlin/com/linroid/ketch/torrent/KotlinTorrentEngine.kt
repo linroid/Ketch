@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -17,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -40,14 +42,20 @@ internal class KotlinTorrentEngine(
 ) : TorrentEngine {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
-  private val budget = TorrentBufferBudget(config.maxBufferedBytes)
-  private val cache = TorrentMetadataCache(scope)
+  private val exchangeBudgets = TorrentExchangeBudgets(config)
+  private val budget = exchangeBudgets.transfer
+  private val storageSlots = Semaphore(config.maxOpenPayloadFiles)
+  private val admissions = TorrentAdmissionLedger(exchangeBudgets.sessions)
+  internal val admittedSessionBytes: Int get() = exchangeBudgets.sessions.allocated
+  private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
+    exchangeBudgets.cache)
   private val tracker = TorrentTracker(http, network)
   private val peerId = torrentRandomBytes(20)
   private val mutex = Mutex()
   private val dhtMutex = Mutex()
   private val sessions = mutableMapOf<String, KotlinTorrentSession>()
   private val outputs = mutableMapOf<String, String>()
+  private val sessionLeases = mutableMapOf<String, TorrentBufferBudget.Lease>()
   private val running = AtomicBoolean(false)
   private var closed = false
   private var port = 0
@@ -56,6 +64,10 @@ internal class KotlinTorrentEngine(
   private val downloadRate = TorrentRateLimiter()
   private val uploadRate = TorrentRateLimiter()
   override val isRunning: Boolean get() = running.load()
+
+  init {
+    checkNotNull(scope.coroutineContext[Job]).invokeOnCompletion { admissions.close() }
+  }
 
   override suspend fun start() = mutex.withLock {
     check(!closed) { "Torrent runtime is closed" }
@@ -116,7 +128,7 @@ internal class KotlinTorrentEngine(
       if (closed) return
       closed = true
       running.store(false)
-      sessions.values.toList().also { sessions.clear(); outputs.clear() }
+      sessions.values.toList().also { sessions.clear(); outputs.clear(); sessionLeases.clear() }
     }
     withContext(NonCancellable) {
       try {
@@ -124,8 +136,12 @@ internal class KotlinTorrentEngine(
         nodes?.forEach { it.close() }
       } finally {
         scope.cancel()
-        network.close()
-        http.close()
+        try { network.close() } finally {
+          try { http.close() } finally {
+            cache.close()
+            checkNotNull(scope.coroutineContext[Job]).join()
+          }
+        }
       }
     }
   }
@@ -146,7 +162,7 @@ internal class KotlinTorrentEngine(
               if (attempted.size > 4096) error("Metadata peer limit exceeded")
               try {
                 return@coroutineScope TorrentMetadataExchange(network, config.maxMetadataBytes,
-                  budget = budget).fetch(magnet.infoHash, endpoint)
+                  budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint)
               } catch (e: PrivateTorrentMagnetException) {
                 throw e
               } catch (e: CancellationException) {
@@ -212,28 +228,39 @@ internal class KotlinTorrentEngine(
     check(sessions.size < config.maxActiveTorrents) { "Too many active torrents" }
     val hash = spec.metadata.infoHash.hex
     check(hash !in sessions) { "Torrent already has an active owner" }
-    val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
-      .resolve(spec.outputPath).normalized()
-    val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId)
-    val output = store.outputPath.toPath()
-    check(outputs.values.none { previous ->
-      val path = previous.toPath()
-      val left = path.segments.map { canonicalTorrentName(it).lowercase() }
-      val right = output.segments.map { canonicalTorrentName(it).lowercase() }
-      path.root.toString().equals(output.root.toString(), ignoreCase = true) &&
-        (left.take(right.size) == right || right.take(left.size) == left)
-    }) { "Torrent output overlaps another task" }
-    val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
-    val session = KotlinTorrentSession(store, network, budget, scope,
-      connections = config.connectionsPerTorrent, uploadPolicy = config.effectiveUploadPolicy,
-      checkpoint = checkpoint, peerId = peerId,
-      discover = { peers, owner -> discover(spec, peers, owner) },
-      downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
-      uploadThrottle = { uploadRate.acquire(it) },
-    )
-    sessions[hash] = session
-    outputs[hash] = output.toString()
-    session
+    val lease = admissions.admit(spec, config)
+    try {
+      val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
+        .resolve(spec.outputPath).normalized()
+      val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId,
+        storageSlots = storageSlots)
+      val output = store.outputPath.toPath()
+      check(outputs.values.none { previous ->
+        val path = previous.toPath()
+        val left = path.segments.map { canonicalTorrentName(it).lowercase() }
+        val right = output.segments.map { canonicalTorrentName(it).lowercase() }
+        path.root.toString().equals(output.root.toString(), ignoreCase = true) &&
+          (left.take(right.size) == right || right.take(left.size) == left)
+      }) { "Torrent output overlaps another task" }
+      val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
+      val session = KotlinTorrentSession(store, network, budget, scope,
+        connections = config.connectionsPerTorrent, uploadPolicy = config.effectiveUploadPolicy,
+        checkpoint = checkpoint, peerId = peerId,
+        discover = { peers, owner -> discover(spec, peers, owner) },
+        downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
+        uploadThrottle = { uploadRate.acquire(it) },
+      )
+      sessionLeases[hash] = lease
+      sessions[hash] = session
+      outputs[hash] = output.toString()
+      session
+    } catch (failure: Throwable) {
+      sessions.remove(hash)
+      outputs.remove(hash)
+      sessionLeases.remove(hash)
+      admissions.release(lease)
+      throw failure
+    }
   }
 
   private suspend fun discover(
@@ -334,6 +361,7 @@ internal class KotlinTorrentEngine(
       sessions[infoHash]?.close(deleteFiles)
       sessions.remove(infoHash)
       outputs.remove(infoHash)
+      sessionLeases.remove(infoHash)?.let(admissions::release)
     }
   }
 

@@ -2,6 +2,7 @@
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.kotlinMultiplatform)
@@ -9,6 +10,13 @@ plugins {
   alias(libs.plugins.kotlinx.serialization)
   alias(libs.plugins.mavenPublish)
 }
+
+val conformancePins = Properties().apply {
+  rootProject.file("test-fixtures/torrent/clients.properties").inputStream().use { load(it) }
+}
+val libtorrentFixtureVersion = conformancePins.getProperty("libtorrent4j.version")
+val torrentConformance = providers.gradleProperty("torrentConformance")
+  .map(String::toBooleanStrict).orElse(false)
 
 kotlin {
   android {
@@ -58,11 +66,12 @@ kotlin {
       implementation(projects.library.server)
       implementation(projects.library.remote)
       implementation(libs.ktor.client.cio)
-      implementation("org.libtorrent4j:libtorrent4j:2.1.0-39")
-      runtimeOnly("org.libtorrent4j:libtorrent4j-macos:2.1.0-39")
-      runtimeOnly("org.libtorrent4j:libtorrent4j-linux:2.1.0-39")
-      runtimeOnly("org.libtorrent4j:libtorrent4j-windows:2.1.0-39")
+      implementation("org.libtorrent4j:libtorrent4j:$libtorrentFixtureVersion")
+      runtimeOnly("org.libtorrent4j:libtorrent4j-macos:$libtorrentFixtureVersion")
+      runtimeOnly("org.libtorrent4j:libtorrent4j-linux:$libtorrentFixtureVersion")
+      runtimeOnly("org.libtorrent4j:libtorrent4j-windows:$libtorrentFixtureVersion")
     }
+    jvmTest.get().resources.srcDir(rootProject.file("test-fixtures/torrent"))
     named("androidDeviceTest") {
       dependencies {
         implementation(libs.kotlin.test)
@@ -83,8 +92,21 @@ tasks.withType<KotlinNativeSimulatorTest>().configureEach {
 
 // Explicit opt-in inputs make external-client and package smoke runs reproducible under Gradle.
 tasks.withType<Test>().configureEach {
+  val conformance = torrentConformance.get()
+  inputs.property("torrentConformance", conformance)
+  // Required evidence must describe this execution, not restored/cached XML from an earlier run.
+  val benchmark = providers.environmentVariable("KETCH_TORRENT_BENCHMARK").orNull == "1"
+  outputs.upToDateWhen { !conformance && !benchmark }
+  outputs.cacheIf { !conformance && !benchmark }
+  if (!conformance && providers.environmentVariable("TRANSMISSION_DAEMON").orNull.isNullOrBlank()) {
+    filter.excludeTestsMatching("*TransmissionInteropTest")
+  }
+  if (providers.environmentVariable("KETCH_TORRENT_BENCHMARK").orNull != "1") {
+    filter.excludeTestsMatching("*TorrentBenchmarkTest")
+  }
   for (name in listOf("TRANSMISSION_DAEMON", "KETCH_TORRENT_BENCHMARK",
-    "KETCH_NATIVE_CLI", "KETCH_JVM_CLI")) {
+    "KETCH_NATIVE_CLI", "KETCH_JVM_CLI", "KETCH_BENCHMARK_BYTES", "KETCH_BENCHMARK_RUNS",
+    "KETCH_BENCHMARK_REVISION", "KETCH_BENCHMARK_REPORT")) {
     val value = providers.environmentVariable(name).orElse("")
     inputs.property(name, value)
     environment(name, value.get())
