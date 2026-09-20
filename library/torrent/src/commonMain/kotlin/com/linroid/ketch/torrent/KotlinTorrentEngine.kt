@@ -1,10 +1,15 @@
 package com.linroid.ketch.torrent
 
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -16,26 +21,21 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
-import okio.ByteString.Companion.toByteString
 import okio.Path.Companion.toPath
-import kotlin.coroutines.AbstractCoroutineContextElement
-import kotlin.coroutines.CoroutineContext
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /** Source-owned Kotlin runtime. Task jobs borrow its bounded transports and discovery services. */
 @OptIn(ExperimentalAtomicApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class,
@@ -518,8 +518,7 @@ internal class KotlinTorrentEngine(
           requireAvailableOutput(output)
           val layout = TorrentContentLayout.from(document.info, document.hybrid)
           val store = TorrentV2PieceStore(document, output, selection, taskId, budget, storageSlots,
-            creationLogPath = if (recoverCreations) v2CreationLog(output, taskId) else null,
-            throttle = throttle)
+            creationLogPath = if (recoverCreations) v2CreationLog(output, taskId) else null)
           v2Identities[hash] = document.identity
           outputs[hash] = output.toString()
           registered = true
@@ -529,8 +528,9 @@ internal class KotlinTorrentEngine(
         decoding = null
         TorrentV2DownloadSession.run(document, prepared.first, prepared.third, prepared.second,
           network, peerId.toByteString(), budget, exchangeBudgets.sessions,
-          maxPeers = minOf(config.connectionsPerTorrent, 500),
-          globalRate = downloadRate, checkpoint = recovery, discover = discover ?: {},
+          maxPeers = 500, initialConnections = minOf(config.connectionsPerTorrent, 500),
+          globalRate = downloadRate, throttle = throttle, checkpoint = recovery,
+          discover = discover ?: {},
           discoverWithReset = if (discover != null) null else { peers, reset ->
             discoverV2(document, prepared.first, prepared.second, trackerTiers, magnetUri,
               privacy, peers, reset)

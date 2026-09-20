@@ -11,15 +11,19 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SourceResumeState
 import io.ktor.http.Url
 import io.ktor.http.decodeURLPart
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.io.encoding.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -27,10 +31,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path.Companion.toPath
-import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.io.encoding.Base64
 
 /**
  * Pure Kotlin BitTorrent v1, v2, and hybrid download source for JVM, Android, and iOS.
@@ -407,9 +407,8 @@ class TorrentDownloadSource(
           } finally {
             withContext(NonCancellable) {
               connections.cancel()
-              try { session.pause(); updateResumeState(context) } finally {
-                tasks.release(context.taskId)
-              }
+              session.pause()
+              updateResumeState(context)
             }
           }
         }
@@ -456,7 +455,10 @@ class TorrentDownloadSource(
     require(document.info.hash.hex == state.infoHash) { "Resume torrent changed" }
     val output = (context.outputPath ?: state.savePath).toPath()
     val absolute = FileSystem.SYSTEM.canonicalize(".".toPath()).resolve(output).normalized()
-    val store = TorrentV2PieceStore(document, absolute, state.selectedFileIds, context.taskId,
+    val selected = if (state.resumeData.isEmpty() && state.savePath.isEmpty()) {
+      context.request.selectedFileIds.ifEmpty { state.selectedFileIds }
+    } else state.selectedFileIds
+    val store = TorrentV2PieceStore(document, absolute, selected, context.taskId,
       TorrentBufferBudget(config.maxBufferedBytes),
       kotlinx.coroutines.sync.Semaphore(config.maxOpenPayloadFiles),
       creationLogPath = v2CreationLog(absolute, context.taskId))

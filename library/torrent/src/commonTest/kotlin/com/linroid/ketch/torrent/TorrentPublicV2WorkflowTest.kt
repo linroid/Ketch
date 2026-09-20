@@ -17,15 +17,17 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -51,6 +53,10 @@ class TorrentPublicV2WorkflowTest {
     restart(hybrid = false, staleCheckpoint = true)
   }
 
+  @Test fun initialCheckpointRemovalRecoversSelectiveOwnershipWithoutResuming() = runTest {
+    restart(hybrid = true, staleCheckpoint = true, removeWithoutResume = true)
+  }
+
   @Test fun pureV2MagnetAuthenticatesMetadataAndExternalPieceLayers() = runTest {
     magnet(hybrid = false)
   }
@@ -74,12 +80,36 @@ class TorrentPublicV2WorkflowTest {
         val task = ketch.download(DownloadRequest("http://fixture/file.torrent",
           destination = Destination((root / "out").toString()), selectedFileIds = setOf("0"),
           speedLimit = SpeedLimit.of(1)))
-        delay(300)
+        withTimeout(5000) {
+          task.segments.first { it.sumOf { segment -> segment.downloadedBytes } >= 65_536 }
+        }
         assertFalse(task.state.value is DownloadState.Completed)
         // The shared limiter allows its documented initial 64 KiB burst.
         assertTrue(task.segments.value.sumOf { it.downloadedBytes } <= 65_536)
         task.setSpeedLimit(SpeedLimit.Unlimited)
         task.await().getOrThrow()
+      } finally { ketch.close(); torrentFileSystem.deleteRecursively(root) }
+    }
+  }
+
+  @Test fun corruptPayloadCannotBypassTheSharedTaskLimiter() = runTest {
+    fixture(false, payloadLength = 131_075) { peer ->
+      peer.remaining.complete(Unit)
+      peer.corruptPayload = true
+      val root = temporaryDirectory()
+      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val ketch = Ketch(peer.http, additionalSources = listOf(source))
+      try {
+        ketch.start()
+        val task = ketch.download(DownloadRequest("http://fixture/file.torrent",
+          destination = Destination((root / "out").toString()), selectedFileIds = setOf("0"),
+          speedLimit = SpeedLimit.of(1)))
+        withTimeout(5000) { peer.payloadSent.first { it >= 65_536 } }
+        delay(200)
+        assertTrue(peer.payloadSent.value <= 65_536,
+          "Corrupt bytes bypassed the limiter: ${peer.payloadSent.value}")
+        assertEquals(0L, task.segments.value.sumOf { it.downloadedBytes })
+        task.cancel()
       } finally { ketch.close(); torrentFileSystem.deleteRecursively(root) }
     }
   }
@@ -115,6 +145,44 @@ class TorrentPublicV2WorkflowTest {
     } }
   }
 
+  @Test fun requestedConnectionCountCanExceedConfiguredDefault() = runTest {
+    fixture(false) { first -> coroutineScope {
+      val second = Peer(false, 32_771)
+      second.start(this)
+      val root = temporaryDirectory()
+      val http = object : HttpEngine by first.http {
+        override suspend fun download(url: String, range: LongRange?,
+          headers: Map<String, String>, onData: suspend (ByteArray) -> Unit) {
+          if (!url.contains("/announce")) {
+            first.http.download(url, range, headers, onData)
+            return
+          }
+          onData(Bencode.encode(mapOf("interval" to 3600L, "peers" to
+            listOf(first.endpoint, second.endpoint).map {
+              mapOf("ip" to it.host, "port" to it.port.toLong())
+            })))
+        }
+      }
+      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+        connectionsPerTorrent = 1), http)
+      val ketch = Ketch(http, additionalSources = listOf(source))
+      try {
+        ketch.start()
+        val task = ketch.download(DownloadRequest("http://fixture/file.torrent",
+          destination = Destination((root / "out").toString()), selectedFileIds = setOf("0"),
+          connections = 2))
+        withTimeout(5000) { first.interested.await(); second.interested.await() }
+        first.remaining.complete(Unit)
+        second.remaining.complete(Unit)
+        task.await().getOrThrow()
+      } finally {
+        ketch.close()
+        second.close()
+        torrentFileSystem.deleteRecursively(root)
+      }
+    } }
+  }
+
   private suspend fun magnet(
     hybrid: Boolean,
     selectLast: Boolean = false,
@@ -146,6 +214,7 @@ class TorrentPublicV2WorkflowTest {
   private suspend fun restart(
     hybrid: Boolean,
     staleCheckpoint: Boolean = false,
+    removeWithoutResume: Boolean = false,
   ) = fixture(hybrid) { peer ->
     val root = temporaryDirectory()
     val recordPath = root / "tasks.json"
@@ -162,7 +231,7 @@ class TorrentPublicV2WorkflowTest {
       task.setConnections(1)
       delay(100)
       task.pause()
-      assertTrue(task.state.value is DownloadState.Paused)
+      assertTrue(task.state.value is DownloadState.Paused, "Pause returned ${task.state.value}")
       val stored = requireNotNull(records.load(task.taskId))
       assertTrue(stored.sourceResumeState?.data?.contains(peer.document.info.hash.hex) == true)
       first.close()
@@ -182,6 +251,12 @@ class TorrentPublicV2WorkflowTest {
       replacement.start()
       val restored = replacement.tasks.value.single()
       assertEquals(task.taskId, restored.taskId)
+      if (removeWithoutResume) {
+        restored.remove(deleteFiles = true)
+        assertFalse(torrentFileSystem.exists(root / "out"))
+        assertFalse(torrentFileSystem.exists(v2CreationLog(root / "out", restored.taskId)))
+        return@fixture
+      }
       restored.resume()
       restored.await().getOrThrow()
       assertContentEquals(peer.payload, torrentFileSystem.read(root / "out" / "a") {
@@ -274,7 +349,11 @@ class TorrentPublicV2WorkflowTest {
     val requestedHashes = CompletableDeferred<Unit>()
     var hashRequests = 0
     var corruptProof = false
+    var corruptPayload = false
+    val payloadSent = MutableStateFlow(0L)
     private val network = createTorrentNetwork()
+    val interested = CompletableDeferred<Unit>()
+    val endpoint: PeerEndpoint get() = listener.local
     private lateinit var listener: TorrentListener
     private lateinit var job: kotlinx.coroutines.Job
     val http = object : HttpEngine {
@@ -322,8 +401,13 @@ class TorrentPublicV2WorkflowTest {
                     if (message.index > 0) remaining.await()
                     val block = if (message.index == blocks.size) byteArrayOf(7)
                       else blocks[message.index]
-                    wire.send(PeerMessage.Piece(message.index, message.begin,
-                      block.copyOfRange(message.begin, message.begin + message.length)))
+                    val bytes = block.copyOfRange(message.begin, message.begin + message.length)
+                    if (corruptPayload) bytes[0] = (bytes[0].toInt() xor 1).toByte()
+                    wire.send(PeerMessage.Piece(message.index, message.begin, bytes))
+                    payloadSent.update { it + bytes.size }
+                  }
+                  is PeerMessage.Control -> if (message.signal == PeerMessage.Signal.INTERESTED) {
+                    interested.complete(Unit)
                   }
                   is PeerMessage.Unknown -> {
                     val request = PeerHashWire.decode(message) as? PeerHashMessage.Request

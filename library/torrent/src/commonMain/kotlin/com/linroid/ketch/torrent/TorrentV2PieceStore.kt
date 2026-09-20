@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,7 +17,6 @@ import okio.FileSystem
 import okio.IOException
 import okio.Path
 import okio.use
-import kotlin.coroutines.CoroutineContext
 
 /** Owned v2/hybrid storage; existing roots require a bound checkpoint and OS identity checks. */
 internal class TorrentV2PieceStore(
@@ -28,7 +28,6 @@ internal class TorrentV2PieceStore(
   private val storageSlots: Semaphore,
   private val fileSystem: FileSystem = torrentFileSystem,
   private val creationLogPath: Path? = null,
-  private val throttle: suspend (Int) -> Unit = {},
 ) {
   private val verifier = TorrentPayloadVerifier(document)
   private val mapping = TorrentOutputMapping.from(document)
@@ -149,7 +148,6 @@ internal class TorrentV2PieceStore(
     verification.update(bytes)
     if (!verification.verify()) return false
     if (verified[index]) return true
-    throttle(bytes.size)
     storageOperation {
       val path = destination(file)
       validateOwned(path, directory = false)

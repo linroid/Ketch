@@ -3,6 +3,8 @@ package com.linroid.ketch.torrent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -15,6 +17,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
@@ -34,7 +37,9 @@ internal class TorrentV2DownloadSession private constructor(
   private val buffers: TorrentBufferBudget,
   private val memory: TorrentBufferBudget,
   private val maxPeers: Int,
+  initialConnections: Int,
   private val globalRate: TorrentRateLimiter,
+  private val throttle: suspend (Int) -> Unit,
   private val discover: suspend (SendChannel<PeerEndpoint>, suspend () -> Unit) -> Unit,
 ) : TorrentSession {
   override val infoHash: String get() = document.info.hash.hex
@@ -53,7 +58,7 @@ internal class TorrentV2DownloadSession private constructor(
   suspend fun fileProgress(): Map<String, Long> = store.progress()
   suspend fun receivedBytes(): Long = store.receivedBytes()
 
-  private val connectionLimit = MutableStateFlow(maxPeers)
+  private val connectionLimit = MutableStateFlow(initialConnections)
 
   fun setConnections(value: Int) {
     require(value in 1..500)
@@ -124,6 +129,22 @@ internal class TorrentV2DownloadSession private constructor(
 
   private suspend fun transfer() = coroutineScope {
     val endpoints = Channel<PeerEndpoint>(maxPeers)
+    val credits = MutableStateFlow(0)
+    var admission: Deferred<Unit>? = null
+    suspend fun admitted(bytes: Int): Boolean {
+      admission?.takeIf { it.isCompleted }?.await()
+      if (credits.value < bytes && admission?.isActive != true) {
+        val missing = bytes - credits.value
+        admission = async(start = CoroutineStart.UNDISPATCHED) {
+          // Charge each requested block before it can arrive, including retries/corrupt payload.
+          // A pending limiter must not block peer control traffic, progress, or checkpoints.
+          throttle(missing)
+          credits.update { it + missing }
+        }
+      }
+      admission?.takeIf { it.isCompleted }?.await()
+      return credits.value >= bytes
+    }
     val resets = Channel<CompletableDeferred<Unit>>(1)
     val acceptingResets = MutableStateFlow(true)
     val discovery = launch {
@@ -157,7 +178,9 @@ internal class TorrentV2DownloadSession private constructor(
             TorrentV2SessionLoop.download(layout, selected, store, pool, worker, buffers, memory,
               maxPeers = limit, connections = dialer.connections, onProgress = ::updateProgress,
               requestDelay = { bytes, admit ->
-                globalRate.requestDelay(bytes, downloadRate, admit)
+                if (!admitted(bytes)) 50L else globalRate.requestDelay(bytes, downloadRate) {
+                  admit().also { sent -> if (sent) credits.update { it - bytes } }
+                }
               })
           }
         }
@@ -191,6 +214,7 @@ internal class TorrentV2DownloadSession private constructor(
       withContext(NonCancellable) {
         try {
           download.cancelAndJoin()
+          admission?.cancelAndJoin()
           discovery.cancelAndJoin()
           watchLimits.cancelAndJoin()
         } finally {
@@ -227,14 +251,16 @@ internal class TorrentV2DownloadSession private constructor(
       buffers: TorrentBufferBudget,
       state: TorrentBufferBudget,
       maxPeers: Int = 100,
+      initialConnections: Int = maxPeers,
       globalRate: TorrentRateLimiter = TorrentRateLimiter(),
+      throttle: suspend (Int) -> Unit = {},
       checkpoint: TorrentV2Checkpoint? = null,
       discover: suspend (SendChannel<PeerEndpoint>) -> Unit,
       discoverWithReset: (suspend (SendChannel<PeerEndpoint>, suspend () -> Unit) -> Unit)? = null,
       body: suspend (TorrentV2DownloadSession) -> T,
     ): T = coroutineScope {
       require(layout.infoHash == document.info.hash && peerId.size == 20)
-      require(maxPeers in 1..500)
+      require(maxPeers in 1..500 && initialConnections in 1..maxPeers)
       store.requireBinding(document.identity, selected, layout)
       val lease = checkNotNull(state.reserve(maxPeers * 512 + 4096)) {
         "Session lifecycle state budget exhausted"
@@ -242,7 +268,7 @@ internal class TorrentV2DownloadSession private constructor(
       val owner = SupervisorJob(coroutineContext[Job])
       val session = TorrentV2DownloadSession(CoroutineScope(coroutineContext + owner), document,
         layout, selected.toSet(), store, network, peerId, buffers, state, maxPeers,
-        globalRate, discoverWithReset ?: { endpoints, _ -> discover(endpoints) })
+        initialConnections, globalRate, throttle, discoverWithReset ?: { endpoints, _ -> discover(endpoints) })
       try {
         // Restore before exposing the owner. Resume always rechecks the adopted payloads.
         if (checkpoint != null) store.restore(checkpoint)
