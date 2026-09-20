@@ -23,7 +23,7 @@ class TorrentV2PieceStoreTest {
     val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-v2-store-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
     val budget = TorrentBufferBudget(1024)
-    val store = TorrentV2PieceStore(document, root, emptySet(), budget, Semaphore(1))
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
     try {
       store.initialize()
       assertFalse(store.commit(0, byteArrayOf(3, 2, 1)))
@@ -48,7 +48,7 @@ class TorrentV2PieceStoreTest {
       "ketch-v2-existing-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
     torrentFileSystem.createDirectory(root)
     torrentFileSystem.write(root / "keep") { writeUtf8("user data") }
-    val store = TorrentV2PieceStore(document, root, emptySet(),
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test",
       TorrentBufferBudget(1024), Semaphore(1))
     try {
       assertFailsWith<okio.IOException> { store.initialize() }
@@ -74,7 +74,8 @@ class TorrentV2PieceStoreTest {
       "piece layers" to emptyMap<String, Any>())))
     val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-v2-hybrid-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
-    val store = TorrentV2PieceStore(doc, root, emptySet(), TorrentBufferBudget(1024), Semaphore(1))
+    val store = TorrentV2PieceStore(doc, root, emptySet(), "test",
+      TorrentBufferBudget(1024), Semaphore(1))
     try {
       store.initialize()
       assertTrue(store.commit(1, last))
@@ -95,7 +96,7 @@ class TorrentV2PieceStoreTest {
     val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-v2-budget-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
     val budget = TorrentBufferBudget(3)
-    val store = TorrentV2PieceStore(document, root, emptySet(), budget, Semaphore(1))
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
     try {
       store.initialize()
       val occupied = checkNotNull(budget.reserve(1))
@@ -118,7 +119,7 @@ class TorrentV2PieceStoreTest {
   fun selectionIsEnforcedBeforeWriting() = runTest {
     val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-v2-selected-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
-    val store = TorrentV2PieceStore(document, root, setOf("1"),
+    val store = TorrentV2PieceStore(document, root, setOf("1"), "test",
       TorrentBufferBudget(2), Semaphore(1))
     try {
       store.initialize()

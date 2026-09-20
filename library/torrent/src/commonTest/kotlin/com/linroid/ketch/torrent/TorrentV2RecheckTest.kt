@@ -26,7 +26,7 @@ class TorrentV2RecheckTest {
     val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-v2-read-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
     val budget = TorrentBufferBudget(payload.size)
-    val store = TorrentV2PieceStore(document, root, emptySet(), budget, Semaphore(1))
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
     try {
       store.initialize()
       assertFailsWith<IllegalStateException> { store.read(0) }
@@ -52,7 +52,7 @@ class TorrentV2RecheckTest {
     val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-v2-replaced-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
     val budget = TorrentBufferBudget(payload.size)
-    val store = TorrentV2PieceStore(document, root, emptySet(), budget, Semaphore(1))
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
     try {
       store.initialize()
       assertTrue(store.commit(0, payload))
@@ -74,7 +74,7 @@ class TorrentV2RecheckTest {
     val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
       "ketch-v2-recheck-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
     val budget = TorrentBufferBudget(payload.size)
-    val store = TorrentV2PieceStore(document, root, emptySet(), budget, Semaphore(1))
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, Semaphore(1))
     try {
       store.initialize()
       assertTrue(store.commit(0, payload))
