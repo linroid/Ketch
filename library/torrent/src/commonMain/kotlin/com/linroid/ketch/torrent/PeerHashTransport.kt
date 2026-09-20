@@ -146,6 +146,8 @@ internal class PeerHashTransport(
     }
   }
 
+  fun nextDeadlineMs(): Long? = exchange.nextDeadlineMs()
+
   fun expire(): List<PeerHashExchange.Ticket> = exchange.expire()
 
   fun close() {

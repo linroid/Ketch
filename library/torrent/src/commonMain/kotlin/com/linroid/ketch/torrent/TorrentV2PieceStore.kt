@@ -104,39 +104,53 @@ internal class TorrentV2PieceStore(
 
   /** Hash mismatch writes nothing. Verified progress is published only after flush and return. */
   suspend fun commit(index: Int, payload: ByteArray): Boolean = mutex.withLock {
-    check(initialized && !closed)
-    require(index in verified.indices)
-    val extent = verifier.layout.v2Piece(index.toLong())
-    val file = filesById.getValue(checkNotNull(extent.fileId))
-    require(file.id in selected && payload.size.toLong() == extent.length)
+    validateCommit(index, payload.size)
     val lease = checkNotNull(buffers.reserve(payload.size)) { "Payload buffer budget exhausted" }
     try {
-      // The caller can reuse/mutate its receive buffer while blocking I/O runs. Hash and write
-      // the same privately owned copy, with its reservation retained until the provider returns.
-      val bytes = payload.copyOf()
-      val verification = verifier.piece(index.toLong())
-      verification.update(bytes)
-      if (!verification.verify()) return@withLock false
-      if (verified[index]) return@withLock true
-      storageOperation {
-        val path = destination(file)
-        validateOwned(path, directory = false)
-        fileSystem.openReadWrite(path, mustExist = true).use { handle ->
-          handle.write(extent.fileOffset, bytes, 0, bytes.size)
-          val expected = document.info.files[file.v2Index].length
-          if (progress[file.v2Index] + extent.length == expected && handle.size() > expected) {
-            handle.resize(expected)
-          }
-          handle.flush()
-        }
-      }
-      currentCoroutineContext().ensureActive()
-      verified[index] = true
-      progress[file.v2Index] += extent.length
-      true
+      // Ordinary caller buffers remain mutable, so hash and write a privately admitted copy.
+      commitBuffer(index, payload.copyOf())
     } finally {
       lease.close()
     }
+  }
+
+  /** Only for sealed assemblies: caller retains admission and immutability until this returns. */
+  suspend fun commitOwned(index: Int, payload: ByteArray): Boolean = mutex.withLock {
+    validateCommit(index, payload.size)
+    commitBuffer(index, payload)
+  }
+
+  private fun validateCommit(index: Int, size: Int) {
+    check(initialized && !closed)
+    require(index in verified.indices)
+    val extent = verifier.layout.v2Piece(index.toLong())
+    require(extent.fileId in selected && size.toLong() == extent.length)
+  }
+
+  /** Both ownership paths share integrity, file ownership and the flush/publication barrier. */
+  private suspend fun commitBuffer(index: Int, bytes: ByteArray): Boolean {
+    val extent = verifier.layout.v2Piece(index.toLong())
+    val file = filesById.getValue(checkNotNull(extent.fileId))
+    val verification = verifier.piece(index.toLong())
+    verification.update(bytes)
+    if (!verification.verify()) return false
+    if (verified[index]) return true
+    storageOperation {
+      val path = destination(file)
+      validateOwned(path, directory = false)
+      fileSystem.openReadWrite(path, mustExist = true).use { handle ->
+        handle.write(extent.fileOffset, bytes, 0, bytes.size)
+        val expected = document.info.files[file.v2Index].length
+        if (progress[file.v2Index] + extent.length == expected && handle.size() > expected) {
+          handle.resize(expected)
+        }
+        handle.flush()
+      }
+    }
+    currentCoroutineContext().ensureActive()
+    verified[index] = true
+    progress[file.v2Index] += extent.length
+    return true
   }
 
   /** The consumer owns this reservation until it finishes using [bytes]. */

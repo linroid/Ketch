@@ -60,7 +60,7 @@ internal class TorrentPeerDownloader(
         if (!state.choking && state.requests.isEmpty()) {
           if (piece == -1) {
             piece = verified.indices.firstOrNull {
-              store.needed(it) && !verified[it] && state.available[it]
+              store.needed(it) && !verified[it] && state.hasPiece(it)
             } ?: -1
             if (piece != -1) assembled = ByteArray(store.pieceSize(piece))
           }

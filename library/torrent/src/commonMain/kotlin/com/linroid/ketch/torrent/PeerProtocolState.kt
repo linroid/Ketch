@@ -2,7 +2,7 @@ package com.linroid.ketch.torrent
 
 /** Per-connection availability and request ownership, independent of the swarm scheduler. */
 internal class PeerProtocolState(
-  pieceCount: Int,
+  private val pieceCount: Int,
   private val maxPending: Int = 32,
   private val explicitRejects: Boolean = false,
 ) {
@@ -10,7 +10,7 @@ internal class PeerProtocolState(
     require(pieceCount in 0..1_000_000 && maxPending in 1..256)
   }
 
-  val available: BooleanArray = BooleanArray(pieceCount)
+  private val available = ByteArray((pieceCount + 7) / 8)
   var choking: Boolean = true
     private set
   var interested: Boolean = false
@@ -20,9 +20,15 @@ internal class PeerProtocolState(
   private val canceled = linkedSetOf<PeerMessage.Request>()
   val requests: Set<PeerMessage.Request> get() = pending.toSet()
 
+  fun hasPiece(index: Int): Boolean = index in 0 until pieceCount &&
+    available[index / 8].toInt() and (128 ushr (index % 8)) != 0
+
+  /** Legacy scheduler snapshots are transient; v2 scheduling reads packed bits directly. */
+  fun availabilitySnapshot(): BooleanArray = BooleanArray(pieceCount, ::hasPiece)
+
   fun requested(request: PeerMessage.Request) {
     check(!choking) { "Peer is choking" }
-    require(request.index in available.indices && available[request.index]) { "Peer lacks piece" }
+    require(hasPiece(request.index)) { "Peer lacks piece" }
     require(pending.size < maxPending && request !in pending) {
       "Peer pipeline is full or duplicated"
     }
@@ -56,17 +62,16 @@ internal class PeerProtocolState(
         PeerMessage.Signal.NOT_INTERESTED -> interested = false
       }
       is PeerMessage.Have -> {
-        require(message.index in available.indices)
+        require(message.index in 0 until pieceCount)
         availabilitySeen = true
-        available[message.index] = true
+        val byte = message.index / 8
+        available[byte] = (available[byte].toInt() or (128 ushr (message.index % 8))).toByte()
       }
       is PeerMessage.Bitfield -> {
         require(!availabilitySeen) { "Repeated or late bitfield" }
-        require(message.bytes.size == (available.size + 7) / 8)
+        PeerFrameLimits(pieceCount).validateBitfield(message.bytes)
         availabilitySeen = true
-        for (index in available.indices) {
-          available[index] = message.bytes[index / 8].toInt() and (128 ushr (index % 8)) != 0
-        }
+        message.bytes.copyInto(available)
       }
       is PeerMessage.Piece -> {
         val request = PeerMessage.Request(message.index, message.begin, message.bytes.size)
