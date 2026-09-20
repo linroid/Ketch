@@ -25,6 +25,19 @@ CI runs JVM/Android host, iOS simulator and JS regression suites; extra macOS/Wi
 the OS filesystem adapters. The Android emulator job requires a nonzero executed test count, since
 an AGP connected-test task can otherwise succeed without running instrumentation.
 
+## Public v2/hybrid workflow
+
+`TorrentPublicV2WorkflowTest` drives the public Ketch/source APIs against a local wire fixture.
+It covers metainfo and tracker-only magnets, external piece-layer authentication, hybrid IDs across
+padding, selective output, live limits, pause, source recreation from serialized task records,
+rechecking modified data, ownership-journal recovery before a source checkpoint, safe removal,
+corrupt proofs, and source shutdown during metadata resolution. The tests execute on JVM and iOS.
+
+`PublicV2IndependentSeederTest` resolves pure v2 and hybrid magnets, fetches their external hash
+layers, and downloads exact payload through Ketch from the pinned test-only libtorrent peer.
+These are download interoperability checks, not evidence for v2 upload, inbound routing, hybrid
+v1-only swarms, a second independent v2 implementation, or the remaining production release gates.
+
 ## Review regression evidence (2026-09-08)
 
 The first review pass added coverage for Unicode path aliases and encoded filename limits,

@@ -28,6 +28,7 @@ internal class TorrentV2PieceStore(
   private val storageSlots: Semaphore,
   private val fileSystem: FileSystem = torrentFileSystem,
   private val creationLogPath: Path? = null,
+  private val throttle: suspend (Int) -> Unit = {},
 ) {
   private val verifier = TorrentPayloadVerifier(document)
   private val mapping = TorrentOutputMapping.from(document)
@@ -148,6 +149,7 @@ internal class TorrentV2PieceStore(
     verification.update(bytes)
     if (!verification.verify()) return false
     if (verified[index]) return true
+    throttle(bytes.size)
     storageOperation {
       val path = destination(file)
       validateOwned(path, directory = false)
@@ -297,15 +299,24 @@ internal class TorrentV2PieceStore(
 
   /** Stores authenticated catalog content before returning a consistent task snapshot. */
   suspend fun checkpoint(
-    catalog: TorrentContentCatalog,
+    catalog: TorrentContentCatalog? = null,
     receivedBytes: Long? = null,
     uploadedBytes: Long? = null,
   ): TorrentV2Checkpoint = mutex.withLock {
     check(initialized && !closed)
+    catalog?.put(document)
+    snapshot(receivedBytes, uploadedBytes)
+  }
+
+  /** Inline source state includes metainfo, so it needs no separate catalog reference. */
+  suspend fun resumeData(): ByteArray? = mutex.withLock {
+    if (!initialized || closed) null else snapshot(null, null).encode()
+  }
+
+  private fun snapshot(receivedBytes: Long?, uploadedBytes: Long?): TorrentV2Checkpoint {
     val received = receivedBytes ?: receivedCounter
     val uploaded = uploadedBytes ?: uploadedCounter
     require(received >= receivedCounter && uploaded >= uploadedCounter)
-    catalog.put(document)
     val destination = checkNotNull(root)
     val records = owned.map { (path, claim) ->
       val components = if (path == destination) emptyList() else
@@ -317,7 +328,7 @@ internal class TorrentV2PieceStore(
       received, uploaded)
     receivedCounter = received
     uploadedCounter = uploaded
-    checkpoint
+    return checkpoint
   }
 
   /** Validates all claims before adoption; initialize/recheck follow successful restore. */
@@ -353,6 +364,13 @@ internal class TorrentV2PieceStore(
     initialized && !closed && progress.sum() == totalSelected
   }
 
+  suspend fun recordReceived(bytes: Int) = mutex.withLock {
+    require(bytes >= 0 && receivedCounter <= Long.MAX_VALUE - bytes)
+    receivedCounter += bytes
+  }
+
+  suspend fun receivedBytes(): Long = mutex.withLock { receivedCounter }
+
   suspend fun verifiedPieces(): BooleanArray = mutex.withLock { verified.copyOf() }
 
   /** Joining the mutex waits for outstanding provider I/O; no later commits are accepted. */
@@ -371,6 +389,18 @@ internal class TorrentV2PieceStore(
         }
       }
       owned.clear()
+      creationLog?.delete()
+    }
+  }
+
+  /** Recovers journal claims for deletion without creating new payload files. */
+  suspend fun recoverOwnership() = mutex.withLock {
+    check(!closed && !initialized)
+    storageOperation {
+      if (creationLogPath != null && fileSystem.exists(creationLogPath)) {
+        val destination = fileSystem.canonicalize(checkNotNull(output.parent)) / output.name
+        prepareCreationLog(destination)
+      }
     }
   }
 

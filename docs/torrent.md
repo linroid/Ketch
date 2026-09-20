@@ -1,19 +1,19 @@
 # Kotlin torrent downloads
 
-`library:torrent` implements BitTorrent v1 in common Kotlin on JVM 11+, Android 26+, and iOS
+`library:torrent` downloads BitTorrent v1, v2, and hybrid content in common Kotlin on JVM 11+, Android 26+, and iOS
 (arm64 and arm64 simulator). The desktop app, Android app, iOS app, CLI, and daemon register
 `TorrentDownloadSource`. Browsers control the daemon through `RemoteKetch`.
 
 ```kotlin
 val torrents = TorrentDownloadSource(
-  TorrentConfig(uploadPolicy = TorrentUploadPolicy.WHILE_DOWNLOADING),
+  TorrentConfig(),
 )
 val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
   additionalSources = listOf(torrents),
 )
 ketch.start()
-val resolved = ketch.resolve(torrentUrl) // HTTPS .torrent URL or btih magnet
+val resolved = ketch.resolve(torrentUrl) // HTTPS .torrent URL or btih/btmh magnet
 val task = ketch.download(
   DownloadRequest(
     url = torrentUrl,
@@ -26,9 +26,10 @@ task.await().getOrThrow()
 ketch.close()
 ```
 
-A single-file destination names the file; a multi-file destination names the torrent's root
-folder. An empty selection downloads every file. IDs retain their original metainfo indices.
-Progress counts verified selected bytes. A piece spanning selected and skipped files needs all
+For v1, a single-file destination names the file; a multi-file destination names the root folder.
+For v2/hybrid, the destination always names a root folder, including single-file torrents. Files
+inside it use the sanitized paths shown by resolution. An empty selection downloads every file. IDs retain their original metainfo indices.
+Progress counts verified selected bytes. In v1, a piece spanning selected and skipped files needs all
 its bytes for verification; skipped boundary bytes live in a hidden task sidecar, not in skipped
 output files. Network speed includes received payload, including those boundary bytes/retries.
 
@@ -42,12 +43,12 @@ for private tracker URLs. A supplied HTTP engine remains owned by its caller.
 
 - HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.
 - Public magnets use BEP 9 metadata exchange, DHT, trackers, and explicit peers. Public swarms
-  support peer exchange. Configure `stateDirectory` to persist DHT routing candidates.
+  support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
   and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
   are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not
   send a completed announce.
-- Upload defaults to `DISABLED`, preserving the previous `enableUpload = false` behavior.
+- V1 upload defaults to `DISABLED`, preserving the previous `enableUpload = false` behavior.
   `WHILE_DOWNLOADING` exchanges verified pieces during transfer; `SEED_AFTER_COMPLETION` keeps
   the session alive after completion until removed or the source is closed. `enableUpload = true`
   maps to the latter when no explicit policy is supplied.
@@ -111,7 +112,18 @@ adapters use JNA for OS directory/handle operations; Android and iOS call platfo
 OS sockets, TLS, filesystem and Unicode normalization services are permitted platform dependencies.
 The pinned libtorrent4j dependency and its loader exist only in JVM tests as an independent peer.
 
-This version supports v1 TCP torrents. It rejects v2/hybrid torrents and does not implement uTP,
+The public v2/hybrid download workflow supports metainfo imports, full-identity `btmh` magnets
+(including magnets with both exact topics), authenticated piece-layer exchange, trackers/DHT,
+selection, progress, shared download limits, live connection limits, pause/resume, safe removal,
+and task-store restart. Hybrid payloads must pass both SHA-1 and SHA-256 verification. Hybrid
+padding files are omitted from selection, so file IDs may have gaps. The source persists metainfo
+and full SHA-256 identity with ownership checkpoints; `.ketch-v2-<task-id>.creation` beside the
+output root also recovers owned files created before the first checkpoint. Keep this journal with
+the task until removal. Configure a durable `TaskStore` to retain task records across processes.
+
+V2/hybrid currently downloads through outgoing v2 TCP connections. V2 incoming routing, uploads,
+seeding, peer exchange, and hybrid participation in v1-only peer swarms remain separate roadmap
+work; upload policy options apply to v1 sessions. This version does not implement uTP,
 protocol encryption, web seeds, NAT mapping, local service discovery, torrent creation, or a ratio
 management UI. No automatic incoming-port mapping is performed. Bounds include 4 MiB metainfo,
 10,000 files, 16 MiB pieces, and configured connection/buffer/task budgets. Configuring many peers
