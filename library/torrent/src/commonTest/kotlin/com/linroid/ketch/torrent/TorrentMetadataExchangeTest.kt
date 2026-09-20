@@ -1,6 +1,9 @@
 package com.linroid.ketch.torrent
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
@@ -11,10 +14,11 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 
 class TorrentMetadataExchangeTest {
   @Test
-  fun exchange_usesPerPeerIdAndAssemblesReorderedBlocks() = runTest { exchange("valid") }
+  fun exchange_assemblesReorderedBlocksWhileTransferBudgetIsFull() = runTest { exchange("valid") }
 
   @Test
   fun exchange_hashMismatchFailsBeforeHandoff() = runTest { exchange("corrupt") }
@@ -24,6 +28,48 @@ class TorrentMetadataExchangeTest {
 
   @Test
   fun exchange_privateMetainfoRequiresExplicitInput() = runTest { exchange("private") }
+
+  @Test
+  fun canceledHandshake_releasesMetadataReservationAndPreservesTransferReservation() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(5_000) {
+        val budgets = TorrentExchangeBudgets(TorrentConfig())
+        val payload = assertNotNull(budgets.transfer.reserve(budgets.transfer.capacity))
+        val network = createTorrentNetwork()
+        val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+        val ready = CompletableDeferred<Unit>()
+        val server = async {
+          val connection = listener.accept()
+          try {
+            connection.readExactly(68)
+            ready.complete(Unit)
+            awaitCancellation()
+          } finally { connection.close() }
+        }
+        val client = async {
+          TorrentMetadataExchange(network, budget = budgets.metadata)
+            .fetch(InfoHash.fromBytes(ByteArray(20)), listener.local)
+        }
+        try {
+          ready.await()
+          assertEquals(budgets.metadata.capacity, budgets.metadata.allocated)
+          client.cancelAndJoin()
+          assertEquals(0, budgets.metadata.allocated)
+          assertEquals(budgets.transfer.capacity, budgets.allocated)
+        } finally {
+          withContext(NonCancellable) {
+            client.cancel()
+            server.cancel()
+            network.close()
+            client.cancelAndJoin()
+            server.cancelAndJoin()
+            payload.close()
+          }
+        }
+        assertEquals(0, budgets.allocated)
+      }
+    }
+  }
 
   @Test
   fun extensions_updatesAreAdditiveAndCanDisableAnId() {
@@ -47,7 +93,9 @@ class TorrentMetadataExchangeTest {
         val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to info)))
         val network = createTorrentNetwork()
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
-        val budget = TorrentBufferBudget(32 * 1024 * 1024)
+        val budgets = TorrentExchangeBudgets(TorrentConfig())
+        val payload = assertNotNull(budgets.transfer.reserve(budgets.transfer.capacity))
+        val budget = budgets.metadata
         val server = async {
           val connection = listener.accept()
           try {
@@ -92,9 +140,12 @@ class TorrentMetadataExchangeTest {
           }
           server.await()
           assertEquals(0, budget.allocated)
+          assertEquals(budgets.transfer.capacity, budgets.allocated)
         } finally {
           server.cancelAndJoin()
           network.close()
+          payload.close()
+          assertEquals(0, budgets.allocated)
         }
       }
     }

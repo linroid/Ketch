@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "v1.libtorrent.dht-metadata-download",
+      "class": "com.linroid.ketch.torrent.IndependentSeederTest",
+      "method": "kotlinDownloader_completesVerifiedTransferFromIndependentSeeder"
+    },
+    {
+      "id": "v1.transmission.explicit-peer-magnet-download",
+      "class": "com.linroid.ketch.torrent.TransmissionInteropTest",
+      "method": "publicSource_resolvesTrackerlessMagnetAndDownloadsFromTransmission"
+    }
+  ]
+}
