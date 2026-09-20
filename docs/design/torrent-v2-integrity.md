@@ -442,3 +442,294 @@ Outbound frame admission also precedes block request registration. Temporary fra
 null for a new request without disturbing existing requests. Cancellation returns false when its
 frame cannot be admitted and leaves the request uncanceled, so the actor may retry after credit
 returns. Neither path emits bytes or resets deadlines; real partial writes still close the stream.
+
+### Admitted piece assembly and verified commit
+
+`TorrentV2PieceAssembly` reserves payload and bounded block-index capacity before allocation. It
+uses canonical 16 KiB requests with a short final block matching the real file tail. Out-of-order
+blocks populate distinct slots; wrong pieces, noncanonical ranges, size mismatches and duplicates
+cannot mark a missing slot complete. Every accepted or rejected delivered block releases its own
+credit after copying/validation, while the independent assembly reservation remains held.
+
+Only a complete assembly can invoke the v2 store. The assembly seals its admitted buffer against
+further mutation and retains credit until the store's validation/write/flush operation unwinds.
+Hash rejection, storage failure or cancellation consumes and releases the assembly without bypassing
+that barrier. Ordinary mutable caller buffers still use a privately admitted store copy. Incomplete assemblies remain available
+for further blocks. A real TCP test joins full-identity v2 negotiation, bounded block requests,
+reverse-order replies, assembly, verification and disk commit, checking all buffer credit returns.
+
+This is component integration against a controlled peer, not independent-client v2 interoperability
+or the finished runtime. The concurrent event loop and timers, multi-peer scheduling, hash serving,
+seeding, session admission/wiring and all remaining production gates still require completion.
+
+
+The sealed assembly path avoids reserving a second full payload: a 16 MiB piece plus bookkeeping
+can now commit under the default 32 MiB transfer budget. The full-size regression failed before
+this change with payload budget exhaustion and now verifies successful disk commit. Closing during
+an in-flight commit defers credit release until that commit unwinds, including cancellation while
+waiting for storage admission.
+
+### Deadline-aware inbox and reader ownership
+
+`PeerV2Inbox.run` owns one child frame reader and a channel with one queued frame. An additional
+sender-held frame can wait behind it; every decoded frame retains its transport reservation.
+The actor dispatches serially and closes delivered frames after use. `next` selects between the
+next frame and the earliest block/hash response deadline. Block expiry closes the connection;
+hash expiry returns exact expired tickets for rescheduling while leaving the healthy stream open.
+Backward hash clocks now expire ownership consistently instead of producing repeated zero-delay
+wakeups without releasing requests.
+
+Scope exit closes the transport and block exchange, cancels and joins the reader, and reclaims
+queued or undelivered frames. Already delivered frames remain explicitly consumer-owned. The
+runtime releases connection admission only after this scope finishes. Deadline selection uses
+channel select rather than wrapping resource return in a timeout scope. The real TCP assembly test
+now uses the inbox for frame handoff before committing authenticated payloads after reader shutdown.
+
+The actor still must offload long storage work and call the inbox while idle; this layer is not a
+background timer that makes arbitrary blocking actor callbacks safe. Scheduler/event-loop command
+wiring, upload/hash serving, full session integration and the remaining production gates remain
+required.
+
+### Bounded commit workers and actor commands
+
+`TorrentV2CommitWorker` owns a bounded assembly queue, a bounded completion queue and one child
+worker. Successful submission transfers an already admitted complete assembly; queue saturation
+leaves ownership with the actor for retry. The worker defaults to `Dispatchers.Default`, moving
+piece verification off the actor, while store I/O still uses its storage admission/provider path.
+It reports verified/rejected commits only after the store returns, and storage failures as explicit
+completion values. Scope exit cancels and joins the worker and closes every undelivered assembly.
+
+The inbox can now select a typed actor-command queue alongside frames and response deadlines.
+When both queues stay ready it alternates preference, preventing either stream from starving the
+other. Command queue ownership stays with its producer; commit completions contain no retained
+payload lease. A shared test blocks storage admission while the actor waits on both peer input and
+worker completion: the pending block still expires at its deadline and teardown returns all credit.
+
+These components supply worker dispatch and completion plumbing. The production scheduler still
+must create/admit assemblies, route completions across peer/session lifetimes, retry queue pressure,
+and reconcile checkpoint/progress generations. Full upload/hash serving, session integration and
+all remaining capabilities and release gates remain required.
+
+### Commit handoff identity
+
+Commit submission now returns an opaque ticket, and every completion carries that exact ticket.
+The ticket contains only the piece index, without retaining an assembly or payload. The scheduler
+can associate it with its current session/selection generation and distinguish later submissions
+for the same piece. Generation reconciliation still belongs to the runtime integration.
+
+Assembly ownership moves atomically from the actor to a unique queue claim, then to the committing
+worker and finally to closed. A queued assembly cannot be submitted twice, mutated, directly
+committed, or released through its old actor handle. If queue admission fails, the exact claim
+restores actor ownership. A stale claim cannot restore or close a newer handoff. Cancellation and
+undelivered queue cleanup close only the current claim, and an in-flight commit retains its lease
+until the store operation unwinds.
+
+Tests exercise duplicate submission before the worker runs, actor close after transfer, restoration
+on queue pressure, stale claims after a second handoff, and exact ticket identity across corrupt
+and successful submissions of the same piece. This strengthens scheduler-facing ownership; full
+scheduler/session routing and the remaining production gates are still required.
+
+### Bounded multi-peer piece ledger
+
+`TorrentV2PieceScheduler` reserves state before copying verified/selection inputs or creating
+assignment maps. The active-piece ceiling includes assemblies already transferred to the commit
+worker. Candidate pieces must be selected, unverified and admitted; canonical missing blocks are
+assigned once across peer pipelines. Unavailable/full/choked peers are skipped and each scheduling
+call bounds outbound admission attempts. Piece selection policy remains separate from this ledger.
+
+Removing a peer closes its pipeline before freeing unanswered assignments for reassignment. Late
+callbacks must match both peer identity and the exact request ticket; stale delivered blocks release
+their credit without displacing a replacement. Completed assemblies stay admitted during commit
+queue pressure. Only a known commit ticket updates scheduler verification; corrupt/failed commits
+make the piece retryable, while unknown or repeated completions cannot publish state.
+
+Tests connect two peer pipelines to one assembly and the real store/worker, exercise replacement
+and late callbacks, selected-file and state/payload admission, queue pressure and corrupt-piece
+retry. Scheduler shutdown releases actor-owned state and assemblies; outer session ownership still
+joins peer readers and storage workers. Automatic piece-selection policy, transport/session wiring,
+generation barriers, upload/hash serving and remaining production capabilities/gates are unfinished.
+
+Scheduler request failures now remove the failed peer's earlier assignments before propagating the
+error. The pipeline may already have closed itself after a partial write; the ledger must still
+release its unanswered blocks so a replacement peer can request them. The regression injects a
+failure on the second request and verifies the replacement starts with the first abandoned block.
+
+### Compact peer availability
+
+Peer protocol state now retains the packed bitfield instead of a BooleanArray per piece. At the
+one-million-piece ceiling, its availability payload is 125,000 bytes per peer. V2 scheduling and
+single-peer lookup read bits directly; the legacy swarm scheduler explicitly requests a detached
+Boolean snapshot for its existing interface. Input bitfields are copied, and snapshots cannot mutate
+protocol state. Have updates and spare-bit validation operate on the same packed representation.
+
+Tests cover byte boundaries, input/snapshot isolation, invalid spare bits without partial state
+publication, empty torrents and the final index of the million-piece profile. This removes one
+large per-peer allocation obstacle. Aggregate peer admission, the legacy scheduler's retained
+snapshots, process RSS and the full simultaneous production resource profiles still need validation.
+
+### Admitted rarity and automatic candidates
+
+`TorrentV2RarityPicker` admits its count index before allocation and charges each retained compact
+peer snapshot separately. Bitfield replacement, duplicate have messages and peer removal maintain
+rarity without aliasing caller buffers. Peer keys identify connection lifetimes. It chooses the
+rarest eligible piece available from the requested peer, rotating equal-rarity choices and avoiding
+candidate-list allocations. A rarity of one permits an early return; other choices may scan the
+full bounded piece index. Runtime selection should be driven by state changes, with large-swarm
+CPU/throughput measurements still required.
+
+The piece scheduler now exposes automatic `beginNext` and uses admitted wanted/verified arrays plus
+a packed busy index for allocation-free candidate eligibility. State allowance scales with actual
+blocks per piece instead of always charging the 16 MiB maximum; up to 1024 active pieces can be
+requested subject to state and payload admission. A test admits 128 small pieces within bounded
+state/payload budgets. This is admission evidence, not a completed simultaneous-peer performance gate.
+
+Tests cover exact rarity choices, rotating ties, replacements/removal, duplicate haves, malformed
+and unadmitted snapshots, empty/million-piece indexes and automatic scheduler integration. Full
+peer/session availability routing, generation barriers, adaptive streaming/endgame policy, upload/
+hash serving, independent-client interoperability and all remaining production gates are unfinished.
+
+### Interest signaling before unchoke
+
+The scheduler derives interest from selected, unverified pieces advertised by the peer, independently
+of choke state, pipeline capacity and assembly admission. Its request path establishes initial
+interest even when candidate admission is waiting for unchoke. The actor calls `updateInterest` after
+availability or verification changes to clear interest once no wanted advertised pieces remain.
+Already interested request pipelines avoid rescanning the piece index for each block.
+
+The block exchange writes interested/not-interested through frame admission, suppresses duplicate
+updates and changes its local flag only after a successful write. Frame pressure leaves the flag
+unchanged for retry. Writes honor existing response deadlines plus their own time bound; partial,
+canceled or late writes close the pipeline. Scheduler write failures remove abandoned assignments.
+
+Tests cover the advertised-piece/interested/unchoke/request order, selected-file completion, frame
+pressure, duplicate suppression and blocked/non-suspending late writes. Full actor event routing,
+upload/hash serving and remaining production capabilities and release gates remain unfinished.
+
+### Request handoff between actors
+
+The piece scheduler can reserve a canonical block with `planNext` without reading mutable peer
+state or writing to a socket. Its availability callback must use the session actor's own snapshot.
+Reservations prevent duplicate assignment while a peer actor waits for outbound admission.
+The peer actor sends the request, then queues `resolve(plan, ticket)` before any response event
+for that ticket. Null acknowledges an unsent request and releases its reservation.
+
+Plans and issued tickets have separate identities: a stale acknowledgement cannot bind or release
+a replacement reservation, and a ticket from another connection cannot bind matching coordinates.
+A rejected acknowledgement requires the issuing actor to cancel or close any ticket it created.
+After a peer actor closes and joins its pipeline and reader, the session owner calls `detachPeer`
+to release abandoned reservations. The synchronous adapters remain for callers owning both objects.
+Full per-peer/session actor wiring and production throughput validation remain outstanding.
+
+### Per-peer download actor
+
+`PeerV2DownloadActor` owns a negotiated transport, block exchange, and inbox reader. The session
+uses bounded commands for interest, block requests/cancels, and hash requests/rejections. Events
+carry exact request acknowledgements, block responses, validated availability/control frames,
+and hash results/timeouts. Acknowledgements enter the event queue before responses for that ticket.
+Only the peer actor reads or mutates its protocol state. Session availability is updated from events.
+
+Queue metadata is admitted before allocation (including bounded hash-timeout ticket lists); retained
+frames and delivered blocks keep separate payload leases. Every consumer closes every event.
+Queued and canceled-send events are reclaimed automatically, while already delivered events remain
+consumer-owned after actor shutdown. Command and event waits cannot outlive an earlier pending
+block/hash deadline. A stalled consumer also has a finite dispatch timeout. Failure closes only this
+peer's event stream with its cause after joining the reader; session shutdown joins the actor before
+releasing queue admission. The caller retains transport ownership if queue admission fails.
+
+This is an internal actor integration building block. Shared session event multiplexing, complete
+hash serving, seeding, and end-to-end production v2 runtime registration remain outstanding.
+
+### Dynamic peer pool and shared events
+
+`PeerV2Pool` adds and stops negotiated peers while one session actor owns membership. Each peer
+publishes `Ready`, then ordered actor events, then one `Closed` event into an admitted shared queue.
+The `Closed` event is sent only after its actor and reader have joined; the session can then detach
+scheduler assignments and retire the exact connection lifetime. Capacity is retained until that
+terminal event is retired. Duplicate or stale terminal events cannot retire a replacement peer.
+
+The pool admits bounded membership and one forwarding event per peer, in addition to shared queue
+capacity. Payloads retain their existing leases through forwarding. Failed/canceled sends and queued
+events close automatically; delivered events remain consumer-owned after pool shutdown. A failed
+peer does not cancel its siblings. Stop requests are nonblocking, while full shutdown cancels and
+joins all members before releasing state admission. A successful attach transfers connection cleanup
+responsibility even when actor queue admission fails or cancellation precedes child startup; a null
+attach leaves the connection with the caller. The caller admits availability before constructing peers.
+
+The pool and the existing scheduler/commit worker now have compatible ownership boundaries. Automatic
+session scheduling from availability and completion events, connection discovery, full hash serving,
+and production runtime registration still need implementation and end-to-end validation.
+
+### Automatic full-metainfo download session
+
+`TorrentV2SessionLoop` consumes the peer pool and commit worker on one session actor. It builds its
+own packed availability index and choke/interest/pipeline state from ordered events, then dispatches
+interest and canonical block plans using nonblocking command sends. Peer actors retain exclusive
+access to their mutable protocol state and socket writes. Interest counts update from availability
+and successful commits; completion uses a remaining-piece counter rather than scanning the torrent
+on every response. Rarity chooses new admitted pieces; existing assemblies keep their assignments.
+
+Responses fill assemblies and completed pieces transfer to the storage worker. Only successful
+verification/flush completions publish verified state; corrupt pieces become requestable again.
+Disk failures propagate and end the session. Peer departure releases assignments only after the
+pool's joined terminal event; remaining peers can retry them. Unavailable partial assemblies with
+no live assignments are evicted so they cannot occupy every active slot. Completed assemblies
+retain their storage ownership. If the last peer departs with an
+already queued commit, the session still waits for that result. Exhaustion without pending commits
+fails explicitly. Admission pressure enables a bounded retry timer; normal idle peers do not poll.
+
+The caller supplies matching authenticated layout/selection and initialized storage, with verified
+bits taken from the store, and owns the surrounding pool/worker scopes. Tests exercise selected
+output, corruption retry, connection failure/reassignment, disk failure, final-peer departure during
+blocked storage, and an already verified selection without peers. These use deterministic framed
+connections and real file storage. Independent-client v2 interoperability and throughput gates remain
+unproven. Discovery/connection orchestration, magnet resolution, complete hash serving, seeding,
+corrupt-peer reputation, and public runtime registration remain outstanding.
+
+### Full session loopback TCP validation
+
+The complete session path is exercised through `createTorrentNetwork` loopback sockets, handshake
+negotiation, bounded peer actors/pool, automatic request scheduling, and real verified file storage.
+Tests cover a pure-v2 handshake and a hybrid v1 handshake upgrading to v2. The seeder checks interest
+and canonical requests, sends both blocks in reverse order, and disconnects before storage completion.
+The selected file is verified byte-for-byte, the unselected file is absent, and both buffer/state
+budgets return to zero after joined cleanup. A hybrid case with a deliberately mismatched v1 piece
+hash rejects otherwise v2-valid payload without publishing progress or writing payload bytes.
+
+These tests run in commonTest on JVM and iOS using the actual platform TCP adapter. Both ends use
+Ketch's protocol implementation, so this is loopback integration evidence, not independent-client
+v2/hybrid interoperability, throughput, physical-device lifecycle, or sustained-resource evidence.
+
+### Admitted outgoing v2 connections
+
+`PeerV2Connector` negotiates authorized endpoints outside the session actor. The shared authenticated
+layout now carries its full v2 info hash, which must match the document before any socket opens.
+Packed peer availability is admitted before connect and handshake. A separate handshake budget can
+preserve negotiation credit under payload saturation. Connect and handshake failures reclaim their
+admission and any acquired socket, including cancellation at the connect timeout's return boundary.
+
+The returned handle has one serialized owner. Successful pool attachment transfers transport, block
+pipeline, and availability admission; closing the old handle cannot close an attached peer. A full
+pool leaves the handle caller-owned and retryable. Availability credit remains held until joined
+terminal retirement or joined pool shutdown, including child-start/admission failures. Closed block
+exchanges discard protocol state, and transferred/closed connector handles drop their owned references.
+Actual pure-v2
+and upgraded-hybrid TCP session tests now use this connector. Global network policy/socket limits,
+metadata/layout admission, endpoint discovery, and public engine/session registration remain caller
+responsibilities and are not completed by this connector.
+
+### Live peer arrivals and bounded dialing
+
+`PeerV2Dialer` consumes an upstream endpoint stream with admitted worker and result-queue limits.
+Handshakes run outside the session actor. Null admission retries the same endpoint after a bounded
+wait; ordinary failures, including a peer's own timeout, are recorded without canceling later attempts.
+Session cancellation still cancels and joins all workers. A failed endpoint stream closes results with
+its cause after queued connections; undelivered and blocked-send handles are closed on shutdown.
+Endpoint authorization, deduplication, and network retry/backoff policy remain upstream responsibilities.
+
+The session loop can start with no attached peers while a connection stream remains open. It rotates
+selection among arrivals, peer events, and storage completions. Arrivals wait for pool capacity, and
+only the session actor attaches them. Every arrival's full v2 identity must match the session layout;
+rejected handles are closed. Stream completion removes the wait condition, so an exhausted session
+fails instead of spinning. The caller joins the dialer and cancels its endpoint producer on exit.
+Actual pure-v2/hybrid TCP tests now start through this stream and include a mismatched-torrent arrival.
+Tracker/DHT endpoint production and public engine registration are still not wired to this path.

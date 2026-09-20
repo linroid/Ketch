@@ -15,7 +15,10 @@ internal class PeerBlockExchange(
   private val timeoutMs: Long = 30_000,
   private val clock: () -> Long = monotonicClock(),
 ) {
-  class Ticket internal constructor(val request: PeerMessage.Request)
+  class Ticket internal constructor(
+    val request: PeerMessage.Request,
+    internal val owner: Any? = null,
+  )
   sealed interface Response {
     class Block internal constructor(
       val ticket: Ticket,
@@ -39,11 +42,50 @@ internal class PeerBlockExchange(
     require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
     require(maxPending in 1..256 && timeoutMs in 1..180_000)
   }
-  private val state = PeerProtocolState(layout.pieceCount.toInt(), maxPending,
-    explicitRejects = true)
+  private var protocol: PeerProtocolState? = PeerProtocolState(
+    layout.pieceCount.toInt(), maxPending, explicitRejects = true)
+  private val state: PeerProtocolState get() = checkNotNull(protocol)
   private val pending = mutableMapOf<PeerMessage.Request, Pending>()
+  private val identity = Any()
   private var closed = false
+  var localInterested: Boolean = false
+    private set
   val pendingCount: Int get() = pending.size
+
+  fun canRequest(index: Int): Boolean = !closed && pending.size < maxPending && !state.choking &&
+    state.hasPiece(index)
+
+  fun owns(ticket: Ticket): Boolean = ticket.owner === identity
+
+  fun hasPiece(index: Int): Boolean = !closed && state.hasPiece(index)
+
+  /** Admission failure leaves interest unchanged for retry; repeated updates emit no frame. */
+  suspend fun setInterested(value: Boolean): Boolean {
+    checkLive()
+    if (localInterested == value) return true
+    try {
+      val time = nextDeadlineMs() ?: timeoutMs
+      check(time > 0) { "Peer block expired before interest write" }
+      val started = clock()
+      val sent = withTimeout(time) {
+        transport.trySend(PeerMessage.Control(if (value) PeerMessage.Signal.INTERESTED else
+          PeerMessage.Signal.NOT_INTERESTED))
+      }
+      checkLive()
+      if (sent) {
+        val finished = clock()
+        val elapsed = finished - started
+        check(finished >= started && elapsed >= 0 && elapsed < time) {
+          "Peer interest write expired"
+        }
+        localInterested = value
+      }
+      return sent
+    } catch (error: Throwable) {
+      close()
+      throw error
+    }
+  }
 
   /** Relative delay for the actor's timer; control traffic and cancels never extend deadlines. */
   fun nextDeadlineMs(): Long? = pending.values.minOfOrNull { remaining(it) }
@@ -65,11 +107,11 @@ internal class PeerBlockExchange(
     PeerWire.encodedSize(request, layout.pieceCount.toInt())
     val length = layout.v2Piece(request.index.toLong()).length
     require(request.begin.toLong() + request.length <= length) { "Block crosses v2 file tail" }
-    if (state.choking || !state.available[request.index] || request in pending ||
+    if (state.choking || !state.hasPiece(request.index) || request in pending ||
       pending.size == maxPending) return null
     val lease = budget.reserve(request.length * 2 + 256) ?: return null
     try {
-      val value = Pending(Ticket(request), clock(), lease)
+      val value = Pending(Ticket(request, identity), clock(), lease)
       val sent = write(value) {
         transport.trySend(request) {
           state.requested(request)
@@ -157,6 +199,7 @@ internal class PeerBlockExchange(
     try { transport.close() } finally {
       pending.values.forEach { it.lease.close() }
       pending.clear()
+      protocol = null
     }
   }
 }

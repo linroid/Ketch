@@ -57,9 +57,12 @@ internal class PeerHashExchange(
     val current = pending[ticket.selector] ?: return 0
     if (current.ticket !== ticket) return 0
     val now = clock()
-    if (now < current.started) return 0
-    return maxOf(0, timeoutMs - (now - current.started))
+    val elapsed = now - current.started
+    if (now < current.started || elapsed < 0) return 0
+    return maxOf(0, timeoutMs - elapsed)
   }
+
+  fun nextDeadlineMs(): Long? = pending.values.minOfOrNull { remainingMs(it.ticket) }
 
   /** A stale send/cancel callback cannot release a newer request for the same coordinates. */
   fun cancel(ticket: Ticket) {
@@ -94,9 +97,7 @@ internal class PeerHashExchange(
 
   /** Called by the connection timer, including while the peer is choking payload requests. */
   fun expire(): List<Ticket> {
-    val now = clock()
-    val expired = pending.values.filter { now >= it.started && now - it.started >= timeoutMs }
-      .map { it.ticket }
+    val expired = pending.values.filter { remainingMs(it.ticket) == 0L }.map { it.ticket }
     expired.forEach(::cancel)
     return expired
   }
