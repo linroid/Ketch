@@ -196,7 +196,7 @@ internal class KotlinTorrentEngine(
         require(it.isNotEmpty()) { "Tracker-only magnets require supplied trackers" }
       }
     } else emptyList()
-    val metadata = cache.resolve(magnet.infoHash) {
+    val metadata = cache.resolve(magnet.infoHash, privacy) {
       withTimeout(config.metadataTimeout) {
         if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
           return@withTimeout fetchTrackerOnly(magnet, restrictedTiers)

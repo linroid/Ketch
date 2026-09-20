@@ -51,7 +51,7 @@ class TorrentV2DocumentTest {
   }
 
   @Test
-  fun emptyAndSmallFilesNeedAnEmptyLayerDictionary() {
+  fun emptyAndSmallFilesAcceptOmittedOrEmptyLayerDictionaries() {
     for (length in listOf(0L, 1L, 16_384L)) {
       val properties = buildMap<String, Any> {
         put("length", length)
@@ -59,11 +59,14 @@ class TorrentV2DocumentTest {
       }
       val rawInfo = mapOf("meta version" to 2L, "piece length" to 16_384L,
         "file tree" to mapOf("file" to mapOf("" to properties)))
-      val bytes = Bencode.encode(mapOf("info" to rawInfo,
-        "piece layers" to emptyMap<String, Any>()))
-      val parsed = TorrentV2Document.parse(bytes, maxLayerBytes = 0)
-      assertEquals(length, parsed.info.totalBytes)
-      assertEquals(emptyMap(), parsed.pieceLayers)
+      // BEP 52 permits omitting the key entirely when no file exceeds the piece length.
+      val envelopes = listOf(mapOf("info" to rawInfo),
+        mapOf("info" to rawInfo, "piece layers" to emptyMap<String, Any>()))
+      for (envelope in envelopes) {
+        val parsed = TorrentV2Document.parse(Bencode.encode(envelope), maxLayerBytes = 0)
+        assertEquals(length, parsed.info.totalBytes)
+        assertEquals(emptyMap(), parsed.pieceLayers)
+      }
     }
   }
 

@@ -43,6 +43,62 @@ class TorrentMetadataCacheTest {
 
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
   @Test
+  fun restrictedCallersNeverJoinPendingPublicDiscovery() = runTest {
+    val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+      "name" to "empty", "length" to 0L, "piece length" to 16_384L, "pieces" to ByteArray(0)
+    ))))
+    val cache = TorrentMetadataCache(backgroundScope)
+    val gate = CompletableDeferred<Unit>()
+    val used = mutableListOf<TorrentDiscoveryPrivacy>()
+    fun fetch(privacy: TorrentDiscoveryPrivacy): suspend () -> TorrentMetadata = {
+      used += privacy
+      gate.await()
+      metadata
+    }
+    val public = async {
+      cache.resolve(metadata.infoHash, TorrentDiscoveryPrivacy.PUBLIC,
+        fetch(TorrentDiscoveryPrivacy.PUBLIC))
+    }
+    runCurrent()
+    val restricted = async {
+      cache.resolve(metadata.infoHash, TorrentDiscoveryPrivacy.TRACKER_ONLY,
+        fetch(TorrentDiscoveryPrivacy.TRACKER_ONLY))
+    }
+    runCurrent()
+    gate.complete(Unit)
+    assertEquals(metadata.infoHash, public.await().infoHash)
+    assertEquals(metadata.infoHash, restricted.await().infoHash)
+    // The restricted caller ran its own tracker-only fetch instead of joining the public one.
+    assertEquals(listOf(TorrentDiscoveryPrivacy.PUBLIC, TorrentDiscoveryPrivacy.TRACKER_ONLY),
+      used)
+  }
+
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun samePrivacyStillSharesOneInFlightFetch() = runTest {
+    val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+      "name" to "empty", "length" to 0L, "piece length" to 16_384L, "pieces" to ByteArray(0)
+    ))))
+    val cache = TorrentMetadataCache(backgroundScope)
+    val gate = CompletableDeferred<Unit>()
+    var fetches = 0
+    val fetch: suspend () -> TorrentMetadata = { fetches++; gate.await(); metadata }
+    val one = async {
+      cache.resolve(metadata.infoHash, TorrentDiscoveryPrivacy.TRACKER_ONLY, fetch)
+    }
+    runCurrent()
+    val two = async {
+      cache.resolve(metadata.infoHash, TorrentDiscoveryPrivacy.TRACKER_ONLY, fetch)
+    }
+    runCurrent()
+    gate.complete(Unit)
+    assertEquals(metadata.infoHash, one.await().infoHash)
+    assertEquals(metadata.infoHash, two.await().infoHash)
+    assertEquals(1, fetches)
+  }
+
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
   fun sharedFetch_survivesOneWaiterCancelAndAvoidsHandoffRefetch() = runTest {
     val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
       "name" to "empty", "length" to 0L, "piece length" to 16_384L, "pieces" to ByteArray(0)
@@ -55,13 +111,13 @@ class TorrentMetadataCacheTest {
       ready.await()
       metadata
     }
-    val first = async { cache.resolve(metadata.infoHash, fetch) }
-    val second = async { cache.resolve(metadata.infoHash, fetch) }
+    val first = async { cache.resolve(metadata.infoHash, fetch = fetch) }
+    val second = async { cache.resolve(metadata.infoHash, fetch = fetch) }
     runCurrent()
     first.cancelAndJoin()
     ready.complete(Unit)
     assertEquals(metadata.infoHash, second.await().infoHash)
-    assertEquals(metadata.infoHash, cache.resolve(metadata.infoHash, fetch).infoHash)
+    assertEquals(metadata.infoHash, cache.resolve(metadata.infoHash, fetch = fetch).infoHash)
     assertEquals(1, fetches)
   }
 

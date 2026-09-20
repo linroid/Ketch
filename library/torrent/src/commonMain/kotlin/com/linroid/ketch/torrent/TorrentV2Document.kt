@@ -39,8 +39,11 @@ internal class TorrentV2Document private constructor(
       require(expectedIdentity?.v1 == null || hybrid != null) {
         "A v1 topic cannot identify a v2-only document"
       }
-      val nodes = requireNotNull(envelope["piece layers"]?.dictionary) {
-        "Imported metainfo requires a piece layers dictionary"
+      // BEP 52 omits the key when no file exceeds the piece length; validatePieceLayers still
+      // rejects omission whenever the parsed files actually require external layers.
+      val layerNode = envelope["piece layers"]
+      val nodes = if (layerNode == null) emptyMap() else requireNotNull(layerNode.dictionary) {
+        "Piece layers must be a dictionary"
       }
       var layerBytes = 0L
       val layers = buildMap {

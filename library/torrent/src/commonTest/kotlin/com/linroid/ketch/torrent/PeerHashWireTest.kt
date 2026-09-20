@@ -47,12 +47,23 @@ class PeerHashWireTest {
   }
 
   @Test
+  fun singleHashRequestsSurviveDecodingAndCountTheirUncoveredProofLayer() {
+    // BEP 52 allows length == 1; a lone base hash covers nothing, so every proof layer follows.
+    val selector = PeerHashSelector(root, 0, 0, 1, 0)
+    assertEquals(2, selector.hashCount)
+    val encoded = PeerHashWire.encode(PeerHashMessage.Request(selector))
+    assertEquals(PeerHashMessage.Request(selector), PeerHashWire.decode(encoded))
+    val hashes = PeerHashMessage.Hashes(selector, ByteArray(2 * 32).toByteString())
+    assertEquals(hashes, PeerHashWire.decode(PeerHashWire.encode(hashes)))
+  }
+
+  @Test
   fun malformedCoordinatesAndResponseSizesAreRejectedBeforeHashAllocation() {
     fun request(base: Int = 0, index: Int = 0, length: Int = 2, proof: Int = 0) =
       PeerMessage.Unknown(21, Buffer().write(root).writeInt(base).writeInt(index)
         .writeInt(length).writeInt(proof).readByteArray())
     for (invalid in listOf(request(base = -1), request(base = 64), request(proof = 64),
-      request(base = 63, proof = 1), request(index = 1), request(length = 1),
+      request(base = 63, proof = 1), request(index = 1), request(length = 0),
       request(length = 3), request(length = 1024), request(length = Int.MIN_VALUE))) {
       assertFailsWith<IllegalArgumentException> { PeerHashWire.decode(invalid) }
     }

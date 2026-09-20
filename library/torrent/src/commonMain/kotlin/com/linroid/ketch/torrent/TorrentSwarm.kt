@@ -270,8 +270,10 @@ internal class TorrentSwarm(
               }
               val accepted = state.received(message)
               when (message) {
-                is PeerMessage.Bitfield, is PeerMessage.Have ->
-                  scheduler.availability(id, state.availabilitySnapshot())
+                // Only the one-time bitfield rebuilds availability; HAVE stays incremental so a
+                // peer cannot force a full snapshot and rarity scan per announcement.
+                is PeerMessage.Bitfield -> scheduler.availability(id, state.availabilitySnapshot())
+                is PeerMessage.Have -> scheduler.announce(id, message.index)
                 is PeerMessage.Control -> {
                   if (message.signal == PeerMessage.Signal.CHOKE) {
                     scheduler.release(id)

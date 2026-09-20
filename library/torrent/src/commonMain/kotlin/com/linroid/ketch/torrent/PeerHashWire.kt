@@ -21,7 +21,8 @@ internal data class PeerHashSelector(
   init {
     require(root.size == 32)
     require(baseLayer in 0..63 && proofLayers in 0..63 && baseLayer + proofLayers <= 63)
-    require(length in 2..512 && length and (length - 1) == 0)
+    // BEP 52 allows any positive power of two up to 512, including a single remaining hash.
+    require(length in 1..512 && length and (length - 1) == 0)
     require(index in 0..0xffff_ffffL && index % length == 0L)
     require(index + length <= 0x1_0000_0000L)
   }
