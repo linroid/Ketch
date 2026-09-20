@@ -132,10 +132,10 @@ internal class TorrentPieceStore(
     require(bytes.size == pieceSize(index) && needed(index))
     if (!matches(index, bytes)) return@withLock false
     if (verified[index]) return@withLock true
+    val start = index * metadata.pieceLength
+    val end = start + bytes.size
+    val spans = overlappingFiles(index).filter { it in selected }
     storageOperation {
-      val start = index * metadata.pieceLength
-      val end = start + bytes.size
-      val spans = overlappingFiles(index).filter { it in selected }
       val selectedBytes = spans.sumOf { overlap(start, end, it) }
       if (selectedBytes < bytes.size) {
         ensureDirectory(sidecar)
@@ -150,10 +150,13 @@ internal class TorrentPieceStore(
         write(filePath(fileIndex), overlapStart - offsets[fileIndex],
           bytes.copyOfRange(sourceOffset, sourceOffset + count.toInt()))
       }
-      verified[index] = true
-      remaining--
-      for (file in spans) fileProgress[file] += overlap(start, end, file)
     }
+    // Return through withContext's cancellation boundary before publishing availability. A
+    // canceled provider may still write bytes; a later operation must reverify before adoption.
+    currentCoroutineContext().ensureActive()
+    verified[index] = true
+    remaining--
+    for (file in spans) fileProgress[file] += overlap(start, end, file)
     true
   }
 

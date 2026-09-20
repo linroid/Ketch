@@ -74,3 +74,80 @@ These are metadata consistency checks. Hash strings alone cannot prove that a hy
 matches both formats. The download/storage integration must verify both integrity schemes before
 publishing shared availability or committed progress. Filesystem path mapping and the complete
 v1/v2 runtime input adapter are still required before advertising v2/hybrid download support.
+
+## Payload authentication before commit
+
+`TorrentPayloadVerifier` binds streamed piece bytes to an authenticated `TorrentV2Document` and
+its content layout. Small files use their file root directly. Larger files use the imported,
+authenticated piece-layer hash; short final pieces are expanded with zero-hash subtrees to that
+layer's height. Hybrid pieces must also match their v1 SHA-1 hash, including virtual alignment
+zeros generated in bounded chunks. Callers provide only actual payload bytes.
+
+Construction enforces the current runtime's 16 MiB piece ceiling before allocating a layout or
+hashing virtual bytes. Metainfo parsing retains larger protocol-valid dimensions, but those
+cannot enter runtime verification. This also bounds hybrid padding work for tiny payloads.
+
+Verification retains hashing state rather than a full piece buffer. It rejects excess input,
+allows incomplete input to be completed, and finalizes once. A successful result authorizes no
+progress publication by itself: storage must retain or stage the same bytes, commit them under
+its cancellation/generation barrier, and only then publish availability. That storage adapter,
+network proof acquisition, and v2 interoperability remain pending.
+
+## Versioned output mapping
+
+`TorrentOutputMapping` policy version 1 maps the complete authenticated file tree before file
+selection. Logical IDs remain separate from paths; hybrids keep their original v1 file indices
+and never map padding into output files. Ordinary valid UTF-8 components of at most 240 bytes
+are preserved. Unsafe components, reserved device names, invalid UTF-8, and names containing the
+policy's `%`/`~` markers are encoded byte-for-byte; larger components use a full SHA-256 name.
+
+Sibling names are compared after canonical Unicode normalization and conservative case folding.
+Colliding siblings receive deterministic full-hash suffixes, including directory/file collisions.
+Residual collisions fail rather than alias two destinations. Shared directories are mapped once,
+so changing selections cannot rename their parents. Raw names remain in authenticated metadata.
+The device-name rules follow [Microsoft's naming guidance](https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file).
+
+This computes relative components only. Destination provider capabilities, full-path limits,
+existing files/aliases, symlink and ownership checks, persistent mapping migration, and joining
+under a trusted caller root remain responsibilities of the storage adapter. The mapper does not
+rename existing v1 downloads or authorize overwriting an existing destination.
+
+## Fresh-directory v2 storage adapter
+
+`TorrentV2PieceStore` connects the document, output mapping, layout and dual payload verifier for
+fresh filesystem downloads. Initialization exclusively creates a new caller-named directory;
+an existing destination is rejected, not adopted. Empty selected files are created. Writes target
+only selected logical files, with v2 file-relative offsets and no padding files. A buffer lease
+precedes copying received bytes, and verification and I/O consume that same private copy.
+
+A shared payload-handle permit spans blocking I/O, including cancellation. Files are flushed before
+the operation returns through the coroutine cancellation boundary; only then does the store mark
+the piece committed and increment selected progress under its mutex. Duplicate commits do not
+count twice. Closing joins outstanding operations through that mutex. Live cleanup checks recorded
+OS identities and removes only created files and empty owned directories.
+
+This adapter is not yet installed in the download engine. Session admission must cover its
+metadata, mapping and index state before construction; its payload-copy leases alone do not prove
+the total memory profile. Persistent ownership, checkpoint v2, resume/import/recheck, committed
+read/proof-serving APIs, generation-tagged session integration, and alternate destination providers
+remain pending. Fresh-root ownership is intentionally not inferred from preexisting directories.
+
+## Committed reads and bounded rechecks
+
+The v2 store serves only committed pieces. Each read copies owned-file bytes under a buffer lease
+and authenticates the snapshot before returning it. The consumer retains the lease until closing
+the returned buffer. Changed, truncated or replaced files revoke the affected piece's availability
+and selected progress; foreign replacements are not read or adopted. Cancellation releases the
+read reservation after any active provider operation returns.
+
+Recheck clears prior availability and scans selected owned files with at most 64 KiB of payload
+scratch. It verifies the same v2/hybrid hashes as commit, flushes matching data left by any earlier
+interrupted write, and publishes each piece only after returning through the cancellation boundary.
+A canceled scan can be retried; it never trusts the old committed bitmap. Rechecks do not adopt
+preexisting roots or override ownership changes. Wire proof serving and restart/import integration
+remain separate work.
+
+Recheck scans each non-empty selected file through one handle and flushes once if any pieces
+match. Its bitmap updates remain tentative under the store mutex until that file's flush and
+cancellation boundary succeed. Failure rolls back that file's tentative bits before unlocking;
+previously completed files remain verified. This avoids a durable flush for every small piece.
