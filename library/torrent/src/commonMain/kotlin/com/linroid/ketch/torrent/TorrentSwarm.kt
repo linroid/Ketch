@@ -38,7 +38,9 @@ internal class TorrentSwarm(
   private val onProgress: suspend (Long) -> Unit = {},
   private val onCompleted: suspend () -> Unit = {},
   private val allowLocalDiscovery: Boolean = false,
+  trackerOnly: Boolean = false,
 ) {
+  private val trackerRestricted = store.metadata.isPrivate || trackerOnly
   private val uploadSlots = Semaphore(4)
   private val connectedMutex = Mutex()
   private val connected = mutableMapOf<Int, PeerEndpoint>()
@@ -72,7 +74,7 @@ internal class TorrentSwarm(
     val results = Channel<Pair<PeerEndpoint, Throwable?>>(512)
     val progressEvents = Channel<Unit>(Channel.CONFLATED)
     val pexEvents = Channel<Pair<PeerEndpoint, PexUpdate>>(64)
-    val pexDirectory = TorrentPeerDirectory(store.metadata.isPrivate)
+    val pexDirectory = TorrentPeerDirectory(trackerRestricted)
     val retryAt = mutableMapOf<PeerEndpoint, Long>()
     val now = monotonicClock()
     var discoveryClosed = false
@@ -224,7 +226,7 @@ internal class TorrentSwarm(
         var metadataServed = 0
         var metadataWindow = TimeSource.Monotonic.markNow()
         if (handshake.extensions) {
-          wire.send(PeerExtensions.handshake(store.metadata, pex = !store.metadata.isPrivate))
+          wire.send(PeerExtensions.handshake(store.metadata, pex = !trackerRestricted))
         }
         val state = PeerProtocolState(store.pieceCount, maxPending = 16)
         val advertised = store.verifiedPieces()
@@ -337,8 +339,8 @@ internal class TorrentSwarm(
                       }
                     }
                   } else if (message.id == PeerExtensions.PEX) {
-                    require(!store.metadata.isPrivate) {
-                      "Private torrent peer exchange is forbidden"
+                    require(!trackerRestricted) {
+                      "Tracker-restricted peer exchange is forbidden"
                     }
                     val update = exchange.receive(message.payload)
                     val added = update.added.filter { peer ->
@@ -358,7 +360,7 @@ internal class TorrentSwarm(
               uploadSlot = true
               wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
             }
-            if (!store.metadata.isPrivate && extensions.id("ut_pex") != 0 && exchange.due()) {
+            if (!trackerRestricted && extensions.id("ut_pex") != 0 && exchange.due()) {
               val contacts = connectedMutex.withLock { connected.values.toSet() }
                 .filter { it != connection.remote && (allowLocalDiscovery ||
                   numericAddress(it.host)?.let(::publicTorrentAddress) == true) }.toSet()

@@ -27,6 +27,12 @@ internal interface TorrentEngine {
    */
   suspend fun fetchMetadata(magnetUri: String): TorrentMetadata?
 
+  /** Explicit privacy must be selected before starting magnet discovery. */
+  suspend fun fetchMetadata(magnetUri: String, privacy: TorrentDiscoveryPrivacy): TorrentMetadata? {
+    require(privacy == TorrentDiscoveryPrivacy.PUBLIC) { "Tracker-only resolution is unsupported" }
+    return fetchMetadata(magnetUri)
+  }
+
   /**
    * Adds a torrent for downloading.
    *
@@ -47,10 +53,11 @@ internal interface TorrentEngine {
     resumeData: ByteArray? = null,
   ): TorrentSession
 
-  suspend fun addTask(spec: TorrentTaskSpec): TorrentSession = addTorrent(
-    spec.metadata.infoHash.hex, spec.outputPath, spec.magnetUri, spec.metadata.metainfoBytes,
-    spec.selected, spec.resumeData
-  )
+  suspend fun addTask(spec: TorrentTaskSpec): TorrentSession {
+    require(spec.privacy == TorrentDiscoveryPrivacy.PUBLIC) { "Tracker-only tasks are unsupported" }
+    return addTorrent(spec.metadata.infoHash.hex, spec.outputPath, spec.magnetUri,
+      spec.metadata.metainfoBytes, spec.selected, spec.resumeData)
+  }
 
   /**
    * Removes a torrent from the engine.
@@ -86,4 +93,5 @@ internal data class TorrentTaskSpec(
   val magnetUri: String? = null,
   val resumeData: ByteArray? = null,
   val throttle: suspend (Int) -> Unit = {},
+  val privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
 )

@@ -20,7 +20,12 @@ internal class TorrentMetadataExchange(
     hash: InfoHash,
     endpoint: PeerEndpoint,
     trackerTiers: List<List<String>> = emptyList(),
+    privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
   ): TorrentMetadata = withTimeout(timeoutMs) {
+    require(privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY ||
+      trackerTiers.any { it.isNotEmpty() }) {
+      "Tracker-only metadata requires supplied trackers"
+    }
     var lease: TorrentBufferBudget.Lease? = null
     while (lease == null) {
       lease = budget.reserve(maxBytes * 4 + 256 * 1024)
@@ -81,7 +86,9 @@ internal class TorrentMetadataExchange(
             require(InfoHash.fromBytes(sha1Digest(output)) == hash) { "Metadata hash mismatch" }
             val metainfo = metainfoFromInfo(output, trackerTiers)
             val metadata = TorrentMetadata.fromBencode(metainfo)
-            if (metadata.isPrivate) throw PrivateTorrentMagnetException()
+            if (metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+              throw PrivateTorrentMagnetException()
+            }
             return@withTimeout metadata
           }
         }
@@ -127,4 +134,4 @@ internal fun metainfoFromInfo(info: ByteArray, trackerTiers: List<List<String>>)
 }
 
 internal class PrivateTorrentMagnetException :
-  IllegalArgumentException("Private torrents require a metainfo input")
+  IllegalArgumentException("Private torrents require tracker-only discovery or a metainfo input")

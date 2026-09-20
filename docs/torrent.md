@@ -44,8 +44,9 @@ for private tracker URLs. A supplied HTTP engine remains owned by its caller.
 - Public magnets use BEP 9 metadata exchange, DHT, trackers, and explicit peers. Public swarms
   support peer exchange. Configure `stateDirectory` to persist DHT routing candidates.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
-  and disconnects its old peers before switching. Private magnets are rejected: provide the
-  authenticated `.torrent` file instead. Partial selections do not send a completed announce.
+  and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
+  are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not
+  send a completed announce.
 - Upload defaults to `DISABLED`, preserving the previous `enableUpload = false` behavior.
   `WHILE_DOWNLOADING` exchanges verified pieces during transfer; `SEED_AFTER_COMPLETION` keeps
   the session alive after completion until removed or the source is closed. `enableUpload = true`
@@ -53,6 +54,36 @@ for private tracker URLs. A supplied HTTP engine remains owned by its caller.
 - Task and global download limits share Ketch's limiter with HTTP/FTP. Live connection limits
   close excess peers. `setUploadRateLimit` and `setTaskUploadRateLimit` on the torrent source
   control upload independently; zero means unlimited.
+
+### Choosing discovery privacy
+
+Select privacy before resolving a magnet. Public discovery is the default. To use only the supplied
+trackers for one input, resolve it explicitly and pass that result into the download request:
+
+```kotlin
+val resolved = torrents.resolve(
+  magnetUri,
+  privacy = TorrentDiscoveryPrivacy.TRACKER_ONLY,
+)
+val task = ketch.download(
+  DownloadRequest(
+    url = resolved.url,
+    destination = Destination("/downloads/example"),
+    resolvedSource = resolved,
+  ),
+)
+```
+
+Alternatively, set `TorrentConfig(discoveryPrivacy = TorrentDiscoveryPrivacy.TRACKER_ONLY)` as the
+source default. `resolveMetainfo(bytes, privacy = ...)` accepts the same per-input choice. Tracker-only
+magnets require supplied tracker URLs, ignore explicit peer addresses, and do not use DHT or peer
+exchange, even if the metadata is public. Public discovery performed before this choice cannot be
+undone by a later private flag.
+
+New source resume records retain the chosen privacy independently of later default changes, including
+when metadata must be fetched again. Legacy records without a privacy choice use the configured
+default and record it on their next save. Source-level selection applies to the local backend;
+remote privacy commands and capability negotiation remain on the v2 roadmap.
 
 ## Storage and restart
 
