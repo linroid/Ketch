@@ -79,3 +79,40 @@ internal class TorrentAdmissionLedger(private val budget: TorrentBufferBudget) {
     entries.exchange(null)?.forEach { it.close() }
   }
 }
+
+/** Admit retained full v2 content plus storage/layout indexes before constructing their arrays. */
+internal fun admitV2Session(
+  document: TorrentV2Document,
+  selectedCount: Int,
+  outputLength: Int,
+  config: TorrentConfig,
+  budget: TorrentBufferBudget,
+  checkpoint: TorrentV2Checkpoint? = null,
+): TorrentBufferBudget.Lease {
+  require(document.info.rawInfo.size <= config.maxMetadataBytes) { "Torrent info limit exceeded" }
+  require(outputLength >= 0)
+  require(document.info.files.size <= config.maxFilesPerTorrent &&
+    selectedCount in 0..config.maxFilesPerTorrent) { "Torrent file limit exceeded" }
+  require(document.info.pieceLength <= 16 * 1024 * 1024) { "Torrent piece length limit exceeded" }
+  var pieces = 0L
+  for (file in document.info.files) {
+    val count = file.length / document.info.pieceLength +
+      if (file.length % document.info.pieceLength == 0L) 0 else 1
+    require(count <= config.maxPiecesPerTorrent - pieces) { "Torrent piece limit exceeded" }
+    pieces += count
+  }
+  val recoveryBytes = checkpoint?.let { saved ->
+    4096L + saved.output.length * 4L + saved.verifiedHint.size * 2L +
+      saved.selected.sumOf { it.length * 4L + 128 } +
+      saved.owned.sumOf { claim ->
+        512L + claim.identity.length * 4L +
+          claim.components.sumOf { it.length * 4L + 128 }
+      }
+  } ?: 0L
+  val bytes = recoveryBytes + document.info.rawInfo.size * 4L +
+    document.pieceLayers.values.sumOf { it.size * 2L + 128 } +
+    document.info.files.sumOf { file -> 2048L + file.path.sumOf { it.size * 8L + 128 } } +
+    pieces * 128 + selectedCount * 128L + outputLength * 4L + 256 * 1024
+  check(bytes <= budget.capacity) { "Torrent session state exceeds admission capacity" }
+  return checkNotNull(budget.reserve(bytes.toInt())) { "Torrent session state budget exhausted" }
+}

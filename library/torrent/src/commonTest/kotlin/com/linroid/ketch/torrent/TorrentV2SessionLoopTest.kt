@@ -7,6 +7,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -127,6 +128,47 @@ class TorrentV2SessionLoopTest {
       assertEquals(0, buffers.allocated)
       assertEquals(0, state.allocated)
     }
+  }
+
+  @Test
+  fun rateLimitedRequestsKeepReceivingAndHonorLiveGlobalAndTaskChanges() = runTest {
+    val f = Fixture(setOf("0"))
+    val clock = { testScheduler.currentTime }
+    val global = TorrentRateLimiter(1, clock)
+    val task = TorrentRateLimiter(1, clock)
+    try {
+      f.store.initialize()
+      val download = async {
+        PeerV2Pool.run(f.state, maxPeers = 1) { pool ->
+          f.attach(pool, clock)
+          TorrentV2CommitWorker.run(f.store, dispatcher = StandardTestDispatcher(testScheduler)) {
+            TorrentV2SessionLoop.download(layout, setOf("0"), f.store, pool, it,
+              f.buffers, f.state, maxPeers = 1,
+              requestDelay = { bytes, admit -> global.requestDelay(bytes, task, admit) },
+              nowMs = clock)
+          }
+        }
+      }
+      try {
+        runCurrent()
+        assertEquals(1, f.connections.single().requests.size)
+        advanceTimeBy(1000)
+        runCurrent()
+        assertFalse(download.isCompleted)
+        assertEquals(1, f.connections.single().requests.size)
+        global.set(0)
+        advanceTimeBy(50)
+        runCurrent()
+        assertEquals(1, f.connections.single().requests.size)
+        task.set(0)
+        advanceTimeBy(50)
+        runCurrent()
+        download.await()
+      } finally { download.cancelAndJoin() }
+      assertTrue(f.store.completed())
+      assertEquals(2, f.connections.single().requests.size)
+      f.checkReleased()
+    } finally { f.store.cleanup() }
   }
 
   @Test
