@@ -1,7 +1,12 @@
-# Pure Kotlin torrent implementation status
+# Pure Kotlin torrent v1 implementation history
 
-Approved scope: [roadmap](pure-kotlin-torrent-roadmap.md). Implementation checkout:
-`/private/tmp/ketch-torrent-stack`; the original checkout is preserved.
+The v1 implementation landed through #147–#161, ending at `06e8e2cb`.
+The table and validation notes below preserve the pre-merge review history; draft and pending-CI
+labels describe that historical snapshot. The temporary implementation checkout is no longer
+the current baseline. See [v2 progress](pure-kotlin-torrent-v2-progress.md) for the merged
+#231–#238/#240 milestone and remaining production roadmap.
+
+Historical approved scope: [v1 roadmap](pure-kotlin-torrent-roadmap.md).
 
 | Layer | PR | Status |
 | --- | --- | --- |
@@ -20,7 +25,7 @@ Approved scope: [roadmap](pure-kotlin-torrent-roadmap.md). Implementation checko
 | 13 Kotlin runtime and product integration | https://github.com/linroid/Ketch/pull/160 | Kotlin default on JVM/Android/iOS; CLI download/daemon registration; public-source selected boundary transfer and offline recovery, incoming seeding, connection reduction, and final checkpoint handoff |
 | 14 Hardening and native removal | https://github.com/linroid/Ketch/pull/161 | Native product engine removed; independent clients, verified remote control, JVM/Android/iOS suites, secure filesystem adapters, resource measurements and product package checks passed locally; expanded CI runs on this draft |
 
-No PR has been merged. Product torrent engines are Kotlin on JVM, Android and iOS. Libtorrent is
+Product torrent engines are Kotlin on JVM, Android and iOS. Libtorrent is
 retained only as a test fixture. JVM JNA calls provide OS filesystem services.
 
 Implementation notes:
