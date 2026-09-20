@@ -5,11 +5,39 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TorrentRateLimiterTest {
-  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun rejectedQueueAndBlockedBucketDoNotConsumeTheOtherBucket() = runTest {
+    val global = TorrentRateLimiter(1) { testScheduler.currentTime }
+    val task = TorrentRateLimiter(1) { testScheduler.currentTime }
+    assertEquals(0L, global.requestDelay(16_384, task) { false })
+    assertEquals(0L, global.requestDelay(16_384, task))
+    val freshTask = TorrentRateLimiter(1) { testScheduler.currentTime }
+    assertEquals(50L, global.requestDelay(16_384, freshTask))
+    val freshGlobal = TorrentRateLimiter(1) { testScheduler.currentTime }
+    assertEquals(50L, freshGlobal.requestDelay(16_384, task))
+    assertEquals(0L, freshGlobal.requestDelay(16_384, freshTask))
+  }
+
+  @Test
+  fun requestRetryDelayTracksRateWithoutAnArtificialPollingThroughputCeiling() = runTest {
+    val global = TorrentRateLimiter(1024 * 1024) { testScheduler.currentTime }
+    val task = TorrentRateLimiter() { testScheduler.currentTime }
+    assertEquals(0L, global.requestDelay(16_384, task))
+    assertEquals(16L, global.requestDelay(16_384, task))
+    advanceTimeBy(16)
+    assertEquals(0L, global.requestDelay(16_384, task))
+    global.set(1)
+    assertEquals(50L, global.requestDelay(16_384, task))
+    global.set(0)
+    assertEquals(0L, global.requestDelay(16_384, task))
+  }
+
   @Test
   fun limit_enforcesSustainedRateAndRemovingLimitUnblocksWaiters() = runTest {
     val limiter = TorrentRateLimiter(1024) { testScheduler.currentTime }

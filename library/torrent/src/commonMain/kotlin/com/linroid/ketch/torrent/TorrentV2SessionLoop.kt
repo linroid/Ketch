@@ -15,6 +15,7 @@ internal object TorrentV2SessionLoop {
     var interestPending = false
     var inFlight = 0
     var admissionBlocked = false
+    var rateRetryAt = 0L
   }
 
   private sealed interface Event {
@@ -43,6 +44,9 @@ internal object TorrentV2SessionLoop {
     maxActive: Int = 2,
     pipeline: Int = 32,
     connections: ReceiveChannel<PeerV2Connector.Connected>? = null,
+    onProgress: suspend () -> Unit = {},
+    requestDelay: suspend (Int, () -> Boolean) -> Long = { _, admit -> admit(); 0 },
+    nowMs: () -> Long = monotonicClock(),
   ) {
     require(maxPeers in 1..500 && pipeline in 1..256)
     val lease = checkNotNull(state.reserve(maxPeers * 512 + 1024)) {
@@ -61,10 +65,11 @@ internal object TorrentV2SessionLoop {
 
       fun wakeAdmission() { peers.values.forEach { it.admissionBlocked = false } }
 
-      fun pump() {
+      suspend fun pump() {
         pieces.submitReady(worker)
         for ((peer, view) in peers) {
-          if (view.admissionBlocked) continue
+          if (view.rateRetryAt <= nowMs()) view.rateRetryAt = 0
+          if (view.admissionBlocked || view.rateRetryAt != 0L) continue
           val interested = view.needed > 0
           if (interested != view.interested && !view.interestPending) {
             if (view.commands.trySend(PeerV2DownloadActor.Command.Interest(interested)).isSuccess) {
@@ -82,10 +87,20 @@ internal object TorrentV2SessionLoop {
             }
           }
           if (plan != null) {
-            if (view.commands.trySend(PeerV2DownloadActor.Command.Request(plan)).isSuccess) {
+            var sent = false
+            val request = plan
+            val delay = requestDelay(request.request.length) {
+              view.commands.trySend(PeerV2DownloadActor.Command.Request(request)).isSuccess
+                .also { sent = it }
+            }
+            require(delay in 0..50 && (delay == 0L || !sent)) { "Invalid request rate delay" }
+            if (delay > 0) {
+              check(pieces.resolve(request, null))
+              view.rateRetryAt = nowMs() + delay
+            } else if (sent) {
               view.inFlight++
             } else {
-              check(pieces.resolve(plan, null))
+              check(pieces.resolve(request, null))
               view.admissionBlocked = true
             }
           }
@@ -140,6 +155,7 @@ internal object TorrentV2SessionLoop {
         }
       }
 
+      onProgress()
       var preference = 0
       var acceptingConnections = connections != null
       while (!pieces.completed()) {
@@ -157,8 +173,12 @@ internal object TorrentV2SessionLoop {
               }
             }
           }
-          // Only admission pressure enables a retry timer; healthy idle peers do not poll.
-          if (peers.values.any { it.admissionBlocked }) onTimeout(250) { Event.Retry }
+          // Retry only blocked work; healthy idle peers do not poll.
+          val memoryDelay = if (peers.values.any { it.admissionBlocked }) 250L else null
+          val rateDelay = peers.values.filter { it.rateRetryAt != 0L }
+            .minOfOrNull { (it.rateRetryAt - nowMs()).coerceAtLeast(1) }
+          val retryDelay = listOfNotNull(memoryDelay, rateDelay).minOrNull()
+          if (retryDelay != null) onTimeout(retryDelay) { Event.Retry }
         }
         preference = (preference + 1) % 3
         when (event) {
@@ -181,6 +201,7 @@ internal object TorrentV2SessionLoop {
                 view.needed--
               }
             }
+            onProgress()
             wakeAdmission()
           }
           is Event.Retry -> wakeAdmission()

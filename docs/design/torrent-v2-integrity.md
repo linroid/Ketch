@@ -1064,3 +1064,85 @@ The metadata exchange partition has a minimum of `TRACKER_SCRAPE_WORKSPACE_BYTES
 of the accepted metainfo-size limit. Small valid metainfo limits therefore retain scrape capability.
 Configuration validation includes this floor in the aggregate exchange ceiling; an explicitly
 undersized aggregate budget fails at construction instead of silently disabling every scrape.
+
+## V2 download lifecycle ownership
+
+`TorrentV2DownloadSession` composes the verified full-metainfo pipeline under one scoped owner.
+Resume initializes/rechecks owned storage before discovery and resets published verification
+progress during checking. Each run owns the endpoint producer, bounded dialer, peer pool, and
+commit worker; terminal completion is published only after those scopes finish cleanup.
+
+Pause joins the active run, including discovery and provider writes, before acknowledging the
+paused state. Owner exit also joins the lifetime and closes storage before returning admission.
+Ordinary failures publish a stopped state and can be retried; immediate retries join the prior
+terminal job. Metadata identity and normalized selection must match the store before any I/O.
+Progress notifications use committed/rechecked storage bytes, not bytes received from peers.
+
+Real TCP coverage downloads a v2 file, alters its payload while paused, and verifies that resume
+rechecks and repairs it before reporting completion. Additional tests cover delayed discovery
+cleanup, repeated failure/retry, store-selection rejection before filesystem creation, and owner
+shutdown admission ordering. Both TCP endpoints are Ketch fixtures, not independent v2 interop.
+
+The engine must still admit document/layout/store indexes before constructing this owner and keep
+that admission until it returns. Engine registration, full-identity incoming routing, public source
+v2 resolution, checkpoints/TaskStore wiring, rate controls, seeding, and tracker/public discovery
+integration remain required follow-up work. This owner does not advertise public v2 support.
+
+Lifecycle admission also compares the complete layout to storage's canonical hybrid-aware layout:
+file IDs/indices, offsets and lengths, piece length, and protocol/payload totals. Matching only the
+full info hash is insufficient because omitting hybrid mapping changes IDs after padding entries.
+A regression now rejects that mismatch before I/O while accepting the canonical selected-file ID.
+
+## Engine-owned v2 download lifetimes
+
+`KotlinTorrentEngine.withV2Download` runs the full-metainfo lifecycle as an engine-owned child.
+The engine admits retained content and storage/layout indexes before construction, enforces the
+configured file/piece/info limits, and uses its shared connection, transfer, session, and payload
+handle pools. Caller cancellation joins the owned child; engine shutdown cancels and joins it
+before the registered metadata admission is released. No output files are deleted by owner exit.
+
+V1 and v2 registrations share the active-task ceiling and canonical output-overlap checks. Full
+v2 hashes identify registrations; a hybrid's v1 identity cannot also own a legacy session, in
+either registration order. Legacy removal cannot release a live v2 output claim. Failed admission
+or registration returns its memory and leaves no output ownership behind. Hybrid layouts are
+constructed with their authenticated v1 padding/index mapping, including selected files after gaps.
+
+The scoped engine path takes policy-authorized endpoints from its caller. Tracker/DHT integration,
+incoming full-identity routing, source/SDK v2 resolution, checkpoint/TaskStore restore, rate controls,
+and seeding remain pending. It is not advertised by the public engine/source API. Real TCP tests
+exercise both a pure v2 file and a hybrid selected file after padding; both peers are Ketch fixtures.
+
+Engine shutdown uses one shared cleanup operation outside the engine job tree. Calls from an
+engine-owned callback request that operation without joining their own ancestor; external callers
+await the same operation as the full cleanup barrier. Concurrent close/stop calls cannot create
+multiple cleanup owners, and start rejects a runtime whose shutdown has been requested. Callback
+regressions cover both the scoped v2 body and its discovery producer, followed by an external
+stop that proves all registration admission has returned.
+
+## V2 runtime capability integration (in progress)
+
+Future changes are grouped around a usable v2 runtime capability instead of one PR per helper.
+The local integration branch now applies global and task download budgets before submitting block
+requests. Admission checks both buckets atomically; a blocked bucket or rejected command queue
+consumes neither. Rate waits do not block peer readers or the session's event handling. Retry
+delays follow available credit and are capped at 50 ms to observe live limit changes.
+
+Rate accounting covers requested payload, including requests that are sent but later fail; protocol
+overhead is separate. The existing 16 KiB burst remains. Real TCP and scheduler tests verify that
+global and task limits both apply and can be removed while downloading, plus transactional queue
+rejection and retry delays that do not impose a fixed polling throughput ceiling. Broader v2
+discovery, recovery, source/API integration and production gates still need work before this
+capability branch is ready for a PR.
+
+The scoped runtime also accepts a previously decoded v2 checkpoint. Engine admission includes its
+retained ownership records, path strings and hint bitmap before store construction. Session setup
+validates and adopts ownership before exposing the owner; failure closes the store and releases
+registration and memory. The first resume rehashes actual payloads before reporting progress or
+completion. Later resumes recheck again without reapplying the initial snapshot. A checkpoint
+cannot authorize replacement files or a different task, selection, content identity or destination.
+
+Recovery tests persist and reload the checkpoint and authenticated catalog, then enter the engine
+with fresh storage ownership. They cover completion without discovery, payload modification while
+paused, invalid task binding and admission cleanup. Decoding/catalog I/O are still caller-owned;
+this entry point does not yet bound their transient allocations or schedule automatic checkpoints.
+TaskStore/source wiring and durable checkpoint publication remain part of the pending integration.

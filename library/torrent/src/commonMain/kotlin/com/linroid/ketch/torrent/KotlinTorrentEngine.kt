@@ -4,12 +4,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.coroutineScope
@@ -26,7 +28,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.FileSystem
+import okio.Path
+import okio.ByteString.Companion.toByteString
 import okio.Path.Companion.toPath
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -41,7 +48,13 @@ internal class KotlinTorrentEngine(
   private val discoveryIntervalMs: Long = 30_000,
   private val nowMs: () -> Long = monotonicClock(),
 ) : TorrentEngine {
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+  private class RuntimeContext : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<RuntimeContext>
+  }
+
+  private val runtimeContext = RuntimeContext()
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + runtimeContext)
+  private val shutdown = AtomicReference<Deferred<Unit>?>(null)
   private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
   private val exchangeBudgets = TorrentExchangeBudgets(config)
   private val budget = exchangeBudgets.transfer
@@ -55,6 +68,7 @@ internal class KotlinTorrentEngine(
   private val mutex = Mutex()
   private val dhtMutex = Mutex()
   private val sessions = mutableMapOf<String, KotlinTorrentSession>()
+  private val v2Identities = mutableMapOf<String, TorrentIdentity>()
   private val outputs = mutableMapOf<String, String>()
   private val sessionLeases = mutableMapOf<String, TorrentBufferBudget.Lease>()
   private val running = AtomicBoolean(false)
@@ -71,7 +85,7 @@ internal class KotlinTorrentEngine(
   }
 
   override suspend fun start() = mutex.withLock {
-    check(!closed) { "Torrent runtime is closed" }
+    check(!closed && shutdown.load() == null) { "Torrent runtime is closed" }
     if (running.load()) return@withLock
     val listener = network.listen(PeerEndpoint("0.0.0.0", config.listenPort))
     port = listener.local.port
@@ -121,14 +135,31 @@ internal class KotlinTorrentEngine(
     } finally { listener.close() }
   }
 
-  override fun close() {
-    running.store(false)
-    scope.cancel()
-    network.close()
-    http.close()
+  override fun close() { requestShutdown() }
+
+  /** Internal callbacks request shutdown; external callers await the complete cleanup barrier. */
+  override suspend fun stop() {
+    val pending = requestShutdown()
+    if (currentCoroutineContext()[RuntimeContext] === runtimeContext) return
+    withContext(NonCancellable) { pending.await() }
   }
 
-  override suspend fun stop() {
+  private fun requestShutdown(): Deferred<Unit> {
+    shutdown.load()?.let { return it }
+    // This job cannot be a descendant of the engine it must cancel and join.
+    val candidate = CoroutineScope(Dispatchers.Default).async(start = CoroutineStart.LAZY) {
+      stopRuntime()
+    }
+    if (shutdown.compareAndSet(null, candidate)) {
+      running.store(false)
+      candidate.start()
+      return candidate
+    }
+    candidate.cancel()
+    return checkNotNull(shutdown.load())
+  }
+
+  private suspend fun stopRuntime() {
     val active = mutex.withLock {
       if (closed) return
       closed = true
@@ -298,9 +329,13 @@ internal class KotlinTorrentEngine(
 
   override suspend fun addTask(spec: TorrentTaskSpec): KotlinTorrentSession = mutex.withLock {
     check(isRunning && !closed)
-    check(sessions.size < config.maxActiveTorrents) { "Too many active torrents" }
+    check(sessions.size + v2Identities.size < config.maxActiveTorrents) {
+      "Too many active torrents"
+    }
     val hash = spec.metadata.infoHash.hex
-    check(hash !in sessions) { "Torrent already has an active owner" }
+    check(hash !in sessions && v2Identities.values.none { it.v1 == spec.metadata.infoHash }) {
+      "Torrent already has an active owner"
+    }
     val lease = admissions.admit(spec, config)
     try {
       val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
@@ -308,13 +343,7 @@ internal class KotlinTorrentEngine(
       val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId,
         storageSlots = storageSlots)
       val output = store.outputPath.toPath()
-      check(outputs.values.none { previous ->
-        val path = previous.toPath()
-        val left = path.segments.map { canonicalTorrentName(it).lowercase() }
-        val right = output.segments.map { canonicalTorrentName(it).lowercase() }
-        path.root.toString().equals(output.root.toString(), ignoreCase = true) &&
-          (left.take(right.size) == right || right.take(left.size) == left)
-      }) { "Torrent output overlaps another task" }
+      requireAvailableOutput(output)
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
       val trackerState = TorrentBufferBudget(
         maxOf(1, trackerControlStateWeight().toInt()))
@@ -337,6 +366,79 @@ internal class KotlinTorrentEngine(
       sessionLeases.remove(hash)
       admissions.release(lease)
       throw failure
+    }
+  }
+
+  private fun requireAvailableOutput(output: Path) {
+    check(outputs.values.none { previous ->
+      val path = previous.toPath()
+      val left = path.segments.map { canonicalTorrentName(it).lowercase() }
+      val right = output.segments.map { canonicalTorrentName(it).lowercase() }
+      path.root.toString().equals(output.root.toString(), ignoreCase = true) &&
+        (left.take(right.size) == right || right.take(left.size) == left)
+    }) { "Torrent output overlaps another task" }
+  }
+
+  /**
+   * Scoped full-metainfo download integration. The caller supplies policy-authorized endpoints;
+   * this path does not yet register incoming v2 routes, resolve magnets, or seed after completion.
+   * Retained metadata/storage indexes are admitted before storage construction or file I/O.
+   * The caller owns checkpoint decoding admission; retained recovery records are admitted here.
+   * Recovery validates ownership before exposing the session and rechecks payloads on resume.
+   */
+  suspend fun <T> withV2Download(
+    taskId: String,
+    document: TorrentV2Document,
+    outputPath: String,
+    selected: Set<String> = emptySet(),
+    checkpoint: TorrentV2Checkpoint? = null,
+    discover: suspend (SendChannel<PeerEndpoint>) -> Unit,
+    body: suspend (TorrentV2DownloadSession) -> T,
+  ): T {
+    val pending = scope.async {
+      val hash = document.info.hash.hex
+      var lease: TorrentBufferBudget.Lease? = null
+      var registered = false
+      try {
+        val prepared = mutex.withLock {
+          check(isRunning && !closed) { "Torrent runtime is closed" }
+          check(sessions.size + v2Identities.size < config.maxActiveTorrents) {
+            "Too many active torrents"
+          }
+          check(hash !in v2Identities &&
+            (document.identity.v1?.hex !in sessions) &&
+            v2Identities.values.none { identity ->
+              identity.v1 != null && identity.v1 == document.identity.v1
+            }) { "Torrent already has an active owner" }
+          lease = admitV2Session(document, selected.size, outputPath.length, config,
+            exchangeBudgets.sessions, checkpoint)
+          val selection = selected.toSet()
+          val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
+            .resolve(outputPath).normalized()
+          val parent = checkNotNull(requested.parent) { "Output root must have a parent" }
+          val output = FileSystem.SYSTEM.canonicalize(parent) / requested.name
+          requireAvailableOutput(output)
+          val layout = TorrentContentLayout.from(document.info, document.hybrid)
+          val store = TorrentV2PieceStore(document, output, selection, taskId, budget, storageSlots)
+          v2Identities[hash] = document.identity
+          outputs[hash] = output.toString()
+          registered = true
+          Triple(layout, store, selection)
+        }
+        TorrentV2DownloadSession.run(document, prepared.first, prepared.third, prepared.second,
+          network, peerId.toByteString(), budget, exchangeBudgets.sessions,
+          maxPeers = minOf(config.connectionsPerTorrent, 500),
+          globalRate = downloadRate, checkpoint = checkpoint, discover = discover, body = body)
+      } finally {
+        withContext(NonCancellable) {
+          try {
+            if (registered) mutex.withLock { v2Identities.remove(hash); outputs.remove(hash) }
+          } finally { lease?.close() }
+        }
+      }
+    }
+    try { return pending.await() } finally {
+      withContext(NonCancellable) { pending.cancelAndJoin() }
     }
   }
 
@@ -455,7 +557,8 @@ internal class KotlinTorrentEngine(
 
   override suspend fun removeTorrent(infoHash: String, deleteFiles: Boolean) {
     mutex.withLock {
-      sessions[infoHash]?.close(deleteFiles)
+      val session = sessions[infoHash] ?: return@withLock
+      session.close(deleteFiles)
       sessions.remove(infoHash)
       outputs.remove(infoHash)
       sessionLeases.remove(infoHash)?.let(admissions::release)
