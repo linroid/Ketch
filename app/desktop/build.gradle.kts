@@ -30,6 +30,7 @@ compose.desktop {
     buildTypes.release.proguard {
       configurationFiles.from(
         rootDir.resolve("app/proguard-rules.pro"),
+        project.file("proguard-rules.pro"),
         project(":library:api").file("consumer-rules.pro"),
         project(":library:core").file("consumer-rules.pro"),
         project(":library:ftp").file("consumer-rules.pro"),

@@ -392,44 +392,51 @@ internal class TrackerTiers(
           beforeSwitch()
           oldPeersClosed = true
         }
-        val previous = statuses.getValue(url)
-        updateStatus(url, previous.copy(outcome = TrackerStatus.Outcome.ANNOUNCING,
-          attempts = previous.attempts + 1))
-        try {
-          val result = announce(url, request, ids[url])
-          result.trackerId?.let { ids[url] = it }
-          val original = tiers.first { url in it }
-          original.remove(url)
-          original.add(0, url)
-          current = url
-          oldPeersClosed = false
-          updateStatus(url, statuses.getValue(url).copy(
-            outcome = TrackerStatus.Outcome.SUCCEEDED,
-            consecutiveFailures = 0,
-            lastPeerCount = result.peers.size,
-            lastIntervalSeconds = result.intervalSeconds,
-            lastMinimumIntervalSeconds = result.minimumIntervalSeconds,
-          ))
-          return result.copy(source = url)
-        } catch (_: TrackerTimeoutException) {
-          currentCoroutineContext().ensureActive()
-          failed(url, TrackerStatus.Outcome.TIMED_OUT)
-        } catch (_: TimeoutCancellationException) {
-          currentCoroutineContext().ensureActive()
-          failed(url, TrackerStatus.Outcome.TIMED_OUT)
-        } catch (e: CancellationException) {
-          throw e
-        } catch (_: Exception) {
-          currentCoroutineContext().ensureActive()
-          failed(url, TrackerStatus.Outcome.FAILED)
-        } finally {
-          val latest = statuses.getValue(url)
-          if (latest.outcome == TrackerStatus.Outcome.ANNOUNCING) {
-            updateStatus(url, latest.copy(outcome = TrackerStatus.Outcome.CANCELED))
-          }
-        }
+        announceCandidate(url, request)?.let { return it }
       }
     }
     error("No tracker responded")
+  }
+
+  // Keep the suspending attempt outside the nested tier loops. Combining their back edges with
+  // catch/finally produces an irreducible coroutine graph that GraalVM 21 cannot compile.
+  private suspend fun announceCandidate(url: String, request: TrackerAnnounce): TrackerResponse? {
+    val previous = statuses.getValue(url)
+    updateStatus(url, previous.copy(outcome = TrackerStatus.Outcome.ANNOUNCING,
+      attempts = previous.attempts + 1))
+    try {
+      val result = announce(url, request, ids[url])
+      result.trackerId?.let { ids[url] = it }
+      val original = tiers.first { url in it }
+      original.remove(url)
+      original.add(0, url)
+      current = url
+      oldPeersClosed = false
+      updateStatus(url, statuses.getValue(url).copy(
+        outcome = TrackerStatus.Outcome.SUCCEEDED,
+        consecutiveFailures = 0,
+        lastPeerCount = result.peers.size,
+        lastIntervalSeconds = result.intervalSeconds,
+        lastMinimumIntervalSeconds = result.minimumIntervalSeconds,
+      ))
+      return result.copy(source = url)
+    } catch (_: TrackerTimeoutException) {
+      currentCoroutineContext().ensureActive()
+      failed(url, TrackerStatus.Outcome.TIMED_OUT)
+    } catch (_: TimeoutCancellationException) {
+      currentCoroutineContext().ensureActive()
+      failed(url, TrackerStatus.Outcome.TIMED_OUT)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (_: Exception) {
+      currentCoroutineContext().ensureActive()
+      failed(url, TrackerStatus.Outcome.FAILED)
+    } finally {
+      val latest = statuses.getValue(url)
+      if (latest.outcome == TrackerStatus.Outcome.ANNOUNCING) {
+        updateStatus(url, latest.copy(outcome = TrackerStatus.Outcome.CANCELED))
+      }
+    }
+    return null
   }
 }
