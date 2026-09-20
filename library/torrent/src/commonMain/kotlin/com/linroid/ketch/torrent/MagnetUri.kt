@@ -5,23 +5,40 @@ import okio.Buffer
 /**
  * Parsed magnet URI containing torrent identification and metadata.
  *
- * Format: `magnet:?xt=urn:btih:<hash>&dn=<name>&tr=<tracker>`
+ * Supports v1 btih, full SHA-256 btmh, and paired hybrid exact topics.
  *
- * @property infoHash 20-byte SHA-1 info hash
+ * @property identity all supplied exact topics, retaining the full v2 digest
  * @property displayName optional human-readable name (`dn` parameter)
  * @property trackers list of tracker announce URLs (`tr` parameters)
  */
 internal data class MagnetUri(
-  val infoHash: InfoHash,
+  val identity: TorrentIdentity,
   val displayName: String? = null,
   val trackers: List<String> = emptyList(),
   val explicitPeers: List<String> = emptyList(),
 ) {
 
+  constructor(
+    infoHash: InfoHash,
+    displayName: String? = null,
+    trackers: List<String> = emptyList(),
+    explicitPeers: List<String> = emptyList(),
+  ) : this(TorrentIdentity(v1 = infoHash), displayName, trackers, explicitPeers)
+
+  /** Transitional v1 runtime guard: never silently discard a supplied v2 exact topic. */
+  val infoHash: InfoHash get() {
+    require(identity.v2 == null) { "V2 metadata and wire integration is not yet available" }
+    return requireNotNull(identity.v1)
+  }
+
   /** Reconstructs the magnet URI string. */
   fun toUri(): String = buildString {
-    append("magnet:?xt=urn:btih:")
-    append(infoHash.hex)
+    append("magnet:?")
+    val topics = buildList {
+      identity.v1?.let { add("xt=urn:btih:${it.hex}") }
+      identity.v2?.let { add("xt=urn:btmh:${it.multihash()}") }
+    }
+    append(topics.joinToString("&"))
     if (displayName != null) {
       append("&dn=")
       append(urlEncode(displayName))
@@ -38,7 +55,7 @@ internal data class MagnetUri(
      * Parses a magnet URI string.
      *
      * @throws IllegalArgumentException if the URI is malformed or
-     *   missing the `xt=urn:btih:` parameter
+     *   missing a supported torrent exact topic
      */
     fun parse(uri: String): MagnetUri {
       require(uri.lowercase().startsWith("magnet:?")) {
@@ -49,6 +66,7 @@ internal data class MagnetUri(
       val params = query.split('&')
 
       var infoHash: InfoHash? = null
+      var v2Hash: V2InfoHash? = null
       var displayName: String? = null
       val trackers = mutableListOf<String>()
       val peers = mutableListOf<String>()
@@ -61,7 +79,11 @@ internal data class MagnetUri(
           "xt" -> {
             val decoded = urlDecode(value)
             val lower = decoded.lowercase()
-            require(!lower.startsWith("urn:btmh:")) { "BitTorrent v2/hybrid unsupported" }
+            if (lower.startsWith("urn:btmh:")) {
+              val candidate = V2InfoHash.fromMultihash(decoded.substring(9))
+              require(v2Hash == null || v2Hash == candidate) { "Conflicting v2 info hashes" }
+              v2Hash = candidate
+            }
             if (lower.startsWith("urn:btih:")) {
               val candidate = parseInfoHash(decoded.substring(9))
               require(infoHash == null || infoHash == candidate) { "Conflicting info hashes" }
@@ -75,12 +97,12 @@ internal data class MagnetUri(
       }
 
       require(trackers.size <= 128 && peers.size <= 128) { "Too many magnet endpoints" }
-      requireNotNull(infoHash) {
-        "Magnet URI missing xt=urn:btih: parameter"
+      require(infoHash != null || v2Hash != null) {
+        "Magnet URI missing a supported torrent exact topic"
       }
 
       return MagnetUri(
-        infoHash = infoHash,
+        identity = TorrentIdentity(infoHash, v2Hash),
         displayName = displayName,
         trackers = trackers.distinct(),
         explicitPeers = peers.distinct(),
