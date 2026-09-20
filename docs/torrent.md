@@ -106,6 +106,11 @@ need their original `.torrent` input again; cleanup preserves data it cannot pro
 
 ## Implementation boundary and limits
 
+The public v2/hybrid download-and-restart milestone landed in
+[PR #240](https://github.com/linroid/Ketch/pull/240), following #231–#238.
+The broader [production v2 roadmap](https://github.com/linroid/Ketch/issues/162) remains open;
+the supported download workflow below is not a complete downloader/seeder release claim.
+
 All torrent parsing, SHA-1, wire protocol, trackers, DHT, scheduling and storage coordination are
 Kotlin. Product artifacts contain no libtorrent engine or torrent JNI bindings. JVM filesystem
 adapters use JNA for OS directory/handle operations; Android and iOS call platform filesystem APIs.
@@ -130,4 +135,4 @@ management UI. No automatic incoming-port mapping is performed. Bounds include 4
 or large pieces increases process memory beyond the piece-buffer budget.
 
 See [verification and measurements](development/torrent-verification.md) and the
-[stacked implementation roadmap](plans/pure-kotlin-torrent-progress.md).
+[current implementation progress](plans/pure-kotlin-torrent-v2-progress.md).

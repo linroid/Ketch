@@ -1,6 +1,9 @@
 # Torrent verification
 
-The implementation is delivered as the [14-layer review stack](../plans/pure-kotlin-torrent-progress.md).
+The v1 implementation landed as the [14-layer stack](../plans/pure-kotlin-torrent-progress.md).
+The merged v2 foundation and public download/restart workflow are tracked in
+[v2 progress](../plans/pure-kotlin-torrent-v2-progress.md). Historical measurements below are
+revision-specific; they do not establish production v2 release qualification.
 Fixtures use deterministic local payloads and isolated temporary directories. Interoperability clients
 are test-only dependencies; normal builds neither start an external downloader nor load libtorrent.
 
@@ -27,6 +30,25 @@ an AGP connected-test task can otherwise succeed without running instrumentation
 
 ## Public v2/hybrid workflow
 
+### Recorded evidence for merged PR #240 (2026-09-20)
+
+[PR #240](https://github.com/linroid/Ketch/pull/240) landed at
+`e822e8bd0383e008486ca5a3384181eaaba9a1a7`, following consolidated #231–#238.
+Its recorded local suites passed with zero failures:
+
+| Suite | JVM | Executed iOS simulator | Android host |
+| --- | ---: | ---: | ---: |
+| Torrent | 635 | 613 | 612 |
+| Core | 203 | 200 | 200 |
+
+The no-native-runtime guard also passed. The
+[final-head update](https://github.com/linroid/Ketch/issues/162#issuecomment-5748957160)
+records green required CI at `de5623c5`, including JVM, iOS, Android host/device, JavaScript,
+macOS/Windows filesystem coverage and the aggregate gate. These are results recorded for
+that reviewed head, not newly executed tests or evidence for uncommitted follow-up changes.
+
+### Coverage and open gates
+
 `TorrentPublicV2WorkflowTest` drives the public Ketch/source APIs against a local wire fixture.
 It covers metainfo and tracker-only magnets, external piece-layer authentication, hybrid IDs across
 padding, selective output, live limits, pause, source recreation from serialized task records,
@@ -37,6 +59,12 @@ corrupt proofs, and source shutdown during metadata resolution. The tests execut
 layers, and downloads exact payload through Ketch from the pinned test-only libtorrent peer.
 These are download interoperability checks, not evidence for v2 upload, inbound routing, hybrid
 v1-only swarms, a second independent v2 implementation, or the remaining production release gates.
+
+The full [roadmap #162](https://github.com/linroid/Ketch/issues/162) still requires bidirectional
+two-engine format interoperability, shaped-network/NAT/proxy fixtures, production resource and
+performance acceptance, physical mobile devices, migration/package qualification and a 72-hour
+soak. Passing the download/restart suites does not complete these gates. The older v1 performance
+and package measurements below remain historical evidence only.
 
 ## Review regression evidence (2026-09-08)
 

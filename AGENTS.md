@@ -160,10 +160,13 @@ cli/          # JVM CLI entry point
 - Platforms: Android, JVM, iOS (no WasmJs — requires raw TCP sockets)
 
 ### BitTorrent/Magnet Support (`library:torrent`)
-- Pure Kotlin BitTorrent v1 engine on Android, JVM and iOS; browser control through RemoteKetch
+- Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
+  browser control through RemoteKetch
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
 - Verified selected-file storage, ownership journal, restart rehash, live limits and explicit seeding
 - Native torrent engine dependencies exist only in interoperability tests
+- Public v2/hybrid download, selection, limits, pause/resume and TaskStore restart are implemented.
+  V2 incoming routing, upload/seeding, PEX and hybrid v1-only peers remain roadmap work.
 - See [support and migration](docs/torrent.md) and [verification](docs/development/torrent-verification.md)
 
 ### AI-Driven Resource Discovery (`ai:discover`) — In Progress
@@ -262,7 +265,8 @@ cli/          # JVM CLI entry point
 2. iOS support is best-effort via expect/actual (iosArm64 + iosSimulatorArm64)
 3. `library:sqlite` does not support WasmJs -- use `InMemoryTaskStore` on that platform
 4. `library:ftp` does not support WasmJs (requires raw TCP sockets)
-5. `library:torrent` has no browser-local engine; v2/hybrid, uTP and protocol encryption are deferred
+5. `library:torrent` has no browser-local engine. V2/hybrid uses outgoing v2 TCP;
+   v2 incoming/upload/seeding/PEX, hybrid v1-only peers, uTP and encryption remain unimplemented.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
 7. `ai:discover` is JVM only (depends on Koog + Ktor CIO)

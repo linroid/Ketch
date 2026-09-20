@@ -1,6 +1,11 @@
 # Pure Kotlin torrent downloader roadmap
 
-Status: **Approved 2026-09-08 — implementation in progress.**
+Status: **Historical v1 scope — implemented through merged PRs #147–#161.**
+
+The v2/hybrid download workflow has since landed through #231–#238 and #240. Use
+[current v2 progress](pure-kotlin-torrent-v2-progress.md) and
+[roadmap #162](https://github.com/linroid/Ketch/issues/162) for current scope and release gates.
+The exclusions below describe the original v1 scope, not current format support.
 
 Prepared 2026-09-07; final checkout inspected: `077a0c9d`. This document
 authorizes no implementation by itself. After approval, deliver the agreed scope through the
@@ -74,7 +79,7 @@ These are code inspection findings; no baseline test run was performed during ro
 Relevant implementation files:
 [source](../../library/torrent/src/commonMain/kotlin/com/linroid/ketch/torrent/TorrentDownloadSource.kt),
 [metadata](../../library/torrent/src/commonMain/kotlin/com/linroid/ketch/torrent/TorrentMetadata.kt),
-[native session](../../library/torrent/src/jvmAndAndroidMain/kotlin/com/linroid/ketch/torrent/Libtorrent4jSession.kt),
+[native session at the inspected baseline](https://github.com/linroid/Ketch/blob/077a0c9d/library/torrent/src/jvmAndAndroidMain/kotlin/com/linroid/ketch/torrent/Libtorrent4jSession.kt),
 [execution](../../library/core/src/commonMain/kotlin/com/linroid/ketch/core/engine/DownloadExecution.kt),
 and [CI](../../.github/workflows/tests.yml).
 
