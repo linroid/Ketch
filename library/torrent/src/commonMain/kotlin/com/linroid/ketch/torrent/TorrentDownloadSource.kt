@@ -29,7 +29,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import okio.FileSystem
 import okio.Path.Companion.toPath
 
 /**
@@ -142,9 +141,9 @@ class TorrentDownloadSource(
             url
           }
           withContext(Dispatchers.IO) {
-            FileSystem.SYSTEM.read(path.toPath()) {
+            torrentSystemFileSystem.read(path.toPath()) {
               val result = readByteArray(minOf(config.maxMetadataBytes.toLong(),
-                FileSystem.SYSTEM.metadata(path.toPath()).size ?: 0L))
+                torrentSystemFileSystem.metadata(path.toPath()).size ?: 0L))
               require(exhausted()) { "Metainfo exceeds limit" }
               result
             }
@@ -454,7 +453,7 @@ class TorrentDownloadSource(
       maxDocumentBytes = config.maxMetadataBytes, maxFiles = config.maxFilesPerTorrent)
     require(document.info.hash.hex == state.infoHash) { "Resume torrent changed" }
     val output = (context.outputPath ?: state.savePath).toPath()
-    val absolute = FileSystem.SYSTEM.canonicalize(".".toPath()).resolve(output).normalized()
+    val absolute = torrentSystemFileSystem.canonicalize(".".toPath()).resolve(output).normalized()
     val selected = if (state.resumeData.isEmpty() && state.savePath.isEmpty()) {
       context.request.selectedFileIds.ifEmpty { state.selectedFileIds }
     } else state.selectedFileIds

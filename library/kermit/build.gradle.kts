@@ -38,8 +38,7 @@ kotlin {
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs { browser() }
 
-  @OptIn(ExperimentalWasmDsl::class)
-  wasmWasi { nodejs() }
+  // Kermit 2.1.0 has no WASI variant; every target must resolve commonMain dependencies.
 
   sourceSets {
     commonMain.dependencies {
