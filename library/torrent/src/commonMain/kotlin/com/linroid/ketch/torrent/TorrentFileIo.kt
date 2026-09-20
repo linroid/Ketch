@@ -10,6 +10,9 @@ import okio.FileHandle
 import okio.FileSystem
 import okio.Path
 
+// Raw filesystem for metainfo, discovery state and path canonicalization. Payload I/O uses
+// torrentFileSystem below to retain its ownership and no-follow protections.
+internal expect val torrentSystemFileSystem: FileSystem
 internal expect val torrentFileSystem: FileSystem
 internal expect fun torrentRandomBytes(size: Int): ByteArray
 

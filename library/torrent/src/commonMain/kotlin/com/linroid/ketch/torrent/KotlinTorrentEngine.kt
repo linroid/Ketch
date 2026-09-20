@@ -33,7 +33,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
-import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
 
@@ -93,7 +92,7 @@ internal class KotlinTorrentEngine(
     accept(listener)
     // Some systems provide dual-stack sockets and reject a second bind on the same port.
     try { accept(network.listen(PeerEndpoint("::", port))) } catch (_: Exception) {
-      currentCoroutineContext().let { if (!it.isActive) throw CancellationException() }
+      currentCoroutineContext().ensureActive()
     }
   }
 
@@ -417,7 +416,7 @@ internal class KotlinTorrentEngine(
     }
     val lease = admissions.admit(spec, config)
     try {
-      val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
+      val requested = torrentSystemFileSystem.canonicalize(".".toPath())
         .resolve(spec.outputPath).normalized()
       val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId,
         storageSlots = storageSlots)
@@ -511,10 +510,10 @@ internal class KotlinTorrentEngine(
           lease = admitV2Session(document, selected.size, outputPath.length, config,
             exchangeBudgets.sessions, recovery)
           val selection = selected.toSet()
-          val requested = FileSystem.SYSTEM.canonicalize(".".toPath())
+          val requested = torrentSystemFileSystem.canonicalize(".".toPath())
             .resolve(outputPath).normalized()
           val parent = checkNotNull(requested.parent) { "Output root must have a parent" }
-          val output = FileSystem.SYSTEM.canonicalize(parent) / requested.name
+          val output = torrentSystemFileSystem.canonicalize(parent) / requested.name
           requireAvailableOutput(output)
           val layout = TorrentContentLayout.from(document.info, document.hybrid)
           val store = TorrentV2PieceStore(document, output, selection, taskId, budget, storageSlots,
@@ -691,8 +690,8 @@ internal class KotlinTorrentEngine(
         val snapshot = config.stateDirectory?.toPath()?.resolve(
           if (':' in host) "dht6.nodes" else "dht4.nodes")
         val restored = snapshot?.let { path -> attempt {
-          require((FileSystem.SYSTEM.metadata(path).size ?: Long.MAX_VALUE) <= 256 * 1024)
-          DhtRoutingTable.restore(FileSystem.SYSTEM.read(path) { readByteArray() })
+          require((torrentSystemFileSystem.metadata(path).size ?: Long.MAX_VALUE) <= 256 * 1024)
+          DhtRoutingTable.restore(torrentSystemFileSystem.read(path) { readByteArray() })
             .second.map { it.endpoint }
         } } ?: emptyList()
         val endpoints = config.dhtBootstrap.flatMap { attempt { resolveEndpoint(it) }
@@ -700,11 +699,11 @@ internal class KotlinTorrentEngine(
         attempt { node.bootstrap((restored + endpoints).distinct().take(64)) }
         while (isActive) {
           if (snapshot != null) attempt {
-            FileSystem.SYSTEM.createDirectories(checkNotNull(snapshot.parent))
+            torrentSystemFileSystem.createDirectories(checkNotNull(snapshot.parent))
             val temporary = snapshot.parent!! / "${snapshot.name}.tmp"
             val bytes = node.snapshot()
-            FileSystem.SYSTEM.write(temporary) { write(bytes) }
-            FileSystem.SYSTEM.atomicMove(temporary, snapshot)
+            torrentSystemFileSystem.write(temporary) { write(bytes) }
+            torrentSystemFileSystem.atomicMove(temporary, snapshot)
           }
           delay(15 * 60_000)
           attempt { node.refresh() }

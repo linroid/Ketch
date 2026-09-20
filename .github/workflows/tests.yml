@@ -51,6 +51,9 @@ jobs:
           TRANSMISSION_DAEMON: ${{ runner.temp }}/ketch-transmission/build/daemon/transmission-daemon
         run: ./gradlew jvmTest :library:torrent:verifyNoNativeTorrentRuntime -PtorrentConformance=true
 
+      - name: Compile publication metadata
+        run: ./gradlew compileCommonMainKotlinMetadata
+
       - name: Require executed interoperability scenarios
         run: |
           python3 tools/torrent/verify_conformance.py \

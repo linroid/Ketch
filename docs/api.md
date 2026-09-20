@@ -38,6 +38,10 @@ kotlin {
 }
 ```
 
+The optional Kermit integration supports Android, JVM, iOS, JavaScript, and WasmJs.
+It does not support WASI because Kermit 2.1.0 does not publish a WASI variant. Projects with
+a WASI target should add Kermit only to source sets shared by its supported targets.
+
 Or without a version catalog:
 
 ```kotlin

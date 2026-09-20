@@ -4,6 +4,8 @@ import okio.FileSystem
 import java.security.SecureRandom
 
 internal expect fun platformTorrentFileSystem(): FileSystem
+internal actual val torrentSystemFileSystem: FileSystem = FileSystem.SYSTEM
+
 internal actual val torrentFileSystem: FileSystem = platformTorrentFileSystem()
 private val secureRandom = SecureRandom()
 internal actual fun torrentRandomBytes(size: Int): ByteArray =
