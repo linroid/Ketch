@@ -540,22 +540,66 @@ class DownloadQueueTest {
   }
 
   @Test
-  fun setPriority_activeTask_isNoOp() = runTest {
+  fun setPriority_urgent_preemptsAndResumesVictim() = runTest {
     withContext(Dispatchers.Default) {
-      val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-      try {
-        val scheduler = createScheduler(maxConcurrent = 10)
+      val scheduler = createScheduler(maxConcurrent = 1)
+      val active = createHandle("active")
+      val queued = createHandle("queued")
+      scheduler.enqueue(active)
+      scheduler.enqueue(queued)
 
-        val h1 = createHandle("task-1")
-        scheduler.enqueue(h1)
+      scheduler.setPriority("queued", DownloadPriority.URGENT)
 
-        // task-1 is active, setPriority should be a no-op
-        scheduler.setPriority("task-1", DownloadPriority.HIGH)
+      assertIs<DownloadState.Queued>(active.mutableState.value)
+      withTimeout(2.seconds) {
+        queued.mutableState.first { it != DownloadState.Queued }
+      }
+      scheduler.onTaskCompleted("queued")
+      withTimeout(2.seconds) {
+        active.mutableState.first { it != DownloadState.Queued }
+      }
+    }
+  }
 
-        // Should not throw or change state
-        delay(100)
-      } finally {
-        scope.cancel()
+  @Test
+  fun setPriority_activeUrgent_isProtectedFromPreemption() = runTest {
+    withContext(Dispatchers.Default) {
+      val scheduler = createScheduler(maxConcurrent = 1)
+      val active = createHandle("active")
+      val queued = createHandle("queued")
+      scheduler.enqueue(active)
+      scheduler.setPriority("active", DownloadPriority.URGENT)
+      scheduler.enqueue(queued)
+
+      scheduler.setPriority("queued", DownloadPriority.URGENT)
+
+      assertIs<DownloadState.Queued>(queued.mutableState.value)
+      withTimeout(2.seconds) {
+        active.mutableState.first { it != DownloadState.Queued }
+      }
+    }
+  }
+
+  @Test
+  fun setPriority_urgent_preemptsSameHostWhenHostLimitIsFull() = runTest {
+    withContext(Dispatchers.Default) {
+      val scheduler = createScheduler(maxConcurrent = 2, maxPerHost = 1)
+      val unrelated = createHandle(
+        "unrelated",
+        createRequest(url = "https://other.com/file", priority = DownloadPriority.LOW)
+      )
+      val sameHost = createHandle("same-host")
+      val queued = createHandle("queued")
+      scheduler.enqueue(unrelated)
+      scheduler.enqueue(sameHost)
+      scheduler.enqueue(queued)
+
+      scheduler.setPriority("queued", DownloadPriority.URGENT)
+
+      assertIs<DownloadState.Queued>(sameHost.mutableState.value)
+      withTimeout(2.seconds) {
+        queued.mutableState.first { it != DownloadState.Queued }
+        unrelated.mutableState.first { it != DownloadState.Queued }
       }
     }
   }

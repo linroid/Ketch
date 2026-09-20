@@ -2,6 +2,7 @@ package com.linroid.ketch.task
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
@@ -20,6 +21,42 @@ import kotlin.test.assertEquals
 import kotlin.time.Instant
 
 class RealDownloadTaskTest {
+  @Test
+  fun setPriority_persistsAndPublishesBeforeUpdatingQueue() = runTest {
+    val store = InMemoryTaskStore()
+    val request = DownloadRequest(url = "https://example.com/file")
+    val now = Instant.fromEpochMilliseconds(0)
+    var queuePriority: DownloadPriority? = null
+    val task = RealDownloadTask(
+      taskId = "task",
+      request = request,
+      createdAt = now,
+      initialState = DownloadState.Paused(DownloadProgress(0, 100)),
+      initialSegments = emptyList(),
+      controller = object : TaskController by UnusedController {
+        override suspend fun setPriority(taskId: String, priority: DownloadPriority) {
+          assertEquals(priority, store.load(taskId)?.request?.priority)
+          queuePriority = priority
+        }
+      },
+      taskStore = store,
+      record = TaskRecord(
+        taskId = "task",
+        request = request,
+        createdAt = now,
+        updatedAt = now,
+      ),
+    )
+    val changed = async { task.requestState.first { it.priority == DownloadPriority.URGENT } }
+
+    task.setPriority(DownloadPriority.URGENT)
+
+    assertEquals(DownloadPriority.URGENT, changed.await().priority)
+    assertEquals(DownloadPriority.URGENT, task.request.priority)
+    assertEquals(DownloadPriority.URGENT, queuePriority)
+    assertEquals(DownloadState.Paused(DownloadProgress(0, 100)), task.state.value)
+  }
+
   @Test
   fun recordUpdate_settingsChange_publishesCurrentRequest() = runTest {
     val request = DownloadRequest(url = "https://example.com/file")

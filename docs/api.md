@@ -141,6 +141,16 @@ DownloadConfig(
 
 ### Priority & Scheduling
 
+`task.setPriority(priority)` persists the change and updates `task.requestState`, including
+for active, paused, and scheduled tasks. LOW, NORMAL, and HIGH determine which queued task
+starts next. Changing a queued task to URGENT can immediately pause a lower-priority active
+task to make room. The interrupted task is requeued and resumes when a slot opens.
+Concurrency and per-host limits still apply; other URGENT tasks cannot be preempted.
+Priority changes do not resume manually paused tasks or bypass schedules and conditions.
+
+Priority does not reserve or weight bandwidth among active downloads. Use per-task
+`setSpeedLimit` and the global speed limit to control transfer rates.
+
 ```kotlin
 // High-priority download
 ketch.download(
