@@ -462,7 +462,7 @@ internal class KotlinTorrentEngine(
    * Scoped full-metainfo download integration. The caller supplies policy-authorized endpoints;
    * this path does not yet register incoming v2 routes, resolve magnets, or seed after completion.
    * Retained metadata/storage indexes are admitted before storage construction or file I/O.
-   * The caller owns checkpoint decoding admission; retained recovery records are admitted here.
+   * Encoded checkpoints and retained recovery records share the session-state budget.
    * Recovery validates ownership before exposing the session and rechecks payloads on resume.
    */
   suspend fun <T> withV2Download(
@@ -490,8 +490,8 @@ internal class KotlinTorrentEngine(
         val recovery = if (checkpointEncoded == null) checkpoint else {
           // Admit base64/raw/parser copies before decoding source-owned persisted state.
           val bytes = checkpointEncoded.length * 12L + 4096
-          require(bytes <= exchangeBudgets.metadata.capacity) { "Recovery state exceeds budget" }
-          decoding = checkNotNull(exchangeBudgets.metadata.reserve(bytes.toInt())) {
+          require(bytes <= exchangeBudgets.sessions.capacity) { "Recovery state exceeds budget" }
+          decoding = checkNotNull(exchangeBudgets.sessions.reserve(bytes.toInt())) {
             "Recovery decode budget exhausted"
           }
           requireNotNull(TorrentV2Checkpoint.decode(decodeBase64(checkpointEncoded))) {

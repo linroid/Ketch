@@ -44,6 +44,59 @@ class KotlinTorrentV2OwnerTest {
     "ketch-engine-v2-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
 
   @Test
+  fun serializedRecoveryUsesSessionBudgetBeyondTheMetadataExchangeLimit() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(30_000) {
+        val root = output()
+        torrentFileSystem.createDirectory(root)
+        val destination = root / "payload"
+        val tree = (0 until 640).associate { index ->
+          ("file-${index.toString().padStart(4, '0')}-" + "x".repeat(100)) to
+            mapOf("" to mapOf("length" to 0L))
+        }
+        val document = TorrentV2Document.parse(Bencode.encode(mapOf("info" to mapOf(
+          "name" to "large-checkpoint", "meta version" to 2L, "piece length" to 16_384L,
+          "file tree" to tree), "piece layers" to emptyMap<String, Any>())))
+        val config = TorrentConfig(dhtEnabled = false, maxMetadataBytes = 96 * 1024,
+          maxSessionStateBytes = 16 * 1024 * 1024)
+        val first = KotlinTorrentEngine(config)
+        val second = KotlinTorrentEngine(config)
+        try {
+          first.start()
+          val encoded = first.withV2Download("large-restart", document, destination.toString(),
+            discover = { error("Empty files must not discover peers") }) { session ->
+            session.resume()
+            assertEquals(TorrentSessionState.FINISHED, session.state.first {
+              it == TorrentSessionState.FINISHED || it == TorrentSessionState.STOPPED
+            })
+            encodeBase64(assertNotNull(session.saveResumeData()))
+          }
+          first.stop()
+          assertEquals(0, first.admittedSessionBytes)
+          assertTrue(encoded.length * 12L + 4096 > config.metadataExchangeBytes,
+            "Fixture must exercise recovery beyond the metadata exchange partition")
+          second.start()
+          second.withV2Download("large-restart", document, destination.toString(),
+            checkpointEncoded = encoded, discover = { error("Recovery must not discover peers") },
+          ) { session ->
+            assertEquals(0L, session.verifiedBytes.value)
+            session.resume()
+            assertEquals(TorrentSessionState.FINISHED, session.state.first {
+              it == TorrentSessionState.FINISHED || it == TorrentSessionState.STOPPED
+            })
+            assertEquals(640, session.fileProgress().size)
+          }
+          assertEquals(0, second.admittedSessionBytes)
+        } finally {
+          first.stop()
+          second.stop()
+          torrentFileSystem.deleteRecursively(root, mustExist = false)
+        }
+      }
+    }
+  }
+
+  @Test
   fun restartRechecksCheckpointBeforeCompletionAndAgainAfterPause() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
