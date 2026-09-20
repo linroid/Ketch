@@ -14,6 +14,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -113,6 +114,10 @@ internal class KotlinTorrentEngine(
           }
         }
       }
+    } catch (error: Exception) {
+      // Closing a socket during shutdown can throw before its provider observes cancellation.
+      currentCoroutineContext().ensureActive()
+      throw error
     } finally { listener.close() }
   }
 
