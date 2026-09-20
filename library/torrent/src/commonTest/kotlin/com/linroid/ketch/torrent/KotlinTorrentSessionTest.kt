@@ -2,6 +2,9 @@ package com.linroid.ketch.torrent
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -16,6 +19,8 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class KotlinTorrentSessionTest {
   @Test
@@ -104,6 +109,73 @@ class KotlinTorrentSessionTest {
       }
     }
   }
+  @Test
+  fun privateResetRevokesIncomingHostsBeforeJoiningOldPeers() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val network = createTorrentNetwork()
+        val budget = TorrentBufferBudget(4 * 1024 * 1024)
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-private-reset-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+          "name" to "file", "length" to 4L, "piece length" to 4L,
+          "pieces" to sha1Digest(byteArrayOf(1, 2, 3, 4)), "private" to 1L
+        ))))
+        val ready = CompletableDeferred<Unit>()
+        val entered = CompletableDeferred<Unit>()
+        val canceling = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val oldClosed = CompletableDeferred<Unit>()
+        fun connection(host: String, hold: Boolean = false): TorrentConnection =
+          object : TorrentConnection {
+            override val remote = PeerEndpoint(host, 1234)
+            override suspend fun write(bytes: ByteArray) = Unit
+            override suspend fun readExactly(size: Int): ByteArray {
+              if (hold) entered.complete(Unit)
+              try { awaitCancellation() } finally {
+                if (hold) withContext(NonCancellable) {
+                  canceling.complete(Unit)
+                  release.await()
+                }
+              }
+            }
+            override fun close() { if (hold) oldClosed.complete(Unit) }
+          }
+        val session = KotlinTorrentSession(TorrentPieceStore(metadata, root / "file",
+          emptySet(), "private-task"), network, budget, this, discover = { _, current ->
+          current.trackerPeers(listOf(PeerEndpoint("127.0.0.1", 6881)))
+          ready.complete(Unit)
+          awaitCancellation()
+        })
+        try {
+          session.resume()
+          ready.await()
+          session.state.first { it == TorrentSessionState.DOWNLOADING }
+          assertTrue(session.accept(connection("127.0.0.1", hold = true)))
+          entered.await()
+          val reset = async { session.resetPeers() }
+          canceling.await()
+          assertFalse(reset.isCompleted)
+          val stale = connection("127.0.0.1")
+          try { assertFalse(session.accept(stale)) } finally { stale.close() }
+          release.complete(Unit)
+          reset.await()
+          assertTrue(oldClosed.isCompleted)
+          val stillStale = connection("127.0.0.1")
+          try { assertFalse(session.accept(stillStale)) } finally { stillStale.close() }
+          session.trackerPeers(listOf(PeerEndpoint("127.0.0.2", 6881)))
+          assertTrue(session.accept(connection("127.0.0.2")))
+        } finally {
+          release.complete(Unit)
+          session.close()
+          network.close()
+          torrentFileSystem.deleteRecursively(root, mustExist = false)
+        }
+        assertEquals(0, budget.allocated)
+      }
+    }
+  }
+
   private suspend fun awaitComplete(session: KotlinTorrentSession) {
     val state = session.state.first {
       it == TorrentSessionState.FINISHED || it == TorrentSessionState.STOPPED

@@ -28,6 +28,34 @@ class TorrentTrackerTest {
   }
 
   @Test
+  fun v2HttpQueryUsesOnlyTheWirePrefixOfTheFullTopic() {
+    val full = V2InfoHash.fromBytes(ByteArray(32) { (255 - it).toByte() })
+    val v2 = request.copy(topic = TrackerTopic.V2(full))
+    val query = TorrentTracker.httpUrl("https://tracker/announce", v2, null)
+      .substringAfter("info_hash=").substringBefore('&')
+    assertEquals("%ff%fe%fd%fc%fb%fa%f9%f8%f7%f6%f5%f4%f3%f2%f1%f0%ef%ee%ed%ec", query)
+  }
+
+  @Test
+  fun trackerIdStateCannotCrossFullTopicsWithTheSameWirePrefix() = runTest {
+    val first = request.copy(topic = TrackerTopic.V2(V2InfoHash.fromBytes(ByteArray(32))))
+    val second = request.copy(topic = TrackerTopic.V2(V2InfoHash.fromBytes(
+      ByteArray(32).also { it[31] = 1 })))
+    var calls = 0
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, _, id ->
+      if (calls++ > 0) assertContentEquals(byteArrayOf(7), id)
+      TrackerResponse(emptyList(), 60, byteArrayOf(7))
+    }
+    tiers.announce(first)
+    assertFailsWith<IllegalArgumentException> { tiers.announce(second) }
+    val legacy = request.copy(topic = TrackerTopic.V1(InfoHash.fromBytes(ByteArray(20))))
+    assertFailsWith<IllegalArgumentException> { tiers.announce(legacy) }
+    assertEquals(1, calls)
+    tiers.announce(first)
+    assertEquals(2, calls)
+  }
+
+  @Test
   fun httpResponse_readsBothFamiliesAndMinimumInterval() {
     val response = TorrentTracker.parseHttp(Bencode.encode(mapOf(
       "interval" to 30L, "min interval" to 60L,
@@ -35,6 +63,7 @@ class TorrentTrackerTest {
       "peers6" to (ByteArray(15) + byteArrayOf(1, 0x1a, 0xe1.toByte()))
     )))
     assertEquals(60L, response.intervalSeconds)
+    assertEquals(60L, response.minimumIntervalSeconds)
     assertEquals(listOf(PeerEndpoint("127.0.0.1", 6881),
       PeerEndpoint("0:0:0:0:0:0:0:1", 6881)), response.peers)
     assertFailsWith<IllegalArgumentException> {
@@ -44,6 +73,15 @@ class TorrentTrackerTest {
       TorrentTracker.parseHttp(Bencode.encode(mapOf("failure reason" to "secret passkey")))
     }
     assertEquals("Tracker rejected announce", error.message)
+  }
+
+  @Test
+  fun httpResponseRetainsAnEarlierManualMinimum() {
+    val response = TorrentTracker.parseHttp(Bencode.encode(mapOf(
+      "interval" to 3600L, "min interval" to 300L, "peers" to ByteArray(0)
+    )))
+    assertEquals(3600L, response.intervalSeconds)
+    assertEquals(300L, response.minimumIntervalSeconds)
   }
 
   @Test
@@ -73,7 +111,25 @@ class TorrentTrackerTest {
     udp(false, dropFirst = true)
   }
 
-  private suspend fun udp(ipv6: Boolean, dropFirst: Boolean = false) = withContext(Dispatchers.Default) {
+  @Test
+  fun v2UdpUsesTheTruncatedHashOverIpv4() = runTest { v2Udp(false) }
+
+  @Test
+  fun v2UdpUsesTheTruncatedHashOverIpv6() = runTest { v2Udp(true) }
+
+  private suspend fun v2Udp(ipv6: Boolean) {
+    val full = V2InfoHash.fromBytes(ByteArray(32) { (255 - it).toByte() })
+    udp(ipv6, announceRequest = request.copy(topic = TrackerTopic.V2(full)),
+      expectedHash = ByteArray(20) { (255 - it).toByte() })
+  }
+
+  private suspend fun udp(
+    ipv6: Boolean,
+    dropFirst: Boolean = false,
+    announceRequest: TrackerAnnounce = request,
+    expectedHash: ByteArray = ByteArray(20) { it.toByte() },
+  ) = withContext(Dispatchers.Default) {
+    val request = announceRequest
     withTimeout(15_000) {
       coroutineScope {
         val network = createTorrentNetwork()
@@ -102,7 +158,7 @@ class TorrentTrackerTest {
             assertEquals(99L, body.readLong())
             assertEquals(1, body.readInt())
             val transaction = body.readInt()
-            assertContentEquals(request.infoHash.toBytes(), body.readByteArray(20))
+            assertContentEquals(expectedHash, body.readByteArray(20))
             assertContentEquals(request.peerId, body.readByteArray(20))
             assertEquals(123L, body.readLong())
             assertEquals(456L, body.readLong())

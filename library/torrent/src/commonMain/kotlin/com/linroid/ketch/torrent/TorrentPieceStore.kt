@@ -252,23 +252,133 @@ internal class TorrentPieceStore(
     ownershipLoaded = true
   }
 
+  private var trackerConfiguration: TrackerConfiguration? = null
+  private var trackerRevision = 0L
+
   suspend fun checkpoint(): TorrentCheckpoint = mutex.withLock { snapshot() }
 
   suspend fun restore(checkpoint: TorrentCheckpoint) = mutex.withLock {
+    validateCheckpoint(checkpoint)
+    for (owned in checkpoint.files) restoreOwned(false, owned)
+    for (owned in checkpoint.directories) restoreOwned(true, owned)
+    trackerConfiguration = checkpoint.trackerConfiguration
+    trackerRevision = checkpoint.trackerRevision
+    // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
+  }
+
+  /** Decode only a journal-owned checkpoint; the callback borrows its admitted state. */
+  suspend fun withPersistedCheckpoint(
+    budget: TorrentBufferBudget,
+    block: suspend (TorrentCheckpoint) -> Unit,
+  ) {
+    var lease: TorrentBufferBudget.Lease? = null
+    var decoded: TorrentCheckpoint? = null
+    try {
+      mutex.withLock {
+        check(initialized)
+        storageOperation {
+          val path = sidecar / "checkpoint"
+          validateRegularPath(path)
+          if (!fileSystem.exists(path)) return@storageOperation
+          val identity = requireNotNull(ownedFiles[path]) { "Checkpoint is not owned by this task" }
+          require(torrentFileIdentity(path) == identity) { "Checkpoint identity changed" }
+          fileSystem.openReadOnly(path).use { handle ->
+            val size = handle.size()
+            require(size in 1..TorrentCheckpoint.MAX_BYTES.toLong())
+            // Retain raw-byte, decoded-graph, and metainfo validation credit through the callback.
+            val weight = size * 16 + 64 * 1024
+            check(weight <= budget.capacity) { "Checkpoint recovery exceeds admission capacity" }
+            lease = checkNotNull(budget.reserve(weight.toInt())) {
+              "Checkpoint recovery budget exhausted"
+            }
+            val bytes = ByteArray(size.toInt())
+            var offset = 0
+            while (offset < bytes.size) {
+              val count = handle.read(offset.toLong(), bytes, offset, bytes.size - offset)
+              if (count <= 0) throw EOFException("Truncated torrent checkpoint")
+              offset += count
+            }
+            require(handle.size() == size && torrentFileIdentity(path) == identity) {
+              "Checkpoint changed during recovery"
+            }
+            val checkpoint = requireNotNull(TorrentCheckpoint.decode(bytes))
+            validateCheckpoint(checkpoint)
+            decoded = checkpoint
+          }
+        }
+      }
+      decoded?.let { block(it) }
+    } finally {
+      decoded = null
+      lease?.close()
+    }
+  }
+
+  /** Installs admitted tracker state; progress and ownership never come from this hint. */
+  suspend fun adoptTrackerCheckpoint(
+    checkpoint: TorrentCheckpoint,
+    configuration: TrackerConfiguration,
+  ) = mutex.withLock {
+    validateCheckpoint(checkpoint)
+    require(checkpoint.trackerRevision > trackerRevision)
+    require(configuration.tiers == checkpoint.trackerConfiguration?.tiers)
+    currentCoroutineContext().ensureActive()
+    trackerConfiguration = configuration
+    trackerRevision = checkpoint.trackerRevision
+  }
+
+  private fun validateCheckpoint(checkpoint: TorrentCheckpoint) {
     require(checkpoint.taskId == taskId && checkpoint.metadata.infoHash == metadata.infoHash)
     require(checkpoint.output == output.toString() &&
       checkpoint.selected.ifEmpty { metadata.files.indices.toSet() } == selected)
-    for (owned in checkpoint.files) restoreOwned(false, owned)
-    for (owned in checkpoint.directories) restoreOwned(true, owned)
-    // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
+  }
+
+  /** Owner shutdown only, after joining all operations; the persisted checkpoint is untouched. */
+  fun discardTrackerConfiguration() {
+    trackerConfiguration = null
+    trackerRevision = 0
+  }
+
+  /** Borrowed committed configuration; a canceled caller can inspect the commit outcome. */
+  suspend fun currentTrackerConfiguration(): TrackerConfiguration? = mutex.withLock {
+    trackerConfiguration
+  }
+
+  suspend fun trackerConfigurationSnapshot(): TrackerConfigurationSnapshot = mutex.withLock {
+    TrackerConfigurationSnapshot(trackerConfiguration?.tiers ?: metadata.trackerTiers,
+      trackerRevision)
   }
 
   /** Flushes a snapshot file before returning bytes for publication through TaskStore. */
   suspend fun persistCheckpoint(receivedBytes: Long = 0, uploadedBytes: Long = 0): ByteArray =
     mutex.withLock {
+      persistSnapshot(receivedBytes, uploadedBytes, trackerConfiguration, trackerRevision)
+    }
+
+  /** The caller retains admission for the configuration while the store uses it. */
+  suspend fun replaceTrackerConfiguration(
+    configuration: TrackerConfiguration,
+    receivedBytes: Long = 0,
+    uploadedBytes: Long = 0,
+    expectedRevision: Long? = null,
+  ): ByteArray = mutex.withLock {
+    require(expectedRevision == null || expectedRevision >= 0)
+    if (expectedRevision != null && expectedRevision != trackerRevision) {
+      throw TrackerRevisionConflict(expectedRevision, trackerRevision)
+    }
+    check(trackerRevision < Long.MAX_VALUE) { "Tracker configuration revision exhausted" }
+    persistSnapshot(receivedBytes, uploadedBytes, configuration, trackerRevision + 1)
+  }
+
+  private suspend fun persistSnapshot(
+    receivedBytes: Long,
+    uploadedBytes: Long,
+    configuration: TrackerConfiguration?,
+    revision: Long,
+  ): ByteArray {
     require(receivedBytes >= 0 && uploadedBytes >= 0)
     check(initialized)
-    storageOperation {
+    return storageOperation {
       if (journal.needsCompaction) {
         require(torrentFileIdentity(journalPath) == ownedFiles[journalPath])
         val records = ownedDirectories.map { true to TorrentOwnedPath(it.key.toString(), it.value) } +
@@ -283,18 +393,40 @@ internal class TorrentPieceStore(
         }
       }
       val temp = sidecar / ("checkpoint-" + InfoHash.fromBytes(torrentRandomBytes(20)).hex + ".tmp")
-      val data = snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
-      fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
-        recordOwned(temp, directory = false)
-        handle.write(0, data, 0, data.size)
-        handle.flush()
+      val data = snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes,
+        trackerConfiguration = configuration, trackerRevision = revision).encode()
+      try {
+        fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
+          recordOwned(temp, directory = false)
+          handle.write(0, data, 0, data.size)
+          handle.flush()
+        }
+        val identity = checkNotNull(ownedFiles[temp])
+        journal.append(false, TorrentOwnedPath(checkpointPath.toString(), identity))
+        currentCoroutineContext().ensureActive()
+        fileSystem.atomicMove(temp, checkpointPath)
+        ownedFiles.remove(temp)
+        ownedFiles[checkpointPath] = identity
+        trackerConfiguration = configuration
+        trackerRevision = revision
+        snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
+      } catch (failure: Throwable) {
+        // Blocking cleanup stays inside the admitted I/O operation, even on cancellation.
+        // After a successful rename the temporary path is no longer in ownedFiles.
+        try {
+          val identity = ownedFiles[temp]
+          if (identity != null) {
+            validateRegularPath(temp)
+            if (torrentFileIdentity(temp) == identity) {
+              fileSystem.delete(temp, mustExist = false)
+            }
+            ownedFiles.remove(temp)
+          }
+        } catch (cleanupFailure: Throwable) {
+          failure.addSuppressed(cleanupFailure)
+        }
+        throw failure
       }
-      val identity = checkNotNull(ownedFiles[temp])
-      journal.append(false, TorrentOwnedPath(checkpointPath.toString(), identity))
-      fileSystem.atomicMove(temp, checkpointPath)
-      ownedFiles.remove(temp)
-      ownedFiles[checkpointPath] = identity
-      snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
     }
   }
 
@@ -307,7 +439,8 @@ internal class TorrentPieceStore(
   private fun snapshot(): TorrentCheckpoint = TorrentCheckpoint(taskId, metadata,
     output.toString(), selected, verified.copyOf(),
     ownedFiles.map { TorrentOwnedPath(it.key.toString(), it.value) },
-    ownedDirectories.map { TorrentOwnedPath(it.key.toString(), it.value) })
+    ownedDirectories.map { TorrentOwnedPath(it.key.toString(), it.value) },
+    trackerConfiguration = trackerConfiguration, trackerRevision = trackerRevision)
 
   private fun recordOwned(path: Path, directory: Boolean) {
     val identity = requireNotNull(torrentFileIdentity(path)) { "Filesystem has no safe file identity" }

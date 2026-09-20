@@ -151,11 +151,25 @@ internal class KotlinTorrentEngine(
     }
   }
 
-  override suspend fun fetchMetadata(magnetUri: String): TorrentMetadata? {
+  override suspend fun fetchMetadata(magnetUri: String): TorrentMetadata? =
+    fetchMetadata(magnetUri, TorrentDiscoveryPrivacy.PUBLIC)
+
+  override suspend fun fetchMetadata(
+    magnetUri: String,
+    privacy: TorrentDiscoveryPrivacy,
+  ): TorrentMetadata? {
     check(isRunning)
     val magnet = MagnetUri.parse(magnetUri)
+    val restrictedTiers = if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+      TrackerConfiguration.prepare(magnet.trackers.map { listOf(it) }).tiers.also {
+        require(it.isNotEmpty()) { "Tracker-only magnets require supplied trackers" }
+      }
+    } else emptyList()
     val metadata = cache.resolve(magnet.infoHash) {
       withTimeout(config.metadataTimeout) {
+        if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+          return@withTimeout fetchTrackerOnly(magnet, restrictedTiers)
+        }
         coroutineScope {
           val peers = Channel<PeerEndpoint>(256)
           val discovery = launch { discoverMagnet(magnet, peers) }
@@ -183,9 +197,62 @@ internal class KotlinTorrentEngine(
       }
     }
     require(magnet.identity.matchesInfo(metadata.infoBytes)) { "Exact topic hash mismatch" }
+    // A cache hit must not bypass this caller's pre-discovery privacy choice.
+    if (metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+      throw PrivateTorrentMagnetException()
+    }
     // Cache the immutable info dictionary, retaining this caller's tracker list.
     return TorrentMetadata.fromBencode(metainfoFromInfo(metadata.infoBytes,
       magnet.trackers.map { listOf(it) }), config.maxMetadataBytes)
+  }
+
+  private suspend fun fetchTrackerOnly(
+    magnet: MagnetUri,
+    trackerTiers: List<List<String>>,
+  ): TorrentMetadata {
+    val urls = trackerTiers.flatten().distinct()
+    var attempts = 0
+    while (currentCoroutineContext().isActive) {
+      var retrySeconds = 30L
+      for (url in urls) {
+        currentCoroutineContext().ensureActive()
+        // Each connection closes before switching trackers, including unsuccessful peer sets.
+        val tiers = TrackerTiers(listOf(listOf(url)), tracker::announce)
+        var contacted = false
+        try {
+          val result = attempt {
+            tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
+              event = TrackerEvent.STARTED))
+          } ?: continue
+          contacted = true
+          retrySeconds = maxOf(retrySeconds, result.intervalSeconds)
+          for (endpoint in result.peers.distinct()) {
+            check(++attempts <= 4096) { "Metadata peer limit exceeded" }
+            try {
+              return TorrentMetadataExchange(network, config.maxMetadataBytes,
+                budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint, trackerTiers,
+                  TorrentDiscoveryPrivacy.TRACKER_ONLY)
+            } catch (error: CancellationException) {
+              if (!currentCoroutineContext().isActive) throw error
+            } catch (_: Exception) {
+              // Only other peers returned by these trackers are eligible retries.
+            }
+          }
+        } finally {
+          if (contacted) withContext(NonCancellable) {
+            withTimeoutOrNull(2000) {
+              attempt {
+                tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, port, 0, 1,
+                  event = TrackerEvent.STOPPED))
+              }
+            }
+          }
+        }
+      }
+      delay(retrySeconds.coerceAtMost(Long.MAX_VALUE / 1000) * 1000)
+    }
+    currentCoroutineContext().ensureActive()
+    error("Metadata resolution stopped")
   }
 
   private suspend fun discoverMagnet(magnet: MagnetUri, output: SendChannel<PeerEndpoint>) =
@@ -249,12 +316,16 @@ internal class KotlinTorrentEngine(
           (left.take(right.size) == right || right.take(left.size) == left)
       }) { "Torrent output overlaps another task" }
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
+      val trackerState = TorrentBufferBudget(
+        maxOf(1, trackerControlStateWeight().toInt()))
       val session = KotlinTorrentSession(store, network, budget, scope,
         connections = config.connectionsPerTorrent, uploadPolicy = config.effectiveUploadPolicy,
         checkpoint = checkpoint, peerId = peerId,
-        discover = { peers, owner -> discover(spec, peers, owner) },
+        discover = { peers, owner -> discover(spec, peers, owner, trackerState) },
         downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
         uploadThrottle = { uploadRate.acquire(it) },
+        trackerConfigurationBudget = exchangeBudgets.sessions,
+        privacy = spec.privacy,
       )
       sessionLeases[hash] = lease
       sessions[hash] = session
@@ -273,25 +344,45 @@ internal class KotlinTorrentEngine(
     spec: TorrentTaskSpec,
     output: SendChannel<PeerEndpoint>,
     session: KotlinTorrentSession,
+    trackerState: TorrentBufferBudget,
   ) = supervisorScope {
     val metadata = spec.metadata
-    if (metadata.trackerTiers.isNotEmpty()) launch {
+    val configuration = session.trackerConfiguration()
+    val trackerTiers = configuration.tiers
+    if (trackerTiers.isNotEmpty()) launch {
       val discovery = TrackerDiscovery(metadata, peerId, port,
-        TrackerTiers(metadata.trackerTiers, tracker::announce), session::resetPeers,
+        TrackerTiers(trackerTiers, tracker::announce, configuration.revision), session::resetPeers,
         nowMs = nowMs,
         announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
       )
+      discovery.observeStatus(session::updateTrackerStatus)
       try {
-        while (isActive) {
-          attempt {
-            discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes)
-          }?.peers?.let { peers ->
-            session.trackerPeers(peers)
-            peers.forEach { output.send(it) }
-          }
-          delay(1000)
+        TrackerControl.run(trackerState, operation = { manual ->
+          discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,
+            manual = manual)
+        }, publish = { response ->
+          session.trackerPeers(response.peers)
+          response.peers.forEach { output.send(it) }
+        }, readStatus = discovery::status,
+          publishStatus = session::updateTrackerStatus,
+          scrape = scrape@{
+            // Admit the bounded HTTP body, parse tree, URL copies, and UDP workspace before I/O.
+            val lease = exchangeBudgets.metadata.reserve(TRACKER_SCRAPE_WORKSPACE_BYTES)
+              ?: return@scrape false
+            try { discovery.scrape(tracker::scrape) } finally { lease.close() }
+          },
+        ) { control ->
+          session.attachTrackerControl(control)
+          try {
+            while (isActive) {
+              attempt { control.poll() }
+              delay(1000)
+            }
+          } finally { session.detachTrackerControl(control) }
         }
       } finally {
+        discovery.observeStatus {}
+        session.updateTrackerStatus(emptyList())
         withContext(NonCancellable) {
           withTimeoutOrNull(2000) {
             if (session.state.value == TorrentSessionState.FINISHED ||
@@ -305,7 +396,7 @@ internal class KotlinTorrentEngine(
         }
       }
     }
-    if (!metadata.isPrivate) {
+    if (!metadata.isPrivate && spec.privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       spec.magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { text ->
           resolveEndpoint(text).forEach { output.send(it) }

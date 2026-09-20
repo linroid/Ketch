@@ -733,3 +733,334 @@ rejected handles are closed. Stream completion removes the wait condition, so an
 fails instead of spinning. The caller joins the dialer and cancels its endpoint producer on exit.
 Actual pure-v2/hybrid TCP tests now start through this stream and include a mismatched-torrent arrival.
 Tracker/DHT endpoint production and public engine registration are still not wired to this path.
+
+
+## Typed tracker topics and v2 lifecycle
+
+Tracker announces retain the full SHA-1 or SHA-256 identity as a typed topic. HTTP and UDP
+serialization convert it to the 20-byte wire form required by
+[BEP 52](https://www.bittorrent.org/beps/bep_0052.html). A tracker tier instance binds to one
+full topic so tracker IDs and preferred endpoints cannot cross colliding wire prefixes or
+hash algorithms. Hybrid dual announcements must use independent tier state for each topic.
+
+V2 discovery validates the content layout identity and computes `left` from whole-torrent
+verified payload, including unselected files and excluding alignment gaps. Downloaded traffic
+is a separate counter. Existing start, interval, completion, stop, and private tracker failover
+semantics apply to both versions; an already complete start does not emit a completion event.
+
+Common tests cover HTTP and IPv4/IPv6 UDP serialization, colliding full topics, tracker ID
+isolation, payload accounting, lifecycle events, and private failover callbacks. This adds the
+tracker protocol and lifecycle building blocks; public v2 engine registration, endpoint
+production, hybrid dual announcements, and scrape remain separate work.
+
+
+## Bounded tracker scrape
+
+HTTP scrape derives a scrape endpoint from the announce path, retains passkey query parameters,
+and requests explicit binary hashes as specified by
+[BEP 48](https://www.bittorrent.org/beps/bep_0048.html). UDP scrape shares announce connection
+cookies, transaction/source validation, bounded retries, and cancellation cleanup under
+[BEP 15](https://www.bittorrent.org/beps/bep_0015.html). Each request contains 1–50 topics;
+duplicate wire hashes are rejected because neither protocol can disambiguate them. HTTP responses
+are limited to 64 KiB and 4096 bencode nodes. Missing HTTP entries remain absent, not zero counts.
+UDP counts are unsigned 32-bit values returned in request order; extension bytes are tolerated.
+
+Scrape statistics are tracker claims, not authenticated content or local download progress.
+Scrape does not start swarm participation or mutate announce lifecycle state. SDK exposure,
+policy admission, scheduling/caching, and independent tracker interoperability remain separate.
+
+
+## Tracker reannounce timing and failure backoff
+
+Tracker responses retain the advertised minimum separately from the regular polling interval.
+Serialized discovery accepts an explicit manual request; it may announce early after the minimum,
+with a 60-second local floor. When no minimum is advertised, the regular interval is used.
+Manual requests do not shorten the next automatic deadline and are not queued implicitly.
+Completion/start/stop events retain their lifecycle semantics independently of the manual throttle.
+
+An exhausted tracker announce advances a retry deadline from 15 seconds exponentially to a
+15-minute cap. Both automatic and manual polls honor it; a successful announce resets it.
+Cancellation propagates without changing retry state. Stop remains best-effort and can run during
+backoff so shutdown can notify the tracker. The existing v1 polling loop also uses this protection.
+The control is internal until SDK/session command wiring is added; per-tracker backoff, diagnostics,
+editing, and network-policy admission remain separate work.
+
+
+## Private tracker failover barrier
+
+A private discovery session installs its peer-reset callback on the serialized tracker tiers.
+When the current tracker fails, tiers await that callback before contacting any different tracker.
+Cleanup failures and cancellation escape immediately, so the failover cannot silently continue.
+A successful cleanup is retained across failed replacement candidates and reset only after an
+announce succeeds, avoiding duplicate cleanup of the same old peer set.
+
+Common tests hold cleanup open and prove no replacement announce occurs, reject cleanup failure,
+and verify one cleanup across multiple failed candidates. This corrects tracker exchange ordering
+for both v1 and v2 discovery. The callback owner still must provide a joined peer/queued-endpoint
+barrier; comprehensive concurrent incoming admission and v2 session policy wiring remain separate.
+
+
+## Private incoming admission during peer reset
+
+The v1 session revokes tracker-authorized hosts before requesting the swarm's joined peer reset.
+Authorization checks and incoming queue insertion share a short mutex with revocation, so every
+accepted old-host enqueue precedes revocation and is covered by the subsequent swarm drain.
+Incoming admission uses `tryLock` and rejects on contention; the engine retains and closes a
+rejected connection. No network or suspend operation runs under the incoming admission lock.
+
+The session regression holds an old peer in cancellation cleanup, verifies old hosts are rejected
+before reset finishes and afterward, then admits a host from the replacement tracker. It also
+checks the old peer closes and all session buffer credit returns after shutdown. Public v2 session
+registration and its corresponding provenance/admission policy remain separate work.
+
+
+## Credential-free tracker status snapshots
+
+Serialized tracker tiers retain one status record per unique configured URL, with stable IDs based
+on the original tier traversal order. Tier promotion does not change these IDs. Records expose
+attempt counts, lifetime/consecutive failure counts, the current outcome, and peer count/intervals
+from the last successful response. Outcomes distinguish uncontacted, in-flight, successful, failed,
+timed-out, and canceled attempts. Cancellation does not increment tracker failure counters.
+
+Snapshots contain no URLs, tracker IDs, peers, raw tracker text, or exceptions. A trusted caller can
+associate an ID with its existing configuration separately. Read snapshots on the session owner;
+returned immutable records do not change during subsequent announces. No event history is retained.
+Private cleanup failure occurs before a replacement attempt, so it does not create false diagnostics.
+SDK/daemon/UI publication and per-tracker scheduling/backoff remain separate roadmap work.
+
+
+## Serialized tracker configuration replacement
+
+Discovery validates and snapshots replacement tiers before suspension, bounds a best-effort stop
+against the old configuration, and awaits private peer cleanup before installation. Parent
+cancellation or cleanup failure prevents installation. A successful edit clears cached tracker IDs,
+resets lifecycle/backoff timing, and uses a fresh started event on the next poll. Full topic binding
+is retained. Removing all trackers is supported and does not enable public discovery for private data.
+
+Replacement lists are limited to 256 entries/tiers and 8192 characters per absolute HTTP(S)/UDP URL;
+unsupported schemes and UDP user-info are rejected before old tracker contact. Endpoint policy
+and SSRF/proxy authorization remain the caller's responsibility. Status IDs are paired with an
+increasing configuration revision, so clients cannot confuse reused ordinal IDs across edits.
+Tests cover stop/cleanup/start ordering, credential state, mutable input, deadlines, cancellation,
+invalid edits, empty configurations, and topic isolation. SDK/daemon/UI edit commands and persistent
+configuration storage remain separate work.
+
+
+## Live session tracker controls
+
+The existing Kotlin session now exposes internal manual reannounce and tracker status flows.
+Periodic discovery and manual requests use one serialized control; only one manual operation may
+be outstanding, and busy/rate-limited requests return false. The discovery lifetime owns manual
+jobs. Caller cancellation cancels and joins its job; discovery shutdown detaches the session handle,
+joins remaining manual cleanup, clears captured callbacks, and returns reserved session-state credit.
+Peer publication follows the same serialized path for automatic and manual responses.
+
+A real engine test verifies tracker HTTP events, manual throttling, status publication, pause/stop,
+fresh controls on resume, and final admission release. Deterministic tests cover serialization,
+bounded manual admission, caller cancellation, owner shutdown barriers, and insufficient budget.
+Status is cleared when discovery stops. SDK/daemon/UI exposure, tracker-edit persistence across
+pause/resume, and public v2 registration remain separate roadmap work.
+
+
+Live-control admission includes the tracker control allowance in the session's initial weight.
+A bounded per-session pool is backed by that held lease, avoiding a second reservation from an
+already full shared partition. Status observers receive attempt transitions before network
+suspension and configuration revisions on replacement; the observer is detached on shutdown.
+The engine regression now runs at exactly its admitted weight and holds the HTTP response until
+ANNOUNCING is observed, then verifies pause/resume and final admission release.
+## Retained tracker configuration admission
+
+Tracker configuration can be admitted against a shared buffer budget before URL parsing and
+snapshot allocation. The reservation conservatively includes UTF-16 string backing and per-entry
+list/map/status overhead, charging shared strings in full. It is bounded by the existing 256-entry
+and 8192-character limits. Validation failure releases the reservation; exhausted admission returns
+null without parsing or capturing configuration.
+
+An owned handle retains the configuration and credit until close. Transfer invalidates the old
+handle without releasing credit, and close is idempotent. The destination is allocated before
+ownership moves. Configuration references are borrowed by the current owner and must not outlive
+close/transfer. Old and proposed configurations may be admitted concurrently so a failed install
+can discard the proposal while retaining the old state. Tests cover these transitions and the
+largest allowed configuration. Wiring this ownership into persistent/live tracker edits remains
+separate work; the existing unadmitted preparation API is unchanged.
+
+
+## Checkpoint tracker overrides
+
+Task checkpoints may carry a validated tracker override independently of authenticated metainfo.
+Absent configuration retains metainfo trackers; an explicit empty list disables them. Checkpoints
+without overrides keep format version 1. Overrides require format version 2 so an older reader rejects
+the state instead of silently restoring the original tracker policy. Both formats remain readable;
+version-1 overrides, missing version-2 fields, unknown versions, and oversized/invalid lists fail closed.
+
+Store restore and later checkpoints preserve the override. Session discovery uses it without merging
+metainfo trackers, and private discovery rules remain unchanged. Admission reserves the maximum
+allowed override control allowance before decoding resume data; retained decoded state is covered by
+the existing resume-data allowance. Real engine tests use exact admission capacity, verify replacement
+and empty tracker lists, and save the override again on pause. Codec/store tests cover versions,
+validation, and repeated persistence. Commands that create/edit overrides in live sessions and public
+SDK/daemon/UI exposure remain separate work.
+
+
+## Tracker configuration checkpoint commit
+
+The piece store can replace tracker configuration through the same flushed temporary checkpoint and
+atomic rename used for ordinary persistence. The proposed configuration is encoded into the temporary
+file while the old in-memory configuration remains current. A cancellation check precedes rename;
+after rename succeeds, the store publishes the new committed configuration and ownership metadata.
+Ordinary checkpoints choose configuration under the store mutex, so a queued save cannot restore a
+stale default captured before another edit.
+
+A caller canceled after rename may not receive the return value even though the commit succeeded.
+The committed configuration remains queryable under the store mutex for ownership reconciliation.
+The caller retains admission while the store uses the configuration. Tests verify repeated saves,
+injected rename failure preserving the old file/state, successful retry, and cancellation precisely
+after rename. Session edit commands and their retained-owner reconciliation remain separate work.
+
+Failed or canceled pre-rename writes remove their staged file only when its recorded OS identity
+still matches, then remove the in-memory temporary ownership entry. Cleanup runs before releasing
+the I/O slot and preserves the original failure if cleanup also fails. Ownership journal records
+remain bounded by the existing compaction mechanism. Repeated canceled replacements are tested on
+the same store, preserving the committed checkpoint and allowing a later successful retry.
+
+## Session tracker edits
+
+The internal session command admits and snapshots a replacement before suspension and allows one
+pending edit. It serializes with pause, resume, and resume-data saves. An active session joins its
+old discovery and peer jobs, revokes private incoming admission, and drains queued connections before
+persisting the replacement. Success restarts a previously active session with the committed tiers;
+ordinary persistence failure restarts with the old tiers. Cancellation can leave the session paused.
+An empty list explicitly disables trackers and remains empty across resume; it never changes the
+metainfo's private flag or enables public discovery.
+
+The command reconciles the store's commit point in non-cancellable cleanup. A rename that completed
+before cancellation transfers the new configuration reservation to the session; otherwise the old
+owner remains. New configuration state and checkpoint encoding allowance are reserved from the
+shared session budget before stopping discovery, while the old allowance is still held. The committed
+allowance remains held for subsequent saves. All sessions reserve control capacity for the validated
+256-entry replacement ceiling, including sessions whose original tracker list was empty.
+
+Edits, saves, and pause persistence are children of the session scope. Closing joins those operations,
+clears the store's in-memory override, and releases its reservations; persisted data remains intact.
+Resume-data saves after closure return null. Caller cancellation joins an outstanding edit before
+returning its uncommitted credit. Tests cover real-engine stop/start ordering and empty overrides,
+failed persistence and retry, post-rename cancellation, snapshot isolation while old discovery joins,
+and admission rejection without interrupting the active session. Public SDK/daemon/UI commands and
+revision conflict handling remain separate work.
+
+## Tracker configuration revisions
+
+Tracker edits now commit a monotonic revision with their checkpoint. Metainfo defaults and legacy
+version-1/version-2 checkpoints start at zero. A committed edit writes checkpoint version 3 with a
+positive `tracker-revision` and the complete override, including explicit empty lists. Old-version
+revision fields, missing/invalid version-3 fields, unknown versions, and exhausted revisions fail
+closed. Ordinary checkpoint saves preserve the revision; failures before rename do not advance it.
+
+Sessions expose a consistent internal tiers/revision snapshot, including before first resume from
+provided checkpoint data. An optional expected revision rejects stale edits before stopping active
+discovery, and the store checks the same revision again under its persistence mutex. Cancellation
+after rename retains the incremented revision together with the committed configuration owner.
+Discovery diagnostics start at the committed revision instead of resetting it to zero on resume.
+
+Tests cover stale edits without discovery interruption or retained credit, pre-resume restoration,
+store persistence/restore, version validation, revision exhaustion, failed edits, cancellation after
+rename, and diagnostic revision wiring. Command idempotency, public conflict responses, and recovery
+when TaskStore resume data lags the on-disk checkpoint remain follow-up integration requirements.
+
+## Recovering edits ahead of TaskStore
+
+Before starting discovery, sessions inspect the checkpoint whose OS identity is recorded in the
+ownership journal. Recovery validates the task, authenticated info hash, output root, and selected
+files, bounds the read by the checkpoint ceiling, and reserves temporary decoding credit before
+allocating its bytes. File identity and size are checked around the bounded read. Unowned, replaced,
+malformed, or differently bound checkpoints fail recovery without being consumed as session state.
+
+A newer tracker revision is adopted with fresh configuration and future-encoding reservations;
+positive equal revisions with different tiers are rejected. Older disk revisions cannot roll back
+TaskStore's configuration. Received/uploaded counters retain the larger authenticated-task value,
+including checkpoints with the same tracker revision. Verified bits and ownership arrays from this
+read are not adopted: the existing journal and payload recheck remain authoritative for ownership
+and progress. Callback failure/cancellation returns decoding credit, and configuration adoption
+reconciles ownership in non-cancellable cleanup.
+
+If recovery fails, pause, save, and shutdown cannot overwrite the newer file with stale in-memory
+state. The committed file remains available for a later retry. This reader decodes a bounded complete
+checkpoint and may reject it when the configured session pool cannot admit that decoding operation;
+streaming recovery and large-profile memory/performance evidence remain required follow-up work.
+Tests exercise a real engine with stale TaskStore data, corrupted payloads, same-revision counters,
+replacement/binding rejection, cancellation/admission cleanup, and a failed-recovery shutdown
+regression that overwrote the committed bytes before the write guard was added.
+
+## Explicit tracker-only engine discovery
+
+The internal engine accepts a privacy choice before resolving a magnet. Public remains the legacy
+default. Tracker-only resolution requires validated supplied trackers, ignores explicit `x.pe`
+endpoints, and does not start DHT discovery. It announces through one preferred tracker at a time,
+tries returned metadata peers sequentially, and closes each metadata connection before a tracker
+can switch. Cancellation does not fall back to public discovery. A successful tracker contact gets
+a bounded best-effort stopped announce when metadata resolution ends.
+
+Only the tracker-only path permits a hash-verified private info dictionary. Public callers still
+reject private metadata, including cache hits populated by an earlier tracker-only request. Cached
+info bytes do not supply endpoints or replace the current caller's tracker list. An explicit task
+privacy field also disables public discovery when the resolved metadata itself is public. Peer
+exchange is neither advertised nor accepted, and incoming hosts must come from tracker responses.
+
+Real TCP tests verify tracker-authorized private metadata, failover from an unavailable tracker,
+ignored explicit peers, no DHT socket attempts, private-cache rejection for public callers, missing
+or invalid tracker rejection before discovery, cancellation while awaiting peers, and the task
+privacy guard after public metadata resolution, including PEX rejection and incoming admission.
+This is engine wiring: source/SDK selection and
+persisted privacy, v2-only magnet metadata/proofs, and the broader network-policy gates remain open.
+The protocol basis is [BEP 27](https://www.bittorrent.org/beps/bep_0027.html) and the info-dictionary
+transfer described by [BEP 9](https://www.bittorrent.org/beps/bep_0009.html).
+
+### Tracker-only metadata fallback review
+
+A successful announce with no usable metadata peers now advances to the next supplied tracker
+within the same resolution round. Each tracker's metadata connections close before a bounded
+best-effort stopped announce and the next tracker starts. Empty responses and failed metadata
+peers both have regression coverage; neither can pin resolution to the first responding tracker.
+The metadata deadline and total peer-attempt bound still apply.
+
+## Source privacy selection and persistence
+
+`TorrentDiscoveryPrivacy` is now a public serializable enum. `TorrentConfig.discoveryPrivacy`
+provides the default for newly resolved inputs. Typed source resolve/metainfo overloads capture an
+explicit choice in `ResolvedSource.metadata`, and execution passes it into `TorrentTaskSpec`.
+Fallback engine adapters reject unsupported tracker-only requests instead of silently using public
+behavior.
+
+Source resume version 2 requires a privacy value and retains it for metadata reuse, refetch, and
+subsequent execution regardless of the new source default. Legacy version 1 omits privacy, follows
+the configured default, and migrates on the next save. Missing version-2 privacy, downgraded values,
+unknown enum values, and unsupported versions fail before the engine starts. The inner checkpoint's
+payload verification and tracker revision rules are unchanged.
+
+Source tests verify default/explicit selection, resolution-to-download handoff, restored metadata
+and metadata refetch, legacy migration, and pre-engine rejection of malformed state. Engine/peer-wire
+privacy tests from the preceding stack remain applicable. Remote negotiation, controller commands,
+and public v2-only magnet proof acquisition remain separate roadmap requirements.
+
+## Session-owned tracker scrape
+
+Active sessions can request a scrape through their existing tracker control. It shares the single
+manual command slot and serialization mutex with reannounce and periodic discovery. Caller
+cancellation joins the owned request; shutdown joins it before releasing control state. The engine
+admits a bounded response/decoding workspace from the shared metadata exchange pool before I/O.
+
+Only the most recently successful announce endpoint is eligible. Scrape cannot select a fallback
+tracker, switch private peers, or authorize new peers. Each endpoint has a 60-second minimum request
+interval within the discovery lifetime, charged before I/O even for failure or cancellation.
+Configuration replacement clears estimates and cooldowns and requires a new successful announce.
+
+Credential-free status snapshots distinguish requested, successful, missing, failed, and canceled
+scrapes. Missing torrent entries clear estimates instead of inventing zero counts. Failed requests
+retain earlier estimates with an explicit failed outcome. These counts never modify local payload
+progress, announce counters, or peer admission. Public controller/remote scrape commands, durable
+request throttling across session restarts, and broader tracker/network-policy gates remain open.
+
+The metadata exchange partition has a minimum of `TRACKER_SCRAPE_WORKSPACE_BYTES`, independent
+of the accepted metainfo-size limit. Small valid metainfo limits therefore retain scrape capability.
+Configuration validation includes this floor in the aggregate exchange ceiling; an explicitly
+undersized aggregate budget fails at construction instead of silently disabling every scrape.

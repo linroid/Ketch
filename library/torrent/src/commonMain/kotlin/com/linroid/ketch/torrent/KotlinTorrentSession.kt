@@ -6,7 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
@@ -15,6 +16,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -38,6 +40,8 @@ internal class KotlinTorrentSession(
   private val discover: suspend (SendChannel<PeerEndpoint>, KotlinTorrentSession) -> Unit,
   private val downloadThrottle: suspend (Int) -> Unit = {},
   private val uploadThrottle: suspend (Int) -> Unit = {},
+  private val trackerConfigurationBudget: TorrentBufferBudget? = null,
+  private val privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
@@ -47,20 +51,131 @@ internal class KotlinTorrentSession(
   private val incoming = Channel<TorrentConnection>(16, onUndeliveredElement = { it.close() })
   private val resets = Channel<CompletableDeferred<Unit>>(1)
 
-  private val allowedPrivateHosts = AtomicReference<Set<String>>(emptySet())
+  suspend fun trackerTiers(): List<List<String>> =
+    store.currentTrackerConfiguration()?.tiers ?: store.metadata.trackerTiers
 
-  fun trackerPeers(peers: List<PeerEndpoint>) {
-    allowedPrivateHosts.store(peers.map { it.host }.toSet())
+  private val trackerEdits = Semaphore(1)
+  private val trackerOwner = AtomicReference<TrackerConfiguration.Owned?>(null)
+  private val trackerWorkspace = AtomicReference<TorrentBufferBudget.Lease?>(null)
+
+  init {
+    checkNotNull(scope.coroutineContext[Job]).invokeOnCompletion {
+      // Every edit/save is a child of this scope; none can still reference the committed override.
+      store.discardTrackerConfiguration()
+      trackerOwner.exchange(null)?.close()
+      trackerWorkspace.exchange(null)?.close()
+    }
+  }
+
+  suspend fun trackerConfiguration(): TrackerConfigurationSnapshot = lifecycle.withLock {
+    if (!recovered) TrackerConfigurationSnapshot(
+      checkpoint?.trackerConfiguration?.tiers ?: store.metadata.trackerTiers,
+      checkpoint?.trackerRevision ?: 0)
+    else store.trackerConfigurationSnapshot()
+  }
+
+  /** False means another edit is pending or configuration credit is unavailable. */
+  suspend fun replaceTrackers(
+    tiers: List<List<String>>,
+    expectedRevision: Long? = null,
+  ): Boolean {
+    require(expectedRevision == null || expectedRevision >= 0)
+    if (!trackerEdits.tryAcquire()) return false
+    var proposal: TrackerConfiguration.Owned? = null
+    var workspace: TorrentBufferBudget.Lease? = null
+    try {
+      val state = trackerConfigurationBudget ?: return false
+      proposal = TrackerConfiguration.admit(tiers, state) ?: return false
+      val candidate = proposal.configuration
+      workspace = state.reserve(candidate.checkpointWorkspaceBytes) ?: return false
+      val pending = scope.async {
+        lifecycle.withLock {
+          check(!closed) { "Torrent session is closed" }
+          if (trackerCheckpointRecovered) {
+            val actualRevision = store.trackerConfigurationSnapshot().revision
+            if (expectedRevision != null && expectedRevision != actualRevision) {
+              throw TrackerRevisionConflict(expectedRevision, actualRevision)
+            }
+            check(actualRevision < Long.MAX_VALUE) { "Tracker configuration revision exhausted" }
+          }
+          val restart = job?.isActive == true
+          val previousState = _state.value
+          try {
+            stopLocked()
+            currentCoroutineContext().ensureActive()
+            recover()
+            try {
+              store.replaceTrackerConfiguration(candidate, received.load(), uploaded.load(),
+                expectedRevision)
+            } finally {
+              withContext(NonCancellable) {
+                // Cancellation at the I/O return boundary does not imply that rename rolled back.
+                if (store.currentTrackerConfiguration() === candidate) {
+                  trackerOwner.exchange(checkNotNull(proposal).transfer())?.close()
+                  trackerWorkspace.exchange(checkNotNull(workspace))?.close()
+                  workspace = null
+                }
+              }
+            }
+          } finally {
+            if (restart && currentCoroutineContext()[Job]?.isActive == true) resumeLocked()
+            else if (!restart) _state.value = previousState
+          }
+          true
+        }
+      }
+      try { return pending.await() } finally {
+        withContext(NonCancellable) { pending.cancelAndJoin() }
+      }
+    } finally {
+      proposal?.close()
+      workspace?.close()
+      trackerEdits.release()
+    }
+  }
+
+  private val trackerControl = AtomicReference<TrackerControl?>(null)
+  private val _trackerStatus = MutableStateFlow<List<TrackerStatus>>(emptyList())
+  val trackerStatus: StateFlow<List<TrackerStatus>> = _trackerStatus
+
+  suspend fun reannounceTrackers(): Boolean = trackerControl.load()?.reannounce() ?: false
+
+  suspend fun scrapeTracker(): Boolean = trackerControl.load()?.scrape() ?: false
+
+  fun attachTrackerControl(control: TrackerControl) {
+    check(trackerControl.compareAndSet(null, control))
+  }
+
+  fun detachTrackerControl(control: TrackerControl) {
+    check(trackerControl.compareAndSet(control, null))
+  }
+
+  fun updateTrackerStatus(status: List<TrackerStatus>) { _trackerStatus.value = status }
+
+  private val trackerRestricted = store.metadata.isPrivate ||
+    privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY
+  private val privateAdmission = Mutex()
+  private var allowedPrivateHosts: Set<String> = emptySet()
+
+  suspend fun trackerPeers(peers: List<PeerEndpoint>) {
+    val hosts = peers.map { it.host }.toSet()
+    privateAdmission.withLock { allowedPrivateHosts = hosts }
   }
 
   fun accept(connection: TorrentConnection): Boolean {
     if (_state.value != TorrentSessionState.DOWNLOADING &&
       _state.value != TorrentSessionState.SEEDING) return false
-    if (store.metadata.isPrivate && connection.remote.host !in allowedPrivateHosts.load()) return false
-    return incoming.trySend(connection).isSuccess
+    if (!trackerRestricted) return incoming.trySend(connection).isSuccess
+    if (!privateAdmission.tryLock()) return false
+    try {
+      if (connection.remote.host !in allowedPrivateHosts) return false
+      return incoming.trySend(connection).isSuccess
+    } finally { privateAdmission.unlock() }
   }
 
   suspend fun resetPeers() {
+    // Admission and enqueue share the lock: every old-host enqueue precedes this revocation.
+    privateAdmission.withLock { allowedPrivateHosts = emptySet() }
     val done = CompletableDeferred<Unit>()
     resets.send(done)
     done.await()
@@ -81,6 +196,7 @@ internal class KotlinTorrentSession(
   private var closed = false
   private var filesDeleted = false
   private var recovered = false
+  private var trackerCheckpointRecovered = false
   private val _state = MutableStateFlow(TorrentSessionState.PAUSED)
   private val _downloadedBytes = MutableStateFlow(0L)
   private val _failure = MutableStateFlow<Throwable?>(null)
@@ -98,19 +214,17 @@ internal class KotlinTorrentSession(
   suspend fun verifiedPieces(): BooleanArray = store.verifiedPieces()
   suspend fun fileProgress(): LongArray = store.progress()
 
-  override suspend fun resume() = lifecycle.withLock {
+  override suspend fun resume() = lifecycle.withLock { resumeLocked() }
+
+  private fun resumeLocked() {
     check(!closed) { "Torrent session is closed" }
     scope.coroutineContext.ensureActive()
-    if (job?.isActive == true) return@withLock
+    if (job?.isActive == true) return
     _failure.value = null
     job = scope.launch {
       try {
         _state.value = TorrentSessionState.CHECKING_FILES
-        if (!recovered) {
-          checkpoint?.let { store.restore(it) }
-          recovered = true
-        }
-        store.initialize()
+        recover()
         store.recheck()
         _downloadedBytes.value = store.progress().sum()
         if (store.completed() && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -133,6 +247,7 @@ internal class KotlinTorrentSession(
           try {
             TorrentSwarm(store, network, budget, peerId = peerId,
               connections = { connectionLimit.load() }, uploadPolicy = uploadPolicy,
+              trackerOnly = trackerRestricted,
               downloadPayload = { bytes ->
                 val total = received.fetchAndAdd(bytes.toLong()) + bytes
                 val now = clock()
@@ -173,19 +288,95 @@ internal class KotlinTorrentSession(
     }
   }
 
-  override suspend fun pause() = lifecycle.withLock {
-    if (closed) return@withLock
+  private suspend fun recover() {
+    if (!recovered) {
+      checkpoint?.let { store.restore(it) }
+      recovered = true
+    }
+    store.initialize()
+    if (trackerCheckpointRecovered) return
+    val state = trackerConfigurationBudget ?: return
+    store.withPersistedCheckpoint(state) { saved ->
+      val current = store.trackerConfigurationSnapshot()
+      if (saved.trackerRevision > current.revision) {
+        val proposal = checkNotNull(TrackerConfiguration.admit(
+          checkNotNull(saved.trackerConfiguration).tiers, state)) {
+          "Recovered tracker configuration budget exhausted"
+        }
+        var workspace: TorrentBufferBudget.Lease? = null
+        val candidate = proposal.configuration
+        try {
+          workspace = checkNotNull(state.reserve(candidate.checkpointWorkspaceBytes)) {
+            "Recovered tracker checkpoint workspace exhausted"
+          }
+          try { store.adoptTrackerCheckpoint(saved, candidate) } finally {
+            withContext(NonCancellable) {
+              if (store.currentTrackerConfiguration() === candidate) {
+                trackerOwner.exchange(proposal.transfer())?.close()
+                trackerWorkspace.exchange(checkNotNull(workspace))?.close()
+                workspace = null
+                received.store(maxOf(received.load(), saved.receivedBytes))
+                uploaded.store(maxOf(uploaded.load(), saved.uploadedBytes))
+              }
+            }
+          }
+        } finally {
+          proposal.close()
+          workspace?.close()
+        }
+      } else if (saved.trackerRevision == current.revision && current.revision > 0) {
+        require(saved.trackerConfiguration?.tiers == current.tiers) {
+          "Conflicting tracker configurations at the same revision"
+        }
+      }
+      received.store(maxOf(received.load(), saved.receivedBytes))
+      uploaded.store(maxOf(uploaded.load(), saved.uploadedBytes))
+    }
+    trackerCheckpointRecovered = true
+  }
+
+  private suspend fun stopLocked() = withContext(NonCancellable) {
     job?.cancelAndJoin()
     job = null
+    privateAdmission.withLock { allowedPrivateHosts = emptySet() }
     while (true) (incoming.tryReceive().getOrNull() ?: break).close()
     _state.value = TorrentSessionState.PAUSED
     currentSpeed.store(0)
-    if (store.isInitialized()) store.persistCheckpoint(received.load(), uploaded.load())
   }
 
-  override suspend fun saveResumeData(): ByteArray? = if (store.isInitialized()) {
-    store.persistCheckpoint(received.load(), uploaded.load())
-  } else null
+  private suspend fun canSaveCheckpoint(): Boolean = store.isInitialized() &&
+    (trackerConfigurationBudget == null || trackerCheckpointRecovered)
+
+  override suspend fun pause() {
+    if (scope.coroutineContext[Job]?.isActive != true) {
+      lifecycle.withLock { if (!closed) stopLocked() }
+      return
+    }
+    val pending = scope.async {
+      lifecycle.withLock {
+        if (!closed) {
+          stopLocked()
+          if (canSaveCheckpoint()) store.persistCheckpoint(received.load(), uploaded.load())
+        }
+      }
+    }
+    try { pending.await() } finally {
+      withContext(NonCancellable) { pending.cancelAndJoin() }
+    }
+  }
+
+  override suspend fun saveResumeData(): ByteArray? {
+    if (scope.coroutineContext[Job]?.isActive != true) return null
+    val pending = scope.async {
+      lifecycle.withLock {
+        if (closed || !canSaveCheckpoint()) null
+        else store.persistCheckpoint(received.load(), uploaded.load())
+      }
+    }
+    try { return pending.await() } finally {
+      withContext(NonCancellable) { pending.cancelAndJoin() }
+    }
+  }
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = rate.set(bytesPerSecond)
 
@@ -207,7 +398,7 @@ internal class KotlinTorrentSession(
     if (!closed) {
       job?.cancelAndJoin()
       job = null
-      scope.cancel()
+      checkNotNull(scope.coroutineContext[Job]).cancelAndJoin()
       incoming.cancel()
       resets.cancel()
       closed = true
