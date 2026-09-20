@@ -273,3 +273,172 @@ These executed process-exit cases extend the injected-I/O tests. They do not pro
 ordering, directory-entry durability, physical mobile lifecycle behavior, or the still-pending v2
 runtime/network integration. The iOS simulator task requires `-PenableIosSimulatorTests=true`;
 a successful Gradle build without that flag skips simulator execution and is not test evidence.
+
+### BEP 52 hash-message wire codec
+
+`PeerHashWire` encodes and decodes hash request (21), hashes (22), and hash reject (23) payloads
+through the existing bounded `PeerWire` frames. It preserves full file-root hashes and unsigned
+32-bit indices, requires aligned power-of-two ranges, and checks exact response lengths before
+copying hash bytes. The response count omits the first `log2(length)-1` proof layers while retaining
+the requested proof-layer count in the selector, as specified by
+[BEP 52](https://raw.githubusercontent.com/bittorrent/bittorrent.org/master/beps/bep_0052.rst).
+
+This adapter limits requests to 512 hashes, following BEP 52's recommended maximum, and bounds
+layer fields to 63. Authenticated file-tree bounds, supported base-layer policy, outstanding-request
+correlation, buffer admission, response proof authentication and hash serving remain required
+connection-handler work. The codec alone does not authorize any hashes or payload progress.
+It is separate from the v1 runtime: later v2 negotiation must explicitly route these frames to it.
+
+### Authenticating peer hash responses
+
+`verifyPeerHashes` checks exact selector correlation and authenticates a bounded response against a
+file root supplied by trusted metadata. It validates the tree dimensions from file length, rejects
+out-of-tree ranges and proofs that do not reach the root, reduces the aligned base-hash group,
+and incorporates uncle hashes in the correct left/right order. Any supplied node covering only
+padding must equal the canonical zero subtree at its layer, even if a noncanonical tree would
+otherwise match the supplied root. Tree arithmetic supports the signed 64-bit file-length range
+without allocating a tree proportional to file size.
+
+This verifier accepts complete proofs to a trusted root. Intermediate cached anchors, outstanding
+request ownership, hash-byte admission/caching and connection handling remain separate work. A
+successful hash proof authenticates metadata hashes; actual payload still requires verification
+and the storage commit barrier before availability is published.
+
+### Hash exchange ownership and admission
+
+`PeerHashExchange` belongs to one connection event loop. Its root-to-length lookup must be restricted
+to authenticated metainfo. It validates complete-proof tree bounds and reserves shared hash-exchange
+credit before returning a request ticket. Duplicate requests, pipeline saturation and exhausted
+credit cannot grow the pending set. The allowance covers three hash-byte representations plus
+bounded verification scratch; unsolicited-frame parser admission remains the reader's responsibility.
+
+Replies must match an outstanding selector and arrive before its deadline. Full-root proof
+verification precedes delivery; rejection, invalid proof, expiry, cancellation and connection close
+release pending credit. Local ticket identity prevents a stale send/cancel callback from releasing a
+new request at the same coordinates. A successful result carries its reservation until the consumer
+closes it, including after connection shutdown. Consumers must drop retained hash bytes before
+releasing that reservation. The connection timer must invoke expiry even while payloads are choked.
+
+Wire replies have no transaction identifier beyond their selector. A delayed response matching a
+new request for the same immutable root/coordinates can satisfy it only after proof authentication;
+it cannot change the trusted content. Live connection routing, timers, parser admission and hash
+cache ownership still need runtime integration. This does not mark step 08 complete.
+
+### Bounded transport dispatch
+
+`PeerHashTransport` connects request ownership to frame issuance, bounded body reads and actor
+response dispatch on an already negotiated v2 connection. It reserves body/decode credit after
+checking the length prefix and before reading the body; consumers keep frame credit until dispatch
+finishes. Authenticated results retain their separate exchange reservation. Ordinary peer messages
+remain available to other actor handlers, and incoming hash requests are surfaced for serving.
+
+Write failure or cancellation closes the possibly partial stream and releases pending exchange
+credit. Read failure, timeout or inability to admit a body closes the stream and releases its frame
+credit; the actor must then close the transport and join the reader. A frame reservation is handed
+off only after the timeout scope returns, preventing cancellation at that boundary from losing its
+lease. Request/accept/expiry/close belong to one actor, with one separately serialized reader.
+
+Tests exercise framed exchange over loopback TCP as well as injected failures and timeout/budget
+boundaries. They do not perform v2 handshake negotiation or independent-client interoperability.
+The full runtime actor, handshake routing, timer wiring, reply serving and payload integration are
+still required before this adapter becomes a supported torrent capability.
+
+Trusted piece-count frame bounds now permit the desktop-profile one-million-piece bitfield
+(125,000 bytes plus its message ID). Unrelated messages retain the ordinary 64 KiB ceiling.
+
+
+### Piece-count-aware frame bounds
+
+`PeerFrameLimits` derives exact bitfield size from a known piece count up to one million. Generic
+peer decoding defaults to the existing 64 KiB ceiling when no count is known. With a known count,
+only bitfield frames can exceed that ceiling; extended, unknown and hash messages retain it.
+Both peer readers inspect the ID and exact bitfield length before reading the remaining body.
+Spare bits and piece indices are validated against the count, and availability state supports the
+same one-million-piece ceiling. V1 metadata supplies its own count; v2 callers supply the authenticated
+layout count without synthesizing SHA-1 hashes.
+
+The hash transport reserves all frame/decode credit for the larger body before reading it and
+retains that credit through dispatch. This removes the wire-size obstacle to the desktop target.
+Aggregate session/peer admission, complete v2 runtime integration and measured production resource
+gates still need verification; accepting a large bitfield alone does not prove those gates.
+
+### Full-identity handshake routes
+
+`PeerIdentityHandshake` retains the caller's full v1/v2 identity while using a separate 20-byte tag
+only for the wire handshake. It supports direct v1/v2 initiation and response, plus explicitly
+offered hybrid upgrades using BEP 52's reserved-byte flag. An upgrade can be accepted only when it
+was offered; a v2 initiation cannot silently downgrade. Incoming tags matching both local aliases
+are rejected as ambiguous. Protocol framing, self-connections and optional expected peer IDs are
+validated. The handshake reserves bounded scratch before I/O, has a ten-second deadline and closes
+the connection on admission, validation, cancellation or I/O failure.
+
+A handshake tag remains a routing hint, not authentication of the remote's full content identity.
+Metainfo and payload/hash proofs still have to satisfy the full expected topics. A multi-torrent
+listener must also reject ambiguous registry matches before selecting a route. Extension/DHT flags
+default off and must only be enabled by a runtime that implements and permits those capabilities.
+
+A loopback test negotiates direct v2 from a validated document before sending a hash request through
+the admitted transport and authenticating the reply. This connects the primitives over real TCP;
+it does not establish independent-client interoperability, a complete payload actor, global listener
+routing, magnet resolution or the remaining production release gates.
+
+### Explicit payload-request responses
+
+The wire codec recognizes reject messages (ID 16) with the same bounded index/begin/length fields
+as requests. `PeerProtocolState` has an explicit-response mode for v2: choking retains outstanding
+requests, and local cancellation marks their eventual payload for discard without freeing a pipeline
+slot. Only the matching piece or rejection completes that request. Mismatched/unsolicited rejections
+and unsolicited or duplicate v2 pieces fail; the legacy mode preserves its existing choke and late
+duplicate behavior.
+
+This follows [BEP 52's request/cancel/reject rules](
+https://raw.githubusercontent.com/bittorrent/bittorrent.org/master/beps/bep_0052.rst).
+The v2 actor must select this mode, transmit cancellation/rejection frames as required, and enforce
+request deadlines/connection teardown. This state slice does not yet implement that actor or the
+remaining optional Fast Extension messages.
+
+### Admitted outbound peer frames
+
+The v2 transport now sends ordinary peer messages and typed hash responses. It validates and
+computes encoded size without copying the payload, reserves encoder/write scratch before encoding,
+and holds that credit until the write unwinds. Hash responses reserve before converting immutable
+proof bytes into a generic wire frame. Generic sends reject hash IDs so outgoing hash requests
+cannot bypass the exchange's pending-request registration.
+
+Admission or input validation failure emits no bytes and leaves the stream usable. A write failure,
+timeout or cancellation may have emitted a partial frame, so it closes the stream and releases all
+pending hash tickets. The actor serializes all writes and retains ownership of supplied payload
+buffers until the call returns; this adapter does not admit those preexisting buffers. Tests cover
+backpressure/cancellation, partial writes, typed replies and a two-way TCP hash exchange.
+
+This supplies the outbound path for the forthcoming v2 payload actor. Proof generation, incoming
+request ownership, choking/seeding policy, block deadlines and runtime integration remain required.
+
+### V2 block response ownership and deadlines
+
+`PeerBlockExchange` connects the explicit-response state to admitted transport writes and the
+file-aligned content layout. Requests cannot cross a real file tail into alignment padding. It
+reserves pending/retained-block credit before registering or sending a request, and bounds duplicate
+requests and pipeline slots. Chokes and cancels retain that ownership until a matching response;
+repeated or stale cancellation tickets cannot cancel a later request with the same coordinates.
+
+Every request has an absolute response deadline, including time spent writing. Writes are bounded
+by the earliest pending deadline, so a blocked new request or cancel cannot conceal an older expired
+request. Control traffic and cancellation do not refresh deadlines. The actor schedules the next
+expiry using `nextDeadlineMs` and calls `expire`; inbound dispatch also checks expiry. Expiry, invalid
+responses and failed/partial writes close the transport and release all pending blocks. Closing a
+connection instead of recycling its timed-out request slots prevents late responses from silently
+being attributed to a retry on that same stream.
+
+Delivered blocks are explicitly unverified and retain their own credit after the input frame closes
+and even after connection shutdown. The consumer closes the block only after verifying or copying
+it into an independently admitted piece assembly buffer. Session admission still must cover the
+availability array before constructing this actor-owned helper. The runtime must join the reader
+before releasing connection admission. Full event-loop/timer wiring, piece assembly and commit,
+upload/hash serving and scheduler integration remain required; this helper is not a complete v2
+session or production-capability claim.
+
+Outbound frame admission also precedes block request registration. Temporary frame pressure returns
+null for a new request without disturbing existing requests. Cancellation returns false when its
+frame cannot be admitted and leaves the request uncanceled, so the actor may retry after credit
+returns. Neither path emits bytes or resets deadlines; real partial writes still close the stream.

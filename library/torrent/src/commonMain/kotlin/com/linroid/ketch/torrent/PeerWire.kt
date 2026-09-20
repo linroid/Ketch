@@ -12,6 +12,7 @@ internal sealed interface PeerMessage {
   data class Request(val index: Int, val begin: Int, val length: Int) : PeerMessage
   data class Piece(val index: Int, val begin: Int, val bytes: ByteArray) : PeerMessage
   data class Cancel(val index: Int, val begin: Int, val length: Int) : PeerMessage
+  data class Reject(val index: Int, val begin: Int, val length: Int) : PeerMessage
   data class Port(val port: Int) : PeerMessage
   data class Extended(val id: Int, val payload: ByteArray) : PeerMessage
   data class Unknown(val id: Int, val payload: ByteArray) : PeerMessage
@@ -29,6 +30,7 @@ internal class PeerWire(
   private val connection: TorrentConnection,
   private val metadata: TorrentMetadata? = null,
   private val idleTimeoutMs: Long = 180_000,
+  private val pieceCount: Int? = metadata?.let { it.pieceHashes.size / 20 },
 ) {
   suspend fun handshake(local: PeerHandshake): PeerHandshake = withTimeout(10_000) {
     connection.write(encodeHandshake(local))
@@ -37,12 +39,17 @@ internal class PeerWire(
 
   suspend fun read(): PeerMessage = withTimeout(idleTimeoutMs) {
     val size = Buffer().write(connection.readExactly(4)).readInt()
-    require(size in 0..MAX_FRAME_SIZE) { "Peer frame exceeds limit" }
-    decode(connection.readExactly(size), metadata)
+    val limits = PeerFrameLimits(pieceCount)
+    limits.validateSize(size)
+    if (size == 0) return@withTimeout PeerMessage.KeepAlive
+    val id = connection.readExactly(1).single().toInt() and 255
+    limits.validateType(size, id)
+    val payload = Buffer().writeByte(id).write(connection.readExactly(size - 1)).readByteArray()
+    decode(payload, metadata, pieceCount)
   }
 
   suspend fun send(message: PeerMessage) = withTimeout(idleTimeoutMs) {
-    connection.write(encode(message, metadata))
+    connection.write(encode(message, metadata, pieceCount))
   }
 
   companion object {
@@ -72,11 +79,17 @@ internal class PeerWire(
       )
     }
 
-    fun decode(payload: ByteArray, metadata: TorrentMetadata? = null): PeerMessage {
-      require(payload.size <= MAX_FRAME_SIZE)
+    fun decode(
+      payload: ByteArray,
+      metadata: TorrentMetadata? = null,
+      pieceCount: Int? = metadata?.let { it.pieceHashes.size / 20 },
+    ): PeerMessage {
+      val limits = PeerFrameLimits(pieceCount)
+      limits.validateSize(payload.size)
       if (payload.isEmpty()) return PeerMessage.KeepAlive
       val input = Buffer().write(payload)
       val id = input.readByte().toInt() and 255
+      limits.validateType(payload.size, id)
       fun exact(size: Int) = require(input.size == size.toLong()) { "Invalid peer message length" }
       val message = when (id) {
         in 0..3 -> {
@@ -88,13 +101,14 @@ internal class PeerWire(
           PeerMessage.Have(input.readInt())
         }
         5 -> PeerMessage.Bitfield(input.readByteArray())
-        6, 8 -> {
+        6, 8, 16 -> {
           exact(12)
           val index = input.readInt()
           val begin = input.readInt()
           val length = input.readInt()
           if (id == 6) PeerMessage.Request(index, begin, length)
-          else PeerMessage.Cancel(index, begin, length)
+          else if (id == 8) PeerMessage.Cancel(index, begin, length)
+          else PeerMessage.Reject(index, begin, length)
         }
         7 -> {
           require(input.size >= 9) { "Empty or truncated peer block" }
@@ -110,12 +124,34 @@ internal class PeerWire(
         }
         else -> PeerMessage.Unknown(id, input.readByteArray())
       }
-      validate(message, metadata)
+      validate(message, metadata, pieceCount)
       return message
     }
 
-    fun encode(message: PeerMessage, metadata: TorrentMetadata? = null): ByteArray {
-      validate(message, metadata)
+    /** Validates before computing bounded encoder scratch, without copying any payload. */
+    fun encodedSize(message: PeerMessage, pieceCount: Int? = null): Int {
+      validate(message, null, pieceCount)
+      val body = when (message) {
+        PeerMessage.KeepAlive -> 0
+        is PeerMessage.Control -> 1
+        is PeerMessage.Have -> 5
+        is PeerMessage.Bitfield -> 1 + message.bytes.size
+        is PeerMessage.Request, is PeerMessage.Cancel, is PeerMessage.Reject -> 13
+        is PeerMessage.Piece -> 9 + message.bytes.size
+        is PeerMessage.Port -> 3
+        is PeerMessage.Extended -> 2 + message.payload.size
+        is PeerMessage.Unknown -> 1 + message.payload.size
+      }
+      PeerFrameLimits(pieceCount).validateSize(body)
+      return body + 4
+    }
+
+    fun encode(
+      message: PeerMessage,
+      metadata: TorrentMetadata? = null,
+      pieceCount: Int? = metadata?.let { it.pieceHashes.size / 20 },
+    ): ByteArray {
+      validate(message, metadata, pieceCount)
       val out = Buffer()
       when (message) {
         PeerMessage.KeepAlive -> Unit
@@ -128,39 +164,44 @@ internal class PeerWire(
           .writeInt(message.begin).write(message.bytes)
         is PeerMessage.Cancel -> out.writeByte(8).writeInt(message.index)
           .writeInt(message.begin).writeInt(message.length)
+        is PeerMessage.Reject -> out.writeByte(16).writeInt(message.index)
+          .writeInt(message.begin).writeInt(message.length)
         is PeerMessage.Port -> out.writeByte(9).writeShort(message.port)
         is PeerMessage.Extended -> out.writeByte(20).writeByte(message.id).write(message.payload)
         is PeerMessage.Unknown -> out.writeByte(message.id).write(message.payload)
       }
-      require(out.size <= MAX_FRAME_SIZE)
+      PeerFrameLimits(pieceCount).validateSize(out.size.toInt())
       return Buffer().writeInt(out.size.toInt()).write(out.readByteArray()).readByteArray()
     }
 
-    private fun validate(message: PeerMessage, metadata: TorrentMetadata?) {
+    private fun validate(message: PeerMessage, metadata: TorrentMetadata?, pieceCount: Int?) {
+      val limits = PeerFrameLimits(pieceCount)
+      require(metadata == null || pieceCount == metadata.pieceHashes.size / 20)
+      val index = when (message) {
+        is PeerMessage.Have -> message.index
+        is PeerMessage.Request -> message.index
+        is PeerMessage.Cancel -> message.index
+        is PeerMessage.Piece -> message.index
+        is PeerMessage.Reject -> message.index
+        else -> null
+      }
+      if (index != null && pieceCount != null) require(index in 0 until pieceCount)
       when (message) {
         is PeerMessage.Have -> validateIndex(message.index, metadata)
         is PeerMessage.Request ->
           validateBlock(message.index, message.begin, message.length, metadata)
         is PeerMessage.Cancel ->
           validateBlock(message.index, message.begin, message.length, metadata)
+        is PeerMessage.Reject ->
+          validateBlock(message.index, message.begin, message.length, metadata)
         is PeerMessage.Piece ->
           validateBlock(message.index, message.begin, message.bytes.size, metadata)
-        is PeerMessage.Bitfield -> {
-          require(message.bytes.size < MAX_FRAME_SIZE)
-          if (metadata != null) {
-            val count = metadata.pieceHashes.size / 20
-            require(message.bytes.size == (count + 7) / 8) { "Wrong bitfield size" }
-            val spare = (8 - count % 8) % 8
-            if (spare != 0) {
-              require(message.bytes.last().toInt() and ((1 shl spare) - 1) == 0) {
-                "Nonzero bitfield padding"
-              }
-            }
-          }
-        }
+        is PeerMessage.Bitfield -> limits.validateBitfield(message.bytes)
         is PeerMessage.Port -> require(message.port in 1..65535)
-        is PeerMessage.Extended -> require(message.id in 0..255)
-        is PeerMessage.Unknown -> require(message.id in 0..255)
+        is PeerMessage.Extended -> require(message.id in 0..255 &&
+          message.payload.size <= MAX_FRAME_SIZE - 2)
+        is PeerMessage.Unknown -> require(message.id in 0..255 &&
+          message.payload.size <= MAX_FRAME_SIZE - 1)
         else -> Unit
       }
     }
