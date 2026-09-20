@@ -151,3 +151,125 @@ Recheck scans each non-empty selected file through one handle and flushes once i
 match. Its bitmap updates remain tentative under the store mutex until that file's flush and
 cancellation boundary succeed. Failure rolls back that file's tentative bits before unlocking;
 previously completed files remain verified. This avoids a durable flush for every small piece.
+
+## Bounded content catalog
+
+`TorrentContentCatalog` stores authenticated raw info and external piece layers under the full
+v2 hash in a caller-private catalog directory. Hybrid loads authenticate every requested topic.
+Serialization retains exact raw info bytes and omits caller context such as tracker URLs and
+comments. Existing entries are authenticated before reuse; corrupt objects are rejected rather
+than overwritten. Reads check a 32 MiB size bound before loading and reject growth during a read.
+
+Publication flushes a uniquely created temporary file before no-replace hard-link creation, retaining
+the I/O
+permit through completion. Failed publication removes only its own unchanged temporary file.
+A reopened catalog revalidates identities and layers instead of trusting its filenames. Tests
+exercise restart reads, hybrid topics/layers, corrupt/oversized entries and publication failure.
+
+This is the bounded in-memory catalog path. Runtime memory admission, streamed/spilled objects
+at full production layer limits, catalog reference accounting/garbage collection, directory-fsync
+power-loss guarantees and checkpoint v2 references remain pending. It does not yet persist task
+ownership, selections or progress and does not enable restart of a download by itself.
+
+Catalog publication uses the platform's atomic hard-link creation and never replaces an existing
+name. Both a new object and a competing winner are authenticated before returning its reference.
+JVM/Android use `Files.createLink`; iOS uses POSIX `link`. Filesystems without hard-link support
+fail explicitly; they need a separate provider adapter, not a replacing-move fallback. The
+publication-race regression inserts valid and invalid competing targets at the exact boundary.
+
+## Version 2 checkpoint format
+
+`TorrentV2Checkpoint` references a full v2 catalog identity and retains the v1 topic for hybrids.
+It records task/output binding, mapping policy version, explicit selections, layout/selection
+generations, transfer counters and a piece-bitfield hint. Ownership records use prior-parent
+references with one component per row, avoiding repeated long prefixes. File/directory kind is
+encoded in the sign of the parent reference; the root is an explicit owned directory.
+
+Decoding bounds the document to 32 MiB, 220,000 ownership rows and 100,000 selections. It rejects
+future format/mapping versions, invalid UTF-8, duplicate paths/selections, missing or non-directory
+parents, forward references, traversal and negative counters. After catalog resolution,
+`validateContent` verifies the full identity, logical selections, mapped ownership paths and exact
+bitfield size/padding. Version 1 state continues through its existing decoder; version 2 is not
+mistaken for a legacy native blob.
+
+This is the codec and binding layer, not task recovery. Before using ownership claims, recovery
+must also match the expected task and caller-authorized root, verify current OS identities, and
+rehash files instead of trusting hint bits. TaskStore publication, ownership journals, v1 migration,
+resume wiring, streaming large state and full-profile admission/power-loss tests remain pending.
+
+## Store snapshots and ownership recovery
+
+The v2 store now has an explicit task identity. `checkpoint` publishes authenticated catalog
+content first, then captures its owned files/directories, selections, generations, counters and
+hint bits under the store mutex. Transfer counters cannot move backwards. The returned codec
+object still needs atomic publication by the task-state layer.
+
+`restore` accepts only an untouched store and checks the expected task, caller-authorized output,
+selection and authenticated content mapping. It validates every recorded OS identity and kind
+before adopting any records, so a failed restore leaves the store empty and retryable. Successful
+restore retains generations/counters but discards all availability hints. Initialization handles
+only validated owned paths or exclusive new creation, and recheck/commit prove bytes before
+progress. Fully verified owned files are trimmed to their declared lengths; foreign replacements
+are neither adopted nor deleted.
+
+This supports checkpoint-backed live-store recovery, not the complete engine resume path. Atomic
+TaskStore publication, durable creation journals for files created after the last snapshot,
+missing-file repair/import, v1 migration, state admission and power-loss qualification remain open.
+
+### Atomic checkpoint files
+
+`TorrentCheckpointFile` publishes task snapshots in an existing caller-private state directory.
+It validates the snapshot against its document and publishes authenticated catalog content first.
+A unique temporary file is written and flushed before atomic replacement of the task's state file;
+failed writes, flushes or replacement retain the previous complete checkpoint. Temporary cleanup
+checks the identity of the file created by this attempt. Loads distinguish missing state from
+malformed state, reject oversized files before allocation, check the task binding, and authenticate
+the referenced catalog document before returning recovery inputs. Store recovery still checks the
+expected output/selection and OS ownership; loaded bitfields remain hints.
+
+Replacement rejects changed content/output bindings, regressed counters or generations, and a
+selection change without a new selection generation. A runtime task owner must serialize writers
+through one adapter instance; cross-process arbitration is not provided. Cancellation observed
+before replacement discards the staged file. Cancellation concurrent with atomic replacement can
+leave the complete new snapshot persisted even though the coroutine returns cancellation; recovery
+must load the persisted state instead of inferring publication from the caller's return value.
+
+This adapter does not yet wire v2 state into `TaskStore` or the engine. Durable creation journals,
+state-memory admission, migration and directory-fsync power-loss recovery remain required work.
+
+### Creation-log recovery before a checkpoint
+
+A v2 store can receive a caller-private `creationLogPath` outside its payload root. Initialization
+publishes a complete task/content/output/selection/mapping-bound header before creating payload
+paths. Each created path's OS identity and kind are flushed in a checksummed, length-framed record;
+compact parent references avoid repeatedly serializing full prefixes. Replay bounds file size,
+record size, count and depth, discards a torn final append, and rejects complete checksum corruption.
+The log uses the same no-replace header publication primitive as the content catalog.
+
+Initialization can recover directly from this log without a checkpoint. All recovered claims must
+belong to the authenticated output mapping and match current filesystem identities before any are
+adopted. Checkpoint claims and log claims must agree when both exist. Missing uncreated files can
+then be created, and payload recheck rebuilds availability. A failed live append is retried before
+further creation. A process exit between creation and successful ownership recording can leave an
+unclaimed path; restart preserves it and refuses to adopt or delete it. This conservative boundary
+also applies to the existing v1 implementation.
+
+The log requires one task writer and a private state directory; it does not arbitrate independent
+processes. Payload cleanup leaves private log disposal to the task-state owner, after successful
+cleanup. Runtime wiring, state admission, log lifecycle/compaction, process-kill coverage and
+power-loss guarantees remain pending; these tests exercise new store instances and injected I/O
+failures rather than claiming physical crash or mobile lifecycle coverage.
+
+### Controlled process-exit evidence
+
+`TorrentV2ProcessCrashTest` runs four independent JVM children that call `Runtime.halt` at actual
+storage boundaries, bypassing coroutine cleanup and shutdown hooks. Recovery rejects a partially
+written piece, rechecks a flushed piece without any checkpoint, preserves the old complete snapshot
+when exit occurs before atomic replacement, and reads the new snapshot after replacement. Each
+case then completes the payload, cleans up owned files and verifies an unrelated neighbor remains.
+The parent enforces a child deadline and joins forced termination before deleting test fixtures.
+
+These executed process-exit cases extend the injected-I/O tests. They do not prove power-loss
+ordering, directory-entry durability, physical mobile lifecycle behavior, or the still-pending v2
+runtime/network integration. The iOS simulator task requires `-PenableIosSimulatorTests=true`;
+a successful Gradle build without that flag skips simulator execution and is not test evidence.

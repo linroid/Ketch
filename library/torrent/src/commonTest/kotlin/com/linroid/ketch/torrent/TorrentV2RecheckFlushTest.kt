@@ -37,19 +37,19 @@ class TorrentV2RecheckFlushTest {
         val delegate = super.openReadWrite(file, mustCreate, mustExist)
         return object : FileHandle(readWrite = true) {
           override fun protectedRead(
-            offset: Long,
+            fileOffset: Long,
             array: ByteArray,
             arrayOffset: Int,
             byteCount: Int,
           ) =
-            delegate.read(offset, array, arrayOffset, byteCount)
+            delegate.read(fileOffset, array, arrayOffset, byteCount)
           override fun protectedWrite(
-            offset: Long,
+            fileOffset: Long,
             array: ByteArray,
             arrayOffset: Int,
             byteCount: Int,
           ) =
-            delegate.write(offset, array, arrayOffset, byteCount)
+            delegate.write(fileOffset, array, arrayOffset, byteCount)
           override fun protectedFlush() {
             flushes++
             if (failFlush) throw IOException("Injected flush failure")
@@ -61,7 +61,7 @@ class TorrentV2RecheckFlushTest {
         }
       }
     }
-    val store = TorrentV2PieceStore(document, root, emptySet(),
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test",
       TorrentBufferBudget(65_536), Semaphore(1), provider)
     try {
       store.initialize()

@@ -43,7 +43,7 @@ class TorrentV2StorageCancellationTest {
         return super.openReadWrite(file, mustCreate, mustExist)
       }
     }
-    val store = TorrentV2PieceStore(document, root, emptySet(), budget, slots, provider)
+    val store = TorrentV2PieceStore(document, root, emptySet(), "test", budget, slots, provider)
     try {
       store.initialize()
       blockWrites = true

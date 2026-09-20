@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import okio.ByteString.Companion.toByteString
 import okio.EOFException
 import okio.FileHandle
 import okio.FileSystem
@@ -17,14 +18,16 @@ import okio.Path
 import okio.use
 import kotlin.coroutines.CoroutineContext
 
-/** Fresh-directory v2/hybrid storage. Existing destinations require the future import path. */
+/** Owned v2/hybrid storage; existing roots require a bound checkpoint and OS identity checks. */
 internal class TorrentV2PieceStore(
-  document: TorrentV2Document,
+  private val document: TorrentV2Document,
   private val output: Path,
   selectedIds: Set<String>,
+  private val taskId: String,
   private val buffers: TorrentBufferBudget,
   private val storageSlots: Semaphore,
   private val fileSystem: FileSystem = torrentFileSystem,
+  private val creationLogPath: Path? = null,
 ) {
   private val verifier = TorrentPayloadVerifier(document)
   private val mapping = TorrentOutputMapping.from(document)
@@ -33,8 +36,14 @@ internal class TorrentV2PieceStore(
   private val filesById = mapping.files.associateBy { it.id }
   private val progress = LongArray(mapping.files.size)
   private val verified: BooleanArray
-  private val owned = linkedMapOf<Path, String>()
+  private data class Ownership(val identity: String, val directory: Boolean)
+  private val owned = linkedMapOf<Path, Ownership>()
+  private var layoutGeneration = 0L
+  private var selectionGeneration = 0L
+  private var receivedCounter = 0L
+  private var uploadedCounter = 0L
   private var root: Path? = null
+  private var creationLog: TorrentV2CreationLog? = null
   private var initialized = false
   private var closed = false
   private val totalSelected = document.info.files.indices.sumOf { index ->
@@ -42,6 +51,7 @@ internal class TorrentV2PieceStore(
   }
 
   init {
+    require(taskId.length in 1..128 && taskId.all { it.isLetterOrDigit() || it == '-' })
     require(output.isAbsolute && output.parent != null)
     TorrentMetadata.validatePathComponent(output.name)
     require(selected.all { it in filesById }) { "Unknown selected file" }
@@ -55,10 +65,11 @@ internal class TorrentV2PieceStore(
     if (initialized) return@withLock
     storageOperation {
       val destination = root ?: (fileSystem.canonicalize(checkNotNull(output.parent)) / output.name)
+      prepareCreationLog(destination)
       if (root == null) {
         fileSystem.createDirectory(destination, mustCreate = true)
         root = destination
-        record(destination)
+        record(destination, directory = true)
       }
       validateOwned(destination, directory = true)
       for (file in mapping.files.filter { it.id in selected }) {
@@ -67,19 +78,22 @@ internal class TorrentV2PieceStore(
           parent /= component
           if (parent !in owned) {
             fileSystem.createDirectory(parent, mustCreate = true)
-            record(parent)
+            record(parent, directory = true)
           }
           validateOwned(parent, directory = true)
         }
         val path = parent / file.components.last()
         if (path !in owned) {
           fileSystem.openReadWrite(path, mustCreate = true).use { handle ->
-            record(path)
+            record(path, directory = false)
             handle.flush()
           }
         } else {
           validateOwned(path, directory = false)
-          fileSystem.openReadWrite(path, mustExist = true).use { it.flush() }
+          fileSystem.openReadWrite(path, mustExist = true).use { handle ->
+            if (document.info.files[file.v2Index].length == 0L) handle.resize(0)
+            handle.flush()
+          }
         }
         validateOwned(path, directory = false)
       }
@@ -109,6 +123,10 @@ internal class TorrentV2PieceStore(
         validateOwned(path, directory = false)
         fileSystem.openReadWrite(path, mustExist = true).use { handle ->
           handle.write(extent.fileOffset, bytes, 0, bytes.size)
+          val expected = document.info.files[file.v2Index].length
+          if (progress[file.v2Index] + extent.length == expected && handle.size() > expected) {
+            handle.resize(expected)
+          }
           handle.flush()
         }
       }
@@ -211,6 +229,9 @@ internal class TorrentV2PieceStore(
                 verified[index] = valid
                 if (valid) matched += extent.length
               }
+              if (matched == layoutFile.length && handle.size() > layoutFile.length) {
+                handle.resize(layoutFile.length)
+              }
               if (matched > 0) handle.flush()
               validateOwned(path, directory = false)
               matched
@@ -247,6 +268,56 @@ internal class TorrentV2PieceStore(
     }
   }
 
+  /** Stores authenticated catalog content before returning a consistent task snapshot. */
+  suspend fun checkpoint(
+    catalog: TorrentContentCatalog,
+    receivedBytes: Long? = null,
+    uploadedBytes: Long? = null,
+  ): TorrentV2Checkpoint = mutex.withLock {
+    check(initialized && !closed)
+    val received = receivedBytes ?: receivedCounter
+    val uploaded = uploadedBytes ?: uploadedCounter
+    require(received >= receivedCounter && uploaded >= uploadedCounter)
+    catalog.put(document)
+    val destination = checkNotNull(root)
+    val records = owned.map { (path, claim) ->
+      val components = if (path == destination) emptyList() else
+        path.relativeTo(destination).segments
+      TorrentV2Checkpoint.Owned(components, claim.identity, claim.directory)
+    }
+    val checkpoint = TorrentV2Checkpoint.create(document, taskId, destination.toString(), selected,
+      records, pieceBitfield(verified).toByteString(), layoutGeneration, selectionGeneration,
+      received, uploaded)
+    receivedCounter = received
+    uploadedCounter = uploaded
+    checkpoint
+  }
+
+  /** Validates all claims before adoption; initialize/recheck follow successful restore. */
+  suspend fun restore(checkpoint: TorrentV2Checkpoint) = mutex.withLock {
+    check(!closed && !initialized && root == null && owned.isEmpty())
+    require(checkpoint.taskId == taskId && checkpoint.selected == selected) {
+      "Checkpoint task or selection mismatch"
+    }
+    checkpoint.validateContent(document)
+    val recovered = storageOperation {
+      val destination = fileSystem.canonicalize(checkNotNull(output.parent)) / output.name
+      require(checkpoint.output == destination.toString()) { "Checkpoint output mismatch" }
+      val records = validateRecords(destination, checkpoint.owned)
+      destination to records
+    }
+    currentCoroutineContext().ensureActive()
+    root = recovered.first
+    owned.putAll(recovered.second)
+    layoutGeneration = checkpoint.layoutGeneration
+    selectionGeneration = checkpoint.selectionGeneration
+    receivedCounter = checkpoint.receivedBytes
+    uploadedCounter = checkpoint.uploadedBytes
+    // Never adopt verifiedHint: current payloads must pass commit or recheck before publication.
+    verified.fill(false)
+    progress.fill(0)
+  }
+
   suspend fun progress(): Map<String, Long> = mutex.withLock {
     mapping.files.filter { it.id in selected }.associate { it.id to progress[it.v2Index] }
   }
@@ -264,9 +335,9 @@ internal class TorrentV2PieceStore(
   suspend fun cleanup() = mutex.withLock {
     closed = true
     storageOperation {
-      for ((path, identity) in owned.toList().asReversed()) {
+      for ((path, claim) in owned.toList().asReversed()) {
         validateParents(path)
-        if (torrentFileIdentity(path) != identity) continue
+        if (torrentFileIdentity(path) != claim.identity) continue
         val metadata = fileSystem.metadataOrNull(path) ?: continue
         if (metadata.isRegularFile || metadata.isDirectory && fileSystem.list(path).isEmpty()) {
           fileSystem.delete(path, mustExist = true)
@@ -282,8 +353,72 @@ internal class TorrentV2PieceStore(
   private fun destination(file: TorrentOutputMapping.File): Path =
     file.components.fold(checkNotNull(root)) { path, component -> path / component }
 
-  private fun record(path: Path) {
-    owned[path] = requireNotNull(torrentFileIdentity(path)) { "Filesystem has no safe identity" }
+  private fun validateRecords(
+    destination: Path,
+    entries: List<TorrentV2Checkpoint.Owned>,
+  ): LinkedHashMap<Path, Ownership> {
+    val records = linkedMapOf<Path, Ownership>()
+    for (entry in entries.sortedBy { it.components.size }) {
+      val path = entry.components.fold(destination) { parent, component -> parent / component }
+      val metadata = fileSystem.metadataOrNull(path)
+      require(metadata != null && metadata.symlinkTarget == null &&
+        (if (entry.directory) metadata.isDirectory else metadata.isRegularFile) &&
+        torrentFileIdentity(path) == entry.identity) { "Checkpoint ownership changed" }
+      records[path] = Ownership(entry.identity, entry.directory)
+    }
+    return records
+  }
+
+  private fun prepareCreationLog(destination: Path) {
+    val requested = creationLogPath ?: return
+    if (creationLog == null) {
+      require(requested.isAbsolute && requested.parent != null)
+      TorrentMetadata.validatePathComponent(requested.name)
+      val path = fileSystem.canonicalize(checkNotNull(requested.parent)) / requested.name
+      require(path.segments.take(destination.segments.size) != destination.segments) {
+        "Creation log must be outside payload storage"
+      }
+      val binding = sha256Digest(Bencode.encode(mapOf(
+        "kind" to "ketch-v2-creation", "mapping" to 1L, "task" to taskId,
+        "v2" to document.info.hash.toBytes(),
+        "v1" to (document.identity.v1?.toBytes() ?: ByteArray(0)),
+        "output" to destination.toString(), "selected" to selected.sorted()
+      )))
+      val candidate = TorrentV2CreationLog(path, binding, fileSystem)
+      val entries = linkedMapOf<List<String>, TorrentV2Checkpoint.Owned>()
+      for (entry in candidate.open() + owned.map { (path, claim) ->
+        ownershipRecord(destination, path, claim)
+      }) {
+        val previous = entries.put(entry.components, entry)
+        require(previous == null || previous == entry) { "Checkpoint and creation log disagree" }
+      }
+      if (entries.isNotEmpty()) {
+        val records = entries.values.toList()
+        TorrentV2Checkpoint.create(document, taskId, destination.toString(), selected, records,
+          ByteArray((verified.size + 7) / 8).toByteString())
+        val recovered = validateRecords(destination, records)
+        owned.putAll(recovered)
+        root = destination
+      }
+      creationLog = candidate
+    }
+    // Retry any failed append from this live instance before creating additional paths.
+    for ((path, claim) in owned) {
+      checkNotNull(creationLog).append(ownershipRecord(destination, path, claim))
+    }
+  }
+
+  private fun ownershipRecord(destination: Path, path: Path, claim: Ownership) =
+    TorrentV2Checkpoint.Owned(
+      if (path == destination) emptyList() else path.relativeTo(destination).segments,
+      claim.identity, claim.directory
+    )
+
+  private fun record(path: Path, directory: Boolean) {
+    val identity = requireNotNull(torrentFileIdentity(path)) { "Filesystem has no safe identity" }
+    val claim = Ownership(identity, directory)
+    owned[path] = claim
+    creationLog?.append(ownershipRecord(checkNotNull(root), path, claim))
   }
 
   private fun validateParents(path: Path) {
@@ -298,7 +433,9 @@ internal class TorrentV2PieceStore(
     val metadata = fileSystem.metadataOrNull(path)
     require(metadata?.symlinkTarget == null && metadata != null &&
       (if (directory) metadata.isDirectory else metadata.isRegularFile) &&
-      owned[path] != null && torrentFileIdentity(path) == owned[path]) { "Storage path changed" }
+      owned[path]?.directory == directory && torrentFileIdentity(path) == owned[path]?.identity) {
+      "Storage path changed"
+    }
     if (!directory) validateParents(path)
   }
 }
