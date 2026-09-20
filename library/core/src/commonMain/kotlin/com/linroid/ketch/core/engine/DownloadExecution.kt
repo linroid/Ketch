@@ -1,9 +1,9 @@
 package com.linroid.ketch.core.engine
 
-import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -22,18 +22,19 @@ import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlin.time.Clock
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.Path
 import okio.Path.Companion.toPath
-import kotlin.time.Clock
-import kotlin.time.TimeSource
 
 /**
  * Encapsulates the execution logic for a single download task.
@@ -57,6 +58,11 @@ internal class DownloadExecution(
 
   private val taskId get() = handle.taskId
   private val request get() = handle.request
+
+  private val reportsProgress = MutableStateFlow(true)
+
+  /** Stop callbacks before a pause/cancel state is published while a source is still joining. */
+  fun stopReportingProgress() { reportsProgress.value = false }
 
   val taskLimiter = DelegatingSpeedLimiter()
   var context: DownloadContext? = null
@@ -470,9 +476,11 @@ internal class DownloadExecution(
           lastBytes = downloaded
           lastMark = now
         }
-        handle.mutableState.value = DownloadState.Downloading(
-          DownloadProgress(downloaded, total, reportedSpeed.value ?: speed),
-        )
+        handle.mutableState.update { current ->
+          if (reportsProgress.value) DownloadState.Downloading(
+            DownloadProgress(downloaded, total, reportedSpeed.value ?: speed),
+          ) else current
+        }
       },
       throttle = { bytes ->
         taskLimiter.acquire(bytes)

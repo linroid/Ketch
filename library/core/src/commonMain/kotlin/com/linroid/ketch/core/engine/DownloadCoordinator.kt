@@ -1,11 +1,11 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.file.FileNameResolver
@@ -13,6 +13,7 @@ import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskState
+import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -24,7 +25,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.time.Clock
 
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
@@ -68,6 +68,7 @@ internal class DownloadCoordinator(
       val pausedDownloaded =
         currentSegments?.sumOf { it.downloadedBytes } ?: 0L
 
+      execution.stopReportingProgress()
       handle.mutableState.value = DownloadState.Paused(
         DownloadProgress(pausedDownloaded, execution.totalBytes),
       )
@@ -155,6 +156,7 @@ internal class DownloadCoordinator(
     val job = mutex.withLock {
       val entry = activeDownloads[taskId]
       val stopping = entry?.job ?: stoppingDownloads[taskId]
+      entry?.execution?.stopReportingProgress()
       stopping?.cancel()
       activeDownloads.remove(taskId)
       stopping

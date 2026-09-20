@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.delay
 import okio.Buffer
+import okio.ByteString.Companion.toByteString
 
 /** BEP 9 bounded metadata exchange, with four outstanding blocks and full hash verification. */
 internal class TorrentMetadataExchange(
@@ -21,7 +22,22 @@ internal class TorrentMetadataExchange(
     endpoint: PeerEndpoint,
     trackerTiers: List<List<String>> = emptyList(),
     privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
-  ): TorrentMetadata = withTimeout(timeoutMs) {
+  ): TorrentMetadata = fetchContent(TorrentIdentity(v1 = hash), endpoint, trackerTiers, privacy) {
+      _, info, _ ->
+    val metadata = TorrentMetadata.fromBencode(metainfoFromInfo(info, trackerTiers))
+    if (metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+      throw PrivateTorrentMagnetException()
+    }
+    metadata
+  }
+
+  suspend fun <T> fetchContent(
+    identity: TorrentIdentity,
+    endpoint: PeerEndpoint,
+    trackerTiers: List<List<String>> = emptyList(),
+    privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
+    decode: suspend (TorrentConnection, ByteArray, TorrentBufferBudget) -> T,
+  ): T = withTimeout(timeoutMs) {
     require(privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY ||
       trackerTiers.any { it.isNotEmpty() }) {
       "Tracker-only metadata requires supplied trackers"
@@ -34,10 +50,12 @@ internal class TorrentMetadataExchange(
     var connection: TorrentConnection? = null
     try {
       connection = network.connect(endpoint)
+      val workspace = TorrentBufferBudget(256 * 1024)
+      val handshake = PeerIdentityHandshake(identity, extensions = true).initiate(connection,
+        if (identity.v2 != null) PeerIdentityHandshake.Mode.V2 else PeerIdentityHandshake.Mode.V1,
+        torrentRandomBytes(20).toByteString(), workspace)
       val wire = PeerWire(connection)
-      val peerId = torrentRandomBytes(20)
-      val handshake = wire.handshake(PeerHandshake(hash, peerId, true, false))
-      require(handshake.extensions && !handshake.peerId.contentEquals(peerId)) {
+      require(handshake.extensions) {
         "Peer does not support metadata exchange"
       }
       wire.send(PeerExtensions.handshake())
@@ -83,13 +101,8 @@ internal class TorrentMetadataExchange(
           received[piece.toInt()] = true
           receivedCount++
           if (receivedCount == received.size) {
-            require(InfoHash.fromBytes(sha1Digest(output)) == hash) { "Metadata hash mismatch" }
-            val metainfo = metainfoFromInfo(output, trackerTiers)
-            val metadata = TorrentMetadata.fromBencode(metainfo)
-            if (metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
-              throw PrivateTorrentMagnetException()
-            }
-            return@withTimeout metadata
+            require(identity.matchesInfo(output)) { "Metadata hash mismatch" }
+            return@withTimeout decode(connection, output, workspace)
           }
         }
         val id = extensions.id("ut_metadata")

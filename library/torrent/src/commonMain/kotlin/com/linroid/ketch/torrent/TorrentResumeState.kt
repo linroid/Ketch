@@ -23,7 +23,8 @@ internal data class TorrentResumeState(
   val privacy: TorrentDiscoveryPrivacy? = null,
 ) {
   init {
-    require(version == 1 || version == 2) { "Unsupported torrent resume version" }
+    require(version in 1..3) { "Unsupported torrent resume version" }
+    require(version != 3 || infoHash.length == 64) { "Invalid v2 identity" }
     require((version == 1) == (privacy == null)) { "Invalid torrent resume privacy" }
   }
 }

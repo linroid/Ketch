@@ -9,8 +9,8 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.core.KetchDispatchers
-import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
@@ -21,6 +21,11 @@ import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -29,15 +34,10 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
-import kotlin.time.Clock
 
 class SelfManagedExecutionTest {
   @Test
@@ -96,7 +96,7 @@ class SelfManagedExecutionTest {
   }
 
   @Test
-  fun immediateResumeWaitsForPausedSourceCheckpointAndClosure() = runTest {
+  fun immediateResumeWaitsForCheckpointAndIgnoresLateProgress() = runTest {
     val started = CompletableDeferred<Unit>()
     val checkpointEntered = CompletableDeferred<Unit>()
     val allowCheckpoint = CompletableDeferred<Unit>()
@@ -116,9 +116,11 @@ class SelfManagedExecutionTest {
         SourceResumeState(type, if (saved) "final" else "initial")
       override suspend fun download(context: DownloadContext) {
         context.segments.value = listOf(Segment(0, 0, 3, 1))
+        context.onProgress(1, 4)
         started.complete(Unit)
         try { awaitCancellation() } finally {
           withContext(NonCancellable) {
+            context.onProgress(2, 4)
             checkpointEntered.complete(Unit)
             allowCheckpoint.await()
             saved = true
@@ -153,6 +155,8 @@ class SelfManagedExecutionTest {
       started.await()
       val pause = launch { coordinator.pause(handle.taskId) }
       checkpointEntered.await()
+      assertTrue(handle.mutableState.value is DownloadState.Paused,
+        "Late progress replaced the paused state: ${handle.mutableState.value}")
       val resume = async { coordinator.resume(handle) }
       yield()
       assertFalse(pause.isCompleted)

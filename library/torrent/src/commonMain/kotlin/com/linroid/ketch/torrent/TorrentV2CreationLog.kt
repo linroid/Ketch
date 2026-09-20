@@ -128,6 +128,11 @@ internal class TorrentV2CreationLog(
     }
   }
 
+  fun delete() {
+    validateIdentity()
+    fileSystem.delete(path, mustExist = true)
+  }
+
   private fun validateIdentity() {
     val metadata = fileSystem.metadata(path)
     require(metadata.isRegularFile && metadata.symlinkTarget == null &&

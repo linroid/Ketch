@@ -107,7 +107,7 @@ internal object TorrentV2SessionLoop {
         }
       }
 
-      fun message(peer: PeerV2Pool.Peer, value: PeerV2DownloadActor.Event) {
+      suspend fun message(peer: PeerV2Pool.Peer, value: PeerV2DownloadActor.Event) {
         val view = peers[peer] ?: return
         when (value) {
           is PeerV2DownloadActor.Event.Update -> when (val update = value.frame.message) {
@@ -142,6 +142,8 @@ internal object TorrentV2SessionLoop {
           is PeerV2DownloadActor.Event.Response -> {
             check(view.inFlight > 0)
             view.inFlight--
+            val block = value.value as? PeerBlockExchange.Response.Block
+            if (block != null) store.recordReceived(block.ticket.request.length)
             pieces.receive(peer.blocks, value.value)
             wakeAdmission()
           }

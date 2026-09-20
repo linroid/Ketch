@@ -43,7 +43,7 @@ data class TorrentConfig(
   val maxExchangeBytes: Int = 64 * 1024 * 1024,
   /** Cache retention ceiling, including conservative file/index and string allowances. */
   val maxCachedMetadataBytes: Int = 4 * 1024 * 1024,
-  /** Aggregate admission allowance for session metadata, indexes, and checking scratch space. */
+  /** Aggregate allowance for session metadata, indexes, checkpoint decoding, and checking. */
   val maxSessionStateBytes: Int = 8 * 1024 * 1024,
   /** Aggregate open payload-file ceiling. Storage waits before opening another payload handle. */
   val maxOpenPayloadFiles: Int = 32,
