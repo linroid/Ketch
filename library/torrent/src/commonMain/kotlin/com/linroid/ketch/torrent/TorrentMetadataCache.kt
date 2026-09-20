@@ -26,7 +26,8 @@ internal class TorrentMetadataCache(
   private val mutex = Mutex()
   private class Entry(val metadata: TorrentMetadata, val lease: TorrentBufferBudget.Lease)
   private val entries = linkedMapOf<InfoHash, Entry>()
-  private val pending = mutableMapOf<InfoHash, Deferred<TorrentMetadata>>()
+  private data class PendingKey(val hash: InfoHash, val privacy: TorrentDiscoveryPrivacy)
+  private val pending = mutableMapOf<PendingKey, Deferred<TorrentMetadata>>()
   private var closed = false
   private var cleanupJob: Job? = null
 
@@ -43,12 +44,23 @@ internal class TorrentMetadataCache(
     entries.remove(hash)?.also { entries[hash] = it }?.metadata
   }
 
-  suspend fun resolve(hash: InfoHash, fetch: suspend () -> TorrentMetadata): TorrentMetadata {
+  /**
+   * Shares one in-flight fetch per hash *and* discovery privacy. A restricted caller must never
+   * join a public operation: that operation may already be using explicit peers or DHT on its
+   * behalf, and its rejection of private metadata does not apply to the restricted caller.
+   * Completed entries stay shared because the hash authenticates them regardless of discovery.
+   */
+  suspend fun resolve(
+    hash: InfoHash,
+    privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
+    fetch: suspend () -> TorrentMetadata,
+  ): TorrentMetadata {
     get(hash)?.let { return it }
+    val key = PendingKey(hash, privacy)
     val operation = mutex.withLock {
       scope.coroutineContext.ensureActive()
       check(!closed) { "Metadata cache is closed" }
-      pending.getOrPut(hash) {
+      pending.getOrPut(key) {
         check(pending.size < 16) { "Too many pending metadata requests" }
         scope.async {
           try {
@@ -56,7 +68,7 @@ internal class TorrentMetadataCache(
             require(metadata.infoHash == hash)
             put(metadata)
           } finally {
-            withContext(NonCancellable) { mutex.withLock { pending.remove(hash) } }
+            withContext(NonCancellable) { mutex.withLock { pending.remove(key) } }
           }
         }
       }

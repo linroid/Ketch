@@ -33,6 +33,20 @@ internal class TorrentPieceScheduler(
     }
   }
 
+  /**
+   * Applies a single HAVE without rebuilding this peer's availability. A peer may announce
+   * before any bitfield, and may repeat announcements, so absent state starts empty and a
+   * duplicate index is ignored rather than counted twice.
+   */
+  suspend fun announce(peer: Int, index: Int) = mutex.withLock {
+    require(index in wanted.indices)
+    val pieces = availability.getOrPut(peer) { BooleanArray(wanted.size) }
+    if (!pieces[index]) {
+      pieces[index] = true
+      rarity[index]++
+    }
+  }
+
   suspend fun claim(peer: Int): Claim? = mutex.withLock {
     check(peer !in claims)
     val available = availability[peer] ?: return@withLock null
