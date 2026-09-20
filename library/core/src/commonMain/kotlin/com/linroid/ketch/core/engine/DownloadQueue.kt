@@ -180,6 +180,12 @@ internal class DownloadQueue(
     mutex.withLock {
       activeEntries[taskId]?.let { entry ->
         entry.priority = priority
+        promoteNext()
+        val urgentEntries = queuedEntries.filter { it.priority == DownloadPriority.URGENT }
+        for (urgent in urgentEntries) {
+          queuedEntries.remove(urgent)
+          tryPreemptAndStart(urgent, extractHost(urgent.handle.request.url))
+        }
         return
       }
       val index = queuedEntries.indexOfFirst { it.taskId == taskId }

@@ -581,6 +581,60 @@ class DownloadQueueTest {
   }
 
   @Test
+  fun setPriority_activeUrgentLowered_startsWaitingUrgentAndResumesVictim() = runTest {
+    withContext(Dispatchers.Default) {
+      for (priority in listOf(DownloadPriority.LOW, DownloadPriority.NORMAL, DownloadPriority.HIGH)) {
+        val scheduler = createScheduler(maxConcurrent = 1)
+        val active = createHandle("active", createRequest(priority = DownloadPriority.URGENT))
+        val queued = createHandle("queued", createRequest(priority = DownloadPriority.URGENT))
+        scheduler.enqueue(active)
+        scheduler.enqueue(queued)
+        assertIs<DownloadState.Queued>(queued.mutableState.value)
+
+        scheduler.setPriority("active", priority)
+
+        assertIs<DownloadState.Queued>(active.mutableState.value)
+        withTimeout(2.seconds) {
+          queued.mutableState.first { it != DownloadState.Queued }
+        }
+        scheduler.onTaskCompleted("queued")
+        withTimeout(2.seconds) {
+          active.mutableState.first { it != DownloadState.Queued }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun setPriority_activeUrgentLowered_skipsHostBlockedUrgent() = runTest {
+    withContext(Dispatchers.Default) {
+      val scheduler = createScheduler(maxConcurrent = 2, maxPerHost = 1)
+      val firstHost = createRequest(priority = DownloadPriority.URGENT)
+      val secondHost = createRequest(
+        url = "https://other.com/file",
+        priority = DownloadPriority.URGENT,
+      )
+      val protected = createHandle("protected", firstHost)
+      val active = createHandle("active", secondHost)
+      val blocked = createHandle("blocked", firstHost, Instant.fromEpochMilliseconds(0))
+      val eligible = createHandle("eligible", secondHost, Instant.fromEpochMilliseconds(1))
+      scheduler.enqueue(protected)
+      scheduler.enqueue(active)
+      scheduler.enqueue(blocked)
+      scheduler.enqueue(eligible)
+
+      scheduler.setPriority("active", DownloadPriority.LOW)
+
+      assertIs<DownloadState.Queued>(blocked.mutableState.value)
+      assertIs<DownloadState.Queued>(active.mutableState.value)
+      withTimeout(2.seconds) {
+        protected.mutableState.first { it != DownloadState.Queued }
+        eligible.mutableState.first { it != DownloadState.Queued }
+      }
+    }
+  }
+
+  @Test
   fun setPriority_urgent_preemptsSameHostWhenHostLimitIsFull() = runTest {
     withContext(Dispatchers.Default) {
       val scheduler = createScheduler(maxConcurrent = 2, maxPerHost = 1)
