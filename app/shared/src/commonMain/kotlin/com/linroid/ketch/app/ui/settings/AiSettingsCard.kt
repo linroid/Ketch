@@ -70,8 +70,9 @@ private class AiSettingsDraft(settings: AiSettings) {
  *
  * @param settings currently saved settings.
  * @param supported whether this platform can run discovery locally.
- * @param usingEnvironmentCredentials whether discovery currently works
- *   on credentials taken from the environment.
+ * @param resolveCredentials fills the blank credentials the platform can
+ *   supply (e.g. from the environment), so the form is judged the way
+ *   the engine will see it.
  * @param connectionTest result of the last connection test.
  * @param onSave persist the edited settings.
  * @param onTest persist the edited settings and call the provider.
@@ -80,7 +81,7 @@ private class AiSettingsDraft(settings: AiSettings) {
 fun AiSettingsCard(
   settings: AiSettings,
   supported: Boolean,
-  usingEnvironmentCredentials: Boolean,
+  resolveCredentials: (AiSettings) -> AiSettings,
   connectionTest: AiConnectionTest,
   compact: Boolean,
   onSave: (AiSettings) -> Unit,
@@ -91,6 +92,11 @@ fun AiSettingsCard(
   val draft = remember(settings) { AiSettingsDraft(settings) }
   var revealKey by remember { mutableStateOf(false) }
   val edited = draft.toSettings()
+  // What the engine will actually run with: a blank token may still be
+  // supplied by the environment.
+  val effective = resolveCredentials(edited)
+  val tokenFromEnvironment = edited.llm.apiKey.isBlank() &&
+    effective.llm.apiKey.isNotBlank()
   val testing = connectionTest is AiConnectionTest.Running
 
   SettingsCard(
@@ -169,7 +175,13 @@ fun AiSettingsCard(
           )
         },
         supportingText = {
-          Text("Stored as plain text in this device's config file.")
+          Text(
+            if (tokenFromEnvironment) {
+              "Leave empty to keep using the key from the environment."
+            } else {
+              "Stored as plain text in this device's config file."
+            },
+          )
         },
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
@@ -272,8 +284,8 @@ fun AiSettingsCard(
 
     AiSettingsStatus(
       edited = edited,
+      effective = effective,
       supported = supported,
-      usingEnvironmentCredentials = usingEnvironmentCredentials,
       connectionTest = connectionTest,
     )
 
@@ -286,7 +298,7 @@ fun AiSettingsCard(
         text = if (testing) "Testing…" else "Test connection",
         onClick = { onTest(edited) },
         variant = KetchButtonVariant.Secondary,
-        enabled = supported && edited.llm.isComplete && !testing,
+        enabled = supported && effective.llm.isComplete && !testing,
       )
       KetchButton(
         text = "Save",
@@ -297,24 +309,28 @@ fun AiSettingsCard(
   }
 }
 
+/**
+ * @param edited the form as typed.
+ * @param effective [edited] with platform-supplied credentials filled in.
+ */
 @Composable
 private fun AiSettingsStatus(
   edited: AiSettings,
+  effective: AiSettings,
   supported: Boolean,
-  usingEnvironmentCredentials: Boolean,
   connectionTest: AiConnectionTest,
 ) {
   val colors = KetchTheme.colors
   val (message, color) = when {
     !supported -> "AI discovery runs in the desktop and Android apps." to
       colors.onSurfaceVariant
-    !edited.llm.isComplete ->
+    !effective.llm.isComplete ->
       "Fill in the fields above to turn discovery on." to colors.warning
-    !edited.search.isComplete ->
+    !effective.search.isComplete ->
       "Add the missing web search credentials." to colors.warning
     !edited.enabled -> "Discovery is switched off." to colors.onSurfaceVariant
-    else -> "Ready — ${edited.llm.provider.label} · " +
-      "${edited.llm.effectiveModel}" to colors.success
+    else -> "Ready — ${effective.llm.provider.label} · " +
+      "${effective.llm.effectiveModel}" to colors.success
   }
   Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     Text(
@@ -322,9 +338,9 @@ private fun AiSettingsStatus(
       style = KetchTheme.typography.bodySmall,
       color = color,
     )
-    if (usingEnvironmentCredentials) {
+    if (effective != edited) {
       Text(
-        text = "Currently using credentials from the environment.",
+        text = "Blank credentials are filled from the environment.",
         style = KetchTheme.typography.bodySmall,
         color = colors.onSurfaceDim,
       )

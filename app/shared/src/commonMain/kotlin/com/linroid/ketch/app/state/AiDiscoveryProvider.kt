@@ -66,4 +66,12 @@ fun interface AiDiscoveryProviderFactory {
    * credentials picked up from the environment) cannot drive discovery.
    */
   fun create(settings: AiSettings): AiDiscoveryProvider?
+
+  /**
+   * Returns [settings] with the blank credentials this platform can
+   * supply filled in — e.g. an API key from the environment — without
+   * switching providers or turning the feature on. Lets the settings
+   * page judge an unsaved form the same way [create] will.
+   */
+  fun withPlatformCredentials(settings: AiSettings): AiSettings = settings
 }

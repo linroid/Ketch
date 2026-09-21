@@ -1,6 +1,7 @@
 package com.linroid.ketch.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
@@ -21,6 +22,12 @@ fun App(
   }
   val aiSettings = remember(instanceManager) {
     AiSettingsController(instanceManager.configStore, aiProviderFactory)
+  }
+  // The instance manager can outlive this composition (Android keeps it
+  // in the service across activity recreation), so the discovery engine
+  // is released here rather than with the manager.
+  DisposableEffect(aiSettings) {
+    onDispose { aiSettings.close() }
   }
   KetchTheme(accent = appSettings.accent) {
     AppShell(instanceManager, appSettings, aiSettings)

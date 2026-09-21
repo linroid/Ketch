@@ -5,6 +5,8 @@ import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -58,6 +60,24 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
   fun `an environment key does not switch discovery on`() {
     // The apps show an Enable switch; only the CLI auto-enables.
     assertNull(envFactory.create(AiSettings()))
+  }
+
+  @Test
+  fun `platform credentials fill the selected provider's blank token`() {
+    val resolved = envFactory.withPlatformCredentials(AiSettings())
+    assertEquals("sk-from-env", resolved.llm.apiKey)
+    assertFalse(resolved.enabled, "resolving must not switch the feature on")
+  }
+
+  @Test
+  fun `platform credentials never pick a different provider`() {
+    // Only an Anthropic key exists; the form still says OpenAI.
+    val anthropicOnly = EmbeddedAiDiscoveryProviderFactory { name ->
+      "sk-ant".takeIf { name == "ANTHROPIC_API_KEY" }
+    }
+    val resolved = anthropicOnly.withPlatformCredentials(AiSettings())
+    assertEquals(LlmProvider.OpenAi, resolved.llm.provider)
+    assertEquals("", resolved.llm.apiKey)
   }
 
   @Test

@@ -128,4 +128,65 @@ class AiSettingsEnvTest {
     assertEquals(SearchProvider.Bing, settings.search.provider)
     assertEquals("stored", settings.search.apiKey)
   }
+
+  @Test
+  fun `a saved google key is kept and the engine id comes from the environment`() {
+    // Review case: previously this stayed incomplete because both
+    // values had to come from the environment.
+    val base = AiSettings(
+      enabled = true,
+      search = SearchSettings(provider = SearchProvider.Google, apiKey = "saved"),
+    )
+    val settings = resolveAiSettingsFromEnv(
+      base = base,
+      getenv = env("GOOGLE_SEARCH_CX" to "cx-from-env"),
+    )
+    assertEquals(SearchProvider.Google, settings.search.provider)
+    assertEquals("saved", settings.search.apiKey)
+    assertEquals("cx-from-env", settings.search.cx)
+    assertTrue(settings.search.isComplete)
+  }
+
+  @Test
+  fun `a chosen search provider is never switched to another one`() {
+    // Review case: a Bing key in the environment used to silently
+    // replace an incomplete Google choice.
+    val base = AiSettings(
+      enabled = true,
+      search = SearchSettings(provider = SearchProvider.Google),
+    )
+    val settings = resolveAiSettingsFromEnv(
+      base = base,
+      getenv = env("BING_SEARCH_API_KEY" to "bing-key"),
+    )
+    assertEquals(SearchProvider.Google, settings.search.provider)
+    assertFalse(settings.search.isComplete)
+  }
+
+  @Test
+  fun `a chosen bing provider gets its blank key from the environment`() {
+    val base = AiSettings(
+      enabled = true,
+      search = SearchSettings(provider = SearchProvider.Bing),
+    )
+    val settings = resolveAiSettingsFromEnv(
+      base = base,
+      getenv = env("BING_SEARCH_API_KEY" to "bing-key"),
+    )
+    assertEquals("bing-key", settings.search.apiKey)
+  }
+
+  @Test
+  fun `no search provider stays none once anything is configured`() {
+    // "None" only yields to the environment for untouched settings.
+    val base = AiSettings(
+      enabled = true,
+      llm = LlmSettings(provider = LlmProvider.OpenAi, apiKey = "sk"),
+    )
+    val settings = resolveAiSettingsFromEnv(
+      base = base,
+      getenv = env("BING_SEARCH_API_KEY" to "bing-key"),
+    )
+    assertEquals(SearchProvider.None, settings.search.provider)
+  }
 }

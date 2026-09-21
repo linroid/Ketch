@@ -109,8 +109,7 @@ fun SettingsPage(
         AiSettingsCard(
           settings = aiSettings.settings,
           supported = aiSettings.supported,
-          usingEnvironmentCredentials =
-            aiSettings.usingEnvironmentCredentials,
+          resolveCredentials = aiSettings::withPlatformCredentials,
           connectionTest = aiSettings.connectionTest,
           compact = compact,
           onSave = { aiSettings.save(it) },

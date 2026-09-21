@@ -45,8 +45,11 @@ data class AiConfig(
  * working for the CLI. The apps have an explicit Enable switch, so they
  * only resolve settings the user has switched on.
  *
- * Search credentials are filled from `BING_SEARCH_API_KEY`, or
- * `GOOGLE_SEARCH_API_KEY` plus `GOOGLE_SEARCH_CX`.
+ * Search works the same way: the selected provider's blank key (and,
+ * for Google, engine id) are filled from `BING_SEARCH_API_KEY`, or
+ * `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_CX`, keeping every saved
+ * value and never switching providers. Only untouched settings let the
+ * environment pick a search provider.
  *
  * @param base settings loaded from the config file
  * @param getenv environment lookup, overridable for testing
@@ -56,7 +59,7 @@ fun resolveAiSettingsFromEnv(
   getenv: (String) -> String? = System::getenv,
 ): AiSettings {
   val llm = resolveLlmFromEnv(base, getenv)
-  val search = resolveSearchFromEnv(base.search, getenv)
+  val search = resolveSearchFromEnv(base, getenv)
   val enabled = base.enabled ||
     (base == AiSettings() && llm.apiKey.isNotBlank())
   return base.copy(enabled = enabled, llm = llm, search = search)
@@ -93,25 +96,45 @@ private fun envKeyFor(
 }?.takeIf { it.isNotBlank() }
 
 private fun resolveSearchFromEnv(
-  base: SearchSettings,
+  base: AiSettings,
   getenv: (String) -> String?,
 ): SearchSettings {
-  if (base.provider != SearchProvider.None && base.isComplete) return base
-  val bingKey = getenv("BING_SEARCH_API_KEY")
-  if (!bingKey.isNullOrBlank()) {
-    return SearchSettings(provider = SearchProvider.Bing, apiKey = bingKey)
-  }
-  val googleKey = getenv("GOOGLE_SEARCH_API_KEY")
-  val googleCx = getenv("GOOGLE_SEARCH_CX")
-  if (!googleKey.isNullOrBlank() && !googleCx.isNullOrBlank()) {
-    return SearchSettings(
-      provider = SearchProvider.Google,
-      apiKey = googleKey,
-      cx = googleCx,
+  val search = base.search
+  fun env(name: String): String? = getenv(name)?.takeIf { it.isNotBlank() }
+  return when (search.provider) {
+    // A chosen provider only has its own blanks filled; saved values
+    // and the choice itself always win.
+    SearchProvider.Bing -> search.copy(
+      apiKey = search.apiKey.ifBlank { env(BING_KEY).orEmpty() },
     )
+    SearchProvider.Google -> search.copy(
+      apiKey = search.apiKey.ifBlank { env(GOOGLE_KEY).orEmpty() },
+      cx = search.cx.ifBlank { env(GOOGLE_CX).orEmpty() },
+    )
+    // "None" is also the default, so it only yields to the environment
+    // while nothing has been configured — the CLI's "export and go".
+    SearchProvider.None -> {
+      if (base != AiSettings()) return search
+      val bing = env(BING_KEY)
+      val googleKey = env(GOOGLE_KEY)
+      val googleCx = env(GOOGLE_CX)
+      when {
+        bing != null ->
+          SearchSettings(provider = SearchProvider.Bing, apiKey = bing)
+        googleKey != null && googleCx != null -> SearchSettings(
+          provider = SearchProvider.Google,
+          apiKey = googleKey,
+          cx = googleCx,
+        )
+        else -> search
+      }
+    }
   }
-  return base
 }
+
+private const val BING_KEY = "BING_SEARCH_API_KEY"
+private const val GOOGLE_KEY = "GOOGLE_SEARCH_API_KEY"
+private const val GOOGLE_CX = "GOOGLE_SEARCH_CX"
 
 private val ENV_PROVIDER_ORDER = listOf(
   LlmProvider.OpenAi,

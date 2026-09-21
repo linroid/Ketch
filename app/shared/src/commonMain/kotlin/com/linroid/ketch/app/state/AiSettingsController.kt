@@ -56,11 +56,11 @@ class AiSettingsController(
   val available: Boolean get() = provider != null
 
   /**
-   * `true` when discovery works although the saved settings are
-   * incomplete — the credentials came from the environment.
+   * [settings] as the engine would see them, with the blank credentials
+   * this platform can supply (e.g. from the environment) filled in.
    */
-  val usingEnvironmentCredentials: Boolean
-    get() = provider != null && !settings.isUsable
+  fun withPlatformCredentials(settings: AiSettings): AiSettings =
+    factory?.withPlatformCredentials(settings) ?: settings
 
   /** Persists [settings] and rebuilds the provider. */
   fun save(settings: AiSettings) {
@@ -112,6 +112,17 @@ class AiSettingsController(
     } finally {
       temporary?.close()
     }
+  }
+
+  /**
+   * Releases the current provider. Call it when the controller is
+   * discarded — e.g. an Android activity recreation that keeps the
+   * service alive — or the engine's HTTP clients and their thread pools
+   * leak.
+   */
+  fun close() {
+    provider?.close()
+    provider = null
   }
 
   /**

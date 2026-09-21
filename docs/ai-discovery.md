@@ -90,14 +90,19 @@ Rules:
 - **In the apps, the Enable switch decides.** An exported key fills in a
   blank token once you switch discovery on, but it never switches the
   feature — or the Discover tab — on by itself.
+- **Web search follows the same rule.** Once you pick Bing or Google, a
+  blank key (and Google's engine id) is filled from that provider's
+  variables; saved values are kept and your choice is never switched to
+  another provider.
 - **In the CLI**, which has no switch, untouched `[ai]` settings plus any
-  provider key select that provider and turn discovery on — the "export
-  a key and go" path. Once anything is configured, the environment only
-  fills blank credentials there too.
+  provider key select that provider (LLM and web search) and turn
+  discovery on — the "export a key and go" path. Once anything is
+  configured, the environment only fills blank credentials there too.
 
-When discovery is running on an environment credential, the settings
-page says so under the status line. **Test connection** works with the
-switch off, so you can check a key before turning discovery on.
+The settings page judges the form the way the engine will: when a blank
+field is covered by the environment it says so under the status line,
+and **Test connection** works with the token left empty. It also works
+with the switch off, so you can check a key before turning discovery on.
 
 ## config.toml
 

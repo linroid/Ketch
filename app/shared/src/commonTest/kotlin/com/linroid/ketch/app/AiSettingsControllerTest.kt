@@ -51,17 +51,29 @@ private class FakeAiProvider(
   }
 }
 
-/** Builds a provider only for settings it considers usable. */
+/**
+ * Builds a provider only for settings it considers usable, after
+ * applying [platform] the way a real factory fills environment keys.
+ */
 private class FakeFactory(
+  private val platform: (AiSettings) -> AiSettings = { it },
   private val usable: (AiSettings) -> Boolean = { it.isUsable },
   private val provider: () -> AiDiscoveryProvider = { FakeAiProvider() },
 ) : AiDiscoveryProviderFactory {
   val created = mutableListOf<AiDiscoveryProvider>()
 
   override fun create(settings: AiSettings): AiDiscoveryProvider? {
-    if (!usable(settings)) return null
+    if (!usable(platform(settings))) return null
     return provider().also { created += it }
   }
+
+  override fun withPlatformCredentials(settings: AiSettings): AiSettings =
+    platform(settings)
+}
+
+/** Stands in for an API key exported in the environment. */
+private val envToken: (AiSettings) -> AiSettings = {
+  it.copy(llm = it.llm.copy(apiKey = it.llm.apiKey.ifBlank { "sk-env" }))
 }
 
 private fun usableSettings(apiKey: String = "sk-test") = AiSettings(
@@ -131,15 +143,55 @@ class AiSettingsControllerTest {
   }
 
   @Test
-  fun credentialsFromTheEnvironmentAreReported() {
-    // Switched on without a saved token, the factory still succeeds —
-    // which is what an environment-provided key looks like.
+  fun platformCredentialsComeFromTheFactory() {
+    val controller = AiSettingsController(
+      configStore = FakeConfigStore(),
+      factory = FakeFactory(platform = envToken),
+    )
+    val resolved = controller.withPlatformCredentials(AiSettings())
+    assertEquals("sk-env", resolved.llm.apiKey)
+  }
+
+  @Test
+  fun withoutAFactorySettingsPassThroughUnchanged() {
+    val controller = AiSettingsController(FakeConfigStore())
+    val settings = AiSettings(enabled = true)
+    assertEquals(settings, controller.withPlatformCredentials(settings))
+  }
+
+  @Test
+  fun anEnvironmentTokenMakesSwitchedOnDiscoveryAvailable() {
     val controller = AiSettingsController(
       configStore = FakeConfigStore(KetchConfig(ai = AiSettings(enabled = true))),
-      factory = FakeFactory(usable = { true }),
+      factory = FakeFactory(platform = envToken),
     )
     assertTrue(controller.available)
-    assertTrue(controller.usingEnvironmentCredentials)
+  }
+
+  @Test
+  fun testConnectionUsesAnEnvironmentToken() = runTest {
+    // Review case: a blank saved token with the key exported used to
+    // leave Test connection unusable.
+    val controller = AiSettingsController(
+      configStore = FakeConfigStore(),
+      factory = FakeFactory(platform = envToken),
+    )
+    controller.testConnection(AiSettings(enabled = true))
+    assertEquals(AiConnectionTest.Success("OK"), controller.connectionTest)
+  }
+
+  @Test
+  fun closeReleasesTheProvider() {
+    // Review case: a discarded controller must not leak its engine.
+    val controller = AiSettingsController(
+      configStore = FakeConfigStore(KetchConfig(ai = usableSettings())),
+      factory = FakeFactory(),
+    )
+    val running = controller.provider as FakeAiProvider
+    controller.close()
+    assertTrue(running.closed)
+    assertNull(controller.provider)
+    assertFalse(controller.available)
   }
 
   @Test
@@ -175,15 +227,6 @@ class AiSettingsControllerTest {
     // The check must not switch discovery on behind the user's back.
     assertNull(controller.provider)
     assertTrue((factory.created.single() as FakeAiProvider).closed)
-  }
-
-  @Test
-  fun configuredCredentialsAreNotReportedAsEnvironmentOnes() {
-    val controller = AiSettingsController(
-      configStore = FakeConfigStore(KetchConfig(ai = usableSettings())),
-      factory = FakeFactory(),
-    )
-    assertFalse(controller.usingEnvironmentCredentials)
   }
 
   @Test

@@ -66,10 +66,17 @@ class EmbeddedAiDiscoveryProviderFactory(
 
   override fun create(settings: AiSettings): AiDiscoveryProvider? {
     if (!settings.enabled) return null
-    val resolved = resolveAiSettingsFromEnv(settings, getenv)
+    val resolved = withPlatformCredentials(settings)
     if (!resolved.isUsable) return null
     return EmbeddedAiDiscoveryProvider(
       AiModule.create(AiConfig(settings = resolved)),
     )
   }
+
+  override fun withPlatformCredentials(settings: AiSettings): AiSettings =
+    // Resolved as switched on, so the environment only fills blanks: the
+    // untouched-settings shortcut that picks a provider and enables the
+    // feature is reserved for the CLI.
+    resolveAiSettingsFromEnv(settings.copy(enabled = true), getenv)
+      .copy(enabled = settings.enabled)
 }
