@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
     setContent {
       val svc = service
       if (svc != null) {
-        App(svc.instanceManager, svc.aiProvider)
+        App(svc.instanceManager, svc.aiProviderFactory)
       }
     }
   }

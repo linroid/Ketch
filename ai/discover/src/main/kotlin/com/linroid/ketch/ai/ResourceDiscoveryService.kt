@@ -2,9 +2,8 @@ package com.linroid.ketch.ai
 
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
-import ai.koog.prompt.executor.clients.openai.OpenAIModels
-import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
+import ai.koog.prompt.dsl.prompt
+import ai.koog.prompt.llm.LLMCapability
 import com.linroid.ketch.ai.agent.AgentOutputParser
 import com.linroid.ketch.ai.agent.DeviceSafetyFilter
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
@@ -57,8 +56,9 @@ class ResourceDiscoveryService internal constructor(
   suspend fun discover(query: DiscoverQuery): DiscoverResult {
     require(query.query.isNotBlank()) { "Query must not be blank" }
 
-    if (config.llm.apiKey.isBlank()) {
-      log.d { "No API key configured, returning empty result" }
+    val llm = LlmClientFactory.resolve(config.llm)
+    if (!config.enabled || llm == null) {
+      log.d { "AI discovery not configured, returning empty result" }
       return DiscoverResult(
         query = query.query,
         candidates = emptyList(),
@@ -84,11 +84,14 @@ class ResourceDiscoveryService internal constructor(
     )
 
     val agent = AIAgent(
-      promptExecutor = MultiLLMPromptExecutor(OpenAILLMClient(config.llm.apiKey)),
-      llmModel = OpenAIModels.Chat.GPT4o,
+      promptExecutor = llm.executor,
+      llmModel = llm.model,
       systemPrompt = SYSTEM_PROMPT,
       toolRegistry = ToolRegistry { tools(toolSet) },
-      temperature = config.agent.temperature,
+      // Newer frontier models reject sampling parameters with a 400,
+      // so the temperature only goes out when the model advertises it.
+      temperature = config.agent.temperature
+        .takeIf { llm.model.supports(LLMCapability.Temperature) },
       maxIterations = config.agent.maxIterations,
     )
 
@@ -119,6 +122,27 @@ class ResourceDiscoveryService internal constructor(
       candidates = candidates,
       sources = toolSet.fetchedSources,
     )
+  }
+
+  /**
+   * Sends a one-line prompt to the configured provider to check that
+   * the endpoint, model and credentials work.
+   *
+   * @return the model's reply text
+   * @throws IllegalStateException if the settings are incomplete
+   */
+  suspend fun verifyConnection(): String {
+    val llm = checkNotNull(LlmClientFactory.resolve(config.llm)) {
+      "AI discovery is not fully configured"
+    }
+    log.i { "Verifying ${config.llm.provider.label} connection" }
+    val reply = llm.executor.execute(
+      prompt = prompt("ketch-verify") {
+        user("Reply with the single word: OK")
+      },
+      model = llm.model,
+    )
+    return reply.textContent().trim()
   }
 
   private fun buildUserMessage(query: DiscoverQuery): String {

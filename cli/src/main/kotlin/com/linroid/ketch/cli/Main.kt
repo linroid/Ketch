@@ -3,8 +3,7 @@ package com.linroid.ketch.cli
 import ch.qos.logback.classic.Level
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
-import com.linroid.ketch.ai.LlmConfig
-import com.linroid.ketch.ai.resolveSearchConfigFromEnv
+import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -15,8 +14,10 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.ai.DiscoverQuery
+import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.defaultConfigPath
 import com.linroid.ketch.config.defaultDbPath
 import com.linroid.ketch.config.generateConfig
@@ -487,8 +488,9 @@ private fun runAiDiscover(args: List<String>) {
     println("  ketch ai-discover \"latest Ubuntu 24.04 ISO\"")
     println("  ketch ai-discover \"ffmpeg release\" --sites ffmpeg.org")
     println()
-    println("Set OPENAI_API_KEY env var for LLM-powered discovery.")
-    println("Without it, results will be empty.")
+    println("Configure a provider and token on the app's Settings")
+    println("page, or export OPENAI_API_KEY / ANTHROPIC_API_KEY /")
+    println("GEMINI_API_KEY for the same effect.")
     return
   }
 
@@ -522,20 +524,26 @@ private fun runAiDiscover(args: List<String>) {
     return
   }
 
-  val apiKey = System.getenv("OPENAI_API_KEY") ?: ""
-  if (apiKey.isBlank()) {
-    println("Note: OPENAI_API_KEY not set." +
-      " Discovery will return empty results.")
-    println()
+  val defaultPath = defaultConfigPath()
+  val stored = if (File(defaultPath).exists()) {
+    FileConfigStore(defaultPath).load().ai
+  } else {
+    AiSettings()
+  }
+  val settings = resolveAiSettingsFromEnv(stored)
+  if (!settings.isUsable) {
+    println("AI discovery is not configured.")
+    println("Set a provider and API token on the app's Settings page,")
+    println("or export a provider API key for this shell.")
+    return
   }
 
-  val aiConfig = AiConfig(
-    enabled = true,
-    llm = LlmConfig(apiKey = apiKey),
-    search = resolveSearchConfigFromEnv(),
-  )
-  val aiModule = AiModule.create(aiConfig)
+  val aiModule = AiModule.create(AiConfig(settings = settings))
 
+  println(
+    "Using ${settings.llm.provider.label}" +
+      " · ${settings.llm.effectiveModel}"
+  )
   println("Discovering resources for: \"$query\"")
   if (sites.isNotEmpty()) {
     println("Sites: ${sites.joinToString(", ")}")
@@ -552,8 +560,8 @@ private fun runAiDiscover(args: List<String>) {
 
     if (response.candidates.isEmpty()) {
       println("No candidates found.")
-      if (apiKey.isBlank()) {
-        println("(Set OPENAI_API_KEY for real results)")
+      if (settings.search.provider == SearchProvider.None) {
+        println("(Configure a web search provider for broader results)")
       }
       return@runBlocking
     }
@@ -721,7 +729,14 @@ private fun printUsage() {
   println("  ai-discover <query>      Discover downloadable resources")
   println("    --sites <domains>      Comma-separated domain allowlist")
   println("    --max-results <n>      Max results (default: 5)")
-  println("                           Requires OPENAI_API_KEY env var")
+  println("                           Configure the provider in the")
+  println("                           app's Settings page, or export a")
+  println("                           provider API key")
+  println()
+  println("  Provider env vars (fill blank settings):")
+  println("    OPENAI_API_KEY         OpenAI or compatible endpoints")
+  println("    ANTHROPIC_API_KEY      Anthropic")
+  println("    GEMINI_API_KEY         Google Gemini")
   println()
   println("  Search env vars (checked in order):")
   println("    BING_SEARCH_API_KEY    Use Bing Web Search API")

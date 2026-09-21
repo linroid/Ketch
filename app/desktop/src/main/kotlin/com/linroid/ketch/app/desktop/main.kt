@@ -5,16 +5,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import com.linroid.ketch.ai.AiConfig
-import com.linroid.ketch.ai.AiModule
-import com.linroid.ketch.ai.LlmConfig
-import com.linroid.ketch.ai.resolveSearchConfigFromEnv
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
-import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProvider
+import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
@@ -61,13 +57,16 @@ fun main() = application {
           )
         },
         localServerFactory = { ketchApi ->
-          val serverConfig = config.server
+          // Reloaded here so a restart from Settings picks up the
+          // saved port, token and mDNS choice.
+          val saved = configStore.load()
+          val serverConfig = saved.server
           val server = KetchServer(
             ketch = ketchApi,
             host = serverConfig.host,
             port = serverConfig.port,
             apiToken = serverConfig.apiToken,
-            name = instanceName,
+            name = saved.name?.ifEmpty { null } ?: instanceName,
             corsAllowedHosts = serverConfig.corsAllowedHosts
               .takeIf { it.isNotEmpty() } ?: listOf("*"),
             mdnsEnabled = serverConfig.mdnsEnabled,
@@ -84,21 +83,7 @@ fun main() = application {
       configStore = configStore,
     )
   }
-  val embeddedAiProvider = remember {
-    val apiKey = System.getenv("OPENAI_API_KEY") ?: ""
-    if (apiKey.isNotBlank()) {
-      val aiModule = AiModule.create(
-        AiConfig(
-          enabled = true,
-          llm = LlmConfig(apiKey = apiKey),
-          search = resolveSearchConfigFromEnv(),
-        ),
-      )
-      EmbeddedAiDiscoveryProvider(aiModule.discoveryService)
-    } else {
-      null
-    }
-  }
+  val aiProviderFactory = remember { EmbeddedAiDiscoveryProviderFactory() }
   DisposableEffect(Unit) {
     onDispose { instanceManager.close() }
   }
@@ -107,6 +92,6 @@ fun main() = application {
     title = "Ketch",
     icon = painterResource("icon.svg"),
   ) {
-    App(instanceManager, embeddedAiProvider)
+    App(instanceManager, aiProviderFactory)
   }
 }

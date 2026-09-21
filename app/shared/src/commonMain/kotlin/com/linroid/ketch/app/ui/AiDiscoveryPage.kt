@@ -14,8 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.app.components.KetchButton
-import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchCard
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.theme.KetchTheme
@@ -26,8 +24,6 @@ import com.linroid.ketch.app.state.AiDiscoverState
 fun AiDiscoveryPage(
   state: AiDiscoverState,
   draft: AiDiscoverDraft,
-  available: Boolean,
-  onAddDirect: () -> Unit,
   onCancelSearch: () -> Unit,
   onDiscover: (String, String) -> Unit,
   onDownloadSelected: (List<AiCandidate>) -> Unit,
@@ -50,14 +46,7 @@ fun AiDiscoveryPage(
             style = KetchTheme.typography.bodyMedium, color = KetchTheme.colors.onSurfaceVariant)
         }
         KetchCard(modifier = Modifier.fillMaxWidth(), padding = if (compact) 16.dp else 24.dp) {
-          AiDiscoverForm(state, draft, available, onDiscover, onCancelSearch)
-        }
-        if (!available) {
-          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("AI discovery isn't available on this device yet.",
-              style = KetchTheme.typography.bodyMedium, color = KetchTheme.colors.onSurfaceVariant)
-            KetchButton("Add a direct link", onClick = onAddDirect, variant = KetchButtonVariant.Secondary)
-          }
+          AiDiscoverForm(state, draft, onDiscover, onCancelSearch)
         }
         AiDiscoverResults(state, draft, onDownloadSelected)
       }

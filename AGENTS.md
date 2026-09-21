@@ -92,15 +92,17 @@ cli/          # JVM CLI entry point
 
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
-  `ServerConfig`, `RemoteConfig`, `PlatformFileSystem` (expect/actual)
+  `ServerConfig`, `RemoteConfig`, `AiSettings`, `LlmSettings`, `LlmProvider`,
+  `SearchSettings`, `SearchProvider`, `PlatformFileSystem` (expect/actual)
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
   `ConnectionState`, `WireModels`, `WireMapper`
 
-### `ai:discover` (JVM only)
-- `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `ResourceDiscoveryService`,
-  `DiscoverQuery`, `DiscoverResult`, `RankedCandidate`
+### `ai:discover` (JVM/Android only)
+- `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `LlmClientFactory`,
+  `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverResult`,
+  `RankedCandidate`
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
   `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`
 - `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
@@ -170,15 +172,29 @@ cli/          # JVM CLI entry point
 - See [support and migration](docs/torrent.md) and [verification](docs/development/torrent-verification.md)
 
 ### AI-Driven Resource Discovery (`ai:discover`) — In Progress
-- LLM agent-driven discovery using Koog framework (v0.6.2)
+- LLM agent-driven discovery using Koog framework (v1.2.0)
+- Providers: OpenAI, Anthropic, Google Gemini, Ollama, any
+  OpenAI-compatible endpoint (`LlmClientFactory` maps them to Koog clients)
+- Configured on the app's Settings page and persisted under `[ai]` in
+  `config.toml`; blank credentials fall back to environment variables
+- The Discover destination is hidden until discovery is usable; in the
+  apps the Enable switch is authoritative (an env key fills a blank token
+  but never enables the feature — only the CLI auto-enables)
+- Provider defaults track current models; unknown ids resolve as custom
+  Koog models, and `temperature` is only sent to models that accept it
 - 7 agent tools: `searchWeb`, `searchSites`, `fetchPage`, `headUrl`,
   `extractDownloads`, `validateUrl`, `emitStep`
 - SSRF protection, device safety scoring, rate limiting
-- JVM only (uses Koog + Ktor CIO client)
+- JVM/Android only (uses Koog + Ktor CIO client)
+- See [AI discovery configuration](docs/ai-discovery.md)
 
 ### Configuration (`config/`)
 - TOML-based configuration via ktoml library
-- `KetchConfig` root with server, download, and remote sections
+- `KetchConfig` root with server, download, remote, AI, and appearance sections
+- `AiSettings`: AI discovery provider, token, model, endpoint and search keys
+- `AppearanceConfig`: accent palette (app-only; CLI and server ignore it)
+- Apps edit all of it on the Settings destination: device name, appearance,
+  downloads (pushed live via `KetchApi.updateConfig`), server, AI discovery
 - `ServerConfig`: host, port, API token, CORS, mDNS
 - `RemoteConfig`: pre-configured remote server connections
 - `FileConfigStore`: platform-specific file persistence via okio
@@ -269,7 +285,10 @@ cli/          # JVM CLI entry point
    v2 incoming/upload/seeding/PEX, hybrid v1-only peers, uTP and encryption remain unimplemented.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
-7. `ai:discover` is JVM only (depends on Koog + Ktor CIO)
+7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO); iOS and
+   the web app report AI discovery as unavailable
+8. AI API tokens are stored in plain text in `config.toml`, like the server
+   `apiToken`; use environment variables on shared machines
 
 ## Roadmap
 

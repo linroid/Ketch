@@ -1,5 +1,7 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.config.AiSettings
+
 /**
  * A discovered resource candidate from AI discovery.
  */
@@ -38,4 +40,30 @@ data class AiDiscoverResponse(
  */
 interface AiDiscoveryProvider {
   suspend fun discover(request: AiDiscoverRequest): AiDiscoverResponse
+
+  /**
+   * Sends a minimal prompt to the configured provider to check the
+   * endpoint, model and credentials.
+   *
+   * @return the model's reply text
+   */
+  suspend fun verify(): String
+
+  /** Releases any resources the implementation holds. */
+  fun close() {}
+}
+
+/**
+ * Builds an [AiDiscoveryProvider] for the given settings.
+ *
+ * Platforms that cannot run the discovery engine (web, iOS) supply no
+ * factory at all, which is what makes the settings page report AI
+ * discovery as unsupported.
+ */
+fun interface AiDiscoveryProviderFactory {
+  /**
+   * Creates a provider, or returns `null` when [settings] (plus any
+   * credentials picked up from the environment) cannot drive discovery.
+   */
+  fun create(settings: AiSettings): AiDiscoveryProvider?
 }

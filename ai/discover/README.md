@@ -9,15 +9,16 @@ Given a query like *"latest Ubuntu 24.04 desktop ISO"*, the agent autonomously
 searches the web, fetches relevant pages, extracts download links, validates
 them for safety, and returns a ranked list of candidates.
 
-The module depends only on `library:api` — it is fully independent from the
-server and remote modules.
+The module depends on `library:api` and `config` (for the persisted
+`AiSettings`) — it is independent from the server and remote modules.
 
 ## Architecture
 
 ```
 ai/discover/
 ├── AiModule.kt                  # Public entry point + factory
-├── AiConfig.kt                  # Configuration (LLM, search, fetcher, agent)
+├── AiConfig.kt                  # Configuration + env credential fallbacks
+├── LlmClientFactory.kt          # Provider → Koog client and model
 ├── ResourceDiscoveryService.kt  # Koog AIAgent orchestrator
 ├── DiscoverQuery.kt             # Input model
 ├── DiscoverResult.kt            # Output model
@@ -145,8 +146,10 @@ ResourceDiscoveryService.discover()
 ```kotlin
 val aiModule = AiModule.create(
   config = AiConfig(
-    enabled = true,
-    llm = LlmConfig(apiKey = "sk-..."),
+    settings = AiSettings(
+      enabled = true,
+      llm = LlmSettings(provider = LlmProvider.OpenAi, apiKey = "sk-..."),
+    ),
   ),
 )
 
@@ -174,26 +177,47 @@ val listener = object : DiscoveryStepListener {
 }
 
 val aiModule = AiModule.create(
-  config = AiConfig(enabled = true, llm = LlmConfig(apiKey = "sk-...")),
+  config = AiConfig(
+    settings = AiSettings(
+      enabled = true,
+      llm = LlmSettings(provider = LlmProvider.Anthropic, apiKey = "sk-ant-..."),
+    ),
+  ),
   stepListener = listener,
 )
 ```
 
+### Apps
+
+The desktop and Android apps configure discovery on the **Settings**
+page (provider, API token, model, endpoint and web search). Settings are
+persisted in `config.toml` under `[ai]`, so the CLI picks up the same
+configuration. See [docs/ai-discovery.md](../../docs/ai-discovery.md).
+
 ### CLI
 
 ```bash
-export OPENAI_API_KEY=sk-...
+# Uses [ai] from config.toml; blank credentials fall back to the env.
 ketch ai-discover "latest Ubuntu 24.04 ISO"
-ketch ai-discover "ffmpeg release" --sites ffmpeg.org
+OPENAI_API_KEY=sk-... ketch ai-discover "ffmpeg release" --sites ffmpeg.org
 ```
 
 ## Configuration
 
+User-facing settings live in the `config` module (`AiSettings`) so the
+apps, the CLI and this module share one representation; the remaining
+sections are engine tuning knobs.
+
 | Config | Field | Default | Description |
 |--------|-------|---------|-------------|
-| `LlmConfig` | `apiKey` | `""` | OpenAI API key (empty = disabled) |
-| | `model` | `"gpt-4o"` | LLM model name |
-| | `maxTokens` | `4096` | Max tokens for LLM response |
+| `AiSettings` | `enabled` | `false` | Master switch |
+| `LlmSettings` | `provider` | `OpenAi` | `OpenAi`, `Anthropic`, `Google`, `Ollama`, `OpenAiCompatible` |
+| | `apiKey` | `""` | Provider API token (not needed for Ollama) |
+| | `model` | `""` | Model id; blank = provider default |
+| | `baseUrl` | `""` | Endpoint; blank = provider default |
+| `SearchSettings` | `provider` | `None` | `None`, `Bing`, `Google` |
+| | `apiKey` | `""` | Search API key |
+| | `cx` | `""` | Google Programmable Search engine id |
 | `AgentConfig` | `maxIterations` | `30` | Max agent tool-call iterations |
 | | `temperature` | `0.2` | LLM sampling temperature |
 | `FetcherConfig` | `maxContentBytes` | `2 MB` | Max content per fetch |
@@ -209,7 +233,9 @@ ketch ai-discover "ffmpeg release" --sites ffmpeg.org
 ./gradlew :ai:discover:test
 ```
 
-66 tests covering:
+Tests cover:
+- `LlmClientFactoryTest` — provider/model resolution, endpoint normalization
+- `AiSettingsEnvTest` — environment credential fallbacks
 - `UrlValidatorTest` — SSRF protection (20 tests)
 - `RobotsTxtParserTest` — robots.txt parsing (13 tests)
 - `ContentExtractorTest` — HTML extraction (7 tests)
@@ -223,8 +249,6 @@ ketch ai-discover "ffmpeg release" --sites ffmpeg.org
   Brave Search, or SearXNG) to replace `DummySearchProvider`
 - [ ] **Streaming step events** — expose `DiscoveryStepListener` callbacks as
   SSE events for real-time UI updates during discovery
-- [ ] **LLM provider flexibility** — support Anthropic, Google, and local models
-  via Koog's multi-provider executor (currently hardcoded to OpenAI)
 - [ ] **Download integration** — after discovery, allow one-click download of
   selected candidates via `KetchApi.download()`
 - [ ] **Caching** — cache fetched page content and HEAD results to avoid

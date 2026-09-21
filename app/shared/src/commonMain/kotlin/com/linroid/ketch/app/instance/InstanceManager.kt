@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 class InstanceManager(
   private val factory: InstanceFactory,
   initialRemotes: List<RemoteConfig> = emptyList(),
-  private val configStore: ConfigStore? = null,
+  val configStore: ConfigStore? = null,
 ) {
   private val scope = CoroutineScope(
     SupervisorJob() + Dispatchers.Default,

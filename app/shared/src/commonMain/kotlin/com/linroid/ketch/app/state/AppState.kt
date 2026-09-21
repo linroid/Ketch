@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
@@ -58,7 +59,8 @@ sealed interface ResolveState {
 class AppState(
   val instanceManager: InstanceManager,
   private val scope: CoroutineScope,
-  private val embeddedAiProvider: AiDiscoveryProvider? = null,
+  val appSettings: AppSettingsController = AppSettingsController(),
+  val aiSettings: AiSettingsController = AiSettingsController(),
 ) {
   private val lanServerDiscovery = LanServerDiscovery()
 
@@ -327,11 +329,32 @@ class AppState(
     }
   }
 
+  /**
+   * Persists download settings and applies them to the active instance,
+   * which takes effect without a restart.
+   */
+  fun applyDownloadConfig(config: DownloadConfig) {
+    appSettings.saveDownload(config)
+    scope.launch {
+      runCatching { activeApi.value.updateConfig(config) }
+        .onFailure { e ->
+          if (e is kotlinx.coroutines.CancellationException) throw e
+          errorMessage =
+            e.message ?: "Failed to apply download settings"
+        }
+    }
+  }
+
   fun aiDiscover(query: String, sites: String) {
     aiDiscoveryJob?.cancel()
-    if (embeddedAiProvider == null) {
+    val provider = aiSettings.provider
+    if (provider == null) {
       aiDiscoverState = AiDiscoverState.Error(
-        "AI discovery is not available",
+        if (aiSettings.supported) {
+          "Add an AI provider and API token in Settings first."
+        } else {
+          "AI discovery is not available on this platform."
+        },
       )
       return
     }
@@ -341,7 +364,7 @@ class AppState(
         val siteList = sites.split(",", " ")
           .map { it.trim() }
           .filter { it.isNotBlank() }
-        embeddedAiProvider.discover(
+        provider.discover(
           AiDiscoverRequest(
             query = query,
             sites = siteList,

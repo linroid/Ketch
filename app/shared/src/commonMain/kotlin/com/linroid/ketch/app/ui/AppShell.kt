@@ -41,7 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.state.AiDiscoveryProvider
+import com.linroid.ketch.app.state.AiSettingsController
+import com.linroid.ketch.app.state.AppDestination
+import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.AiDiscoverDraft
@@ -50,22 +52,30 @@ import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
 import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.ketch.app.util.matchesSearch
 import com.linroid.ketch.app.ui.list.DownloadList
+import com.linroid.ketch.app.ui.settings.SettingsPage
 import com.linroid.ketch.app.ui.sidebar.SidebarNavigation
 import com.linroid.ketch.app.ui.sidebar.SpeedStatusBar
 import com.linroid.ketch.app.ui.sidebar.filterIcon
 import com.linroid.ketch.app.ui.toolbar.BatchActionBar
 import com.linroid.ketch.app.ui.toolbar.KetchToolbar
 import com.linroid.ketch.app.ui.toolbar.countTasksByFilter
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppShell(
   instanceManager: InstanceManager,
-  embeddedAiProvider: AiDiscoveryProvider? = null,
+  appSettings: AppSettingsController = remember { AppSettingsController() },
+  aiSettings: AiSettingsController = remember { AiSettingsController() },
 ) {
   val scope = rememberCoroutineScope()
-  val appState = remember(instanceManager) {
-    AppState(instanceManager, scope, embeddedAiProvider)
+  val appState = remember(instanceManager, appSettings, aiSettings) {
+    AppState(
+      instanceManager = instanceManager,
+      scope = scope,
+      appSettings = appSettings,
+      aiSettings = aiSettings,
+    )
   }
 
   val instances by appState.instances.collectAsState()
@@ -152,9 +162,20 @@ fun AppShell(
     }
   }
 
-  // Use the full sidebar when it fits; otherwise keep two destinations in
+  // Use the full sidebar when it fits; otherwise keep the destinations in
   // the bottom bar instead of a sparse rail that squeezes the content.
-  var discoverySelected by rememberSaveable { mutableStateOf(false) }
+  var destinationName by rememberSaveable {
+    mutableStateOf(AppDestination.Downloads.name)
+  }
+  val destinations = AppDestination.visible(aiSettings.available)
+  val destination = AppDestination.valueOf(destinationName)
+    .takeIf { it in destinations } ?: AppDestination.Downloads
+  LaunchedEffect(destination) {
+    // Keep the saved value in step when a destination disappears.
+    if (destination.name != destinationName) {
+      destinationName = destination.name
+    }
+  }
   val aiDraft = remember { AiDiscoverDraft() }
   val adaptiveInfo = currentWindowAdaptiveInfo()
   val isExpanded = adaptiveInfo.windowSizeClass
@@ -169,31 +190,21 @@ fun AppShell(
 
   NavigationSuiteScaffold(
     navigationSuiteItems = {
-      item(
-        label = { Text("Downloads") },
-        selected = !discoverySelected,
-        onClick = { discoverySelected = false },
-        icon = {
-          KetchIconImage(
-            icon = KetchIcon.Active, size = 24.dp,
-            tint = if (!discoverySelected) KetchTheme.colors.primary
-              else KetchTheme.colors.onSurfaceVariant,
-          )
-        },
-      )
-      item(
-        label = { Text("Discover") },
-        selected = discoverySelected,
-        onClick = { discoverySelected = true },
-        icon = {
-          KetchIconImage(
-            icon = KetchIcon.Ai,
-            size = 24.dp,
-            tint = if (discoverySelected) KetchTheme.colors.primary
-              else KetchTheme.colors.onSurfaceVariant,
-          )
-        },
-      )
+      destinations.forEach { entry ->
+        val selected = destination == entry
+        item(
+          label = { Text(entry.label) },
+          selected = selected,
+          onClick = { destinationName = entry.name },
+          icon = {
+            KetchIconImage(
+              icon = entry.icon, size = 24.dp,
+              tint = if (selected) KetchTheme.colors.primary
+                else KetchTheme.colors.onSurfaceVariant,
+            )
+          },
+        )
+      }
     },
     layoutType = navLayoutType,
   ) {
@@ -204,11 +215,12 @@ fun AppShell(
           if (isExpanded) {
             SidebarNavigation(
               selectedFilter = appState.statusFilter,
-              discoverySelected = discoverySelected,
-              onDiscoverySelect = { discoverySelected = true },
+              destination = destination,
+              showDiscovery = AppDestination.Discover in destinations,
+              onDestinationSelect = { destinationName = it.name },
               taskCounts = taskCounts,
               onFilterSelect = { selected ->
-                discoverySelected = false
+                destinationName = AppDestination.Downloads.name
                 appState.statusFilter = selected
               },
               activeInstance = activeInstance,
@@ -221,20 +233,37 @@ fun AppShell(
 
           // Content area
           Column(modifier = Modifier.weight(1f)) {
-            if (discoverySelected) {
+            if (destination == AppDestination.Discover) {
               AiDiscoveryPage(
                 state = appState.aiDiscoverState,
                 draft = aiDraft,
-                available = embeddedAiProvider != null,
-                onAddDirect = { appState.requestAddDownload() },
                 onCancelSearch = { appState.resetAiDiscover() },
                 onDiscover = { query, sites -> appState.aiDiscover(query, sites) },
                 onDownloadSelected = { candidates ->
                   appState.aiDownloadSelected(candidates)
                   aiDraft.selected = emptySet()
-                  discoverySelected = false
+                  destinationName = AppDestination.Downloads.name
                   appState.statusFilter = StatusFilter.All
                 },
+              )
+            } else if (destination == AppDestination.Settings) {
+              SettingsPage(
+                appSettings = appSettings,
+                aiSettings = aiSettings,
+                defaultDeviceName = activeInstance?.label ?: "this device",
+                backendLabel = activeInstance?.label ?: "this device",
+                serverState = serverState,
+                serverSupported = instanceManager.isLocalServerSupported,
+                onSaveDownload = { appState.applyDownloadConfig(it) },
+                onTestAi = { settings ->
+                  scope.launch { aiSettings.testConnection(settings) }
+                },
+                onStartServer = {
+                  instanceManager.startServer(
+                    appSettings.config.server.port,
+                  )
+                },
+                onStopServer = { instanceManager.stopServer() },
               )
             } else {
               if (isExpanded) {

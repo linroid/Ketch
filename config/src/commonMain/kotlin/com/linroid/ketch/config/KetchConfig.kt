@@ -12,6 +12,8 @@ import kotlinx.serialization.Serializable
  * @property server server-mode settings (host, port, auth).
  * @property download download engine settings.
  * @property remotes pre-configured remote server connections.
+ * @property ai AI resource discovery settings.
+ * @property appearance app look and feel settings.
  */
 @Serializable
 data class KetchConfig(
@@ -19,4 +21,6 @@ data class KetchConfig(
   val server: ServerConfig = ServerConfig(),
   val download: DownloadConfig = DownloadConfig(),
   val remotes: List<RemoteConfig> = emptyList(),
+  val ai: AiSettings = AiSettings(),
+  val appearance: AppearanceConfig = AppearanceConfig(),
 )
