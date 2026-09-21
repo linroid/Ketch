@@ -37,6 +37,9 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 
 - **Multi-platform** `✅` -- Works on Android, iOS, Desktop, and Web
 - **Segmented downloads** `✅` -- Accelerate downloads by splitting files into multiple parallel connections
+- **Multi-network downloads** `✅` -- Distribute HTTP segments across multiple network interfaces
+  on JVM/Desktop and Android, configurable locally or remotely through `KetchApi`
+  ([setup and limitations](docs/multiple-networks.md))
 - **Pause / Resume** `✅` -- Pause and pick up where you left off, even after restarting your app
 - **Queue management** `✅` -- Manage multiple downloads with priorities and concurrency limits
 - **Speed limiting** `✅` -- Control bandwidth usage per task or globally
@@ -72,6 +75,9 @@ dependencies {
 ```
 
 Start downloading:
+
+To distribute HTTP segments across Wi-Fi, Ethernet, or Android cellular networks, see
+[multiple network interfaces](docs/multiple-networks.md).
 
 ```kotlin
 val ketch = Ketch(

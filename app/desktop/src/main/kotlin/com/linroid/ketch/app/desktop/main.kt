@@ -15,6 +15,7 @@ import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
@@ -45,7 +46,7 @@ fun main() = application {
         deviceName = instanceName,
         embeddedFactory = {
           Ketch(
-            httpEngine = KtorHttpEngine(),
+            httpEngine = KtorHttpEngine.withNetworkInterfaces(),
             taskStore = taskStore,
             config = downloadConfig,
             name = instanceName,

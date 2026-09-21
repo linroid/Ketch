@@ -67,6 +67,21 @@ interface KetchApi {
    */
   suspend fun updateConfig(config: DownloadConfig)
 
+  /** Lists HTTP network interfaces and their runtime selection on this instance. */
+  suspend fun networkInterfaces(): NetworkInterfaces = NetworkInterfaces()
+
+  /**
+   * Selects interfaces for subsequent HTTP requests, including retries and new segments.
+   * In-flight requests finish on their existing network. An empty selection restores default
+   * routing. Selection is runtime-only and is not persisted across instance restarts.
+   *
+   * @throws IllegalArgumentException if an ID is unknown or unavailable
+   * @throws UnsupportedOperationException if this backend cannot configure interfaces
+   */
+  suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+    throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
+  }
+
   /** Release resources (HTTP client, SSE connection, etc.). */
   fun close()
 

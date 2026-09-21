@@ -128,6 +128,20 @@ Ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
 | Desktop | CIO |
 | WasmJs | Js |
 
+For downloading across multiple interfaces, wrap network-bound engines in
+`MultiNetworkHttpEngine`. JVM provides `KtorHttpEngine.forLocalAddress(InetAddress)`;
+Android provides `KtorHttpEngine.forNetwork(Network)`. These are extension functions in
+`com.linroid.ketch.engine` and must be imported explicitly. See
+[multiple network interfaces](multiple-networks.md) for setup and platform limits.
+
+`KetchApi.networkInterfaces()` returns supported interfaces and their current selection on the
+download instance. `KetchApi.updateNetworkInterfaces(NetworkInterfaceConfig(interfaceIds))`
+changes the selection for subsequent HTTP requests; an empty list restores system-default
+routing. `RemoteKetch` forwards these methods through `GET`/`PUT /api/network-interfaces`.
+Selection is runtime-only. SDK instances enable these controls with
+`KtorHttpEngine.withNetworkInterfaces()` on JVM or
+`KtorHttpEngine.withNetworkInterfaces(connectivityManager)` on Android.
+
 ## Configuration
 
 ```kotlin

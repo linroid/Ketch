@@ -11,11 +11,14 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.NetworkInterfaceConfig
+import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
@@ -422,6 +425,15 @@ class Ketch(
     queue.maxPerHost = config.maxConnectionsPerHost
 
     log.i { "Config updated: $config" }
+  }
+
+  override suspend fun networkInterfaces(): NetworkInterfaces =
+    (httpEngine as? ConfigurableNetworkHttpEngine)?.networkInterfaces() ?: NetworkInterfaces()
+
+  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+    val configurable = httpEngine as? ConfigurableNetworkHttpEngine
+      ?: throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
+    return configurable.updateNetworkInterfaces(config)
   }
 
   override fun close() {

@@ -3,6 +3,8 @@ package com.linroid.ketch.remote
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.NetworkInterfaceConfig
+import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.DownloadConfig
@@ -30,6 +32,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
@@ -181,6 +184,29 @@ class RemoteKetch internal constructor(
       setBody(config)
     }
     checkSuccess(response)
+  }
+
+  override suspend fun networkInterfaces(): NetworkInterfaces {
+    val response = httpClient.get(Api.NetworkInterfaces())
+    if (response.status == HttpStatusCode.NotFound ||
+      response.status == HttpStatusCode.NotImplemented
+    ) return NetworkInterfaces()
+    checkSuccess(response)
+    return response.body()
+  }
+
+  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+    val response = httpClient.put(Api.NetworkInterfaces()) {
+      contentType(ContentType.Application.Json)
+      setBody(config)
+    }
+    when (response.status) {
+      HttpStatusCode.BadRequest -> throw IllegalArgumentException("Invalid network interface selection")
+      HttpStatusCode.NotFound, HttpStatusCode.NotImplemented ->
+        throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
+    }
+    checkSuccess(response)
+    return response.body()
   }
 
   override fun close() {
