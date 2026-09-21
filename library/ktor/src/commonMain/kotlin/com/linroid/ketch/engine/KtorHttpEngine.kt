@@ -178,7 +178,7 @@ class KtorHttpEngine(
   companion object {
     private const val DEFAULT_BUFFER_SIZE = 8192
 
-    private fun defaultClient(): HttpClient = HttpClient {
+    private fun defaultClient(): HttpClient = HttpClient(defaultHttpClientEngine()) {
       install(HttpTimeout) {
         socketTimeoutMillis = Long.MAX_VALUE
         requestTimeoutMillis = Long.MAX_VALUE

@@ -23,6 +23,7 @@ import com.linroid.ketch.config.defaultDbPath
 import com.linroid.ketch.config.generateConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.mcp.KetchMcpServer
@@ -164,7 +165,7 @@ fun main(args: Array<String>) {
   )
 
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine(),
+    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
     config = config,
     additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
   )
@@ -429,7 +430,7 @@ private fun runServer(args: Array<String>) {
   val taskStore = SqliteTaskStore(driver)
 
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine(),
+    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
     taskStore = taskStore,
     config = downloadConfig,
     name = instanceName,
@@ -653,7 +654,7 @@ private fun runMcp(args: List<String>) {
   val taskStore = SqliteTaskStore(driver)
 
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine(),
+    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
     taskStore = taskStore,
     config = downloadConfig,
     logger = Logger.console(ketchLogLevel),

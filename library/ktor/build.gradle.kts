@@ -49,6 +49,7 @@ kotlin {
     }
     jvmMain.dependencies {
       implementation(libs.ktor.client.cio)
+      implementation(libs.ktor.client.okhttp)
     }
     wasmJsMain.dependencies {
       implementation(libs.ktor.client.js)
@@ -56,6 +57,7 @@ kotlin {
     commonTest.dependencies {
       implementation(libs.kotlin.test)
       implementation(libs.ktor.client.mock)
+      implementation(libs.kotlinx.coroutines.test)
     }
   }
 }

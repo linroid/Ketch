@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
  * ### Server
  * - `GET  /api/status`       — server health and task counts
  * - `PUT  /api/config`       — update download configuration
+ * - `GET  /api/network-interfaces` — discover interfaces and current selection
+ * - `PUT  /api/network-interfaces` — select interfaces for new HTTP requests
  * - `POST /api/resolve`      — resolve URL metadata without downloading
  *
  * ### Tasks
@@ -43,6 +45,10 @@ class Api {
   @Serializable
   @Resource("config")
   data class Config(val parent: Api = Api())
+
+  @Serializable
+  @Resource("network-interfaces")
+  data class NetworkInterfaces(val parent: Api = Api())
 
   @Serializable
   @Resource("resolve")

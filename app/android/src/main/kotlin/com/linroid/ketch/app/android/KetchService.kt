@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.net.ConnectivityManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
@@ -23,6 +24,7 @@ import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
+import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
@@ -91,7 +93,9 @@ class KetchService : Service() {
         deviceName = instanceName,
         embeddedFactory = {
           Ketch(
-            httpEngine = KtorHttpEngine(),
+            httpEngine = KtorHttpEngine.withNetworkInterfaces(
+              getSystemService(ConnectivityManager::class.java)
+            ),
             taskStore = taskStore,
             config = downloadConfig,
             name = instanceName,
