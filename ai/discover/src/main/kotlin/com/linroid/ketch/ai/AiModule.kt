@@ -11,6 +11,8 @@ import com.linroid.ketch.ai.search.SearchProvider
 import com.linroid.ketch.ai.site.SiteProfileStore
 import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.config.SearchProvider as SearchProviderKind
+import com.linroid.ketch.config.SearchSettings
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -32,7 +34,18 @@ class AiModule(
   val discoveryService: ResourceDiscoveryService,
   val siteProfiler: SiteProfiler,
   val siteProfileStore: SiteProfileStore,
+  private val httpClients: List<HttpClient> = emptyList(),
 ) {
+
+  /**
+   * Releases the HTTP clients this module created.
+   *
+   * Call it when replacing a module after a settings change; the Ktor
+   * engines own thread pools that would otherwise be leaked.
+   */
+  fun close() {
+    httpClients.forEach(HttpClient::close)
+  }
 
   companion object {
     /**
@@ -64,11 +77,9 @@ class AiModule(
       val siteProfileStore = SiteProfileStore()
       val siteProfiler = SiteProfiler(fetcher)
 
+      val searchClient = createSearchClient(config.fetcher.requestTimeoutMs)
       val resolvedSearchProvider =
-        searchProvider ?: resolveSearchProvider(
-          config.search,
-          createSearchClient(config.fetcher.requestTimeoutMs),
-        )
+        searchProvider ?: resolveSearchProvider(config.search, searchClient)
 
       val discoveryService = ResourceDiscoveryService(
         searchProvider = resolvedSearchProvider,
@@ -83,6 +94,7 @@ class AiModule(
         discoveryService = discoveryService,
         siteProfiler = siteProfiler,
         siteProfileStore = siteProfileStore,
+        httpClients = listOf(fetcherClient, searchClient),
       )
     }
 
@@ -97,25 +109,20 @@ class AiModule(
       }
 
     internal fun resolveSearchProvider(
-      config: SearchConfig,
+      settings: SearchSettings,
       httpClient: HttpClient,
-    ): SearchProvider = when (config.provider.trim().lowercase()) {
-      "bing" -> {
-        if (config.apiKey.isBlank()) {
-          log.w { "Bing search configured but apiKey is blank; falling back to no-op" }
-          DummySearchProvider()
-        } else {
-          BingSearchProvider(httpClient, config.apiKey)
+    ): SearchProvider = when {
+      !settings.isComplete -> {
+        log.w {
+          "${settings.provider.label} search is missing credentials;" +
+            " falling back to no-op"
         }
+        DummySearchProvider()
       }
-      "google" -> {
-        if (config.apiKey.isBlank() || config.cx.isBlank()) {
-          log.w { "Google search configured but apiKey or cx is blank; falling back to no-op" }
-          DummySearchProvider()
-        } else {
-          GoogleSearchProvider(httpClient, config.apiKey, config.cx)
-        }
-      }
+      settings.provider == SearchProviderKind.Bing ->
+        BingSearchProvider(httpClient, settings.apiKey)
+      settings.provider == SearchProviderKind.Google ->
+        GoogleSearchProvider(httpClient, settings.apiKey, settings.cx)
       else -> DummySearchProvider()
     }
   }

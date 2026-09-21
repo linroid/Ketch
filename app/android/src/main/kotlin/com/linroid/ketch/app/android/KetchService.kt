@@ -12,18 +12,14 @@ import android.os.Environment
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import com.linroid.ketch.ai.AiConfig
-import com.linroid.ketch.ai.AiModule
-import com.linroid.ketch.ai.LlmConfig
-import com.linroid.ketch.ai.resolveSearchConfigFromEnv
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.ServerState
-import com.linroid.ketch.app.state.AiDiscoveryProvider
-import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProvider
+import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
+import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -52,8 +48,9 @@ class KetchService : Service() {
 
   lateinit var instanceManager: InstanceManager
     private set
-  var aiProvider: AiDiscoveryProvider? = null
-    private set
+  /** Builds discovery providers from the settings the user saves. */
+  val aiProviderFactory: AiDiscoveryProviderFactory =
+    EmbeddedAiDiscoveryProviderFactory()
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private val binder = LocalBinder()
@@ -108,14 +105,17 @@ class KetchService : Service() {
           )
         },
         localServerFactory = { ketchApi ->
-          val serverConfig = config.server
+          // Reloaded here so a restart from Settings picks up the
+          // saved port, token and mDNS choice.
+          val saved = configStore.load()
+          val serverConfig = saved.server
           log.i { "Starting local server on port ${serverConfig.port}" }
           val server = KetchServer(
             ketchApi,
             host = serverConfig.host,
             port = serverConfig.port,
             apiToken = serverConfig.apiToken,
-            name = instanceName,
+            name = saved.name ?: instanceName,
             corsAllowedHosts = serverConfig.corsAllowedHosts
               .takeIf { it.isNotEmpty() } ?: listOf("*"),
             mdnsEnabled = serverConfig.mdnsEnabled,
@@ -135,19 +135,6 @@ class KetchService : Service() {
       configStore = configStore,
     )
 
-    val apiKey = System.getenv("OPENAI_API_KEY") ?: ""
-    if (apiKey.isNotBlank()) {
-      val aiModule = AiModule.create(
-        AiConfig(
-          enabled = true,
-          llm = LlmConfig(apiKey = apiKey),
-          search = resolveSearchConfigFromEnv(),
-        ),
-      )
-      aiProvider = EmbeddedAiDiscoveryProvider(
-        aiModule.discoveryService,
-      )
-    }
     startForegroundMonitor()
   }
 

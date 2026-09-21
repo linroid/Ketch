@@ -1,83 +1,146 @@
 package com.linroid.ketch.ai
 
+import com.linroid.ketch.config.AiSettings
+import com.linroid.ketch.config.LlmProvider
+import com.linroid.ketch.config.LlmSettings
+import com.linroid.ketch.config.SearchProvider
+import com.linroid.ketch.config.SearchSettings
+
 /**
  * Configuration for the AI resource discovery feature.
  *
- * @param enabled master switch; when `false`, AI endpoints return 404
- * @param llm LLM provider settings
- * @param search search provider settings
+ * [settings] holds everything the user configures (and what the apps
+ * persist in `config.toml`); the remaining sections are engine tuning
+ * knobs that are not exposed in the UI.
+ *
+ * @param settings user-facing LLM and search settings
  * @param fetcher fetcher security settings
  * @param discovery discovery orchestration limits
+ * @param agent agent execution limits
  */
 data class AiConfig(
-  val enabled: Boolean = false,
-  val llm: LlmConfig = LlmConfig(),
-  val search: SearchConfig = SearchConfig(),
+  val settings: AiSettings = AiSettings(),
   val fetcher: FetcherConfig = FetcherConfig(),
   val discovery: DiscoveryConfig = DiscoveryConfig(),
   val agent: AgentConfig = AgentConfig(),
-)
+) {
+  /** Master switch; when `false`, discovery returns no candidates. */
+  val enabled: Boolean get() = settings.enabled
+
+  /** LLM connection settings. */
+  val llm: LlmSettings get() = settings.llm
+
+  /** Web search settings. */
+  val search: SearchSettings get() = settings.search
+}
 
 /**
- * LLM provider configuration.
+ * Fills blank credentials in [base] from environment variables.
  *
- * @param provider provider type: "openai", "anthropic", "google"
- * @param apiKey API key (from env var or config)
- * @param model model name (e.g., "gpt-4o")
- * @param maxTokens max tokens for LLM response
- * @param baseUrl base URL override for compatible APIs
- */
-data class LlmConfig(
-  val provider: String = "openai",
-  val apiKey: String = "",
-  val model: String = "gpt-4o",
-  val maxTokens: Int = 4096,
-  val baseUrl: String? = null,
-)
-
-/**
- * Search provider configuration.
+ * The API key for the configured provider is read from that provider's
+ * conventional variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+ * `GEMINI_API_KEY`/`GOOGLE_API_KEY`). When [base] is still at its
+ * defaults, any of those variables also selects the provider and
+ * switches discovery on, which keeps the "export a key and go" flow
+ * working for the CLI. The apps have an explicit Enable switch, so they
+ * only resolve settings the user has switched on.
  *
- * @param provider search API provider type: `"bing"`, `"google"`, or
- *   `"none"` (default, no-op fallback)
- * @param apiKey search API key (Bing subscription key or Google API key)
- * @param cx Google Custom Search Engine ID (only used when
- *   [provider] is `"google"`)
- */
-data class SearchConfig(
-  val provider: String = "none",
-  val apiKey: String = "",
-  val cx: String = "",
-)
-
-/**
- * Resolves a [SearchConfig] from environment variables.
+ * Search works the same way: the selected provider's blank key (and,
+ * for Google, engine id) are filled from `BING_SEARCH_API_KEY`, or
+ * `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_CX`, keeping every saved
+ * value and never switching providers. Only untouched settings let the
+ * environment pick a search provider.
  *
- * Priority:
- * 1. `BING_SEARCH_API_KEY` → Bing
- * 2. `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` → Google
- * 3. Default (no-op)
- *
+ * @param base settings loaded from the config file
  * @param getenv environment lookup, overridable for testing
  */
-fun resolveSearchConfigFromEnv(
+fun resolveAiSettingsFromEnv(
+  base: AiSettings = AiSettings(),
   getenv: (String) -> String? = System::getenv,
-): SearchConfig {
-  val bingKey = getenv("BING_SEARCH_API_KEY")
-  if (!bingKey.isNullOrBlank()) {
-    return SearchConfig(provider = "bing", apiKey = bingKey)
-  }
-  val googleKey = getenv("GOOGLE_SEARCH_API_KEY")
-  val googleCx = getenv("GOOGLE_SEARCH_CX")
-  if (!googleKey.isNullOrBlank() && !googleCx.isNullOrBlank()) {
-    return SearchConfig(
-      provider = "google",
-      apiKey = googleKey,
-      cx = googleCx,
-    )
-  }
-  return SearchConfig()
+): AiSettings {
+  val llm = resolveLlmFromEnv(base, getenv)
+  val search = resolveSearchFromEnv(base, getenv)
+  val enabled = base.enabled ||
+    (base == AiSettings() && llm.apiKey.isNotBlank())
+  return base.copy(enabled = enabled, llm = llm, search = search)
 }
+
+private fun resolveLlmFromEnv(
+  base: AiSettings,
+  getenv: (String) -> String?,
+): LlmSettings {
+  val llm = base.llm
+  if (llm.apiKey.isNotBlank()) return llm
+  val configured = envKeyFor(llm.provider, getenv)
+  if (configured != null) return llm.copy(apiKey = configured)
+  // Untouched settings: let any provider key pick the provider.
+  if (base != AiSettings()) return llm
+  for (provider in ENV_PROVIDER_ORDER) {
+    val key = envKeyFor(provider, getenv) ?: continue
+    return llm.copy(provider = provider, apiKey = key)
+  }
+  return llm
+}
+
+private fun envKeyFor(
+  provider: LlmProvider,
+  getenv: (String) -> String?,
+): String? = when (provider) {
+  LlmProvider.OpenAi,
+  LlmProvider.OpenAiCompatible,
+  -> getenv("OPENAI_API_KEY")
+  LlmProvider.Anthropic -> getenv("ANTHROPIC_API_KEY")
+  LlmProvider.Google ->
+    getenv("GEMINI_API_KEY") ?: getenv("GOOGLE_API_KEY")
+  LlmProvider.Ollama -> null
+}?.takeIf { it.isNotBlank() }
+
+private fun resolveSearchFromEnv(
+  base: AiSettings,
+  getenv: (String) -> String?,
+): SearchSettings {
+  val search = base.search
+  fun env(name: String): String? = getenv(name)?.takeIf { it.isNotBlank() }
+  return when (search.provider) {
+    // A chosen provider only has its own blanks filled; saved values
+    // and the choice itself always win.
+    SearchProvider.Bing -> search.copy(
+      apiKey = search.apiKey.ifBlank { env(BING_KEY).orEmpty() },
+    )
+    SearchProvider.Google -> search.copy(
+      apiKey = search.apiKey.ifBlank { env(GOOGLE_KEY).orEmpty() },
+      cx = search.cx.ifBlank { env(GOOGLE_CX).orEmpty() },
+    )
+    // "None" is also the default, so it only yields to the environment
+    // while nothing has been configured — the CLI's "export and go".
+    SearchProvider.None -> {
+      if (base != AiSettings()) return search
+      val bing = env(BING_KEY)
+      val googleKey = env(GOOGLE_KEY)
+      val googleCx = env(GOOGLE_CX)
+      when {
+        bing != null ->
+          SearchSettings(provider = SearchProvider.Bing, apiKey = bing)
+        googleKey != null && googleCx != null -> SearchSettings(
+          provider = SearchProvider.Google,
+          apiKey = googleKey,
+          cx = googleCx,
+        )
+        else -> search
+      }
+    }
+  }
+}
+
+private const val BING_KEY = "BING_SEARCH_API_KEY"
+private const val GOOGLE_KEY = "GOOGLE_SEARCH_API_KEY"
+private const val GOOGLE_CX = "GOOGLE_SEARCH_CX"
+
+private val ENV_PROVIDER_ORDER = listOf(
+  LlmProvider.OpenAi,
+  LlmProvider.Anthropic,
+  LlmProvider.Google,
+)
 
 /**
  * Fetcher security settings.

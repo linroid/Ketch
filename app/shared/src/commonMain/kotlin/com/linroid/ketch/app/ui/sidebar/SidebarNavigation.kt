@@ -33,6 +33,7 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.remote.ConnectionState
@@ -42,8 +43,9 @@ private val SIDEBAR_WIDTH = 216.dp
 @Composable
 fun SidebarNavigation(
   selectedFilter: StatusFilter,
-  discoverySelected: Boolean,
-  onDiscoverySelect: () -> Unit,
+  destination: AppDestination,
+  showDiscovery: Boolean,
+  onDestinationSelect: (AppDestination) -> Unit,
   taskCounts: Map<StatusFilter, Int>,
   onFilterSelect: (StatusFilter) -> Unit,
   activeInstance: InstanceEntry?,
@@ -90,21 +92,32 @@ fun SidebarNavigation(
         KetchSidebarItem(
           label = filter.label,
           icon = filterIcon(filter),
-          selected = !discoverySelected && selectedFilter == filter,
+          selected = destination == AppDestination.Downloads &&
+            selectedFilter == filter,
           onClick = { onFilterSelect(filter) },
           count = if (count > 0) count else null,
         )
       }
 
-      Spacer(Modifier.height(16.dp))
-      SectionLabel("Discover")
-      KetchSidebarItem(
-        label = "AI discovery",
-        icon = KetchIcon.Ai,
-        selected = discoverySelected,
-        onClick = onDiscoverySelect,
-      )
+      if (showDiscovery) {
+        Spacer(Modifier.height(16.dp))
+        SectionLabel("Discover")
+        KetchSidebarItem(
+          label = "AI discovery",
+          icon = KetchIcon.Ai,
+          selected = destination == AppDestination.Discover,
+          onClick = { onDestinationSelect(AppDestination.Discover) },
+        )
+      }
 
+      Spacer(Modifier.height(16.dp))
+      SectionLabel("App")
+      KetchSidebarItem(
+        label = "Settings",
+        icon = KetchIcon.Settings,
+        selected = destination == AppDestination.Settings,
+        onClick = { onDestinationSelect(AppDestination.Settings) },
+      )
     }
     HorizontalDivider(
       modifier = Modifier.padding(horizontal = 16.dp),

@@ -53,7 +53,8 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Media extraction** `🔜` -- Extract and download media from websites (like yt-dlp)
 - **Resource sniffer** `🔜` -- Detect downloadable resources from web pages
 - **Browser extension** `🔜` -- Intercept and manage downloads directly from your browser
-- **AI-driven discovery** `🚧` -- Find download links from natural language queries using an LLM agent
+- **AI-driven discovery** `🚧` -- Find download links from natural language queries using an
+  [LLM agent you configure in the app](docs/ai-discovery.md) (OpenAI, Anthropic, Gemini, Ollama)
 - **MCP server** `🔜` -- Expose Ketch capabilities as tools for AI agents via Model Context Protocol
 
 ## Getting Started
@@ -154,6 +155,7 @@ Supported platforms: **macOS** (arm64), **Linux** (x64, arm64), **Windows** (x64
 - [Architecture](docs/architecture.md) -- Modules, dependency graph, download pipeline, and multi-backend design
 - [API Reference](docs/api.md) -- Installation, module interfaces, configuration, error handling, and logging
 - [Logging](docs/logging.md) -- Logging system and configuration
+- [AI discovery](docs/ai-discovery.md) -- Providers, tokens, web search, and environment variables
 - [CLI](cli/README.md) -- Command-line interface for downloads and running the daemon
 
 ## Contributing

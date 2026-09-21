@@ -56,7 +56,7 @@ kotlin {
 
   sourceSets {
     commonMain.dependencies {
-      implementation(projects.config)
+      api(projects.config)
       implementation(projects.library.remote)
 
       implementation(libs.kotlinx.coroutines.core)

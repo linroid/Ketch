@@ -38,7 +38,6 @@ import com.linroid.ketch.app.util.formatBytes
 fun AiDiscoverForm(
   state: AiDiscoverState,
   draft: AiDiscoverDraft,
-  available: Boolean,
   onDiscover: (String, String) -> Unit,
   onCancelSearch: () -> Unit,
 ) {
@@ -95,7 +94,7 @@ fun AiDiscoverForm(
       KetchButton(
         text = if (loading) "Finding links…" else "Find links",
         leadingIcon = KetchIcon.Ai,
-        enabled = available && draft.query.isNotBlank() && !loading,
+        enabled = draft.query.isNotBlank() && !loading,
         onClick = {
           draft.prepareSearch()
           onDiscover(draft.submittedQuery, draft.sites.trim())
