@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.log.KetchLogger
@@ -37,6 +38,7 @@ internal class DownloadQueue(
     val handle: TaskHandle,
     var priority: DownloadPriority = DownloadPriority.NORMAL,
     var preempted: Boolean = false,
+    val destination: Destination? = null,
   ) {
     val taskId get() = handle.taskId
   }
@@ -44,8 +46,15 @@ internal class DownloadQueue(
   suspend fun enqueue(
     handle: TaskHandle,
     preferResume: Boolean = false,
+    destination: Destination? = null,
   ) {
     mutex.withLock {
+      if (queuedEntries.any { it.taskId == handle.taskId }) return
+      if (activeEntries.containsKey(handle.taskId)) {
+        if (!handle.mutableState.value.isTerminal) return
+        removeActive(handle.taskId)
+      }
+      handle.mutableState.value = DownloadState.Queued
       val host = extractHost(handle.request.url)
       val hostCount = hostConnectionCount.getOrElse(host) { 0 }
 
@@ -53,6 +62,7 @@ internal class DownloadQueue(
         handle = handle,
         priority = handle.request.priority,
         preempted = preferResume,
+        destination = destination,
       )
 
       if (activeEntries.size < maxConcurrent &&
@@ -140,8 +150,11 @@ internal class DownloadQueue(
     }
   }
 
-  suspend fun onTaskCompleted(taskId: String) {
+  suspend fun onTaskCompleted(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
+      if (expectedState != null &&
+        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+      ) return
       removeActive(taskId)
       log.d {
         "Task completed: taskId=$taskId, " +
@@ -152,8 +165,11 @@ internal class DownloadQueue(
     }
   }
 
-  suspend fun onTaskFailed(taskId: String) {
+  suspend fun onTaskFailed(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
+      if (expectedState != null &&
+        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+      ) return
       removeActive(taskId)
       log.d {
         "Task failed: taskId=$taskId, " +
@@ -164,8 +180,11 @@ internal class DownloadQueue(
     }
   }
 
-  suspend fun onTaskCanceled(taskId: String) {
+  suspend fun onTaskCanceled(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
+      if (expectedState != null &&
+        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+      ) return
       removeActive(taskId)
       log.d {
         "Task canceled: taskId=$taskId, " +
@@ -252,7 +271,7 @@ internal class DownloadQueue(
     taskHostMap[entry.taskId] = host
     if (entry.preempted) {
       entry.preempted = false
-      val resumed = coordinator.resume(entry.handle)
+      val resumed = coordinator.resume(entry.handle, entry.destination)
       if (!resumed) {
         coordinator.start(entry.handle)
       }

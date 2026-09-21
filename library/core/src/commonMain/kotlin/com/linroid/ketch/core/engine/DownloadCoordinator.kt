@@ -104,6 +104,11 @@ internal class DownloadCoordinator(
     job?.join()
   }
 
+  suspend fun awaitCompletion(taskId: String) {
+    val job = mutex.withLock { activeDownloads[taskId]?.job ?: stoppingDownloads[taskId] }
+    job?.join()
+  }
+
   suspend fun resume(
     handle: TaskHandle,
     destination: Destination? = null,
