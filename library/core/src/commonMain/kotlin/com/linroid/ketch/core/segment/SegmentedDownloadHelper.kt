@@ -4,10 +4,14 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.DownloadContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -74,6 +78,7 @@ class SegmentedDownloadHelper(
         downloadSegment,
       )
 
+      currentSegments = context.segments.value
       if (batchCompleted) break
 
       val newCount = context.pendingResegment
@@ -112,6 +117,7 @@ class SegmentedDownloadHelper(
       onProgress: suspend (bytesDownloaded: Long) -> Unit,
     ) -> Segment,
   ): Boolean {
+    val initialConnections = context.maxConnections.value
     val segmentProgress =
       allSegments.map { it.downloadedBytes }.toMutableList()
     val segmentMutex = Mutex()
@@ -149,19 +155,19 @@ class SegmentedDownloadHelper(
 
     return try {
       coroutineScope {
-        val watcherJob = launch {
-          val lastSeen = context.maxConnections.value
+        val batchScope = this
+        val watcherJob = launch(start = CoroutineStart.UNDISPATCHED) {
           context.maxConnections.first { count ->
-            count > 0 && count != lastSeen
+            count > 0 && count != initialConnections
           }
           context.pendingResegment =
             context.maxConnections.value
           log.i {
             "Connection change detected for " +
               "taskId=${context.taskId}: " +
-              "$lastSeen -> ${context.pendingResegment}"
+              "$initialConnections -> ${context.pendingResegment}"
           }
-          throw CancellationException("Resegmenting")
+          batchScope.cancel(CancellationException("Resegmenting"))
         }
 
         try {
@@ -178,6 +184,7 @@ class SegmentedDownloadHelper(
               }
               segmentMutex.withLock {
                 updatedSegments[completed.index] = completed
+                segmentProgress[completed.index] = completed.downloadedBytes
               }
               context.segments.value = currentSegments()
               log.d {
@@ -196,13 +203,16 @@ class SegmentedDownloadHelper(
         true
       }
     } catch (e: CancellationException) {
+      currentCoroutineContext().ensureActive()
       if (context.pendingResegment > 0) {
-        withContext(NonCancellable) {
-          context.segments.value = currentSegments()
-        }
         false
       } else {
         throw e
+      }
+    } finally {
+      // Keep every written byte, even when throttled progress has not been published yet.
+      withContext(NonCancellable) {
+        context.segments.value = currentSegments()
       }
     }
   }

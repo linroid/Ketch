@@ -30,7 +30,8 @@ internal class SegmentDownloader(
 
     val remainingBytes = segment.totalBytes - segment.downloadedBytes
     log.d {
-      "Starting segment ${segment.index}: range ${segment.start}..${segment.end} ($remainingBytes bytes remaining)"
+      "Starting segment ${segment.index}: range ${segment.start}..${segment.end} " +
+        "($remainingBytes bytes remaining)"
     }
 
     val initialBytes = segment.downloadedBytes
@@ -39,6 +40,9 @@ internal class SegmentDownloader(
 
     httpEngine.download(url, range, headers) { data ->
       currentCoroutineContext().ensureActive()
+      if (data.size > segment.totalBytes - downloadedBytes) {
+        throw KetchError.Unsupported(IllegalStateException("Response exceeds segment boundary"))
+      }
       taskLimiter.acquire(data.size)
       globalLimiter.acquire(data.size)
 

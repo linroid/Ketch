@@ -54,10 +54,25 @@ kotlin {
     wasmJsMain.dependencies {
       implementation(libs.ktor.client.js)
     }
+    jvmTest.dependencies {
+      implementation(projects.library.sqlite)
+      implementation(libs.sqldelight.runtime)
+    }
     commonTest.dependencies {
       implementation(libs.kotlin.test)
       implementation(libs.ktor.client.mock)
       implementation(libs.kotlinx.coroutines.test)
     }
+  }
+}
+
+// Public fixtures are deliberately excluded from ordinary offline test runs.
+tasks.withType<Test>().configureEach {
+  val publicDownloads = providers.gradleProperty("publicDownloadTests").orNull == "true"
+  inputs.property("publicDownloadTests", publicDownloads)
+  outputs.upToDateWhen { !publicDownloads }
+  outputs.cacheIf { !publicDownloads }
+  if (!publicDownloads) {
+    filter.excludeTestsMatching("*PublicDownloadTest")
   }
 }

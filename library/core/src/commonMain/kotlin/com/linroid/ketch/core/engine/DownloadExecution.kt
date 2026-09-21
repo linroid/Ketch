@@ -133,7 +133,7 @@ internal class DownloadExecution(
     } else {
       source = sourceResolver.resolve(request.url)
       log.d { "Resolved source '${source.type}' for ${request.url}" }
-      resolvedUrl = source.resolve(request.url, request.headers)
+      resolvedUrl = downloadWithRetry { source.resolve(request.url, request.headers) }
     }
 
     val total = if (resolvedUrl.selectionMode == FileSelectionMode.MULTIPLE &&
@@ -279,10 +279,20 @@ internal class DownloadExecution(
           withContext(NonCancellable) {
             saveJob.cancelAndJoin()
             val updatedResume = source.updateResumeState(ctx)
+            val snapshot = handle.mutableSegments.value
             handle.record.update {
-              it.copy(segments = handle.mutableSegments.value,
+              it.copy(segments = snapshot,
                 sourceResumeState = updatedResume ?: it.sourceResumeState,
                 updatedAt = Clock.System.now())
+            }
+            if (snapshot.isNotEmpty()) {
+              handle.mutableState.update { state ->
+                if (state is DownloadState.Paused) {
+                  state.copy(progress = state.progress.copy(
+                    downloadedBytes = snapshot.sumOf { it.downloadedBytes },
+                  ))
+                } else state
+              }
             }
           }
         }
@@ -323,6 +333,8 @@ internal class DownloadExecution(
     log.i { "Zero-byte file for taskId=$taskId, completing" }
     val fa = createFileAccessor(outputPath, dispatchers.io)
     try {
+      // Create or truncate the destination; flushing a lazy accessor alone is insufficient.
+      fa.preallocate(0)
       fa.flush()
     } catch (e: Exception) {
       if (e is CancellationException) throw e
@@ -374,15 +386,14 @@ internal class DownloadExecution(
     }
   }
 
-  private suspend fun downloadWithRetry(
+  private suspend fun <T> downloadWithRetry(
     ctx: DownloadContext? = null,
-    block: suspend () -> Unit,
-  ) {
+    block: suspend () -> T,
+  ): T {
     var retryCount = 0
     while (true) {
       try {
-        block()
-        return
+        return block()
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
@@ -402,16 +413,14 @@ internal class DownloadExecution(
         retryCount++
 
         val delayMs: Long
-        if (error is KetchError.Http && error.code == 429 &&
-          ctx != null
-        ) {
-          reduceConnections(ctx, error.rateLimitRemaining)
+        if (error is KetchError.Http && error.code == 429) {
+          if (ctx != null) reduceConnections(ctx, error.rateLimitRemaining)
           delayMs = error.retryAfterSeconds?.let { it * 1000L }
             ?: (config.retryDelayMs * (1 shl (retryCount - 1)))
           log.w {
             "Rate limited (429). Retry attempt $retryCount " +
               "after ${delayMs}ms delay, connections=" +
-              "${ctx.maxConnections.value}"
+              "${ctx?.maxConnections?.value ?: request.connections}"
           }
         } else {
           delayMs = config.retryDelayMs * (1 shl (retryCount - 1))
