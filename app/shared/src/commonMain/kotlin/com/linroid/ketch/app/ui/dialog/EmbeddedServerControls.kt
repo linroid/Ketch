@@ -19,7 +19,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 @Composable
 fun EmbeddedServerControls(
   serverState: ServerState,
-  onStartServer: (port: Int, token: String?) -> Unit,
+  onStartServer: () -> Unit,
   onStopServer: () -> Unit,
 ) {
   when (serverState) {
@@ -43,10 +43,10 @@ fun EmbeddedServerControls(
         )
       }
     }
-    is ServerState.Stopped -> {
+    is ServerState.Stopped, is ServerState.Failed -> {
       KetchButton(
-        text = "Start server",
-        onClick = { onStartServer(8642, null) },
+        text = if (serverState is ServerState.Failed) "Retry server" else "Start server",
+        onClick = onStartServer,
         leadingIcon = KetchIcon.Local,
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,

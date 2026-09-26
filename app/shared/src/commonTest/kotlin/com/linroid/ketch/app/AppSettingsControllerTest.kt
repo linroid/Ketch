@@ -1,10 +1,9 @@
 package com.linroid.ketch.app
 
 import com.linroid.ketch.api.DownloadConfig
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppSettingsController
-import com.linroid.ketch.app.state.DownloadSettingsInput
+import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.config.AccentColor
 import com.linroid.ketch.config.AiSettings
@@ -13,13 +12,13 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
 import com.linroid.ketch.config.ServerConfig
+import com.linroid.ketch.config.ThemeMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-private class RecordingConfigStore(
+internal class RecordingConfigStore(
   private var config: KetchConfig = KetchConfig(),
 ) : ConfigStore {
   override fun load(): KetchConfig = config
@@ -96,90 +95,26 @@ class AppSettingsControllerTest {
   }
 
   @Test
+  fun `accent and theme mode are saved without overwriting each other`() {
+    val store = RecordingConfigStore()
+    val controller = AppSettingsController(store)
+    controller.saveThemeMode(ThemeMode.Dark)
+    controller.saveAccent(KetchAccent.Harbor)
+    assertEquals(ThemeMode.Dark, store.load().appearance.theme)
+    assertEquals(AccentColor.Harbor, store.load().appearance.accent)
+
+    controller.saveThemeMode(ThemeMode.Light)
+    assertEquals(ThemeMode.Light, controller.themeMode)
+    assertEquals(KetchAccent.Harbor, controller.accent)
+  }
+
+  @Test
   fun `accents survive a round trip through the persisted form`() {
     KetchAccent.entries.forEach { accent ->
       val controller = AppSettingsController(RecordingConfigStore())
       controller.saveAccent(accent)
       assertEquals(accent, controller.accent)
     }
-  }
-}
-
-class DownloadSettingsInputTest {
-
-  private val base = DownloadConfig()
-
-  private fun input(
-    concurrent: String = "2",
-    perDownload: String = "4",
-    perHost: String = "8",
-    directory: String = "",
-    speedLimit: SpeedLimit = SpeedLimit.Unlimited,
-  ) = DownloadSettingsInput(
-    directory = directory,
-    maxConcurrentDownloads = concurrent,
-    maxConnectionsPerDownload = perDownload,
-    maxConnectionsPerHost = perHost,
-    speedLimit = speedLimit,
-  )
-
-  @Test
-  fun `valid values build a config`() {
-    val config = input(
-      concurrent = "3",
-      perDownload = "6",
-      perHost = "0",
-      directory = " /tmp/dl ",
-      speedLimit = SpeedLimit.mbps(2),
-    ).toConfig(base)
-    assertNotNull(config)
-    assertEquals(3, config.maxConcurrentDownloads)
-    assertEquals(6, config.maxConnectionsPerDownload)
-    assertEquals(0, config.maxConnectionsPerHost)
-    assertEquals("/tmp/dl", config.defaultDirectory)
-    assertEquals(SpeedLimit.mbps(2), config.speedLimit)
-  }
-
-  @Test
-  fun `a blank directory falls back to the platform default`() {
-    val config = input(directory = "   ").toConfig(base)
-    assertNotNull(config)
-    assertNull(config.defaultDirectory)
-  }
-
-  @Test
-  fun `zero connections per download is rejected`() {
-    // DownloadConfig would throw on this, so the form must catch it.
-    val form = input(perDownload = "0")
-    assertNotNull(form.validate())
-    assertNull(form.toConfig(base))
-  }
-
-  @Test
-  fun `non-numeric and negative values are rejected`() {
-    assertNotNull(input(concurrent = "many").validate())
-    assertNotNull(input(concurrent = "-1").validate())
-    assertNotNull(input(perHost = "-2").validate())
-    assertNull(input(perDownload = "").toConfig(base))
-  }
-
-  @Test
-  fun `zero means unlimited for queue limits`() {
-    val config = input(concurrent = "0", perHost = "0").toConfig(base)
-    assertNotNull(config)
-    assertEquals(0, config.maxConcurrentDownloads)
-  }
-
-  @Test
-  fun `a saved config round trips through the form`() {
-    val saved = base.copy(
-      defaultDirectory = "/downloads",
-      maxConcurrentDownloads = 7,
-      maxConnectionsPerDownload = 3,
-      maxConnectionsPerHost = 5,
-      speedLimit = SpeedLimit.kbps(512),
-    )
-    assertEquals(saved, DownloadSettingsInput.from(saved).toConfig(saved))
   }
 }
 
@@ -198,6 +133,24 @@ class AppDestinationTest {
     assertEquals(
       AppDestination.entries.toList(),
       AppDestination.visible(aiAvailable = true),
+    )
+  }
+}
+
+class SettingsCategoryTest {
+
+  @Test
+  fun `remote access is hidden where no local server can run`() {
+    val categories = SettingsCategory.visible(serverSupported = false)
+    assertTrue(SettingsCategory.RemoteAccess !in categories)
+    assertEquals(SettingsCategory.entries.size - 1, categories.size)
+  }
+
+  @Test
+  fun `every category is offered where the server can run`() {
+    assertEquals(
+      SettingsCategory.entries.toList(),
+      SettingsCategory.visible(serverSupported = true),
     )
   }
 }

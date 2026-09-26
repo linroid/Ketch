@@ -40,11 +40,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.InstanceSettingsController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.AiDiscoverDraft
 import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
@@ -247,22 +249,27 @@ fun AppShell(
                 },
               )
             } else if (destination == AppDestination.Settings) {
+              val instance = activeInstance
+              val instanceSettings = remember(instance) {
+                InstanceSettingsController(
+                  api = instance?.instance ?: appState.activeApi.value,
+                  local = appSettings.takeIf { instance is EmbeddedInstance },
+                  scope = scope,
+                )
+              }
               SettingsPage(
                 appSettings = appSettings,
                 aiSettings = aiSettings,
-                defaultDeviceName = activeInstance?.label ?: "this device",
-                backendLabel = activeInstance?.label ?: "this device",
+                instanceSettings = instanceSettings,
+                instanceLabel = instance?.label ?: "this device",
+                systemDeviceName = instances
+                  .firstOrNull { it is EmbeddedInstance }?.label,
                 serverState = serverState,
                 serverSupported = instanceManager.isLocalServerSupported,
-                onSaveDownload = { appState.applyDownloadConfig(it) },
-                onTestAi = { settings ->
-                  scope.launch { aiSettings.testConnection(settings) }
+                onTestAi = {
+                  scope.launch { aiSettings.testConnection(aiSettings.settings) }
                 },
-                onStartServer = {
-                  instanceManager.startServer(
-                    appSettings.config.server.port,
-                  )
-                },
+                onStartServer = { instanceManager.startServer() },
                 onStopServer = { instanceManager.stopServer() },
               )
             } else {

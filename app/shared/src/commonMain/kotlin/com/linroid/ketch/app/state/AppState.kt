@@ -4,7 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.Destination
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
@@ -326,22 +325,6 @@ class AppState(
         errorMessage =
           "Failed to reconnect: ${e.message}"
       }
-    }
-  }
-
-  /**
-   * Persists download settings and applies them to the active instance,
-   * which takes effect without a restart.
-   */
-  fun applyDownloadConfig(config: DownloadConfig) {
-    appSettings.saveDownload(config)
-    scope.launch {
-      runCatching { activeApi.value.updateConfig(config) }
-        .onFailure { e ->
-          if (e is kotlinx.coroutines.CancellationException) throw e
-          errorMessage =
-            e.message ?: "Failed to apply download settings"
-        }
     }
   }
 

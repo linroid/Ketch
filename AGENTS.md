@@ -175,7 +175,7 @@ cli/          # JVM CLI entry point
 - LLM agent-driven discovery using Koog framework (v1.2.0)
 - Providers: OpenAI, Anthropic, Google Gemini, Ollama, any
   OpenAI-compatible endpoint (`LlmClientFactory` maps them to Koog clients)
-- Configured on the app's Settings page and persisted under `[ai]` in
+- Configured under Settings → AI discovery and persisted under `[ai]` in
   `config.toml`; blank credentials fall back to environment variables
 - The Discover destination is hidden until discovery is usable; in the
   apps the Enable switch is authoritative (an env key fills a blank token
@@ -192,10 +192,17 @@ cli/          # JVM CLI entry point
 - TOML-based configuration via ktoml library
 - `KetchConfig` root with server, download, remote, AI, and appearance sections
 - `AiSettings`: AI discovery provider, token, model, endpoint and search keys
-- `AppearanceConfig`: accent palette (app-only; CLI and server ignore it)
-- Apps edit all of it on the Settings destination: device name, appearance,
-  downloads (pushed live via `KetchApi.updateConfig`), server, AI discovery
-- `ServerConfig`: host, port, API token, CORS, mDNS
+- `AppearanceConfig`: accent palette and light/dark `ThemeMode` (app-only;
+  CLI and server ignore it)
+- Apps edit it on the Settings destination, split into `SettingsCategory`
+  pages (General, Downloads, Network, Remote access, AI discovery, About).
+  Changes apply as they are made; there are no Save buttons
+- Downloads and Network settings belong to the active instance
+  (`InstanceSettingsController`): pushed live via `KetchApi.updateConfig` /
+  `updateNetworkInterfaces`, and saved to `config.toml` only for the
+  embedded instance
+- `ServerConfig`: host, port, API token, CORS, mDNS, `autoStart` (apps start
+  the server on launch)
 - `RemoteConfig`: pre-configured remote server connections
 - `FileConfigStore`: platform-specific file persistence via okio
 

@@ -5,10 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.config.AccentColor
-import com.linroid.ketch.config.AppearanceConfig
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.ServerConfig
+import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.app.theme.KetchAccent
 
 /**
@@ -31,6 +31,9 @@ class AppSettingsController(
   /** Accent palette the UI should be themed with. */
   val accent: KetchAccent get() = config.appearance.accent.toKetchAccent()
 
+  /** Whether the UI follows the system or forces light or dark. */
+  val themeMode: ThemeMode get() = config.appearance.theme
+
   /** Persists the instance name; blank clears it back to the default. */
   fun saveName(name: String) {
     update { it.copy(name = name.trim().ifBlank { null }) }
@@ -49,8 +52,13 @@ class AppSettingsController(
   /** Persists the accent palette. */
   fun saveAccent(accent: KetchAccent) {
     update {
-      it.copy(appearance = AppearanceConfig(accent.toAccentColor()))
+      it.copy(appearance = it.appearance.copy(accent = accent.toAccentColor()))
     }
+  }
+
+  /** Persists the light/dark mode. */
+  fun saveThemeMode(mode: ThemeMode) {
+    update { it.copy(appearance = it.appearance.copy(theme = mode)) }
   }
 
   private fun update(block: (KetchConfig) -> KetchConfig) {

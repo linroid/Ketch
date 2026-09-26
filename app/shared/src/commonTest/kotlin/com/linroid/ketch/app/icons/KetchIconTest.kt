@@ -10,7 +10,7 @@ class KetchIconTest {
   fun circularIconsRetainBothHalvesWhenParsedByCompose() {
     val circularIcons = listOf(
       KetchIcon.Search, KetchIcon.Settings,
-      KetchIcon.Queued, KetchIcon.Done, KetchIcon.Failed, KetchIcon.Remote,
+      KetchIcon.Queued, KetchIcon.Done, KetchIcon.Failed, KetchIcon.Remote, KetchIcon.Info,
     )
     for (icon in circularIcons) {
       val nodes = PathParser().parsePathString(icon.data.strokes.first()).toNodes()
