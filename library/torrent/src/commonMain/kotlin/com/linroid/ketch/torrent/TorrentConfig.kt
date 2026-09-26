@@ -12,7 +12,10 @@ import kotlin.time.Duration.Companion.seconds
  *   order) instead of failing, and a seeding session yields its slot to a waiting download.
  * @property metadataTimeoutSeconds timeout for magnet metadata
  *   resolution in seconds
- * @property connectionsPerTorrent default connections per torrent
+ * @property connectionsPerTorrent peer cap for a task that sets no connections. A task's
+ *   `DownloadRequest.connections` or `DownloadTask.setConnections` value replaces it, clamped to
+ *   1..512 for v1 and 1..500 for v2. `DownloadConfig.maxConnectionsPerDownload` counts HTTP
+ *   segments and does not apply to torrents; [maxConnections] bounds all torrents together.
  * @property enableUpload whether to seed after download completes
  * @property listenPort port for incoming peer connections; 0 for
  *   random port
