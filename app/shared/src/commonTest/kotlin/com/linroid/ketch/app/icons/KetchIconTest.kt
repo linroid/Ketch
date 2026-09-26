@@ -9,7 +9,7 @@ class KetchIconTest {
   @Test
   fun circularIconsRetainBothHalvesWhenParsedByCompose() {
     val circularIcons = listOf(
-      KetchIcon.Search, KetchIcon.Settings,
+      KetchIcon.Search, KetchIcon.Settings, KetchIcon.Appearance,
       KetchIcon.Queued, KetchIcon.Done, KetchIcon.Failed, KetchIcon.Remote,
     )
     for (icon in circularIcons) {

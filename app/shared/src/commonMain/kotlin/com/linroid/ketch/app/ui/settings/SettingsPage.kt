@@ -11,43 +11,28 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.api.DownloadConfig
-import com.linroid.ketch.app.instance.ServerState
-import com.linroid.ketch.app.state.AiSettingsController
-import com.linroid.ketch.app.state.AppSettingsController
+import com.linroid.ketch.app.state.SettingsSection
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.config.AiSettings
 
 /**
- * Settings destination: device, appearance, downloads, server and AI.
+ * Settings as a full page with every section stacked, for narrow windows.
+ * Wide windows use [SettingsDialog] instead.
  *
- * @param appSettings holder for the non-AI config sections.
- * @param aiSettings holder for AI discovery settings and its provider.
- * @param defaultDeviceName label used when no name is configured.
- * @param backendLabel instance that download settings are applied to.
- * @param serverState whether the local server is running.
- * @param serverSupported whether this platform can run a local server.
- * @param onSaveDownload persist download settings and push them to the
- *   active instance.
- * @param onTestAi persist AI settings and call the provider.
- * @param onStartServer start the local server.
- * @param onStopServer stop the local server.
+ * @param sections sections to show, in order.
+ * @param section renders one section; see [SettingsSectionCard].
  */
 @Composable
 fun SettingsPage(
-  appSettings: AppSettingsController,
-  aiSettings: AiSettingsController,
-  defaultDeviceName: String,
-  backendLabel: String,
-  serverState: ServerState,
-  serverSupported: Boolean,
-  onSaveDownload: (DownloadConfig) -> Unit,
-  onTestAi: (AiSettings) -> Unit,
-  onStartServer: () -> Unit,
-  onStopServer: () -> Unit,
+  sections: List<SettingsSection>,
+  section: @Composable (
+    section: SettingsSection,
+    compact: Boolean,
+    onUnsavedChange: (Boolean) -> Unit,
+  ) -> Unit,
 ) {
   BoxWithConstraints(Modifier.fillMaxSize()) {
     val compact = maxWidth < 600.dp
@@ -74,47 +59,9 @@ fun SettingsPage(
             color = KetchTheme.colors.onSurfaceVariant,
           )
         }
-
-        GeneralSettingsCard(
-          name = appSettings.config.name.orEmpty(),
-          defaultName = defaultDeviceName,
-          compact = compact,
-          onSave = { appSettings.saveName(it) },
-        )
-
-        AppearanceSettingsCard(
-          accent = appSettings.accent,
-          compact = compact,
-          onSelect = { appSettings.saveAccent(it) },
-        )
-
-        DownloadSettingsCard(
-          config = appSettings.config.download,
-          backendLabel = backendLabel,
-          compact = compact,
-          onSave = onSaveDownload,
-        )
-
-        if (serverSupported) {
-          ServerSettingsCard(
-            config = appSettings.config.server,
-            serverState = serverState,
-            compact = compact,
-            onSave = { appSettings.saveServer(it) },
-            onStart = onStartServer,
-            onStop = onStopServer,
-          )
+        sections.forEach { entry ->
+          key(entry) { section(entry, compact) {} }
         }
-
-        AiSettingsCard(
-          settings = aiSettings.settings,
-          supported = aiSettings.supported,
-          resolveCredentials = aiSettings::withPlatformCredentials,
-          connectionTest = aiSettings.connectionTest,
-          compact = compact,
-          onSave = { aiSettings.save(it) },
-          onTest = onTestAi,
-        )
       }
     }
   }

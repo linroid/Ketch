@@ -9,6 +9,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -98,4 +101,14 @@ fun SettingsTextField(
     shape = RoundedCornerShape(12.dp),
     modifier = modifier.fillMaxWidth(),
   )
+}
+
+/**
+ * Tells [onChange] whenever a card's form starts or stops differing from
+ * what is saved.
+ */
+@Composable
+internal fun ReportUnsaved(hasUnsavedEdits: Boolean, onChange: (Boolean) -> Unit) {
+  val latest by rememberUpdatedState(onChange)
+  LaunchedEffect(hasUnsavedEdits) { latest(hasUnsavedEdits) }
 }

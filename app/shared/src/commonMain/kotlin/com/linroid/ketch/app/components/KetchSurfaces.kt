@@ -102,7 +102,11 @@ fun KetchProgressBar(
   }
 }
 
-/** Sidebar destination with selected, hover, and keyboard-focus feedback. */
+/**
+ * Sidebar destination with selected, hover, and keyboard-focus feedback.
+ *
+ * @param trailing optional marker after the label, e.g. an unsaved dot.
+ */
 @Composable
 fun KetchSidebarItem(
   label: String,
@@ -111,6 +115,7 @@ fun KetchSidebarItem(
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   count: Int? = null,
+  trailing: (@Composable () -> Unit)? = null,
 ) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
@@ -161,6 +166,7 @@ fun KetchSidebarItem(
           ),
         )
       }
+      trailing?.invoke()
     }
   }
 }
