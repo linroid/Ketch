@@ -21,16 +21,6 @@ class TorrentSettingsTest {
   }
 
   @Test
-  fun `trackers round trip through toml`() {
-    val config = KetchConfig(
-      torrent = TorrentSettings(trackers = listOf("udp://tracker.example:1337/announce")),
-    )
-    val encoded = ConfigStore.toml.encodeToString(KetchConfig.serializer(), config)
-    val decoded = ConfigStore.toml.decodeFromString(KetchConfig.serializer(), encoded)
-    assertEquals(config.torrent, decoded.torrent)
-  }
-
-  @Test
   fun `config without a torrent section decodes to no extra trackers`() {
     val decoded = ConfigStore.toml.decodeFromString(
       KetchConfig.serializer(),

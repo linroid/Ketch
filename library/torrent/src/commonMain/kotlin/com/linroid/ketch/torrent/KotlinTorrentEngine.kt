@@ -83,6 +83,7 @@ internal class KotlinTorrentEngine(
   private var nodes: List<DhtNode>? = null
   private val downloadRate = TorrentRateLimiter()
   private val uploadRate = TorrentRateLimiter()
+  private val additionalTrackers = AtomicReference(usableTrackers(config.additionalTrackers))
   override val isRunning: Boolean get() = running.load()
 
   init {
@@ -391,9 +392,8 @@ internal class KotlinTorrentEngine(
           attempt { resolveEndpoint(text) }?.forEach { output.send(it) }
         }
       }
-      if (magnet.trackers.isNotEmpty()) launch {
-        val tiers = TrackerTiers(magnet.trackers.map { listOf(it) }, tracker::announce)
-        while (isActive) {
+      suspend fun announce(tiers: TrackerTiers) {
+        while (currentCoroutineContext().isActive) {
           val result = attempt {
             tiers.announce(TrackerAnnounce(topic, peerId, port, 0, 1,
               event = TrackerEvent.STARTED))
@@ -401,6 +401,12 @@ internal class KotlinTorrentEngine(
           result?.peers?.forEach { output.send(it) }
           delay((result?.intervalSeconds ?: 30) * 1000)
         }
+      }
+      if (magnet.trackers.isNotEmpty()) launch {
+        announce(TrackerTiers(magnet.trackers.map { listOf(it) }, tracker::announce))
+      }
+      for (url in extraTrackers(magnet.trackers)) launch {
+        announce(TrackerTiers(listOf(listOf(url)), tracker::announce))
       }
       if (config.dhtEnabled) launch {
         while (isActive) {
@@ -604,6 +610,13 @@ internal class KotlinTorrentEngine(
       }
     }
     if (!document.info.privateTorrent && privacy == TorrentDiscoveryPrivacy.PUBLIC) {
+      for (url in extraTrackers(tiers.flatten())) launch {
+        val discovery = TrackerDiscovery(document, layout, peerId, port,
+          TrackerTiers(listOf(listOf(url)), tracker::announce))
+        announceExtra({ stopped ->
+          discovery.poll(store.verifiedPieces(), store.receivedBytes(), 0, stopped = stopped)
+        }) { found -> found.forEach { peers.send(it) } }
+      }
       magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { endpoint ->
           attempt { resolveEndpoint(endpoint).forEach { peers.send(it) } }
@@ -680,6 +693,16 @@ internal class KotlinTorrentEngine(
       }
     }
     if (!metadata.isPrivate && spec.privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+      for (url in extraTrackers(trackerTiers.flatten())) launch {
+        val discovery = TrackerDiscovery(metadata, peerId, port,
+          TrackerTiers(listOf(listOf(url)), tracker::announce), nowMs = nowMs,
+          announceCompletion = spec.selected.isEmpty() || spec.selected.size == metadata.files.size,
+        )
+        announceExtra({ stopped ->
+          discovery.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,
+            stopped = stopped)
+        }) { found -> found.forEach { output.send(it) } }
+      }
       spec.magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { text ->
           attempt { resolveEndpoint(text) }?.forEach { output.send(it) }
@@ -724,7 +747,10 @@ internal class KotlinTorrentEngine(
         suspend fun bootstrap() {
           val endpoints = config.dhtBootstrap.flatMap { attempt { resolveEndpoint(it) }
             ?: emptyList() }.filter { (':' in it.host) == (':' in host) }
-          attempt { node.bootstrap((restored + endpoints).distinct().take(64)) }
+          // A large snapshot must not crowd out the routers when its nodes have gone stale.
+          val saved = restored.filter { it !in endpoints }
+            .take((64 - endpoints.size).coerceAtLeast(0))
+          attempt { node.bootstrap((saved + endpoints).distinct().take(64)) }
         }
         bootstrap()
         var retryMs = DHT_BOOTSTRAP_RETRY_MS
@@ -736,12 +762,16 @@ internal class KotlinTorrentEngine(
             continue
           }
           retryMs = DHT_BOOTSTRAP_RETRY_MS
-          if (snapshot != null) attempt {
-            torrentSystemFileSystem.createDirectories(checkNotNull(snapshot.parent))
-            val temporary = snapshot.parent!! / "${snapshot.name}.tmp"
-            val bytes = node.snapshot()
-            torrentSystemFileSystem.write(temporary) { write(bytes) }
-            torrentSystemFileSystem.atomicMove(temporary, snapshot)
+          if (snapshot != null) {
+            // Processes sharing the directory must not write through the same temporary file.
+            val temporary = checkNotNull(snapshot.parent) /
+              "${snapshot.name}.${torrentRandomBytes(4).toByteString().hex()}.tmp"
+            attempt {
+              torrentSystemFileSystem.createDirectories(checkNotNull(snapshot.parent))
+              val bytes = node.snapshot()
+              torrentSystemFileSystem.write(temporary) { write(bytes) }
+              torrentSystemFileSystem.atomicMove(temporary, snapshot)
+            } ?: attempt { torrentSystemFileSystem.delete(temporary, mustExist = false) }
           }
           delay(DHT_REFRESH_MS)
           attempt { node.refresh() }
@@ -795,9 +825,58 @@ internal class KotlinTorrentEngine(
   override fun setDownloadRateLimit(bytesPerSecond: Long) = downloadRate.set(bytesPerSecond)
   override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
   fun setConnections(value: Int) = network.set(value)
+
+  /** Replaces the extra public trackers; sessions and lookups started afterwards use them. */
+  fun setAdditionalTrackers(urls: List<String>) = additionalTrackers.store(usableTrackers(urls))
+
+  private fun usableTrackers(urls: List<String>): List<String> {
+    val candidates = urls.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    val valid = candidates.filter { url ->
+      try {
+        TrackerConfiguration.prepare(listOf(listOf(url)))
+        true
+      } catch (_: IllegalArgumentException) {
+        false
+      }
+    }
+    // Counts only: tracker URLs can carry passkeys.
+    if (valid.size < candidates.size) {
+      log.w { "Ignoring ${candidates.size - valid.size} invalid additional tracker URL(s)" }
+    }
+    if (valid.size > MAX_ADDITIONAL_TRACKERS) {
+      log.w { "Using the first $MAX_ADDITIONAL_TRACKERS of ${valid.size} additional trackers" }
+    }
+    return valid.take(MAX_ADDITIONAL_TRACKERS)
+  }
+
+  /** Configured extra trackers that public discovery adds beside a torrent's [own] trackers. */
+  private fun extraTrackers(own: List<String>): List<String> {
+    val existing = own.toSet()
+    return additionalTrackers.load().filter { it !in existing }
+  }
+
+  /**
+   * Announces one extra tracker until cancelled, then sends a best-effort stop. Each extra runs on
+   * its own because tier traversal stops at the first tracker that answers, and would otherwise
+   * wait behind every unreachable tracker of the torrent's own list.
+   */
+  private suspend fun announceExtra(
+    poll: suspend (stopped: Boolean) -> TrackerResponse?,
+    publish: suspend (List<PeerEndpoint>) -> Unit,
+  ) {
+    try {
+      while (currentCoroutineContext().isActive) {
+        attempt { poll(false) }?.let { publish(it.peers.distinct()) }
+        delay(1000)
+      }
+    } finally {
+      withContext(NonCancellable) { withTimeoutOrNull(2000) { attempt { poll(true) } } }
+    }
+  }
 }
 
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
+private const val MAX_ADDITIONAL_TRACKERS = 64
 private const val DHT_REFRESH_MS = 15 * 60_000L
 
 private suspend fun <T> attempt(block: suspend () -> T): T? = try {

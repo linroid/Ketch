@@ -59,6 +59,12 @@ data class TorrentConfig(
   val maxPiecesPerTorrent: Int = 250_000,
   /** Default for newly resolved inputs; persisted tasks retain their saved privacy choice. */
   val discoveryPrivacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
+  /**
+   * Extra `http`, `https` or `udp` announce URLs for public torrents, announced alongside each
+   * torrent's own trackers rather than after them. Private torrents and tracker-only discovery
+   * never contact them. Invalid URLs are ignored, and at most 64 are used.
+   */
+  val additionalTrackers: List<String> = emptyList(),
 
 ) {
   init {

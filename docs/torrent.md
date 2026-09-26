@@ -43,7 +43,14 @@ for private tracker URLs. A supplied HTTP engine remains owned by its caller.
 
 - HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.
 - Public magnets use BEP 9 metadata exchange, DHT, trackers, and explicit peers. Public swarms
-  support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates.
+  support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates;
+  a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
+  The apps and CLI keep it in their config directory.
+- `additionalTrackers` (the apps' and CLI's `[torrent] trackers` in `config.toml`) adds trackers
+  to public torrents and public magnet lookups. Each one is announced alongside the torrent's own
+  trackers rather than as a later tier, so it helps when a network blocks the torrent's trackers.
+  Private torrents and tracker-only discovery never contact them.
+  `TorrentDownloadSource.setAdditionalTrackers` changes the list for torrents started later.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
   and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
   are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not
