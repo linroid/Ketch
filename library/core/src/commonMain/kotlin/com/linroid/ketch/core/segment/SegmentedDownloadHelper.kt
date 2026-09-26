@@ -53,6 +53,10 @@ class SegmentedDownloadHelper(
    * @param segments initial list of segments (some may already
    *   have progress)
    * @param totalBytes total download size
+   * @param supportsRanges whether the server can transfer from arbitrary
+   *   byte offsets (HTTP Range, FTP REST). When `false`, changes to
+   *   [DownloadContext.maxConnections] are ignored: splitting the single
+   *   transfer would need offsets the server cannot serve.
    * @param downloadSegment protocol-specific download function for
    *   a single segment. Receives the segment and a progress
    *   callback (bytesDownloaded so far for this segment). Must
@@ -62,6 +66,7 @@ class SegmentedDownloadHelper(
     context: DownloadContext,
     segments: List<Segment>,
     totalBytes: Long,
+    supportsRanges: Boolean = true,
     downloadSegment: suspend (
       segment: Segment,
       onProgress: suspend (bytesDownloaded: Long) -> Unit,
@@ -75,7 +80,7 @@ class SegmentedDownloadHelper(
 
       val batchCompleted = downloadBatch(
         context, currentSegments, incomplete, totalBytes,
-        downloadSegment,
+        supportsRanges, downloadSegment,
       )
 
       currentSegments = context.segments.value
@@ -100,9 +105,10 @@ class SegmentedDownloadHelper(
   /**
    * Downloads one batch of incomplete segments concurrently.
    *
-   * A watcher coroutine monitors [DownloadContext.maxConnections]
-   * for changes. When the connection count changes, it sets
-   * [DownloadContext.pendingResegment] and cancels the scope.
+   * When [supportsRanges] is `true`, a watcher coroutine monitors
+   * [DownloadContext.maxConnections] for changes. When the connection
+   * count changes, it sets [DownloadContext.pendingResegment] and cancels
+   * the scope.
    *
    * @return `true` if all segments completed, `false` if
    *   interrupted for resegmentation
@@ -112,6 +118,7 @@ class SegmentedDownloadHelper(
     allSegments: List<Segment>,
     incompleteSegments: List<Segment>,
     totalBytes: Long,
+    supportsRanges: Boolean,
     downloadSegment: suspend (
       segment: Segment,
       onProgress: suspend (bytesDownloaded: Long) -> Unit,
@@ -156,18 +163,22 @@ class SegmentedDownloadHelper(
     return try {
       coroutineScope {
         val batchScope = this
-        val watcherJob = launch(start = CoroutineStart.UNDISPATCHED) {
-          context.maxConnections.first { count ->
-            count > 0 && count != initialConnections
+        val watcherJob = if (supportsRanges) {
+          launch(start = CoroutineStart.UNDISPATCHED) {
+            context.maxConnections.first { count ->
+              count > 0 && count != initialConnections
+            }
+            context.pendingResegment =
+              context.maxConnections.value
+            log.i {
+              "Connection change detected for " +
+                "taskId=${context.taskId}: " +
+                "$initialConnections -> ${context.pendingResegment}"
+            }
+            batchScope.cancel(CancellationException("Resegmenting"))
           }
-          context.pendingResegment =
-            context.maxConnections.value
-          log.i {
-            "Connection change detected for " +
-              "taskId=${context.taskId}: " +
-              "$initialConnections -> ${context.pendingResegment}"
-          }
-          batchScope.cancel(CancellationException("Resegmenting"))
+        } else {
+          null
         }
 
         try {
@@ -196,7 +207,7 @@ class SegmentedDownloadHelper(
           }
           results.awaitAll()
         } finally {
-          watcherJob.cancel()
+          watcherJob?.cancel()
         }
 
         context.segments.value = currentSegments()

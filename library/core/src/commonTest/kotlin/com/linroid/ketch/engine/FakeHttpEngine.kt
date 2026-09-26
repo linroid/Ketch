@@ -66,6 +66,12 @@ class FakeHttpEngine(
       )
     }
 
+    // Like KtorHttpEngine: a server without range support answers with the whole body,
+    // which only matches a range starting at zero.
+    if (range != null && range.first > 0 && !serverInfo.acceptRanges) {
+      throw KetchError.Unsupported(IllegalStateException("Server ignored the range"))
+    }
+
     val start = range?.first?.toInt() ?: 0
     val end = range?.last?.toInt() ?: (content.size - 1)
     val rangeContent = content.sliceArray(start..minOf(end, content.size - 1))
