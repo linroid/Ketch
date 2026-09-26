@@ -2,9 +2,14 @@ package com.linroid.ketch.app.desktop
 
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -21,8 +26,15 @@ import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import java.awt.GraphicsEnvironment
 import java.io.File
 import java.net.InetAddress
+import kotlin.math.min
+
+// Wide enough for the sidebar layout, which the shared UI switches to at the
+// 840dp expanded breakpoint, and tall enough to show the whole sidebar.
+private const val DEFAULT_WINDOW_WIDTH = 1024
+private const val DEFAULT_WINDOW_HEIGHT = 720
 
 fun main() = application {
   val instanceManager = remember {
@@ -88,11 +100,26 @@ fun main() = application {
   DisposableEffect(Unit) {
     onDispose { instanceManager.close() }
   }
+  val windowState = rememberWindowState(
+    size = defaultWindowSize(),
+    position = WindowPosition(Alignment.Center),
+  )
   Window(
     onCloseRequest = ::exitApplication,
+    state = windowState,
     title = "Ketch",
     icon = painterResource("icon.svg"),
   ) {
     App(instanceManager, aiProviderFactory)
   }
+}
+
+// Shrinks to fit screens smaller than the preferred size.
+private fun defaultWindowSize(): DpSize {
+  val bounds = GraphicsEnvironment.getLocalGraphicsEnvironment()
+    .maximumWindowBounds
+  return DpSize(
+    width = min(DEFAULT_WINDOW_WIDTH, bounds.width).dp,
+    height = min(DEFAULT_WINDOW_HEIGHT, bounds.height).dp,
+  )
 }
