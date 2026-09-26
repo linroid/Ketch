@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
-import kotlin.io.encoding.Base64
 
 /**
  * Largest `.torrent` file the apps read, matching the torrent source's metainfo bound. Platform
@@ -21,10 +20,18 @@ sealed interface IncomingDownload {
   val label: String
 
   /**
-   * Ready to resolve. [url] may be an inline `data:` URL that is never shown to the user;
-   * backends resolve it to a short URL for the task.
+   * A `.torrent` file's [content], resolved like a dropped file through
+   * [com.linroid.ketch.api.KetchApi.resolveContent] so remote backends work too.
    */
-  data class Ready(override val label: String, val url: String) : IncomingDownload
+  class Ready(override val label: String, val content: ByteArray) : IncomingDownload {
+    // Content equality lets opening the same file twice queue it only once.
+    override fun equals(other: Any?): Boolean =
+      other is Ready && label == other.label && content.contentEquals(other.content)
+
+    override fun hashCode(): Int = 31 * label.hashCode() + content.contentHashCode()
+
+    override fun toString(): String = "Ready(label=$label, ${content.size} bytes)"
+  }
 
   /** The input could not be read; [message] explains why. */
   data class Failed(override val label: String, val message: String) : IncomingDownload
@@ -70,18 +77,12 @@ class IncomingDownloads {
   }
 }
 
-/**
- * Wraps `.torrent` file contents in a `data:` URL so they reach local and remote backends
- * alike: a remote daemon cannot read this device's files.
- */
+/** Checks `.torrent` file contents read by a platform entry point. */
 fun torrentFileDownload(name: String, bytes: ByteArray): IncomingDownload = when {
   bytes.isEmpty() -> IncomingDownload.Failed(name, "The file is empty")
   bytes.size > MAX_TORRENT_FILE_BYTES -> IncomingDownload.Failed(
     name,
     "The file is larger than ${MAX_TORRENT_FILE_BYTES / 1024 / 1024} MiB",
   )
-  else -> IncomingDownload.Ready(
-    name,
-    "data:application/x-bittorrent;base64,${Base64.Default.encode(bytes)}",
-  )
+  else -> IncomingDownload.Ready(name, bytes)
 }

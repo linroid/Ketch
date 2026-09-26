@@ -1,16 +1,17 @@
 package com.linroid.ketch.app
 
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
+import com.linroid.ketch.app.state.ResolveState
 import com.linroid.ketch.app.state.torrentFileDownload
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -20,17 +21,23 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IncomingDownloadsTest {
-  private val prefix = "data:application/x-bittorrent;base64,"
-  private val first = IncomingDownload.Ready("a.torrent", "data:a")
-  private val second = IncomingDownload.Ready("b.torrent", "data:b")
+  private val first = IncomingDownload.Ready("a.torrent", byteArrayOf(1))
+  private val second = IncomingDownload.Ready("b.torrent", byteArrayOf(2))
+  private val resolved = ResolvedSource(
+    url = "torrent:abc",
+    sourceType = "torrent",
+    totalBytes = 3,
+    supportsResume = true,
+    suggestedFileName = "a",
+    maxSegments = 1,
+  )
 
   @Test
-  fun `torrent files become inline data URLs`() {
+  fun `torrent files keep their content`() {
     val bytes = "d4:infod4:name1:aee".encodeToByteArray()
     val download = assertIs<IncomingDownload.Ready>(torrentFileDownload("a.torrent", bytes))
     assertEquals("a.torrent", download.label)
-    assertTrue(download.url.startsWith(prefix))
-    assertContentEquals(bytes, Base64.Default.decode(download.url.removePrefix(prefix)))
+    assertContentEquals(bytes, download.content)
   }
 
   @Test
@@ -48,7 +55,8 @@ class IncomingDownloadsTest {
     val incoming = IncomingDownloads()
     incoming.offer(first)
     incoming.offer(second)
-    incoming.offer(first)
+    // The same file read again is a new array with equal content.
+    incoming.offer(IncomingDownload.Ready("a.torrent", byteArrayOf(1)))
 
     assertEquals(listOf(first, second), incoming.pending.value)
     incoming.complete(first)
@@ -69,7 +77,8 @@ class IncomingDownloadsTest {
   @Test
   fun `opened files are shown one after another`() = runTest {
     val incoming = IncomingDownloads()
-    withManager { manager ->
+    val api = FakeKetchApi("Core").apply { resolveContentResult = resolved }
+    withManager(api) { manager ->
       val state = AppState(manager, backgroundScope, incoming = incoming)
       incoming.offer(first)
       incoming.offer(second)
@@ -77,10 +86,16 @@ class IncomingDownloadsTest {
 
       assertTrue(state.showAddDialog)
       assertEquals(first, state.openedDownload)
+      // Resolved like a dropped file, so remote backends receive the content too.
+      assertEquals("a.torrent", state.droppedFile?.name)
+      assertEquals("a.torrent", api.lastResolvedFileName)
+      assertContentEquals(first.content, api.lastResolvedContent)
+      assertEquals(ResolveState.Resolved(resolved), state.resolveState)
       state.closeAddDialog()
       runCurrent()
       assertTrue(state.showAddDialog)
       assertEquals(second, state.openedDownload)
+      assertEquals("b.torrent", api.lastResolvedFileName)
       state.closeAddDialog()
       runCurrent()
       assertFalse(state.showAddDialog)
@@ -108,13 +123,14 @@ class IncomingDownloadsTest {
   @Test
   fun `opened files wait for a backend`() = runTest {
     val incoming = IncomingDownloads()
-    withManager(embedded = false) { manager ->
+    withManager(api = null) { manager ->
       val state = AppState(manager, backgroundScope, incoming = incoming)
       incoming.offer(first)
       runCurrent()
 
       assertFalse(state.showAddDialog)
       assertTrue(state.showAddRemoteDialog)
+      assertNull(state.droppedFile)
       assertEquals(listOf(first), incoming.pending.value)
     }
   }
@@ -132,12 +148,12 @@ class IncomingDownloadsTest {
     }
   }
 
-  private inline fun withManager(embedded: Boolean = true, block: (InstanceManager) -> Unit) {
-    val factory = if (embedded) {
-      InstanceFactory(embeddedFactory = { FakeKetchApi("Core") })
-    } else {
-      InstanceFactory()
-    }
+  /** Runs [block] with an embedded [api], or in remote-only mode with none connected. */
+  private inline fun withManager(
+    api: FakeKetchApi? = FakeKetchApi("Core"),
+    block: (InstanceManager) -> Unit,
+  ) {
+    val factory = if (api != null) InstanceFactory(embeddedFactory = { api }) else InstanceFactory()
     val manager = InstanceManager(factory)
     try {
       block(manager)

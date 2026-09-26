@@ -3,7 +3,6 @@ package com.linroid.ketch.core.file
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.loggableUrl
 
 /**
  * Default strategy for resolving file names:
@@ -27,7 +26,7 @@ internal class DefaultFileNameResolver : FileNameResolver {
     val name = fromContentDisposition(contentDisposition)
       ?: fromUrl(request.url)
       ?: FALLBACK
-    log.d { "Resolved filename: \"$name\" for url: ${loggableUrl(request.url)}" }
+    log.d { "Resolved filename: \"$name\" for url: ${request.url}" }
     return name
   }
 

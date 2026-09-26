@@ -33,18 +33,6 @@ class TorrentDownloadSourceTest {
   }
 
   @Test
-  fun canHandle_metainfoDataUrl() {
-    assertTrue(source.canHandle("data:application/x-bittorrent;base64,ZGU="))
-    assertTrue(source.canHandle("DATA:Application/X-BitTorrent;base64,ZGU="))
-  }
-
-  @Test
-  fun canHandle_otherDataUrl_returnsFalse() {
-    assertFalse(source.canHandle("data:text/plain;base64,ZGU="))
-    assertFalse(source.canHandle("data:application/x-bittorrent2;base64,ZGU="))
-  }
-
-  @Test
   fun canHandle_httpUrl_returnsFalse() {
     assertFalse(source.canHandle("https://example.com/file.zip"))
   }
@@ -57,6 +45,26 @@ class TorrentDownloadSourceTest {
   @Test
   fun canHandle_emptyString_returnsFalse() {
     assertFalse(source.canHandle(""))
+  }
+
+  @Test
+  fun canHandleContent_torrentFileName_caseInsensitive() {
+    assertTrue(source.canHandleContent("anything".encodeToByteArray(), "Ubuntu.TORRENT"))
+  }
+
+  @Test
+  fun canHandleContent_bencodedDictionaryWithoutTorrentName() {
+    val content = "d8:announce3:urle".encodeToByteArray()
+    assertTrue(source.canHandleContent(content, null))
+    assertTrue(source.canHandleContent(content, "download"))
+  }
+
+  @Test
+  fun canHandleContent_otherContent_returnsFalse() {
+    assertFalse(source.canHandleContent("hello".encodeToByteArray(), "notes.txt"))
+    assertFalse(source.canHandleContent("data".encodeToByteArray(), null))
+    assertFalse(source.canHandleContent("d".encodeToByteArray(), null))
+    assertFalse(source.canHandleContent(ByteArray(0), null))
   }
 
   @Test

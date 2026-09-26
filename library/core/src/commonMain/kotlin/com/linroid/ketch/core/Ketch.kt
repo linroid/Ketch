@@ -18,7 +18,6 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
-import com.linroid.ketch.api.log.loggableUrl
 import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
@@ -161,7 +160,7 @@ class Ketch(
     val isScheduled = request.schedule !is DownloadSchedule.Immediate ||
       request.conditions.isNotEmpty()
     log.i {
-      "Downloading: taskId=$taskId, url=${loggableUrl(request.url)}, " +
+      "Downloading: taskId=$taskId, url=${request.url}, " +
         "connections=${request.connections}, " +
         "priority=${request.priority}" +
         if (isScheduled) ", schedule=${request.schedule}" else ""
@@ -189,9 +188,18 @@ class Ketch(
     url: String,
     properties: Map<String, String>,
   ): ResolvedSource {
-    log.i { "Resolving URL: ${loggableUrl(url)}" }
+    log.i { "Resolving URL: $url" }
     val source = sourceResolver.resolve(url)
     return source.resolve(url, properties)
+  }
+
+  override suspend fun resolveContent(
+    content: ByteArray,
+    fileName: String?,
+  ): ResolvedSource {
+    log.i { "Resolving content: fileName=$fileName, size=${content.size}" }
+    val source = sourceResolver.resolveContent(content, fileName)
+    return source.resolveContent(content, fileName)
   }
 
   override suspend fun start() {

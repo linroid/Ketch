@@ -3,13 +3,13 @@ package com.linroid.ketch.remote
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.loggableUrl
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.TaskEvent
@@ -138,7 +138,7 @@ class RemoteKetch internal constructor(
   override suspend fun download(
     request: DownloadRequest,
   ): DownloadTask {
-    log.i { "Download: url=${loggableUrl(request.url)}" }
+    log.i { "Download: url=${request.url}" }
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(request)
@@ -158,6 +158,25 @@ class RemoteKetch internal constructor(
     val response = httpClient.post(Api.Resolve()) {
       contentType(ContentType.Application.Json)
       setBody(ResolveUrlRequest(url, properties))
+    }
+    checkSuccess(response)
+    return response.body()
+  }
+
+  override suspend fun resolveContent(
+    content: ByteArray,
+    fileName: String?,
+  ): ResolvedSource {
+    val response = httpClient.post(Api.Resolve.Content(fileName = fileName)) {
+      contentType(ContentType.Application.OctetStream)
+      setBody(content)
+    }
+    when (response.status) {
+      HttpStatusCode.UnsupportedMediaType -> throw KetchError.Unsupported()
+      HttpStatusCode.UnprocessableEntity -> throw response.body<KetchError>()
+      HttpStatusCode.PayloadTooLarge -> throw IllegalArgumentException("File is too large")
+      HttpStatusCode.NotFound, HttpStatusCode.NotImplemented ->
+        throw UnsupportedOperationException("Resolving file content is unavailable")
     }
     checkSuccess(response)
     return response.body()

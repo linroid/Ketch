@@ -2,7 +2,6 @@ package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.loggableUrl
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -44,10 +43,21 @@ internal class SourceResolver(private val sources: List<DownloadSource>) {
     check(!closed.load()) { "Download sources are closed" }
     val source = sources.firstOrNull { it.canHandle(url) }
     if (source != null) {
-      log.d { "Resolved source '${source.type}' for URL: ${loggableUrl(url)}" }
+      log.d { "Resolved source '${source.type}' for URL: $url" }
       return source
     }
-    log.e { "No source found for URL: ${loggableUrl(url)}" }
+    log.e { "No source found for URL: $url" }
+    throw KetchError.Unsupported()
+  }
+
+  fun resolveContent(content: ByteArray, fileName: String?): DownloadSource {
+    check(!closed.load()) { "Download sources are closed" }
+    val source = sources.firstOrNull { it.canHandleContent(content, fileName) }
+    if (source != null) {
+      log.d { "Resolved source '${source.type}' for content: fileName=$fileName" }
+      return source
+    }
+    log.e { "No source found for content: fileName=$fileName, size=${content.size}" }
     throw KetchError.Unsupported()
   }
 

@@ -33,16 +33,14 @@ Progress counts verified selected bytes. In v1, a piece spanning selected and sk
 its bytes for verification; skipped boundary bytes live in a hidden task sidecar, not in skipped
 output files. Network speed includes received payload, including those boundary bytes/retries.
 
-For SDK-provided bytes, call `torrents.resolveMetainfo(bytes)` and pass the returned source as
-`DownloadRequest.resolvedSource`, with its `url` as the request URL. Local `.torrent` paths and
+For SDK-provided bytes, call `ketch.resolveContent(bytes, "name.torrent")` (or
+`torrents.resolveMetainfo(bytes)` on the source) and pass the returned source as
+`DownloadRequest.resolvedSource`, with its `url` as the request URL. `resolveContent` also works
+through `RemoteKetch`, which uploads the bytes to the daemon's `POST /api/resolve/content`; the
+apps use it for `.torrent` files dropped onto the window. Local `.torrent` paths and
 `file:` URLs also work. HTTP(S) metainfo is bounded and fetched through the HTTP engine; tracker
 passkeys are not logged by the torrent HTTP adapter. Avoid enabling application-level URL logging
 for private tracker URLs. A supplied HTTP engine remains owned by its caller.
-
-Through `KetchApi`, which has no bytes API, pass metainfo as a
-`data:application/x-bittorrent;base64,...` URL to `resolve`. This also reaches a remote daemon,
-which cannot read the caller's files. Use the resolved `torrent:<info-hash>` URL as the request URL
-so the task record does not repeat the file; the metainfo travels in `resolvedSource`.
 
 ## Opening `.torrent` files in the apps
 
@@ -56,11 +54,12 @@ The apps register for `.torrent` files, so the system file manager offers Ketch 
 | iOS | `org.bittorrent.torrent` document type | `onOpenURL` from Files, AirDrop and share sheets |
 | Web | Manifest `file_handlers` | `launchQueue`, only for the app installed from a Chromium browser over HTTPS or localhost |
 
-Each opened file shows the add dialog with its name, size and file selection; nothing downloads
-until the user confirms. Several files open one after another. The file travels to the active
-backend as a data URL, so remote daemons work too, provided they run a version that accepts
-metainfo data URLs. Files over the 4 MiB metainfo limit are rejected. On iOS, copies placed in the
-app's `Documents/Inbox` are deleted after reading.
+Each opened file shows the add dialog with its name, size and file selection, as a dropped file
+does; nothing downloads until the user confirms. Several files open one after another, and a file
+stays pending until downloaded or dismissed, so it survives an Android activity recreation. Like a
+dropped file, it reaches the active backend through `resolveContent`, so remote daemons work too.
+Files over the 4 MiB metainfo limit are rejected. On iOS, copies placed in the app's
+`Documents/Inbox` are deleted after reading.
 
 File associations apply to packaged desktop builds (`packageDistributionForCurrentOS`), not
 `./gradlew :app:desktop:run`. The desktop app runs once per configuration directory: another launch,

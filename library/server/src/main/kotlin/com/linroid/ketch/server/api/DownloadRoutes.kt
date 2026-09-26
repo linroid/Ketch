@@ -4,7 +4,6 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.loggableUrl
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ConnectionsRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
@@ -35,7 +34,7 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
 
   post<Api.Tasks> {
     val request = call.receive<DownloadRequest>()
-    log.d { "POST /api/tasks url=${loggableUrl(request.url)}" }
+    log.d { "POST /api/tasks url=${request.url}" }
     val task = ketch.download(request)
     call.respond(
       HttpStatusCode.Created,

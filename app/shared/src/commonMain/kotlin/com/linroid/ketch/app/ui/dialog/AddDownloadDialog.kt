@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
@@ -60,9 +61,11 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.state.IncomingDownload
+import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.ResolveState
+import com.linroid.ketch.app.ui.FileDropTarget
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.common.PriorityIcon
 import com.linroid.ketch.app.ui.common.PrioritySelector
@@ -79,8 +82,10 @@ private enum class DialogPanel {
 }
 
 /**
- * @param opened a file opened from outside the app. Its name replaces the URL field, and the
- *   download uses the resolved URL, since the opened URL can embed the whole file.
+ * @param droppedFileName name of a dropped `.torrent` file that replaces the
+ *   URL field; the download then uses the file's resolved source.
+ * @param onDropFiles receives files dropped onto the dialog, which sits in
+ *   its own layer above the window's drop target. Null disables dropping.
  */
 @Composable
 fun AddDownloadDialog(
@@ -97,9 +102,11 @@ fun AddDownloadDialog(
     ResolvedSource?,
     selectedFileIds: Set<String>,
   ) -> Unit,
-  opened: IncomingDownload.Ready? = null,
+  droppedFileName: String? = null,
+  onRetryDroppedFile: () -> Unit = {},
+  onDropFiles: ((List<DroppedFile>) -> Unit)? = null,
 ) {
-  var url by remember { mutableStateOf(opened?.url ?: "") }
+  var url by remember { mutableStateOf("") }
   var fileName by remember { mutableStateOf("") }
   var fileNameEditedByUser by remember {
     mutableStateOf(false)
@@ -139,12 +146,20 @@ fun AddDownloadDialog(
     return embedCredentials(trimmed, username, password)
   }
 
+  // A dropped file replaces whatever URL was typed.
+  LaunchedEffect(droppedFileName) {
+    if (droppedFileName != null) {
+      lastResolvedSource = ""
+      url = ""
+      if (!fileNameEditedByUser) fileName = ""
+    }
+  }
+
   // Debounce: auto-resolve when URL is non-blank
   LaunchedEffect(url) {
     val trimmed = url.trim()
     if (trimmed.isNotBlank() && trimmed != lastResolvedSource) {
-      // Opened files are complete already; only typing needs debouncing.
-      if (opened == null) delay(500)
+      delay(500)
       val resolveUrl = buildResolveUrl()
       lastResolvedSource = resolveUrl
       onResolveUrl(resolveUrl)
@@ -184,67 +199,49 @@ fun AddDownloadDialog(
     resolved.files.size > 1
 
   val formContent: @Composable ColumnScope.() -> Unit = {
-    LaunchedEffect(Unit) {
-      if (opened == null) urlFocusRequester.requestFocus()
+    LaunchedEffect(droppedFileName == null) {
+      if (droppedFileName == null) urlFocusRequester.requestFocus()
     }
-    OutlinedTextField(
-      value = opened?.label ?: url,
-      onValueChange = {
-        if (opened != null) return@OutlinedTextField
-        url = it
-        if (!fileNameEditedByUser) {
-          // Reset filename so resolve can fill it
-          fileName = ""
-        }
-      },
-      modifier = Modifier.fillMaxWidth()
-        .focusRequester(urlFocusRequester),
-      readOnly = opened != null,
-      label = { Text(if (opened != null) "File" else "URL") },
-      singleLine = true,
-      placeholder = {
-        Text("URL, magnet link, or .torrent")
-      },
-      isError = resolveState is ResolveState.Error,
-      trailingIcon = {
-        when (resolveState) {
-          is ResolveState.Resolving -> {
-            CircularProgressIndicator(
-              modifier = Modifier.size(20.dp),
-              strokeWidth = 2.dp,
-            )
+    if (droppedFileName != null) {
+      DroppedFileField(
+        name = droppedFileName,
+        resolveState = resolveState,
+        onRetry = onRetryDroppedFile,
+        onClear = onResetResolve,
+      )
+    } else {
+      OutlinedTextField(
+        value = url,
+        onValueChange = {
+          url = it
+          if (!fileNameEditedByUser) {
+            // Reset filename so resolve can fill it
+            fileName = ""
           }
-          is ResolveState.Resolved -> {
-            Icon(
-              Icons.Filled.CheckCircle,
-              contentDescription = "Resolved",
-              tint = MaterialTheme.colorScheme.primary,
-              modifier = Modifier.size(20.dp),
-            )
-          }
-          is ResolveState.Error -> {
-            IconButton(
-              onClick = {
-                if (url.isNotBlank()) {
-                  val resolveUrl = buildResolveUrl()
-                  lastResolvedSource = resolveUrl
-                  onResolveUrl(resolveUrl)
-                }
+        },
+        modifier = Modifier.fillMaxWidth()
+          .focusRequester(urlFocusRequester),
+        label = { Text("URL") },
+        singleLine = true,
+        placeholder = {
+          Text("URL, magnet link, or .torrent")
+        },
+        isError = resolveState is ResolveState.Error,
+        trailingIcon = {
+          ResolveStatusIcon(
+            resolveState = resolveState,
+            onRetry = {
+              if (url.isNotBlank()) {
+                val resolveUrl = buildResolveUrl()
+                lastResolvedSource = resolveUrl
+                onResolveUrl(resolveUrl)
               }
-            ) {
-              Icon(
-                Icons.Filled.Refresh,
-                contentDescription = "Retry",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp),
-              )
-            }
-          }
-          is ResolveState.Idle -> {}
-        }
-      },
-      supportingText = null,
-    )
+            },
+          )
+        },
+        supportingText = null,
+      )
+    }
 
     // Resolve result section
     ResolveInfoSection(resolveState)
@@ -401,7 +398,11 @@ fun AddDownloadDialog(
     KetchButton(
       text = if (selectedSchedule == DownloadSchedule.Immediate) "Download" else "Schedule download",
       onClick = {
-        val downloadUrl = if (opened != null) resolved?.url.orEmpty() else buildResolveUrl()
+        val downloadUrl = if (droppedFileName != null) {
+          resolved?.url.orEmpty()
+        } else {
+          buildResolveUrl()
+        }
         if (downloadUrl.isNotEmpty()) {
           val fileIds = if (hasMultipleFiles) {
             selectedFileIds.toSet()
@@ -415,8 +416,7 @@ fun AddDownloadDialog(
           )
         }
       },
-      enabled = url.isNotBlank() &&
-        (opened == null || resolved != null) &&
+      enabled = (if (droppedFileName != null) resolved != null else url.isNotBlank()) &&
         (!hasMultipleFiles || selectedFileIds.isNotEmpty()),
     )
   }
@@ -434,7 +434,83 @@ fun AddDownloadDialog(
     title = { Text("Add download") },
     confirmButton = confirmAction,
     dismissButton = cancelAction,
-    content = formContent,
+    content = if (onDropFiles == null) formContent else {
+      {
+        FileDropTarget(onDrop = onDropFiles, compact = true) {
+          Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            formContent()
+          }
+        }
+      }
+    },
+  )
+}
+
+@Composable
+private fun ResolveStatusIcon(
+  resolveState: ResolveState,
+  onRetry: () -> Unit,
+) {
+  when (resolveState) {
+    is ResolveState.Resolving -> {
+      CircularProgressIndicator(
+        modifier = Modifier.size(20.dp),
+        strokeWidth = 2.dp,
+      )
+    }
+    is ResolveState.Resolved -> {
+      Icon(
+        Icons.Filled.CheckCircle,
+        contentDescription = "Resolved",
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.size(20.dp),
+      )
+    }
+    is ResolveState.Error -> {
+      IconButton(onClick = onRetry) {
+        Icon(
+          Icons.Filled.Refresh,
+          contentDescription = "Retry",
+          tint = MaterialTheme.colorScheme.error,
+          modifier = Modifier.size(20.dp),
+        )
+      }
+    }
+    is ResolveState.Idle -> {}
+  }
+}
+
+/** Read-only stand-in for the URL field while a dropped file is attached. */
+@Composable
+private fun DroppedFileField(
+  name: String,
+  resolveState: ResolveState,
+  onRetry: () -> Unit,
+  onClear: () -> Unit,
+) {
+  OutlinedTextField(
+    value = name,
+    onValueChange = {},
+    modifier = Modifier.fillMaxWidth(),
+    readOnly = true,
+    label = { Text("Torrent file") },
+    singleLine = true,
+    isError = resolveState is ResolveState.Error,
+    leadingIcon = {
+      KetchFileTypeChip(fileName = name, size = 28.dp)
+    },
+    trailingIcon = {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        ResolveStatusIcon(resolveState = resolveState, onRetry = onRetry)
+        IconButton(onClick = onClear) {
+          Icon(
+            Icons.Filled.Close,
+            contentDescription = "Remove file",
+            modifier = Modifier.size(20.dp),
+          )
+        }
+      }
+    },
   )
 }
 

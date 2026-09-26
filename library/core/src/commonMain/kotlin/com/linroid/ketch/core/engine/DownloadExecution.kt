@@ -12,7 +12,6 @@ import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isFile
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.loggableUrl
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
@@ -126,14 +125,14 @@ internal class DownloadExecution(
 
     if (resolved != null) {
       log.d {
-        "Using pre-resolved info for ${loggableUrl(request.url)} " +
+        "Using pre-resolved info for ${request.url} " +
           "(source=${resolved.sourceType})"
       }
       source = sourceResolver.resolveByType(resolved.sourceType)
       resolvedUrl = resolved
     } else {
       source = sourceResolver.resolve(request.url)
-      log.d { "Resolved source '${source.type}' for ${loggableUrl(request.url)}" }
+      log.d { "Resolved source '${source.type}' for ${request.url}" }
       resolvedUrl = downloadWithRetry { source.resolve(request.url, request.headers) }
     }
 
@@ -148,11 +147,11 @@ internal class DownloadExecution(
       }
     } else resolvedUrl.totalBytes
     if (total < 0) {
-      log.e { "Unknown file size for ${loggableUrl(request.url)}" }
+      log.e { "Unknown file size for ${request.url}" }
       throw KetchError.SourceError(
         sourceType = source.type,
         cause = Exception(
-          "Unknown file size for ${loggableUrl(request.url)}"
+          "Unknown file size for ${request.url}"
         ),
       )
     }
