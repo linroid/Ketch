@@ -52,9 +52,11 @@ class MainActivity : ComponentActivity() {
       connection,
       BIND_AUTO_CREATE,
     )
-    // A recreated activity still carries the intent it already handled; its file is still
-    // pending in the application.
-    if (savedInstanceState == null) {
+    // Skip intents already handled: a recreated activity carries its old intent (the file is
+    // still pending in the application), and reopening from Recents replays the task's launch
+    // intent, whose one-time read grant may have expired.
+    val launchedFromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+    if (savedInstanceState == null && !launchedFromHistory) {
       handleIntent(intent)
     }
     setContent {
