@@ -139,10 +139,12 @@ fun main(args: Array<String>) {
     return
   }
 
-  val destination = if (dest != null) {
-    Destination(dest)
-  } else {
-    Destination(".")
+  // A trailing separator marks a Destination as a directory
+  val destination = when {
+    dest == null -> Destination("./")
+    File(dest).isDirectory && !dest.endsWith(File.separatorChar) ->
+      Destination(dest + File.separatorChar)
+    else -> Destination(dest)
   }
 
   println("Downloading: $url")
@@ -167,6 +169,7 @@ fun main(args: Array<String>) {
   val ketch = Ketch(
     httpEngine = KtorHttpEngine.withNetworkInterfaces(),
     config = config,
+    logger = Logger.console(ketchLogLevel),
     additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
   )
 
