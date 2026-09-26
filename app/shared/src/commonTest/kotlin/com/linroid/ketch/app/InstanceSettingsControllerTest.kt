@@ -30,6 +30,7 @@ private class SettingsKetchApi(
   override val backendLabel = "Settings"
   override val tasks = MutableStateFlow(emptyList<DownloadTask>())
   val applied = mutableListOf<DownloadConfig>()
+  val networkRequests = mutableListOf<List<String>>()
   var gate: CompletableDeferred<Unit>? = null
   var failUpdates = false
 
@@ -62,6 +63,8 @@ private class SettingsKetchApi(
   override suspend fun networkInterfaces(): NetworkInterfaces = networks
 
   override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+    gate?.await()
+    networkRequests += config.interfaceIds
     if (failUpdates) throw IllegalArgumentException("Unknown interface")
     networks = networks.copy(config = config)
     return networks
@@ -157,6 +160,33 @@ class InstanceSettingsControllerTest {
     assertEquals(listOf("en1", "en0"), controller.networks?.config?.interfaceIds)
     advanceUntilIdle()
     assertEquals(listOf("en1"), controller.networks?.config?.interfaceIds)
+    assertNotNull(controller.networkError)
+  }
+
+  @Test
+  fun `failed selections fall back to what the instance last confirmed`() = runTest {
+    val available = listOf(
+      NetworkInterfaceInfo("a", "Wi-Fi", listOf("192.168.1.2")),
+      NetworkInterfaceInfo("b", "Ethernet", listOf("10.0.0.2")),
+    )
+    val api = SettingsKetchApi(networks = NetworkInterfaces(supported = true, available))
+    val controller = InstanceSettingsController(api, local = null, scope = this)
+    controller.loadNetworks()
+    advanceUntilIdle()
+    api.failUpdates = true
+    api.gate = CompletableDeferred()
+
+    controller.selectNetworks(listOf("a"))
+    advanceUntilIdle() // "a" is in flight
+    controller.selectNetworks(listOf("a", "b"))
+    controller.selectNetworks(listOf("b"))
+    api.gate?.complete(Unit)
+    advanceUntilIdle()
+
+    // Only the newest queued selection is sent after the one in flight.
+    assertEquals(listOf(listOf("a"), listOf("b")), api.networkRequests)
+    // Neither was accepted, so nothing is ticked.
+    assertEquals(emptyList(), controller.networks?.config?.interfaceIds)
     assertNotNull(controller.networkError)
   }
 }

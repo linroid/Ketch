@@ -54,6 +54,12 @@ class InstanceSettingsController(
   private val networkLock = Mutex()
   private var appliedDownload: DownloadConfig? = null
 
+  // What the instance last reported, to fall back to when a change fails.
+  private var confirmedNetworks: NetworkInterfaces? = null
+
+  // Newest selection not yet sent; older unsent ones are dropped.
+  private var pendingNetworkIds: List<String>? = null
+
   /** Reads the download settings of a remote instance. */
   fun loadDownload() {
     if (local != null) return
@@ -76,7 +82,9 @@ class InstanceSettingsController(
           networkError = it
           if (networks == null) networks = NetworkInterfaces()
         }) {
-          networks = api.networkInterfaces()
+          val loaded = api.networkInterfaces()
+          confirmedNetworks = loaded
+          if (pendingNetworkIds == null) networks = loaded
         }
       }
     }
@@ -104,18 +112,31 @@ class InstanceSettingsController(
   /**
    * Routes new HTTP requests over the interfaces in [ids], in order;
    * an empty list restores the system's default routing.
+   *
+   * The selection shows at once. Selections made while one is being sent
+   * are coalesced into the newest, and a failure falls back to what the
+   * instance last confirmed.
    */
   fun selectNetworks(ids: List<String>) {
     val current = networks ?: return
     networks = current.copy(config = NetworkInterfaceConfig(ids))
     networkError = null
+    pendingNetworkIds = ids
     scope.launch {
       networkLock.withLock {
+        val requested = pendingNetworkIds ?: return@withLock
+        pendingNetworkIds = null
         attempt(onError = {
           networkError = it
-          networks = current
+          // A newer selection is queued behind this one; let it decide.
+          if (pendingNetworkIds == null) networks = confirmedNetworks ?: current
         }) {
-          networks = api.updateNetworkInterfaces(NetworkInterfaceConfig(ids))
+          val updated = api.updateNetworkInterfaces(NetworkInterfaceConfig(requested))
+          confirmedNetworks = updated
+          if (pendingNetworkIds == null) {
+            networks = updated
+            networkError = null
+          }
         }
       }
     }
