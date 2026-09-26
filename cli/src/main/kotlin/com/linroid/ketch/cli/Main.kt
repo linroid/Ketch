@@ -18,12 +18,15 @@ import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.SearchProvider
+import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.config.defaultConfigPath
 import com.linroid.ketch.config.defaultDbPath
 import com.linroid.ketch.config.generateConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
+import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.mcp.KetchMcpServer
@@ -170,7 +173,7 @@ fun main(args: Array<String>) {
     httpEngine = KtorHttpEngine.withNetworkInterfaces(),
     config = config,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
+    additionalSources = listOf(FtpDownloadSource(), torrentSource(defaultTorrentSettings())),
   )
 
   runBlocking {
@@ -438,7 +441,7 @@ private fun runServer(args: Array<String>) {
     config = downloadConfig,
     name = instanceName,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource())
+    additionalSources = listOf(FtpDownloadSource(), torrentSource(fileConfig.torrent)),
   )
   val server = KetchServer(
     ketch,
@@ -661,7 +664,7 @@ private fun runMcp(args: List<String>) {
     taskStore = taskStore,
     config = downloadConfig,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
+    additionalSources = listOf(FtpDownloadSource(), torrentSource(fileConfig.torrent)),
   )
 
   Runtime.getRuntime().addShutdownHook(Thread {
@@ -698,6 +701,26 @@ private fun printMcpUsage() {
   println("      }")
   println("    }")
   println("  }")
+}
+
+/** Torrent source that persists DHT state and adds the configured extra trackers. */
+private fun torrentSource(settings: TorrentSettings) = TorrentDownloadSource(
+  TorrentConfig(
+    stateDirectory = File(defaultConfigDir(), "torrent-state").path,
+    additionalTrackers = settings.trackers,
+  ),
+)
+
+/** The `[torrent]` section of the default config file, when one exists. */
+private fun defaultTorrentSettings(): TorrentSettings {
+  val path = defaultConfigPath()
+  if (!File(path).exists()) return TorrentSettings()
+  return try {
+    FileConfigStore(path).load().torrent
+  } catch (e: Exception) {
+    System.err.println("Ignoring torrent settings in $path: ${e.message}")
+    TorrentSettings()
+  }
 }
 
 private fun printUsage() {

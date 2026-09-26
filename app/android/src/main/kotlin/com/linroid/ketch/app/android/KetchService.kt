@@ -104,6 +104,7 @@ class KetchService : Service() {
               FtpDownloadSource(),
               TorrentDownloadSource(com.linroid.ketch.torrent.TorrentConfig(
                 stateDirectory = filesDir.resolve("torrent-state").absolutePath,
+                additionalTrackers = configStore.load().torrent.trackers,
               )),
             ),
           )

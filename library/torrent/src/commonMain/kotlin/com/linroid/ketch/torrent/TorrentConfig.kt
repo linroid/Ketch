@@ -28,7 +28,8 @@ data class TorrentConfig(
   val stateDirectory: String? = null,
   /** Bootstrap endpoints in host:port or [IPv6]:port form. */
   val dhtBootstrap: List<String> = listOf(
-    "router.bittorrent.com:6881", "router.utorrent.com:6881", "dht.transmissionbt.com:6881"
+    "router.bittorrent.com:6881", "router.utorrent.com:6881", "dht.transmissionbt.com:6881",
+    "dht.libtorrent.org:25401"
   ),
   /** Explicit policy; null preserves the legacy [enableUpload] setting. */
   val uploadPolicy: TorrentUploadPolicy? = null,
@@ -58,6 +59,12 @@ data class TorrentConfig(
   val maxPiecesPerTorrent: Int = 250_000,
   /** Default for newly resolved inputs; persisted tasks retain their saved privacy choice. */
   val discoveryPrivacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
+  /**
+   * Extra `http`, `https` or `udp` announce URLs for public torrents, announced alongside each
+   * torrent's own trackers rather than after them. Private torrents and tracker-only discovery
+   * never contact them. Invalid URLs are ignored, and at most 64 are used.
+   */
+  val additionalTrackers: List<String> = emptyList(),
 
 ) {
   init {
