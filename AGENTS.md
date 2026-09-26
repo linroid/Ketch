@@ -166,6 +166,8 @@ cli/          # JVM CLI entry point
   browser control through RemoteKetch
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
 - Verified selected-file storage, ownership journal, restart rehash, live limits and explicit seeding
+- Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
+  app) and send them to any backend as `data:application/x-bittorrent;base64,` URLs
 - Native torrent engine dependencies exist only in interoperability tests
 - Public v2/hybrid download, selection, limits, pause/resume and TaskStore restart are implemented.
   V2 incoming routing, upload/seeding, PEX and hybrid v1-only peers remain roadmap work.

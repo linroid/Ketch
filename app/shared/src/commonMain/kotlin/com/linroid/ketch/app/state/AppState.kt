@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.state
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.Destination
@@ -111,6 +112,12 @@ class AppState(
   )
     private set
 
+  private val openedDownloads = mutableStateListOf<IncomingDownload.Ready>()
+
+  /** The opened file the add dialog shows, or null when the user types a URL. */
+  val openedDownload: IncomingDownload.Ready?
+    get() = openedDownloads.firstOrNull()
+
   /**
    * Handle "New Task" action. If no backend is available,
    * show the add-remote-server dialog instead.
@@ -121,6 +128,30 @@ class AppState(
     } else {
       showAddDialog = true
     }
+  }
+
+  /**
+   * Shows a download opened from outside the app in the add dialog. Files opened together are
+   * shown one after another; opening one that is already waiting has no effect.
+   */
+  fun openIncoming(download: IncomingDownload) {
+    when (download) {
+      is IncomingDownload.Failed ->
+        errorMessage = "Couldn't open ${download.label}: ${download.message}"
+      is IncomingDownload.Ready -> {
+        if (download in openedDownloads) return
+        if (openedDownloads.isEmpty()) resetResolveState()
+        openedDownloads += download
+        requestAddDownload()
+      }
+    }
+  }
+
+  /** Closes the add dialog, moving on to the next opened download if one is waiting. */
+  fun closeAddDialog() {
+    resetResolveState()
+    if (openedDownloads.isNotEmpty()) openedDownloads.removeAt(0)
+    showAddDialog = openedDownloads.isNotEmpty()
   }
   var discoveryState by mutableStateOf<DiscoveryState>(
     DiscoveryState.Idle
@@ -139,6 +170,12 @@ class AppState(
   private var resolvingUrl: String? = null
 
   init {
+    scope.launch {
+      activeInstance.collect { instance ->
+        // A file opened before any backend was connected waits for one.
+        if (instance != null && openedDownloads.isNotEmpty()) showAddDialog = true
+      }
+    }
     scope.launch {
       connectionState.collect { state ->
         if (state is ConnectionState.Unauthorized) {

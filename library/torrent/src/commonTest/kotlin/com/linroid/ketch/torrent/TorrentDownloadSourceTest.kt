@@ -33,6 +33,18 @@ class TorrentDownloadSourceTest {
   }
 
   @Test
+  fun canHandle_metainfoDataUrl() {
+    assertTrue(source.canHandle("data:application/x-bittorrent;base64,ZGU="))
+    assertTrue(source.canHandle("DATA:Application/X-BitTorrent;base64,ZGU="))
+  }
+
+  @Test
+  fun canHandle_otherDataUrl_returnsFalse() {
+    assertFalse(source.canHandle("data:text/plain;base64,ZGU="))
+    assertFalse(source.canHandle("data:application/x-bittorrent2;base64,ZGU="))
+  }
+
+  @Test
   fun canHandle_httpUrl_returnsFalse() {
     assertFalse(source.canHandle("https://example.com/file.zip"))
   }

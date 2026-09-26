@@ -34,6 +34,9 @@ import okio.Path.Companion.toPath
 /**
  * Pure Kotlin BitTorrent v1, v2, and hybrid download source for JVM, Android, and iOS.
  * Supports HTTP(S) metainfo, local paths/file URLs, metainfo bytes, and btih/btmh magnets.
+ * Metainfo bytes can also travel as a `data:application/x-bittorrent;base64,...` URL, which
+ * reaches remote backends through [com.linroid.ketch.api.KetchApi.resolve]; the resolved
+ * source's `torrent:` URL should then be used as the request URL.
  * The optional HTTP engine remains owned by its caller. Output must be a filesystem path.
  */
 @OptIn(ExperimentalAtomicApi::class)
@@ -92,6 +95,7 @@ class TorrentDownloadSource(
   }
 
   override fun canHandle(url: String): Boolean {
+    if (isMetainfoDataUrl(url)) return true
     val lower = url.lowercase()
     return lower.startsWith("magnet:") || lower.startsWith("torrent:") ||
       lower.substringBefore('?').substringBefore('#').endsWith(".torrent")
@@ -119,6 +123,9 @@ class TorrentDownloadSource(
   ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
     try {
+      if (isMetainfoDataUrl(url)) {
+        return resolveMetainfo(decodeMetainfoDataUrl(url, config.maxMetadataBytes), privacy)
+      }
       val metadata = if (url.startsWith("magnet:", true)) {
         if (MagnetUri.parse(url).identity.v2 != null) {
           val bytes = (getEngine() as KotlinTorrentEngine).fetchV2Metadata(url, privacy)

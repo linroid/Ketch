@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,6 +46,7 @@ import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.AiDiscoverDraft
 import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
@@ -67,6 +69,7 @@ fun AppShell(
   instanceManager: InstanceManager,
   appSettings: AppSettingsController = remember { AppSettingsController() },
   aiSettings: AiSettingsController = remember { AiSettingsController() },
+  incoming: IncomingDownloads? = null,
 ) {
   val scope = rememberCoroutineScope()
   val appState = remember(instanceManager, appSettings, aiSettings) {
@@ -76,6 +79,11 @@ fun AppShell(
       appSettings = appSettings,
       aiSettings = aiSettings,
     )
+  }
+  if (incoming != null) {
+    LaunchedEffect(incoming, appState) {
+      incoming.requests.collect { appState.openIncoming(it) }
+    }
   }
 
   val instances by appState.instances.collectAsState()
@@ -402,22 +410,26 @@ fun AppShell(
 
   // Dialogs
   if (appState.showAddDialog) {
-    AddDownloadDialog(
-      resolveState = appState.resolveState,
-      onResolveUrl = { appState.resolveUrl(it) },
-      onResetResolve = { appState.resetResolveState() },
-      onDismiss = { appState.showAddDialog = false },
-      onDownload = { url, fileName, speedLimit,
-                     priority, schedule,
-                     resolvedUrl, selectedFileIds ->
-        appState.showAddDialog = false
-        appState.dismissError()
-        appState.startDownload(
-          url, fileName, speedLimit, priority,
-          schedule, resolvedUrl, selectedFileIds,
-        )
-      },
-    )
+    // Each opened file starts a fresh form.
+    key(appState.openedDownload) {
+      AddDownloadDialog(
+        resolveState = appState.resolveState,
+        onResolveUrl = { appState.resolveUrl(it) },
+        onResetResolve = { appState.resetResolveState() },
+        onDismiss = { appState.closeAddDialog() },
+        onDownload = { url, fileName, speedLimit,
+                       priority, schedule,
+                       resolvedUrl, selectedFileIds ->
+          appState.closeAddDialog()
+          appState.dismissError()
+          appState.startDownload(
+            url, fileName, speedLimit, priority,
+            schedule, resolvedUrl, selectedFileIds,
+          )
+        },
+        opened = appState.openedDownload,
+      )
+    }
   }
 
   if (appState.showInstanceSelector) {

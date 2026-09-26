@@ -61,6 +61,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.ResolveState
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.common.PriorityIcon
@@ -77,6 +78,10 @@ private enum class DialogPanel {
   None, SpeedLimit, Priority, Schedule
 }
 
+/**
+ * @param opened a file opened from outside the app. Its name replaces the URL field, and the
+ *   download uses the resolved URL, since the opened URL can embed the whole file.
+ */
 @Composable
 fun AddDownloadDialog(
   resolveState: ResolveState,
@@ -92,8 +97,9 @@ fun AddDownloadDialog(
     ResolvedSource?,
     selectedFileIds: Set<String>,
   ) -> Unit,
+  opened: IncomingDownload.Ready? = null,
 ) {
-  var url by remember { mutableStateOf("") }
+  var url by remember { mutableStateOf(opened?.url ?: "") }
   var fileName by remember { mutableStateOf("") }
   var fileNameEditedByUser by remember {
     mutableStateOf(false)
@@ -137,7 +143,8 @@ fun AddDownloadDialog(
   LaunchedEffect(url) {
     val trimmed = url.trim()
     if (trimmed.isNotBlank() && trimmed != lastResolvedSource) {
-      delay(500)
+      // Opened files are complete already; only typing needs debouncing.
+      if (opened == null) delay(500)
       val resolveUrl = buildResolveUrl()
       lastResolvedSource = resolveUrl
       onResolveUrl(resolveUrl)
@@ -178,11 +185,12 @@ fun AddDownloadDialog(
 
   val formContent: @Composable ColumnScope.() -> Unit = {
     LaunchedEffect(Unit) {
-      urlFocusRequester.requestFocus()
+      if (opened == null) urlFocusRequester.requestFocus()
     }
     OutlinedTextField(
-      value = url,
+      value = opened?.label ?: url,
       onValueChange = {
+        if (opened != null) return@OutlinedTextField
         url = it
         if (!fileNameEditedByUser) {
           // Reset filename so resolve can fill it
@@ -191,7 +199,8 @@ fun AddDownloadDialog(
       },
       modifier = Modifier.fillMaxWidth()
         .focusRequester(urlFocusRequester),
-      label = { Text("URL") },
+      readOnly = opened != null,
+      label = { Text(if (opened != null) "File" else "URL") },
       singleLine = true,
       placeholder = {
         Text("URL, magnet link, or .torrent")
@@ -392,7 +401,7 @@ fun AddDownloadDialog(
     KetchButton(
       text = if (selectedSchedule == DownloadSchedule.Immediate) "Download" else "Schedule download",
       onClick = {
-        val downloadUrl = buildResolveUrl()
+        val downloadUrl = if (opened != null) resolved?.url.orEmpty() else buildResolveUrl()
         if (downloadUrl.isNotEmpty()) {
           val fileIds = if (hasMultipleFiles) {
             selectedFileIds.toSet()
@@ -407,6 +416,7 @@ fun AddDownloadDialog(
         }
       },
       enabled = url.isNotBlank() &&
+        (opened == null || resolved != null) &&
         (!hasMultipleFiles || selectedFileIds.isNotEmpty()),
     )
   }

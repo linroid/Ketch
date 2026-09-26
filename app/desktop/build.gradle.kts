@@ -20,6 +20,7 @@ dependencies {
   implementation(compose.desktop.currentOs)
   implementation(libs.kotlinx.coroutinesSwing)
   implementation(libs.logback)
+  testImplementation(libs.kotlin.test)
 }
 
 compose.desktop {
@@ -44,6 +45,13 @@ compose.desktop {
       targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
       modules("java.sql")
       packageName = "Ketch"
+      // Lists Ketch under "Open with" for .torrent files in Finder, Explorer and Linux file
+      // managers; see main.kt for how each platform delivers the file.
+      fileAssociation(
+        mimeType = "application/x-bittorrent",
+        extension = "torrent",
+        description = "BitTorrent file",
+      )
 
       macOS {
         iconFile.set(rootProject.file("art/icon.icns"))

@@ -18,6 +18,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.api.log.loggableUrl
 import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
@@ -188,7 +189,7 @@ class Ketch(
     url: String,
     properties: Map<String, String>,
   ): ResolvedSource {
-    log.i { "Resolving URL: $url" }
+    log.i { "Resolving URL: ${loggableUrl(url)}" }
     val source = sourceResolver.resolve(url)
     return source.resolve(url, properties)
   }

@@ -39,6 +39,33 @@ For SDK-provided bytes, call `torrents.resolveMetainfo(bytes)` and pass the retu
 passkeys are not logged by the torrent HTTP adapter. Avoid enabling application-level URL logging
 for private tracker URLs. A supplied HTTP engine remains owned by its caller.
 
+Through `KetchApi`, which has no bytes API, pass metainfo as a
+`data:application/x-bittorrent;base64,...` URL to `resolve`. This also reaches a remote daemon,
+which cannot read the caller's files. Use the resolved `torrent:<info-hash>` URL as the request URL
+so the task record does not repeat the file; the metainfo travels in `resolvedSource`.
+
+## Opening `.torrent` files in the apps
+
+The apps register for `.torrent` files, so the system file manager offers Ketch under "Open with":
+
+| Platform | Registration | Delivery |
+|----------|--------------|----------|
+| Android | `ACTION_VIEW` filters for `application/x-bittorrent`, plus `.torrent` paths with a generic type | `content:` URI to the running activity |
+| macOS | File association in the packaged app | Finder open-file events |
+| Windows, Linux | File association in the MSI/DEB package | Path or `file:` URI argument; a second launch forwards it to the running app and exits |
+| iOS | `org.bittorrent.torrent` document type | `onOpenURL` from Files, AirDrop and share sheets |
+| Web | Manifest `file_handlers` | `launchQueue`, only for the app installed from a Chromium browser over HTTPS or localhost |
+
+Each opened file shows the add dialog with its name, size and file selection; nothing downloads
+until the user confirms. Several files open one after another. The file travels to the active
+backend as a data URL, so remote daemons work too, provided they run a version that accepts
+metainfo data URLs. Files over the 4 MiB metainfo limit are rejected. On iOS, copies placed in the
+app's `Documents/Inbox` are deleted after reading.
+
+File associations apply to packaged desktop builds (`packageDistributionForCurrentOS`), not
+`./gradlew :app:desktop:run`. The desktop app runs once per configuration directory: another launch,
+including a development run, hands its files to the running app instead of opening a second window.
+
 ## Discovery and upload
 
 - HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.

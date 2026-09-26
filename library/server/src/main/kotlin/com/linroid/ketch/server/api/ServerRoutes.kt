@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.loggableUrl
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
@@ -51,7 +52,7 @@ internal fun Route.serverRoutes(ketch: KetchApi) {
 
   post<Api.Resolve> {
     val body = call.receive<ResolveUrlRequest>()
-    log.i { "POST /api/resolve url=${body.url}" }
+    log.i { "POST /api/resolve url=${loggableUrl(body.url)}" }
     val resolved = ketch.resolve(body.url, body.properties)
     call.respond(resolved)
   }
