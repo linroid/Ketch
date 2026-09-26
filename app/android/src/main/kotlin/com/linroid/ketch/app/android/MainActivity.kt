@@ -20,6 +20,7 @@ import com.linroid.ketch.app.App
 class MainActivity : ComponentActivity() {
 
   private var service: KetchService? by mutableStateOf(null)
+  private val ketchApplication get() = application as KetchApplication
   private val requestNotificationPermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { }
@@ -51,12 +52,31 @@ class MainActivity : ComponentActivity() {
       connection,
       BIND_AUTO_CREATE,
     )
+    // Skip intents already handled: a recreated activity carries its old intent (the file is
+    // still pending in the application), and reopening from Recents replays the task's launch
+    // intent, whose one-time read grant may have expired.
+    val launchedFromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+    if (savedInstanceState == null && !launchedFromHistory) {
+      handleIntent(intent)
+    }
     setContent {
       val svc = service
       if (svc != null) {
-        App(svc.instanceManager, svc.aiProviderFactory)
+        App(svc.instanceManager, svc.aiProviderFactory, incoming = ketchApplication.incoming)
       }
     }
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    handleIntent(intent)
+  }
+
+  /** Hands a `.torrent` file opened with Ketch to the app, which keeps it until handled. */
+  private fun handleIntent(intent: Intent?) {
+    if (intent?.action != Intent.ACTION_VIEW) return
+    val uri = intent.data ?: return
+    ketchApplication.openFile(uri)
   }
 
   override fun onDestroy() {
