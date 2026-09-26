@@ -97,8 +97,11 @@ tasks.withType<Test>().configureEach {
   // Required evidence must describe this execution, not restored/cached XML from an earlier run.
   val benchmark = providers.environmentVariable("KETCH_TORRENT_BENCHMARK").orNull == "1"
   val measuring = providers.environmentVariable("KETCH_TORRENT_MEMORY").orNull == "1"
-  outputs.upToDateWhen { !conformance && !benchmark && !measuring }
-  outputs.cacheIf { !conformance && !benchmark && !measuring }
+  val publicSwarm = providers.gradleProperty("publicTorrentTests").orNull == "true"
+  inputs.property("publicTorrentTests", publicSwarm)
+  outputs.upToDateWhen { !conformance && !benchmark && !measuring && !publicSwarm }
+  outputs.cacheIf { !conformance && !benchmark && !measuring && !publicSwarm }
+  if (!publicSwarm) filter.excludeTestsMatching("*PublicSwarmTest")
   if (!conformance && providers.environmentVariable("TRANSMISSION_DAEMON").orNull.isNullOrBlank()) {
     filter.excludeTestsMatching("*TransmissionInteropTest")
   }

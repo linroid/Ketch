@@ -24,6 +24,17 @@ client is libtorrent4j 2.1.0-39. Set `KETCH_NATIVE_CLI` and `KETCH_JVM_CLI` alon
 `TRANSMISSION_DAEMON` to exercise the built executables against the same independent seeder.
 The Gradle test cache tracks these opt-in environment values.
 
+`PublicSwarmTest` downloads the current Debian netinst image (about 750 MiB) from the public
+swarm through a magnet with Debian's HTTP tracker and a UDP tracker, pauses once payload arrives,
+resumes, and checks the result against Debian's published `SHA256SUMS`. It is excluded unless
+`-PpublicTorrentTests=true` is set:
+
+```sh
+./gradlew :library:torrent:jvmTest -PpublicTorrentTests=true --tests '*PublicSwarmTest'
+```
+
+Network restrictions on trackers, DHT bootstrap or peers fail the test rather than skipping it.
+
 CI runs JVM/Android host, iOS simulator and JS regression suites; extra macOS/Windows jobs exercise
 the OS filesystem adapters. The Android emulator job requires a nonzero executed test count, since
 an AGP connected-test task can otherwise succeed without running instrumentation.

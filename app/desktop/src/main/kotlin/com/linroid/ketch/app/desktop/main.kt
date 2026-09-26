@@ -8,7 +8,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -137,7 +136,14 @@ private fun ApplicationScope.KetchWindow(
       singleInstance.close()
     }
   }
-  val windowState = rememberWindowState()
+  val windowStateStore = remember {
+    WindowStateStore(File(configDir, "window.properties"))
+  }
+  val savedBounds = remember { windowStateStore.load() }
+  val windowState = remember { initialWindowState(savedBounds) }
+  LaunchedEffect(windowState) {
+    windowStateStore.saveChanges(windowState, savedBounds)
+  }
   Window(
     onCloseRequest = ::exitApplication,
     state = windowState,
