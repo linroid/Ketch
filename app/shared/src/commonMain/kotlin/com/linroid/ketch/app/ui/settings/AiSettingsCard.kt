@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +65,41 @@ private class AiSettingsDraft(settings: AiSettings) {
       cx = searchCx.trim(),
     ),
   )
+
+  companion object {
+    val Saver = listSaver<AiSettingsDraft, Any>(
+      save = {
+        listOf(
+          it.enabled,
+          it.provider.name,
+          it.apiKey,
+          it.model,
+          it.baseUrl,
+          it.searchProvider.name,
+          it.searchApiKey,
+          it.searchCx,
+        )
+      },
+      restore = {
+        AiSettingsDraft(
+          AiSettings(
+            enabled = it[0] as Boolean,
+            llm = LlmSettings(
+              provider = LlmProvider.valueOf(it[1] as String),
+              apiKey = it[2] as String,
+              model = it[3] as String,
+              baseUrl = it[4] as String,
+            ),
+            search = SearchSettings(
+              provider = SearchProvider.valueOf(it[5] as String),
+              apiKey = it[6] as String,
+              cx = it[7] as String,
+            ),
+          ),
+        )
+      },
+    )
+  }
 }
 
 /**
@@ -76,6 +113,7 @@ private class AiSettingsDraft(settings: AiSettings) {
  * @param connectionTest result of the last connection test.
  * @param onSave persist the edited settings.
  * @param onTest persist the edited settings and call the provider.
+ * @param onUnsavedChange told whether the form differs from [settings].
  */
 @Composable
 fun AiSettingsCard(
@@ -87,9 +125,12 @@ fun AiSettingsCard(
   onSave: (AiSettings) -> Unit,
   onTest: (AiSettings) -> Unit,
   modifier: Modifier = Modifier,
+  onUnsavedChange: (Boolean) -> Unit = {},
 ) {
   val colors = KetchTheme.colors
-  val draft = remember(settings) { AiSettingsDraft(settings) }
+  val draft = rememberSaveable(settings, saver = AiSettingsDraft.Saver) {
+    AiSettingsDraft(settings)
+  }
   var revealKey by remember { mutableStateOf(false) }
   val edited = draft.toSettings()
   // What the engine will actually run with: a blank token may still be
@@ -98,6 +139,7 @@ fun AiSettingsCard(
   val tokenFromEnvironment = edited.llm.apiKey.isBlank() &&
     effective.llm.apiKey.isNotBlank()
   val testing = connectionTest is AiConnectionTest.Running
+  ReportUnsaved(supported && edited != settings, onUnsavedChange)
 
   SettingsCard(
     title = "AI discovery",

@@ -10,8 +10,14 @@ import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.AppShell
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
+ * Root of the Ketch app, shared by every platform.
+ *
+ * @param openSettingsRequests emits when the platform asks to open
+ *   Settings, e.g. from a keyboard shortcut or the macOS app menu.
  * @param incoming downloads opened from outside the app, such as `.torrent` files opened from
  *   the system file manager; each one is shown in the add dialog.
  */
@@ -19,6 +25,7 @@ import com.linroid.ketch.app.ui.AppShell
 fun App(
   instanceManager: InstanceManager,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
+  openSettingsRequests: Flow<Unit> = emptyFlow(),
   incoming: IncomingDownloads? = null,
 ) {
   // The controllers are created here because the theme needs the saved
@@ -36,6 +43,6 @@ fun App(
     onDispose { aiSettings.close() }
   }
   KetchTheme(accent = appSettings.accent) {
-    AppShell(instanceManager, appSettings, aiSettings, incoming)
+    AppShell(instanceManager, appSettings, aiSettings, openSettingsRequests, incoming)
   }
 }

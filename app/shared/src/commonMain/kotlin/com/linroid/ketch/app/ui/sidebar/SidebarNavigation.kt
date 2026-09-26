@@ -46,6 +46,7 @@ fun SidebarNavigation(
   destination: AppDestination,
   showDiscovery: Boolean,
   onDestinationSelect: (AppDestination) -> Unit,
+  onOpenSettings: () -> Unit,
   taskCounts: Map<StatusFilter, Int>,
   onFilterSelect: (StatusFilter) -> Unit,
   activeInstance: InstanceEntry?,
@@ -115,8 +116,9 @@ fun SidebarNavigation(
       KetchSidebarItem(
         label = "Settings",
         icon = KetchIcon.Settings,
-        selected = destination == AppDestination.Settings,
-        onClick = { onDestinationSelect(AppDestination.Settings) },
+        // Opens over the current destination rather than replacing it.
+        selected = false,
+        onClick = onOpenSettings,
       )
     }
     HorizontalDivider(

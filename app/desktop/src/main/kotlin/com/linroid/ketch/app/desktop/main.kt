@@ -4,6 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
@@ -28,9 +37,12 @@ import com.linroid.ketch.torrent.TorrentDownloadSource
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import java.awt.Desktop
 import java.io.File
 import java.net.InetAddress
 import java.util.concurrent.Executors
+
+private val isMac = System.getProperty("os.name").startsWith("Mac")
 
 fun main(args: Array<String>) {
   val configDir = defaultConfigDir()
@@ -130,7 +142,15 @@ private fun ApplicationScope.KetchWindow(
     )
   }
   val aiProviderFactory = remember { EmbeddedAiDiscoveryProviderFactory() }
+  val openSettings = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
   DisposableEffect(Unit) {
+    // Enables the native "Settings…" item (⌘,) in the macOS app menu.
+    if (Desktop.isDesktopSupported()) {
+      val desktop = Desktop.getDesktop()
+      if (desktop.isSupported(Desktop.Action.APP_PREFERENCES)) {
+        desktop.setPreferencesHandler { openSettings.tryEmit(Unit) }
+      }
+    }
     onDispose {
       instanceManager.close()
       singleInstance.close()
@@ -149,6 +169,9 @@ private fun ApplicationScope.KetchWindow(
     state = windowState,
     title = "Ketch",
     icon = painterResource("icon.svg"),
+    onPreviewKeyEvent = { event ->
+      if (event.isOpenSettingsShortcut()) openSettings.tryEmit(Unit) else false
+    },
   ) {
     LaunchedEffect(Unit) {
       focusRequests.collect {
@@ -156,6 +179,12 @@ private fun ApplicationScope.KetchWindow(
         window.toFront()
       }
     }
-    App(instanceManager, aiProviderFactory, incoming)
+    App(instanceManager, aiProviderFactory, openSettings, incoming)
   }
 }
+
+/** ⌘, on macOS and Ctrl+, elsewhere, the usual shortcut for settings. */
+private fun KeyEvent.isOpenSettingsShortcut(): Boolean =
+  type == KeyEventType.KeyDown && key == Key.Comma &&
+    (if (isMac) isMetaPressed else isCtrlPressed) &&
+    !isAltPressed && !isShiftPressed
