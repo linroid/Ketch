@@ -50,6 +50,17 @@ internal class SourceResolver(private val sources: List<DownloadSource>) {
     throw KetchError.Unsupported()
   }
 
+  fun resolveContent(content: ByteArray, fileName: String?): DownloadSource {
+    check(!closed.load()) { "Download sources are closed" }
+    val source = sources.firstOrNull { it.canHandleContent(content, fileName) }
+    if (source != null) {
+      log.d { "Resolved source '${source.type}' for content: fileName=$fileName" }
+      return source
+    }
+    log.e { "No source found for content: fileName=$fileName, size=${content.size}" }
+    throw KetchError.Unsupported()
+  }
+
   fun resolveByType(type: String): DownloadSource {
     check(!closed.load()) { "Download sources are closed" }
     val source = sources.firstOrNull { it.type == type }

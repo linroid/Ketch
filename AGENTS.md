@@ -93,7 +93,7 @@ cli/          # JVM CLI entry point
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
   `ServerConfig`, `RemoteConfig`, `AiSettings`, `LlmSettings`, `LlmProvider`,
-  `SearchSettings`, `SearchProvider`, `PlatformFileSystem` (expect/actual)
+  `SearchSettings`, `SearchProvider`, `TorrentSettings`, `PlatformFileSystem` (expect/actual)
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
@@ -207,6 +207,7 @@ cli/          # JVM CLI entry point
 - `AiSettings`: AI discovery provider, token, model, endpoint and search keys
 - `AppearanceConfig`: accent palette and light/dark `ThemeMode` (app-only;
   CLI and server ignore it)
+- `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`)
 - Apps edit it on the Settings destination, split into `SettingsCategory`
   pages (General, Downloads, Network, Remote access, AI discovery, About).
   Wide windows open it as an overlay dialog (also ⌘, / Ctrl+, on desktop),

@@ -46,7 +46,10 @@ class TorrentDownloadSource(
 ) : DownloadSource {
   private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
   private val http by httpDelegate
-  internal var engineFactory: () -> TorrentEngine = { KotlinTorrentEngine(config, http = http) }
+  private val additionalTrackers = AtomicReference(config.additionalTrackers)
+  internal var engineFactory: () -> TorrentEngine = {
+    KotlinTorrentEngine(config.copy(additionalTrackers = additionalTrackers.load()), http = http)
+  }
   private val engine = AtomicReference<TorrentEngine?>(null)
   private val closed = AtomicBoolean(false)
   private val engineMutex = Mutex()
@@ -103,11 +106,40 @@ class TorrentDownloadSource(
     (getEngine() as KotlinTorrentEngine).setConnections(connections)
   }
 
+  /**
+   * Replace [TorrentConfig.additionalTrackers]. Torrents started or resumed afterwards use the new
+   * list; running torrents keep the trackers they started with.
+   */
+  suspend fun setAdditionalTrackers(urls: List<String>) = engineMutex.withLock {
+    additionalTrackers.store(urls)
+    (engine.load() as? KotlinTorrentEngine)?.setAdditionalTrackers(urls)
+  }
+
   override fun canHandle(url: String): Boolean {
     val lower = url.lowercase()
     return lower.startsWith("magnet:") || lower.startsWith("torrent:") ||
       lower.substringBefore('?').substringBefore('#').endsWith(".torrent")
   }
+
+  /** Accepts `.torrent` file names, or content that starts like a bencoded dictionary. */
+  override fun canHandleContent(content: ByteArray, fileName: String?): Boolean {
+    if (fileName?.endsWith(".torrent", ignoreCase = true) == true) return true
+    // Metainfo is a dictionary whose first key is length-prefixed, e.g. "d8:announce".
+    return content.size >= 2 && content[0] == 'd'.code.toByte() &&
+      content[1] in '1'.code.toByte()..'9'.code.toByte()
+  }
+
+  /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
+  override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
+    withContext(Dispatchers.Default) {
+      try {
+        resolveMetainfo(content)
+      } catch (e: CancellationException) { throw e
+      } catch (e: Exception) {
+        if (e is KetchError) throw e
+        throw KetchError.SourceError(TYPE, e)
+      }
+    }
 
   /** Resolve metainfo supplied by a file picker or SDK caller without making a network request. */
   fun resolveMetainfo(

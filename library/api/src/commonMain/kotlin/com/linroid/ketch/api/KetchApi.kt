@@ -44,6 +44,27 @@ interface KetchApi {
   ): ResolvedSource
 
   /**
+   * Resolves metadata from file content the caller already holds, such as
+   * a `.torrent` file picked or dropped by the user, without fetching it.
+   *
+   * The content is not stored anywhere else, so start the download by
+   * passing the returned [ResolvedSource] in [DownloadRequest.resolvedSource]
+   * with its [ResolvedSource.url] as [DownloadRequest.url].
+   *
+   * @param content the raw file content
+   * @param fileName the original file name, if known. Sources may use its
+   *   extension to recognize the content.
+   * @throws KetchError.Unsupported if no source recognizes the content
+   * @throws UnsupportedOperationException if this backend cannot resolve content
+   */
+  suspend fun resolveContent(
+    content: ByteArray,
+    fileName: String? = null,
+  ): ResolvedSource {
+    throw UnsupportedOperationException("Resolving file content is unavailable")
+  }
+
+  /**
    * Initialize backend runtime state.
    *
    * - Core backend restores persisted tasks.

@@ -30,6 +30,7 @@ import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
+import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import kotlinx.coroutines.flow.MutableSharedFlow
 import java.awt.Desktop
@@ -67,7 +68,12 @@ fun main() = application {
             logger = Logger.console(),
             additionalSources = listOf(
               FtpDownloadSource(),
-              TorrentDownloadSource(),
+              TorrentDownloadSource(
+                TorrentConfig(
+                  stateDirectory = configDir + File.separator + "torrent-state",
+                  additionalTrackers = configStore.load().torrent.trackers,
+                ),
+              ),
             ),
           )
         },

@@ -62,6 +62,26 @@ class TorrentDownloadSourceTest {
   }
 
   @Test
+  fun canHandleContent_torrentFileName_caseInsensitive() {
+    assertTrue(source.canHandleContent("anything".encodeToByteArray(), "Ubuntu.TORRENT"))
+  }
+
+  @Test
+  fun canHandleContent_bencodedDictionaryWithoutTorrentName() {
+    val content = "d8:announce3:urle".encodeToByteArray()
+    assertTrue(source.canHandleContent(content, null))
+    assertTrue(source.canHandleContent(content, "download"))
+  }
+
+  @Test
+  fun canHandleContent_otherContent_returnsFalse() {
+    assertFalse(source.canHandleContent("hello".encodeToByteArray(), "notes.txt"))
+    assertFalse(source.canHandleContent("data".encodeToByteArray(), null))
+    assertFalse(source.canHandleContent("d".encodeToByteArray(), null))
+    assertFalse(source.canHandleContent(ByteArray(0), null))
+  }
+
+  @Test
   fun type_isTorrent() {
     kotlin.test.assertEquals("torrent", source.type)
   }

@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -142,6 +143,42 @@ class TorrentDownloadSourceResolveTest {
     }
     assertEquals("torrent", error.sourceType)
     assertIs<RuntimeException>(error.cause)
+  }
+
+  // -- resolve via .torrent content --
+
+  @Test
+  fun resolveContent_metainfoBytes_resolvesWithoutEngine() = runTest {
+    val content = Bencode.encode(mapOf(
+      "announce" to "http://tracker.example.com/announce",
+      "info" to mapOf(
+        "name" to "pack", "piece length" to 16384L, "pieces" to ByteArray(20),
+        "files" to listOf(
+          mapOf("length" to 1L, "path" to listOf("a.txt")),
+          mapOf("length" to 2L, "path" to listOf("b.txt")),
+        ),
+      ),
+    ))
+
+    val resolved = source.resolveContent(content, "pack.torrent")
+
+    val hash = TorrentMetadata.fromBencode(content).infoHash.hex
+    assertEquals("torrent:$hash", resolved.url)
+    assertEquals("torrent", resolved.sourceType)
+    assertEquals(3L, resolved.totalBytes)
+    assertEquals("pack", resolved.suggestedFileName)
+    assertEquals(listOf("0", "1"), resolved.files.map { it.id })
+    assertEquals(hash, resolved.metadata["infoHash"])
+    assertNotNull(resolved.metadata["metainfo"])
+    assertFalse(fakeEngine.started)
+  }
+
+  @Test
+  fun resolveContent_malformedBytes_throwsSourceError() = runTest {
+    val error = assertFailsWith<KetchError.SourceError> {
+      source.resolveContent("d8:announce".encodeToByteArray(), "broken.torrent")
+    }
+    assertEquals("torrent", error.sourceType)
   }
 
   // -- resolve via .torrent URL --

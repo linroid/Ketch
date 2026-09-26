@@ -12,7 +12,9 @@ import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
+import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
@@ -24,6 +26,11 @@ fun MainViewController() = ComposeUIViewController {
     @Suppress("UNCHECKED_CAST")
     val docsDir = (NSSearchPathForDirectoriesInDomains(
       NSDocumentDirectory, NSUserDomainMask, true,
+    ) as List<String>).first()
+    // Internal state stays out of Documents, which the Files app shows.
+    @Suppress("UNCHECKED_CAST")
+    val supportDir = (NSSearchPathForDirectoriesInDomains(
+      NSApplicationSupportDirectory, NSUserDomainMask, true,
     ) as List<String>).first()
     val configStore = FileConfigStore("$docsDir/config.toml")
     val config = configStore.load()
@@ -46,7 +53,12 @@ fun MainViewController() = ComposeUIViewController {
             logger = Logger.console(),
             additionalSources = listOf(
               FtpDownloadSource(),
-              TorrentDownloadSource(),
+              TorrentDownloadSource(
+                TorrentConfig(
+                  stateDirectory = "$supportDir/torrent-state",
+                  additionalTrackers = configStore.load().torrent.trackers,
+                ),
+              ),
             ),
           )
         },

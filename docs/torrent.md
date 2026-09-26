@@ -33,8 +33,11 @@ Progress counts verified selected bytes. In v1, a piece spanning selected and sk
 its bytes for verification; skipped boundary bytes live in a hidden task sidecar, not in skipped
 output files. Network speed includes received payload, including those boundary bytes/retries.
 
-For SDK-provided bytes, call `torrents.resolveMetainfo(bytes)` and pass the returned source as
-`DownloadRequest.resolvedSource`, with its `url` as the request URL. Local `.torrent` paths and
+For SDK-provided bytes, call `ketch.resolveContent(bytes, "name.torrent")` (or
+`torrents.resolveMetainfo(bytes)` on the source) and pass the returned source as
+`DownloadRequest.resolvedSource`, with its `url` as the request URL. `resolveContent` also works
+through `RemoteKetch`, which uploads the bytes to the daemon's `POST /api/resolve/content`; the
+apps use it for `.torrent` files dropped onto the window. Local `.torrent` paths and
 `file:` URLs also work. HTTP(S) metainfo is bounded and fetched through the HTTP engine; tracker
 passkeys are not logged by the torrent HTTP adapter. Avoid enabling application-level URL logging
 for private tracker URLs. A supplied HTTP engine remains owned by its caller.
@@ -43,7 +46,14 @@ for private tracker URLs. A supplied HTTP engine remains owned by its caller.
 
 - HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.
 - Public magnets use BEP 9 metadata exchange, DHT, trackers, and explicit peers. Public swarms
-  support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates.
+  support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates;
+  a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
+  The apps and CLI keep it in their config directory.
+- `additionalTrackers` (the apps' and CLI's `[torrent] trackers` in `config.toml`) adds trackers
+  to public torrents and public magnet lookups. Each one is announced alongside the torrent's own
+  trackers rather than as a later tier, so it helps when a network blocks the torrent's trackers.
+  Private torrents and tracker-only discovery never contact them.
+  `TorrentDownloadSource.setAdditionalTrackers` changes the list for torrents started later.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
   and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
   are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not

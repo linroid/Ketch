@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
  * @property remotes pre-configured remote server connections.
  * @property ai AI resource discovery settings.
  * @property appearance app look and feel settings.
+ * @property torrent BitTorrent engine settings.
  */
 @Serializable
 data class KetchConfig(
@@ -23,4 +24,5 @@ data class KetchConfig(
   val remotes: List<RemoteConfig> = emptyList(),
   val ai: AiSettings = AiSettings(),
   val appearance: AppearanceConfig = AppearanceConfig(),
+  val torrent: TorrentSettings = TorrentSettings(),
 )
