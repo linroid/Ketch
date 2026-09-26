@@ -97,6 +97,26 @@ class TorrentDownloadSource(
       lower.substringBefore('?').substringBefore('#').endsWith(".torrent")
   }
 
+  /** Accepts `.torrent` file names, or content that starts like a bencoded dictionary. */
+  override fun canHandleContent(content: ByteArray, fileName: String?): Boolean {
+    if (fileName?.endsWith(".torrent", ignoreCase = true) == true) return true
+    // Metainfo is a dictionary whose first key is length-prefixed, e.g. "d8:announce".
+    return content.size >= 2 && content[0] == 'd'.code.toByte() &&
+      content[1] in '1'.code.toByte()..'9'.code.toByte()
+  }
+
+  /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
+  override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
+    withContext(Dispatchers.Default) {
+      try {
+        resolveMetainfo(content)
+      } catch (e: CancellationException) { throw e
+      } catch (e: Exception) {
+        if (e is KetchError) throw e
+        throw KetchError.SourceError(TYPE, e)
+      }
+    }
+
   /** Resolve metainfo supplied by a file picker or SDK caller without making a network request. */
   fun resolveMetainfo(
     bytes: ByteArray,

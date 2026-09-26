@@ -48,6 +48,24 @@ class FakeKetchApi(
     )
   }
 
+  /** Result of [resolveContent]; unsupported when null. */
+  var resolveContentResult: ResolvedSource? = null
+  var lastResolvedContent: ByteArray? = null
+    private set
+  var lastResolvedFileName: String? = null
+    private set
+
+  override suspend fun resolveContent(
+    content: ByteArray,
+    fileName: String?,
+  ): ResolvedSource {
+    lastResolvedContent = content
+    lastResolvedFileName = fileName
+    return resolveContentResult ?: throw UnsupportedOperationException(
+      "FakeKetchApi does not support resolveContent"
+    )
+  }
+
   override suspend fun status(): KetchStatus {
     throw UnsupportedOperationException(
       "FakeKetchApi does not support status"

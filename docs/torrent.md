@@ -33,8 +33,11 @@ Progress counts verified selected bytes. In v1, a piece spanning selected and sk
 its bytes for verification; skipped boundary bytes live in a hidden task sidecar, not in skipped
 output files. Network speed includes received payload, including those boundary bytes/retries.
 
-For SDK-provided bytes, call `torrents.resolveMetainfo(bytes)` and pass the returned source as
-`DownloadRequest.resolvedSource`, with its `url` as the request URL. Local `.torrent` paths and
+For SDK-provided bytes, call `ketch.resolveContent(bytes, "name.torrent")` (or
+`torrents.resolveMetainfo(bytes)` on the source) and pass the returned source as
+`DownloadRequest.resolvedSource`, with its `url` as the request URL. `resolveContent` also works
+through `RemoteKetch`, which uploads the bytes to the daemon's `POST /api/resolve/content`; the
+apps use it for `.torrent` files dropped onto the window. Local `.torrent` paths and
 `file:` URLs also work. HTTP(S) metainfo is bounded and fetched through the HTTP engine; tracker
 passkeys are not logged by the torrent HTTP adapter. Avoid enabling application-level URL logging
 for private tracker URLs. A supplied HTTP engine remains owned by its caller.

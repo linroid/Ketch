@@ -57,6 +57,7 @@ class SourceResolverTest {
     assertEquals(1, closeCount)
     assertFailsWith<IllegalStateException> { resolver.resolve("magnet:test") }
     assertFailsWith<IllegalStateException> { resolver.resolveByType("magnet") }
+    assertFailsWith<IllegalStateException> { resolver.resolveContent(byteArrayOf(1), null) }
   }
 
   @Test
@@ -120,6 +121,26 @@ class SourceResolverTest {
     val resolver = SourceResolver(listOf(httpSource))
     assertFailsWith<KetchError.Unsupported> {
       resolver.resolveByType("torrent")
+    }
+  }
+
+  @Test
+  fun resolveContent_matchingSource_returnsFirstMatch() {
+    val contentSource = object : DownloadSource by fakeSource {
+      override val type = "content"
+      override fun canHandleContent(content: ByteArray, fileName: String?) =
+        fileName == "a.torrent"
+    }
+    val resolver = SourceResolver(listOf(httpSource, contentSource, fakeSource))
+    val source = resolver.resolveContent(byteArrayOf(1), "a.torrent")
+    assertEquals("content", source.type)
+  }
+
+  @Test
+  fun resolveContent_noSourceAccepts_throwsUnsupported() {
+    val resolver = SourceResolver(listOf(httpSource, fakeSource))
+    assertFailsWith<KetchError.Unsupported> {
+      resolver.resolveContent(byteArrayOf(1), "a.torrent")
     }
   }
 

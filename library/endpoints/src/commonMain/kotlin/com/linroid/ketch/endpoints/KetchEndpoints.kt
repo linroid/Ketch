@@ -17,6 +17,7 @@ import kotlinx.serialization.Serializable
  * - `GET  /api/network-interfaces` — discover interfaces and current selection
  * - `PUT  /api/network-interfaces` — select interfaces for new HTTP requests
  * - `POST /api/resolve`      — resolve URL metadata without downloading
+ * - `POST /api/resolve/content` — resolve metadata from uploaded file bytes
  *
  * ### Tasks
  * - `GET    /api/tasks`                  — list all tasks
@@ -52,7 +53,16 @@ class Api {
 
   @Serializable
   @Resource("resolve")
-  data class Resolve(val parent: Api = Api())
+  data class Resolve(val parent: Api = Api()) {
+
+    /** Resolves the request body, e.g. `.torrent` bytes, as file content. */
+    @Serializable
+    @Resource("content")
+    data class Content(
+      val parent: Resolve = Resolve(),
+      val fileName: String? = null,
+    )
+  }
 
   @Serializable
   @Resource("tasks")
