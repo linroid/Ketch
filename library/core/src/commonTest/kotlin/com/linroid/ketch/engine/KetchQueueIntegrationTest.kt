@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
@@ -187,6 +188,49 @@ class KetchQueueIntegrationTest {
       runCurrent()
       assertEquals(7, source.contexts.getValue("running").effectiveConnections())
       assertTrue(ketch.status().system.downloadDirectory.endsWith("ketch-config-test"))
+    }
+  }
+
+  @Test
+  fun setSpeedLimitAndConnections_queuedTask_applyWhenStarted() = runTest {
+    withKetch { ketch, source, store ->
+      ketch.download(request("first"))
+      runCurrent()
+      val queued = ketch.download(request("second"))
+      runCurrent()
+
+      queued.setSpeedLimit(SpeedLimit.of(4096))
+      queued.setConnections(3)
+
+      assertEquals(SpeedLimit.of(4096), store.load(queued.taskId)?.request?.speedLimit)
+      assertEquals(3, queued.requestState.value.connections)
+      source.complete("first")
+      runCurrent()
+      val context = source.contexts.getValue("second")
+      assertEquals(3, context.effectiveConnections())
+      assertEquals(SpeedLimit.of(4096), context.request.speedLimit)
+    }
+  }
+
+  @Test
+  fun setSpeedLimitAndConnections_pausedTask_applyOnResume() = runTest {
+    withKetch { ketch, source, store ->
+      val task = ketch.download(request("first"))
+      runCurrent()
+      task.pause()
+
+      task.setSpeedLimit(SpeedLimit.of(2048))
+      task.setConnections(5)
+
+      val record = store.load(task.taskId)
+      assertEquals(SpeedLimit.of(2048), record?.request?.speedLimit)
+      assertEquals(5, record?.request?.connections)
+      assertIs<DownloadState.Paused>(task.state.value)
+      task.resume()
+      runCurrent()
+      val context = source.contexts.getValue("first")
+      assertEquals(5, context.effectiveConnections())
+      assertEquals(SpeedLimit.of(2048), context.request.speedLimit)
     }
   }
 

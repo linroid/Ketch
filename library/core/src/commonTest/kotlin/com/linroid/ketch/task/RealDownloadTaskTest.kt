@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.time.Instant
 
 class RealDownloadTaskTest {
@@ -55,6 +57,66 @@ class RealDownloadTaskTest {
     assertEquals(DownloadPriority.URGENT, task.request.priority)
     assertEquals(DownloadPriority.URGENT, queuePriority)
     assertEquals(DownloadState.Paused(DownloadProgress(0, 100)), task.state.value)
+  }
+
+  @Test
+  fun setSpeedLimit_persistsAndPublishesBeforeApplying() = runTest {
+    val store = InMemoryTaskStore()
+    var applied: SpeedLimit? = null
+    val task = pausedTask(store, object : TaskController by UnusedController {
+      override suspend fun setSpeedLimit(taskId: String, limit: SpeedLimit) {
+        assertEquals(limit, store.load(taskId)?.request?.speedLimit)
+        applied = limit
+      }
+    })
+
+    task.setSpeedLimit(SpeedLimit.of(4096))
+
+    assertEquals(SpeedLimit.of(4096), task.requestState.value.speedLimit)
+    assertEquals(SpeedLimit.of(4096), applied)
+  }
+
+  @Test
+  fun setConnections_persistsAndPublishesBeforeApplying() = runTest {
+    val store = InMemoryTaskStore()
+    var applied: Int? = null
+    val task = pausedTask(store, object : TaskController by UnusedController {
+      override suspend fun setConnections(taskId: String, connections: Int) {
+        assertEquals(connections, store.load(taskId)?.request?.connections)
+        applied = connections
+      }
+    })
+
+    task.setConnections(6)
+
+    assertEquals(6, task.requestState.value.connections)
+    assertEquals(6, applied)
+  }
+
+  @Test
+  fun setConnections_zero_throwsWithoutPersisting() = runTest {
+    val store = InMemoryTaskStore()
+    val task = pausedTask(store, UnusedController)
+
+    assertFailsWith<IllegalArgumentException> { task.setConnections(0) }
+
+    assertNull(store.load(task.taskId))
+    assertEquals(0, task.request.connections)
+  }
+
+  private fun pausedTask(store: InMemoryTaskStore, controller: TaskController): RealDownloadTask {
+    val request = DownloadRequest(url = "https://example.com/file")
+    val now = Instant.fromEpochMilliseconds(0)
+    return RealDownloadTask(
+      taskId = "task",
+      request = request,
+      createdAt = now,
+      initialState = DownloadState.Paused(DownloadProgress(0, 100)),
+      initialSegments = emptyList(),
+      controller = controller,
+      taskStore = store,
+      record = TaskRecord(taskId = "task", request = request, createdAt = now, updatedAt = now),
+    )
   }
 
   @Test

@@ -188,6 +188,10 @@ internal class DownloadCoordinator(
     log.d { "Cancel record updated for taskId=$taskId" }
   }
 
+  /**
+   * Applies [limit] to the task's running execution, if any. Callers
+   * persist the limit first so an execution created later picks it up.
+   */
   suspend fun setTaskSpeedLimit(taskId: String, limit: SpeedLimit) {
     mutex.withLock {
       val entry = activeDownloads[taskId] ?: return
@@ -195,6 +199,7 @@ internal class DownloadCoordinator(
     }
   }
 
+  /** Like [setTaskSpeedLimit], for the task's connection count. */
   suspend fun setTaskConnections(taskId: String, connections: Int) {
     mutex.withLock {
       val entry = activeDownloads[taskId] ?: return

@@ -68,7 +68,11 @@ internal class DownloadExecution(
   /** Stop callbacks before a pause/cancel state is published while a source is still joining. */
   fun stopReportingProgress() { reportsProgress.value = false }
 
-  val taskLimiter = DelegatingSpeedLimiter()
+  /**
+   * Per-task limiter, created from the persisted request so a limit set
+   * while the task was not running applies from the first byte.
+   */
+  val taskLimiter = DelegatingSpeedLimiter(createLimiter(handle.request.speedLimit))
   var context: DownloadContext? = null
   var fileAccessor: FileAccessor? = null
   var totalBytes: Long = 0
@@ -88,13 +92,8 @@ internal class DownloadExecution(
     }
   }
 
+  /** Applies [limit] to the running transfer. The caller persists it in the task record. */
   suspend fun setSpeedLimit(limit: SpeedLimit) {
-    handle.record.update {
-      it.copy(
-        request = it.request.copy(speedLimit = limit),
-        updatedAt = Clock.System.now(),
-      )
-    }
     val current = taskLimiter.delegate
     if (limit.isUnlimited) {
       (current as? TokenBucket)?.updateRate(0)
@@ -110,14 +109,12 @@ internal class DownloadExecution(
     }
   }
 
-  suspend fun setConnections(connections: Int) {
+  /**
+   * Applies [connections] to the running transfer. The caller persists it
+   * in the task record; a context built later reads the persisted value.
+   */
+  fun setConnections(connections: Int) {
     require(connections > 0) { "Connections must be greater than 0" }
-    handle.record.update {
-      it.copy(
-        request = it.request.copy(connections = connections),
-        updatedAt = Clock.System.now(),
-      )
-    }
     context?.maxConnections?.value = connections
     log.i { "Task connections updated for taskId=$taskId: $connections" }
   }
@@ -190,8 +187,6 @@ internal class DownloadExecution(
       )
     }
 
-    taskLimiter.delegate = createLimiter(request.speedLimit)
-
     val preResolved = resolvedUrl
     runDownload(outputPath, total, source, preResolved) { ctx ->
       source.download(ctx)
@@ -220,7 +215,6 @@ internal class DownloadExecution(
         ),
       )
     totalBytes = taskRecord.totalBytes
-    taskLimiter.delegate = createLimiter(taskRecord.request.speedLimit)
 
     val resumeState = taskRecord.sourceResumeState
       ?: throw KetchError.CorruptResumeState(
