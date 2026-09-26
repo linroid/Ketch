@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.desktop
 
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Window
@@ -25,8 +26,8 @@ import java.io.File
 import java.net.InetAddress
 
 fun main() = application {
+  val configDir = remember { defaultConfigDir() }
   val instanceManager = remember {
-    val configDir = defaultConfigDir()
     val configStore = FileConfigStore(
       configDir + File.separator + "config.toml",
     )
@@ -88,8 +89,17 @@ fun main() = application {
   DisposableEffect(Unit) {
     onDispose { instanceManager.close() }
   }
+  val windowStateStore = remember {
+    WindowStateStore(File(configDir, "window.properties"))
+  }
+  val savedBounds = remember { windowStateStore.load() }
+  val windowState = remember { initialWindowState(savedBounds) }
+  LaunchedEffect(windowState) {
+    windowStateStore.saveChanges(windowState, savedBounds)
+  }
   Window(
     onCloseRequest = ::exitApplication,
+    state = windowState,
     title = "Ketch",
     icon = painterResource("icon.svg"),
   ) {
