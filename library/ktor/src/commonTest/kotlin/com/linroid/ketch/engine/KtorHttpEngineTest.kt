@@ -45,6 +45,35 @@ class KtorHttpEngineTest {
   }
 
   @Test
+  fun download_chunkedFullResponse_validatesActualLength() = runTest {
+    val chunked = "Transfer-Encoding" to "chunked"
+    withResponse(HttpStatusCode.OK, "abcdefgh", chunked) { engine ->
+      var body = ""
+      engine.download("https://example.com/file", 0L..7L) { body += it.decodeToString() }
+      assertEquals("abcdefgh", body)
+    }
+    withResponse(HttpStatusCode.OK, "abcd", chunked) { engine ->
+      assertFailsWith<KetchError.Network> {
+        engine.download("https://example.com/file", 0L..7L) {}
+      }
+    }
+    withResponse(HttpStatusCode.OK, "abcdefghij", chunked) { engine ->
+      var delivered = 0
+      assertFailsWith<KetchError.Unsupported> {
+        engine.download("https://example.com/file", 0L..7L) { delivered += it.size }
+      }
+      assertTrue(delivered <= 8)
+    }
+    withResponse(HttpStatusCode.OK, "abcdefgh", chunked) { engine ->
+      var delivered = false
+      assertFailsWith<KetchError.Unsupported> {
+        engine.download("https://example.com/file", 4L..7L) { delivered = true }
+      }
+      assertTrue(!delivered)
+    }
+  }
+
+  @Test
   fun download_invalidContentRange_rejectsBeforeDeliveringData() = runTest {
     for (range in listOf("", "bytes 0-3/8", "bytes 4-6/8", "bytes 4-7/7", "invalid")) {
       withResponse(HttpStatusCode.PartialContent, "efgh", "Content-Range" to range) { engine ->

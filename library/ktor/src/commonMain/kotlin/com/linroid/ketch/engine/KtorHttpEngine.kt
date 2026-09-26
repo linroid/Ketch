@@ -161,7 +161,8 @@ class KtorHttpEngine(
               response.headers[HttpHeaders.ContentRange], range
             )
             // A server may ignore Range. Only a complete response starting at zero is safe.
-            HttpStatusCode.OK -> range.first == 0L && response.contentLength() == expectedBytes
+            HttpStatusCode.OK -> range.first == 0L &&
+              (response.contentLength() == null || response.contentLength() == expectedBytes)
             else -> false
           }
           if (!validRange) {
