@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +20,7 @@ import com.linroid.ketch.app.components.KetchButton
  * @param name saved name; blank means the platform default.
  * @param defaultName label the app falls back to.
  * @param onSave persist the edited name.
+ * @param onUnsavedChange told whether the field differs from [name].
  */
 @Composable
 fun GeneralSettingsCard(
@@ -28,8 +29,11 @@ fun GeneralSettingsCard(
   compact: Boolean,
   onSave: (String) -> Unit,
   modifier: Modifier = Modifier,
+  onUnsavedChange: (Boolean) -> Unit = {},
 ) {
-  var edited by remember(name) { mutableStateOf(name) }
+  var edited by rememberSaveable(name) { mutableStateOf(name) }
+  val changed = edited.trim() != name.trim()
+  ReportUnsaved(changed, onUnsavedChange)
   SettingsCard(
     title = "This device",
     description = "How this instance appears to you and to other devices.",
@@ -53,7 +57,7 @@ fun GeneralSettingsCard(
       KetchButton(
         text = "Save",
         onClick = { onSave(edited) },
-        enabled = edited.trim() != name.trim(),
+        enabled = changed,
       )
     }
   }
