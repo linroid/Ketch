@@ -31,6 +31,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okio.IOException
 import okio.Path.Companion.toPath
 
 /**
@@ -63,7 +64,12 @@ class TorrentDownloadSource(
     engine.load()?.let { return@withLock it }
     val created = engineFactory()
     try {
-      created.start()
+      try {
+        created.start()
+      } catch (e: IOException) {
+        // Binding the peer listener is the only socket work here, such as a port still in use.
+        throw KetchError.Network(e)
+      }
       engine.store(created)
       if (closed.load()) { engine.exchange(null)?.close(); error("Torrent source is closed") }
       created
@@ -124,12 +130,17 @@ class TorrentDownloadSource(
     properties: Map<String, String> = emptyMap(),
   ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
-    try {
+    return reportingFailures {
       if (url.startsWith("magnet:", true)) {
-        return metadataFetches.withPermit { resolveMagnet(url, privacy) }
+        return@reportingFailures metadataFetches.withPermit { resolveMagnet(url, privacy) }
       }
       val bytes = if (url.startsWith("https://", true) || url.startsWith("http://", true)) {
-        http.fetch(url, config.maxMetadataBytes, headers = properties)
+        try {
+          http.fetch(url, config.maxMetadataBytes, headers = properties)
+        } catch (e: IOException) {
+          // Caller-supplied engines may surface raw socket failures; the metainfo host is remote.
+          throw KetchError.Network(e)
+        }
       } else {
         val path = if (url.startsWith("file:", true)) {
           val parsed = Url(url)
@@ -150,15 +161,8 @@ class TorrentDownloadSource(
           }
         }
       }
-      return resolveV2Metainfo(url, bytes, config, privacy)
+      resolveV2Metainfo(url, bytes, config, privacy)
         ?: resolved(url, TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes), privacy)
-    } catch (e: TimeoutCancellationException) {
-      currentCoroutineContext().ensureActive()
-      throw KetchError.Network(Exception("Torrent operation timed out"))
-    } catch (e: CancellationException) { throw e
-    } catch (e: Exception) {
-      if (e is KetchError) throw e
-      throw KetchError.SourceError(TYPE, e)
     }
   }
 
@@ -219,12 +223,15 @@ class TorrentDownloadSource(
     }
   }
 
-  override suspend fun download(context: DownloadContext) {
+  override suspend fun download(context: DownloadContext) = reportingFailures {
     val resolved = context.preResolved ?: resolve(context.url, context.headers)
     execute(context, resolved, null)
   }
 
-  override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
+  override suspend fun resume(
+    context: DownloadContext,
+    resumeState: SourceResumeState,
+  ) = reportingFailures {
     val state = try { Json.decodeFromString<TorrentResumeState>(resumeState.data)
     } catch (e: Exception) { throw KetchError.CorruptResumeState(e.message, e) }
     val checkpoint = if (state.version == 3 || state.resumeData.isEmpty()) null else
@@ -237,6 +244,20 @@ class TorrentDownloadSource(
     }
     require(resolved.metadata[META_INFO_HASH] == state.infoHash) { "Resume torrent changed" }
     execute(context, resolved, state)
+  }
+
+  /**
+   * Reports failures in Ketch's terms (see [torrentFailure]). Cancellation is never wrapped;
+   * only an internal timeout, while the caller is still active, becomes a failure.
+   */
+  private suspend inline fun <T> reportingFailures(block: () -> T): T = try {
+    block()
+  } catch (e: CancellationException) {
+    if (e !is TimeoutCancellationException) throw e
+    currentCoroutineContext().ensureActive()
+    throw torrentFailure(e)
+  } catch (e: Exception) {
+    throw torrentFailure(e)
   }
 
   private suspend fun execute(
@@ -433,7 +454,7 @@ class TorrentDownloadSource(
     context: DownloadContext,
     total: Long,
     block: suspend () -> Boolean,
-  ) = try {
+  ) {
     val evicted = slots.acquire(context.request.priority) {
       // The task holds a Ketch download slot, so it reports as downloading (which also lets it
       // be paused) at 0 bytes/s with its restored progress; waiting transfers nothing.
@@ -447,8 +468,7 @@ class TorrentDownloadSource(
     } finally {
       if (!lent) withContext(NonCancellable) { slots.release() }
     }
-  } catch (e: CancellationException) { throw e
-  } catch (e: Exception) { throw KetchError.SourceError(TYPE, e) }
+  }
 
   /**
    * Finished snapshots are bounded; persisted task state and the ownership journal recover tasks
@@ -580,6 +600,20 @@ class TorrentDownloadSource(
 internal expect fun createTorrentEngine(
   config: TorrentConfig,
 ): TorrentEngine
+
+/**
+ * Maps a torrent failure onto Ketch's retry policy. Peer, tracker and DHT failures are retried
+ * inside the swarm, so only timeouts that reach a task (such as magnet metadata resolution) are
+ * transient [KetchError.Network]. Storage failures are [KetchError.Disk]; verification, protocol
+ * and admission failures are [KetchError.SourceError]. Neither is retried.
+ */
+internal fun torrentFailure(error: Throwable): KetchError = when (error) {
+  is KetchError -> error
+  is TimeoutCancellationException -> KetchError.Network(error)
+  is TorrentStorageException -> KetchError.Disk(error.cause)
+  is IOException -> KetchError.Disk(error)
+  else -> KetchError.SourceError(TorrentDownloadSource.TYPE, error)
+}
 
 /** Platform-specific base64 encoding. */
 internal fun encodeBase64(data: ByteArray): String = Base64.Default.encode(data)
