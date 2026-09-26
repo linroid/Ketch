@@ -46,3 +46,40 @@ Do **not** write tests for things the Kotlin language or frameworks already guar
 - Use `FakeHttpEngine` and similar test doubles for isolation, but don't test the doubles
 - When a formula or algorithm lives in production code, test it by calling that production
   code — never reimplement the formula locally and assert against the reimplementation
+
+## Public HTTP Download Smoke Tests
+
+Run the desktop app with `./gradlew :app:desktop:run`.
+
+The Ktor module has opt-in end-to-end tests using real HTTPS connections and temporary files:
+
+```shell
+./gradlew :library:ktor:jvmTest -PpublicDownloadTests=true --tests '*PublicDownloadTest'
+```
+
+These verify a Git v2.46.0 README from GitHub against its SHA-256 checksum, plus HTTPBingo's
+256 KiB deterministic range resource through a redirect and segmented pause/resume. They check
+file contents and completed segment progress. Each test has a 90-second timeout and cleans up
+its temporary files. Public service outages, rate limits, or network restrictions fail the tests;
+they are not silently treated as success.
+
+Ordinary test runs exclude these tests. Opted-in runs bypass test-result caching and up-to-date
+checks so they always exercise the network. Use `:library:core:jvmTest` for the offline regression
+coverage of completed segment progress.
+
+## Offline HTTP Integration Tests
+
+```shell
+./gradlew :library:core:jvmTest :library:ktor:jvmTest :library:ftp:jvmTest
+```
+
+`HttpDownloadIntegrationTest` uses a loopback HTTP server, real Ktor connections, temporary
+output files, and SQLite task storage. It covers empty and small files, uneven segments,
+servers without range support, invalid range responses, interrupted transfers, HTTP retries,
+pause/resume, cancellation cleanup, live connection changes, changed server identity,
+SQLite restart/resume, truncated local files, and UTF-8 server filenames. Each case has a
+bounded timeout and closes its clients, server, database, and temporary files.
+
+Common tests also check response validation without sockets and regression cases for segment
+progress snapshots, cancellation, and resegmentation. Keep fault-injection tests local so they
+remain reproducible without relying on a public server to misbehave.

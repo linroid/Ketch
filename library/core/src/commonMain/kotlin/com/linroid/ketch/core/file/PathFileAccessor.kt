@@ -71,7 +71,7 @@ internal class PathFileAccessor(
   }
 
   override suspend fun preallocate(size: Long) {
-    if (size <= 0) return
+    if (size < 0) return
     log.d { "Preallocating $size bytes: $realPath" }
     withContext(dispatcher) {
       val handle = getOrCreateHandle()

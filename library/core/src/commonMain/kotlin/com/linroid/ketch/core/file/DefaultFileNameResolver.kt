@@ -39,7 +39,7 @@ internal class DefaultFileNameResolver : FileNameResolver {
 
       // Try filename*=UTF-8''<encoded> (RFC 5987)
       val extRegex = Regex(
-        """filename\*\s*=\s*UTF-8''(.+)""",
+        """filename\*\s*=\s*UTF-8'[^']*'([^;]+)""",
         RegexOption.IGNORE_CASE
       )
       extRegex.find(header)?.groupValues?.get(1)?.let { encoded ->
@@ -89,22 +89,23 @@ internal class DefaultFileNameResolver : FileNameResolver {
     }
 
     internal fun percentDecode(encoded: String): String {
-      val sb = StringBuilder()
-      var i = 0
-      while (i < encoded.length) {
-        if (encoded[i] == '%' && i + 2 < encoded.length) {
-          val hex = encoded.substring(i + 1, i + 3)
-          val code = hex.toIntOrNull(16)
-          if (code != null) {
-            sb.append(code.toChar())
-            i += 3
+      val input = encoded.encodeToByteArray()
+      val output = ByteArray(input.size)
+      var read = 0
+      var written = 0
+      while (read < input.size) {
+        if (input[read] == '%'.code.toByte() && read + 2 < input.size) {
+          val high = input[read + 1].toInt().toChar().digitToIntOrNull(16)
+          val low = input[read + 2].toInt().toChar().digitToIntOrNull(16)
+          if (high != null && low != null) {
+            output[written++] = (high * 16 + low).toByte()
+            read += 3
             continue
           }
         }
-        sb.append(encoded[i])
-        i++
+        output[written++] = input[read++]
       }
-      return sb.toString()
+      return output.decodeToString(endIndex = written)
     }
   }
 }

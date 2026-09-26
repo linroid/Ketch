@@ -41,7 +41,7 @@ internal class HttpDownloadSource(
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(url, properties)
     val fileName = serverInfo.contentDisposition?.let {
-      extractDispositionFileName(it)
+      DefaultFileNameResolver.fromContentDisposition(it)
     } ?: DefaultFileNameResolver.fromUrl(url)
     return ResolvedSource(
       url = url,
@@ -318,13 +318,6 @@ internal class HttpDownloadSource(
       lastModified = resolved.metadata[META_LAST_MODIFIED],
       totalBytes = totalBytes,
     )
-  }
-
-  private fun extractDispositionFileName(
-    contentDisposition: String,
-  ): String? {
-    val regex = Regex("""filename\*?=(?:UTF-8''|"?)([^";]+)"?""")
-    return regex.find(contentDisposition)?.groupValues?.get(1)
   }
 
   companion object {

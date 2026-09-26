@@ -83,7 +83,11 @@ internal class ContentUriFileAccessor(
   }
 
   override suspend fun preallocate(size: Long) {
-    if (size <= 0) return
+    if (size < 0) return
+    if (size == 0L) {
+      withContext(dispatcher) { Os.ftruncate(fileDescriptor, 0) }
+      return
+    }
     log.d { "Preallocating $size bytes for uri: $uri" }
     writeAt(size - 1, byteArrayOf(0))
   }
