@@ -8,6 +8,7 @@ import androidx.compose.ui.window.ComposeViewport
 import com.linroid.ketch.config.WebConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.instance.RemoteInstance
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
@@ -34,8 +35,9 @@ fun main() {
         val entry = instanceManager.addRemote(host, port)
         scope.launch { instanceManager.switchTo(entry) }
       } else if (config.remotes.isNotEmpty()) {
+        // Web has no embedded instance, so select by type rather than index.
         val first = instanceManager.instances.value
-          .drop(1).firstOrNull() // skip embedded (null), take first remote
+          .filterIsInstance<RemoteInstance>().firstOrNull()
         if (first != null) {
           scope.launch { instanceManager.switchTo(first) }
         }
