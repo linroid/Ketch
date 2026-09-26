@@ -4,6 +4,8 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 
 /**
@@ -11,7 +13,8 @@ import androidx.compose.runtime.setValue
  * settings dialog can ask before closing over them.
  *
  * A section keeps its flag while another section is shown: its draft is
- * still there when the user switches back.
+ * still there when the user switches back. Remember it with [Saver] so the
+ * flags survive state restoration along with the drafts.
  */
 @Stable
 class SettingsEdits {
@@ -55,5 +58,20 @@ class SettingsEdits {
   fun discard() {
     unsaved.clear()
     confirmingDiscard = false
+  }
+
+  companion object {
+    /**
+     * Saves the unsaved sections, so a section that is not on screen when
+     * the state is restored is still guarded.
+     */
+    val Saver: Saver<SettingsEdits, Any> = listSaver(
+      save = { edits -> edits.unsavedSections.map { it.name } },
+      restore = { names ->
+        SettingsEdits().apply {
+          names.forEach { report(SettingsSection.valueOf(it), true) }
+        }
+      },
+    )
   }
 }

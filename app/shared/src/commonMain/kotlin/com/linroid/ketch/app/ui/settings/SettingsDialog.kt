@@ -24,7 +24,6 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -68,7 +67,8 @@ fun SettingsDialog(
   ) -> Unit,
 ) {
   val colors = KetchTheme.colors
-  val edits = remember { SettingsEdits() }
+  // Saved with the drafts, so restored drafts are still guarded on close.
+  val edits = rememberSaveable(saver = SettingsEdits.Saver) { SettingsEdits() }
   // Keeps each section's draft and scroll position while another is shown.
   val drafts = rememberSaveableStateHolder()
   var selectedName by rememberSaveable { mutableStateOf(sections.first().name) }

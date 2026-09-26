@@ -1,10 +1,12 @@
 package com.linroid.ketch.app
 
+import androidx.compose.runtime.saveable.SaverScope
 import com.linroid.ketch.app.state.SettingsEdits
 import com.linroid.ketch.app.state.SettingsSection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SettingsEditsTest {
@@ -71,6 +73,21 @@ class SettingsEditsTest {
       listOf(SettingsSection.General, SettingsSection.Ai),
       edits.unsavedSections,
     )
+  }
+
+  @Test
+  fun saver_restoredState_stillGuardsEveryUnsavedSection() {
+    val edits = SettingsEdits()
+    edits.report(SettingsSection.Downloads, true)
+    edits.report(SettingsSection.Ai, true)
+
+    val saved = with(SettingsEdits.Saver) {
+      SaverScope { true }.save(edits)
+    }
+    val restored = SettingsEdits.Saver.restore(assertNotNull(saved))
+
+    assertEquals(edits.unsavedSections, assertNotNull(restored).unsavedSections)
+    assertFalse(restored.requestClose())
   }
 
   @Test
