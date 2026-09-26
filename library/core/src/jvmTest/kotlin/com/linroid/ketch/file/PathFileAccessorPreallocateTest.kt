@@ -9,6 +9,7 @@ import kotlin.io.path.deleteIfExists
 import kotlin.io.path.fileSize
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Regression tests for [PathFileAccessor.preallocate] — particularly
@@ -55,17 +56,14 @@ class PathFileAccessorPreallocateTest {
   }
 
   @Test
-  fun preallocate_zero_isNoOp() = runTest {
+  fun preallocate_zero_createsEmptyFile() = runTest {
     val path = tempPath()
     val accessor = PathFileAccessor(path, Dispatchers.IO)
     try {
       accessor.preallocate(0L)
-      // No file written; size() opens the handle lazily — verify the
-      // file system path has no file or has size zero.
       val p = java.nio.file.Path.of(path)
-      if (java.nio.file.Files.exists(p)) {
-        assertEquals(0L, p.fileSize())
-      }
+      assertTrue(Files.exists(p))
+      assertEquals(0L, p.fileSize())
     } finally {
       accessor.close()
       java.nio.file.Path.of(path).deleteIfExists()

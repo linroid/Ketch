@@ -26,6 +26,9 @@ interface FileAccessor {
   /** Returns the current file size in bytes. */
   suspend fun size(): Long
 
-  /** Pre-allocates [size] bytes on disk to avoid fragmentation. */
+  /**
+   * Pre-allocates [size] bytes on disk to avoid fragmentation.
+   * A zero size creates an empty destination or truncates an existing destination to zero bytes.
+   */
   suspend fun preallocate(size: Long)
 }

@@ -1,15 +1,48 @@
 package com.linroid.ketch.segment
 
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.core.file.NoOpFileAccessor
+import com.linroid.ketch.core.segment.SegmentDownloader
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.segment.SegmentCalculator
 import com.linroid.ketch.engine.FakeHttpEngine
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SegmentDownloaderTest {
+  @Test
+  fun download_oversizedChunk_doesNotWriteBeyondSegment() = runTest {
+    val engine = object : HttpEngine by FakeHttpEngine() {
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) {
+        onData(byteArrayOf(1, 2))
+        onData(byteArrayOf(3, 4, 5))
+      }
+    }
+    var written = 0
+    val file = object : FileAccessor by NoOpFileAccessor {
+      override suspend fun writeAt(offset: Long, data: ByteArray) {
+        written += data.size
+      }
+    }
+    assertFailsWith<KetchError.Unsupported> {
+      SegmentDownloader(engine, file).download(
+        "https://example.com/file", Segment(index = 0, start = 0, end = 3)
+      ) {}
+    }
+    assertEquals(2, written)
+  }
+
 
   @Test
   fun download_completesFullSegment() = runTest {

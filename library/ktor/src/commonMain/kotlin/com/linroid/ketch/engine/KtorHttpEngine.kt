@@ -12,6 +12,7 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
@@ -48,7 +49,9 @@ class KtorHttpEngine(
       }
 
       if (!response.status.isSuccess()) {
-        if (logRequests) log.e { "HTTP error ${response.status.value}: ${response.status.description}" }
+        if (logRequests) log.e {
+          "HTTP error ${response.status.value}: ${response.status.description}"
+        }
         val is429 = response.status.value == 429
         val retryAfter = if (is429) {
           parseRetryAfter(response.headers["Retry-After"])
@@ -150,15 +153,44 @@ class KtorHttpEngine(
           )
         }
 
+        val expectedBytes = range?.let { it.last - it.first + 1 }
+          ?: response.contentLength()
+        if (range != null) {
+          val validRange = when (status) {
+            HttpStatusCode.PartialContent -> matchesRange(
+              response.headers[HttpHeaders.ContentRange], range
+            )
+            // A server may ignore Range. Only a complete response starting at zero is safe.
+            HttpStatusCode.OK -> range.first == 0L &&
+              (response.contentLength() == null || response.contentLength() == expectedBytes)
+            else -> false
+          }
+          if (!validRange) {
+            throw KetchError.Unsupported(IllegalStateException("Server returned a different range"))
+          }
+        }
         val channel = response.bodyAsChannel()
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var receivedBytes = 0L
 
         while (!channel.isClosedForRead) {
           val bytesRead = channel.readAvailable(buffer)
           if (bytesRead > 0) {
+            if (expectedBytes != null && bytesRead > expectedBytes - receivedBytes) {
+              throw KetchError.Unsupported(
+                cause = IllegalStateException("Response exceeds requested length"),
+              )
+            }
+            receivedBytes += bytesRead
             val data = if (bytesRead == buffer.size) buffer else buffer.copyOf(bytesRead)
             onData(data)
           }
+        }
+        channel.closedCause?.let { throw it }
+        if (expectedBytes != null && receivedBytes != expectedBytes) {
+          throw KetchError.Network(
+            cause = IllegalStateException("Response ended before requested length"),
+          )
         }
       }
     } catch (e: CancellationException) {
@@ -177,6 +209,16 @@ class KtorHttpEngine(
 
   companion object {
     private const val DEFAULT_BUFFER_SIZE = 8192
+    private val CONTENT_RANGE = Regex("""bytes (\d+)-(\d+)/(\d+|\*)""", RegexOption.IGNORE_CASE)
+
+    private fun matchesRange(value: String?, range: LongRange): Boolean {
+      val match = value?.trim()?.let { CONTENT_RANGE.matchEntire(it) } ?: return false
+      val start = match.groupValues[1].toLongOrNull() ?: return false
+      val end = match.groupValues[2].toLongOrNull() ?: return false
+      val total = match.groupValues[3]
+      return start == range.first && end == range.last &&
+        (total == "*" || total.toLongOrNull()?.let { it > end } == true)
+    }
 
     private fun defaultClient(): HttpClient = HttpClient(defaultHttpClientEngine()) {
       install(HttpTimeout) {

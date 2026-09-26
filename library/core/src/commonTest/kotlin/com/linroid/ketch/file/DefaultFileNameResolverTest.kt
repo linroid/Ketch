@@ -7,6 +7,20 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DefaultFileNameResolverTest {
+  @Test
+  fun percentDecode_utf8_preservesMultibyteCharacters() {
+    assertEquals("中文-é-😀.txt", DefaultFileNameResolver.percentDecode(
+      "%E4%B8%AD%E6%96%87-%C3%A9-%F0%9F%98%80.txt"
+    ))
+  }
+
+  @Test
+  fun contentDisposition_extendedFilename_excludesFollowingParameters() {
+    assertEquals("中文.txt", DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename*=UTF-8'zh'%E4%B8%AD%E6%96%87.txt; size=17"
+    ))
+  }
+
 
   private val resolver = DefaultFileNameResolver()
   private val dir = "/tmp"
