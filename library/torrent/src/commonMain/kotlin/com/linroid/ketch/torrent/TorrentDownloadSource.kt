@@ -279,6 +279,7 @@ class TorrentDownloadSource(
         states[context.taskId] = state
       }
       val runtime = getEngine()
+      makeRoomForDownload(runtime)
       session = runtime.addTask(TorrentTaskSpec(context.taskId, metadata, output, selected,
         context.url.takeIf { it.startsWith("magnet:", true) },
         previous?.resumeData?.takeIf { it.isNotEmpty() }?.let(::decodeBase64), context.throttle,
@@ -325,6 +326,8 @@ class TorrentDownloadSource(
           if (!keepSeeding) {
             engine.load()?.removeTorrent(hash)
             tasks.release(context.taskId)
+          } else {
+            tasks.markSeeding(context.taskId)
           }
         }
       }
@@ -369,6 +372,7 @@ class TorrentDownloadSource(
         states[context.taskId] = state
       }
       val runtime = getEngine() as KotlinTorrentEngine
+      makeRoomForDownload(runtime)
       runtime.withV2Download(context.taskId, document, output, selected,
         checkpointEncoded = previous?.resumeData?.takeIf { it.isNotEmpty() },
         trackerTiers = sourceTrackerTiers(bytes, config.maxMetadataBytes),
@@ -423,6 +427,18 @@ class TorrentDownloadSource(
     } catch (error: CancellationException) { throw error
     } catch (error: Exception) { throw KetchError.SourceError(TYPE, error)
     } finally { tasks.release(context.taskId) }
+  }
+
+  /**
+   * Seeding is optional background work, so a new download takes the slot of the oldest seeder.
+   * Only tasks whose download already returned are evicted; a live download never sees its
+   * session stop underneath it.
+   */
+  private suspend fun makeRoomForDownload(runtime: TorrentEngine) {
+    val kotlin = runtime as? KotlinTorrentEngine ?: return
+    while (!kotlin.hasFreeSlot()) {
+      release(tasks.oldestSeeding() ?: return, null)
+    }
   }
 
   /** Stops a session that outlived its download, such as one still seeding. */

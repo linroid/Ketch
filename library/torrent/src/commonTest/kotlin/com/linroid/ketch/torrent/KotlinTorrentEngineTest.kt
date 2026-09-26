@@ -185,6 +185,43 @@ class KotlinTorrentEngineTest {
   }
 
   @Test
+  fun removeTorrent_freesSeedingSlotOutputAndAdmission() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val bytes = byteArrayOf(1, 2, 3, 4)
+        val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+          "name" to "seed", "length" to 4L, "piece length" to 4L, "pieces" to sha1Digest(bytes)))))
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-seed-slot-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        FileSystem.SYSTEM.createDirectories(root)
+        FileSystem.SYSTEM.write(root / "seed") { write(bytes) }
+        val spec = TorrentTaskSpec("seeder", metadata, (root / "seed").toString(), emptySet())
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false, maxActiveTorrents = 1,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+        try {
+          engine.start()
+          val session = engine.addTask(spec)
+          session.resume()
+          assertEquals(TorrentSessionState.SEEDING, session.state.first {
+            it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+          }, session.failure.value?.stackTraceToString())
+          assertFalse(engine.hasFreeSlot())
+          engine.removeTorrent(metadata.infoHash.hex, deleteFiles = false)
+          assertTrue(engine.hasFreeSlot())
+          assertEquals(0, engine.admittedSessionBytes)
+          assertEquals(TorrentSessionState.STOPPED, session.state.value)
+          // The output path is free again once the close has finished.
+          engine.addTask(spec.copy(taskId = "next"))
+          assertFalse(engine.hasFreeSlot())
+        } finally {
+          engine.stop()
+          FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+        }
+      }
+    }
+  }
+
+  @Test
   fun completedTorrent_acceptsNewIncomingPeerAndSeedsVerifiedBytes() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {

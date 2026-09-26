@@ -72,6 +72,7 @@ internal class KotlinTorrentEngine(
   private val mutex = Mutex()
   private val dhtMutex = Mutex()
   private val sessions = mutableMapOf<String, KotlinTorrentSession>()
+  private val closing = mutableMapOf<String, Closing>()
   private val v2Identities = mutableMapOf<String, TorrentIdentity>()
   private val outputs = mutableMapOf<String, String>()
   private val sessionLeases = mutableMapOf<String, TorrentBufferBudget.Lease>()
@@ -180,7 +181,10 @@ internal class KotlinTorrentEngine(
       if (closed) return
       closed = true
       running.store(false)
-      sessions.values.toList().also { sessions.clear(); outputs.clear(); sessionLeases.clear() }
+      // Sessions still closing elsewhere are closed again here; close() is idempotent.
+      (sessions.values + closing.values.map { it.session }).also {
+        sessions.clear(); closing.clear(); outputs.clear(); sessionLeases.clear()
+      }
     }
     withContext(NonCancellable) {
       try {
@@ -424,18 +428,12 @@ internal class KotlinTorrentEngine(
 
   override suspend fun addTask(spec: TorrentTaskSpec): KotlinTorrentSession = mutex.withLock {
     check(isRunning && !closed)
-    // Seeding is optional background work; a new download takes the oldest seeding slot.
-    while (sessions.size + v2Identities.size >= config.maxActiveTorrents) {
-      val seeding = sessions.entries.firstOrNull {
-        it.value.state.value == TorrentSessionState.SEEDING
-      } ?: break
-      removeSessionLocked(seeding.key, deleteFiles = false)
-    }
     check(sessions.size + v2Identities.size < config.maxActiveTorrents) {
       "Too many active torrents"
     }
     val hash = spec.metadata.infoHash.hex
-    check(hash !in sessions && v2Identities.values.none { it.v1 == spec.metadata.infoHash }) {
+    check(hash !in sessions && hash !in closing &&
+      v2Identities.values.none { it.v1 == spec.metadata.infoHash }) {
       "Torrent already has an active owner"
     }
     val lease = admissions.admit(spec, config)
@@ -527,7 +525,7 @@ internal class KotlinTorrentEngine(
             "Too many active torrents"
           }
           check(hash !in v2Identities &&
-            (document.identity.v1?.hex !in sessions) &&
+            (document.identity.v1?.hex !in sessions) && (document.identity.v1?.hex !in closing) &&
             v2Identities.values.none { identity ->
               identity.v1 != null && identity.v1 == document.identity.v1
             }) { "Torrent already has an active owner" }
@@ -754,16 +752,44 @@ internal class KotlinTorrentEngine(
     result
   }
 
-  override suspend fun removeTorrent(infoHash: String, deleteFiles: Boolean) {
-    mutex.withLock { removeSessionLocked(infoHash, deleteFiles) }
+  /** False when [addTask] would reject a new torrent for lack of an active slot. */
+  internal suspend fun hasFreeSlot(): Boolean = mutex.withLock {
+    sessions.size + v2Identities.size < config.maxActiveTorrents
   }
 
-  private suspend fun removeSessionLocked(infoHash: String, deleteFiles: Boolean) {
-    val session = sessions[infoHash] ?: return
-    session.close(deleteFiles)
-    sessions.remove(infoHash)
-    outputs.remove(infoHash)
-    sessionLeases.remove(infoHash)?.let(admissions::release)
+  /**
+   * Closing joins peers, a final tracker announce and optionally a recursive delete, so it runs
+   * without the engine lock. The session stops receiving peers and frees its slot at once, but
+   * keeps its output path and admission lease until every concurrent close has finished and the
+   * last one succeeded.
+   */
+  override suspend fun removeTorrent(infoHash: String, deleteFiles: Boolean) {
+    val entry = mutex.withLock {
+      val current = closing[infoHash] ?: sessions.remove(infoHash)?.let { session ->
+        Closing(session).also { closing[infoHash] = it }
+      } ?: return
+      current.also { it.users++ }
+    }
+    var closed = false
+    try {
+      withContext(NonCancellable) { entry.session.close(deleteFiles) }
+      closed = true
+    } finally {
+      withContext(NonCancellable) {
+        mutex.withLock {
+          // A failed close (such as a refused delete) stays charged and registered for a retry.
+          if (--entry.users == 0 && closed && closing[infoHash] === entry) {
+            closing.remove(infoHash)
+            outputs.remove(infoHash)
+            sessionLeases.remove(infoHash)?.let(admissions::release)
+          }
+        }
+      }
+    }
+  }
+
+  private class Closing(val session: KotlinTorrentSession) {
+    var users = 0
   }
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = downloadRate.set(bytesPerSecond)

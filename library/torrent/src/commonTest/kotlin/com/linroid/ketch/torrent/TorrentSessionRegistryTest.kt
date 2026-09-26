@@ -44,4 +44,21 @@ class TorrentSessionRegistryTest {
     }
     assertNull(registry.session("a"))
   }
+
+  @Test
+  fun oldestSeeding_onlyReturnsTasksWhoseDownloadReturned() = runTest {
+    val registry = TorrentSessionRegistry()
+    registry.reserve("downloading", "a")
+    registry.reserve("seeding-old", "b")
+    registry.reserve("seeding-new", "c")
+    assertNull(registry.oldestSeeding())
+    registry.markSeeding("seeding-new")
+    registry.markSeeding("seeding-old")
+    // Reservation order, not marking order, decides which seeder is oldest.
+    assertEquals("seeding-old", registry.oldestSeeding())
+    registry.release("seeding-old")
+    assertEquals("seeding-new", registry.oldestSeeding())
+    registry.release("seeding-new")
+    assertNull(registry.oldestSeeding())
+  }
 }

@@ -28,6 +28,13 @@ internal object MacTorrentFileSystem : ForwardingFileSystem(FileSystem.SYSTEM) {
       throw IOException("Torrent filesystem operation failed (errno=${Native.getLastError()})")
     }
   }
+  /**
+   * The 64-bit-inode `struct stat` layout, with st_mode at offset 4. On x86_64 the plain `fstat`
+   * symbol keeps the legacy 32-bit-inode layout (st_mode at offset 8); arm64 has only the new one.
+   */
+  private val fstat: String by lazy {
+    if (System.getProperty("os.arch") in setOf("x86_64", "amd64")) "fstat\$INODE64" else "fstat"
+  }
   private const val DIRECTORY = 0x100000
   private const val NOFOLLOW = 0x100
   private const val NONBLOCK = 0x4
@@ -65,7 +72,7 @@ internal object MacTorrentFileSystem : ForwardingFileSystem(FileSystem.SYSTEM) {
     checked(fd >= 0)
     try {
       Memory(144).use { attributes ->
-        checked(call("fstat", fd, attributes) == 0)
+        checked(call(fstat, fd, attributes) == 0)
         checked(attributes.getShort(4).toInt() and 0xf000 == 0x8000)
       }
       DescriptorHandle(fd, writable)
