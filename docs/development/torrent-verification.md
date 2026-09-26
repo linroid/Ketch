@@ -140,6 +140,38 @@ Security boundaries, migration behavior and explicitly deferred protocols are do
 [the support guide](../torrent.md). Treat the throughput/memory numbers as a baseline to improve,
 not a performance guarantee.
 
+### Session state memory
+
+`TorrentSessionMemoryTest` checks that session admission (`maxSessionStateBytes`) bounds the heap
+a session really retains, and is the basis for that default. Run it with
+`KETCH_TORRENT_MEMORY=1 ./gradlew :library:torrent:jvmTest --tests '*TorrentSessionMemoryTest'`;
+set `KETCH_TORRENT_MEMORY_REPORT` to a path to save the table.
+
+Each row holds five distinct torrents with 256 KiB pieces in DOWNLOADING with no peers, measured
+as used JVM heap after repeated GC against a baseline taken before any metadata is parsed. This
+covers session state only: parsed metadata and v2 piece layers, storage and scheduler indexes,
+tracker and discovery state. Piece and wire buffers belong to the transfer budget
+(`maxBufferedBytes`) and are excluded. Two runs on JDK 21 (macOS arm64) agreed within 6%:
+
+| Format | Pieces | Files | Charged / session | Retained / session | Ratio |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| v1 | 1,000 | 1 | 501 KiB | 238 KiB | 2.10 |
+| v1 | 30,000 | 1 | 6,392 KiB | 3,719 KiB | 1.72 |
+| v1 | 30,000 | 1,000 | 7,295 KiB | 4,029 KiB | 1.81 |
+| v1 | 100,000 | 1 | 20,610 KiB | 6,957 KiB | 2.96 |
+| v1 | 100,000 | 10,000 | 29,937 KiB | 16,057 KiB | 1.86 |
+| v2 | 1,000 | 1 | 1,185 KiB | 85 KiB | 13.78 |
+| v2 | 30,000 | 1 | 6,796 KiB | 1,263 KiB | 5.38 |
+| v2 | 30,000 | 1,000 | 9,702 KiB | 2,716 KiB | 3.57 |
+| v2 | 100,000 | 1 | 20,339 KiB | 4,807 KiB | 4.23 |
+| v2 | 100,000 | 10,000 | 49,616 KiB | 19,484 KiB | 2.55 |
+
+Admission is conservative in every row, so the 64 MiB default holds at most about 37 MiB of real
+session heap (64 MiB / 1.72). It admits five 30k-piece, 1,000-file torrents of either format, or
+the 100k-piece, 10k-file v2 torrent. v2 charges about 1.1 MiB of fixed per-session state sized
+for 500 peers, which dominates small torrents. These are JVM figures; ART object layouts differ,
+and transient peaks while checking or decoding a checkpoint are not sampled.
+
 The final local torrent counts were 275 JVM tests, 265 Android host tests, 266 iOS simulator tests,
 and one Android device test, with zero failures. Core counts were 203 JVM and 200 each on Android host, iOS simulator and JS. The server suite passed 42 tests. Counts include opt-in JVM fixture
 methods, which return early when their required environment variables are absent; the recorded
