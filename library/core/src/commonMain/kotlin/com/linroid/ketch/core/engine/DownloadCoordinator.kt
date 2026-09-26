@@ -26,9 +26,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/**
+ * Starts, resumes and stops download executions.
+ *
+ * @param config provides the current global configuration; each start or
+ *   resume takes a snapshot of it
+ */
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
-  private val config: DownloadConfig,
+  private val config: () -> DownloadConfig,
   private val fileNameResolver: FileNameResolver,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
   private val dispatchers: KetchDispatchers,
@@ -254,7 +260,7 @@ internal class DownloadCoordinator(
       handle = handle,
       sourceResolver = sourceResolver,
       fileNameResolver = fileNameResolver,
-      config = config,
+      config = config(),
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
     )
@@ -318,6 +324,7 @@ internal class DownloadCoordinator(
       throttle = { _ -> },
       headers = handle.request.headers,
       outputPath = outputPath,
+      config = config(),
     )
     try {
       source.cleanup(ctx, record.sourceResumeState)

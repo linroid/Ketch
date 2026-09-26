@@ -85,7 +85,7 @@ class DownloadQueueTest {
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
-      config = DownloadConfig(),
+      config = { DownloadConfig() },
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
@@ -105,7 +105,7 @@ class DownloadQueueTest {
     val dispatcher = StandardTestDispatcher(testScheduler)
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(HttpDownloadSource(FakeHttpEngine(failOnHead = true)))),
-      config = DownloadConfig(retryCount = 0),
+      config = { DownloadConfig(retryCount = 0) },
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
     )

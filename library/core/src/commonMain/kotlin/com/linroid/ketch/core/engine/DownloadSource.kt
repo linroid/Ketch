@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.ResolvedSource
 import kotlinx.coroutines.CancellationException
 
@@ -51,6 +52,20 @@ interface DownloadSource {
   ): ResolvedSource
 
   /**
+   * Resolves source metadata with the engine's current global [config].
+   * Ketch always calls this overload. Override it when the resolved
+   * metadata depends on global defaults, for example when
+   * [ResolvedSource.maxSegments] reports
+   * [DownloadConfig.maxConnectionsPerDownload]. The default ignores
+   * [config] and delegates to [resolve].
+   */
+  suspend fun resolve(
+    url: String,
+    properties: Map<String, String>,
+    config: DownloadConfig,
+  ): ResolvedSource = resolve(url, properties)
+
+  /**
    * Executes a fresh download. The source is responsible for writing
    * data via [DownloadContext.fileAccessor], reporting progress via
    * [DownloadContext.onProgress], and updating segments via
@@ -59,6 +74,13 @@ interface DownloadSource {
    * The source must respect cancellation by checking coroutine
    * context and must apply throttling via
    * [DownloadContext.throttle].
+   *
+   * Global defaults come from [DownloadContext.config]. Segmented sources
+   * should size their transfers with [DownloadContext.effectiveConnections]
+   * and follow later [DownloadContext.maxConnections] changes. After a
+   * retryable failure the engine calls this method again with the same
+   * context, so sources that can transfer from byte offsets should continue
+   * from the progress in [DownloadContext.segments] rather than restart.
    */
   suspend fun download(context: DownloadContext)
 

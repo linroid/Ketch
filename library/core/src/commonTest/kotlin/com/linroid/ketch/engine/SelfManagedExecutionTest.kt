@@ -148,7 +148,7 @@ class SelfManagedExecutionTest {
     }
     val dispatcher = StandardTestDispatcher(testScheduler)
     val coordinator = DownloadCoordinator(SourceResolver(listOf(source)),
-      DownloadConfig(saveIntervalMs = 60_000), DefaultFileNameResolver(),
+      { DownloadConfig(saveIntervalMs = 60_000) }, DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher))
     try {
       coordinator.start(handle)

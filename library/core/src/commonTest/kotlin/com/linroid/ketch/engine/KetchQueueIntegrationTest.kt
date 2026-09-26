@@ -13,6 +13,7 @@ import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CompletableDeferred
@@ -26,6 +27,7 @@ import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class KetchQueueIntegrationTest {
   @Test
@@ -157,6 +159,37 @@ class KetchQueueIntegrationTest {
     }
   }
 
+  @Test
+  fun updateConfig_downloadDefaults_applyToNewAndResumedDownloads() = runTest {
+    withKetch { ketch, source, _ ->
+      val running = ketch.download(request("running"))
+      runCurrent()
+      val directory = "/ketch-config-test"
+      ketch.updateConfig(
+        DownloadConfig(
+          defaultDirectory = directory,
+          maxConcurrentDownloads = 2,
+          maxConnectionsPerDownload = 7,
+          retryCount = 0,
+        ),
+      )
+
+      ketch.download(DownloadRequest(url = "fixture://host/fresh"))
+      runCurrent()
+      val fresh = source.contexts.getValue("fresh")
+      assertEquals(7, fresh.effectiveConnections())
+      assertEquals(resolveChildPath(directory, "fixture.bin"), fresh.outputPath)
+      // A running download keeps the configuration it started with until it resumes.
+      assertEquals(4, source.contexts.getValue("running").effectiveConnections())
+
+      running.pause()
+      running.resume()
+      runCurrent()
+      assertEquals(7, source.contexts.getValue("running").effectiveConnections())
+      assertTrue(ketch.status().system.downloadDirectory.endsWith("ketch-config-test"))
+    }
+  }
+
   private suspend fun TestScope.withKetch(
     block: suspend (Ketch, GatedSource, InMemoryTaskStore) -> Unit,
   ) {
@@ -190,6 +223,7 @@ class KetchQueueIntegrationTest {
     var maximumActive = 0
     var failNext = false
     var cleanupGate: CompletableDeferred<Unit>? = null
+    val contexts = mutableMapOf<String, DownloadContext>()
     private var active = 0
     private val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
 
@@ -208,6 +242,7 @@ class KetchQueueIntegrationTest {
       }
       active++
       maximumActive = maxOf(maximumActive, active)
+      contexts[context.url.substringAfterLast('/')] = context
       try {
         context.segments.value = listOf(Segment(index = 0, start = 0, end = 3))
         context.onProgress(0, 4)

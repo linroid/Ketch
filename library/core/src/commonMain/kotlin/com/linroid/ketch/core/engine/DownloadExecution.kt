@@ -45,6 +45,10 @@ import okio.Path.Companion.toPath
  *
  * Created by [DownloadCoordinator] for each active download and
  * discarded after the download completes, fails, or is canceled.
+ *
+ * @param config snapshot of the global configuration taken when this
+ *   execution was created; later [com.linroid.ketch.api.KetchApi.updateConfig]
+ *   calls apply to the next start or resume
  */
 internal class DownloadExecution(
   private val handle: TaskHandle,
@@ -133,7 +137,7 @@ internal class DownloadExecution(
     } else {
       source = sourceResolver.resolve(request.url)
       log.d { "Resolved source '${source.type}' for ${request.url}" }
-      resolvedUrl = downloadWithRetry { source.resolve(request.url, request.headers) }
+      resolvedUrl = downloadWithRetry { source.resolve(request.url, request.headers, config) }
     }
 
     val total = if (resolvedUrl.selectionMode == FileSelectionMode.MULTIPLE &&
@@ -438,11 +442,7 @@ internal class DownloadExecution(
     ctx: DownloadContext,
     rateLimitRemaining: Long? = null,
   ) {
-    val current = when {
-      ctx.maxConnections.value > 0 -> ctx.maxConnections.value
-      ctx.request.connections > 0 -> ctx.request.connections
-      else -> config.maxConnectionsPerDownload
-    }
+    val current = ctx.effectiveConnections()
     val reduced = if (rateLimitRemaining != null &&
       rateLimitRemaining < current
     ) {
@@ -502,6 +502,7 @@ internal class DownloadExecution(
       maxConnections = MutableStateFlow(
         request.connections.takeIf { it > 0 } ?: 0,
       ),
+      config = config,
     )
   }
 

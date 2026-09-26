@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -18,12 +19,12 @@ import kotlinx.serialization.json.Json
  *
  * Encapsulates range detection, segment calculation, and parallel
  * segment downloads. This is the default source used for all
- * HTTP/HTTPS URLs.
+ * HTTP/HTTPS URLs. Connection count and progress interval defaults come
+ * from [DownloadContext.config], so global configuration changes apply
+ * to downloads started or resumed afterwards.
  */
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
-  private val maxConnections: Int = 4,
-  private val progressIntervalMs: Long = 200,
 ) : DownloadSource {
   private val log = KetchLogger("HttpSource")
 
@@ -37,6 +38,12 @@ internal class HttpDownloadSource(
   override suspend fun resolve(
     url: String,
     properties: Map<String, String>,
+  ): ResolvedSource = resolve(url, properties, DownloadConfig.Default)
+
+  override suspend fun resolve(
+    url: String,
+    properties: Map<String, String>,
+    config: DownloadConfig,
   ): ResolvedSource {
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(url, properties)
@@ -49,7 +56,7 @@ internal class HttpDownloadSource(
       totalBytes = serverInfo.contentLength ?: -1,
       supportsResume = serverInfo.supportsResume,
       suggestedFileName = fileName,
-      maxSegments = if (serverInfo.supportsResume) maxConnections else 1,
+      maxSegments = if (serverInfo.supportsResume) config.maxConnectionsPerDownload else 1,
       metadata = buildMap {
         serverInfo.etag?.let { put(META_ETAG, it) }
         serverInfo.lastModified?.let { put(META_LAST_MODIFIED, it) }
@@ -69,7 +76,7 @@ internal class HttpDownloadSource(
 
   override suspend fun download(context: DownloadContext) {
     val resolved = context.preResolved
-      ?: resolve(context.url, context.headers)
+      ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
     if (totalBytes < 0) throw KetchError.Unsupported()
 
@@ -78,7 +85,7 @@ internal class HttpDownloadSource(
     val reset = resolved.metadata[META_RATE_LIMIT_RESET]
       ?.toLongOrNull()
     val connections = applyRateLimit(
-      effectiveConnections(context), remaining, reset,
+      context.effectiveConnections(), remaining, reset,
     )
 
     // Reuse existing segments with progress on retry (e.g., after
@@ -155,7 +162,7 @@ internal class HttpDownloadSource(
     val totalBytes = state.totalBytes
 
     val connections = applyRateLimit(
-      effectiveConnections(context),
+      context.effectiveConnections(),
       serverInfo.rateLimitRemaining,
       serverInfo.rateLimitReset,
     )
@@ -223,11 +230,6 @@ internal class HttpDownloadSource(
     return segments
   }
 
-  private val segmentHelper = SegmentedDownloadHelper(
-    progressIntervalMs = progressIntervalMs,
-    tag = "HttpSource",
-  )
-
   /**
    * Downloads segments via HTTP Range requests with dynamic
    * resegmentation support. Delegates the concurrent batch loop
@@ -238,6 +240,10 @@ internal class HttpDownloadSource(
     segments: List<Segment>,
     totalBytes: Long,
   ) {
+    val segmentHelper = SegmentedDownloadHelper(
+      progressIntervalMs = context.config.progressIntervalMs,
+      tag = "HttpSource",
+    )
     segmentHelper.downloadAll(
       context, segments, totalBytes,
     ) { segment, onProgress ->
@@ -253,22 +259,6 @@ internal class HttpDownloadSource(
       downloader.download(
         context.url, segment, context.headers, onProgress,
       )
-    }
-  }
-
-  /**
-   * Returns the number of connections to use, honoring
-   * [DownloadContext.maxConnections] override (set on rate-limit
-   * retries or dynamic adjustment), then
-   * [DownloadRequest.connections], then the engine-level
-   * [maxConnections] default.
-   */
-  private fun effectiveConnections(context: DownloadContext): Int {
-    return when {
-      context.maxConnections.value > 0 ->
-        context.maxConnections.value
-      context.request.connections > 0 -> context.request.connections
-      else -> maxConnections
     }
   }
 

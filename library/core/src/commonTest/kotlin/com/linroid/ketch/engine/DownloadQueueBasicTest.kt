@@ -76,7 +76,7 @@ class DownloadQueueBasicTest {
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
-      config = DownloadConfig(),
+      config = { DownloadConfig() },
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
