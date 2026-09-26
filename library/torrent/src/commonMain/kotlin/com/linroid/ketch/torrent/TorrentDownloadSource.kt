@@ -308,7 +308,7 @@ class TorrentDownloadSource(
           val connections = launch {
             context.maxConnections.collect { value ->
               (session as? KotlinTorrentSession)?.setConnections(
-                if (value > 0) value.coerceAtMost(512) else config.connectionsPerTorrent)
+                torrentPeerLimit(value, config.connectionsPerTorrent, MAX_V1_PEERS))
             }
           }
           try {
@@ -396,8 +396,8 @@ class TorrentDownloadSource(
             tasks.attach(context.taskId, session)
             val connections = launch {
               context.maxConnections.collect { value ->
-                session.setConnections(if (value > 0) minOf(value, 500)
-                  else minOf(config.connectionsPerTorrent, 500))
+                session.setConnections(
+                  torrentPeerLimit(value, config.connectionsPerTorrent, MAX_V2_PEERS))
               }
             }
             val clock = monotonicClock()
@@ -600,6 +600,18 @@ class TorrentDownloadSource(
 internal expect fun createTorrentEngine(
   config: TorrentConfig,
 ): TorrentEngine
+
+/** Peer caps accepted by v1 and v2 sessions. */
+internal const val MAX_V1_PEERS = 512
+internal const val MAX_V2_PEERS = 500
+
+/**
+ * Maps a task's connection setting onto its torrent peer cap. For torrents, Ketch's per-task
+ * connections count peers, not HTTP segments: a positive value is clamped to 1..[max], and 0
+ * (unset) uses [default], normally [TorrentConfig.connectionsPerTorrent].
+ */
+internal fun torrentPeerLimit(requested: Int, default: Int, max: Int): Int =
+  (if (requested > 0) requested else default).coerceIn(1, max)
 
 /**
  * Maps a torrent failure onto Ketch's retry policy. Peer, tracker and DHT failures are retried

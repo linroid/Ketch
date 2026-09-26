@@ -72,6 +72,17 @@ class TorrentDownloadSourceTest {
   }
 
   @Test
+  fun torrentPeerLimit_unsetUsesTorrentDefault_explicitValuesAreClamped() {
+    // Unset (0) never falls back to Ketch's small HTTP segment count.
+    assertEquals(100, torrentPeerLimit(0, default = 100, max = MAX_V1_PEERS))
+    assertEquals(4, torrentPeerLimit(4, default = 100, max = MAX_V1_PEERS))
+    assertEquals(512, torrentPeerLimit(100_000, default = 100, max = MAX_V1_PEERS))
+    assertEquals(500, torrentPeerLimit(100_000, default = 100, max = MAX_V2_PEERS))
+    assertEquals(500, torrentPeerLimit(0, default = 512, max = MAX_V2_PEERS))
+    assertEquals(1, torrentPeerLimit(-3, default = 0, max = MAX_V1_PEERS))
+  }
+
+  @Test
   fun torrentFailure_onlyTimeoutsAreRetryable() = runTest {
     val disk = KetchError.Disk(IOException("full"))
     assertSame(disk, torrentFailure(disk))
