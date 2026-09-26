@@ -40,13 +40,12 @@ import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -132,6 +131,8 @@ class Ketch(
   )
 
   private val tasksMutex = Mutex()
+  private val monitorMutex = Mutex()
+  private val taskMonitors = mutableMapOf<String, Job>()
   private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
 
   /** Observable list of all download tasks. */
@@ -211,31 +212,32 @@ class Ketch(
   private val taskController = object : TaskController {
     override suspend fun pause(taskId: String) {
       coordinator.pause(taskId)
+      queue.dequeue(taskId)
     }
 
     override suspend fun resume(
       handle: TaskHandle,
       destination: Destination?,
     ) {
-      val resumed = coordinator.resume(handle, destination)
-      if (!resumed) {
-        coordinator.start(handle)
+      if (handle.mutableState.value is DownloadState.Failed) {
+        coordinator.awaitCompletion(handle.taskId)
       }
+      queue.enqueue(handle, preferResume = true, destination = destination)
     }
 
     override suspend fun cancel(handle: TaskHandle) {
       val taskId = handle.taskId
       scheduler.cancel(taskId)
-      queue.dequeue(taskId)
       coordinator.cancel(handle)
+      queue.dequeue(taskId)
     }
 
     override suspend fun remove(handle: TaskHandle, deleteFiles: Boolean) {
       val taskId = handle.taskId
       log.i { "Removing task: taskId=$taskId, deleteFiles=$deleteFiles" }
       scheduler.cancel(taskId)
-      queue.dequeue(taskId)
       coordinator.cancel(handle)
+      queue.dequeue(taskId)
       if (deleteFiles) {
         try {
           coordinator.cleanup(handle)
@@ -246,6 +248,7 @@ class Ketch(
         }
       }
       taskStore.remove(taskId)
+      monitorMutex.withLock { taskMonitors.remove(taskId)?.cancel() }
       tasksMutex.withLock {
         _tasks.value = _tasks.value.filter { it.taskId != taskId }
       }
@@ -382,25 +385,21 @@ class Ketch(
     }
   }
 
-  private fun monitorTaskState(
+  private suspend fun monitorTaskState(
     taskId: String,
     stateFlow: StateFlow<DownloadState>,
   ) {
-    scope.launch {
-      val terminalState =
-        stateFlow.filterIsInstance<DownloadState>()
-          .first { it.isTerminal }
-      when (terminalState) {
-        is DownloadState.Completed ->
-          queue.onTaskCompleted(taskId)
-
-        is DownloadState.Failed ->
-          queue.onTaskFailed(taskId)
-
-        is DownloadState.Canceled ->
-          queue.onTaskCanceled(taskId)
-
-        else -> {}
+    monitorMutex.withLock {
+      taskMonitors.remove(taskId)?.cancel()
+      taskMonitors[taskId] = scope.launch {
+        stateFlow.collect { state ->
+          when (state) {
+            is DownloadState.Completed -> queue.onTaskCompleted(taskId, state)
+            is DownloadState.Failed -> queue.onTaskFailed(taskId, state)
+            is DownloadState.Canceled -> queue.onTaskCanceled(taskId, state)
+            else -> {}
+          }
+        }
       }
     }
   }

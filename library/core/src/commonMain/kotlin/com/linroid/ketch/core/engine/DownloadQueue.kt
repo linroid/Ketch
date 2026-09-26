@@ -1,12 +1,15 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.task.TaskHandle
+import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
+import kotlin.time.Clock
 
 internal class DownloadQueue(
   maxConcurrentDownloads: Int,
@@ -37,6 +40,7 @@ internal class DownloadQueue(
     val handle: TaskHandle,
     var priority: DownloadPriority = DownloadPriority.NORMAL,
     var preempted: Boolean = false,
+    val destination: Destination? = null,
   ) {
     val taskId get() = handle.taskId
   }
@@ -44,40 +48,25 @@ internal class DownloadQueue(
   suspend fun enqueue(
     handle: TaskHandle,
     preferResume: Boolean = false,
+    destination: Destination? = null,
   ) {
     mutex.withLock {
-      val host = extractHost(handle.request.url)
-      val hostCount = hostConnectionCount.getOrElse(host) { 0 }
-
+      if (queuedEntries.any { it.taskId == handle.taskId }) return
+      if (activeEntries.containsKey(handle.taskId)) {
+        if (!handle.mutableState.value.isTerminal) return
+        removeActive(handle.taskId)
+      }
+      markQueued(handle)
       val entry = QueueEntry(
         handle = handle,
         priority = handle.request.priority,
         preempted = preferResume,
+        destination = destination,
       )
-
-      if (activeEntries.size < maxConcurrent &&
-        hostCount < maxPerHost
-      ) {
-        log.i {
-          "Starting download immediately: taskId=${entry.taskId}, " +
-            "active=${activeEntries.size}/" +
-            "$maxConcurrent"
-        }
-        startTask(entry, host)
-      } else if (handle.request.priority == DownloadPriority.URGENT) {
-        tryPreemptAndStart(entry, host)
-      } else {
-        insertSorted(entry)
-        handle.mutableState.value = DownloadState.Queued
-        log.i {
-          "Download queued: taskId=${entry.taskId}, " +
-            "priority=${handle.request.priority}, " +
-            "position=${
-              queuedEntries.indexOfFirst {
-                it.taskId == entry.taskId
-              } + 1
-            }/${queuedEntries.size}"
-        }
+      insertSorted(entry)
+      promoteNext()
+      if (entry.priority == DownloadPriority.URGENT && queuedEntries.remove(entry)) {
+        tryPreemptAndStart(entry, extractHost(handle.request.url))
       }
     }
   }
@@ -117,7 +106,7 @@ internal class DownloadQueue(
     removeActive(victim.taskId)
 
     victim.preempted = true
-    victim.handle.mutableState.value = DownloadState.Queued
+    markQueued(victim.handle)
     insertSorted(victim)
 
     val hostCount = hostConnectionCount.getOrElse(host) { 0 }
@@ -140,8 +129,11 @@ internal class DownloadQueue(
     }
   }
 
-  suspend fun onTaskCompleted(taskId: String) {
+  suspend fun onTaskCompleted(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
+      if (expectedState != null &&
+        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+      ) return
       removeActive(taskId)
       log.d {
         "Task completed: taskId=$taskId, " +
@@ -152,8 +144,11 @@ internal class DownloadQueue(
     }
   }
 
-  suspend fun onTaskFailed(taskId: String) {
+  suspend fun onTaskFailed(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
+      if (expectedState != null &&
+        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+      ) return
       removeActive(taskId)
       log.d {
         "Task failed: taskId=$taskId, " +
@@ -164,8 +159,11 @@ internal class DownloadQueue(
     }
   }
 
-  suspend fun onTaskCanceled(taskId: String) {
+  suspend fun onTaskCanceled(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
+      if (expectedState != null &&
+        activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+      ) return
       removeActive(taskId)
       log.d {
         "Task canceled: taskId=$taskId, " +
@@ -252,7 +250,7 @@ internal class DownloadQueue(
     taskHostMap[entry.taskId] = host
     if (entry.preempted) {
       entry.preempted = false
-      val resumed = coordinator.resume(entry.handle)
+      val resumed = coordinator.resume(entry.handle, entry.destination)
       if (!resumed) {
         coordinator.start(entry.handle)
       }
@@ -285,6 +283,13 @@ internal class DownloadQueue(
       }
     }
     return null
+  }
+
+  private suspend fun markQueued(handle: TaskHandle) {
+    handle.record.update {
+      it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
+    }
+    handle.mutableState.value = DownloadState.Queued
   }
 
   private fun insertSorted(entry: QueueEntry) {
