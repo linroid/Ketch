@@ -50,6 +50,28 @@ class KetchQueueIntegrationTest {
   }
 
   @Test
+  fun pause_queuedTask_leavesQueueUntilResumed() = runTest {
+    withKetch { ketch, source, store ->
+      ketch.download(request("first"))
+      runCurrent()
+      val queued = ketch.download(request("second"))
+      runCurrent()
+
+      queued.pause()
+
+      assertIs<DownloadState.Paused>(queued.state.value)
+      assertEquals(TaskState.PAUSED, store.load(queued.taskId)?.state)
+      source.complete("first")
+      runCurrent()
+      // The freed slot does not start a paused task.
+      assertIs<DownloadState.Paused>(queued.state.value)
+      queued.resume()
+      runCurrent()
+      assertIs<DownloadState.Downloading>(queued.state.value)
+    }
+  }
+
+  @Test
   fun resume_respectsOccupiedQueueSlot() = runTest {
     withKetch { ketch, source, store ->
       val first = ketch.download(request("first"))

@@ -47,8 +47,9 @@ internal class RealDownloadTask(
   private val log = KetchLogger("DownloadTask")
 
   override suspend fun pause() {
-    if (mutableState.value.isActive) {
-      controller.pause(taskId)
+    val s = mutableState.value
+    if (s.isActive || s is DownloadState.Queued) {
+      controller.pause(this)
     } else {
       log.w { "Ignoring pause for taskId=$taskId in state ${mutableState.value}" }
     }

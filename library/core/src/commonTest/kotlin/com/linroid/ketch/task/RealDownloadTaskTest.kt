@@ -149,7 +149,7 @@ class RealDownloadTaskTest {
   }
 
   private object UnusedController : TaskController {
-    override suspend fun pause(taskId: String) = error("Unexpected call")
+    override suspend fun pause(handle: TaskHandle) = error("Unexpected call")
     override suspend fun resume(handle: TaskHandle, destination: Destination?) =
       error("Unexpected call")
     override suspend fun cancel(handle: TaskHandle) = error("Unexpected call")

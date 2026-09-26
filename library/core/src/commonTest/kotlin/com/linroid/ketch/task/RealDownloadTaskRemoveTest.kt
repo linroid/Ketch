@@ -23,7 +23,7 @@ class RealDownloadTaskRemoveTest {
   private class CapturingController : TaskController {
     var lastRemoveDeleteFiles: Boolean? = null
 
-    override suspend fun pause(taskId: String) = Unit
+    override suspend fun pause(handle: TaskHandle) = Unit
     override suspend fun resume(handle: TaskHandle, destination: Destination?) = Unit
     override suspend fun cancel(handle: TaskHandle) = Unit
     override suspend fun remove(handle: TaskHandle, deleteFiles: Boolean) {

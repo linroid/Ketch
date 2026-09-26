@@ -207,9 +207,27 @@ class Ketch(
   }
 
   private val taskController = object : TaskController {
-    override suspend fun pause(taskId: String) {
+    override suspend fun pause(handle: TaskHandle) {
+      val taskId = handle.taskId
       coordinator.pause(taskId)
       queue.dequeue(taskId)
+      // Stop an execution promoted between the two calls above.
+      coordinator.pause(taskId)
+      val state = handle.mutableState.value
+      if (state !is DownloadState.Queued && state !is DownloadState.Paused) return
+      // A task still waiting for a slot, or stopped before it saved any segments,
+      // must not restart on its own after a restart.
+      val record = handle.record.value
+      if (record.state != TaskState.PAUSED) {
+        handle.record.update {
+          it.copy(state = TaskState.PAUSED, updatedAt = Clock.System.now())
+        }
+      }
+      if (state is DownloadState.Queued) {
+        handle.mutableState.value = DownloadState.Paused(
+          DownloadProgress(record.segments?.sumOf { it.downloadedBytes } ?: 0L, record.totalBytes),
+        )
+      }
     }
 
     override suspend fun resume(
