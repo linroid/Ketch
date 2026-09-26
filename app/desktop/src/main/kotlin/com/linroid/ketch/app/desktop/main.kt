@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.desktop
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -13,6 +14,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.linroid.ketch.api.log.Logger
@@ -21,6 +23,7 @@ import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
+import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
@@ -32,15 +35,55 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import java.awt.Desktop
 import java.io.File
 import java.net.InetAddress
+import java.util.concurrent.Executors
 
 private val isMac = System.getProperty("os.name").startsWith("Mac")
 
-fun main() = application {
-  val configDir = remember { defaultConfigDir() }
+fun main(args: Array<String>) {
+  val configDir = defaultConfigDir()
+  val incoming = IncomingDownloads()
+  // Raised when a later launch hands over its files, to bring the window forward.
+  val focusRequests = MutableSharedFlow<Unit>(
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST,
+  )
+  // One thread keeps files in the order they were opened, off the UI thread.
+  val fileReader = Executors.newSingleThreadExecutor { task ->
+    Thread(task, "ketch-open-files").apply { isDaemon = true }
+  }
+  fun open(files: List<File>) {
+    if (files.isNotEmpty()) fileReader.execute { incoming.offerFiles(files) }
+  }
+
+  val launchFiles = fileArguments(args.toList())
+  val singleInstance = SingleInstance.acquire(
+    File(configDir),
+    launchFiles.map { it.path },
+  ) { forwarded ->
+    open(fileArguments(forwarded))
+    focusRequests.tryEmit(Unit)
+  } ?: return
+  installOpenFileHandler(::open)
+  open(launchFiles)
+
+  application {
+    KetchWindow(configDir, incoming, focusRequests, singleInstance)
+  }
+}
+
+@Composable
+private fun ApplicationScope.KetchWindow(
+  configDir: String,
+  incoming: IncomingDownloads,
+  focusRequests: Flow<Unit>,
+  singleInstance: SingleInstance,
+) {
   val instanceManager = remember {
     val configStore = FileConfigStore(
       configDir + File.separator + "config.toml",
@@ -114,7 +157,10 @@ fun main() = application {
         desktop.setPreferencesHandler { openSettings.tryEmit(Unit) }
       }
     }
-    onDispose { instanceManager.close() }
+    onDispose {
+      instanceManager.close()
+      singleInstance.close()
+    }
   }
   val windowStateStore = remember {
     WindowStateStore(File(configDir, "window.properties"))
@@ -133,7 +179,13 @@ fun main() = application {
       if (event.isOpenSettingsShortcut()) openSettings.tryEmit(Unit) else false
     },
   ) {
-    App(instanceManager, aiProviderFactory, openSettings)
+    LaunchedEffect(Unit) {
+      focusRequests.collect {
+        windowState.isMinimized = false
+        window.toFront()
+      }
+    }
+    App(instanceManager, aiProviderFactory, openSettings, incoming)
   }
 }
 

@@ -6,6 +6,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -20,8 +21,11 @@ import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
 import platform.UIKit.UIDevice
 
+/**
+ * @param incoming files opened in Ketch; the Swift app offers them from `onOpenURL`.
+ */
 @Suppress("unused", "FunctionName")
-fun MainViewController() = ComposeUIViewController {
+fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
   val instanceManager = remember {
     @Suppress("UNCHECKED_CAST")
     val docsDir = (NSSearchPathForDirectoriesInDomains(
@@ -70,5 +74,5 @@ fun MainViewController() = ComposeUIViewController {
   DisposableEffect(Unit) {
     onDispose { instanceManager.close() }
   }
-  App(instanceManager)
+  App(instanceManager, incoming = incoming)
 }

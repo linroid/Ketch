@@ -30,6 +30,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -63,6 +64,7 @@ class AppState(
   private val scope: CoroutineScope,
   val appSettings: AppSettingsController = AppSettingsController(),
   val aiSettings: AiSettingsController = AiSettingsController(),
+  private val incoming: IncomingDownloads = IncomingDownloads(),
 ) {
   private val lanServerDiscovery = LanServerDiscovery()
 
@@ -113,6 +115,10 @@ class AppState(
   )
     private set
 
+  /** The opened file the add dialog shows, or null when the user types a URL. */
+  var openedDownload by mutableStateOf<IncomingDownload.Ready?>(null)
+    private set
+
   /**
    * Handle "New Task" action. If no backend is available,
    * show the add-remote-server dialog instead.
@@ -123,6 +129,13 @@ class AppState(
     } else {
       showAddDialog = true
     }
+  }
+
+  /** Closes the add dialog; the next opened download, if one is waiting, then shows. */
+  fun closeAddDialog() {
+    resetResolveState()
+    showAddDialog = false
+    openedDownload?.let(incoming::complete)
   }
   var discoveryState by mutableStateOf<DiscoveryState>(
     DiscoveryState.Idle
@@ -147,6 +160,28 @@ class AppState(
   private var resolving: Any? = null
 
   init {
+    scope.launch {
+      // Opened files show one at a time in the add dialog, like a dropped file, and wait for a
+      // backend if none is connected. Pending files survive a recreated UI and show again.
+      combine(incoming.pending, activeInstance) { pending, instance ->
+        pending.firstOrNull() to (instance != null)
+      }.collect { (next, connected) ->
+        when {
+          next == null -> openedDownload = null
+          !connected -> showAddRemoteDialog = true
+          next != openedDownload -> {
+            openedDownload = next
+            resolveDroppedFile(DroppedFile(next.label) { next.content })
+            showAddDialog = true
+          }
+        }
+      }
+    }
+    scope.launch {
+      incoming.failures.collect {
+        errorMessage = "Couldn't open ${it.label}: ${it.message}"
+      }
+    }
     scope.launch {
       connectionState.collect { state ->
         if (state is ConnectionState.Unauthorized) {
