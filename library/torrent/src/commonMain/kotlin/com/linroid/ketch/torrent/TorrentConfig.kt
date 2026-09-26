@@ -28,7 +28,8 @@ data class TorrentConfig(
   val stateDirectory: String? = null,
   /** Bootstrap endpoints in host:port or [IPv6]:port form. */
   val dhtBootstrap: List<String> = listOf(
-    "router.bittorrent.com:6881", "router.utorrent.com:6881", "dht.transmissionbt.com:6881"
+    "router.bittorrent.com:6881", "router.utorrent.com:6881", "dht.transmissionbt.com:6881",
+    "dht.libtorrent.org:25401"
   ),
   /** Explicit policy; null preserves the legacy [enableUpload] setting. */
   val uploadPolicy: TorrentUploadPolicy? = null,
