@@ -33,4 +33,27 @@ class AppearanceConfigTest {
     )
     assertEquals(AppearanceConfig(), decoded.appearance)
   }
+
+  @Test
+  fun `theme mode round trips and defaults to following the system`() {
+    val encoded = ConfigStore.toml.encodeToString(
+      KetchConfig.serializer(),
+      KetchConfig(appearance = AppearanceConfig(theme = ThemeMode.Dark)),
+    )
+    assertTrue(encoded.contains("theme = \"dark\""), encoded)
+    val decoded = ConfigStore.toml
+      .decodeFromString(KetchConfig.serializer(), encoded)
+    assertEquals(ThemeMode.Dark, decoded.appearance.theme)
+
+    // Configs written before the theme existed keep following the system.
+    val legacy = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[appearance]
+      |accent = "harbor"
+      """.trimMargin(),
+    )
+    assertEquals(ThemeMode.System, legacy.appearance.theme)
+    assertEquals(AccentColor.Harbor, legacy.appearance.accent)
+  }
 }
