@@ -27,11 +27,13 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchCard
+import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AiDiscoverDraft
 import com.linroid.ketch.app.state.AiDiscoverState
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
 
 @Composable
@@ -181,6 +183,13 @@ private fun CandidateItem(candidate: AiCandidate, selected: Boolean, onToggle: (
         .padding(12.dp),
     ) {
       Checkbox(checked = selected, onCheckedChange = null, modifier = Modifier.padding(end = 12.dp, top = 2.dp))
+      KetchFileTypeChip(
+        fileName = candidate.fileName ?: extractFilename(candidate.url),
+        sourceUrl = candidate.url,
+        mimeType = candidate.mimeType,
+        size = 32.dp,
+        modifier = Modifier.padding(end = 12.dp),
+      )
       Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.weight(1f)) {
         Text(candidate.title.ifBlank { candidate.fileName ?: candidate.url },
           style = KetchTheme.typography.bodyLarge, color = colors.onBackground)
