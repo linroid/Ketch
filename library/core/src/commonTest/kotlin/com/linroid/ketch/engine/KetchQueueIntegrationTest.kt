@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
@@ -22,13 +23,16 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class KetchQueueIntegrationTest {
   @Test
@@ -251,6 +255,48 @@ class KetchQueueIntegrationTest {
     }
   }
 
+  @Test
+  fun reschedule_isRestoredAfterRestartAndResumesProgress() = runTest {
+    withKetch { ketch, _, store ->
+      val task = ketch.download(request("first"))
+      runCurrent()
+      val schedule = DownloadSchedule.AfterDelay(10.seconds)
+      task.reschedule(schedule)
+      runCurrent()
+      val record = assertNotNull(store.load(task.taskId))
+      assertEquals(TaskState.SCHEDULED, record.state)
+      assertEquals(schedule, record.request.schedule)
+
+      val snapshot = store.loadAll()
+      ketch.close()
+      runCurrent()
+      val restoredStore = InMemoryTaskStore()
+      snapshot.forEach { restoredStore.save(it) }
+      val dispatcher = StandardTestDispatcher(testScheduler)
+      val source = GatedSource()
+      val restored = Ketch(
+        httpEngine = FakeHttpEngine(),
+        taskStore = restoredStore,
+        config = DownloadConfig(maxConcurrentDownloads = 1, retryCount = 0),
+        additionalSources = listOf(source),
+        dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
+      )
+      try {
+        restored.start()
+        runCurrent()
+        val restoredTask = restored.tasks.value.single()
+        assertEquals(DownloadState.Scheduled(schedule), restoredTask.state.value)
+        advanceTimeBy(11.seconds)
+        runCurrent()
+        assertIs<DownloadState.Downloading>(restoredTask.state.value)
+        assertEquals(listOf("first"), source.resumed)
+      } finally {
+        restored.close()
+        runCurrent()
+      }
+    }
+  }
+
   private suspend fun TestScope.withKetch(
     block: suspend (Ketch, GatedSource, InMemoryTaskStore) -> Unit,
   ) {
@@ -285,6 +331,7 @@ class KetchQueueIntegrationTest {
     var failNext = false
     var cleanupGate: CompletableDeferred<Unit>? = null
     val contexts = mutableMapOf<String, DownloadContext>()
+    val resumed = mutableListOf<String>()
     private var active = 0
     private val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
 
@@ -315,8 +362,10 @@ class KetchQueueIntegrationTest {
       }
     }
 
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
+      resumed += context.url.substringAfterLast('/')
       download(context)
+    }
 
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
       SourceResumeState(type, "{}")
