@@ -5,9 +5,11 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.task.TaskHandle
+import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
+import kotlin.time.Clock
 
 internal class DownloadQueue(
   maxConcurrentDownloads: Int,
@@ -54,40 +56,17 @@ internal class DownloadQueue(
         if (!handle.mutableState.value.isTerminal) return
         removeActive(handle.taskId)
       }
-      handle.mutableState.value = DownloadState.Queued
-      val host = extractHost(handle.request.url)
-      val hostCount = hostConnectionCount.getOrElse(host) { 0 }
-
+      markQueued(handle)
       val entry = QueueEntry(
         handle = handle,
         priority = handle.request.priority,
         preempted = preferResume,
         destination = destination,
       )
-
-      if (activeEntries.size < maxConcurrent &&
-        hostCount < maxPerHost
-      ) {
-        log.i {
-          "Starting download immediately: taskId=${entry.taskId}, " +
-            "active=${activeEntries.size}/" +
-            "$maxConcurrent"
-        }
-        startTask(entry, host)
-      } else if (handle.request.priority == DownloadPriority.URGENT) {
-        tryPreemptAndStart(entry, host)
-      } else {
-        insertSorted(entry)
-        handle.mutableState.value = DownloadState.Queued
-        log.i {
-          "Download queued: taskId=${entry.taskId}, " +
-            "priority=${handle.request.priority}, " +
-            "position=${
-              queuedEntries.indexOfFirst {
-                it.taskId == entry.taskId
-              } + 1
-            }/${queuedEntries.size}"
-        }
+      insertSorted(entry)
+      promoteNext()
+      if (entry.priority == DownloadPriority.URGENT && queuedEntries.remove(entry)) {
+        tryPreemptAndStart(entry, extractHost(handle.request.url))
       }
     }
   }
@@ -127,7 +106,7 @@ internal class DownloadQueue(
     removeActive(victim.taskId)
 
     victim.preempted = true
-    victim.handle.mutableState.value = DownloadState.Queued
+    markQueued(victim.handle)
     insertSorted(victim)
 
     val hostCount = hostConnectionCount.getOrElse(host) { 0 }
@@ -304,6 +283,13 @@ internal class DownloadQueue(
       }
     }
     return null
+  }
+
+  private suspend fun markQueued(handle: TaskHandle) {
+    handle.record.update {
+      it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
+    }
+    handle.mutableState.value = DownloadState.Queued
   }
 
   private fun insertSorted(entry: QueueEntry) {

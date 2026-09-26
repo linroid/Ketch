@@ -13,6 +13,8 @@ import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.task.InMemoryTaskStore
+import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -28,7 +30,7 @@ import kotlin.test.assertIs
 class KetchQueueIntegrationTest {
   @Test
   fun pause_releasesSlotForQueuedDownload() = runTest {
-    withKetch { ketch, source ->
+    withKetch { ketch, source, _ ->
       val first = ketch.download(request("first"))
       runCurrent()
       val second = ketch.download(request("second"))
@@ -42,7 +44,7 @@ class KetchQueueIntegrationTest {
 
   @Test
   fun resume_respectsOccupiedQueueSlot() = runTest {
-    withKetch { ketch, source ->
+    withKetch { ketch, source, store ->
       val first = ketch.download(request("first"))
       runCurrent()
       first.pause()
@@ -51,6 +53,7 @@ class KetchQueueIntegrationTest {
       first.resume()
       runCurrent()
       assertEquals(DownloadState.Queued, first.state.value)
+      assertEquals(TaskState.QUEUED, store.load(first.taskId)?.state)
       source.complete("second")
       runCurrent()
       assertIs<DownloadState.Completed>(second.state.value)
@@ -60,8 +63,43 @@ class KetchQueueIntegrationTest {
   }
 
   @Test
+  fun resume_waitingInQueue_isRestoredAfterRestart() = runTest {
+    withKetch { ketch, _, store ->
+      val first = ketch.download(request("first"))
+      runCurrent()
+      first.pause()
+      ketch.download(request("second"))
+      runCurrent()
+      first.resume()
+      val snapshot = store.loadAll()
+      ketch.close()
+      runCurrent()
+      // Copy the records captured at shutdown, without shutdown callbacks changing them.
+      val restoredStore = InMemoryTaskStore()
+      snapshot.forEach { restoredStore.save(it) }
+      val dispatcher = StandardTestDispatcher(testScheduler)
+      val restored = Ketch(
+        httpEngine = FakeHttpEngine(),
+        taskStore = restoredStore,
+        config = DownloadConfig(maxConcurrentDownloads = 1, retryCount = 0),
+        additionalSources = listOf(GatedSource()),
+        dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
+      )
+      try {
+        restored.start()
+        runCurrent()
+        val state = restored.tasks.value.first { it.taskId == first.taskId }.state.value
+        assertIs<DownloadState.Downloading>(state)
+      } finally {
+        restored.close()
+        runCurrent()
+      }
+    }
+  }
+
+  @Test
   fun retry_failedTask_respectsQueueAndReleasesSlotAfterCompletion() = runTest {
-    withKetch { ketch, source ->
+    withKetch { ketch, source, store ->
       source.failNext = true
       val first = ketch.download(request("first"))
       runCurrent()
@@ -72,6 +110,7 @@ class KetchQueueIntegrationTest {
       val third = ketch.download(request("third"))
       runCurrent()
       assertEquals(DownloadState.Queued, first.state.value)
+      assertEquals(TaskState.QUEUED, store.load(first.taskId)?.state)
       source.complete("second")
       runCurrent()
       assertIs<DownloadState.Completed>(second.state.value)
@@ -85,7 +124,7 @@ class KetchQueueIntegrationTest {
 
   @Test
   fun cancel_waitsForTransferCleanupBeforePromotingNext() = runTest {
-    withKetch { ketch, source ->
+    withKetch { ketch, source, _ ->
       source.cleanupGate = CompletableDeferred()
       val first = ketch.download(request("first"))
       runCurrent()
@@ -103,12 +142,13 @@ class KetchQueueIntegrationTest {
 
   @Test
   fun urgent_preemptsAndLaterResumesVictim() = runTest {
-    withKetch { ketch, source ->
+    withKetch { ketch, source, store ->
       val first = ketch.download(request("first"))
       runCurrent()
       val urgent = ketch.download(request("urgent").copy(priority = DownloadPriority.URGENT))
       runCurrent()
       assertEquals(DownloadState.Queued, first.state.value)
+      assertEquals(TaskState.QUEUED, store.load(first.taskId)?.state)
       assertIs<DownloadState.Downloading>(urgent.state.value)
       source.complete("urgent")
       runCurrent()
@@ -117,17 +157,21 @@ class KetchQueueIntegrationTest {
     }
   }
 
-  private suspend fun TestScope.withKetch(block: suspend (Ketch, GatedSource) -> Unit) {
+  private suspend fun TestScope.withKetch(
+    block: suspend (Ketch, GatedSource, InMemoryTaskStore) -> Unit,
+  ) {
     val dispatcher = StandardTestDispatcher(testScheduler)
     val source = GatedSource()
+    val store = InMemoryTaskStore()
     val ketch = Ketch(
       httpEngine = FakeHttpEngine(),
+      taskStore = store,
       config = DownloadConfig(maxConcurrentDownloads = 1, retryCount = 0),
       additionalSources = listOf(source),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
     )
     try {
-      block(ketch, source)
+      block(ketch, source, store)
     } finally {
       source.cleanupGate?.complete(Unit)
       ketch.close()

@@ -23,6 +23,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -96,6 +98,34 @@ class DownloadQueueTest {
       maxConnectionsPerHost = maxPerHost,
       coordinator = coordinator,
     )
+  }
+
+  @Test
+  fun retry_beforeTerminalNotification_promotesHigherPriorityTaskFirst() = runTest {
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val coordinator = DownloadCoordinator(
+      sourceResolver = SourceResolver(listOf(HttpDownloadSource(FakeHttpEngine(failOnHead = true)))),
+      config = DownloadConfig(retryCount = 0),
+      fileNameResolver = DefaultFileNameResolver(),
+      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
+    )
+    val queue = DownloadQueue(1, 1, coordinator)
+    try {
+      val retry = createHandle("retry")
+      queue.enqueue(retry)
+      runCurrent()
+      assertIs<DownloadState.Failed>(retry.mutableState.value)
+      // Deliberately delay the terminal notification, leaving the failed entry active.
+      val high = createHandle("high", createRequest(priority = DownloadPriority.HIGH))
+      queue.enqueue(high)
+      queue.enqueue(retry, preferResume = true)
+      runCurrent()
+      assertEquals(DownloadState.Queued, retry.mutableState.value)
+      // The fake rejects HEAD: failure proves the high-priority task was started.
+      assertIs<DownloadState.Failed>(high.mutableState.value)
+    } finally {
+      coordinator.close()
+    }
   }
 
   // ---- Priority ordering tests ----
