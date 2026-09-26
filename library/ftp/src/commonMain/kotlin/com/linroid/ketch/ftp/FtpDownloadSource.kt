@@ -1,5 +1,6 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -23,18 +24,20 @@ import kotlinx.serialization.json.Json
  *
  * Register with `Ketch(additionalSources = listOf(FtpDownloadSource()))`.
  *
- * @param maxConnections default number of parallel FTP connections
- * @param progressIntervalMs minimum interval between progress reports
- * @param clientFactory factory for creating [FtpClient] instances;
- *   defaults to [RealFtpClient]. Override for testing.
+ * Global settings come from [DownloadContext.config]: the connection count
+ * follows [DownloadContext.effectiveConnections] (live override, then
+ * [com.linroid.ketch.api.DownloadRequest.connections], then
+ * [DownloadConfig.maxConnectionsPerDownload]), progress updates use
+ * [DownloadConfig.progressIntervalMs] and data reads use
+ * [DownloadConfig.bufferSize]. Servers without REST support always use a
+ * single connection. Retries after a dropped connection continue from the
+ * bytes already written.
  */
-class FtpDownloadSource(
-  private val maxConnections: Int = 4,
-  private val progressIntervalMs: Long = 200,
-) : DownloadSource {
+class FtpDownloadSource : DownloadSource {
 
-  internal var clientFactory: (FtpUrl) -> FtpClient = { url ->
-    RealFtpClient(url.host, url.port)
+  /** Creates the [FtpClient] for a URL and read buffer size. Override for testing. */
+  internal var clientFactory: (url: FtpUrl, bufferSize: Int) -> FtpClient = { url, bufferSize ->
+    RealFtpClient(url.host, url.port, bufferSize)
   }
   private val log = KetchLogger("FtpSource")
 
@@ -58,6 +61,12 @@ class FtpDownloadSource(
   override suspend fun resolve(
     url: String,
     properties: Map<String, String>,
+  ): ResolvedSource = resolve(url, properties, DownloadConfig.Default)
+
+  override suspend fun resolve(
+    url: String,
+    properties: Map<String, String>,
+    config: DownloadConfig,
   ): ResolvedSource {
     val ftpUrl = try {
       FtpUrl.parse(url)
@@ -65,7 +74,7 @@ class FtpDownloadSource(
       throw KetchError.SourceError(TYPE, e)
     }
 
-    val client = clientFactory(ftpUrl)
+    val client = clientFactory(ftpUrl, config.bufferSize)
     try {
       client.connect()
       if (ftpUrl.isTls) client.upgradeToTls()
@@ -85,7 +94,7 @@ class FtpDownloadSource(
         supportsResume = supportsRest,
         suggestedFileName = fileName,
         maxSegments = if (supportsRest && fileSize != null) {
-          maxConnections
+          config.maxConnectionsPerDownload
         } else {
           1
         },
@@ -102,7 +111,7 @@ class FtpDownloadSource(
 
   override suspend fun download(context: DownloadContext) {
     val resolved = context.preResolved
-      ?: resolve(context.url, context.headers)
+      ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
     if (totalBytes < 0) {
       log.e { "Unknown file size for ${context.url} — file may not exist" }
@@ -115,11 +124,21 @@ class FtpDownloadSource(
       )
     }
 
-    val connections = effectiveConnections(context)
+    val supportsRest = resolved.supportsResume
+    val connections = if (supportsRest) context.effectiveConnections() else 1
 
+    // A retry after a dropped connection keeps the bytes already written,
+    // like HTTP. Without REST the transfer can only restart at byte zero.
+    val existing = context.segments.value
     val segments = if (
-      resolved.supportsResume && connections > 1
+      supportsRest && existing.any { it.downloadedBytes > 0 }
     ) {
+      log.i {
+        "Reusing segments with existing progress, " +
+          "resegmenting to $connections connections"
+      }
+      SegmentCalculator.resegment(existing, connections)
+    } else if (connections > 1) {
       log.i {
         "Server supports REST. Using $connections " +
           "connections, totalBytes=$totalBytes"
@@ -132,15 +151,17 @@ class FtpDownloadSource(
 
     context.segments.value = segments
 
-    try {
-      context.fileAccessor.preallocate(totalBytes)
-    } catch (e: Exception) {
-      if (e is CancellationException) throw e
-      if (e is KetchError) throw e
-      throw KetchError.Disk(e)
+    if (existing.isEmpty()) {
+      try {
+        context.fileAccessor.preallocate(totalBytes)
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        if (e is KetchError) throw e
+        throw KetchError.Disk(e)
+      }
     }
 
-    downloadSegments(context, segments, totalBytes)
+    downloadSegments(context, segments, totalBytes, supportsRest)
   }
 
   override suspend fun resume(
@@ -157,7 +178,8 @@ class FtpDownloadSource(
     log.i { "Resuming download for taskId=${context.taskId}" }
 
     val ftpUrl = FtpUrl.parse(context.url)
-    val client = clientFactory(ftpUrl)
+    val client = clientFactory(ftpUrl, context.config.bufferSize)
+    val supportsRest: Boolean
     try {
       client.connect()
       if (ftpUrl.isTls) client.upgradeToTls()
@@ -174,6 +196,7 @@ class FtpDownloadSource(
           )
         }
       }
+      supportsRest = client.supportsRest()
     } finally {
       client.disconnect()
     }
@@ -181,15 +204,22 @@ class FtpDownloadSource(
     var segments = context.segments.value
     val totalBytes = state.totalBytes
 
-    val connections = effectiveConnections(context)
-    val incompleteCount = segments.count { !it.isComplete }
-    if (incompleteCount > 0 && connections != incompleteCount) {
-      log.i {
-        "Resegmenting for taskId=${context.taskId}: " +
-          "$incompleteCount -> $connections connections"
-      }
-      segments = SegmentCalculator.resegment(segments, connections)
+    if (!supportsRest) {
+      // Without REST every transfer starts at byte zero, so saved progress cannot be used.
+      log.w { "Server does not support REST, restarting taskId=${context.taskId} from zero" }
+      segments = SegmentCalculator.singleSegment(totalBytes)
       context.segments.value = segments
+    } else {
+      val connections = context.effectiveConnections()
+      val incompleteCount = segments.count { !it.isComplete }
+      if (incompleteCount > 0 && connections != incompleteCount) {
+        log.i {
+          "Resegmenting for taskId=${context.taskId}: " +
+            "$incompleteCount -> $connections connections"
+        }
+        segments = SegmentCalculator.resegment(segments, connections)
+        context.segments.value = segments
+      }
     }
 
     val validatedSegments = validateLocalFile(
@@ -199,7 +229,7 @@ class FtpDownloadSource(
       context.segments.value = validatedSegments
     }
 
-    downloadSegments(context, validatedSegments, totalBytes)
+    downloadSegments(context, validatedSegments, totalBytes, supportsRest)
   }
 
   private suspend fun validateLocalFile(
@@ -243,11 +273,6 @@ class FtpDownloadSource(
     return segments
   }
 
-  private val segmentHelper = SegmentedDownloadHelper(
-    progressIntervalMs = progressIntervalMs,
-    tag = "FtpSource",
-  )
-
   /**
    * Downloads segments via FTP connections with dynamic
    * resegmentation support. Delegates the concurrent batch loop
@@ -257,9 +282,14 @@ class FtpDownloadSource(
     context: DownloadContext,
     segments: List<Segment>,
     totalBytes: Long,
+    supportsRest: Boolean,
   ) {
+    val segmentHelper = SegmentedDownloadHelper(
+      progressIntervalMs = context.config.progressIntervalMs,
+      tag = "FtpSource",
+    )
     segmentHelper.downloadAll(
-      context, segments, totalBytes,
+      context, segments, totalBytes, supportsRest,
     ) { segment, onProgress ->
       downloadSegment(context, segment, onProgress)
     }
@@ -286,7 +316,7 @@ class FtpDownloadSource(
     }
 
     val ftpUrl = FtpUrl.parse(context.url)
-    val client = clientFactory(ftpUrl)
+    val client = clientFactory(ftpUrl, context.config.bufferSize)
     var downloadedBytes = segment.downloadedBytes
     val remaining = segment.totalBytes - downloadedBytes
 
@@ -372,16 +402,6 @@ class FtpDownloadSource(
    * callback loop when a segment has received all its bytes.
    */
   private class SegmentCompleteException : Exception()
-
-  private fun effectiveConnections(context: DownloadContext): Int {
-    return when {
-      context.maxConnections.value > 0 ->
-        context.maxConnections.value
-
-      context.request.connections > 0 -> context.request.connections
-      else -> maxConnections
-    }
-  }
 
   companion object {
     const val TYPE = "ftp"
