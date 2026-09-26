@@ -6,6 +6,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okio.Buffer
@@ -34,18 +35,20 @@ class PeerV2InboxTest {
         return input.readByteArray(size.toLong())
       } finally { activeReads-- }
     }
-    override suspend fun write(bytes: ByteArray) { check(!closed) }
+    val written = mutableListOf<ByteArray>()
+    override suspend fun write(bytes: ByteArray) { check(!closed); written += bytes }
     override fun close() { closed = true }
     fun add(message: PeerMessage) { input.write(PeerWire.encode(message, pieceCount = 2)) }
   }
 
-  private class Fixture(clock: () -> Long) {
+  private class Fixture(keepAliveMs: Long = 60_000, clock: () -> Long) {
     val connection = Connection()
     val budget = TorrentBufferBudget(200_000)
     val root = ByteArray(32).toByteString()
     val selector = PeerHashSelector(root, 0, 0, 2, 0)
     val hashes = PeerHashExchange(budget, { 16_385L }, timeoutMs = 10, clock = clock)
-    val transport = PeerHashTransport(connection, hashes, budget, pieceCount = 2)
+    val transport = PeerHashTransport(connection, hashes, budget, pieceCount = 2,
+      keepAliveMs = keepAliveMs, clock = clock)
     private val info = TorrentV2Info.parse(Bencode.encode(mapOf("meta version" to 2L,
       "piece length" to 16_384L, "file tree" to mapOf("a" to mapOf("" to mapOf(
         "length" to 16_385L, "pieces root" to root.toByteArray()))))))
@@ -60,6 +63,20 @@ class PeerV2InboxTest {
         val frame = assertIs<PeerV2Inbox.Event.Frame>(inbox.next()).value
         try { blocks.receive(frame) } finally { frame.close() }
       }
+    }
+  }
+
+  @Test
+  fun idleConnection_sendsKeepAlivesWhileWaiting() = runTest {
+    val f = Fixture(keepAliveMs = 1_000) { testScheduler.currentTime }
+    PeerV2Inbox.run(f.transport, f.blocks) { inbox ->
+      val next = async { inbox.next() }
+      advanceTimeBy(2_500)
+      runCurrent()
+      val keepAlive = PeerWire.encode(PeerMessage.KeepAlive)
+      assertEquals(2, f.connection.written.size)
+      assertTrue(f.connection.written.all { it.contentEquals(keepAlive) })
+      next.cancel()
     }
   }
 

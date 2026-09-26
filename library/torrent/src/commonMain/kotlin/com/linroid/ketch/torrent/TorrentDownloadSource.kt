@@ -124,8 +124,16 @@ class TorrentDownloadSource(
           val bytes = (getEngine() as KotlinTorrentEngine).fetchV2Metadata(url, privacy)
           return requireNotNull(resolveV2Metainfo(url, bytes, config, privacy))
         }
-        getEngine().fetchMetadata(url, privacy) ?: throw KetchError.Network(
+        val fetched = getEngine().fetchMetadata(url, privacy) ?: throw KetchError.Network(
           Exception("Torrent metadata resolution timed out"))
+        if (!isHybridInfo(fetched.infoBytes)) fetched else {
+          // A btih-only magnet found a hybrid torrent. Its v2 identity keys the task, so fetch
+          // the piece layers under that topic instead of mixing v1 and v2 hashes.
+          val v2Hash = V2InfoHash.fromBytes(sha256Digest(fetched.infoBytes))
+          val bytes = (getEngine() as KotlinTorrentEngine)
+            .fetchV2Metadata("$url&xt=urn:btmh:${v2Hash.multihash()}", privacy)
+          return requireNotNull(resolveV2Metainfo(url, bytes, config, privacy))
+        }
       } else {
         val bytes = if (url.startsWith("https://", true) || url.startsWith("http://", true)) {
           http.fetch(url, config.maxMetadataBytes, headers = properties)
@@ -417,6 +425,16 @@ class TorrentDownloadSource(
     } finally { tasks.release(context.taskId) }
   }
 
+  /** Stops a session that outlived its download, such as one still seeding. */
+  override suspend fun release(taskId: String, resumeState: SourceResumeState?) {
+    val session = tasks.session(taskId) ?: return
+    try {
+      engine.load()?.removeTorrent(session.infoHash)
+    } finally {
+      tasks.release(taskId)
+    }
+  }
+
   override suspend fun cleanup(context: DownloadContext, resumeState: SourceResumeState?) {
     if (resumeState == null) return
     try {
@@ -518,3 +536,6 @@ internal fun encodeBase64(data: ByteArray): String = Base64.Default.encode(data)
 
 /** Platform-specific base64 decoding. */
 internal fun decodeBase64(data: String): ByteArray = Base64.Default.decode(data)
+
+private fun isHybridInfo(infoBytes: ByteArray): Boolean = infoBytes.isNotEmpty() &&
+  Bencode.parse(infoBytes, infoBytes.size)["meta version"]?.integer == 2L

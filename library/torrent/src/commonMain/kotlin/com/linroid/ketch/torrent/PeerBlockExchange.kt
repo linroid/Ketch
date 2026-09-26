@@ -6,6 +6,9 @@ import kotlinx.coroutines.withTimeout
  * One actor owns this v2 download pipeline and its transport. The session admits availability
  * state before construction; pending/delivered blocks retain their own buffer reservations.
  * A separate reader hands frames to receive. The actor must schedule expire at nextDeadlineMs.
+ *
+ * The Fast extension (BEP 6) is not negotiated, so a CHOKE silently discards every outstanding
+ * request (BEP 3). The actor collects those with [takeDropped] and returns them to the scheduler.
  */
 internal class PeerBlockExchange(
   private val layout: TorrentContentLayout,
@@ -43,9 +46,10 @@ internal class PeerBlockExchange(
     require(maxPending in 1..256 && timeoutMs in 1..180_000)
   }
   private var protocol: PeerProtocolState? = PeerProtocolState(
-    layout.pieceCount.toInt(), maxPending, explicitRejects = true)
+    layout.pieceCount.toInt(), maxPending)
   private val state: PeerProtocolState get() = checkNotNull(protocol)
   private val pending = mutableMapOf<PeerMessage.Request, Pending>()
+  private val dropped = mutableListOf<Response.Rejected>()
   private val identity = Any()
   private var closed = false
   var localInterested: Boolean = false
@@ -159,7 +163,10 @@ internal class PeerBlockExchange(
     return result
   }
 
-  /** Caller closes the frame after dispatch; delivered blocks own separate retained credit. */
+  /**
+   * Caller closes the frame after dispatch; delivered blocks own separate retained credit. Null
+   * means an ordinary update, including a late block for a request that a CHOKE already dropped.
+   */
   fun receive(frame: PeerHashTransport.Frame): Response? {
     try {
       checkLive()
@@ -170,9 +177,23 @@ internal class PeerBlockExchange(
         is PeerMessage.Reject -> PeerMessage.Request(message.index, message.begin, message.length)
         else -> null
       }
+      // Tolerate a Reject for a live request even though Fast was never negotiated.
+      if (message is PeerMessage.Reject && request in pending) state.cancel(checkNotNull(request))
       val accepted = state.received(message)
+      if (message is PeerMessage.Control && message.signal == PeerMessage.Signal.CHOKE) {
+        for (value in pending.values) {
+          value.lease.close()
+          dropped += Response.Rejected(value.ticket)
+        }
+        pending.clear()
+      }
       if (request == null) return null
-      val value = checkNotNull(pending.remove(request)) { "Missing block request ownership" }
+      val value = pending.remove(request) ?: run {
+        // The protocol state remembers requests dropped by CHOKE or cancel; anything else is
+        // unsolicited and has already failed there.
+        check(!accepted) { "Missing block request ownership" }
+        return null
+      }
       if (message is PeerMessage.Piece && accepted) {
         return Response.Block(value.ticket, message.bytes, value.lease)
       }
@@ -184,6 +205,9 @@ internal class PeerBlockExchange(
       throw error
     }
   }
+
+  /** Requests the peer discarded by choking us; each must be returned to the scheduler. */
+  fun takeDropped(): List<Response.Rejected> = dropped.toList().also { dropped.clear() }
 
   /** A timed-out request cannot be forgotten on a reusable v2 stream; tear down the connection. */
   fun expire(): Boolean {

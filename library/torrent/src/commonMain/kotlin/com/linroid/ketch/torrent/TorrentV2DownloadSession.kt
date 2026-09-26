@@ -176,7 +176,8 @@ internal class TorrentV2DownloadSession private constructor(
         ) { dialer ->
           TorrentV2CommitWorker.run(store) { worker ->
             TorrentV2SessionLoop.download(layout, selected, store, pool, worker, buffers, memory,
-              maxPeers = limit, connections = dialer.connections, onProgress = ::updateProgress,
+              maxPeers = limit, maxActive = activePieces(layout, buffers),
+              connections = dialer.connections, onProgress = ::updateProgress,
               requestDelay = { bytes, admit ->
                 if (!admitted(bytes)) 50L else globalRate.requestDelay(bytes, downloadRate) {
                   admit().also { sent -> if (sent) credits.update { it - bytes } }
@@ -281,3 +282,10 @@ internal class TorrentV2DownloadSession private constructor(
     }
   }
 }
+
+/**
+ * Pieces assembled at once across the swarm. Piece buffers come from the transfer budget, which
+ * still gates each start, so this only bounds per-piece scheduler state.
+ */
+internal fun activePieces(layout: TorrentContentLayout, buffers: TorrentBufferBudget): Int =
+  (buffers.capacity / layout.pieceLength).coerceIn(2L, 64L).toInt()

@@ -1,11 +1,13 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -52,7 +54,10 @@ internal class KotlinTorrentEngine(
   }
 
   private val runtimeContext = RuntimeContext()
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + runtimeContext)
+  private val log = KetchLogger("TorrentEngine")
+  // Background work must never take down the host process; failures are contained per task.
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + runtimeContext +
+    CoroutineExceptionHandler { _, error -> log.e(error) { "Torrent background task failed" } })
   private val shutdown = AtomicReference<Deferred<Unit>?>(null)
   private val network = TorrentConnectionBudget(rawNetwork, config.maxConnections)
   private val exchangeBudgets = TorrentExchangeBudgets(config)
@@ -98,8 +103,20 @@ internal class KotlinTorrentEngine(
 
   private fun accept(listener: TorrentListener) = scope.launch {
     try {
+      var backoffMs = 0L
       while (isActive) {
-        val connection = listener.accept()
+        // Aborted handshakes and descriptor exhaustion are transient; keep accepting.
+        val connection = try {
+          listener.accept().also { backoffMs = 0 }
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          currentCoroutineContext().ensureActive()
+          backoffMs = (backoffMs * 2).coerceIn(100, 5_000)
+          log.w(e) { "Incoming peer accept failed; retrying in ${backoffMs}ms" }
+          delay(backoffMs)
+          continue
+        }
         launch(start = CoroutineStart.ATOMIC) {
           var handedOff = false
           try {
@@ -367,7 +384,7 @@ internal class KotlinTorrentEngine(
     supervisorScope {
       launch {
         for (text in magnet.explicitPeers) {
-          resolveEndpoint(text).forEach { output.send(it) }
+          attempt { resolveEndpoint(text) }?.forEach { output.send(it) }
         }
       }
       if (magnet.trackers.isNotEmpty()) launch {
@@ -407,6 +424,13 @@ internal class KotlinTorrentEngine(
 
   override suspend fun addTask(spec: TorrentTaskSpec): KotlinTorrentSession = mutex.withLock {
     check(isRunning && !closed)
+    // Seeding is optional background work; a new download takes the oldest seeding slot.
+    while (sessions.size + v2Identities.size >= config.maxActiveTorrents) {
+      val seeding = sessions.entries.firstOrNull {
+        it.value.state.value == TorrentSessionState.SEEDING
+      } ?: break
+      removeSessionLocked(seeding.key, deleteFiles = false)
+    }
     check(sessions.size + v2Identities.size < config.maxActiveTorrents) {
       "Too many active torrents"
     }
@@ -660,7 +684,7 @@ internal class KotlinTorrentEngine(
     if (!metadata.isPrivate && spec.privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       spec.magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { text ->
-          resolveEndpoint(text).forEach { output.send(it) }
+          attempt { resolveEndpoint(text) }?.forEach { output.send(it) }
         }
       } }
       if (config.dhtEnabled) launch {
@@ -679,7 +703,11 @@ internal class KotlinTorrentEngine(
     }
 
   private suspend fun dht(): List<DhtNode> = dhtMutex.withLock {
-    nodes?.let { return@withLock it }
+    nodes?.let { current ->
+      if (current.isNotEmpty() && current.all { it.isRunning }) return@withLock current
+      // A node whose socket failed never recovers; rebind rather than lose DHT for good.
+      current.forEach { attempt { it.close() } }
+    }
     val result = mutableListOf<DhtNode>()
     for (host in listOf("0.0.0.0", "::")) {
       val node = attempt { DhtNode(network.bindUdp(PeerEndpoint(host, 0)), scope,
@@ -694,10 +722,22 @@ internal class KotlinTorrentEngine(
           DhtRoutingTable.restore(torrentSystemFileSystem.read(path) { readByteArray() })
             .second.map { it.endpoint }
         } } ?: emptyList()
-        val endpoints = config.dhtBootstrap.flatMap { attempt { resolveEndpoint(it) }
-          ?: emptyList() }.filter { (':' in it.host) == (':' in host) }
-        attempt { node.bootstrap((restored + endpoints).distinct().take(64)) }
-        while (isActive) {
+        // Resolve on every attempt: bootstrap names do not resolve while the device is offline.
+        suspend fun bootstrap() {
+          val endpoints = config.dhtBootstrap.flatMap { attempt { resolveEndpoint(it) }
+            ?: emptyList() }.filter { (':' in it.host) == (':' in host) }
+          attempt { node.bootstrap((restored + endpoints).distinct().take(64)) }
+        }
+        bootstrap()
+        var retryMs = DHT_BOOTSTRAP_RETRY_MS
+        while (isActive && node.isRunning) {
+          if (node.contactCount() == 0) {
+            delay(retryMs)
+            retryMs = (retryMs * 2).coerceAtMost(DHT_REFRESH_MS)
+            bootstrap()
+            continue
+          }
+          retryMs = DHT_BOOTSTRAP_RETRY_MS
           if (snapshot != null) attempt {
             torrentSystemFileSystem.createDirectories(checkNotNull(snapshot.parent))
             val temporary = snapshot.parent!! / "${snapshot.name}.tmp"
@@ -705,7 +745,7 @@ internal class KotlinTorrentEngine(
             torrentSystemFileSystem.write(temporary) { write(bytes) }
             torrentSystemFileSystem.atomicMove(temporary, snapshot)
           }
-          delay(15 * 60_000)
+          delay(DHT_REFRESH_MS)
           attempt { node.refresh() }
         }
       }
@@ -715,19 +755,24 @@ internal class KotlinTorrentEngine(
   }
 
   override suspend fun removeTorrent(infoHash: String, deleteFiles: Boolean) {
-    mutex.withLock {
-      val session = sessions[infoHash] ?: return@withLock
-      session.close(deleteFiles)
-      sessions.remove(infoHash)
-      outputs.remove(infoHash)
-      sessionLeases.remove(infoHash)?.let(admissions::release)
-    }
+    mutex.withLock { removeSessionLocked(infoHash, deleteFiles) }
+  }
+
+  private suspend fun removeSessionLocked(infoHash: String, deleteFiles: Boolean) {
+    val session = sessions[infoHash] ?: return
+    session.close(deleteFiles)
+    sessions.remove(infoHash)
+    outputs.remove(infoHash)
+    sessionLeases.remove(infoHash)?.let(admissions::release)
   }
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = downloadRate.set(bytesPerSecond)
   override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
   fun setConnections(value: Int) = network.set(value)
 }
+
+private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
+private const val DHT_REFRESH_MS = 15 * 60_000L
 
 private suspend fun <T> attempt(block: suspend () -> T): T? = try {
   block()

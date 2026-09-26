@@ -57,4 +57,20 @@ class TorrentRateLimiterTest {
     runCurrent()
     assertTrue(waiting.isCompleted)
   }
+
+  @Test
+  fun acquire_sustainsRatesAboveOneBlockPerPoll() = runTest {
+    val rate = 4L * 1024 * 1024
+    val global = TorrentRateLimiter(rate) { testScheduler.currentTime }
+    val task = TorrentRateLimiter(rate) { testScheduler.currentTime }
+    val start = testScheduler.currentTime
+    // 1 MiB through two stacked 4 MiB/s limits, as a torrent task's session and engine limits.
+    repeat(64) {
+      global.acquire(16_384)
+      task.acquire(16_384)
+    }
+    val elapsed = testScheduler.currentTime - start
+    // ~246 ms after the initial 16 KiB burst; a 16 KiB-per-50 ms bucket needed over 3 s.
+    assertTrue(elapsed in 200L..300L, "1 MiB at 4 MiB/s took $elapsed ms")
+  }
 }

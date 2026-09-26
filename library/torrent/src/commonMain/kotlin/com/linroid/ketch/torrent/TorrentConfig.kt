@@ -40,11 +40,14 @@ data class TorrentConfig(
    * Combined admission ceiling for buffers, metadata exchange, cache entries, and session state.
    * This is not a process RSS limit; platform allocations and caller-owned state are separate.
    */
-  val maxExchangeBytes: Int = 64 * 1024 * 1024,
+  val maxExchangeBytes: Int = 96 * 1024 * 1024,
   /** Cache retention ceiling, including conservative file/index and string allowances. */
   val maxCachedMetadataBytes: Int = 4 * 1024 * 1024,
-  /** Aggregate allowance for session metadata, indexes, checkpoint decoding, and checking. */
-  val maxSessionStateBytes: Int = 8 * 1024 * 1024,
+  /**
+   * Aggregate allowance for session metadata, indexes, checkpoint decoding, and checking. The
+   * default admits [maxActiveTorrents] torrents of roughly 30k pieces each.
+   */
+  val maxSessionStateBytes: Int = 32 * 1024 * 1024,
   /** Aggregate open payload-file ceiling. Storage waits before opening another payload handle. */
   val maxOpenPayloadFiles: Int = 32,
   /** File count ceiling applied before constructing a session's storage indexes. */

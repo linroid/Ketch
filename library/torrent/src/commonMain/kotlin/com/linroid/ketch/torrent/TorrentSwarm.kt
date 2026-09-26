@@ -64,8 +64,14 @@ internal class TorrentSwarm(
       store.verifiedPieces(), store::pieceSize, budget)
     val largestPiece = (0 until store.pieceCount).filter { store.needed(it) }
       .maxOfOrNull { store.pieceSize(it) } ?: 0
-    require(budget.capacity >= largestPiece + 256 * 1024 + store.pieceCount * 4) {
+    val peerOverhead = PEER_WIRE_BYTES + store.pieceCount * 4
+    require(budget.capacity >= largestPiece + peerOverhead) {
       "Torrent buffer limit cannot hold a piece and peer protocol state"
+    }
+    // Leave room for one claim so connected peers can never starve piece buffers entirely.
+    fun reservePeer(): TorrentBufferBudget.Lease? {
+      if (budget.capacity - budget.allocated - peerOverhead < largestPiece) return null
+      return budget.reserve(peerOverhead)
     }
     val active = mutableMapOf<PeerEndpoint, Job>()
     val attempts = linkedMapOf<PeerEndpoint, Int>()
@@ -143,7 +149,7 @@ internal class TorrentSwarm(
             pending.addLast(endpoint)
             continue
           }
-          val overhead = budget.reserve(256 * 1024 + store.pieceCount * 4) ?: run {
+          val overhead = reservePeer() ?: run {
             pending.addFirst(endpoint)
             break
           }
@@ -156,7 +162,7 @@ internal class TorrentSwarm(
         select<Unit> {
           incoming?.onReceive { connection ->
             val overhead = if (active.size < limit && connection.remote !in active) {
-              budget.reserve(256 * 1024 + store.pieceCount * 4)
+              reservePeer()
             } else null
             if (overhead == null) connection.close()
             else launchPeer(connection.remote, overhead, connection)
@@ -443,6 +449,9 @@ internal class TorrentSwarm(
       }
     }
 }
+
+/** One maximal frame plus its decode copy; piece buffers are charged separately per claim. */
+private const val PEER_WIRE_BYTES = 2 * PeerWire.MAX_FRAME_SIZE
 
 internal class TorrentStorageException(cause: IOException) :
   Exception("Torrent storage failed", cause)
