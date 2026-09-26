@@ -10,21 +10,21 @@ apps, and is persisted in `config.toml` so the CLI uses the same values.
 ## Settings page
 
 Open **Settings** from the sidebar (desktop) or the bottom bar
-(Android). The *AI discovery* card holds:
+(Android), then the **AI discovery** category. It holds:
 
 | Field | Notes |
 |-------|-------|
-| Enable AI discovery | Master switch. While discovery cannot run, the **Discover** tab is hidden from the sidebar and bottom bar — Settings is where you switch it on. |
+| AI discovery | Master switch. While discovery cannot run, the **Discover** tab is hidden from the sidebar and bottom bar — Settings is where you switch it on. |
 | Provider | OpenAI, Anthropic, Google Gemini, Ollama, or any OpenAI-compatible endpoint. |
-| API token | Required for everything except Ollama. |
+| API key | Required for everything except Ollama. |
 | Model | Blank uses the provider default (see below). |
 | Endpoint | Blank uses the provider default; required for OpenAI-compatible. |
 | Web search | None, Bing, or Google Programmable Search, plus credentials. |
 
-**Test connection** saves the form and sends a one-line prompt to the
-provider, so a wrong token or model shows up immediately instead of on
-the first search. **Save** applies the settings without restarting the
-app — the discovery engine is rebuilt in place.
+Changes are saved as you make them — there is no Save button — and the
+discovery engine is rebuilt in place, without restarting the app. **Test**
+sends a one-line prompt to the provider with the saved settings, so a
+wrong key or model shows up immediately instead of on the first search.
 
 The token is stored in plain text in the app's config file, the same way
 the server's `apiToken` is. On a shared machine, prefer an environment
@@ -101,7 +101,7 @@ Rules:
 
 The settings page judges the form the way the engine will: when a blank
 field is covered by the environment it says so under the status line,
-and **Test connection** works with the token left empty. It also works
+and **Test** works with the token left empty. It also works
 with the switch off, so you can check a key before turning discovery on.
 
 ## config.toml

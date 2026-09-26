@@ -10,6 +10,8 @@ import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.HttpDownloadSource
+import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
@@ -19,11 +21,13 @@ import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -31,6 +35,8 @@ import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -85,7 +91,7 @@ class DownloadQueueTest {
     )
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
-      config = DownloadConfig(),
+      config = { DownloadConfig() },
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
@@ -105,7 +111,7 @@ class DownloadQueueTest {
     val dispatcher = StandardTestDispatcher(testScheduler)
     val coordinator = DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(HttpDownloadSource(FakeHttpEngine(failOnHead = true)))),
-      config = DownloadConfig(retryCount = 0),
+      config = { DownloadConfig(retryCount = 0) },
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
     )
@@ -817,17 +823,180 @@ class DownloadQueueTest {
   }
 
   @Test
-  fun extractHost_noScheme_returnsInput() {
-    val host = DownloadQueue.extractHost("not-a-url")
-    assertEquals("not-a-url", host)
+  fun extractHost_noScheme_returnsNull() {
+    assertNull(DownloadQueue.extractHost("not-a-url"))
+    assertNull(DownloadQueue.extractHost("/downloads/file.zip"))
   }
 
   @Test
-  fun extractHost_ipAddress() {
-    val host = DownloadQueue.extractHost(
-      "https://192.168.1.1:8080/file",
+  fun extractHost_ftpUserInfo_usesHostNotUser() {
+    val host = DownloadQueue.extractHost("ftp://user:p%40ss@ftp.example.com:2121/file")
+    assertEquals("ftp.example.com", host)
+  }
+
+  @Test
+  fun extractHost_passwordContainsAt_usesLastAt() {
+    val host = DownloadQueue.extractHost("ftp://user:p@ss@ftp.example.com/file")
+    assertEquals("ftp.example.com", host)
+  }
+
+  @Test
+  fun extractHost_mixedCase_isLowercased() {
+    assertEquals(
+      DownloadQueue.extractHost("https://example.com/a"),
+      DownloadQueue.extractHost("HTTPS://Example.COM/b"),
     )
-    assertEquals("192.168.1.1", host)
+  }
+
+  @Test
+  fun extractHost_ipv6WithPort_stripsBracketsAndPort() {
+    assertEquals("::1", DownloadQueue.extractHost("ftp://[::1]:21/file"))
+    assertEquals("fe80::1", DownloadQueue.extractHost("http://user@[FE80::1]/file"))
+  }
+
+  @Test
+  fun extractHost_queryWithoutPath_stopsAtQuery() {
+    assertEquals("example.com", DownloadQueue.extractHost("https://example.com?next=/a"))
+  }
+
+  @Test
+  fun extractHost_hostlessUris_returnNull() {
+    assertNull(DownloadQueue.extractHost("magnet:?xt=urn:btih:abc123"))
+    assertNull(DownloadQueue.extractHost("torrent:0123456789abcdef"))
+    assertNull(DownloadQueue.extractHost("file:///home/user/file.zip"))
+    assertNull(DownloadQueue.extractHost("file://localhost/home/user/file.zip"))
+  }
+
+  @Test
+  fun perHostLimit_hostlessUris_areNotCounted() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(10, 1, coordinator)
+    try {
+      val first = createHandle("first", createRequest(url = "magnet:?xt=urn:btih:aaa"))
+      val second = createHandle("second", createRequest(url = "magnet:?xt=urn:btih:bbb"))
+      queue.enqueue(first)
+      queue.enqueue(second)
+      runCurrent()
+      // Both started: without a torrent source they fail instead of waiting in the queue.
+      assertIs<DownloadState.Failed>(first.mutableState.value)
+      assertIs<DownloadState.Failed>(second.mutableState.value)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun perHostLimit_differentUserInfoAndPort_sharesHostLimit() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(10, 1, coordinator)
+    try {
+      queue.enqueue(createHandle("alice", createRequest(url = "https://alice@Example.com/a")))
+      val bob = createHandle("bob", createRequest(url = "https://bob@example.com:8443/b"))
+      queue.enqueue(bob)
+      runCurrent()
+      assertEquals(listOf("https://alice@Example.com/a"), engine.probed)
+      assertEquals(DownloadState.Queued, bob.mutableState.value)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun updateLimits_raisedConcurrency_promotesQueuedTasks() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(1, 0, coordinator)
+    try {
+      val handles = listOf("a", "b", "c").map {
+        createHandle(it, createRequest(url = "https://$it.example.com/file"))
+      }
+      handles.forEach { queue.enqueue(it) }
+      runCurrent()
+      assertEquals(1, engine.probed.size)
+
+      queue.updateLimits(maxConcurrentDownloads = 3, maxConnectionsPerHost = 0)
+      runCurrent()
+
+      assertEquals(3, engine.probed.size)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun updateLimits_raisedPerHostLimit_promotesSameHostTask() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(10, 1, coordinator)
+    try {
+      queue.enqueue(createHandle("first", createRequest(url = "https://example.com/1")))
+      queue.enqueue(createHandle("second", createRequest(url = "https://example.com/2")))
+      runCurrent()
+      assertEquals(listOf("https://example.com/1"), engine.probed)
+
+      queue.updateLimits(maxConcurrentDownloads = 10, maxConnectionsPerHost = 2)
+      runCurrent()
+
+      assertEquals(listOf("https://example.com/1", "https://example.com/2"), engine.probed)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun updateLimits_lowered_keepsRunningTasksAndHoldsQueue() = runTest {
+    val engine = BlockingHeadEngine()
+    val coordinator = blockingCoordinator(engine)
+    val queue = DownloadQueue(2, 0, coordinator)
+    try {
+      val first = createHandle("first", createRequest(url = "https://a.example.com/1"))
+      val second = createHandle("second", createRequest(url = "https://b.example.com/2"))
+      queue.enqueue(first)
+      queue.enqueue(second)
+      runCurrent()
+
+      queue.updateLimits(maxConcurrentDownloads = 1, maxConnectionsPerHost = 0)
+      queue.enqueue(createHandle("third", createRequest(url = "https://c.example.com/3")))
+      runCurrent()
+      // Lowering the limit neither pauses nor cancels a running task.
+      assertTrue(listOf(first, second).none {
+        it.mutableState.value is DownloadState.Paused || it.mutableState.value.isTerminal
+      })
+      assertEquals(2, engine.probed.size)
+
+      queue.onTaskCompleted("first")
+      runCurrent()
+      // One task is still active, which already fills the lowered limit.
+      assertEquals(2, engine.probed.size)
+
+      queue.onTaskCompleted("second")
+      runCurrent()
+      assertEquals("https://c.example.com/3", engine.probed.last())
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  /** Records probed URLs and keeps every started download waiting in its HEAD request. */
+  private class BlockingHeadEngine : HttpEngine by FakeHttpEngine() {
+    val probed = mutableListOf<String>()
+
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
+      probed += url
+      awaitCancellation()
+    }
+  }
+
+  private fun TestScope.blockingCoordinator(engine: HttpEngine): DownloadCoordinator {
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    return DownloadCoordinator(
+      sourceResolver = SourceResolver(listOf(HttpDownloadSource(engine))),
+      config = { DownloadConfig() },
+      fileNameResolver = DefaultFileNameResolver(),
+      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
+    )
   }
 
   // ---- Multiple promotions after completion ----

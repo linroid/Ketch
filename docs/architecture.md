@@ -56,7 +56,7 @@ regardless of backend.
 KetchApi
   |-- tasks: StateFlow<List<DownloadTask>>
   |-- download(request): DownloadTask
-  |-- setGlobalSpeedLimit(limit)
+  |-- updateConfig(config)
   |-- resolveUrl(url): ResolvedUrl
   |-- close()
 ```
@@ -168,8 +168,8 @@ Global SpeedLimiter (shared across all tasks)
         |-- tokens consumed = min(task budget, global budget)
 ```
 
-Set via `KetchApi.setGlobalSpeedLimit()` (global) or `DownloadTask.setSpeedLimit()`
-(per-task). Both can be changed at runtime.
+Set via `DownloadConfig.speedLimit` with `KetchApi.updateConfig()` (global) or
+`DownloadTask.setSpeedLimit()` (per-task). Both can be changed at runtime.
 
 ## Daemon Server
 

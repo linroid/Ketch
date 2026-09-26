@@ -59,27 +59,27 @@ import kotlin.uuid.Uuid
  *
  * @param httpEngine the HTTP engine for HTTP/HTTPS downloads
  * @param taskStore persistent storage for task records
- * @param config global download configuration
+ * @param config initial global download configuration; replace it at
+ *   runtime with [updateConfig]
  * @param name user-visible instance name included in [status]
  * @param fileNameResolver strategy for resolving download file names
  * @param additionalSources extra [DownloadSource] implementations
  *   (e.g., torrent, media). HTTP is always included as a fallback.
  * @param logger logging backend
  * @param dispatchers dedicated dispatchers for task management,
- *   network operations, and file I/O
+ *   network operations, and file I/O. The default pools have a fixed
+ *   size: network transfers suspend instead of blocking a thread, so the
+ *   pool size does not limit how many connections a download can use.
  */
 class Ketch(
   private val httpEngine: HttpEngine,
   private val taskStore: TaskStore = InMemoryTaskStore(),
-  private val config: DownloadConfig = DownloadConfig.Default,
+  config: DownloadConfig = DownloadConfig.Default,
   private val name: String = "Ketch",
   private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
   additionalSources: List<DownloadSource> = emptyList(),
   logger: Logger = Logger.None,
-  private val dispatchers: KetchDispatchers = KetchDispatchers(
-    networkThreads = config.maxConnectionsPerDownload,
-    ioThreads = maxOf(config.maxConnectionsPerDownload / 2, 2),
-  ),
+  private val dispatchers: KetchDispatchers = KetchDispatchers(),
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
@@ -94,11 +94,7 @@ class Ketch(
     },
   )
 
-  private val httpSource = HttpDownloadSource(
-    httpEngine = httpEngine,
-    maxConnections = config.maxConnectionsPerDownload,
-    progressIntervalMs = config.progressIntervalMs,
-  )
+  private val httpSource = HttpDownloadSource(httpEngine)
 
   private val sourceResolver = SourceResolver(
     additionalSources + httpSource,
@@ -113,7 +109,7 @@ class Ketch(
 
   private val coordinator = DownloadCoordinator(
     sourceResolver = sourceResolver,
-    config = config,
+    config = { currentConfig },
     fileNameResolver = fileNameResolver,
     globalLimiter = globalLimiter,
     dispatchers = dispatchers,
@@ -190,7 +186,7 @@ class Ketch(
   ): ResolvedSource {
     log.i { "Resolving URL: $url" }
     val source = sourceResolver.resolve(url)
-    return source.resolve(url, properties)
+    return source.resolve(url, properties, currentConfig)
   }
 
   override suspend fun resolveContent(
@@ -208,20 +204,39 @@ class Ketch(
   }
 
   override suspend fun status(): KetchStatus {
+    val config = currentConfig
     return KetchStatus(
       name = name,
       version = KetchApi.VERSION,
       revision = KetchApi.REVISION,
       uptime = startMark.elapsedNow().inWholeSeconds,
-      config = currentConfig,
+      config = config,
       system = currentSystemInfo(config.defaultDirectory ?: "downloads"),
     )
   }
 
   private val taskController = object : TaskController {
-    override suspend fun pause(taskId: String) {
+    override suspend fun pause(handle: TaskHandle) {
+      val taskId = handle.taskId
       coordinator.pause(taskId)
       queue.dequeue(taskId)
+      // Stop an execution promoted between the two calls above.
+      coordinator.pause(taskId)
+      val state = handle.mutableState.value
+      if (state !is DownloadState.Queued && state !is DownloadState.Paused) return
+      // A task still waiting for a slot, or stopped before it saved any segments,
+      // must not restart on its own after a restart.
+      val record = handle.record.value
+      if (record.state != TaskState.PAUSED) {
+        handle.record.update {
+          it.copy(state = TaskState.PAUSED, updatedAt = Clock.System.now())
+        }
+      }
+      if (state is DownloadState.Queued) {
+        handle.mutableState.value = DownloadState.Paused(
+          DownloadProgress(record.segments?.sumOf { it.downloadedBytes } ?: 0L, record.totalBytes),
+        )
+      }
     }
 
     override suspend fun resume(
@@ -420,6 +435,11 @@ class Ketch(
     }
   }
 
+  /**
+   * Replaces the global configuration. The speed limit and queue limits
+   * apply immediately; the remaining fields are snapshotted by each
+   * download when it starts or resumes. See [KetchApi.updateConfig].
+   */
   override suspend fun updateConfig(config: DownloadConfig) {
     currentConfig = config
 
@@ -435,9 +455,8 @@ class Ketch(
       globalLimiter.delegate = TokenBucket(limit.bytesPerSecond)
     }
 
-    // Apply queue config
-    queue.maxConcurrent = config.maxConcurrentDownloads
-    queue.maxPerHost = config.maxConnectionsPerHost
+    // Apply queue limits, starting queued tasks if a limit was raised
+    queue.updateLimits(config.maxConcurrentDownloads, config.maxConnectionsPerHost)
 
     log.i { "Config updated: $config" }
   }

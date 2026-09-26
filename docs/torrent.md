@@ -86,8 +86,24 @@ including a development run, hands its files to the running app instead of openi
   the session alive after completion until removed or the source is closed. `enableUpload = true`
   maps to the latter when no explicit policy is supplied.
 - Task and global download limits share Ketch's limiter with HTTP/FTP. Live connection limits
-  close excess peers. `setUploadRateLimit` and `setTaskUploadRateLimit` on the torrent source
-  control upload independently; zero means unlimited.
+  close excess peers (see [Ketch download settings](#ketch-download-settings)).
+  `setUploadRateLimit` and `setTaskUploadRateLimit` on the torrent source control upload
+  independently; zero means unlimited.
+
+## Ketch download settings
+
+Torrent tasks honor the same `DownloadConfig` and per-task settings as HTTP and FTP tasks:
+
+| Setting | Torrent behavior |
+| --- | --- |
+| Simultaneous downloads (`maxConcurrentDownloads`) | Ketch's queue starts torrents like any other task. The engine also runs at most `TorrentConfig.maxActiveTorrents` (default 5) torrents, seeding sessions included. Further started torrents wait for an engine slot instead of failing: they report as downloading at 0 bytes/s with their restored progress, can be paused or canceled at once, and start by priority, then arrival order. A seeding session yields its slot to a waiting download. |
+| Global and per-task speed limits | Applied live to verified payload on v1 and v2, through the same limiter as HTTP/FTP. The per-task limit still applies after pause and resume. |
+| Per-task connections (`DownloadRequest.connections`, `DownloadTask.setConnections`) | The task's peer cap, applied live. Values are clamped to 1..512 (v1) or 1..500 (v2), never rejected. Unset (0) uses `TorrentConfig.connectionsPerTorrent` (default 100). |
+| Connections per download (`maxConnectionsPerDownload`) | Not used: it counts HTTP segments. `TorrentConfig.maxConnections` (default 200) bounds sockets across all torrents. |
+| Priority | Ordered by Ketch's queue, and by the engine-slot wait above. |
+| Retries (`retryCount`, `retryDelayMs`) | Peer, tracker and DHT failures are retried inside the swarm without failing the task. Failures that reach the task are retried only when transient (`KetchError.Network`: metadata resolution timeouts, remote metainfo fetches, a busy listen port). Storage failures (`KetchError.Disk`), verification and protocol failures (`KetchError.SourceError`) are not retried. |
+
+Up to 16 magnet metadata fetches run at once; further magnet resolutions wait for one to finish.
 
 ### Choosing discovery privacy
 

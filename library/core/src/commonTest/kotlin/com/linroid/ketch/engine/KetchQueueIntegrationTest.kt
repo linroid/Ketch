@@ -4,15 +4,18 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CompletableDeferred
@@ -20,12 +23,16 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class KetchQueueIntegrationTest {
   @Test
@@ -39,6 +46,28 @@ class KetchQueueIntegrationTest {
       runCurrent()
       assertIs<DownloadState.Downloading>(second.state.value)
       assertEquals(1, source.maximumActive)
+    }
+  }
+
+  @Test
+  fun pause_queuedTask_leavesQueueUntilResumed() = runTest {
+    withKetch { ketch, source, store ->
+      ketch.download(request("first"))
+      runCurrent()
+      val queued = ketch.download(request("second"))
+      runCurrent()
+
+      queued.pause()
+
+      assertIs<DownloadState.Paused>(queued.state.value)
+      assertEquals(TaskState.PAUSED, store.load(queued.taskId)?.state)
+      source.complete("first")
+      runCurrent()
+      // The freed slot does not start a paused task.
+      assertIs<DownloadState.Paused>(queued.state.value)
+      queued.resume()
+      runCurrent()
+      assertIs<DownloadState.Downloading>(queued.state.value)
     }
   }
 
@@ -157,6 +186,139 @@ class KetchQueueIntegrationTest {
     }
   }
 
+  @Test
+  fun updateConfig_raisedConcurrencyLimit_startsQueuedDownload() = runTest {
+    withKetch { ketch, source, _ ->
+      ketch.download(request("first"))
+      runCurrent()
+      val second = ketch.download(request("second"))
+      runCurrent()
+      assertEquals(DownloadState.Queued, second.state.value)
+
+      ketch.updateConfig(DownloadConfig(maxConcurrentDownloads = 2, retryCount = 0))
+      runCurrent()
+
+      assertIs<DownloadState.Downloading>(second.state.value)
+      assertEquals(2, source.maximumActive)
+    }
+  }
+
+  @Test
+  fun updateConfig_downloadDefaults_applyToNewAndResumedDownloads() = runTest {
+    withKetch { ketch, source, _ ->
+      val running = ketch.download(request("running"))
+      runCurrent()
+      val directory = "/ketch-config-test"
+      ketch.updateConfig(
+        DownloadConfig(
+          defaultDirectory = directory,
+          maxConcurrentDownloads = 2,
+          maxConnectionsPerDownload = 7,
+          retryCount = 0,
+        ),
+      )
+
+      ketch.download(DownloadRequest(url = "fixture://host/fresh"))
+      runCurrent()
+      val fresh = source.contexts.getValue("fresh")
+      assertEquals(7, fresh.effectiveConnections())
+      assertEquals(resolveChildPath(directory, "fixture.bin"), fresh.outputPath)
+      // A running download keeps the configuration it started with until it resumes.
+      assertEquals(4, source.contexts.getValue("running").effectiveConnections())
+
+      running.pause()
+      running.resume()
+      runCurrent()
+      assertEquals(7, source.contexts.getValue("running").effectiveConnections())
+      assertTrue(ketch.status().system.downloadDirectory.endsWith("ketch-config-test"))
+    }
+  }
+
+  @Test
+  fun setSpeedLimitAndConnections_queuedTask_applyWhenStarted() = runTest {
+    withKetch { ketch, source, store ->
+      ketch.download(request("first"))
+      runCurrent()
+      val queued = ketch.download(request("second"))
+      runCurrent()
+
+      queued.setSpeedLimit(SpeedLimit.of(4096))
+      queued.setConnections(3)
+
+      assertEquals(SpeedLimit.of(4096), store.load(queued.taskId)?.request?.speedLimit)
+      assertEquals(3, queued.requestState.value.connections)
+      source.complete("first")
+      runCurrent()
+      val context = source.contexts.getValue("second")
+      assertEquals(3, context.effectiveConnections())
+      assertEquals(SpeedLimit.of(4096), context.request.speedLimit)
+    }
+  }
+
+  @Test
+  fun setSpeedLimitAndConnections_pausedTask_applyOnResume() = runTest {
+    withKetch { ketch, source, store ->
+      val task = ketch.download(request("first"))
+      runCurrent()
+      task.pause()
+
+      task.setSpeedLimit(SpeedLimit.of(2048))
+      task.setConnections(5)
+
+      val record = store.load(task.taskId)
+      assertEquals(SpeedLimit.of(2048), record?.request?.speedLimit)
+      assertEquals(5, record?.request?.connections)
+      assertIs<DownloadState.Paused>(task.state.value)
+      task.resume()
+      runCurrent()
+      val context = source.contexts.getValue("first")
+      assertEquals(5, context.effectiveConnections())
+      assertEquals(SpeedLimit.of(2048), context.request.speedLimit)
+    }
+  }
+
+  @Test
+  fun reschedule_isRestoredAfterRestartAndResumesProgress() = runTest {
+    withKetch { ketch, _, store ->
+      val task = ketch.download(request("first"))
+      runCurrent()
+      val schedule = DownloadSchedule.AfterDelay(10.seconds)
+      task.reschedule(schedule)
+      runCurrent()
+      val record = assertNotNull(store.load(task.taskId))
+      assertEquals(TaskState.SCHEDULED, record.state)
+      assertEquals(schedule, record.request.schedule)
+
+      val snapshot = store.loadAll()
+      ketch.close()
+      runCurrent()
+      val restoredStore = InMemoryTaskStore()
+      snapshot.forEach { restoredStore.save(it) }
+      val dispatcher = StandardTestDispatcher(testScheduler)
+      val source = GatedSource()
+      val restored = Ketch(
+        httpEngine = FakeHttpEngine(),
+        taskStore = restoredStore,
+        config = DownloadConfig(maxConcurrentDownloads = 1, retryCount = 0),
+        additionalSources = listOf(source),
+        dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
+      )
+      try {
+        restored.start()
+        runCurrent()
+        val restoredTask = restored.tasks.value.single()
+        assertEquals(DownloadState.Scheduled(schedule), restoredTask.state.value)
+        advanceTimeBy(11.seconds)
+        runCurrent()
+        assertIs<DownloadState.Downloading>(restoredTask.state.value)
+        assertEquals(listOf("first"), source.resumed)
+      } finally {
+        restored.close()
+        runCurrent()
+      }
+    }
+  }
+
   private suspend fun TestScope.withKetch(
     block: suspend (Ketch, GatedSource, InMemoryTaskStore) -> Unit,
   ) {
@@ -190,6 +352,8 @@ class KetchQueueIntegrationTest {
     var maximumActive = 0
     var failNext = false
     var cleanupGate: CompletableDeferred<Unit>? = null
+    val contexts = mutableMapOf<String, DownloadContext>()
+    val resumed = mutableListOf<String>()
     private var active = 0
     private val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
 
@@ -208,6 +372,7 @@ class KetchQueueIntegrationTest {
       }
       active++
       maximumActive = maxOf(maximumActive, active)
+      contexts[context.url.substringAfterLast('/')] = context
       try {
         context.segments.value = listOf(Segment(index = 0, start = 0, end = 3))
         context.onProgress(0, 4)
@@ -219,8 +384,10 @@ class KetchQueueIntegrationTest {
       }
     }
 
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
+    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
+      resumed += context.url.substringAfterLast('/')
       download(context)
+    }
 
     override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
       SourceResumeState(type, "{}")

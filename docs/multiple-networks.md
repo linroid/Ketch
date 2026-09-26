@@ -7,8 +7,9 @@ pause/resume, and retry settings still apply.
 
 Interface discovery and runtime selection are exposed through `KetchApi` and `RemoteKetch`.
 Desktop, Android, and CLI instances enable these controls, including through their daemon REST
-API. There is no settings UI or CLI selection flag yet. FTP and BitTorrent connections do not
-use this dispatcher.
+API. In the apps, **Settings → Network** lists the active instance's interfaces and applies the
+ticked ones immediately; there is no CLI selection flag yet. FTP and BitTorrent connections do
+not use this dispatcher.
 
 ## Configure a local or remote instance
 

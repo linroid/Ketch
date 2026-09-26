@@ -1,5 +1,6 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.ServerInfo
@@ -151,13 +152,12 @@ class RateLimitTest {
         rateLimitReset = 30,
       ),
     )
-    val source = HttpDownloadSource(
-      httpEngine = engine,
-      maxConnections = 4,
+    val source = HttpDownloadSource(httpEngine = engine)
+    val resolved = source.resolve(
+      "https://example.com/file.zip", emptyMap(), DownloadConfig(maxConnectionsPerDownload = 4),
     )
-    val resolved = source.resolve("https://example.com/file.zip")
-    // maxSegments is based on maxConnections (4), rate limit capping
-    // happens at download time, not resolve time
+    // maxSegments is based on maxConnectionsPerDownload (4), rate limit
+    // capping happens at download time, not resolve time
     assertEquals(4, resolved.maxSegments)
     // But metadata carries the rate limit info for download() to cap
     assertEquals("2", resolved.metadata["rateLimitRemaining"])

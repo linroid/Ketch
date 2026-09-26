@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -18,12 +19,12 @@ import kotlinx.serialization.json.Json
  *
  * Encapsulates range detection, segment calculation, and parallel
  * segment downloads. This is the default source used for all
- * HTTP/HTTPS URLs.
+ * HTTP/HTTPS URLs. Connection count and progress interval defaults come
+ * from [DownloadContext.config], so global configuration changes apply
+ * to downloads started or resumed afterwards.
  */
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
-  private val maxConnections: Int = 4,
-  private val progressIntervalMs: Long = 200,
 ) : DownloadSource {
   private val log = KetchLogger("HttpSource")
 
@@ -37,6 +38,12 @@ internal class HttpDownloadSource(
   override suspend fun resolve(
     url: String,
     properties: Map<String, String>,
+  ): ResolvedSource = resolve(url, properties, DownloadConfig.Default)
+
+  override suspend fun resolve(
+    url: String,
+    properties: Map<String, String>,
+    config: DownloadConfig,
   ): ResolvedSource {
     val detector = RangeSupportDetector(httpEngine)
     val serverInfo = detector.detect(url, properties)
@@ -49,7 +56,7 @@ internal class HttpDownloadSource(
       totalBytes = serverInfo.contentLength ?: -1,
       supportsResume = serverInfo.supportsResume,
       suggestedFileName = fileName,
-      maxSegments = if (serverInfo.supportsResume) maxConnections else 1,
+      maxSegments = if (serverInfo.supportsResume) config.maxConnectionsPerDownload else 1,
       metadata = buildMap {
         serverInfo.etag?.let { put(META_ETAG, it) }
         serverInfo.lastModified?.let { put(META_LAST_MODIFIED, it) }
@@ -69,7 +76,7 @@ internal class HttpDownloadSource(
 
   override suspend fun download(context: DownloadContext) {
     val resolved = context.preResolved
-      ?: resolve(context.url, context.headers)
+      ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
     if (totalBytes < 0) throw KetchError.Unsupported()
 
@@ -78,7 +85,7 @@ internal class HttpDownloadSource(
     val reset = resolved.metadata[META_RATE_LIMIT_RESET]
       ?.toLongOrNull()
     val connections = applyRateLimit(
-      effectiveConnections(context), remaining, reset,
+      rangeLimitedConnections(context, resolved.supportsResume), remaining, reset,
     )
 
     // Reuse existing segments with progress on retry (e.g., after
@@ -93,7 +100,7 @@ internal class HttpDownloadSource(
           "resegmenting to $connections connections"
       }
       SegmentCalculator.resegment(existing, connections)
-    } else if (resolved.supportsResume && connections > 1) {
+    } else if (connections > 1) {
       log.i {
         "Server supports ranges. Using $connections " +
           "connections, totalBytes=$totalBytes"
@@ -116,7 +123,7 @@ internal class HttpDownloadSource(
       }
     }
 
-    downloadSegments(context, segments, totalBytes)
+    downloadSegments(context, segments, totalBytes, resolved.supportsResume)
   }
 
   override suspend fun resume(
@@ -155,7 +162,7 @@ internal class HttpDownloadSource(
     val totalBytes = state.totalBytes
 
     val connections = applyRateLimit(
-      effectiveConnections(context),
+      rangeLimitedConnections(context, serverInfo.supportsResume),
       serverInfo.rateLimitRemaining,
       serverInfo.rateLimitReset,
     )
@@ -179,7 +186,7 @@ internal class HttpDownloadSource(
       context.segments.value = validatedSegments
     }
 
-    downloadSegments(context, validatedSegments, totalBytes)
+    downloadSegments(context, validatedSegments, totalBytes, serverInfo.supportsResume)
   }
 
   private suspend fun validateLocalFile(
@@ -223,11 +230,6 @@ internal class HttpDownloadSource(
     return segments
   }
 
-  private val segmentHelper = SegmentedDownloadHelper(
-    progressIntervalMs = progressIntervalMs,
-    tag = "HttpSource",
-  )
-
   /**
    * Downloads segments via HTTP Range requests with dynamic
    * resegmentation support. Delegates the concurrent batch loop
@@ -237,9 +239,14 @@ internal class HttpDownloadSource(
     context: DownloadContext,
     segments: List<Segment>,
     totalBytes: Long,
+    supportsRanges: Boolean,
   ) {
+    val segmentHelper = SegmentedDownloadHelper(
+      progressIntervalMs = context.config.progressIntervalMs,
+      tag = "HttpSource",
+    )
     segmentHelper.downloadAll(
-      context, segments, totalBytes,
+      context, segments, totalBytes, supportsRanges,
     ) { segment, onProgress ->
       val throttleLimiter = object : SpeedLimiter {
         override suspend fun acquire(bytes: Int) {
@@ -257,19 +264,21 @@ internal class HttpDownloadSource(
   }
 
   /**
-   * Returns the number of connections to use, honoring
-   * [DownloadContext.maxConnections] override (set on rate-limit
-   * retries or dynamic adjustment), then
-   * [DownloadRequest.connections], then the engine-level
-   * [maxConnections] default.
+   * Returns [DownloadContext.effectiveConnections], or 1 when the server
+   * does not advertise byte-range support: extra segments would need
+   * offsets such a server cannot serve.
    */
-  private fun effectiveConnections(context: DownloadContext): Int {
-    return when {
-      context.maxConnections.value > 0 ->
-        context.maxConnections.value
-      context.request.connections > 0 -> context.request.connections
-      else -> maxConnections
+  private fun rangeLimitedConnections(
+    context: DownloadContext,
+    supportsRanges: Boolean,
+  ): Int {
+    val requested = context.effectiveConnections()
+    if (supportsRanges || requested <= 1) return requested
+    log.i {
+      "Server does not support ranges, using 1 of $requested connections " +
+        "for taskId=${context.taskId}"
     }
+    return 1
   }
 
   /**

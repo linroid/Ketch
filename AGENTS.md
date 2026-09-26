@@ -124,13 +124,26 @@ cli/          # JVM CLI entry point
 
 ### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)
-- Per-host connection limits (`DownloadConfig.maxConnectionsPerHost`)
+- Per-host download limits (`DownloadConfig.maxConnectionsPerHost`), keyed by the lowercased
+  URL host; host-less URIs (magnet, `torrent:`, local files) are not counted
+- `KetchApi.updateConfig` applies queue limits immediately: raising one promotes queued
+  tasks, lowering one never interrupts running tasks
 - Priority-based ordering (`DownloadPriority`: LOW, NORMAL, HIGH, URGENT)
 - URGENT preemption: pauses lowest-priority active download to make room
 
+### Live Configuration
+- `Ketch` keeps the current `DownloadConfig`; `updateConfig` applies speed and queue limits
+  immediately, other fields (default directory, connections, retries, intervals, buffer size)
+  are snapshotted into `DownloadContext.config` when a download starts or resumes
+- Sources read defaults from `DownloadContext.config` and `DownloadContext.effectiveConnections()`
+- Per-task `setSpeedLimit` / `setConnections` / `setPriority` / `reschedule` persist to the
+  `TaskRecord` in any non-terminal state and apply live when the task is running
+
 ### Speed Limiting
-- Global speed limit via `DownloadConfig.speedLimit` or `KetchApi.setGlobalSpeedLimit()`
-- Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`
+- Global speed limit via `DownloadConfig.speedLimit`, changed at runtime with
+  `KetchApi.updateConfig()`
+- Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`;
+  it caps the task in addition to the global limit (the lower rate wins)
 - Token-bucket algorithm (`TokenBucket`) with delegating wrapper
 
 ### Download Scheduling (`DownloadScheduler`)
@@ -177,7 +190,7 @@ cli/          # JVM CLI entry point
 - LLM agent-driven discovery using Koog framework (v1.2.0)
 - Providers: OpenAI, Anthropic, Google Gemini, Ollama, any
   OpenAI-compatible endpoint (`LlmClientFactory` maps them to Koog clients)
-- Configured on the app's Settings page and persisted under `[ai]` in
+- Configured under Settings → AI discovery and persisted under `[ai]` in
   `config.toml`; blank credentials fall back to environment variables
 - The Discover destination is hidden until discovery is usable; in the
   apps the Enable switch is authoritative (an env key fills a blank token
@@ -194,11 +207,20 @@ cli/          # JVM CLI entry point
 - TOML-based configuration via ktoml library
 - `KetchConfig` root with server, download, remote, AI, and appearance sections
 - `AiSettings`: AI discovery provider, token, model, endpoint and search keys
-- `AppearanceConfig`: accent palette (app-only; CLI and server ignore it)
+- `AppearanceConfig`: accent palette and light/dark `ThemeMode` (app-only;
+  CLI and server ignore it)
 - `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`)
-- Apps edit all of it on the Settings destination: device name, appearance,
-  downloads (pushed live via `KetchApi.updateConfig`), server, AI discovery
-- `ServerConfig`: host, port, API token, CORS, mDNS
+- Apps edit it on the Settings destination, split into `SettingsCategory`
+  pages (General, Downloads, Network, Remote access, AI discovery, About).
+  Wide windows open it as an overlay dialog (also ⌘, / Ctrl+, on desktop),
+  narrow ones as a page. Changes apply as they are made; there are no Save
+  buttons
+- Downloads and Network settings belong to the active instance
+  (`InstanceSettingsController`): pushed live via `KetchApi.updateConfig` /
+  `updateNetworkInterfaces`, and saved to `config.toml` only for the
+  embedded instance
+- `ServerConfig`: host, port, API token, CORS, mDNS, `autoStart` (apps start
+  the server on launch)
 - `RemoteConfig`: pre-configured remote server connections
 - `FileConfigStore`: platform-specific file persistence via okio
 

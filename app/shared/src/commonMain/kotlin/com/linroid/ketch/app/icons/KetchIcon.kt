@@ -18,6 +18,7 @@ enum class KetchIcon(internal val data: IconData) {
   Close(IconData.strokes("M5 5l10 10", "M15 5L5 15")),
   Check(IconData.strokes("M4 10l4 4 8-8")),
   Chevron(IconData.strokes("M7 5l5 5-5 5")),
+  ChevronLeft(IconData.strokes("M13 5l-5 5 5 5")),
   ChevronDown(IconData.strokes("M5 8l5 5 5-5")),
   Search(IconData.paths(
     stroke = listOf("M9 3a6 6 0 1 0 0 12A6 6 0 0 0 9 3z", "M13.5 13.5l3 3"),
@@ -102,6 +103,18 @@ enum class KetchIcon(internal val data: IconData) {
     "M3 10h14",
     "M10 3c3 4 3 10 0 14",
     "M10 3c-3 4-3 10 0 14",
+  )),
+  Network(IconData.paths(
+    stroke = listOf(
+      "M2.5 7.5a11 11 0 0 1 15 0",
+      "M5 10.5a7 7 0 0 1 10 0",
+      "M7.5 13.5a3.5 3.5 0 0 1 5 0",
+    ),
+    fill = listOf("M10 17.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"),
+  )),
+  Info(IconData.paths(
+    stroke = listOf("M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14z", "M10 9.5v4.5"),
+    fill = listOf("M10 7.6a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"),
   )),
 }
 

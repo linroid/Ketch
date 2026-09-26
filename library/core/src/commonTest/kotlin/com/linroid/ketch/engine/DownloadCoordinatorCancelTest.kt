@@ -109,7 +109,7 @@ class DownloadCoordinatorCancelTest {
   private fun createCoordinator(source: DownloadSource): DownloadCoordinator =
     DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
-      config = DownloadConfig(),
+      config = { DownloadConfig() },
       fileNameResolver = DefaultFileNameResolver(),
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
