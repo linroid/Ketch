@@ -124,13 +124,26 @@ cli/          # JVM CLI entry point
 
 ### Queue Management (`DownloadQueue`)
 - Configurable concurrent download slots (`DownloadConfig.maxConcurrentDownloads`)
-- Per-host connection limits (`DownloadConfig.maxConnectionsPerHost`)
+- Per-host download limits (`DownloadConfig.maxConnectionsPerHost`), keyed by the lowercased
+  URL host; host-less URIs (magnet, `torrent:`, local files) are not counted
+- `KetchApi.updateConfig` applies queue limits immediately: raising one promotes queued
+  tasks, lowering one never interrupts running tasks
 - Priority-based ordering (`DownloadPriority`: LOW, NORMAL, HIGH, URGENT)
 - URGENT preemption: pauses lowest-priority active download to make room
 
+### Live Configuration
+- `Ketch` keeps the current `DownloadConfig`; `updateConfig` applies speed and queue limits
+  immediately, other fields (default directory, connections, retries, intervals, buffer size)
+  are snapshotted into `DownloadContext.config` when a download starts or resumes
+- Sources read defaults from `DownloadContext.config` and `DownloadContext.effectiveConnections()`
+- Per-task `setSpeedLimit` / `setConnections` / `setPriority` / `reschedule` persist to the
+  `TaskRecord` in any non-terminal state and apply live when the task is running
+
 ### Speed Limiting
-- Global speed limit via `DownloadConfig.speedLimit` or `KetchApi.setGlobalSpeedLimit()`
-- Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`
+- Global speed limit via `DownloadConfig.speedLimit`, changed at runtime with
+  `KetchApi.updateConfig()`
+- Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`;
+  it caps the task in addition to the global limit (the lower rate wins)
 - Token-bucket algorithm (`TokenBucket`) with delegating wrapper
 
 ### Download Scheduling (`DownloadScheduler`)

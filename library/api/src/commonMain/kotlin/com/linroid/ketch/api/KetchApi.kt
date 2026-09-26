@@ -58,12 +58,20 @@ interface KetchApi {
   suspend fun status(): KetchStatus
 
   /**
-   * Updates the runtime download configuration.
+   * Replaces the runtime download configuration.
    *
-   * Changes take effect immediately on all active downloads.
-   * For example, updating [DownloadConfig.speedLimit] adjusts
-   * the global speed limit, and updating
-   * [DownloadConfig.queue] adjusts concurrency settings.
+   * Applied immediately:
+   * - [DownloadConfig.speedLimit] throttles all active downloads.
+   * - [DownloadConfig.maxConcurrentDownloads] and [DownloadConfig.maxConnectionsPerHost]:
+   *   raising a limit starts queued downloads right away; lowering one never interrupts
+   *   running downloads, queued ones wait until enough of them finish.
+   *
+   * Applied to downloads that start or resume after the update (running downloads keep the
+   * values they started with until paused and resumed):
+   * [DownloadConfig.defaultDirectory], [DownloadConfig.maxConnectionsPerDownload],
+   * [DownloadConfig.retryCount], [DownloadConfig.retryDelayMs],
+   * [DownloadConfig.progressIntervalMs], [DownloadConfig.saveIntervalMs] and
+   * [DownloadConfig.bufferSize].
    */
   suspend fun updateConfig(config: DownloadConfig)
 
