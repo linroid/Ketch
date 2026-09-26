@@ -11,6 +11,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.instance.DiscoveredServer
@@ -20,6 +21,7 @@ import com.linroid.ketch.app.instance.LanServerDiscovery
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -136,7 +138,13 @@ class AppState(
     ResolveState.Idle
   )
     private set
-  private var resolvingUrl: String? = null
+
+  /** A dropped `.torrent` file added in place of a typed URL. */
+  var droppedFile by mutableStateOf<DroppedFile?>(null)
+    private set
+
+  /** The URL or file whose resolution [resolveState] reflects. */
+  private var resolving: Any? = null
 
   init {
     scope.launch {
@@ -154,17 +162,17 @@ class AppState(
   }
 
   fun resolveUrl(url: String) {
-    resolvingUrl = url
+    resolving = url
     resolveState = ResolveState.Resolving
     scope.launch {
       runCatching {
         activeApi.value.resolve(url)
       }.onSuccess { result ->
-        if (resolvingUrl == url) {
+        if (resolving == url) {
           resolveState = ResolveState.Resolved(result)
         }
       }.onFailure { e ->
-        if (resolvingUrl == url) {
+        if (resolving == url) {
           resolveState = ResolveState.Error(
             message = e.message ?: "Failed to resolve URL",
             cause = e,
@@ -174,8 +182,55 @@ class AppState(
     }
   }
 
+  /**
+   * Opens the add dialog for the first `.torrent` file in [files], which
+   * is then resolved by the active instance instead of a typed URL.
+   */
+  fun addDroppedFiles(files: List<DroppedFile>) {
+    val torrent = files.firstOrNull {
+      it.name.endsWith(".torrent", ignoreCase = true)
+    }
+    if (torrent == null) {
+      errorMessage = "Only .torrent files can be dropped to add a download"
+      return
+    }
+    requestAddDownload()
+    if (showAddDialog) resolveDroppedFile(torrent)
+  }
+
+  /** Reads [file] and resolves its content; also retries a failed attempt. */
+  fun resolveDroppedFile(file: DroppedFile) {
+    droppedFile = file
+    resolving = file
+    resolveState = ResolveState.Resolving
+    scope.launch {
+      runCatching {
+        val content = file.readBytes(MAX_DROPPED_FILE_BYTES)
+        activeApi.value.resolveContent(content, file.name)
+      }.onSuccess { result ->
+        if (resolving === file) {
+          resolveState = ResolveState.Resolved(result)
+        }
+      }.onFailure { e ->
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        if (resolving === file) {
+          resolveState = ResolveState.Error(
+            message = when (e) {
+              is KetchError.SourceError -> "${file.name} is not a valid torrent file"
+              is KetchError.Unsupported -> "${file.name} is not a supported file"
+              else -> e.message ?: "Failed to read ${file.name}"
+            },
+            cause = e,
+          )
+        }
+      }
+    }
+  }
+
+  /** Clears the resolved URL or dropped file. */
   fun resetResolveState() {
-    resolvingUrl = null
+    resolving = null
+    droppedFile = null
     resolveState = ResolveState.Idle
   }
 
@@ -413,5 +468,10 @@ class AppState(
 
   fun dismissError() {
     errorMessage = null
+  }
+
+  private companion object {
+    /** Matches the daemon's upload limit; torrent metainfo is 4 MiB by default. */
+    const val MAX_DROPPED_FILE_BYTES = 16L * 1024 * 1024
   }
 }

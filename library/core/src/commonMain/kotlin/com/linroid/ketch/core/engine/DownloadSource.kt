@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import kotlinx.coroutines.CancellationException
 
@@ -49,6 +50,29 @@ interface DownloadSource {
     url: String,
     properties: Map<String, String> = emptyMap(),
   ): ResolvedSource
+
+  /**
+   * Returns true if this source can resolve caller-supplied file
+   * [content] via [resolveContent]. [fileName] is the original file
+   * name, if known. The default implementation returns `false`.
+   */
+  fun canHandleContent(content: ByteArray, fileName: String?): Boolean = false
+
+  /**
+   * Resolves source metadata from caller-supplied file [content]
+   * without network access, such as the bytes of a `.torrent` file.
+   *
+   * The returned [ResolvedSource] must carry everything needed to
+   * download, because the engine passes it to [download] as
+   * [DownloadContext.preResolved] instead of calling [resolve] with
+   * [ResolvedSource.url].
+   *
+   * @param content the raw file content
+   * @param fileName the original file name, if known
+   */
+  suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource {
+    throw KetchError.Unsupported()
+  }
 
   /**
    * Executes a fresh download. The source is responsible for writing

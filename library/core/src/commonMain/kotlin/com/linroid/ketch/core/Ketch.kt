@@ -193,6 +193,15 @@ class Ketch(
     return source.resolve(url, properties)
   }
 
+  override suspend fun resolveContent(
+    content: ByteArray,
+    fileName: String?,
+  ): ResolvedSource {
+    log.i { "Resolving content: fileName=$fileName, size=${content.size}" }
+    val source = sourceResolver.resolveContent(content, fileName)
+    return source.resolveContent(content, fileName)
+  }
+
   override suspend fun start() {
     log.i { "Start" }
     loadTasks()

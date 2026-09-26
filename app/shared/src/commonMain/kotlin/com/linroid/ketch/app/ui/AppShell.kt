@@ -225,210 +225,220 @@ fun AppShell(
     NavigationSuiteType.NavigationBar
   }
 
-  NavigationSuiteScaffold(
-    navigationSuiteItems = {
-      destinations.forEach { entry ->
-        val selected = if (settingsOpen) {
-          entry == AppDestination.Settings
-        } else {
-          entry == destination
-        }
-        item(
-          label = { Text(entry.label) },
-          selected = selected,
-          onClick = {
-            if (entry == AppDestination.Settings) {
-              settingsOpen = true
-            } else {
-              destinationName = entry.name
-              settingsOpen = false
-            }
-          },
-          icon = {
-            KetchIconImage(
-              icon = entry.icon, size = 24.dp,
-              tint = if (selected) KetchTheme.colors.primary
-                else KetchTheme.colors.onSurfaceVariant,
-            )
-          },
-        )
-      }
+  FileDropTarget(
+    onDrop = { files ->
+      // Show the list the new task will appear in.
+      destinationName = AppDestination.Downloads.name
+      settingsOpen = false
+      appState.addDroppedFiles(files)
     },
-    layoutType = navLayoutType,
+    modifier = Modifier.fillMaxSize(),
   ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-      Column(modifier = Modifier.fillMaxSize()) {
-        // Expanded: sidebar + content side by side
-        Row(modifier = Modifier.weight(1f)) {
-          if (isExpanded) {
-            SidebarNavigation(
-              selectedFilter = appState.statusFilter,
-              destination = destination,
-              showDiscovery = AppDestination.Discover in destinations,
-              onDestinationSelect = { destinationName = it.name },
-              onOpenSettings = { settingsOpen = true },
-              taskCounts = taskCounts,
-              onFilterSelect = { selected ->
-                destinationName = AppDestination.Downloads.name
-                appState.statusFilter = selected
-              },
-              activeInstance = activeInstance,
-              connectionState = connectionState,
-              onInstanceClick = {
-                appState.showInstanceSelector = true
-              },
-            )
+    NavigationSuiteScaffold(
+      navigationSuiteItems = {
+        destinations.forEach { entry ->
+          val selected = if (settingsOpen) {
+            entry == AppDestination.Settings
+          } else {
+            entry == destination
           }
-
-          // Content area
-          Column(modifier = Modifier.weight(1f)) {
-            if (settingsOpen && !isExpanded) {
-              SettingsPage(sections = settingsSections, section = settingsSection)
-            } else if (destination == AppDestination.Discover) {
-              AiDiscoveryPage(
-                state = appState.aiDiscoverState,
-                draft = aiDraft,
-                onCancelSearch = { appState.resetAiDiscover() },
-                onDiscover = { query, sites -> appState.aiDiscover(query, sites) },
-                onDownloadSelected = { candidates ->
-                  appState.aiDownloadSelected(candidates)
-                  aiDraft.selected = emptySet()
+          item(
+            label = { Text(entry.label) },
+            selected = selected,
+            onClick = {
+              if (entry == AppDestination.Settings) {
+                settingsOpen = true
+              } else {
+                destinationName = entry.name
+                settingsOpen = false
+              }
+            },
+            icon = {
+              KetchIconImage(
+                icon = entry.icon, size = 24.dp,
+                tint = if (selected) KetchTheme.colors.primary
+                  else KetchTheme.colors.onSurfaceVariant,
+              )
+            },
+          )
+        }
+      },
+      layoutType = navLayoutType,
+    ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+          // Expanded: sidebar + content side by side
+          Row(modifier = Modifier.weight(1f)) {
+            if (isExpanded) {
+              SidebarNavigation(
+                selectedFilter = appState.statusFilter,
+                destination = destination,
+                showDiscovery = AppDestination.Discover in destinations,
+                onDestinationSelect = { destinationName = it.name },
+                onOpenSettings = { settingsOpen = true },
+                taskCounts = taskCounts,
+                onFilterSelect = { selected ->
                   destinationName = AppDestination.Downloads.name
-                  appState.statusFilter = StatusFilter.All
+                  appState.statusFilter = selected
+                },
+                activeInstance = activeInstance,
+                connectionState = connectionState,
+                onInstanceClick = {
+                  appState.showInstanceSelector = true
                 },
               )
-            } else {
-              if (isExpanded) {
-                KetchToolbar(
-                  title = if (appState.statusFilter == StatusFilter.All) "Downloads" else appState.statusFilter.label,
-                  downloadCount = filteredTasks.size,
-                  searchQuery = searchQuery,
-                  onSearchQueryChange = { searchQuery = it },
-                  bandwidthBytesPerSec = totalSpeed,
-                  globalCapBytesPerSec = null,
-                  hasActiveDownloads = hasActive,
-                  hasPausedDownloads = hasPaused,
-                  hasCompletedDownloads = hasCompleted,
-                  onPauseAll = { appState.pauseAll() },
-                  onResumeAll = { appState.resumeAll() },
-                  onClearCompleted = { appState.clearCompleted() },
-                  onAddClick = { appState.requestAddDownload() },
+            }
+
+            // Content area
+            Column(modifier = Modifier.weight(1f)) {
+              if (settingsOpen && !isExpanded) {
+                SettingsPage(sections = settingsSections, section = settingsSection)
+              } else if (destination == AppDestination.Discover) {
+                AiDiscoveryPage(
+                  state = appState.aiDiscoverState,
+                  draft = aiDraft,
+                  onCancelSearch = { appState.resetAiDiscover() },
+                  onDiscover = { query, sites -> appState.aiDiscover(query, sites) },
+                  onDownloadSelected = { candidates ->
+                    appState.aiDownloadSelected(candidates)
+                    aiDraft.selected = emptySet()
+                    destinationName = AppDestination.Downloads.name
+                    appState.statusFilter = StatusFilter.All
+                  },
                 )
               } else {
-                TopAppBar(
-                  title = {
-                    Text(
-                      text = if (appState.statusFilter == StatusFilter.All) "Downloads" else appState.statusFilter.label,
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.SemiBold,
-                    )
-                  },
-                  actions = {
-                    com.linroid.ketch.app.components.KetchIconButton(
-                      icon = KetchIcon.Plus,
-                      contentDescription = "Add download",
-                      onClick = { appState.requestAddDownload() },
-                      tint = KetchTheme.colors.primary,
-                    )
-                    BatchActionBar(
-                      hasActiveDownloads = hasActive,
-                      hasPausedDownloads = hasPaused,
-                      hasCompletedDownloads = hasCompleted,
-                      onPauseAll = { appState.pauseAll() },
-                      onResumeAll = { appState.resumeAll() },
-                      onClearCompleted = {
-                        appState.clearCompleted()
-                      },
-                    )
-                  },
-                  colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                  ),
-                )
-              }
+                if (isExpanded) {
+                  KetchToolbar(
+                    title = if (appState.statusFilter == StatusFilter.All) "Downloads" else appState.statusFilter.label,
+                    downloadCount = filteredTasks.size,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    bandwidthBytesPerSec = totalSpeed,
+                    globalCapBytesPerSec = null,
+                    hasActiveDownloads = hasActive,
+                    hasPausedDownloads = hasPaused,
+                    hasCompletedDownloads = hasCompleted,
+                    onPauseAll = { appState.pauseAll() },
+                    onResumeAll = { appState.resumeAll() },
+                    onClearCompleted = { appState.clearCompleted() },
+                    onAddClick = { appState.requestAddDownload() },
+                  )
+                } else {
+                  TopAppBar(
+                    title = {
+                      Text(
+                        text = if (appState.statusFilter == StatusFilter.All) "Downloads" else appState.statusFilter.label,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                      )
+                    },
+                    actions = {
+                      com.linroid.ketch.app.components.KetchIconButton(
+                        icon = KetchIcon.Plus,
+                        contentDescription = "Add download",
+                        onClick = { appState.requestAddDownload() },
+                        tint = KetchTheme.colors.primary,
+                      )
+                      BatchActionBar(
+                        hasActiveDownloads = hasActive,
+                        hasPausedDownloads = hasPaused,
+                        hasCompletedDownloads = hasCompleted,
+                        onPauseAll = { appState.pauseAll() },
+                        onResumeAll = { appState.resumeAll() },
+                        onClearCompleted = {
+                          appState.clearCompleted()
+                        },
+                      )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                      containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                  )
+                }
 
-              if (!isExpanded) {
-                com.linroid.ketch.app.components.KetchTextField(
-                  value = searchQuery, onValueChange = { searchQuery = it },
-                  placeholder = "Search downloads…", leadingIcon = KetchIcon.Search,
-                  modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-              }
+                if (!isExpanded) {
+                  com.linroid.ketch.app.components.KetchTextField(
+                    value = searchQuery, onValueChange = { searchQuery = it },
+                    placeholder = "Search downloads…", leadingIcon = KetchIcon.Search,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                  )
+                }
 
-              if (!isExpanded) {
-                DownloadFilters(
-                  selected = appState.statusFilter,
-                  counts = taskCounts,
-                  onSelect = { appState.statusFilter = it },
-                )
-              }
+                if (!isExpanded) {
+                  DownloadFilters(
+                    selected = appState.statusFilter,
+                    counts = taskCounts,
+                    onSelect = { appState.statusFilter = it },
+                  )
+                }
 
-              // Error banner
-              if (appState.errorMessage != null) {
-                KetchCard(
-                  modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                  padding = 0.dp,
-                ) {
-                  Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment =
-                      Alignment.CenterVertically,
-                    horizontalArrangement =
-                      Arrangement.spacedBy(12.dp),
+                // Error banner
+                if (appState.errorMessage != null) {
+                  KetchCard(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .padding(horizontal = 16.dp),
+                    padding = 0.dp,
                   ) {
-                    Text(
-                      text = appState.errorMessage ?: "",
-                      style = KetchTheme.typography.bodySmall,
-                      color = KetchTheme.colors.error,
-                      modifier = Modifier.weight(1f),
-                    )
-                    KetchButton(
-                      text = "Dismiss",
-                      onClick = { appState.dismissError() },
-                      variant =
-                        com.linroid.ketch.app.components
-                          .KetchButtonVariant.Ghost,
-                      size = KetchButtonSize.Small,
-                    )
+                    Row(
+                      modifier = Modifier.padding(16.dp),
+                      verticalAlignment =
+                        Alignment.CenterVertically,
+                      horizontalArrangement =
+                        Arrangement.spacedBy(12.dp),
+                    ) {
+                      Text(
+                        text = appState.errorMessage ?: "",
+                        style = KetchTheme.typography.bodySmall,
+                        color = KetchTheme.colors.error,
+                        modifier = Modifier.weight(1f),
+                      )
+                      KetchButton(
+                        text = "Dismiss",
+                        onClick = { appState.dismissError() },
+                        variant =
+                          com.linroid.ketch.app.components
+                            .KetchButtonVariant.Ghost,
+                        size = KetchButtonSize.Small,
+                      )
+                    }
                   }
                 }
-              }
 
-              // Download list
-              DownloadList(
-                tasks = filteredTasks,
-                onAddDownload = { appState.requestAddDownload() },
-                isEmpty = sortedTasks.isEmpty() &&
-                  appState.errorMessage == null,
-                isFilterEmpty = filteredTasks.isEmpty() &&
-                  sortedTasks.isNotEmpty(),
-                selectedFilter = appState.statusFilter,
-                onShowAllDownloads = { appState.statusFilter = StatusFilter.All },
-                onClearSearch = { searchQuery = "" },
-                searchQuery = searchQuery,
-                bottomPadding = 24.dp,
-                scope = scope,
-                modifier = Modifier.weight(1f),
-              )
+                // Download list
+                DownloadList(
+                  tasks = filteredTasks,
+                  onAddDownload = { appState.requestAddDownload() },
+                  isEmpty = sortedTasks.isEmpty() &&
+                    appState.errorMessage == null,
+                  isFilterEmpty = filteredTasks.isEmpty() &&
+                    sortedTasks.isNotEmpty(),
+                  selectedFilter = appState.statusFilter,
+                  onShowAllDownloads = { appState.statusFilter = StatusFilter.All },
+                  onClearSearch = { searchQuery = "" },
+                  searchQuery = searchQuery,
+                  bottomPadding = 24.dp,
+                  scope = scope,
+                  modifier = Modifier.weight(1f),
+                )
+              }
             }
           }
+
+          // Bottom speed status bar
+          SpeedStatusBar(
+            activeDownloads = activeDownloadCount,
+            totalSpeed = totalSpeed,
+            instanceLabel = activeInstance?.label,
+            connectionState = connectionState,
+            onInstanceClick = {
+              appState.showInstanceSelector = true
+            },
+          )
         }
 
-        // Bottom speed status bar
-        SpeedStatusBar(
-          activeDownloads = activeDownloadCount,
-          totalSpeed = totalSpeed,
-          instanceLabel = activeInstance?.label,
-          connectionState = connectionState,
-          onInstanceClick = {
-            appState.showInstanceSelector = true
-          },
-        )
+
       }
-
-
     }
   }
 
@@ -456,7 +466,13 @@ fun AppShell(
           url, fileName, speedLimit, priority,
           schedule, resolvedUrl, selectedFileIds,
         )
+        appState.resetResolveState()
       },
+      droppedFileName = appState.droppedFile?.name,
+      onRetryDroppedFile = {
+        appState.droppedFile?.let { appState.resolveDroppedFile(it) }
+      },
+      onDropFiles = { appState.addDroppedFiles(it) },
     )
   }
 
