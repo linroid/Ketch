@@ -9,7 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
  * @param onSave persist the edited settings.
  * @param onStart start the local server on the saved port.
  * @param onStop stop the local server.
+ * @param onUnsavedChange told whether the form differs from [config].
  */
 @Composable
 fun ServerSettingsCard(
@@ -48,13 +49,16 @@ fun ServerSettingsCard(
   onStart: () -> Unit,
   onStop: () -> Unit,
   modifier: Modifier = Modifier,
+  onUnsavedChange: (Boolean) -> Unit = {},
 ) {
   val colors = KetchTheme.colors
-  var port by remember(config) { mutableStateOf(config.port.toString()) }
-  var token by remember(config) {
+  var port by rememberSaveable(config) {
+    mutableStateOf(config.port.toString())
+  }
+  var token by rememberSaveable(config) {
     mutableStateOf(config.apiToken.orEmpty())
   }
-  var mdns by remember(config) { mutableStateOf(config.mdnsEnabled) }
+  var mdns by rememberSaveable(config) { mutableStateOf(config.mdnsEnabled) }
 
   val parsedPort = port.toIntOrNull()
   val portError = parsedPort == null || parsedPort !in 1..65535
@@ -64,6 +68,8 @@ fun ServerSettingsCard(
     mdnsEnabled = mdns,
   )
   val running = serverState as? ServerState.Running
+  // An invalid port is an unsaved edit too: closing would lose it.
+  ReportUnsaved(edited != config, onUnsavedChange)
 
   SettingsCard(
     title = "Server",

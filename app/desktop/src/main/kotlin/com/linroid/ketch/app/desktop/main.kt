@@ -1,7 +1,17 @@
 package com.linroid.ketch.app.desktop
 
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -21,12 +31,16 @@ import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import kotlinx.coroutines.flow.MutableSharedFlow
+import java.awt.Desktop
 import java.io.File
 import java.net.InetAddress
 
+private val isMac = System.getProperty("os.name").startsWith("Mac")
+
 fun main() = application {
+  val configDir = remember { defaultConfigDir() }
   val instanceManager = remember {
-    val configDir = defaultConfigDir()
     val configStore = FileConfigStore(
       configDir + File.separator + "config.toml",
     )
@@ -85,14 +99,40 @@ fun main() = application {
     )
   }
   val aiProviderFactory = remember { EmbeddedAiDiscoveryProviderFactory() }
+  val openSettings = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
   DisposableEffect(Unit) {
+    // Enables the native "Settings…" item (⌘,) in the macOS app menu.
+    if (Desktop.isDesktopSupported()) {
+      val desktop = Desktop.getDesktop()
+      if (desktop.isSupported(Desktop.Action.APP_PREFERENCES)) {
+        desktop.setPreferencesHandler { openSettings.tryEmit(Unit) }
+      }
+    }
     onDispose { instanceManager.close() }
+  }
+  val windowStateStore = remember {
+    WindowStateStore(File(configDir, "window.properties"))
+  }
+  val savedBounds = remember { windowStateStore.load() }
+  val windowState = remember { initialWindowState(savedBounds) }
+  LaunchedEffect(windowState) {
+    windowStateStore.saveChanges(windowState, savedBounds)
   }
   Window(
     onCloseRequest = ::exitApplication,
+    state = windowState,
     title = "Ketch",
     icon = painterResource("icon.svg"),
+    onPreviewKeyEvent = { event ->
+      if (event.isOpenSettingsShortcut()) openSettings.tryEmit(Unit) else false
+    },
   ) {
-    App(instanceManager, aiProviderFactory)
+    App(instanceManager, aiProviderFactory, openSettings)
   }
 }
+
+/** ⌘, on macOS and Ctrl+, elsewhere, the usual shortcut for settings. */
+private fun KeyEvent.isOpenSettingsShortcut(): Boolean =
+  type == KeyEventType.KeyDown && key == Key.Comma &&
+    (if (isMac) isMetaPressed else isCtrlPressed) &&
+    !isAltPressed && !isShiftPressed

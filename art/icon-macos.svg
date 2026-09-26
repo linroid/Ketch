@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Source of icon.icns. Follows Apple's macOS icon grid: an 824x824
+    continuous-corner squircle (radius 185.4) centered on a 1024x1024 canvas.
+    macOS 26+ puts icons that break this shape on a light plate in the Dock.
+  -->
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="5" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- Background squircle with shadow -->
+  <path fill="#000000" filter="url(#shadow)" d="M924,512 L924,640.59 C924,722.19 924,763 910.11,806.92 C892.66,854.88 854.88,892.66 806.92,910.11 C763,924 722.19,924 640.59,924 L383.41,924 C301.81,924 261,924 217.08,910.11 C169.12,892.66 131.34,854.88 113.89,806.92 C100,763 100,722.19 100,640.59 L100,383.41 C100,301.81 100,261 113.89,217.08 C131.34,169.12 169.12,131.34 217.08,113.89 C261,100 301.81,100 383.41,100 L640.59,100 C722.19,100 763,100 806.92,113.89 C854.88,131.34 892.66,169.12 910.11,217.08 C924,261 924,301.81 924,383.41 Z"/>
+  <!-- Glyph from icon-app.svg, scaled from its 480px tile to the 824px squircle -->
+  <g transform="translate(100 100) scale(1.7166667) translate(-16 -16)">
+    <!-- Main sail (taller, forward) -->
+    <polygon points="168,72 168,338 308,338" fill="#FFFFFF"/>
+    <!-- Mizzen sail (shorter, aft) -->
+    <polygon points="316,168 316,338 404,338" fill="#00BCD4"/>
+    <!-- Hull -->
+    <path d="M88,346 Q256,432 424,346 Z" fill="#FFFFFF"/>
+  </g>
+</svg>

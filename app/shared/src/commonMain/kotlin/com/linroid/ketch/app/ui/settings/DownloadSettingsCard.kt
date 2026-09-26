@@ -8,12 +8,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.state.DownloadSettingsInput
 import com.linroid.ketch.app.theme.KetchTheme
@@ -26,6 +28,7 @@ import com.linroid.ketch.app.ui.common.SpeedLimitSelector
  * @param config saved download settings.
  * @param backendLabel instance the settings will be applied to.
  * @param onSave persist and apply the edited settings.
+ * @param onUnsavedChange told whether the form differs from [config].
  */
 @Composable
 fun DownloadSettingsCard(
@@ -34,12 +37,15 @@ fun DownloadSettingsCard(
   compact: Boolean,
   onSave: (DownloadConfig) -> Unit,
   modifier: Modifier = Modifier,
+  onUnsavedChange: (Boolean) -> Unit = {},
 ) {
-  var input by remember(config) {
+  var input by rememberSaveable(config, stateSaver = InputSaver) {
     mutableStateOf(DownloadSettingsInput.from(config))
   }
   val error = input.validate()
   val edited = input.toConfig(config)
+  // An invalid form is an unsaved edit too: closing would lose it.
+  ReportUnsaved(edited != config, onUnsavedChange)
 
   SettingsCard(
     title = "Downloads",
@@ -112,3 +118,29 @@ fun DownloadSettingsCard(
     }
   }
 }
+
+private val InputSaver = listSaver<DownloadSettingsInput, Any>(
+  save = {
+    listOf(
+      it.directory,
+      it.maxConcurrentDownloads,
+      it.maxConnectionsPerDownload,
+      it.maxConnectionsPerHost,
+      it.speedLimit.bytesPerSecond,
+    )
+  },
+  restore = {
+    val bytesPerSecond = it[4] as Long
+    DownloadSettingsInput(
+      directory = it[0] as String,
+      maxConcurrentDownloads = it[1] as String,
+      maxConnectionsPerDownload = it[2] as String,
+      maxConnectionsPerHost = it[3] as String,
+      speedLimit = if (bytesPerSecond == 0L) {
+        SpeedLimit.Unlimited
+      } else {
+        SpeedLimit.of(bytesPerSecond)
+      },
+    )
+  },
+)

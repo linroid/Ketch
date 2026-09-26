@@ -20,6 +20,8 @@ dependencies {
   implementation(compose.desktop.currentOs)
   implementation(libs.kotlinx.coroutinesSwing)
   implementation(libs.logback)
+
+  testImplementation(libs.kotlin.test)
 }
 
 compose.desktop {
