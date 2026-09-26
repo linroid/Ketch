@@ -111,7 +111,8 @@ private fun DownloadSettingsGroups(
 
   SettingsGroup(
     title = "Queue",
-    footer = "Downloads beyond these limits wait in the queue and start in priority order.",
+    footer = "Extra downloads wait in the queue and start in priority order. Lowering a " +
+      "limit lets running downloads finish.",
   ) {
     SettingsSelectRow(
       title = "Simultaneous downloads",
@@ -123,7 +124,7 @@ private fun DownloadSettingsGroups(
     )
     SettingsSelectRow(
       title = "Downloads per server",
-      description = "Limit for each website or FTP server. Torrents aren't counted.",
+      description = "Limit for each website or FTP server. Magnet links aren't counted.",
       value = config.maxConnectionsPerHost,
       options = countChoices(listOf(1, 2, 3, 4, 6, 8, 12, 16, 0), config.maxConnectionsPerHost),
       label = { if (it == 0) "Unlimited" else "$it" },
