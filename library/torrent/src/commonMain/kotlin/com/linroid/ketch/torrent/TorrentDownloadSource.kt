@@ -46,7 +46,10 @@ class TorrentDownloadSource(
 ) : DownloadSource {
   private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
   private val http by httpDelegate
-  internal var engineFactory: () -> TorrentEngine = { KotlinTorrentEngine(config, http = http) }
+  private val additionalTrackers = AtomicReference(config.additionalTrackers)
+  internal var engineFactory: () -> TorrentEngine = {
+    KotlinTorrentEngine(config.copy(additionalTrackers = additionalTrackers.load()), http = http)
+  }
   private val engine = AtomicReference<TorrentEngine?>(null)
   private val closed = AtomicBoolean(false)
   private val engineMutex = Mutex()
@@ -92,6 +95,15 @@ class TorrentDownloadSource(
   suspend fun setConnectionLimit(connections: Int) {
     require(connections in 1..4096)
     (getEngine() as KotlinTorrentEngine).setConnections(connections)
+  }
+
+  /**
+   * Replace [TorrentConfig.additionalTrackers]. Torrents started or resumed afterwards use the new
+   * list; running torrents keep the trackers they started with.
+   */
+  suspend fun setAdditionalTrackers(urls: List<String>) = engineMutex.withLock {
+    additionalTrackers.store(urls)
+    (engine.load() as? KotlinTorrentEngine)?.setAdditionalTrackers(urls)
   }
 
   override fun canHandle(url: String): Boolean {
