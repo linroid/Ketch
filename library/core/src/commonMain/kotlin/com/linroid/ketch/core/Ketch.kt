@@ -428,9 +428,8 @@ class Ketch(
       globalLimiter.delegate = TokenBucket(limit.bytesPerSecond)
     }
 
-    // Apply queue config
-    queue.maxConcurrent = config.maxConcurrentDownloads
-    queue.maxPerHost = config.maxConnectionsPerHost
+    // Apply queue limits, starting queued tasks if a limit was raised
+    queue.updateLimits(config.maxConcurrentDownloads, config.maxConnectionsPerHost)
 
     log.i { "Config updated: $config" }
   }

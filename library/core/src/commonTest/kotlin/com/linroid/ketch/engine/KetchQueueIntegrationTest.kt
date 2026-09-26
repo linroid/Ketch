@@ -161,6 +161,23 @@ class KetchQueueIntegrationTest {
   }
 
   @Test
+  fun updateConfig_raisedConcurrencyLimit_startsQueuedDownload() = runTest {
+    withKetch { ketch, source, _ ->
+      ketch.download(request("first"))
+      runCurrent()
+      val second = ketch.download(request("second"))
+      runCurrent()
+      assertEquals(DownloadState.Queued, second.state.value)
+
+      ketch.updateConfig(DownloadConfig(maxConcurrentDownloads = 2, retryCount = 0))
+      runCurrent()
+
+      assertIs<DownloadState.Downloading>(second.state.value)
+      assertEquals(2, source.maximumActive)
+    }
+  }
+
+  @Test
   fun updateConfig_downloadDefaults_applyToNewAndResumedDownloads() = runTest {
     withKetch { ketch, source, _ ->
       val running = ketch.download(request("running"))
