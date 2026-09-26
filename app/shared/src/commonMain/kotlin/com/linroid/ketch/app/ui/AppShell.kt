@@ -47,6 +47,7 @@ import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.InstanceSettingsController
+import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.AiDiscoverDraft
 import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
@@ -54,6 +55,8 @@ import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
 import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.ketch.app.util.matchesSearch
 import com.linroid.ketch.app.ui.list.DownloadList
+import com.linroid.ketch.app.ui.settings.SettingsDialog
+import com.linroid.ketch.app.ui.settings.SettingsCategoryContent
 import com.linroid.ketch.app.ui.settings.SettingsPage
 import com.linroid.ketch.app.ui.sidebar.SidebarNavigation
 import com.linroid.ketch.app.ui.sidebar.SpeedStatusBar
@@ -61,6 +64,8 @@ import com.linroid.ketch.app.ui.sidebar.filterIcon
 import com.linroid.ketch.app.ui.toolbar.BatchActionBar
 import com.linroid.ketch.app.ui.toolbar.KetchToolbar
 import com.linroid.ketch.app.ui.toolbar.countTasksByFilter
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,6 +74,7 @@ fun AppShell(
   instanceManager: InstanceManager,
   appSettings: AppSettingsController = remember { AppSettingsController() },
   aiSettings: AiSettingsController = remember { AiSettingsController() },
+  openSettingsRequests: Flow<Unit> = emptyFlow(),
 ) {
   val scope = rememberCoroutineScope()
   val appState = remember(instanceManager, appSettings, aiSettings) {
@@ -171,12 +177,46 @@ fun AppShell(
   }
   val destinations = AppDestination.visible(aiSettings.available)
   val destination = AppDestination.valueOf(destinationName)
-    .takeIf { it in destinations } ?: AppDestination.Downloads
+    .takeIf { it in destinations && it != AppDestination.Settings }
+    ?: AppDestination.Downloads
   LaunchedEffect(destination) {
     // Keep the saved value in step when a destination disappears.
     if (destination.name != destinationName) {
       destinationName = destination.name
     }
+  }
+  // Settings opens over the current destination: as a dialog on wide
+  // windows and as a full page on narrow ones. One flag drives both, so
+  // resizing across the breakpoint switches between them.
+  var settingsOpen by rememberSaveable { mutableStateOf(false) }
+  LaunchedEffect(openSettingsRequests) {
+    openSettingsRequests.collect { settingsOpen = true }
+  }
+  val settingsCategories = SettingsCategory.visible(instanceManager.isLocalServerSupported)
+  // Download and network settings belong to the active instance.
+  val settingsInstance = activeInstance
+  val instanceSettings = remember(settingsInstance) {
+    InstanceSettingsController(
+      api = settingsInstance?.instance ?: appState.activeApi.value,
+      local = appSettings.takeIf { settingsInstance is EmbeddedInstance },
+      scope = scope,
+    )
+  }
+  val settingsContent: @Composable (SettingsCategory) -> Unit = { category ->
+    SettingsCategoryContent(
+      category = category,
+      appSettings = appSettings,
+      aiSettings = aiSettings,
+      instanceSettings = instanceSettings,
+      instanceLabel = settingsInstance?.label ?: "this device",
+      systemDeviceName = instances.firstOrNull { it is EmbeddedInstance }?.label,
+      serverState = serverState,
+      onTestAi = {
+        scope.launch { aiSettings.testConnection(aiSettings.settings) }
+      },
+      onStartServer = { instanceManager.startServer() },
+      onStopServer = { instanceManager.stopServer() },
+    )
   }
   val aiDraft = remember { AiDiscoverDraft() }
   val adaptiveInfo = currentWindowAdaptiveInfo()
@@ -193,11 +233,22 @@ fun AppShell(
   NavigationSuiteScaffold(
     navigationSuiteItems = {
       destinations.forEach { entry ->
-        val selected = destination == entry
+        val selected = if (settingsOpen) {
+          entry == AppDestination.Settings
+        } else {
+          entry == destination
+        }
         item(
           label = { Text(entry.label) },
           selected = selected,
-          onClick = { destinationName = entry.name },
+          onClick = {
+            if (entry == AppDestination.Settings) {
+              settingsOpen = true
+            } else {
+              destinationName = entry.name
+              settingsOpen = false
+            }
+          },
           icon = {
             KetchIconImage(
               icon = entry.icon, size = 24.dp,
@@ -220,6 +271,7 @@ fun AppShell(
               destination = destination,
               showDiscovery = AppDestination.Discover in destinations,
               onDestinationSelect = { destinationName = it.name },
+              onOpenSettings = { settingsOpen = true },
               taskCounts = taskCounts,
               onFilterSelect = { selected ->
                 destinationName = AppDestination.Downloads.name
@@ -235,7 +287,13 @@ fun AppShell(
 
           // Content area
           Column(modifier = Modifier.weight(1f)) {
-            if (destination == AppDestination.Discover) {
+            if (settingsOpen && !isExpanded) {
+              SettingsPage(
+                categories = settingsCategories,
+                content = settingsContent,
+                onClose = { settingsOpen = false },
+              )
+            } else if (destination == AppDestination.Discover) {
               AiDiscoveryPage(
                 state = appState.aiDiscoverState,
                 draft = aiDraft,
@@ -247,30 +305,6 @@ fun AppShell(
                   destinationName = AppDestination.Downloads.name
                   appState.statusFilter = StatusFilter.All
                 },
-              )
-            } else if (destination == AppDestination.Settings) {
-              val instance = activeInstance
-              val instanceSettings = remember(instance) {
-                InstanceSettingsController(
-                  api = instance?.instance ?: appState.activeApi.value,
-                  local = appSettings.takeIf { instance is EmbeddedInstance },
-                  scope = scope,
-                )
-              }
-              SettingsPage(
-                appSettings = appSettings,
-                aiSettings = aiSettings,
-                instanceSettings = instanceSettings,
-                instanceLabel = instance?.label ?: "this device",
-                systemDeviceName = instances
-                  .firstOrNull { it is EmbeddedInstance }?.label,
-                serverState = serverState,
-                serverSupported = instanceManager.isLocalServerSupported,
-                onTestAi = {
-                  scope.launch { aiSettings.testConnection(aiSettings.settings) }
-                },
-                onStartServer = { instanceManager.startServer() },
-                onStopServer = { instanceManager.stopServer() },
               )
             } else {
               if (isExpanded) {
@@ -408,6 +442,14 @@ fun AppShell(
   }
 
   // Dialogs
+  if (settingsOpen && isExpanded) {
+    SettingsDialog(
+      categories = settingsCategories,
+      onDismiss = { settingsOpen = false },
+      content = settingsContent,
+    )
+  }
+
   if (appState.showAddDialog) {
     AddDownloadDialog(
       resolveState = appState.resolveState,

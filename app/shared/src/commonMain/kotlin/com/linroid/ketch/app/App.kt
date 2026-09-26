@@ -11,11 +11,20 @@ import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.AppShell
 import com.linroid.ketch.config.ThemeMode
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
+/**
+ * Root of the Ketch app, shared by every platform.
+ *
+ * @param openSettingsRequests emits when the platform asks to open
+ *   Settings, e.g. from a keyboard shortcut or the macOS app menu.
+ */
 @Composable
 fun App(
   instanceManager: InstanceManager,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
+  openSettingsRequests: Flow<Unit> = emptyFlow(),
 ) {
   // The controllers are created here because the theme needs the saved
   // accent and theme mode before the shell composes.
@@ -37,6 +46,6 @@ fun App(
     ThemeMode.Dark -> true
   }
   KetchTheme(darkTheme = darkTheme, accent = appSettings.accent) {
-    AppShell(instanceManager, appSettings, aiSettings)
+    AppShell(instanceManager, appSettings, aiSettings, openSettingsRequests)
   }
 }

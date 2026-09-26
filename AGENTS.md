@@ -209,7 +209,9 @@ cli/          # JVM CLI entry point
   CLI and server ignore it)
 - Apps edit it on the Settings destination, split into `SettingsCategory`
   pages (General, Downloads, Network, Remote access, AI discovery, About).
-  Changes apply as they are made; there are no Save buttons
+  Wide windows open it as an overlay dialog (also ⌘, / Ctrl+, on desktop),
+  narrow ones as a page. Changes apply as they are made; there are no Save
+  buttons
 - Downloads and Network settings belong to the active instance
   (`InstanceSettingsController`): pushed live via `KetchApi.updateConfig` /
   `updateNetworkInterfaces`, and saved to `config.toml` only for the

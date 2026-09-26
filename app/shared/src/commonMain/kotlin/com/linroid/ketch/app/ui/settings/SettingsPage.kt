@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,9 +52,8 @@ import com.linroid.ketch.app.theme.KetchTheme
 private val TWO_PANE_MIN_WIDTH = 760.dp
 
 /**
- * Settings destination, organised by [SettingsCategory]. Wide windows
- * show the categories beside the selected page; narrow ones show the
- * list first and open a category on tap.
+ * The settings of one [category]. [SettingsPage] and [SettingsDialog]
+ * both show categories through this.
  *
  * Changes are applied as they are made, so there is nothing to save.
  *
@@ -65,67 +65,93 @@ private val TWO_PANE_MIN_WIDTH = 760.dp
  * @param systemDeviceName name this device goes by when none is set, or
  *   `null` when the app has no local instance (the web app).
  * @param serverState whether the local server is running.
- * @param serverSupported whether this platform can run a local server.
  * @param onTestAi call the AI provider with the saved settings.
  * @param onStartServer start the local server.
  * @param onStopServer stop the local server.
- * @param initialCategory category to open first; on narrow windows
- *   `null` starts at the category list.
  */
 @Composable
-fun SettingsPage(
+fun SettingsCategoryContent(
+  category: SettingsCategory,
   appSettings: AppSettingsController,
   aiSettings: AiSettingsController,
   instanceSettings: InstanceSettingsController,
   instanceLabel: String,
   systemDeviceName: String?,
   serverState: ServerState,
-  serverSupported: Boolean,
   onTestAi: () -> Unit,
   onStartServer: () -> Unit,
   onStopServer: () -> Unit,
+) {
+  when (category) {
+    SettingsCategory.General -> GeneralSettings(appSettings, systemDeviceName)
+    SettingsCategory.Downloads -> DownloadSettings(instanceSettings, instanceLabel)
+    SettingsCategory.Network -> NetworkSettings(instanceSettings, instanceLabel)
+    SettingsCategory.RemoteAccess -> RemoteAccessSettings(
+      config = appSettings.config.server,
+      serverState = serverState,
+      onChange = { appSettings.saveServer(it) },
+      onStart = onStartServer,
+      onStop = onStopServer,
+    )
+    SettingsCategory.Ai -> AiDiscoverySettings(
+      settings = aiSettings.settings,
+      supported = aiSettings.supported,
+      resolveCredentials = aiSettings::withPlatformCredentials,
+      connectionTest = aiSettings.connectionTest,
+      onChange = { aiSettings.save(it) },
+      onTest = onTestAi,
+    )
+    SettingsCategory.About -> AboutSettings()
+  }
+}
+
+/**
+ * Settings as a full page, for windows too narrow for [SettingsDialog].
+ * Medium widths show the categories beside the selected page; phones
+ * show the list first and open a category on tap.
+ *
+ * @param categories categories to list, in order.
+ * @param content renders one category; see [SettingsCategoryContent].
+ * @param onClose leaves Settings when back is pressed on the category
+ *   list; `null` leaves back handling to the platform.
+ * @param initialCategory category to open first; on phones `null` starts
+ *   at the category list.
+ */
+@Composable
+fun SettingsPage(
+  categories: List<SettingsCategory>,
+  content: @Composable (SettingsCategory) -> Unit,
+  onClose: (() -> Unit)? = null,
   initialCategory: SettingsCategory? = null,
 ) {
-  val categories = SettingsCategory.visible(serverSupported)
   var openName by rememberSaveable { mutableStateOf(initialCategory?.name) }
   val open = categories.firstOrNull { it.name == openName }
 
-  val content: @Composable (SettingsCategory) -> Unit = { category ->
-    when (category) {
-      SettingsCategory.General -> GeneralSettings(appSettings, systemDeviceName)
-      SettingsCategory.Downloads -> DownloadSettings(instanceSettings, instanceLabel)
-      SettingsCategory.Network -> NetworkSettings(instanceSettings, instanceLabel)
-      SettingsCategory.RemoteAccess -> RemoteAccessSettings(
-        config = appSettings.config.server,
-        serverState = serverState,
-        onChange = { appSettings.saveServer(it) },
-        onStart = onStartServer,
-        onStop = onStopServer,
-      )
-      SettingsCategory.Ai -> AiDiscoverySettings(
-        settings = aiSettings.settings,
-        supported = aiSettings.supported,
-        resolveCredentials = aiSettings::withPlatformCredentials,
-        connectionTest = aiSettings.connectionTest,
-        onChange = { aiSettings.save(it) },
-        onTest = onTestAi,
-      )
-      SettingsCategory.About -> AboutSettings()
-    }
-  }
-
   BoxWithConstraints(Modifier.fillMaxSize()) {
     val inset = if (maxWidth < 600.dp) 16.dp else 32.dp
+    val twoPane = maxWidth >= TWO_PANE_MIN_WIDTH
+    // Back steps out of a category first, then out of Settings.
+    val onBack = if (open != null && !twoPane) {
+      { openName = null }
+    } else {
+      onClose
+    }
+    if (onBack != null) {
+      NavigationBackHandler(
+        state = rememberNavigationEventState(NavigationEventInfo.None),
+        onBackCompleted = onBack,
+      )
+    }
     when {
-      maxWidth >= TWO_PANE_MIN_WIDTH -> Row(Modifier.fillMaxSize()) {
+      twoPane -> Row(Modifier.fillMaxSize()) {
         val selected = open ?: categories.first()
-        CategoryNav(
+        SettingsCategoryNav(
           categories = categories,
           selected = selected,
           onSelect = { openName = it.name },
         )
         VerticalDivider(color = KetchTheme.colors.outlineVariant)
-        CategoryPage(
+        SettingsCategoryPage(
           category = selected,
           inset = inset,
           onBack = null,
@@ -138,32 +164,35 @@ fun SettingsPage(
         inset = inset,
         onOpen = { openName = it.name },
       )
-      else -> {
-        NavigationBackHandler(
-          state = rememberNavigationEventState(NavigationEventInfo.None),
-          onBackCompleted = { openName = null },
-        )
-        CategoryPage(
-          category = open,
-          inset = inset,
-          onBack = { openName = null },
-          content = content,
-        )
-      }
+      else -> SettingsCategoryPage(
+        category = open,
+        inset = inset,
+        onBack = { openName = null },
+        content = content,
+      )
     }
   }
 }
 
+/**
+ * Category list beside a settings page.
+ *
+ * @param background fill behind the list, e.g. to set it apart in a
+ *   dialog.
+ * @param footer optional content pinned under the list.
+ */
 @Composable
-private fun CategoryNav(
+internal fun SettingsCategoryNav(
   categories: List<SettingsCategory>,
   selected: SettingsCategory,
   onSelect: (SettingsCategory) -> Unit,
+  background: Color = Color.Transparent,
+  footer: (@Composable () -> Unit)? = null,
 ) {
   Column(
     modifier = Modifier.width(232.dp)
       .fillMaxHeight()
-      .verticalScroll(rememberScrollState())
+      .background(background)
       .padding(vertical = 24.dp),
   ) {
     Text(
@@ -172,14 +201,17 @@ private fun CategoryNav(
       color = KetchTheme.colors.onBackground,
       modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 16.dp),
     )
-    categories.forEach { category ->
-      KetchSidebarItem(
-        label = category.title,
-        icon = category.icon,
-        selected = category == selected,
-        onClick = { onSelect(category) },
-      )
+    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+      categories.forEach { category ->
+        KetchSidebarItem(
+          label = category.title,
+          icon = category.icon,
+          selected = category == selected,
+          onClick = { onSelect(category) },
+        )
+      }
     }
+    footer?.invoke()
   }
 }
 
@@ -241,7 +273,7 @@ private fun CategoryIcon(icon: KetchIcon) {
  *   already on screen.
  */
 @Composable
-private fun CategoryPage(
+internal fun SettingsCategoryPage(
   category: SettingsCategory,
   inset: Dp,
   onBack: (() -> Unit)?,
@@ -269,7 +301,6 @@ private fun CategoryPage(
               icon = KetchIcon.ChevronLeft,
               contentDescription = "Back to settings",
               onClick = onBack,
-              modifier = Modifier.padding(start = 0.dp),
             )
           }
           SettingsHeader(title = category.title, description = category.summary)

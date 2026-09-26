@@ -37,6 +37,10 @@ enum class KetchIcon(internal val data: IconData) {
       "M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4",
     ),
   )),
+  Appearance(IconData.paths(
+    stroke = listOf("M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14z"),
+    fill = listOf("M10 3a7 7 0 0 1 0 14z"),
+  )),
 
   // Playback / actions
   Play(IconData.fills("M6 4l10 6-10 6V4z")),
