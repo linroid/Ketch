@@ -161,7 +161,7 @@ class Ketch(
     val isScheduled = request.schedule !is DownloadSchedule.Immediate ||
       request.conditions.isNotEmpty()
     log.i {
-      "Downloading: taskId=$taskId, url=${request.url}, " +
+      "Downloading: taskId=$taskId, url=${loggableUrl(request.url)}, " +
         "connections=${request.connections}, " +
         "priority=${request.priority}" +
         if (isScheduled) ", schedule=${request.schedule}" else ""

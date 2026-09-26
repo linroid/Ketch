@@ -9,6 +9,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.loggableUrl
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.TaskEvent
@@ -137,7 +138,7 @@ class RemoteKetch internal constructor(
   override suspend fun download(
     request: DownloadRequest,
   ): DownloadTask {
-    log.i { "Download: url=${request.url}" }
+    log.i { "Download: url=${loggableUrl(request.url)}" }
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(request)

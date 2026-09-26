@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.loggableUrl
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.NoOpFileAccessor
@@ -47,7 +48,7 @@ internal class DownloadCoordinator(
 
   suspend fun start(handle: TaskHandle) {
     val taskId = handle.taskId
-    log.i { "Starting download: taskId=$taskId, url=${handle.request.url}" }
+    log.i { "Starting download: taskId=$taskId, url=${loggableUrl(handle.request.url)}" }
     handle.record.update {
       it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
     }
