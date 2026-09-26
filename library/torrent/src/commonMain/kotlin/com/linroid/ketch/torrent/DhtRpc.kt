@@ -33,6 +33,9 @@ internal class DhtRpc(
 
   val local: PeerEndpoint get() = socket.local
 
+  /** False once the receive loop has ended; the owner must replace the node. */
+  val isRunning: Boolean get() = receiver?.isActive == true
+
   fun start() {
     check(receiver == null)
     receiver = scope.launch {
@@ -57,7 +60,13 @@ internal class DhtRpc(
               DhtCodec.error(message.transaction, 203)
             }
             if (reply != null && reply.size <= DhtCodec.MAX_SEND &&
-              rate.admitReply(packet.remote.host, reply.size)) socket.send(packet.remote, reply)
+              rate.admitReply(packet.remote.host, reply.size)) {
+              // A reply that cannot be routed (network switch, unreachable host) only loses
+              // that reply. It must not end the receive loop and with it the whole node.
+              try { socket.send(packet.remote, reply) } catch (e: CancellationException) {
+                throw e
+              } catch (_: Exception) { }
+            }
           }
         }
       } catch (e: Exception) {

@@ -48,6 +48,11 @@ internal class DhtNode(
 
   fun start() = rpc.start()
 
+  val isRunning: Boolean get() = rpc.isRunning
+
+  /** Verified routing contacts; zero means bootstrap has not succeeded yet. */
+  suspend fun contactCount(): Int = routing.size()
+
   suspend fun close() = rpc.close()
 
   suspend fun snapshot(): ByteArray = routing.snapshot()

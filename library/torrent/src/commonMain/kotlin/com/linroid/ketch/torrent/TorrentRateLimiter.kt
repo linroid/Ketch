@@ -15,7 +15,7 @@ internal class TorrentRateLimiter(
 ) {
   private val rate = AtomicLong(bytesPerSecond)
   private val mutex = Mutex()
-  private var tokens = 16_384.0
+  private var tokens = MAX_BLOCK.toDouble()
   private var updated = nowMs()
 
   init { require(bytesPerSecond >= 0) }
@@ -36,7 +36,7 @@ internal class TorrentRateLimiter(
     task: TorrentRateLimiter,
     admit: () -> Boolean = { true },
   ): Long {
-    require(bytes in 1..16_384 && task !== this)
+    require(bytes in 1..MAX_BLOCK && task !== this)
     return mutex.withLock {
       task.mutex.withLock {
         val globalRate = rate.load()
@@ -55,28 +55,44 @@ internal class TorrentRateLimiter(
 
   private fun refill(currentRate: Long) {
     val now = nowMs()
-    tokens = minOf(16_384.0,
+    tokens = minOf(capacity(currentRate),
       tokens + (now - updated).coerceAtLeast(0) * currentRate.toDouble() / 1000.0)
     updated = now
   }
 
+  /** Holds 100 ms of traffic so a waiter sleeping up to [MAX_WAIT_MS] never loses refill. */
+  private fun capacity(currentRate: Long): Double =
+    maxOf(MAX_BLOCK.toDouble(), currentRate / 10.0)
+
   private fun delayFor(bytes: Int, currentRate: Long): Long {
     if (currentRate == 0L || tokens >= bytes) return 0
-    return ceil((bytes - tokens) * 1000 / currentRate).toLong().coerceIn(1, 50)
+    return shortfallMs(bytes - tokens, currentRate)
   }
+
+  private fun shortfallMs(missing: Double, currentRate: Long): Long =
+    ceil(missing * 1000 / currentRate).toLong().coerceIn(1, MAX_WAIT_MS)
 
   suspend fun acquire(bytes: Int) {
     require(bytes >= 0)
     var remaining = bytes
     while (remaining > 0) {
-      val consumed = mutex.withLock {
+      val wait = mutex.withLock {
         val currentRate = rate.load()
         if (currentRate == 0L) return
         refill(currentRate)
-        minOf(remaining, tokens.toInt()).also { tokens -= it }
+        val consumed = minOf(remaining, tokens.toInt().coerceAtLeast(0))
+        tokens -= consumed
+        remaining -= consumed
+        if (remaining == 0) return
+        val next = minOf(remaining.toDouble(), capacity(currentRate))
+        shortfallMs(next - tokens, currentRate)
       }
-      remaining -= consumed
-      if (remaining > 0) delay(50)
+      delay(wait)
     }
+  }
+
+  private companion object {
+    const val MAX_BLOCK = 16_384
+    const val MAX_WAIT_MS = 50L
   }
 }

@@ -68,7 +68,9 @@ internal class PeerV2DownloadActor private constructor(
       body: suspend (PeerV2DownloadActor) -> T,
     ): T = coroutineScope {
       require(capacity in 1..256 && dispatchTimeoutMs in 1..180_000)
-      val lease = checkNotNull(state.reserve(capacity * 16_384 + 4096)) {
+      // Queued block payloads and hash frames hold their own transfer-budget leases, so the
+      // session state pays only for the queued event objects.
+      val lease = checkNotNull(state.reserve(capacity * 1024 + 4096)) {
         "Peer actor queue budget exhausted"
       }
       val commands = Channel<Command>(capacity)
@@ -131,6 +133,8 @@ internal class PeerV2DownloadActor private constructor(
                     if (!retainFrame) frame.close()
                   }
                   publish(event)
+                  // After the CHOKE update, hand back every request the peer silently dropped.
+                  for (rejected in blocks.takeDropped()) publish(Event.Response(rejected))
                 }
               }
             }

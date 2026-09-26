@@ -124,8 +124,16 @@ class TorrentDownloadSource(
           val bytes = (getEngine() as KotlinTorrentEngine).fetchV2Metadata(url, privacy)
           return requireNotNull(resolveV2Metainfo(url, bytes, config, privacy))
         }
-        getEngine().fetchMetadata(url, privacy) ?: throw KetchError.Network(
+        val fetched = getEngine().fetchMetadata(url, privacy) ?: throw KetchError.Network(
           Exception("Torrent metadata resolution timed out"))
+        if (!isHybridInfo(fetched.infoBytes)) fetched else {
+          // A btih-only magnet found a hybrid torrent. Its v2 identity keys the task, so fetch
+          // the piece layers under that topic instead of mixing v1 and v2 hashes.
+          val v2Hash = V2InfoHash.fromBytes(sha256Digest(fetched.infoBytes))
+          val bytes = (getEngine() as KotlinTorrentEngine)
+            .fetchV2Metadata("$url&xt=urn:btmh:${v2Hash.multihash()}", privacy)
+          return requireNotNull(resolveV2Metainfo(url, bytes, config, privacy))
+        }
       } else {
         val bytes = if (url.startsWith("https://", true) || url.startsWith("http://", true)) {
           http.fetch(url, config.maxMetadataBytes, headers = properties)
@@ -271,6 +279,7 @@ class TorrentDownloadSource(
         states[context.taskId] = state
       }
       val runtime = getEngine()
+      makeRoomForDownload(runtime)
       session = runtime.addTask(TorrentTaskSpec(context.taskId, metadata, output, selected,
         context.url.takeIf { it.startsWith("magnet:", true) },
         previous?.resumeData?.takeIf { it.isNotEmpty() }?.let(::decodeBase64), context.throttle,
@@ -317,6 +326,8 @@ class TorrentDownloadSource(
           if (!keepSeeding) {
             engine.load()?.removeTorrent(hash)
             tasks.release(context.taskId)
+          } else {
+            tasks.markSeeding(context.taskId)
           }
         }
       }
@@ -361,6 +372,7 @@ class TorrentDownloadSource(
         states[context.taskId] = state
       }
       val runtime = getEngine() as KotlinTorrentEngine
+      makeRoomForDownload(runtime)
       runtime.withV2Download(context.taskId, document, output, selected,
         checkpointEncoded = previous?.resumeData?.takeIf { it.isNotEmpty() },
         trackerTiers = sourceTrackerTiers(bytes, config.maxMetadataBytes),
@@ -415,6 +427,28 @@ class TorrentDownloadSource(
     } catch (error: CancellationException) { throw error
     } catch (error: Exception) { throw KetchError.SourceError(TYPE, error)
     } finally { tasks.release(context.taskId) }
+  }
+
+  /**
+   * Seeding is optional background work, so a new download takes the slot of the oldest seeder.
+   * Only tasks whose download already returned are evicted; a live download never sees its
+   * session stop underneath it.
+   */
+  private suspend fun makeRoomForDownload(runtime: TorrentEngine) {
+    val kotlin = runtime as? KotlinTorrentEngine ?: return
+    while (!kotlin.hasFreeSlot()) {
+      release(tasks.oldestSeeding() ?: return, null)
+    }
+  }
+
+  /** Stops a session that outlived its download, such as one still seeding. */
+  override suspend fun release(taskId: String, resumeState: SourceResumeState?) {
+    val session = tasks.session(taskId) ?: return
+    try {
+      engine.load()?.removeTorrent(session.infoHash)
+    } finally {
+      tasks.release(taskId)
+    }
   }
 
   override suspend fun cleanup(context: DownloadContext, resumeState: SourceResumeState?) {
@@ -518,3 +552,6 @@ internal fun encodeBase64(data: ByteArray): String = Base64.Default.encode(data)
 
 /** Platform-specific base64 decoding. */
 internal fun decodeBase64(data: String): ByteArray = Base64.Default.decode(data)
+
+private fun isHybridInfo(infoBytes: ByteArray): Boolean = infoBytes.isNotEmpty() &&
+  Bencode.parse(infoBytes, infoBytes.size)["meta version"]?.integer == 2L

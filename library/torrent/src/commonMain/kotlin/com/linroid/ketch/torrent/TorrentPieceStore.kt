@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okio.FileHandle
 import okio.FileSystem
 import okio.use
 import okio.Path
@@ -127,10 +128,15 @@ internal class TorrentPieceStore(
   }
 
   /** False means a hash mismatch; no bytes or progress are committed in that case. */
-  suspend fun commit(index: Int, bytes: ByteArray): Boolean = mutex.withLock {
-    check(initialized)
+  suspend fun commit(index: Int, bytes: ByteArray): Boolean {
     require(bytes.size == pieceSize(index) && needed(index))
-    if (!matches(index, bytes)) return@withLock false
+    // Hash against immutable metainfo outside the lock so other peers' commits proceed.
+    if (!matches(index, bytes)) return false
+    return commitVerified(index, bytes)
+  }
+
+  private suspend fun commitVerified(index: Int, bytes: ByteArray): Boolean = mutex.withLock {
+    check(initialized)
     if (verified[index]) return@withLock true
     val start = index * metadata.pieceLength
     val end = start + bytes.size
@@ -147,8 +153,8 @@ internal class TorrentPieceStore(
         if (count == 0L) continue
         val overlapStart = maxOf(start, offsets[fileIndex])
         val sourceOffset = (overlapStart - start).toInt()
-        write(filePath(fileIndex), overlapStart - offsets[fileIndex],
-          bytes.copyOfRange(sourceOffset, sourceOffset + count.toInt()))
+        write(filePath(fileIndex), overlapStart - offsets[fileIndex], bytes, sourceOffset,
+          count.toInt())
       }
     }
     // Return through withContext's cancellation boundary before publishing availability. A
@@ -171,11 +177,12 @@ internal class TorrentPieceStore(
       verified.fill(false)
       fileProgress.fill(0)
       remaining = wanted.count { it }
+      val chunk = ByteArray(CHECK_CHUNK_BYTES)
       for (index in verified.indices) {
         currentCoroutineContext().ensureActive()
         if (!needed(index)) continue
         verified[index] = try {
-          matches(index, readPiece(index))
+          storedPieceMatches(index, chunk)
         } catch (_: okio.IOException) {
           false
         }
@@ -285,8 +292,9 @@ internal class TorrentPieceStore(
           fileSystem.openReadOnly(path).use { handle ->
             val size = handle.size()
             require(size in 1..TorrentCheckpoint.MAX_BYTES.toLong())
-            // Retain raw-byte, decoded-graph, and metainfo validation credit through the callback.
-            val weight = size * 16 + 64 * 1024
+            // Retain raw bytes, the parsed tree, and the decoded metainfo copies through the
+            // callback. The metainfo dominates, so this stays linear in the file size.
+            val weight = size * 4 + 64 * 1024
             check(weight <= budget.capacity) { "Checkpoint recovery exceeds admission capacity" }
             lease = checkNotNull(budget.reserve(weight.toInt())) {
               "Checkpoint recovery budget exhausted"
@@ -473,8 +481,37 @@ internal class TorrentPieceStore(
 
   private fun readPiece(index: Int): ByteArray {
     val bytes = ByteArray(pieceSize(index))
+    forEachStoredSpan(index) { handle, offset, targetOffset, count ->
+      readFully(handle, offset, bytes, targetOffset, count)
+    }
+    return bytes
+  }
+
+  /** Hashes stored spans through a fixed chunk, so checking never holds a whole piece. */
+  private fun storedPieceMatches(index: Int, chunk: ByteArray): Boolean {
+    val digest = Sha1()
+    var hashed = 0
+    forEachStoredSpan(index) { handle, offset, targetOffset, count ->
+      check(targetOffset == hashed) { "Piece spans are not contiguous" }
+      var done = 0
+      while (done < count) {
+        val size = minOf(chunk.size, count - done)
+        readFully(handle, offset + done, chunk, 0, size)
+        digest.update(chunk, 0, size)
+        done += size
+      }
+      hashed += count
+    }
+    return hashed == pieceSize(index) &&
+      digest.digest().contentEquals(metadata.pieceHashes.copyOfRange(index * 20, index * 20 + 20))
+  }
+
+  private inline fun forEachStoredSpan(
+    index: Int,
+    visit: (handle: FileHandle, offset: Long, targetOffset: Int, count: Int) -> Unit,
+  ) {
     val start = index * metadata.pieceLength
-    val end = start + bytes.size
+    val end = start + pieceSize(index)
     for (file in overlappingFiles(index)) {
       val count = overlap(start, end, file).toInt()
       if (count == 0) continue
@@ -483,25 +520,32 @@ internal class TorrentPieceStore(
       val path = if (file in selected) filePath(file) else sidecar / "$index.piece"
       val offset = if (file in selected) overlapStart - offsets[file] else targetOffset.toLong()
       validateRegularPath(path)
-      fileSystem.openReadOnly(path).use { handle ->
-        var read = 0
-        while (read < count) {
-          val size = handle.read(offset + read, bytes, targetOffset + read, count - read)
-          if (size <= 0) throw EOFException("Truncated piece storage")
-          read += size
-        }
-      }
+      fileSystem.openReadOnly(path).use { handle -> visit(handle, offset, targetOffset, count) }
     }
-    return bytes
   }
 
-  private fun write(path: Path, offset: Long, bytes: ByteArray) {
+  private fun readFully(handle: FileHandle, offset: Long, bytes: ByteArray, at: Int, count: Int) {
+    var read = 0
+    while (read < count) {
+      val size = handle.read(offset + read, bytes, at + read, count - read)
+      if (size <= 0) throw EOFException("Truncated piece storage")
+      read += size
+    }
+  }
+
+  private fun write(
+    path: Path,
+    offset: Long,
+    bytes: ByteArray,
+    from: Int = 0,
+    count: Int = bytes.size - from,
+  ) {
     validateRegularPath(path)
     val existed = fileSystem.exists(path)
     fileSystem.openReadWrite(path, mustCreate = !existed).use { handle ->
       if (!existed) recordOwned(path, directory = false)
-      handle.write(offset, bytes, 0, bytes.size)
-      handle.flush()
+      // No fsync per piece: resume always rehashes, and finish() syncs the completed files.
+      handle.write(offset, bytes, from, count)
     }
   }
 
@@ -587,5 +631,10 @@ internal class TorrentPieceStore(
     return suffix.asReversed().fold(fileSystem.canonicalize(parent)) { result, name ->
       result / name
     }
+  }
+
+  internal companion object {
+    /** Recheck hashes stored pieces through one buffer of this size, whatever the piece length. */
+    const val CHECK_CHUNK_BYTES: Int = 64 * 1024
   }
 }

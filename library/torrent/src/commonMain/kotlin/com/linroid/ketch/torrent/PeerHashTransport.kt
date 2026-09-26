@@ -16,6 +16,8 @@ internal class PeerHashTransport(
   private val frames: TorrentBufferBudget,
   private val timeoutMs: Long = 180_000,
   private val pieceCount: Int? = null,
+  private val keepAliveMs: Long = 60_000,
+  private val clock: () -> Long = monotonicClock(),
 ) {
   class Frame internal constructor(
     val message: PeerMessage,
@@ -33,8 +35,18 @@ internal class PeerHashTransport(
   private val limits = PeerFrameLimits(pieceCount)
   private val reads = Mutex()
   private var closed = false
+  private var lastWrite = clock()
 
-  init { require(timeoutMs in 1..180_000) }
+  init { require(timeoutMs in 1..180_000 && keepAliveMs > 0) }
+
+  /** Milliseconds until an idle connection owes the peer a keep-alive; zero means now. */
+  fun keepAliveDelayMs(): Long = (keepAliveMs - (clock() - lastWrite)).coerceIn(0, keepAliveMs)
+
+  /** Called by the actor while idle. Peers drop connections that stay silent for ~2 minutes. */
+  suspend fun sendKeepAlive() {
+    check(!closed)
+    trySend(PeerMessage.KeepAlive)
+  }
 
   suspend fun request(selector: PeerHashSelector): PeerHashExchange.Ticket? {
     check(!closed)
@@ -47,6 +59,7 @@ internal class PeerHashTransport(
       withTimeout(minOf(timeoutMs, remaining)) {
         connection.write(PeerWire.encode(PeerHashWire.encode(PeerHashMessage.Request(selector))))
       }
+      lastWrite = clock()
       check(exchange.remainingMs(ticket) > 0) { "Hash request expired during write" }
       return ticket
     } catch (error: Throwable) {
@@ -98,6 +111,7 @@ internal class PeerHashTransport(
     val lease = frames.reserve(size * 4 + 512) ?: return false
     try {
       withTimeout(timeoutMs) { connection.write(encode()) }
+      lastWrite = clock()
       return true
     } catch (error: Throwable) {
       // Partial frames cannot be retried on this byte stream. Pending hash tickets die with it.

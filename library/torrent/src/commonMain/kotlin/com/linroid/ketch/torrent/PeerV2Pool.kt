@@ -26,6 +26,7 @@ internal class PeerV2Pool private constructor(
     val blocks: PeerBlockExchange,
     internal val transport: PeerHashTransport,
     internal val admission: TorrentBufferBudget.Lease? = null,
+    internal val slot: TorrentBufferBudget.Lease? = null,
   ) {
     internal val stop = CompletableDeferred<Unit>()
     internal val terminal = CompletableDeferred<Event.Closed>()
@@ -68,7 +69,9 @@ internal class PeerV2Pool private constructor(
       "Connection already belongs to this pool"
     }
     if (members.size == maxPeers) return null
-    val peer = Peer(blocks, transport, admission)
+    // Charge the forwarded-event slot per attached peer, not for every possible peer up front.
+    val slot = state.reserve(PEER_SLOT_BYTES) ?: return null
+    val peer = Peer(blocks, transport, admission, slot)
     val job = scope.launch(start = CoroutineStart.LAZY) {
       var cause = coroutineScope {
         val outcome = CompletableDeferred<Throwable?>()
@@ -127,6 +130,7 @@ internal class PeerV2Pool private constructor(
       event.peer.terminal.getCompleted() !== event) return false
     if (members.remove(event.peer) == null) return false
     event.peer.admission?.close()
+    event.peer.slot?.close()
     return true
   }
 
@@ -139,13 +143,18 @@ internal class PeerV2Pool private constructor(
     for (peer in members.keys) {
       try { closePeer(peer) } catch (error: Throwable) {
         if (failure == null) failure = error else failure.addSuppressed(error)
-      } finally { peer.admission?.close() }
+      } finally {
+        peer.admission?.close()
+        peer.slot?.close()
+      }
     }
     members.clear()
     try { output.cancel() } finally { failure?.let { throw it } }
   }
 
   companion object {
+    private const val PEER_SLOT_BYTES = 8192
+
     private fun closePeer(peer: Peer) {
       try { peer.blocks.close() } finally { peer.transport.close() }
     }
@@ -158,8 +167,9 @@ internal class PeerV2Pool private constructor(
       body: suspend (PeerV2Pool) -> T,
     ): T = coroutineScope {
       require(maxPeers in 1..500 && capacity in 1..256)
-      // One forwarded event per peer plus the shared queue, including hash timeout ticket lists.
-      val lease = checkNotNull(state.reserve((maxPeers + capacity) * 8192 + 2048)) {
+      // The shared queue, including hash timeout ticket lists. Each attached peer adds its own
+      // forwarded-event slot in attach().
+      val lease = checkNotNull(state.reserve(capacity * PEER_SLOT_BYTES + 2048)) {
         "Peer pool state budget exhausted"
       }
       val output = Channel<Event>(capacity, onUndeliveredElement = { it.close() })

@@ -110,6 +110,8 @@ internal class DhtRoutingTable(
     }
   }
 
+  suspend fun size(): Int = mutex.withLock { buckets.sumOf { it.entries.size } }
+
   suspend fun snapshot(): ByteArray = mutex.withLock {
     Bencode.encode(mapOf("version" to 1L, "id" to localId.toByteArray(), "nodes" to
       buckets.flatMap { it.entries }.filter { it.failures < 2 }.map {

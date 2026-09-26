@@ -37,13 +37,9 @@ internal class PeerV2Inbox private constructor(
       check(!blocks.expire()) { "Peer block response deadline expired" }
       val expired = transport.expire()
       if (expired.isNotEmpty()) return Event.HashTimeout(expired)
-      val blockDelay = blocks.nextDeadlineMs()
-      val hashDelay = transport.nextDeadlineMs()
-      val delay = when {
-        blockDelay == null -> hashDelay
-        hashDelay == null -> blockDelay
-        else -> minOf(blockDelay, hashDelay)
-      }
+      val keepAlive = transport.keepAliveDelayMs()
+      val delay = listOfNotNull(blocks.nextDeadlineMs(), transport.nextDeadlineMs(), keepAlive)
+        .min()
       // Channel cancellation owns any undelivered frame. Avoid a withTimeout return boundary
       // that could discard a successfully received frame without releasing its reservation.
       val event = select<Event<C>?> {
@@ -51,12 +47,14 @@ internal class PeerV2Inbox private constructor(
         if (preferCommands && commands != null) commands.onReceive { Event.Command(it) }
         frames.onReceive { Event.Frame(it) }
         if (!preferCommands && commands != null) commands.onReceive { Event.Command(it) }
-        if (delay != null) onTimeout(delay) { null }
+        onTimeout(delay) { null }
       }
       if (event != null) {
         preferCommands = event !is Event.Command
         return event
       }
+      // Only the idle timer fired: tell the peer we are alive so it keeps the connection.
+      if (delay == keepAlive) transport.sendKeepAlive()
     }
   }
 

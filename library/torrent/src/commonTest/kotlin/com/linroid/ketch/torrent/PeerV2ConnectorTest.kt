@@ -155,7 +155,8 @@ class PeerV2ConnectorTest {
       val terminal = assertIs<PeerV2Pool.Event.Closed>(pool.events.receive())
       assertTrue(network.closed)
       assertEquals(0, network.readers)
-      assertEquals(baseline + 1025, state.allocated)
+      // Availability admission plus the pool's per-peer event slot.
+      assertEquals(baseline + 1025 + 8192, state.allocated)
       assertTrue(pool.retire(terminal))
       assertEquals(baseline, state.allocated)
       connected.close()

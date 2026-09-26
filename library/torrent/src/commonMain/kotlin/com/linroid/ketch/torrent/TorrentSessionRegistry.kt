@@ -5,7 +5,11 @@ import kotlinx.coroutines.sync.withLock
 
 /** Reserves swarm ownership before starting I/O and routes snapshots by task identity. */
 internal class TorrentSessionRegistry {
-  private data class Entry(val infoHash: String, var session: TorrentSession? = null)
+  private data class Entry(
+    val infoHash: String,
+    var session: TorrentSession? = null,
+    var seeding: Boolean = false,
+  )
 
   private val mutex = Mutex()
   private val entries = mutableMapOf<String, Entry>()
@@ -27,6 +31,17 @@ internal class TorrentSessionRegistry {
 
   suspend fun session(taskId: String): TorrentSession? = mutex.withLock {
     entries[taskId]?.session
+  }
+
+  /** The task's download returned while its session keeps seeding in the background. */
+  suspend fun markSeeding(taskId: String) = mutex.withLock {
+    entries[taskId]?.seeding = true
+    Unit
+  }
+
+  /** Oldest seeding task no download is attached to; the only kind that may be evicted. */
+  suspend fun oldestSeeding(): String? = mutex.withLock {
+    entries.entries.firstOrNull { it.value.seeding }?.key
   }
 
   suspend fun isReserved(taskId: String): Boolean = mutex.withLock { taskId in entries }

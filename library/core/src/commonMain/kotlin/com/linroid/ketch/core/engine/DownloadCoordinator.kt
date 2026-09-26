@@ -261,6 +261,23 @@ internal class DownloadCoordinator(
   }
 
   /**
+   * Lets the task's source stop work that outlived the download via
+   * [DownloadSource.release]. The caller must have cancelled the active
+   * download first. No-op for tasks without a recorded source type.
+   */
+  suspend fun release(handle: TaskHandle) {
+    val record = handle.record.value
+    val sourceType = record.sourceType ?: return
+    val source = try {
+      sourceResolver.resolveByType(sourceType)
+    } catch (e: KetchError) {
+      log.w(e) { "Skipping release for taskId=${handle.taskId}: unknown source '$sourceType'" }
+      return
+    }
+    source.release(handle.taskId, record.sourceResumeState)
+  }
+
+  /**
    * Deletes any data produced for the given task by dispatching to its
    * [DownloadSource.cleanup]. The caller must have cancelled the active
    * download (if any) before invoking this. No-op if the task has no

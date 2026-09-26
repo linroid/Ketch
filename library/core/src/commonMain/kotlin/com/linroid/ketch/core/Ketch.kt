@@ -238,6 +238,13 @@ class Ketch(
       scheduler.cancel(taskId)
       coordinator.cancel(handle)
       queue.dequeue(taskId)
+      try {
+        coordinator.release(handle)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Throwable) {
+        log.w(e) { "Release failed for taskId=$taskId" }
+      }
       if (deleteFiles) {
         try {
           coordinator.cleanup(handle)

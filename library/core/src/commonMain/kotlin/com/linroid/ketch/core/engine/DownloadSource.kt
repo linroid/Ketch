@@ -102,6 +102,21 @@ interface DownloadSource {
   ): SourceResumeState? = null
 
   /**
+   * Releases work this source keeps alive for a task after [download]
+   * or [resume] has returned, such as a torrent that is still seeding.
+   * Called by the engine whenever a task is removed, with or without
+   * deleting files, after the active download (if any) has been
+   * cancelled and before [cleanup].
+   *
+   * Best-effort, like [cleanup]. The default implementation does nothing.
+   *
+   * @param taskId the removed task
+   * @param resumeState the source-specific resume state persisted in the
+   *   task record, or `null` if the task never produced one
+   */
+  suspend fun release(taskId: String, resumeState: SourceResumeState?) {}
+
+  /**
    * Deletes any data this source wrote for the given task. Called by
    * the engine when a task is removed with `deleteFiles = true`,
    * after the active download (if any) has been cancelled.

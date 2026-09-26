@@ -74,34 +74,36 @@ class PeerBlockExchangeTest {
   }
 
   @Test
-  fun chokeAndCancelRetainOwnershipUntilAResponseWithoutExtendingTheDeadline() = runTest {
+  fun choke_dropsOutstandingRequestsAsRejectedAndIgnoresLateBlocks() = runTest {
     val f = Fixture(pipeline = 1)
     f.ready()
     val request = PeerMessage.Request(0, 0, 3)
     val ticket = assertNotNull(f.exchange.request(request))
     f.now = 4
-    f.receive(PeerMessage.Control(PeerMessage.Signal.CHOKE))
-    f.exchange.cancel(ticket)
-    f.receive(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
-    assertNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
-    val written = f.connection.outgoing.size
-    f.exchange.cancel(ticket)
-    assertEquals(written, f.connection.outgoing.size)
-    assertEquals(1, f.exchange.pendingCount)
-    assertEquals(6L, f.exchange.nextDeadlineMs())
-    assertTrue(f.blocks.allocated > 0)
-    val discarded = assertIs<PeerBlockExchange.Response.Canceled>(
-      f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3))))
-    assertSame(ticket, discarded.ticket)
+    // Without the Fast extension a choking peer silently discards our requests (BEP 3).
+    assertNull(f.receive(PeerMessage.Control(PeerMessage.Signal.CHOKE)))
+    val dropped = f.exchange.takeDropped()
+    assertEquals(1, dropped.size)
+    assertSame(ticket, dropped.single().ticket)
+    assertTrue(f.exchange.takeDropped().isEmpty())
+    assertEquals(0, f.exchange.pendingCount)
+    assertNull(f.exchange.nextDeadlineMs())
     assertEquals(0, f.blocks.allocated)
+    // A block already in flight when the peer choked is discarded, not a protocol violation.
+    assertNull(f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3))))
+    assertFalse(f.connection.closed)
+    f.now = 100
+    assertFalse(f.exchange.expire())
     f.receive(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
     val replacement = assertNotNull(f.exchange.request(request))
-    val before = f.connection.outgoing.size
-    f.exchange.cancel(ticket)
-    assertEquals(before, f.connection.outgoing.size)
+    assertTrue(f.exchange.cancel(replacement))
+    assertSame(replacement, assertIs<PeerBlockExchange.Response.Canceled>(
+      f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3)))).ticket)
+    val tail = PeerMessage.Request(1, 0, 5)
+    val rejectedTicket = assertNotNull(f.exchange.request(tail))
     val rejected = assertIs<PeerBlockExchange.Response.Rejected>(
-      f.receive(PeerMessage.Reject(0, 0, 3)))
-    assertSame(replacement, rejected.ticket)
+      f.receive(PeerMessage.Reject(1, 0, 5)))
+    assertSame(rejectedTicket, rejected.ticket)
     f.exchange.close()
     assertEquals(0, f.blocks.allocated)
   }

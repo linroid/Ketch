@@ -39,6 +39,18 @@ class TorrentSessionAdmissionTest {
   }
 
   @Test
+  fun sessionStateWeight_doesNotScaleWithPieceLength() {
+    val metadata = fixture("a")
+    val small = TorrentTaskSpec("task", metadata, "/tmp/admission/a", emptySet())
+    val large = small.copy(metadata = metadata.copy(pieceLength = 16L * 1024 * 1024,
+      totalBytes = 16L * 1024 * 1024))
+    // Piece buffers are charged to the transfer budget, never to shared session state.
+    assertEquals(sessionStateWeight(small), sessionStateWeight(large))
+    val config = TorrentConfig()
+    assertTrue(sessionStateWeight(large) * config.maxActiveTorrents <= config.maxSessionStateBytes)
+  }
+
+  @Test
   fun engineRejectsBeforeCreatingStorageAndReturnsCreditOnFailedConstruction() = runTest {
     withContext(Dispatchers.Default) {
       val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /

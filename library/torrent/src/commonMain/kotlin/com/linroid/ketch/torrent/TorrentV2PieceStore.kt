@@ -115,7 +115,7 @@ internal class TorrentV2PieceStore(
     initialized = true
   }
 
-  /** Hash mismatch writes nothing. Verified progress is published only after flush and return. */
+  /** Hash mismatch writes nothing. Verified progress is published only after the write returns. */
   suspend fun commit(index: Int, payload: ByteArray): Boolean = mutex.withLock {
     validateCommit(index, payload.size)
     val lease = checkNotNull(buffers.reserve(payload.size)) { "Payload buffer budget exhausted" }
@@ -154,10 +154,11 @@ internal class TorrentV2PieceStore(
       fileSystem.openReadWrite(path, mustExist = true).use { handle ->
         handle.write(extent.fileOffset, bytes, 0, bytes.size)
         val expected = document.info.files[file.v2Index].length
-        if (progress[file.v2Index] + extent.length == expected && handle.size() > expected) {
-          handle.resize(expected)
+        if (progress[file.v2Index] + extent.length == expected) {
+          if (handle.size() > expected) handle.resize(expected)
+          // Sync once per completed file. Resume rehashes, so partial files need no fsync.
+          handle.flush()
         }
-        handle.flush()
       }
     }
     currentCoroutineContext().ensureActive()
