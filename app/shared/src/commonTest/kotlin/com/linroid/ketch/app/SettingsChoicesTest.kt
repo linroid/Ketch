@@ -41,7 +41,7 @@ class SettingsChoicesTest {
   }
 
   @Test
-  fun `zero, negative and garbage amounts are rejected`() {
+  fun `zero negative and garbage amounts are rejected`() {
     assertNull(parseSpeedLimit("0", SpeedUnit.KB))
     assertNull(parseSpeedLimit("-5", SpeedUnit.MB))
     assertNull(parseSpeedLimit("", SpeedUnit.MB))
