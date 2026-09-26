@@ -7,7 +7,9 @@ import kotlin.time.Duration.Companion.seconds
  * Configuration for the torrent engine.
  *
  * @property dhtEnabled whether to enable DHT for peer discovery
- * @property maxActiveTorrents maximum number of active torrents
+ * @property maxActiveTorrents maximum number of torrents the engine runs at once, including
+ *   seeding sessions. Further downloads wait for a slot (higher priority first, then arrival
+ *   order) instead of failing, and a seeding session yields its slot to a waiting download.
  * @property metadataTimeoutSeconds timeout for magnet metadata
  *   resolution in seconds
  * @property connectionsPerTorrent default connections per torrent

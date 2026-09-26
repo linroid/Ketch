@@ -61,7 +61,7 @@ internal class TorrentMetadataCache(
       scope.coroutineContext.ensureActive()
       check(!closed) { "Metadata cache is closed" }
       pending.getOrPut(key) {
-        check(pending.size < 16) { "Too many pending metadata requests" }
+        check(pending.size < MAX_PENDING_METADATA) { "Too many pending metadata requests" }
         scope.async {
           try {
             val metadata = get(hash) ?: fetch()
@@ -125,6 +125,9 @@ internal class TorrentMetadataCache(
     entries.remove(entries.keys.first())?.lease?.close()
   }
 }
+
+/** Distinct in-flight metadata fetches per runtime; the source queues magnets beyond this. */
+internal const val MAX_PENDING_METADATA = 16
 
 /** Retained arrays, strings, file records, and container allowance; not process RSS. */
 internal fun cacheWeight(metadata: TorrentMetadata): Long =
