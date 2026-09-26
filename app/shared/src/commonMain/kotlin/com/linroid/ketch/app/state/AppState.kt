@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.state
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.Destination
@@ -29,6 +28,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -62,6 +62,7 @@ class AppState(
   private val scope: CoroutineScope,
   val appSettings: AppSettingsController = AppSettingsController(),
   val aiSettings: AiSettingsController = AiSettingsController(),
+  private val incoming: IncomingDownloads = IncomingDownloads(),
 ) {
   private val lanServerDiscovery = LanServerDiscovery()
 
@@ -112,11 +113,9 @@ class AppState(
   )
     private set
 
-  private val openedDownloads = mutableStateListOf<IncomingDownload.Ready>()
-
   /** The opened file the add dialog shows, or null when the user types a URL. */
-  val openedDownload: IncomingDownload.Ready?
-    get() = openedDownloads.firstOrNull()
+  var openedDownload by mutableStateOf<IncomingDownload.Ready?>(null)
+    private set
 
   /**
    * Handle "New Task" action. If no backend is available,
@@ -130,28 +129,11 @@ class AppState(
     }
   }
 
-  /**
-   * Shows a download opened from outside the app in the add dialog. Files opened together are
-   * shown one after another; opening one that is already waiting has no effect.
-   */
-  fun openIncoming(download: IncomingDownload) {
-    when (download) {
-      is IncomingDownload.Failed ->
-        errorMessage = "Couldn't open ${download.label}: ${download.message}"
-      is IncomingDownload.Ready -> {
-        if (download in openedDownloads) return
-        if (openedDownloads.isEmpty()) resetResolveState()
-        openedDownloads += download
-        requestAddDownload()
-      }
-    }
-  }
-
-  /** Closes the add dialog, moving on to the next opened download if one is waiting. */
+  /** Closes the add dialog; the next opened download, if one is waiting, then shows. */
   fun closeAddDialog() {
     resetResolveState()
-    if (openedDownloads.isNotEmpty()) openedDownloads.removeAt(0)
-    showAddDialog = openedDownloads.isNotEmpty()
+    showAddDialog = false
+    openedDownload?.let(incoming::complete)
   }
   var discoveryState by mutableStateOf<DiscoveryState>(
     DiscoveryState.Idle
@@ -171,9 +153,23 @@ class AppState(
 
   init {
     scope.launch {
-      activeInstance.collect { instance ->
-        // A file opened before any backend was connected waits for one.
-        if (instance != null && openedDownloads.isNotEmpty()) showAddDialog = true
+      // Opened files show one at a time in the add dialog, and wait for a backend if none is
+      // connected. Pending files survive a recreated UI, so they show again after it.
+      combine(incoming.pending, activeInstance) { pending, instance ->
+        pending.firstOrNull() to (instance != null)
+      }.collect { (next, connected) ->
+        if (next != openedDownload) {
+          resetResolveState()
+          openedDownload = next
+        }
+        if (next != null) {
+          if (connected) showAddDialog = true else showAddRemoteDialog = true
+        }
+      }
+    }
+    scope.launch {
+      incoming.failures.collect {
+        errorMessage = "Couldn't open ${it.label}: ${it.message}"
       }
     }
     scope.launch {

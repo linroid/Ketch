@@ -7,9 +7,8 @@ import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
 import com.linroid.ketch.app.state.torrentFileDownload
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
@@ -22,6 +21,8 @@ import kotlin.test.assertTrue
 
 class IncomingDownloadsTest {
   private val prefix = "data:application/x-bittorrent;base64,"
+  private val first = IncomingDownload.Ready("a.torrent", "data:a")
+  private val second = IncomingDownload.Ready("b.torrent", "data:b")
 
   @Test
   fun `torrent files become inline data URLs`() {
@@ -43,50 +44,103 @@ class IncomingDownloadsTest {
   }
 
   @Test
-  fun `downloads offered before the UI collects are kept in order`() = runTest {
+  fun `opened files stay pending until completed`() {
     val incoming = IncomingDownloads()
-    incoming.offer(IncomingDownload.Ready("a.torrent", "data:a"))
+    incoming.offer(first)
+    incoming.offer(second)
+    incoming.offer(first)
+
+    assertEquals(listOf(first, second), incoming.pending.value)
+    incoming.complete(first)
+    assertEquals(listOf(second), incoming.pending.value)
+  }
+
+  @Test
+  fun `unreadable files are delivered once`() = runTest {
+    val incoming = IncomingDownloads()
     incoming.offerUnreadable("b.torrent", Exception("Permission denied"))
 
     assertEquals(
-      listOf(
-        IncomingDownload.Ready("a.torrent", "data:a"),
-        IncomingDownload.Failed("b.torrent", "Permission denied"),
-      ),
-      incoming.requests.take(2).toList(),
+      IncomingDownload.Failed("b.torrent", "Permission denied"),
+      incoming.failures.first(),
     )
   }
 
   @Test
-  fun `opened files are shown one after another`() = withAppState { state ->
-    val first = IncomingDownload.Ready("a.torrent", "data:a")
-    val second = IncomingDownload.Ready("b.torrent", "data:b")
-    state.openIncoming(first)
-    state.openIncoming(second)
-    state.openIncoming(first)
+  fun `opened files are shown one after another`() = runTest {
+    val incoming = IncomingDownloads()
+    withManager { manager ->
+      val state = AppState(manager, backgroundScope, incoming = incoming)
+      incoming.offer(first)
+      incoming.offer(second)
+      runCurrent()
 
-    assertTrue(state.showAddDialog)
-    assertEquals(first, state.openedDownload)
-    state.closeAddDialog()
-    assertTrue(state.showAddDialog)
-    assertEquals(second, state.openedDownload)
-    state.closeAddDialog()
-    assertFalse(state.showAddDialog)
-    assertNull(state.openedDownload)
+      assertTrue(state.showAddDialog)
+      assertEquals(first, state.openedDownload)
+      state.closeAddDialog()
+      runCurrent()
+      assertTrue(state.showAddDialog)
+      assertEquals(second, state.openedDownload)
+      state.closeAddDialog()
+      runCurrent()
+      assertFalse(state.showAddDialog)
+      assertNull(state.openedDownload)
+      assertEquals(emptyList(), incoming.pending.value)
+    }
   }
 
   @Test
-  fun `unreadable files are reported without opening the dialog`() = withAppState { state ->
-    state.openIncoming(IncomingDownload.Failed("a.torrent", "The file is empty"))
+  fun `an opened file shows again in a recreated UI`() = runTest {
+    val incoming = IncomingDownloads()
+    withManager { manager ->
+      AppState(manager, backgroundScope, incoming = incoming)
+      incoming.offer(first)
+      runCurrent()
 
-    assertFalse(state.showAddDialog)
-    assertEquals("Couldn't open a.torrent: The file is empty", state.errorMessage)
+      // Android recreates the activity, and with it the UI state, on rotation.
+      val recreated = AppState(manager, backgroundScope, incoming = incoming)
+      runCurrent()
+      assertTrue(recreated.showAddDialog)
+      assertEquals(first, recreated.openedDownload)
+    }
   }
 
-  private fun withAppState(block: TestScope.(AppState) -> Unit) = runTest {
-    val manager = InstanceManager(InstanceFactory(embeddedFactory = { FakeKetchApi("Core") }))
+  @Test
+  fun `opened files wait for a backend`() = runTest {
+    val incoming = IncomingDownloads()
+    withManager(embedded = false) { manager ->
+      val state = AppState(manager, backgroundScope, incoming = incoming)
+      incoming.offer(first)
+      runCurrent()
+
+      assertFalse(state.showAddDialog)
+      assertTrue(state.showAddRemoteDialog)
+      assertEquals(listOf(first), incoming.pending.value)
+    }
+  }
+
+  @Test
+  fun `unreadable files are reported without opening the dialog`() = runTest {
+    val incoming = IncomingDownloads()
+    withManager { manager ->
+      val state = AppState(manager, backgroundScope, incoming = incoming)
+      incoming.offer(IncomingDownload.Failed("a.torrent", "The file is empty"))
+      runCurrent()
+
+      assertFalse(state.showAddDialog)
+      assertEquals("Couldn't open a.torrent: The file is empty", state.errorMessage)
+    }
+  }
+
+  private inline fun withManager(embedded: Boolean = true, block: (InstanceManager) -> Unit) {
+    val factory = if (embedded) {
+      InstanceFactory(embeddedFactory = { FakeKetchApi("Core") })
+    } else {
+      InstanceFactory()
+    }
+    val manager = InstanceManager(factory)
     try {
-      block(AppState(manager, backgroundScope))
+      block(manager)
     } finally {
       manager.close()
     }

@@ -78,18 +78,14 @@ fun AppShell(
   incoming: IncomingDownloads? = null,
 ) {
   val scope = rememberCoroutineScope()
-  val appState = remember(instanceManager, appSettings, aiSettings) {
+  val appState = remember(instanceManager, appSettings, aiSettings, incoming) {
     AppState(
       instanceManager = instanceManager,
       scope = scope,
       appSettings = appSettings,
       aiSettings = aiSettings,
+      incoming = incoming ?: IncomingDownloads(),
     )
-  }
-  if (incoming != null) {
-    LaunchedEffect(incoming, appState) {
-      incoming.requests.collect { appState.openIncoming(it) }
-    }
   }
 
   val instances by appState.instances.collectAsState()

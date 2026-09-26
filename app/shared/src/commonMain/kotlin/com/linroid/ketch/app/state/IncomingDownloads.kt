@@ -2,7 +2,11 @@ package com.linroid.ketch.app.state
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlin.io.encoding.Base64
 
 /**
@@ -27,17 +31,32 @@ sealed interface IncomingDownload {
 }
 
 /**
- * Queue of downloads opened from outside the app. Platform entry points offer them as they
- * arrive, even before the UI is ready, and the UI receives each one once.
+ * Downloads opened from outside the app. Platform entry points offer them as they arrive, even
+ * before the UI is ready. Each one stays [pending] until the UI [completes][complete] it, so a
+ * UI recreated in between (e.g. an Android configuration change) shows it again; keep this
+ * object for as long as that UI can be recreated.
  */
 class IncomingDownloads {
-  private val channel = Channel<IncomingDownload>(Channel.UNLIMITED)
+  private val pendingState = MutableStateFlow<List<IncomingDownload.Ready>>(emptyList())
+  private val failureChannel = Channel<IncomingDownload.Failed>(Channel.UNLIMITED)
 
-  /** Opened downloads in arrival order. Collect from one place only. */
-  val requests: Flow<IncomingDownload> = channel.receiveAsFlow()
+  /** Opened downloads waiting for the user, oldest first. */
+  val pending: StateFlow<List<IncomingDownload.Ready>> = pendingState.asStateFlow()
 
+  /** Files that could not be read, each delivered once. Collect from one place only. */
+  val failures: Flow<IncomingDownload.Failed> = failureChannel.receiveAsFlow()
+
+  /** Adds [download]; one that is already pending is not added twice. */
   fun offer(download: IncomingDownload) {
-    channel.trySend(download)
+    when (download) {
+      is IncomingDownload.Ready -> pendingState.update { if (download in it) it else it + download }
+      is IncomingDownload.Failed -> failureChannel.trySend(download)
+    }
+  }
+
+  /** Marks [download] as handled, whether the user downloaded or dismissed it. */
+  fun complete(download: IncomingDownload.Ready) {
+    pendingState.update { it - download }
   }
 
   /** Offers the contents of a `.torrent` file named [name]. */
