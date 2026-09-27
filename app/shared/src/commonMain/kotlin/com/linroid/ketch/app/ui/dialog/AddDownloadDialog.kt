@@ -829,6 +829,11 @@ private fun FileSelector(
               onCheckedChange = { onToggle(file.id) },
               modifier = Modifier.size(32.dp),
             )
+            KetchFileTypeChip(
+              fileName = file.name,
+              size = 24.dp,
+              modifier = Modifier.padding(start = 4.dp, end = 8.dp),
+            )
             Column(
               modifier = Modifier.weight(1f),
             ) {

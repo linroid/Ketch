@@ -134,6 +134,34 @@ internal object KetchPalette {
   )
 }
 
+/**
+ * Hues for file-type tiles, spaced around the OKLCH wheel at a shared lightness per theme so
+ * no kind looks louder than another. Each glyph keeps at least 3:1 against its own tinted
+ * tile.
+ */
+enum class FileTypeHue(val light: Color, val dark: Color) {
+  Red(Color(0xFFB63B39), Color(0xFFFF8A83)),
+  Orange(Color(0xFFA75001), Color(0xFFF4975B)),
+  Amber(Color(0xFF8E6201), Color(0xFFDDA64A)),
+  Brown(Color(0xFF835935), Color(0xFFCBA180)),
+  Lime(Color(0xFF5B7809), Color(0xFFA0BE69)),
+  Green(Color(0xFF11813C), Color(0xFF72C886)),
+  Jade(Color(0xFF037E65), Color(0xFF5EC7A9)),
+  Teal(Color(0xFF017B80), Color(0xFF58C4CA)),
+  Sky(Color(0xFF00769F), Color(0xFF58BEEE)),
+  Blue(Color(0xFF3566C7), Color(0xFF86B1FF)),
+  Indigo(Color(0xFF615CBF), Color(0xFFA5A7FE)),
+  Violet(Color(0xFF8050B0), Color(0xFFC59AF6)),
+  Magenta(Color(0xFFA34284), Color(0xFFEB8DC9)),
+  Slate(Color(0xFF5E6D80), Color(0xFFA4B3C5)),
+  ;
+
+  companion object {
+    /** Opacity of the hue behind the glyph on a file-type tile. */
+    const val TILE_ALPHA: Float = 0.13f
+  }
+}
+
 fun lightKetchColors(accent: KetchAccent = KetchAccent.Signal): KetchColors {
   val a = when (accent) {
     KetchAccent.Signal -> KetchPalette.SignalLight
