@@ -76,6 +76,46 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "com.linroid.ketch.endpoints.model.ConnectionsRequest",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.ConnectionsRequest$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.TasksResponse",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.TasksResponse$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.api.NetworkInterfaces",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.api.NetworkInterfaces$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.api.NetworkInterfaceConfig",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.api.NetworkInterfaceConfig$Companion",
+    "allDeclaredMethods": true
+  },
+  {
     "name": "com.linroid.ketch.api.KetchStatus",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,

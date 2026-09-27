@@ -30,6 +30,9 @@ graalvmNative {
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",
         "--initialize-at-build-time=ch.qos.logback",
         "--initialize-at-build-time=org.slf4j",
+        // Ktor's OkHttp engine (under io.ktor) switches over this enum, so its
+        // build-time WhenMappings class initializes it.
+        "--initialize-at-build-time=okhttp3.Protocol",
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",
