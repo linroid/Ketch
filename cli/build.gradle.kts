@@ -98,8 +98,10 @@ val prepareNativeLicenses by tasks.registering(Sync::class) {
   into(layout.buildDirectory.dir("native/nativeCompile/licenses"))
 }
 
+// The native plugin clears its output directory before building the executable.
+// Restore the sidecar notices after compilation, including when the image is up to date.
 tasks.named("nativeCompile") {
-  dependsOn(prepareNativeLicenses)
+  finalizedBy(prepareNativeLicenses)
 }
 
 dependencies {
