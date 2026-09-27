@@ -89,13 +89,13 @@ jobs:
         if: matrix.os != 'windows'
         run: |
           cd cli/build/native/nativeCompile
-          tar -czf ketch-cli-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz ketch
+          tar -czf ketch-cli-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz ketch licenses
 
       - name: Package (Windows)
         if: matrix.os == 'windows'
         run: |
           cd cli/build/native/nativeCompile
-          7z a ketch-cli-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.zip ketch.exe
+          7z a ketch-cli-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.zip ketch.exe licenses
 
       - uses: actions/upload-artifact@v7
         with:

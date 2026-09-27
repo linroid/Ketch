@@ -3,8 +3,19 @@ package com.linroid.ketch.app.ui.settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
@@ -13,12 +24,14 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
 
 private const val PROJECT_URL = "https://github.com/linroid/Ketch"
 
 /** Version information and project links. */
 @Composable
 fun AboutSettings() {
+  var showLicenses by remember { mutableStateOf(false) }
   Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
     SettingsGroup {
       SettingsRow(title = "Version", trailing = { MonoValue(KetchApi.VERSION) })
@@ -35,8 +48,41 @@ fun AboutSettings() {
         description = "Open an issue on GitHub",
         url = "$PROJECT_URL/issues",
       )
+      SettingsRow(
+        title = "Open-source licenses",
+        description = "Ketch and third-party notices",
+        modifier = Modifier.clickable(role = Role.Button) { showLicenses = true },
+      )
     }
   }
+  if (showLicenses) {
+    LicenseDialog(onDismiss = { showLicenses = false })
+  }
+}
+
+@Composable
+private fun LicenseDialog(onDismiss: () -> Unit) {
+  var licenseText by remember { mutableStateOf("Loading licenses…") }
+  LaunchedEffect(Unit) {
+    licenseText = listOf("LICENSE.txt", "THIRD-PARTY-NOTICES.txt").map {
+      Res.readBytes("files/licenses/$it").decodeToString()
+    }.joinToString("\n\n")
+  }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Open-source licenses") },
+    text = {
+      SelectionContainer {
+        Text(
+          text = licenseText,
+          modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+        )
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = onDismiss) { Text("Close") }
+    },
+  )
 }
 
 @Composable
