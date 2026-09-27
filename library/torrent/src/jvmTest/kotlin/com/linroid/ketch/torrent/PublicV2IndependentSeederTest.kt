@@ -59,9 +59,26 @@ class PublicV2IndependentSeederTest {
       try {
         manager.start(SessionParams(settings))
         val torrent = TorrentInfo(data)
+        for (index in 0 until torrent.files().numFiles()) {
+          val path = torrent.files().filePath(index)
+          println("Independent v2 seed file: $path exists=${seed.resolve(path).exists()}")
+        }
         manager.download(torrent, seed)
-        while (manager.find(torrent.infoHash())?.status()?.isSeeding() != true ||
-          manager.swig().listen_port() == 0) delay(20)
+        var lastState: String? = null
+        while (true) {
+          val status = manager.find(torrent.infoHash())?.status()
+          val state = "state=${status?.state()} progress=${status?.progress()} " +
+            "error=${status?.errorCode()} port=${manager.swig().listen_port()}"
+          if (state != lastState) {
+            println("Independent v2 seeder: $state")
+            lastState = state
+          }
+          check(status == null || status.errorCode().value() == 0) {
+            "Independent v2 seeder failed: $state"
+          }
+          if (status?.isSeeding() == true && manager.swig().listen_port() != 0) break
+          delay(20)
+        }
         val magnet = MagnetUri(expected.identity,
           explicitPeers = listOf("127.0.0.1:${manager.swig().listen_port()}")).toUri()
         val resolved = source.resolve(magnet, emptyMap())
