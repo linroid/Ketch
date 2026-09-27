@@ -68,12 +68,12 @@ class PublicV2IndependentSeederTest {
         while (true) {
           val status = manager.find(torrent.infoHash())?.status()
           val state = "state=${status?.state()} progress=${status?.progress()} " +
-            "error=${status?.errorCode()} port=${manager.swig().listen_port()}"
+            "error=${status?.errorCode()?.message} port=${manager.swig().listen_port()}"
           if (state != lastState) {
             println("Independent v2 seeder: $state")
             lastState = state
           }
-          check(status == null || status.errorCode().value() == 0) {
+          check(status == null || !status.errorCode().isError) {
             "Independent v2 seeder failed: $state"
           }
           if (status?.isSeeding() == true && manager.swig().listen_port() != 0) break
