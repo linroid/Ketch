@@ -1,0 +1,38 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:aapt="http://schemas.android.com/aapt"
+  android:width="108dp"
+  android:height="108dp"
+  android:viewportWidth="108"
+  android:viewportHeight="108">
+  <!-- Tile from art/icon-square.svg; its 1024px artwork maps onto the 72dp visible area -->
+  <group
+    android:scaleX="0.0703125"
+    android:scaleY="0.0703125"
+    android:translateX="18"
+    android:translateY="18">
+    <path android:pathData="M-256,-256 H1280 V1280 H-256 Z">
+      <aapt:attr name="android:fillColor">
+        <gradient
+          android:type="linear"
+          android:startX="153.6"
+          android:startY="0"
+          android:endX="870.4"
+          android:endY="1024"
+          android:startColor="#FFB25B"
+          android:endColor="#E0482B" />
+      </aapt:attr>
+    </path>
+    <!-- Soft highlight in the top-left corner -->
+    <path android:pathData="M-256,-256 H1280 V1280 H-256 Z">
+      <aapt:attr name="android:fillColor">
+        <gradient
+          android:type="radial"
+          android:centerX="330"
+          android:centerY="140"
+          android:gradientRadius="640"
+          android:startColor="#40FFFFFF"
+          android:endColor="#00FFFFFF" />
+      </aapt:attr>
+    </path>
+  </group>
+</vector>
