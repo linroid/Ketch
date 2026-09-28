@@ -53,6 +53,12 @@ class LogFormatTest {
   }
 
   @Test
+  fun redactUrl_passwordContainingQueryOrFragmentMark_isMasked() {
+    assertEquals("ftp://user:***@example.com/file", redactUrl("ftp://user:pa?ss@example.com/file"))
+    assertEquals("ftp://user:***@example.com/file", redactUrl("ftp://user:pa#ss@example.com/file"))
+  }
+
+  @Test
   fun redactUrl_withoutPassword_isUnchanged() {
     val urls = listOf(
       "https://example.com:8443/file.zip?name=a@b",

@@ -50,7 +50,7 @@ internal class TorrentV2DownloadSession private constructor(
     .sumOf { document.info.files[it.v2Index].length }
   override val downloadSpeed: Long get() = 0
   private val log = KetchLogger("TorrentSession")
-  private val label = "v2 ${logHash(document.info.hash.hex)}"
+  private val label = "taskId=${store.taskId} (v2 ${logHash(document.info.hash.hex)})"
 
   override fun setFilePriorities(priorities: Map<Int, Int>) {
     error("File selection is fixed for this session")
