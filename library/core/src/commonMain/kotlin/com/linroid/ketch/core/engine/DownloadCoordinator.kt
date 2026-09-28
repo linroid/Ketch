@@ -81,14 +81,13 @@ internal class DownloadCoordinator(
 
       entry.job.cancel()
 
-      currentSegments?.let { segments ->
+      if (currentSegments != null) {
         log.d { "Saving pause state for taskId=$taskId" }
+        // Segments are left to the execution: once its source runs, it saves its final
+        // segments while stopping, and this earlier snapshot could land after and replace
+        // them. Before that, the record already holds the segments being resumed from.
         handle.record.update {
-          it.copy(
-            state = TaskState.PAUSED,
-            segments = segments,
-            updatedAt = Clock.System.now(),
-          )
+          it.copy(state = TaskState.PAUSED, updatedAt = Clock.System.now())
         }
       }
 
