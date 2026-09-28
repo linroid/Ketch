@@ -62,7 +62,7 @@ so UI code works identically regardless of backend:
 interface KetchApi {
   val tasks: StateFlow<List<DownloadTask>>
   suspend fun download(request: DownloadRequest): DownloadTask
-  suspend fun setGlobalSpeedLimit(limit: SpeedLimit)
+  suspend fun updateConfig(config: DownloadConfig)
   fun close()
   // ... plus backendLabel, version
 }
@@ -157,6 +157,19 @@ DownloadConfig(
 )
 ```
 
+`ketch.updateConfig(config)` replaces the configuration at runtime. `speedLimit`,
+`maxConcurrentDownloads` and `maxConnectionsPerHost` apply immediately: raising a queue limit
+starts queued downloads, lowering one lets running downloads finish. All other fields apply to
+downloads that start or resume afterwards; pause and resume a running download to pick them up.
+
+The per-host limit counts downloads by URL host (case-insensitive, ignoring user info and port).
+Magnet links, `torrent:` identifiers and local files are not counted.
+
+`maxConnectionsPerDownload` and `DownloadRequest.connections` split HTTP(S) and FTP(S)
+downloads into parallel ranges when the server supports HTTP Range or FTP REST; otherwise a
+single connection is used. BitTorrent treats a per-task connection count as its peer limit.
+`bufferSize` sets the FTP read buffer; HTTP buffering is up to the `HttpEngine`.
+
 ### Priority & Scheduling
 
 `task.setPriority(priority)` persists the change and updates `task.requestState`, including
@@ -191,8 +204,14 @@ ketch.download(
 
 // Speed limiting
 task.setSpeedLimit(SpeedLimit.mbps(1))        // per-task
-ketch.setGlobalSpeedLimit(SpeedLimit.kbps(500)) // global
+ketch.updateConfig(config.copy(speedLimit = SpeedLimit.kbps(500))) // global
 ```
+
+A per-task limit applies in addition to the global one, so a task never exceeds the lower of
+the two. `setSpeedLimit`, `setConnections` and `setPriority` are persisted for queued, scheduled,
+paused and failed tasks and take effect when the task starts or resumes; `reschedule` is
+persisted too (conditions are not). `pause()` also works on a queued task: it leaves the queue
+until `resume()` is called.
 
 ## Error Handling
 

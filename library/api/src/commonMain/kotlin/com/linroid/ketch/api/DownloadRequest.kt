@@ -17,16 +17,19 @@ import kotlinx.serialization.Serializable
  *   - `Destination("content://...")` — content URI, use as-is
  * @property connections number of concurrent connections (segments) to
  *   use. Must be non-negative. When `0` (the default), the engine uses
- *   [DownloadConfig.maxConnectionsPerDownload].
- *   Falls back to a single connection if the server does not support
- *   HTTP Range requests.
+ *   [DownloadConfig.maxConnectionsPerDownload] as it was when the download
+ *   started or resumed. Falls back to a single connection if the server
+ *   does not support HTTP Range requests or FTP REST. BitTorrent sources
+ *   treat a positive value as their peer connection limit instead.
  * @property headers custom HTTP headers to include in every request
  *   (HEAD and GET) for this download.
  * @property properties arbitrary key-value pairs for use by custom
  *   extensions. Ketch itself does not read these values.
- * @property speedLimit per-task speed limit. Overrides the global
- *   speed limit for this download. Defaults to
- *   [SpeedLimit.Unlimited] (use global limit).
+ * @property speedLimit per-task speed limit. Applies in addition to the
+ *   global [DownloadConfig.speedLimit], so the download runs at no more
+ *   than the lower of the two. It cannot raise a download above the
+ *   global limit. Defaults to [SpeedLimit.Unlimited] (only the global
+ *   limit applies).
  * @property priority queue priority for this download. Higher-priority
  *   tasks are started before lower-priority ones when download slots
  *   become available. Defaults to [DownloadPriority.NORMAL].

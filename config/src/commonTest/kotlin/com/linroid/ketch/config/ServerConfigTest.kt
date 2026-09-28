@@ -3,7 +3,9 @@ package com.linroid.ketch.config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ServerConfigTest {
 
@@ -61,5 +63,28 @@ class ServerConfigTest {
     assertEquals(
       listOf("localhost:3000"), config.corsAllowedHosts,
     )
+  }
+
+  @Test
+  fun `only loopback bind addresses count as this machine only`() {
+    assertTrue(ServerConfig(host = ServerConfig.LOOPBACK_HOST).isLoopbackOnly)
+    assertTrue(ServerConfig(host = "localhost").isLoopbackOnly)
+    assertTrue(ServerConfig(host = "::1").isLoopbackOnly)
+    assertFalse(ServerConfig().isLoopbackOnly)
+    // A specific LAN address still accepts other devices.
+    assertFalse(ServerConfig(host = "192.168.1.20").isLoopbackOnly)
+  }
+
+  @Test
+  fun `configs written before auto start existed keep the server manual`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[server]
+      |port = 9000
+      """.trimMargin(),
+    )
+    assertFalse(decoded.server.autoStart)
+    assertEquals(9000, decoded.server.port)
   }
 }

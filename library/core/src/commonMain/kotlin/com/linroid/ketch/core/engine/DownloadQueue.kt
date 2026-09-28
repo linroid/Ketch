@@ -25,16 +25,27 @@ internal class DownloadQueue(
   /** Effective max concurrent downloads (0 = unlimited → Int.MAX_VALUE). */
   @Volatile
   var maxConcurrent: Int = effectiveLimit(maxConcurrentDownloads)
-    internal set(value) {
-      field = effectiveLimit(value)
-    }
+    private set
 
-  /** Effective max connections per host (0 = unlimited → Int.MAX_VALUE). */
+  /** Effective max downloads per host (0 = unlimited → Int.MAX_VALUE). */
   @Volatile
   var maxPerHost: Int = effectiveLimit(maxConnectionsPerHost)
-    internal set(value) {
-      field = effectiveLimit(value)
+    private set
+
+  /**
+   * Replaces the concurrency limits (`0` = unlimited). Raising a limit
+   * immediately starts queued tasks that now fit. Lowering one never
+   * stops running tasks: they finish normally and queued tasks wait
+   * until the active count drops below the new limit.
+   */
+  suspend fun updateLimits(maxConcurrentDownloads: Int, maxConnectionsPerHost: Int) {
+    mutex.withLock {
+      maxConcurrent = effectiveLimit(maxConcurrentDownloads)
+      maxPerHost = effectiveLimit(maxConnectionsPerHost)
+      log.i { "Limits updated: maxConcurrent=$maxConcurrent, maxPerHost=$maxPerHost" }
+      promoteNext()
     }
+  }
 
   internal data class QueueEntry(
     val handle: TaskHandle,
@@ -78,9 +89,9 @@ internal class DownloadQueue(
    */
   private suspend fun tryPreemptAndStart(
     entry: QueueEntry,
-    host: String,
+    host: String?,
   ) {
-    val hostIsFull = hostConnectionCount.getOrElse(host) { 0 } >= maxPerHost
+    val hostIsFull = !hasHostCapacity(host)
     val victim = activeEntries.values
       .filter { it.priority < DownloadPriority.URGENT }
       .filter { !hostIsFull || extractHost(it.handle.request.url) == host }
@@ -109,10 +120,7 @@ internal class DownloadQueue(
     markQueued(victim.handle)
     insertSorted(victim)
 
-    val hostCount = hostConnectionCount.getOrElse(host) { 0 }
-    if (activeEntries.size < maxConcurrent &&
-      hostCount < maxPerHost
-    ) {
+    if (activeEntries.size < maxConcurrent && hasHostCapacity(host)) {
       log.i {
         "Starting URGENT download: taskId=${entry.taskId}, " +
           "active=${activeEntries.size + 1}/" +
@@ -191,9 +199,7 @@ internal class DownloadQueue(
       val entry = queuedEntries.removeAt(index)
       entry.priority = priority
       val host = extractHost(entry.handle.request.url)
-      if (activeEntries.size < maxConcurrent &&
-        hostConnectionCount.getOrElse(host) { 0 } < maxPerHost
-      ) {
+      if (activeEntries.size < maxConcurrent && hasHostCapacity(host)) {
         startTask(entry, host)
       } else if (priority == DownloadPriority.URGENT) {
         tryPreemptAndStart(entry, host)
@@ -243,11 +249,13 @@ internal class DownloadQueue(
 
   private suspend fun startTask(
     entry: QueueEntry,
-    host: String,
+    host: String?,
   ) {
     activeEntries[entry.taskId] = entry
-    hostConnectionCount[host] = (hostConnectionCount[host] ?: 0) + 1
-    taskHostMap[entry.taskId] = host
+    if (host != null) {
+      hostConnectionCount[host] = (hostConnectionCount[host] ?: 0) + 1
+      taskHostMap[entry.taskId] = host
+    }
     if (entry.preempted) {
       entry.preempted = false
       val resumed = coordinator.resume(entry.handle, entry.destination)
@@ -275,15 +283,12 @@ internal class DownloadQueue(
   }
 
   private fun findNextEligible(): QueueEntry? {
-    for (entry in queuedEntries) {
-      val host = extractHost(entry.handle.request.url)
-      val hostCount = hostConnectionCount.getOrElse(host) { 0 }
-      if (hostCount < maxPerHost) {
-        return entry
-      }
-    }
-    return null
+    return queuedEntries.firstOrNull { hasHostCapacity(extractHost(it.handle.request.url)) }
   }
+
+  /** Host-less URIs (see [extractHost]) are not subject to the per-host limit. */
+  private fun hasHostCapacity(host: String?): Boolean =
+    host == null || hostConnectionCount.getOrElse(host) { 0 } < maxPerHost
 
   private suspend fun markQueued(handle: TaskHandle) {
     handle.record.update {
@@ -306,11 +311,24 @@ internal class DownloadQueue(
   }
 
   companion object {
-    internal fun extractHost(url: String): String {
-      val afterScheme = url.substringAfter("://", "")
-      if (afterScheme.isEmpty()) return url
-      val hostPort = afterScheme.substringBefore("/")
-      return hostPort.substringBefore(":")
+    private val AUTHORITY = Regex("""^([A-Za-z][A-Za-z0-9+.\-]*)://([^/?#]*)""")
+
+    /**
+     * Returns the key used for the per-host limit: the URL host in lower
+     * case, without user info, port or IPv6 brackets. Returns `null` for
+     * URIs without a network host — magnet links, `torrent:` identifiers,
+     * `file:` URLs and local paths — which the per-host limit ignores.
+     */
+    internal fun extractHost(url: String): String? {
+      val match = AUTHORITY.find(url.trim()) ?: return null
+      if (match.groupValues[1].equals("file", ignoreCase = true)) return null
+      val hostPort = match.groupValues[2].substringAfterLast('@')
+      val host = if (hostPort.startsWith('[')) {
+        hostPort.substring(1).substringBefore(']')
+      } else {
+        hostPort.substringBefore(':')
+      }
+      return host.lowercase().ifEmpty { null }
     }
 
     private fun effectiveLimit(value: Int): Int =

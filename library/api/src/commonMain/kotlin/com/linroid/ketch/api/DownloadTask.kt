@@ -22,7 +22,11 @@ interface DownloadTask {
   val state: StateFlow<DownloadState>
   val segments: StateFlow<List<Segment>>
 
-  /** Pauses the download, preserving segment progress for later resume. */
+  /**
+   * Pauses the download, preserving segment progress for later resume.
+   * Works while downloading or queued; a queued task leaves the queue
+   * until [resume] is called.
+   */
   suspend fun pause()
 
   /**
@@ -40,7 +44,10 @@ interface DownloadTask {
 
   /**
    * Updates the speed limit for this download task.
-   * Takes effect immediately on all active segments.
+   * Persists the new limit in [request] and publishes it through [requestState].
+   * Takes effect immediately while downloading; queued, scheduled, paused and failed
+   * tasks use it when they start or resume. The global speed limit still applies,
+   * see [DownloadRequest.speedLimit].
    *
    * @param limit the new speed limit, or [SpeedLimit.Unlimited] to remove
    */
@@ -60,9 +67,13 @@ interface DownloadTask {
 
   /**
    * Updates the number of concurrent connections (segments) for this
-   * download task. Takes effect immediately on active downloads —
-   * segments are dynamically merged or split to match the new
-   * connection count while preserving completed progress.
+   * download task. Persists the new count in [request] and publishes it
+   * through [requestState]. Takes effect immediately on active downloads —
+   * segments are dynamically merged or split to match the new connection
+   * count while preserving completed progress. Queued, scheduled, paused
+   * and failed tasks use it when they start or resume. Servers without
+   * HTTP Range or FTP REST support keep a single connection; BitTorrent
+   * sources apply it as their peer connection limit.
    *
    * @param connections the new connection count, must be greater than 0
    */
@@ -71,7 +82,9 @@ interface DownloadTask {
   /**
    * Reschedules this download with a new schedule and optional conditions.
    * Active downloads are paused (preserving progress) before rescheduling.
-   * Works from any non-terminal state.
+   * Works from any non-terminal state. The new schedule is persisted in
+   * [request] and survives a restart; like [DownloadRequest.conditions],
+   * the conditions themselves are not persisted.
    *
    * @param schedule the new schedule to apply
    * @param conditions optional conditions that must be met before starting

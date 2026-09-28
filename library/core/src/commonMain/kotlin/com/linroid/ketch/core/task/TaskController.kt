@@ -13,7 +13,7 @@ import com.linroid.ketch.api.SpeedLimit
  * queue, scheduler) and centralize multi-step cleanup sequences.
  */
 internal interface TaskController {
-  suspend fun pause(taskId: String)
+  suspend fun pause(handle: TaskHandle)
   suspend fun resume(handle: TaskHandle, destination: Destination? = null)
   suspend fun cancel(handle: TaskHandle)
   suspend fun remove(handle: TaskHandle, deleteFiles: Boolean)

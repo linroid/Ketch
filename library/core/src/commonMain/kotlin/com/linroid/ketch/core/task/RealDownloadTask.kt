@@ -28,7 +28,7 @@ internal class RealDownloadTask(
   taskStore: TaskStore,
   record: TaskRecord,
 ) : DownloadTask, TaskHandle {
-  private val priorityMutex = Mutex()
+  private val settingsMutex = Mutex()
   private val mutableRequest = MutableStateFlow(request)
   override val requestState: StateFlow<DownloadRequest> = mutableRequest.asStateFlow()
   override val request: DownloadRequest get() = requestState.value
@@ -47,8 +47,9 @@ internal class RealDownloadTask(
   private val log = KetchLogger("DownloadTask")
 
   override suspend fun pause() {
-    if (mutableState.value.isActive) {
-      controller.pause(taskId)
+    val s = mutableState.value
+    if (s.isActive || s is DownloadState.Queued) {
+      controller.pause(this)
     } else {
       log.w { "Ignoring pause for taskId=$taskId in state ${mutableState.value}" }
     }
@@ -71,11 +72,16 @@ internal class RealDownloadTask(
     }
   }
 
-  override suspend fun setSpeedLimit(limit: SpeedLimit) {
+  // Settings are persisted before they are applied, so an execution that starts in between
+  // reads the new value, and tasks that are not running keep it for their next start.
+  override suspend fun setSpeedLimit(limit: SpeedLimit): Unit = settingsMutex.withLock {
+    record.update {
+      it.copy(request = it.request.copy(speedLimit = limit), updatedAt = Clock.System.now())
+    }
     controller.setSpeedLimit(taskId, limit)
   }
 
-  override suspend fun setPriority(priority: DownloadPriority): Unit = priorityMutex.withLock {
+  override suspend fun setPriority(priority: DownloadPriority): Unit = settingsMutex.withLock {
     record.update {
       it.copy(request = it.request.copy(priority = priority), updatedAt = Clock.System.now())
     }
@@ -83,7 +89,16 @@ internal class RealDownloadTask(
   }
 
   override suspend fun setConnections(connections: Int) {
-    controller.setConnections(taskId, connections)
+    require(connections > 0) { "Connections must be greater than 0" }
+    settingsMutex.withLock {
+      record.update {
+        it.copy(
+          request = it.request.copy(connections = connections),
+          updatedAt = Clock.System.now(),
+        )
+      }
+      controller.setConnections(taskId, connections)
+    }
   }
 
   override suspend fun reschedule(

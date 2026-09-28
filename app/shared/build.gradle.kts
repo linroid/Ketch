@@ -16,6 +16,10 @@ kotlin {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
 
+    androidResources {
+      enable = true
+    }
+
     compilerOptions {
       jvmTarget.set(JvmTarget.JVM_11)
     }
@@ -71,6 +75,7 @@ kotlin {
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.androidx.lifecycle.viewmodelCompose)
       implementation(libs.androidx.lifecycle.runtimeCompose)
+      implementation(libs.androidx.navigationevent.compose)
     }
     commonTest.dependencies {
       implementation(libs.kotlin.test)

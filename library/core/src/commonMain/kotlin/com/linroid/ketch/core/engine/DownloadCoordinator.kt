@@ -27,8 +27,10 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Runs downloads. [config] is read each time an execution starts, so
- * runtime config changes reach downloads started or resumed afterwards.
+ * Starts, resumes and stops download executions.
+ *
+ * @param config provides the current global configuration; each start or
+ *   resume takes a snapshot of it
  */
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
@@ -186,6 +188,10 @@ internal class DownloadCoordinator(
     log.d { "Cancel record updated for taskId=$taskId" }
   }
 
+  /**
+   * Applies [limit] to the task's running execution, if any. Callers
+   * persist the limit first so an execution created later picks it up.
+   */
   suspend fun setTaskSpeedLimit(taskId: String, limit: SpeedLimit) {
     mutex.withLock {
       val entry = activeDownloads[taskId] ?: return
@@ -193,6 +199,7 @@ internal class DownloadCoordinator(
     }
   }
 
+  /** Like [setTaskSpeedLimit], for the task's connection count. */
   suspend fun setTaskConnections(taskId: String, connections: Int) {
     mutex.withLock {
       val entry = activeDownloads[taskId] ?: return
@@ -322,6 +329,7 @@ internal class DownloadCoordinator(
       throttle = { _ -> },
       headers = handle.request.headers,
       outputPath = outputPath,
+      config = config(),
     )
     try {
       source.cleanup(ctx, record.sourceResumeState)

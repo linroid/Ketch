@@ -92,4 +92,70 @@ class MixedDownloadLimitsTest {
       }
     }
   }
+
+  @Test
+  fun taskLimitStillAppliesToTorrentAfterPauseAndResume() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-resume-limit-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        val bytes = ByteArray(256 * 1024) { (it * 7).toByte() }
+        val hashes = bytes.asList().chunked(16_384).fold(ByteArray(0)) { value, chunk ->
+          value + sha1Digest(chunk.toByteArray())
+        }
+        val data = Bencode.encode(mapOf("info" to mapOf("name" to "payload",
+          "length" to bytes.size.toLong(), "piece length" to 16_384L, "pieces" to hashes)))
+        val metadata = TorrentMetadata.fromBencode(data)
+        torrentFileSystem.createDirectories(root)
+        torrentFileSystem.write(root / "seed") { write(bytes) }
+        val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+        val ketch = Ketch(UnusedHttp, additionalSources = listOf(source))
+        try {
+          seeder.start()
+          val seed = seeder.addTask(TorrentTaskSpec("resume-seed", metadata,
+            (root / "seed").toString(), emptySet()))
+          seed.resume()
+          assertEquals(TorrentSessionState.SEEDING, seed.state.first {
+            it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+          })
+          ketch.start()
+          val magnet = MagnetUri(metadata.infoHash,
+            explicitPeers = listOf("127.0.0.1:${seeder.listenPort}")).toUri()
+          val torrent = ketch.download(DownloadRequest(magnet,
+            destination = Destination((root / "torrent").toString()),
+            resolvedSource = source.resolveMetainfo(data), speedLimit = SpeedLimit.of(1)))
+          torrent.segments.first { segments -> segments.sumOf { it.downloadedBytes } > 0 }
+          torrent.pause()
+          torrent.resume()
+          torrent.state.first { it is DownloadState.Downloading }
+          delay(500)
+          // Each execution gets a fresh 64 KiB limiter burst and then one byte per second.
+          val downloaded = torrent.segments.value.sumOf { it.downloadedBytes }
+          assertTrue(downloaded <= 131_072, "Verified bytes after resume: $downloaded")
+          assertFalse(torrent.state.value is DownloadState.Completed)
+          torrent.setSpeedLimit(SpeedLimit.Unlimited)
+          withTimeout(3000) { torrent.await().getOrThrow() }
+          assertContentEquals(bytes, torrentFileSystem.read(root / "torrent") { readByteArray() })
+        } finally {
+          ketch.close()
+          seeder.stop()
+          torrentFileSystem.deleteRecursively(root, mustExist = false)
+        }
+      }
+    }
+  }
+
+  private object UnusedHttp : HttpEngine {
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+      error("unused")
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ): Unit = error("unused")
+    override fun close() = Unit
+  }
 }

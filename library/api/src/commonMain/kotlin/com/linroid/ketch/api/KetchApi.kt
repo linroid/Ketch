@@ -79,13 +79,20 @@ interface KetchApi {
   suspend fun status(): KetchStatus
 
   /**
-   * Updates the runtime download configuration.
+   * Replaces the runtime download configuration.
    *
-   * [DownloadConfig.speedLimit], [DownloadConfig.maxConcurrentDownloads]
-   * and [DownloadConfig.maxConnectionsPerHost] apply to active downloads
-   * immediately. [DownloadConfig.defaultDirectory] and
-   * [DownloadConfig.maxConnectionsPerDownload] apply to downloads started
-   * afterwards.
+   * Applied immediately:
+   * - [DownloadConfig.speedLimit] throttles all active downloads.
+   * - [DownloadConfig.maxConcurrentDownloads] and [DownloadConfig.maxConnectionsPerHost]:
+   *   raising a limit starts queued downloads right away; lowering one never interrupts
+   *   running downloads, queued ones wait until enough of them finish.
+   *
+   * Applied to downloads that start or resume after the update (running downloads keep the
+   * values they started with until paused and resumed):
+   * [DownloadConfig.defaultDirectory], [DownloadConfig.maxConnectionsPerDownload],
+   * [DownloadConfig.retryCount], [DownloadConfig.retryDelayMs],
+   * [DownloadConfig.progressIntervalMs], [DownloadConfig.saveIntervalMs] and
+   * [DownloadConfig.bufferSize].
    *
    * @throws IllegalArgumentException if [DownloadConfig.defaultDirectory]
    *   changed to a folder that does not exist on this instance

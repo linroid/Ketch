@@ -2,230 +2,104 @@ package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.linroid.ketch.app.components.KetchButton
-import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
-import com.linroid.ketch.app.components.KetchSidebarItem
 import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.state.SettingsEdits
-import com.linroid.ketch.app.state.SettingsSection
+import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.ui.common.AdaptiveModal
 
 /**
- * Settings as a panel over the app, for wide windows: a section list on
- * the left and the selected section on the right. Narrow windows use
+ * Settings as a panel over the app, for wide windows: the categories on
+ * the left and the selected one on the right. Narrow windows use
  * [SettingsPage] instead.
  *
- * Unsaved edits survive switching sections. Closing — the close button,
- * Esc or a click outside — asks first while any section still has them.
+ * Changes apply as they are made, so closing — the close button, Esc or
+ * a click outside — never loses anything; a field being edited saves as
+ * the panel closes.
  *
- * @param sections sections to list, in order.
+ * @param categories categories to list, in order.
  * @param onDismiss close the settings.
- * @param section renders one section; see [SettingsSectionCard].
+ * @param content renders one category; see [SettingsCategoryContent].
  */
 @Composable
 fun SettingsDialog(
-  sections: List<SettingsSection>,
+  categories: List<SettingsCategory>,
   onDismiss: () -> Unit,
-  section: @Composable (
-    section: SettingsSection,
-    compact: Boolean,
-    onUnsavedChange: (Boolean) -> Unit,
-  ) -> Unit,
+  content: @Composable (SettingsCategory) -> Unit,
 ) {
   val colors = KetchTheme.colors
-  // Saved with the drafts, so restored drafts are still guarded on close.
-  val edits = rememberSaveable(saver = SettingsEdits.Saver) { SettingsEdits() }
-  // Keeps each section's draft and scroll position while another is shown.
-  val drafts = rememberSaveableStateHolder()
-  var selectedName by rememberSaveable { mutableStateOf(sections.first().name) }
-  val selected = sections.firstOrNull { it.name == selectedName } ?: sections.first()
-  val requestClose = {
-    if (edits.requestClose()) onDismiss()
-  }
+  var selectedName by rememberSaveable { mutableStateOf(categories.first().name) }
+  val selected = categories.firstOrNull { it.name == selectedName } ?: categories.first()
 
   Dialog(
-    onDismissRequest = requestClose,
+    onDismissRequest = onDismiss,
     properties = DialogProperties(usePlatformDefaultWidth = false),
   ) {
     val shape = RoundedCornerShape(16.dp)
     Row(
       modifier = Modifier
         .padding(32.dp)
-        .widthIn(max = 880.dp)
-        .heightIn(max = 720.dp)
+        .widthIn(max = 960.dp)
+        .heightIn(max = 760.dp)
         .fillMaxSize()
         .clip(shape)
         .background(colors.background)
         .border(1.dp, colors.outline, shape),
     ) {
-      SettingsNavigation(
-        sections = sections,
+      SettingsCategoryNav(
+        categories = categories,
         selected = selected,
-        edits = edits,
         onSelect = { selectedName = it.name },
+        background = colors.surfaceVariant,
+        footer = {
+          Text(
+            text = "Changes apply as you make them.",
+            style = KetchTheme.typography.bodySmall,
+            color = colors.onSurfaceDim,
+            modifier = Modifier.padding(horizontal = 22.dp),
+          )
+        },
       )
       VerticalDivider(color = colors.outlineVariant)
-      Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-        Row(
-          modifier = Modifier.fillMaxWidth().padding(12.dp),
-          horizontalArrangement = Arrangement.End,
-        ) {
+      Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+        Column(Modifier.fillMaxSize()) {
+          SettingsCategoryPage(
+            category = selected,
+            inset = 32.dp,
+            onBack = null,
+            content = content,
+          )
+        }
+        // KetchIconButton wraps its modifier in a tooltip, so align a box.
+        Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
           KetchIconButton(
             icon = KetchIcon.Close,
-            onClick = requestClose,
+            onClick = onDismiss,
             contentDescription = "Close settings",
           )
         }
-        drafts.SaveableStateProvider(selected.name) {
-          Column(
-            modifier = Modifier
-              .fillMaxSize()
-              .verticalScroll(rememberScrollState())
-              .padding(start = 32.dp, end = 32.dp, bottom = 32.dp),
-          ) {
-            section(selected, false) { edits.report(selected, it) }
-          }
-        }
       }
     }
-
-    if (edits.confirmingDiscard) {
-      DiscardEditsDialog(
-        sections = edits.unsavedSections,
-        onKeepEditing = edits::keepEditing,
-        onDiscard = {
-          edits.discard()
-          onDismiss()
-        },
-      )
-    }
-  }
-}
-
-@Composable
-private fun SettingsNavigation(
-  sections: List<SettingsSection>,
-  selected: SettingsSection,
-  edits: SettingsEdits,
-  onSelect: (SettingsSection) -> Unit,
-) {
-  val colors = KetchTheme.colors
-  Column(
-    modifier = Modifier
-      .width(220.dp)
-      .fillMaxHeight()
-      .background(colors.surfaceVariant)
-      .padding(vertical = 20.dp),
-  ) {
-    Text(
-      text = "Settings",
-      style = KetchTheme.typography.displaySmall,
-      color = colors.onBackground,
-      modifier = Modifier.padding(horizontal = 22.dp),
-    )
-    Spacer(Modifier.size(16.dp))
-    sections.forEach { entry ->
-      KetchSidebarItem(
-        label = entry.label,
-        icon = entry.icon,
-        selected = entry == selected,
-        onClick = { onSelect(entry) },
-        trailing = if (edits.isUnsaved(entry)) {
-          { UnsavedDot() }
-        } else {
-          null
-        },
-      )
-    }
-    Spacer(Modifier.weight(1f))
-    Text(
-      text = "Saved to this device's config file.",
-      style = KetchTheme.typography.bodySmall,
-      color = colors.onSurfaceDim,
-      modifier = Modifier.padding(horizontal = 22.dp),
-    )
-  }
-}
-
-@Composable
-private fun UnsavedDot() {
-  Box(
-    modifier = Modifier
-      .size(8.dp)
-      .clip(CircleShape)
-      .background(KetchTheme.colors.warning)
-      .semantics { contentDescription = "Unsaved changes" },
-  )
-}
-
-@Composable
-private fun DiscardEditsDialog(
-  sections: List<SettingsSection>,
-  onKeepEditing: () -> Unit,
-  onDiscard: () -> Unit,
-) {
-  val names = sections.map { it.label }
-  val list = if (names.size <= 1) {
-    names.joinToString()
-  } else {
-    names.dropLast(1).joinToString() + " and " + names.last()
-  }
-  AdaptiveModal(
-    onDismissRequest = onKeepEditing,
-    title = { Text("Discard unsaved changes?") },
-    confirmButton = {
-      KetchButton(
-        text = "Discard",
-        onClick = onDiscard,
-        variant = KetchButtonVariant.Danger,
-      )
-    },
-    dismissButton = {
-      KetchButton(
-        text = "Keep editing",
-        onClick = onKeepEditing,
-        variant = KetchButtonVariant.Ghost,
-      )
-    },
-  ) {
-    Text(
-      text = "Your changes to $list haven't been saved.",
-      style = KetchTheme.typography.bodyMedium,
-      color = KetchTheme.colors.onSurfaceVariant,
-    )
   }
 }

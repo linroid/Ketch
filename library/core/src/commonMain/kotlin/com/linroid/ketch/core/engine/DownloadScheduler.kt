@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.task.TaskHandle
+import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,7 +41,9 @@ internal class DownloadScheduler(
         waitForConditions(taskId, conditions)
 
         log.i { "Schedule and conditions met for taskId=$taskId, enqueuing" }
-        queue.enqueue(handle)
+        // A task rescheduled after it had started is restored here after a restart;
+        // resuming keeps its progress and falls back to a fresh start without segments.
+        queue.enqueue(handle, preferResume = true)
 
         mutex.withLock { scheduledJobs.remove(taskId) }
       }
@@ -58,6 +61,14 @@ internal class DownloadScheduler(
       scheduledJobs.remove(taskId)?.cancel()
     }
 
+    // Persist so a restart restores the new schedule. Conditions are kept in memory only.
+    handle.record.update {
+      it.copy(
+        request = it.request.copy(schedule = schedule, conditions = conditions),
+        state = TaskState.SCHEDULED,
+        updatedAt = Clock.System.now(),
+      )
+    }
     handle.mutableState.value = DownloadState.Scheduled(schedule)
     log.i {
       "Rescheduling download: taskId=$taskId, schedule=$schedule, " +

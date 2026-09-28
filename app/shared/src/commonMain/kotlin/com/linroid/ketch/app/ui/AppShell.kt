@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -40,12 +41,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.SettingsSection
+import com.linroid.ketch.app.state.IncomingDownloads
+import com.linroid.ketch.app.state.InstanceSettingsController
+import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.AiDiscoverDraft
 import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
@@ -54,8 +58,8 @@ import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.ketch.app.util.matchesSearch
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.settings.SettingsDialog
+import com.linroid.ketch.app.ui.settings.SettingsCategoryContent
 import com.linroid.ketch.app.ui.settings.SettingsPage
-import com.linroid.ketch.app.ui.settings.SettingsSectionCard
 import com.linroid.ketch.app.ui.sidebar.SidebarNavigation
 import com.linroid.ketch.app.ui.sidebar.SpeedStatusBar
 import com.linroid.ketch.app.ui.sidebar.filterIcon
@@ -73,14 +77,16 @@ fun AppShell(
   appSettings: AppSettingsController = remember { AppSettingsController() },
   aiSettings: AiSettingsController = remember { AiSettingsController() },
   openSettingsRequests: Flow<Unit> = emptyFlow(),
+  incoming: IncomingDownloads? = null,
 ) {
   val scope = rememberCoroutineScope()
-  val appState = remember(instanceManager, appSettings, aiSettings) {
+  val appState = remember(instanceManager, appSettings, aiSettings, incoming) {
     AppState(
       instanceManager = instanceManager,
       scope = scope,
       appSettings = appSettings,
       aiSettings = aiSettings,
+      incoming = incoming ?: IncomingDownloads(),
     )
   }
 
@@ -190,29 +196,32 @@ fun AppShell(
   LaunchedEffect(openSettingsRequests) {
     openSettingsRequests.collect { settingsOpen = true }
   }
-  val settingsSections =
-    SettingsSection.visible(instanceManager.isLocalServerSupported)
-  val settingsSection: @Composable (SettingsSection, Boolean, (Boolean) -> Unit) -> Unit =
-    { section, compact, onUnsavedChange ->
-      SettingsSectionCard(
-        section = section,
-        compact = compact,
-        onUnsavedChange = onUnsavedChange,
-        appSettings = appSettings,
-        aiSettings = aiSettings,
-        defaultDeviceName = activeInstance?.label ?: "this device",
-        backendLabel = activeInstance?.label ?: "this device",
-        serverState = serverState,
-        onSaveDownload = { appState.applyDownloadConfig(it) },
-        onTestAi = { settings ->
-          scope.launch { aiSettings.testConnection(settings) }
-        },
-        onStartServer = {
-          instanceManager.startServer(appSettings.config.server.port)
-        },
-        onStopServer = { instanceManager.stopServer() },
-      )
-    }
+  val settingsCategories = SettingsCategory.visible(instanceManager.isLocalServerSupported)
+  // Download and network settings belong to the active instance.
+  val settingsInstance = activeInstance
+  val instanceSettings = remember(settingsInstance) {
+    InstanceSettingsController(
+      api = settingsInstance?.instance ?: appState.activeApi.value,
+      local = appSettings.takeIf { settingsInstance is EmbeddedInstance },
+      scope = scope,
+    )
+  }
+  val settingsContent: @Composable (SettingsCategory) -> Unit = { category ->
+    SettingsCategoryContent(
+      category = category,
+      appSettings = appSettings,
+      aiSettings = aiSettings,
+      instanceSettings = instanceSettings,
+      instanceLabel = settingsInstance?.label ?: "this device",
+      systemDeviceName = instances.firstOrNull { it is EmbeddedInstance }?.label,
+      serverState = serverState,
+      onTestAi = {
+        scope.launch { aiSettings.testConnection(aiSettings.settings) }
+      },
+      onStartServer = { instanceManager.startServer() },
+      onStopServer = { instanceManager.stopServer() },
+    )
+  }
   val aiDraft = remember { AiDiscoverDraft() }
   val adaptiveInfo = currentWindowAdaptiveInfo()
   val isExpanded = adaptiveInfo.windowSizeClass
@@ -292,7 +301,11 @@ fun AppShell(
             // Content area
             Column(modifier = Modifier.weight(1f)) {
               if (settingsOpen && !isExpanded) {
-                SettingsPage(sections = settingsSections, section = settingsSection)
+                SettingsPage(
+                  categories = settingsCategories,
+                  content = settingsContent,
+                  onClose = { settingsOpen = false },
+                )
               } else if (destination == AppDestination.Discover) {
                 AiDiscoveryPage(
                   state = appState.aiDiscoverState,
@@ -445,35 +458,37 @@ fun AppShell(
   // Dialogs
   if (settingsOpen && isExpanded) {
     SettingsDialog(
-      sections = settingsSections,
+      categories = settingsCategories,
       onDismiss = { settingsOpen = false },
-      section = settingsSection,
+      content = settingsContent,
     )
   }
 
   if (appState.showAddDialog) {
-    AddDownloadDialog(
-      resolveState = appState.resolveState,
-      onResolveUrl = { appState.resolveUrl(it) },
-      onResetResolve = { appState.resetResolveState() },
-      onDismiss = { appState.showAddDialog = false },
-      onDownload = { url, fileName, speedLimit,
-                     priority, schedule,
-                     resolvedUrl, selectedFileIds ->
-        appState.showAddDialog = false
-        appState.dismissError()
-        appState.startDownload(
-          url, fileName, speedLimit, priority,
-          schedule, resolvedUrl, selectedFileIds,
-        )
-        appState.resetResolveState()
-      },
-      droppedFileName = appState.droppedFile?.name,
-      onRetryDroppedFile = {
-        appState.droppedFile?.let { appState.resolveDroppedFile(it) }
-      },
-      onDropFiles = { appState.addDroppedFiles(it) },
-    )
+    // Each opened file starts a fresh form.
+    key(appState.openedDownload) {
+      AddDownloadDialog(
+        resolveState = appState.resolveState,
+        onResolveUrl = { appState.resolveUrl(it) },
+        onResetResolve = { appState.resetResolveState() },
+        onDismiss = { appState.closeAddDialog() },
+        onDownload = { url, fileName, speedLimit,
+                       priority, schedule,
+                       resolvedUrl, selectedFileIds ->
+          appState.closeAddDialog()
+          appState.dismissError()
+          appState.startDownload(
+            url, fileName, speedLimit, priority,
+            schedule, resolvedUrl, selectedFileIds,
+          )
+        },
+        droppedFileName = appState.droppedFile?.name,
+        onRetryDroppedFile = {
+          appState.droppedFile?.let { appState.resolveDroppedFile(it) }
+        },
+        onDropFiles = { appState.addDroppedFiles(it) },
+      )
+    }
   }
 
   if (appState.showInstanceSelector) {

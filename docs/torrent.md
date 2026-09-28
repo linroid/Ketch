@@ -42,6 +42,29 @@ apps use it for `.torrent` files dropped onto the window. Local `.torrent` paths
 passkeys are not logged by the torrent HTTP adapter. Avoid enabling application-level URL logging
 for private tracker URLs. A supplied HTTP engine remains owned by its caller.
 
+## Opening `.torrent` files in the apps
+
+The apps register for `.torrent` files, so the system file manager offers Ketch under "Open with":
+
+| Platform | Registration | Delivery |
+|----------|--------------|----------|
+| Android | `ACTION_VIEW` filters for `application/x-bittorrent`, plus `.torrent` paths with a generic type | `content:` URI to the running activity |
+| macOS | File association in the packaged app | Finder open-file events |
+| Windows, Linux | File association in the MSI/DEB package | Path or `file:` URI argument; a second launch forwards it to the running app and exits |
+| iOS | `org.bittorrent.torrent` document type | `onOpenURL` from Files, AirDrop and share sheets |
+| Web | Manifest `file_handlers` | `launchQueue`, only for the app installed from a Chromium browser over HTTPS or localhost |
+
+Each opened file shows the add dialog with its name, size and file selection, as a dropped file
+does; nothing downloads until the user confirms. Several files open one after another, and a file
+stays pending until downloaded or dismissed, so it survives an Android activity recreation. Like a
+dropped file, it reaches the active backend through `resolveContent`, so remote daemons work too.
+Files over the 4 MiB metainfo limit are rejected. On iOS, copies placed in the app's
+`Documents/Inbox` are deleted after reading.
+
+File associations apply to packaged desktop builds (`packageDistributionForCurrentOS`), not
+`./gradlew :app:desktop:run`. The desktop app runs once per configuration directory: another launch,
+including a development run, hands its files to the running app instead of opening a second window.
+
 ## Discovery and upload
 
 - HTTP(S) and UDP trackers support tiers, IPv4/IPv6, lifecycle events, and failover.
@@ -63,8 +86,24 @@ for private tracker URLs. A supplied HTTP engine remains owned by its caller.
   the session alive after completion until removed or the source is closed. `enableUpload = true`
   maps to the latter when no explicit policy is supplied.
 - Task and global download limits share Ketch's limiter with HTTP/FTP. Live connection limits
-  close excess peers. `setUploadRateLimit` and `setTaskUploadRateLimit` on the torrent source
-  control upload independently; zero means unlimited.
+  close excess peers (see [Ketch download settings](#ketch-download-settings)).
+  `setUploadRateLimit` and `setTaskUploadRateLimit` on the torrent source control upload
+  independently; zero means unlimited.
+
+## Ketch download settings
+
+Torrent tasks honor the same `DownloadConfig` and per-task settings as HTTP and FTP tasks:
+
+| Setting | Torrent behavior |
+| --- | --- |
+| Simultaneous downloads (`maxConcurrentDownloads`) | Ketch's queue starts torrents like any other task. The engine also runs at most `TorrentConfig.maxActiveTorrents` (default 5) torrents, seeding sessions included. Further started torrents wait for an engine slot instead of failing: they report as downloading at 0 bytes/s with their restored progress, can be paused or canceled at once, and start by priority, then arrival order. A seeding session yields its slot to a waiting download. |
+| Global and per-task speed limits | Applied live to verified payload on v1 and v2, through the same limiter as HTTP/FTP. The per-task limit still applies after pause and resume. |
+| Per-task connections (`DownloadRequest.connections`, `DownloadTask.setConnections`) | The task's peer cap, applied live. Values are clamped to 1..512 (v1) or 1..500 (v2), never rejected. Unset (0) uses `TorrentConfig.connectionsPerTorrent` (default 100). |
+| Connections per download (`maxConnectionsPerDownload`) | Not used: it counts HTTP segments. `TorrentConfig.maxConnections` (default 200) bounds sockets across all torrents. |
+| Priority | Ordered by Ketch's queue, and by the engine-slot wait above. |
+| Retries (`retryCount`, `retryDelayMs`) | Peer, tracker and DHT failures are retried inside the swarm without failing the task. Failures that reach the task are retried only when transient (`KetchError.Network`: metadata resolution timeouts, remote metainfo fetches, a busy listen port). Storage failures (`KetchError.Disk`), verification and protocol failures (`KetchError.SourceError`) are not retried. |
+
+Up to 16 magnet metadata fetches run at once; further magnet resolutions wait for one to finish.
 
 ### Choosing discovery privacy
 
@@ -126,6 +165,8 @@ Kotlin. Product artifacts contain no libtorrent engine or torrent JNI bindings. 
 adapters use JNA for OS directory/handle operations; Android and iOS call platform filesystem APIs.
 OS sockets, TLS, filesystem and Unicode normalization services are permitted platform dependencies.
 The pinned libtorrent4j dependency and its loader exist only in JVM tests as an independent peer.
+See [release licensing and provenance](development/licensing.md) for dependency notices and
+the scope of the torrent source provenance review.
 
 The public v2/hybrid download workflow supports metainfo imports, full-identity `btmh` magnets
 (including magnets with both exact topics), authenticated piece-layer exchange, trackers/DHT,

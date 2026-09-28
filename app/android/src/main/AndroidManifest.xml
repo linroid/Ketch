@@ -21,12 +21,38 @@
     android:supportsRtl="true"
     android:theme="@android:style/Theme.Material.Light.NoActionBar"
     android:usesCleartextTraffic="true">
+    <!-- singleTask so opening a file reuses the running app via onNewIntent. -->
     <activity
       android:name="com.linroid.ketch.app.android.MainActivity"
-      android:exported="true">
+      android:exported="true"
+      android:launchMode="singleTask">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <!-- .torrent files opened from file managers, browsers and other apps. -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:scheme="content" />
+        <data android:scheme="file" />
+        <data android:mimeType="application/x-bittorrent" />
+      </intent-filter>
+      <!--
+        Some providers report a generic type, so match the extension as well. pathPattern
+        needs a host, and its matcher stops at the first dot, hence the dotted variants.
+      -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:scheme="content" />
+        <data android:scheme="file" />
+        <data android:host="*" />
+        <data android:mimeType="application/octet-stream" />
+        <data android:pathPattern=".*\\.torrent" />
+        <data android:pathPattern=".*\\..*\\.torrent" />
+        <data android:pathPattern=".*\\..*\\..*\\.torrent" />
+        <data android:pathPattern=".*\\..*\\..*\\..*\\.torrent" />
       </intent-filter>
     </activity>
     <service

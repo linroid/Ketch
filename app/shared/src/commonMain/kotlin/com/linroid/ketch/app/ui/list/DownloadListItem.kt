@@ -212,7 +212,7 @@ private fun DownloadRow(
         .heightIn(min = 80.dp)
         .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-      KetchFileTypeChip(fileName)
+      KetchFileTypeChip(fileName, sourceUrl = request.url)
 
       // Name + thin progress
       Column(

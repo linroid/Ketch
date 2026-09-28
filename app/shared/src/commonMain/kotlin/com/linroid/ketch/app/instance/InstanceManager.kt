@@ -8,6 +8,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.remote.RemoteKetch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,15 +46,7 @@ class InstanceManager(
    * `null` in remote-only mode (e.g. wasmJs/web).
    */
   private val embeddedInstance: EmbeddedInstance? =
-    if (factory.hasEmbedded) {
-      val embedded = factory.createEmbedded()
-      val store = configStore
-      if (store == null) embedded else {
-        embedded.copy(instance = ConfigPersistingKetchApi(embedded.instance, store))
-      }
-    } else {
-      null
-    }
+    if (factory.hasEmbedded) factory.createEmbedded() else null
 
   private val _instances =
     MutableStateFlow(listOfNotNull<InstanceEntry>(embeddedInstance))
@@ -92,6 +85,9 @@ class InstanceManager(
     embeddedInstance?.instance?.let { ketch ->
       scope.launch { ketch.start() }
     }
+    if (isLocalServerSupported && configStore?.load()?.server?.autoStart == true) {
+      startServer()
+    }
   }
 
   /**
@@ -123,17 +119,24 @@ class InstanceManager(
   }
 
   /**
-   * Start the local HTTP server exposing the embedded instance.
+   * Start the local HTTP server exposing the embedded instance, with the
+   * server settings currently saved in [configStore].
    * Only available when [isLocalServerSupported] is `true`.
    */
-  fun startServer(port: Int = 8642) {
+  fun startServer() {
     val api = embeddedInstance?.instance
       ?: throw UnsupportedOperationException(
         "No embedded instance for local server",
       )
+    val config = configStore?.load()?.server ?: ServerConfig()
     factory.stopServer()
-    factory.startServer(api)
-    _serverState.value = ServerState.Running(port)
+    _serverState.value = try {
+      factory.startServer(api)
+      ServerState.Running(config)
+    } catch (e: Exception) {
+      // Typically the port is taken; report it instead of crashing.
+      ServerState.Failed(e.message ?: "Could not start the server.")
+    }
   }
 
   /** Stop the local HTTP server if running. */

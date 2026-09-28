@@ -30,6 +30,12 @@ kotlin {
   }
 }
 
+tasks.named<Copy>("wasmJsProcessResources") {
+  from(rootProject.file("app/shared/src/commonMain/composeResources/files/licenses")) {
+    into("licenses")
+  }
+}
+
 // Workaround: ktoml 0.7.1 generates Wasm code that binaryen's validator
 // rejects (type mismatch in TomlMainEncoder.appendValue). Skip validation
 // until ktoml ships a Kotlin 2.3-compatible release.
