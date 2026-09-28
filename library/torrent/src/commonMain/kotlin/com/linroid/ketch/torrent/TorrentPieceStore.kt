@@ -22,7 +22,7 @@ internal class TorrentPieceStore(
   val metadata: TorrentMetadata,
   output: Path,
   selected: Set<Int>,
-  private val taskId: String,
+  val taskId: String,
   private val fileSystem: FileSystem = torrentFileSystem,
   private val storageSlots: Semaphore = Semaphore(32),
 ) {

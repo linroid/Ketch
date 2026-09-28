@@ -9,7 +9,7 @@ Ketch provides a pluggable logging system for diagnostics and debugging.
 ```kotlin
 val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
-  logger = Logger.console()  // Logs to console/logcat/NSLog
+  logger = Logger.console()  // Logs to stdout, Logcat, or the browser console
 )
 ```
 
@@ -48,84 +48,113 @@ val ketch = Ketch(
 
 ## Log Levels
 
-- **Verbose**: Detailed diagnostic information (segment downloads, byte-level details)
-- **Debug**: Debugging information (server detection, metadata operations)
-- **Info**: General informational messages (download started, paused, resumed, completed)
-- **Warn**: Warning messages (retries, validation issues, non-critical errors)
-- **Error**: Error messages (download failures, validation failures)
+- **Verbose**: Detailed diagnostics (segment progress, FTP commands, per-peer torrent events)
+- **Debug**: Internal operations (server detection, tracker announces, DHT, swarm summaries)
+- **Info**: User-facing events (download start, state changes, completion, torrent lifecycle)
+- **Warn**: Recoverable problems (retries, changed server files, corrupt torrent pieces)
+- **Error**: Failures (a download giving up, an engine that cannot start)
 
 ## What Gets Logged
 
 ### Info Level (Recommended for Production)
-- Ketch initialization
-- Download start/pause/resume/cancel
-- Server capabilities (range support, content length)
-- Download completion
-- Retry attempts
+- Ketch initialization with version and revision
+- Download start, with the resolved source, size and output path
+- Every task state transition, such as `Queued -> Downloading` or `Downloading -> Failed(...)`
+- Torrent engine start, resolved torrents, file checks, completion and seeding
+- Magnet metadata lookups and their timeouts
 
 ### Debug Level (Recommended for Development)
-- Server info detection
-- Segment calculations
-- File preallocation
-- Metadata save/load operations
-- Segment start/completion
+- Server info detection and segment calculations
+- File preallocation and resume validation
+- Tracker announces per tracker, DHT bootstrap and lookups
+- A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers,
+  newly discovered and failed peers, corrupt pieces
 
 ### Verbose Level (For Detailed Diagnostics)
-- Segment-level progress details
-- Individual segment operations
+- Segment-level progress details and speed limiter waits
+- FTP protocol commands and replies
+- Individual torrent peer disconnects and rejected incoming connections
+
+## Log Format
+
+`Logger.console()` writes one record per call, prefixed with the local time and level. A
+record's stack trace follows it on the same stream:
+
+```
+2026-09-28 14:03:12.345 [INFO] [Ketch] Ketch v1.0.0 (762f2b3) initialized: name=Ketch
+```
+
+Task-scoped messages include `taskId=`, so concurrent downloads can be told apart with
+`grep`. Warnings that do not print a stack trace, such as retries, still name the underlying
+cause chain.
 
 ## Example Log Output
 
-With `Logger.console()` or `Severity.Debug`:
+An HTTP download that survives one dropped connection:
 
 ```
-[INFO] [Ketch] Ketch v1.0.0 initialized
-[INFO] [Ketch] Starting download: taskId=download-123, url=https://example.com/file.zip, connections=4
-[DEBUG] [Coordinator] Detecting server capabilities for https://example.com/file.zip
-[DEBUG] [RangeDetector] Sending HEAD request to https://example.com/file.zip
-[DEBUG] [KtorHttpEngine] HEAD request: https://example.com/file.zip
-[INFO] [RangeDetector] Server info: contentLength=10485760, acceptRanges=bytes, supportsResume=true, etag="abc123", lastModified=null
-[INFO] [Coordinator] Server supports range requests. Using 4 connections, totalBytes=10485760
-[DEBUG] [Coordinator] Preallocating 10485760 bytes for taskId=download-123
-[DEBUG] [Coordinator] Saving metadata for taskId=download-123
-[DEBUG] [SegmentDownloader] Starting segment 0: range 0..2621439 (2621440 bytes remaining)
-[DEBUG] [KtorHttpEngine] GET request: https://example.com/file.zip, range=0-2621439
-[DEBUG] [SegmentDownloader] Starting segment 1: range 2621440..5242879 (2621440 bytes remaining)
-[DEBUG] [KtorHttpEngine] GET request: https://example.com/file.zip, range=2621440-5242879
-[DEBUG] [SegmentDownloader] Starting segment 2: range 5242880..7864319 (2621440 bytes remaining)
-[DEBUG] [KtorHttpEngine] GET request: https://example.com/file.zip, range=5242880-7864319
-[DEBUG] [SegmentDownloader] Starting segment 3: range 7864320..10485759 (2621440 bytes remaining)
-[DEBUG] [KtorHttpEngine] GET request: https://example.com/file.zip, range=7864320-10485759
-[DEBUG] [SegmentDownloader] Completed segment 0: downloaded 2621440 bytes
-[DEBUG] [SegmentDownloader] Completed segment 1: downloaded 2621440 bytes
-[DEBUG] [SegmentDownloader] Completed segment 2: downloaded 2621440 bytes
-[DEBUG] [SegmentDownloader] Completed segment 3: downloaded 2621440 bytes
-[INFO] [Coordinator] Download completed successfully for taskId=download-123
+14:03:12.410 [INFO] [Ketch] Downloading: taskId=3f2a, url=https://example.com/file.zip, connections=0, priority=NORMAL
+14:03:12.520 [INFO] [RangeDetector] Server info: contentLength=10485760, acceptRanges=true, supportsResume=true, etag="abc123", lastModified=null
+14:03:12.522 [INFO] [Execution] Resolved taskId=3f2a: source=http, totalBytes=10485760, outputPath=/Users/me/Downloads/file.zip
+14:03:12.524 [INFO] [HttpSource] Server supports ranges. Using 4 connections for taskId=3f2a, totalBytes=10485760
+14:03:12.530 [INFO] [Ketch] Task state: taskId=3f2a, Queued -> Downloading
+14:03:17.001 [WARN] [Execution] Retry 1/3 for taskId=3f2a in 1000ms: Network: Network error occurred <- IOException: Connection reset by peer
+14:03:25.870 [INFO] [Execution] Download completed for taskId=3f2a
+14:03:25.871 [INFO] [Ketch] Task state: taskId=3f2a, Downloading -> Completed(/Users/me/Downloads/file.zip)
 ```
 
-### Pause/Resume Example
+A magnet download (dates omitted, task IDs shortened):
 
 ```
-[INFO] [Ketch] Pausing download: taskId=download-123
-[INFO] [Coordinator] Pausing download for taskId=download-123
-[DEBUG] [Coordinator] Saving pause state for taskId=download-123
-...
-[INFO] [Ketch] Resuming download: taskId=download-123
-[INFO] [Coordinator] Resuming download for taskId=download-123, url=https://example.com/file.zip
-[DEBUG] [Coordinator] Validating server state for resume
-[DEBUG] [RangeDetector] Sending HEAD request to https://example.com/file.zip
-[INFO] [RangeDetector] Server info: contentLength=10485760, acceptRanges=bytes, supportsResume=true, etag="abc123", lastModified=null
-[DEBUG] [Coordinator] Server validation passed, continuing resume
+[INFO] [TorrentEngine] Torrent engine listening on port 51413 (IPv4 and IPv6), dht=true, maxActiveTorrents=5, maxConnections=200, extraTrackers=2
+[INFO] [TorrentEngine] Fetching metadata for magnet 0123456789ab: privacy=PUBLIC, trackers=3, peers=0, timeout=2m
+[DEBUG] [TorrentTracker] Announce STARTED for 0123456789ab to udp://tracker.example:6969: peers=50, interval=1800s
+[DEBUG] [TorrentTracker] Announce STARTED for 0123456789ab to https://tracker2.example:443 failed (1 in a row): timed out
+[DEBUG] [TorrentEngine] IPv4 DHT bootstrap from 4 router(s) and 60 saved node(s): 112 contact(s)
+[INFO] [TorrentEngine] Fetched metadata for magnet 0123456789ab in 4.2s
+[INFO] [TorrentSource] Resolved torrent from magnet: 0123456789ab "ubuntu.iso", v1, files=1, totalBytes=6114656256
+[INFO] [TorrentSession] Downloading taskId=9c1e (0123456789ab) with up to 100 peer(s), upload=DISABLED, privacy=PUBLIC
+[DEBUG] [TorrentSwarm] Swarm taskId=9c1e (0123456789ab): pieces 120/23326, peers connected=12 active=20/100, queued=40, known=140, discovered=88, failed=31, corrupt=0, discovery=open
 ```
 
-### Retry Example
+## Troubleshooting
 
-```
-[ERROR] [KtorHttpEngine] Network error: Connection timeout
-[WARN] [Coordinator] Retry attempt 1 after 1000ms delay: Network error: Connection timeout
-[DEBUG] [SegmentDownloader] Starting segment 0: range 0..2621439 (2621440 bytes remaining)
-...
-```
+| Symptom | What to look for |
+|---|---|
+| A download fails | `Download failed for taskId=...` with its cause chain, and the `Retry n/m` lines before it |
+| A resume restarts from zero | `ETag mismatch`, `Last-Modified mismatch` or `Local file integrity check failed` |
+| A task stays queued | `[DownloadQueue]` lines showing the concurrency and per-host limits |
+| A magnet never resolves | `Metadata for magnet ... not found within`, tracker announce failures, DHT contacts |
+| A torrent stays at 0% | The swarm summary: `discovered=0` points at trackers or DHT, `connected=0` at reachability, `corrupt>0` at bad peers |
+| A remote instance is offline | `[RemoteKetch] Connection to ... failed (attempt n)` or `rejected the API token` |
+
+The apps choose their level as follows:
+
+- **Desktop**: debug by default; set `KETCH_LOG_LEVEL` to `verbose`, `debug`, `info`, `warn`
+  or `error`, for example `KETCH_LOG_LEVEL=verbose ./gradlew :app:desktop:run`
+- **CLI**: info by default; `-v`/`--verbose` for debug, `--debug` for verbose
+- **Android and iOS**: debug
+- **Web**: info, in the browser's developer console
+
+## Sensitive Data
+
+Logs are meant to be shared in bug reports, so Ketch keeps credentials out of them:
+
+- Passwords in URLs are masked: `ftp://user:***@example.com/file`
+- Query parameters with credential-like names (`passkey`, `token`, `X-Amz-Signature`, ...)
+  are masked: `https://tracker.example/download.php?id=42&passkey=***`
+- URLs quoted in error messages are masked the same way in cause summaries and in stack
+  traces printed by `Logger.console()`. A custom `Logger`, including `KermitLogger`, receives
+  the original throwable, so a crash reporter still sees the real exception
+- Magnet links keep only their `xt` topic and `dn` name; tracker and source parameters are
+  counted, not printed
+- Tracker URLs are reduced to `scheme://host:port`, including URLs quoted in error messages,
+  because paths and queries carry private tracker passkeys
+- Cookie and authorization header values are masked in HTTP debug logs, and request headers
+  are never logged
+
+When adding log lines, pass URLs through `redactUrl()` (and tracker URLs through
+`trackerLabel()` in `library:torrent`).
 
 ## Custom Logger Implementation
 
@@ -171,18 +200,18 @@ separately.
 ## Platform-Specific Behavior
 
 ### Android
-- `Logger.console()` uses Android's `Log` class (appears in Logcat)
-- Tags are prefixed with "Ketch."
+- `Logger.console()` uses Android's `Log` class with the tag `Ketch` (appears in Logcat,
+  which adds its own timestamps)
 
 ### iOS
-- `Logger.console()` uses `NSLog` (appears in Xcode console)
+- `Logger.console()` prints timestamped lines to standard output (appears in the Xcode console)
 
 ### JVM/Desktop
-- `Logger.console()` uses `println` for most logs
-- Error messages use `System.err`
+- `Logger.console()` prints timestamped lines to standard output; errors go to `System.err`
+- A record's stack trace is printed with it, on the same stream
 
-### WebAssembly
-- `Logger.console()` uses `println` (appears in browser dev tools)
+### JavaScript and WebAssembly
+- `Logger.console()` prints timestamped lines with `println` (appears in browser dev tools)
 
 ## See Also
 

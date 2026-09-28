@@ -15,8 +15,11 @@ internal class SegmentDownloader(
   private val fileAccessor: FileAccessor,
   private val taskLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
+  taskId: String? = null,
 ) {
   private val log = KetchLogger("SegmentDownloader")
+  private val owner = taskId?.let { " for taskId=$it" }.orEmpty()
+
   suspend fun download(
     url: String,
     segment: Segment,
@@ -24,13 +27,13 @@ internal class SegmentDownloader(
     onProgress: suspend (bytesDownloaded: Long) -> Unit,
   ): Segment {
     if (segment.isComplete) {
-      log.d { "Skipping complete segment ${segment.index}" }
+      log.d { "Skipping complete segment ${segment.index}$owner" }
       return segment
     }
 
     val remainingBytes = segment.totalBytes - segment.downloadedBytes
     log.d {
-      "Starting segment ${segment.index}: range ${segment.start}..${segment.end} " +
+      "Starting segment ${segment.index}$owner: range ${segment.start}..${segment.end} " +
         "($remainingBytes bytes remaining)"
     }
 
@@ -60,7 +63,7 @@ internal class SegmentDownloader(
 
     if (downloadedBytes < segment.totalBytes) {
       log.w {
-        "Incomplete segment ${segment.index}: " +
+        "Incomplete segment ${segment.index}$owner: " +
           "downloaded $downloadedBytes/${segment.totalBytes} bytes"
       }
       throw KetchError.Network(
@@ -72,7 +75,7 @@ internal class SegmentDownloader(
     }
 
     log.d {
-      "Completed segment ${segment.index}: " +
+      "Completed segment ${segment.index}$owner: " +
         "downloaded ${downloadedBytes - initialBytes} bytes"
     }
 

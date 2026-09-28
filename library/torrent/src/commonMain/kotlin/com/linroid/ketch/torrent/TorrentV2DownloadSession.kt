@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +49,8 @@ internal class TorrentV2DownloadSession private constructor(
     .filter { selected.isEmpty() || it.id in selected }
     .sumOf { document.info.files[it.v2Index].length }
   override val downloadSpeed: Long get() = 0
+  private val log = KetchLogger("TorrentSession")
+  private val label = "taskId=${store.taskId} (v2 ${logHash(document.info.hash.hex)})"
 
   override fun setFilePriorities(priorities: Map<Int, Int>) {
     error("File selection is fixed for this session")
@@ -90,21 +93,27 @@ internal class TorrentV2DownloadSession private constructor(
     mutableState.value = TorrentSessionState.CHECKING_FILES
     job = scope.launch {
       try {
+        log.i { "Checking files for $label" }
         store.initialize()
         // Persisted bits and earlier live progress cannot authorize bytes changed while paused.
         store.recheck()
         updateProgress()
+        log.i { "Checked files for $label: ${mutableProgress.value}/$totalBytes bytes verified" }
         if (!store.completed()) {
           mutableState.value = TorrentSessionState.DOWNLOADING
+          log.i { "Downloading $label with up to ${connectionLimit.value} peer(s)" }
           transfer()
         }
         currentCoroutineContext().ensureActive()
         mutableState.value = TorrentSessionState.FINISHED
+        log.i { "Torrent $label completed" }
       } catch (error: CancellationException) {
         if (!checkNotNull(currentCoroutineContext()[Job]).isActive) throw error
+        log.w(error) { "Torrent $label stopped: ${error.describeWithoutUrls()}" }
         mutableFailure.value = error
         mutableState.value = TorrentSessionState.STOPPED
       } catch (error: Exception) {
+        log.w(error) { "Torrent $label stopped: ${error.describeWithoutUrls()}" }
         mutableFailure.value = error
         mutableState.value = TorrentSessionState.STOPPED
       }

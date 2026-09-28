@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
 import io.ktor.http.Url
 import io.ktor.http.URLBuilder
 import io.ktor.http.encodedPath
@@ -15,6 +16,8 @@ import okio.Buffer
 import kotlin.coroutines.cancellation.CancellationException
 
 internal class TrackerTimeoutException : IllegalStateException("Tracker did not respond")
+
+private val log = KetchLogger("TorrentTracker")
 
 internal enum class TrackerEvent(val code: Int) {
   NONE(0), COMPLETED(1), STARTED(2), STOPPED(3)
@@ -419,18 +422,25 @@ internal class TrackerTiers(
         lastIntervalSeconds = result.intervalSeconds,
         lastMinimumIntervalSeconds = result.minimumIntervalSeconds,
       ))
+      log.d {
+        "Announce ${request.event} for ${request.topic.logHash()} to ${trackerLabel(url)}: " +
+          "peers=${result.peers.size}, interval=${result.intervalSeconds}s"
+      }
       return result.copy(source = url)
     } catch (_: TrackerTimeoutException) {
       currentCoroutineContext().ensureActive()
       failed(url, TrackerStatus.Outcome.TIMED_OUT)
+      announceFailed(url, request, "timed out")
     } catch (_: TimeoutCancellationException) {
       currentCoroutineContext().ensureActive()
       failed(url, TrackerStatus.Outcome.TIMED_OUT)
+      announceFailed(url, request, "timed out")
     } catch (e: CancellationException) {
       throw e
-    } catch (_: Exception) {
+    } catch (e: Exception) {
       currentCoroutineContext().ensureActive()
       failed(url, TrackerStatus.Outcome.FAILED)
+      announceFailed(url, request, e.describeWithoutUrls())
     } finally {
       val latest = statuses.getValue(url)
       if (latest.outcome == TrackerStatus.Outcome.ANNOUNCING) {
@@ -438,5 +448,13 @@ internal class TrackerTiers(
       }
     }
     return null
+  }
+
+  private fun announceFailed(url: String, request: TrackerAnnounce, reason: String) {
+    val failures = statuses.getValue(url).consecutiveFailures
+    log.d {
+      "Announce ${request.event} for ${request.topic.logHash()} to ${trackerLabel(url)} " +
+        "failed ($failures in a row): $reason"
+    }
   }
 }

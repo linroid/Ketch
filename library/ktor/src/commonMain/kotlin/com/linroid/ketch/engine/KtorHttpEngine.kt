@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.head
@@ -36,7 +37,7 @@ class KtorHttpEngine(
 
   override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
     try {
-      if (logRequests) log.d { "HEAD request: $url" }
+      if (logRequests) log.d { "HEAD request: ${redactUrl(url)}" }
       val response = client.head(url) {
         headers.forEach { (name, value) -> header(name, value) }
       }
@@ -44,13 +45,15 @@ class KtorHttpEngine(
       if (logRequests) log.d {
         "HEAD ${response.status.value} headers: " +
           response.headers.entries().joinToString { (k, v) ->
-            "$k=${v.joinToString(",")}"
+            // Cookies are session credentials; their presence is enough for troubleshooting.
+            if (k.lowercase() in SENSITIVE_HEADERS) "$k=***" else "$k=${v.joinToString(",")}"
           }
       }
 
       if (!response.status.isSuccess()) {
         if (logRequests) log.e {
-          "HTTP error ${response.status.value}: ${response.status.description}"
+          "HTTP error ${response.status.value}: ${response.status.description} " +
+            "for HEAD ${redactUrl(url)}"
         }
         val is429 = response.status.value == 429
         val retryAfter = if (is429) {
@@ -112,9 +115,11 @@ class KtorHttpEngine(
   ) {
     try {
       if (range != null) {
-        if (logRequests) log.d { "GET request: $url, range=${range.first}-${range.last}" }
+        if (logRequests) log.d {
+          "GET request: ${redactUrl(url)}, range=${range.first}-${range.last}"
+        }
       } else {
-        if (logRequests) log.d { "GET request: $url (no range)" }
+        if (logRequests) log.d { "GET request: ${redactUrl(url)} (no range)" }
       }
       val customHeaders = headers
       client.prepareGet(url) {
@@ -133,7 +138,9 @@ class KtorHttpEngine(
         }
 
         if (!status.isSuccess()) {
-          if (logRequests) log.e { "HTTP error ${status.value}: ${status.description}" }
+          if (logRequests) log.e {
+            "HTTP error ${status.value}: ${status.description} for GET ${redactUrl(url)}"
+          }
           val is429 = status.value == 429
           val retryAfter = if (is429) {
             parseRetryAfter(response.headers["Retry-After"])
@@ -209,6 +216,7 @@ class KtorHttpEngine(
 
   companion object {
     private const val DEFAULT_BUFFER_SIZE = 8192
+    private val SENSITIVE_HEADERS = setOf("set-cookie", "cookie", "authorization")
     private val CONTENT_RANGE = Regex("""bytes (\d+)-(\d+)/(\d+|\*)""", RegexOption.IGNORE_CASE)
 
     private fun matchesRange(value: String?, range: LongRange): Boolean {

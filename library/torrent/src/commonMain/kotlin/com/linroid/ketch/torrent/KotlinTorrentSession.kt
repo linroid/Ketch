@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,8 @@ internal class KotlinTorrentSession(
 ) : TorrentSession {
   init { require(connections in 1..512) }
 
+  private val log = KetchLogger("TorrentSession")
+  private val label = "taskId=${store.taskId} (${logHash(store.metadata.infoHash.hex)})"
   private val scope = CoroutineScope(parent.coroutineContext +
     SupervisorJob(parent.coroutineContext[Job]) + Dispatchers.Default)
   private val lifecycle = Mutex()
@@ -224,13 +227,19 @@ internal class KotlinTorrentSession(
     job = scope.launch {
       try {
         _state.value = TorrentSessionState.CHECKING_FILES
+        log.i { "Checking files for $label" }
         recover()
-        store.recheck()
+        val verified = store.recheck()
         _downloadedBytes.value = store.progress().sum()
+        log.i {
+          "Checked files for $label: ${verified.count { it }}/${verified.size} pieces verified, " +
+            "${_downloadedBytes.value}/${store.totalSelectedBytes} bytes"
+        }
         if (store.completed() && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
           store.finish()
           store.persistCheckpoint(received.load(), uploaded.load())
           _state.value = TorrentSessionState.FINISHED
+          log.i { "Torrent $label is already complete" }
           return@launch
         }
         speedMutex.withLock {
@@ -239,6 +248,10 @@ internal class KotlinTorrentSession(
           currentSpeed.store(0)
         }
         _state.value = TorrentSessionState.DOWNLOADING
+        log.i {
+          "Downloading $label with up to ${connectionLimit.load()} peer(s), " +
+            "upload=$uploadPolicy, privacy=$privacy"
+        }
         coroutineScope {
           val peers = Channel<PeerEndpoint>(256)
           val discovery = launch {
@@ -273,7 +286,12 @@ internal class KotlinTorrentSession(
                 _state.value = if (uploadPolicy == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
                   TorrentSessionState.SEEDING
                 } else TorrentSessionState.FINISHED
+                log.i {
+                  "Torrent $label completed: received=${received.load()}, " +
+                    "uploaded=${uploaded.load()}, state=${_state.value}"
+                }
               },
+              logLabel = label,
             ).run(peers, incoming, resets)
           } finally {
             withContext(NonCancellable) { discovery.cancelAndJoin(); peers.cancel() }
@@ -282,6 +300,7 @@ internal class KotlinTorrentSession(
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
+        log.w(e) { "Torrent $label stopped: ${e.describeWithoutUrls()}" }
         _failure.value = e
         _state.value = TorrentSessionState.STOPPED
       }
@@ -384,7 +403,7 @@ internal class KotlinTorrentSession(
 
   fun setConnections(value: Int) {
     require(value in 1..512)
-    connectionLimit.store(value)
+    if (connectionLimit.exchange(value) != value) log.d { "Peer limit for $label: $value" }
   }
 
   override fun setFilePriorities(priorities: Map<Int, Int>) {

@@ -13,6 +13,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -99,7 +100,7 @@ class KetchService : Service() {
             taskStore = taskStore,
             config = config.download,
             name = instanceName,
-            logger = Logger.console(),
+            logger = Logger.console(LogLevel.DEBUG),
             additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )
         },

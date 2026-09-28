@@ -18,6 +18,8 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
@@ -137,7 +139,8 @@ class Ketch(
 
   init {
     KetchLogger.setLogger(logger)
-    log.i { "Ketch v${KetchApi.VERSION} initialized" }
+    log.i { "Ketch v${KetchApi.VERSION} (${KetchApi.REVISION}) initialized: name=$name" }
+    log.d { "Initial config: $config" }
     if (!config.speedLimit.isUnlimited) {
       log.i { "Global speed limit: ${config.speedLimit}" }
     }
@@ -157,7 +160,7 @@ class Ketch(
     val isScheduled = request.schedule !is DownloadSchedule.Immediate ||
       request.conditions.isNotEmpty()
     log.i {
-      "Downloading: taskId=$taskId, url=${request.url}, " +
+      "Downloading: taskId=$taskId, url=${redactUrl(request.url)}, " +
         "connections=${request.connections}, " +
         "priority=${request.priority}" +
         if (isScheduled) ", schedule=${request.schedule}" else ""
@@ -185,7 +188,7 @@ class Ketch(
     url: String,
     properties: Map<String, String>,
   ): ResolvedSource {
-    log.i { "Resolving URL: $url" }
+    log.i { "Resolving URL: ${redactUrl(url)}" }
     val source = sourceResolver.resolve(url)
     return source.resolve(url, properties, currentConfig)
   }
@@ -424,7 +427,14 @@ class Ketch(
     monitorMutex.withLock {
       taskMonitors.remove(taskId)?.cancel()
       taskMonitors[taskId] = scope.launch {
+        var previous: DownloadState? = null
         stateFlow.collect { state ->
+          // Progress updates keep the state type; only real transitions are worth a line.
+          val last = previous
+          previous = state
+          if (last != null && last::class != state::class) {
+            log.i { "Task state: taskId=$taskId, ${last.logLabel()} -> ${state.logLabel()}" }
+          }
           when (state) {
             is DownloadState.Completed -> queue.onTaskCompleted(taskId, state)
             is DownloadState.Failed -> queue.onTaskFailed(taskId, state)
@@ -434,6 +444,12 @@ class Ketch(
         }
       }
     }
+  }
+
+  private fun DownloadState.logLabel(): String = when (this) {
+    is DownloadState.Failed -> "Failed(${error.describeCauses()})"
+    is DownloadState.Completed -> "Completed($outputPath)"
+    else -> this::class.simpleName ?: toString()
   }
 
   /**

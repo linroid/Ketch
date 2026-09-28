@@ -12,6 +12,8 @@ import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isFile
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.defaultDownloadDirectory
 import com.linroid.ketch.core.file.FileAccessor
@@ -127,14 +129,16 @@ internal class DownloadExecution(
 
     if (resolved != null) {
       log.d {
-        "Using pre-resolved info for ${request.url} " +
-          "(source=${resolved.sourceType})"
+        "Using pre-resolved info for taskId=$taskId: url=${redactUrl(request.url)}, " +
+          "source=${resolved.sourceType}"
       }
       source = sourceResolver.resolveByType(resolved.sourceType)
       resolvedUrl = resolved
     } else {
       source = sourceResolver.resolve(request.url)
-      log.d { "Resolved source '${source.type}' for ${request.url}" }
+      log.d {
+        "Resolved source '${source.type}' for taskId=$taskId: url=${redactUrl(request.url)}"
+      }
       resolvedUrl = downloadWithRetry { source.resolve(request.url, request.headers, config) }
     }
 
@@ -149,11 +153,11 @@ internal class DownloadExecution(
       }
     } else resolvedUrl.totalBytes
     if (total < 0) {
-      log.e { "Unknown file size for ${request.url}" }
+      log.e { "Unknown file size for taskId=$taskId: url=${redactUrl(request.url)}" }
       throw KetchError.SourceError(
         sourceType = source.type,
         cause = Exception(
-          "Unknown file size for ${request.url}"
+          "Unknown file size for ${redactUrl(request.url)}"
         ),
       )
     }
@@ -168,7 +172,10 @@ internal class DownloadExecution(
       serverFileName = fileName,
       deduplicate = true,
     )
-    log.d { "Resolved outputPath=$outputPath" }
+    log.i {
+      "Resolved taskId=$taskId: source=${source.type}, totalBytes=$total, " +
+        "outputPath=$outputPath"
+    }
 
     if (total == 0L && !source.managesOwnFileIo) {
       completeZeroByteFile(outputPath, source.type)
@@ -403,9 +410,10 @@ internal class DownloadExecution(
         }
 
         if (!error.isRetryable || retryCount >= config.retryCount) {
-          log.e(error) {
-            "Download failed after $retryCount retries: " +
-              "${error.message}"
+          // DownloadCoordinator logs the failure itself, with its stack trace.
+          log.i {
+            if (error.isRetryable) "Giving up on taskId=$taskId after $retryCount retries"
+            else "Not retrying taskId=$taskId: ${error::class.simpleName} is not retryable"
           }
           throw error
         }
@@ -418,15 +426,15 @@ internal class DownloadExecution(
           delayMs = error.retryAfterSeconds?.let { it * 1000L }
             ?: (config.retryDelayMs * (1 shl (retryCount - 1)))
           log.w {
-            "Rate limited (429). Retry attempt $retryCount " +
-              "after ${delayMs}ms delay, connections=" +
+            "Rate limited (429) for taskId=$taskId. Retry $retryCount/${config.retryCount} " +
+              "in ${delayMs}ms, connections=" +
               "${ctx?.maxConnections?.value ?: request.connections}"
           }
         } else {
           delayMs = config.retryDelayMs * (1 shl (retryCount - 1))
           log.w {
-            "Retry attempt $retryCount after ${delayMs}ms " +
-              "delay: ${error.message}"
+            "Retry $retryCount/${config.retryCount} for taskId=$taskId in ${delayMs}ms: " +
+              error.describeCauses()
           }
         }
         delay(delayMs)

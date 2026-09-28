@@ -5,6 +5,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
@@ -114,7 +115,7 @@ class FtpDownloadSource : DownloadSource {
       ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
     if (totalBytes < 0) {
-      log.e { "Unknown file size for ${context.url} — file may not exist" }
+      log.e { "Unknown file size for ${redactUrl(context.url)} — file may not exist" }
       throw KetchError.SourceError(
         sourceType = TYPE,
         cause = Exception(

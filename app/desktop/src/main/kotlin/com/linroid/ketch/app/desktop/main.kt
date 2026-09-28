@@ -17,6 +17,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -108,7 +109,7 @@ private fun ApplicationScope.KetchWindow(
             taskStore = taskStore,
             config = config.download,
             name = instanceName,
-            logger = Logger.console(),
+            logger = Logger.console(consoleLogLevel()),
             additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )
         },
@@ -180,6 +181,16 @@ private fun ApplicationScope.KetchWindow(
     }
     App(instanceManager, aiProviderFactory, openSettings, incoming)
   }
+}
+
+/**
+ * Console log level from `KETCH_LOG_LEVEL` (`verbose`, `debug`, `info`, `warn` or `error`).
+ * Defaults to debug; verbose adds per-segment, per-peer and protocol-level lines.
+ */
+private fun consoleLogLevel(): LogLevel {
+  val name = System.getenv("KETCH_LOG_LEVEL")?.trim() ?: return LogLevel.DEBUG
+  return LogLevel.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+    ?: LogLevel.DEBUG
 }
 
 /** ⌘, on macOS and Ctrl+, elsewhere, the usual shortcut for settings. */

@@ -3,6 +3,7 @@ package com.linroid.ketch.app
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.window.ComposeUIViewController
+import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -56,7 +57,7 @@ fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
             taskStore = taskStore,
             config = config.download,
             name = instanceName,
-            logger = Logger.console(),
+            logger = Logger.console(LogLevel.DEBUG),
             additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )
         },

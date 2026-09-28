@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
@@ -37,6 +38,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
 import okio.Path
 import okio.Path.Companion.toPath
+import kotlin.time.TimeSource
 
 /** Source-owned Kotlin runtime. Task jobs borrow its bounded transports and discovery services. */
 @OptIn(ExperimentalAtomicApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class,
@@ -98,8 +100,14 @@ internal class KotlinTorrentEngine(
     running.store(true)
     accept(listener)
     // Some systems provide dual-stack sockets and reject a second bind on the same port.
-    try { accept(network.listen(PeerEndpoint("::", port))) } catch (_: Exception) {
+    val ipv6 = try { accept(network.listen(PeerEndpoint("::", port))); true } catch (_: Exception) {
       currentCoroutineContext().ensureActive()
+      false
+    }
+    log.i {
+      "Torrent engine listening on port $port" + (if (ipv6) " (IPv4 and IPv6)" else " (IPv4)") +
+        ", dht=${config.dhtEnabled}, maxActiveTorrents=${config.maxActiveTorrents}, " +
+        "maxConnections=${config.maxConnections}, extraTrackers=${additionalTrackers.load().size}"
     }
   }
 
@@ -139,8 +147,9 @@ internal class KotlinTorrentEngine(
             handedOff = mutex.withLock { sessions[hash.hex]?.accept(replay) == true }
           } catch (e: CancellationException) {
             throw e
-          } catch (_: Exception) {
+          } catch (e: Exception) {
             // Malformed, unknown, or expired handshakes are isolated to this connection.
+            log.v { "Rejected incoming peer ${connection.remote}: ${e.describeWithoutUrls()}" }
           } finally {
             if (!handedOff) connection.close()
           }
@@ -187,6 +196,7 @@ internal class KotlinTorrentEngine(
         sessions.clear(); closing.clear(); outputs.clear(); sessionLeases.clear()
       }
     }
+    log.i { "Stopping torrent engine with ${active.size} session(s)" }
     withContext(NonCancellable) {
       try {
         active.forEach { it.pause(); it.close() }
@@ -217,35 +227,55 @@ internal class KotlinTorrentEngine(
         require(it.isNotEmpty()) { "Tracker-only magnets require supplied trackers" }
       }
     } else emptyList()
+    val hash = logHash(magnet.infoHash.hex)
     val metadata = cache.resolve(magnet.infoHash, privacy) {
-      withTimeout(config.metadataTimeout) {
-        if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
-          return@withTimeout fetchTrackerOnly(magnet, restrictedTiers)
-        }
-        coroutineScope {
-          val peers = Channel<PeerEndpoint>(256)
-          val discovery = launch { discoverMagnet(magnet, peers) }
-          val attempted = mutableSetOf<PeerEndpoint>()
-          try {
-            while (true) {
-              val endpoint = peers.receive()
-              if (!attempted.add(endpoint)) continue
-              if (attempted.size > 4096) error("Metadata peer limit exceeded")
-              try {
-                return@coroutineScope TorrentMetadataExchange(network, config.maxMetadataBytes,
-                  budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint)
-              } catch (e: PrivateTorrentMagnetException) {
-                throw e
-              } catch (e: CancellationException) {
-                if (!currentCoroutineContext().isActive) throw e
-              } catch (_: Exception) {
-                // A bad peer must not prevent trying the remaining discovery candidates.
+      log.i {
+        "Fetching metadata for magnet $hash: privacy=$privacy, trackers=${magnet.trackers.size}, " +
+          "peers=${magnet.explicitPeers.size}, timeout=${config.metadataTimeout}"
+      }
+      val started = TimeSource.Monotonic.markNow()
+      var tried = 0
+      try {
+        withTimeout(config.metadataTimeout) {
+          if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+            return@withTimeout fetchTrackerOnly(magnet, restrictedTiers)
+          }
+          coroutineScope {
+            val peers = Channel<PeerEndpoint>(256)
+            val discovery = launch { discoverMagnet(magnet, peers) }
+            val attempted = mutableSetOf<PeerEndpoint>()
+            try {
+              while (true) {
+                val endpoint = peers.receive()
+                if (!attempted.add(endpoint)) continue
+                if (attempted.size > 4096) error("Metadata peer limit exceeded")
+                tried = attempted.size
+                try {
+                  return@coroutineScope TorrentMetadataExchange(network, config.maxMetadataBytes,
+                    budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint)
+                    .also { log.d { "Metadata for $hash received from $endpoint" } }
+                } catch (e: PrivateTorrentMagnetException) {
+                  throw e
+                } catch (e: CancellationException) {
+                  if (!currentCoroutineContext().isActive) throw e
+                } catch (e: Exception) {
+                  // A bad peer must not prevent trying the remaining discovery candidates.
+                  log.v { "Metadata for $hash from $endpoint failed: ${e.describeWithoutUrls()}" }
+                }
               }
-            }
-            @Suppress("UNREACHABLE_CODE")
-            error("No metadata peers")
-          } finally { discovery.cancel(); peers.cancel() }
+              @Suppress("UNREACHABLE_CODE")
+              error("No metadata peers")
+            } finally { discovery.cancel(); peers.cancel() }
+          }
+        }.also {
+          log.i { "Fetched metadata for magnet $hash in ${started.elapsedNow()}" }
         }
+      } catch (e: TimeoutCancellationException) {
+        log.w {
+          "Metadata for magnet $hash not found within ${config.metadataTimeout} " +
+            "after trying $tried peer(s)"
+        }
+        throw e
       }
     }
     require(magnet.identity.matchesInfo(metadata.infoBytes)) { "Exact topic hash mismatch" }
@@ -271,10 +301,32 @@ internal class KotlinTorrentEngine(
   private suspend fun resolveV2Metadata(
     magnetUri: String,
     privacy: TorrentDiscoveryPrivacy,
+  ): ByteArray {
+    val started = TimeSource.Monotonic.markNow()
+    var hash = "?"
+    try {
+      return fetchV2MetadataWithinTimeout(magnetUri, privacy) { hash = it }.also {
+        log.i { "Fetched v2 metadata for magnet $hash in ${started.elapsedNow()}" }
+      }
+    } catch (e: TimeoutCancellationException) {
+      log.w { "V2 metadata for magnet $hash not found within ${config.metadataTimeout}" }
+      throw e
+    }
+  }
+
+  private suspend fun fetchV2MetadataWithinTimeout(
+    magnetUri: String,
+    privacy: TorrentDiscoveryPrivacy,
+    onTopic: (String) -> Unit,
   ): ByteArray = withTimeout(config.metadataTimeout) {
     check(isRunning)
     val magnet = MagnetUri.parse(magnetUri)
     val topic = TrackerTopic.V2(requireNotNull(magnet.identity.v2))
+    onTopic(topic.logHash())
+    log.i {
+      "Fetching v2 metadata for magnet ${topic.logHash()}: privacy=$privacy, " +
+        "trackers=${magnet.trackers.size}, timeout=${config.metadataTimeout}"
+    }
     val tiers = TrackerConfiguration.prepare(magnet.trackers.map { listOf(it) }).tiers
     require(privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY || tiers.isNotEmpty()) {
       "Tracker-only magnets require supplied trackers"
@@ -322,7 +374,13 @@ internal class KotlinTorrentEngine(
           check(attempted.size <= 4096) { "Metadata peer limit exceeded" }
           try { return@coroutineScope fetch(endpoint)
           } catch (error: PrivateTorrentMagnetException) { throw error
-          } catch (error: Exception) { currentCoroutineContext().ensureActive() }
+          } catch (error: Exception) {
+            currentCoroutineContext().ensureActive()
+            log.v {
+              "V2 metadata for ${topic.logHash()} from $endpoint failed: " +
+                error.describeWithoutUrls()
+            }
+          }
         }
         @Suppress("UNREACHABLE_CODE")
         error("No metadata peers")
@@ -465,6 +523,12 @@ internal class KotlinTorrentEngine(
       sessionLeases[hash] = lease
       sessions[hash] = session
       outputs[hash] = output.toString()
+      log.i {
+        "Added torrent ${logHash(hash)} for taskId=${spec.taskId}: " +
+          "trackers=${spec.metadata.trackerTiers.sumOf { it.size }}, privacy=${spec.privacy}, " +
+          "private=${spec.metadata.isPrivate}, resume=${checkpoint != null}, " +
+          "active=${sessions.size + v2Identities.size}/${config.maxActiveTorrents}"
+      }
       session
     } catch (failure: Throwable) {
       sessions.remove(hash)
@@ -719,9 +783,12 @@ internal class KotlinTorrentEngine(
 
   private suspend fun dhtPeers(hash: InfoHash, announce: Boolean): List<PeerEndpoint> =
     supervisorScope {
-      dht().map { node -> async { attempt { node.peers(hash, if (announce) port else null) }
-        ?: emptyList() } }.awaitAll().flatten().distinct()
-    }
+      dht().map { node -> async {
+        attempt("DHT lookup for ${logHash(hash.hex)}") {
+          node.peers(hash, if (announce) port else null)
+        } ?: emptyList()
+      } }.awaitAll().flatten().distinct()
+    }.also { peers -> log.d { "DHT lookup for ${logHash(hash.hex)} found ${peers.size} peer(s)" } }
 
   private suspend fun dht(): List<DhtNode> = dhtMutex.withLock {
     nodes?.let { current ->
@@ -731,31 +798,45 @@ internal class KotlinTorrentEngine(
     }
     val result = mutableListOf<DhtNode>()
     for (host in listOf("0.0.0.0", "::")) {
-      val node = attempt { DhtNode(network.bindUdp(PeerEndpoint(host, 0)), scope,
-        allowLocalAddresses = allowLocalDiscovery) } ?: continue
+      val family = if (':' in host) "IPv6" else "IPv4"
+      val node = attempt("Binding the $family DHT socket") {
+        DhtNode(network.bindUdp(PeerEndpoint(host, 0)), scope,
+          allowLocalAddresses = allowLocalDiscovery)
+      } ?: continue
       node.start()
       result.add(node)
       scope.launch {
         val snapshot = config.stateDirectory?.toPath()?.resolve(
           if (':' in host) "dht6.nodes" else "dht4.nodes")
-        val restored = snapshot?.let { path -> attempt {
-          require((torrentSystemFileSystem.metadata(path).size ?: Long.MAX_VALUE) <= 256 * 1024)
-          DhtRoutingTable.restore(torrentSystemFileSystem.read(path) { readByteArray() })
-            .second.map { it.endpoint }
-        } } ?: emptyList()
+        val restored = snapshot?.let { path ->
+          attempt("Restoring $family DHT nodes") {
+            if (!torrentSystemFileSystem.exists(path)) return@attempt emptyList()
+            require((torrentSystemFileSystem.metadata(path).size ?: Long.MAX_VALUE) <= 256 * 1024)
+            DhtRoutingTable.restore(torrentSystemFileSystem.read(path) { readByteArray() })
+              .second.map { it.endpoint }
+          }
+        } ?: emptyList()
         // Resolve on every attempt: bootstrap names do not resolve while the device is offline.
         suspend fun bootstrap() {
-          val endpoints = config.dhtBootstrap.flatMap { attempt { resolveEndpoint(it) }
-            ?: emptyList() }.filter { (':' in it.host) == (':' in host) }
+          val endpoints = config.dhtBootstrap.flatMap { router ->
+            attempt("Resolving DHT router $router") { resolveEndpoint(router) } ?: emptyList()
+          }.filter { (':' in it.host) == (':' in host) }
           // A large snapshot must not crowd out the routers when its nodes have gone stale.
           val saved = restored.filter { it !in endpoints }
             .take((64 - endpoints.size).coerceAtLeast(0))
-          attempt { node.bootstrap((saved + endpoints).distinct().take(64)) }
+          attempt("$family DHT bootstrap") {
+            node.bootstrap((saved + endpoints).distinct().take(64))
+          }
+          log.d {
+            "$family DHT bootstrap from ${endpoints.size} router(s) and ${saved.size} saved " +
+              "node(s): ${node.contactCount()} contact(s)"
+          }
         }
         bootstrap()
         var retryMs = DHT_BOOTSTRAP_RETRY_MS
         while (isActive && node.isRunning) {
           if (node.contactCount() == 0) {
+            log.d { "$family DHT has no contacts; bootstrapping again in ${retryMs / 1000}s" }
             delay(retryMs)
             retryMs = (retryMs * 2).coerceAtMost(DHT_REFRESH_MS)
             bootstrap()
@@ -766,7 +847,7 @@ internal class KotlinTorrentEngine(
             // Processes sharing the directory must not write through the same temporary file.
             val temporary = checkNotNull(snapshot.parent) /
               "${snapshot.name}.${torrentRandomBytes(4).toByteString().hex()}.tmp"
-            attempt {
+            attempt("Saving $family DHT nodes") {
               torrentSystemFileSystem.createDirectories(checkNotNull(snapshot.parent))
               val bytes = node.snapshot()
               torrentSystemFileSystem.write(temporary) { write(bytes) }
@@ -774,10 +855,12 @@ internal class KotlinTorrentEngine(
             } ?: attempt { torrentSystemFileSystem.delete(temporary, mustExist = false) }
           }
           delay(DHT_REFRESH_MS)
-          attempt { node.refresh() }
+          attempt("$family DHT refresh") { node.refresh() }
         }
+        if (isActive) log.i { "$family DHT socket stopped; the next lookup binds a new one" }
       }
     }
+    if (result.isEmpty()) log.w { "DHT is unavailable: no UDP socket could be bound" }
     nodes = result
     result
   }
@@ -801,6 +884,7 @@ internal class KotlinTorrentEngine(
       current.also { it.users++ }
     }
     var closed = false
+    log.d { "Removing torrent ${logHash(infoHash)}, deleteFiles=$deleteFiles" }
     try {
       withContext(NonCancellable) { entry.session.close(deleteFiles) }
       closed = true
@@ -827,7 +911,11 @@ internal class KotlinTorrentEngine(
   fun setConnections(value: Int) = network.set(value)
 
   /** Replaces the extra public trackers; sessions and lookups started afterwards use them. */
-  fun setAdditionalTrackers(urls: List<String>) = additionalTrackers.store(usableTrackers(urls))
+  fun setAdditionalTrackers(urls: List<String>) {
+    val usable = usableTrackers(urls)
+    additionalTrackers.store(usable)
+    log.i { "Extra trackers updated: ${usable.size} tracker(s)" }
+  }
 
   private fun usableTrackers(urls: List<String>): List<String> {
     val candidates = urls.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
@@ -879,12 +967,23 @@ private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 private const val MAX_ADDITIONAL_TRACKERS = 64
 private const val DHT_REFRESH_MS = 15 * 60_000L
 
-private suspend fun <T> attempt(block: suspend () -> T): T? = try {
+private val attemptLog = KetchLogger("TorrentEngine")
+
+/**
+ * Runs best-effort discovery work, returning null on failure. A [label] names the work in a
+ * debug line when it fails; unlabeled attempts are either expected to fail often or already
+ * report their own outcome.
+ */
+private suspend fun <T> attempt(label: String? = null, block: suspend () -> T): T? = try {
   block()
 } catch (e: CancellationException) {
   if (!currentCoroutineContext().isActive) throw e
+  if (label != null) attemptLog.d { "$label timed out" }
   null
-} catch (_: Exception) { null }
+} catch (e: Exception) {
+  if (label != null) attemptLog.d { "$label failed: ${e.describeWithoutUrls()}" }
+  null
+}
 
 internal suspend fun resolveEndpoint(value: String): List<PeerEndpoint> {
   val port = value.substringAfterLast(':').toIntOrNull()

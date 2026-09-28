@@ -59,7 +59,13 @@ internal class RemoteDownloadTask(
   ) {
     request?.let { mutableRequest.value = it }
     segments?.let { _segments.value = it }
-    log.d { "State update for taskId=$taskId: $newState" }
+    val previous = _state.value
+    if (previous::class != newState::class) {
+      log.d {
+        "State update for taskId=$taskId: " +
+          "${previous::class.simpleName} -> ${newState::class.simpleName}"
+      }
+    }
     _state.value = newState
   }
 
