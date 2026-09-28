@@ -137,9 +137,17 @@ main() {
   # Install to target directory
   if [ -w "$INSTALL_DIR" ]; then
     mv "$binary" "${INSTALL_DIR}/${BINARY_NAME}"
+    if [ -d "${tmpdir}/licenses" ]; then
+      mkdir -p "${INSTALL_DIR}/ketch-licenses"
+      cp -R "${tmpdir}/licenses/." "${INSTALL_DIR}/ketch-licenses/"
+    fi
   else
     info "Installing to ${INSTALL_DIR} (requires sudo)..."
     sudo mv "$binary" "${INSTALL_DIR}/${BINARY_NAME}"
+    if [ -d "${tmpdir}/licenses" ]; then
+      sudo mkdir -p "${INSTALL_DIR}/ketch-licenses"
+      sudo cp -R "${tmpdir}/licenses/." "${INSTALL_DIR}/ketch-licenses/"
+    fi
   fi
 
   info "Installed ketch to ${INSTALL_DIR}/${BINARY_NAME}"

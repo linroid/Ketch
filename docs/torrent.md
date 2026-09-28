@@ -165,6 +165,8 @@ Kotlin. Product artifacts contain no libtorrent engine or torrent JNI bindings. 
 adapters use JNA for OS directory/handle operations; Android and iOS call platform filesystem APIs.
 OS sockets, TLS, filesystem and Unicode normalization services are permitted platform dependencies.
 The pinned libtorrent4j dependency and its loader exist only in JVM tests as an independent peer.
+See [release licensing and provenance](development/licensing.md) for dependency notices and
+the scope of the torrent source provenance review.
 
 The public v2/hybrid download workflow supports metainfo imports, full-identity `btmh` magnets
 (including magnets with both exact topics), authenticated piece-layer exchange, trackers/DHT,

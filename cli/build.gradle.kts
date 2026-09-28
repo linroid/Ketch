@@ -62,7 +62,7 @@ val bundleWebApp by tasks.registering(Copy::class) {
     dependsOn(":app:web:wasmJsBrowserDistribution")
   }
   from(webSourceDir)
-  exclude("*.map", "*.LICENSE.txt")
+  exclude("*.map")
   into(layout.buildDirectory.dir("generated/resources/web"))
   // Inject auto-connect flag so the bundled web UI connects to its
   // serving host automatically.
@@ -78,6 +78,30 @@ val bundleWebApp by tasks.registering(Copy::class) {
 
 sourceSets.main {
   resources.srcDir(bundleWebApp.map { layout.buildDirectory.dir("generated/resources") })
+}
+
+val releaseLicenses = rootProject.layout.projectDirectory
+  .dir("app/shared/src/commonMain/composeResources/files/licenses")
+
+tasks.processResources {
+  from(releaseLicenses) { into("licenses") }
+}
+
+distributions.main {
+  contents {
+    from(releaseLicenses) { into("licenses") }
+  }
+}
+
+val prepareNativeLicenses by tasks.registering(Sync::class) {
+  from(releaseLicenses)
+  into(layout.buildDirectory.dir("native/nativeCompile/licenses"))
+}
+
+// The native plugin clears its output directory before building the executable.
+// Restore the sidecar notices after compilation, including when the image is up to date.
+tasks.named("nativeCompile") {
+  finalizedBy(prepareNativeLicenses)
 }
 
 dependencies {

@@ -59,6 +59,8 @@ When writing Kotlin code for this project:
 
 - **Public APIs**: Use explicit types and add KDoc comments
 - **Internal classes**: Mark with `internal` modifier
+- **Third-party code**: Follow [licensing and provenance](licensing.md) when copying,
+  translating, or adapting code; retain its source revision, license, and required notices.
 - **Naming**: Use meaningful, descriptive names
 - **Functions**: Keep focused and concise
 - **Sealed hierarchies**: Use sealed classes/interfaces for closed type hierarchies (e.g., `KetchError`)
