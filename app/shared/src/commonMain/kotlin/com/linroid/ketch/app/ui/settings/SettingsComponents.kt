@@ -378,8 +378,6 @@ fun <T> SettingsSegmented(
  * @param secret masks the text, with a Show/Hide toggle.
  * @param numeric accepts digits only.
  * @param decimal accepts digits and a decimal point.
- * @param minLines height of the field in lines; above 1, Enter starts a
- *   new line instead of saving.
  */
 @Composable
 fun SettingsTextInput(
@@ -395,21 +393,16 @@ fun SettingsTextInput(
   mono: Boolean = false,
   enabled: Boolean = true,
   width: Dp? = null,
-  minLines: Int = 1,
   actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
-  val multiLine = minLines > 1
-  val colors = KetchTheme.colors
   val focusManager = LocalFocusManager.current
   var text by remember { mutableStateOf(value) }
-  var focused by remember { mutableStateOf(false) }
   var revealed by remember { mutableStateOf(false) }
   // Adopt changes made elsewhere, but never rewrite what the user is
   // typing just because saving normalised it.
   LaunchedEffect(value) {
     if (normalize(text) != value) text = value
   }
-  val error = validate(text)
   val commit by rememberUpdatedState {
     val normalized = normalize(text)
     if (normalized != value && validate(text) == null) onCommit(normalized)
@@ -422,6 +415,85 @@ fun SettingsTextInput(
     onDispose { commit() }
   }
 
+  val showToggle = secret && text.isNotEmpty()
+  SettingsTextField(
+    value = text,
+    onValueChange = { typed ->
+      text = when {
+        numeric -> typed.filter(Char::isDigit)
+        decimal -> typed.filter { it.isDigit() || it == '.' }
+        else -> typed
+      }
+    },
+    modifier = modifier,
+    placeholder = placeholder,
+    error = validate(text),
+    onDone = {
+      commit()
+      focusManager.clearFocus()
+    },
+    onFocusChange = { focused -> if (!focused) commit() },
+    keyboardType = when {
+      numeric -> KeyboardType.Number
+      decimal -> KeyboardType.Decimal
+      secret -> KeyboardType.Password
+      else -> KeyboardType.Text
+    },
+    visualTransformation = if (secret && !revealed) {
+      PasswordVisualTransformation()
+    } else {
+      VisualTransformation.None
+    },
+    mono = mono,
+    enabled = enabled,
+    width = width,
+    trailing = if (showToggle || actions != null) {
+      {
+        if (showToggle) {
+          KetchButton(
+            text = if (revealed) "Hide" else "Show",
+            onClick = { revealed = !revealed },
+            variant = KetchButtonVariant.Ghost,
+            size = KetchButtonSize.Small,
+            enabled = enabled,
+          )
+        }
+        actions?.invoke(this)
+      }
+    } else {
+      null
+    },
+  )
+}
+
+/**
+ * Single-line settings text field that only reports edits, for text the
+ * caller acts on itself, e.g. with an Add button. [SettingsTextInput]
+ * builds on it for text that saves itself.
+ *
+ * @param error shown under the field, which is outlined in red.
+ * @param onDone runs when Enter is pressed.
+ * @param onFocusChange called when the field gains or loses focus.
+ * @param trailing controls at the end of the field.
+ */
+@Composable
+fun SettingsTextField(
+  value: String,
+  onValueChange: (String) -> Unit,
+  modifier: Modifier = Modifier,
+  placeholder: String = "",
+  error: String? = null,
+  onDone: () -> Unit = {},
+  onFocusChange: (Boolean) -> Unit = {},
+  keyboardType: KeyboardType = KeyboardType.Text,
+  visualTransformation: VisualTransformation = VisualTransformation.None,
+  mono: Boolean = false,
+  enabled: Boolean = true,
+  width: Dp? = null,
+  trailing: (@Composable RowScope.() -> Unit)? = null,
+) {
+  val colors = KetchTheme.colors
+  var focused by remember { mutableStateOf(false) }
   val shape = RoundedCornerShape(10.dp)
   val borderColor = when {
     error != null -> colors.error
@@ -432,43 +504,26 @@ fun SettingsTextInput(
     .copy(color = if (enabled) colors.onBackground else colors.onSurfaceDim)
   Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
     BasicTextField(
-      value = text,
-      onValueChange = { typed ->
-        text = when {
-          numeric -> typed.filter(Char::isDigit)
-          decimal -> typed.filter { it.isDigit() || it == '.' }
-          else -> typed
-        }
-      },
+      value = value,
+      onValueChange = onValueChange,
       enabled = enabled,
-      singleLine = !multiLine,
-      minLines = minLines,
+      singleLine = true,
       textStyle = textStyle,
       cursorBrush = SolidColor(colors.primary),
-      visualTransformation = if (secret && !revealed) {
-        PasswordVisualTransformation()
-      } else {
-        VisualTransformation.None
-      },
+      visualTransformation = visualTransformation,
       keyboardOptions = KeyboardOptions(
-        keyboardType = when {
-          numeric -> KeyboardType.Number
-          decimal -> KeyboardType.Decimal
-          secret -> KeyboardType.Password
-          else -> KeyboardType.Text
-        },
-        imeAction = if (multiLine) ImeAction.Default else ImeAction.Done,
+        keyboardType = keyboardType,
+        imeAction = ImeAction.Done,
         autoCorrectEnabled = false,
       ),
-      keyboardActions = KeyboardActions(onDone = {
-        commit()
-        focusManager.clearFocus()
-      }),
+      keyboardActions = KeyboardActions(onDone = { onDone() }),
       modifier = Modifier
         .let { if (width != null) it.widthIn(max = width) else it.fillMaxWidth() }
         .onFocusChanged {
-          if (focused && !it.isFocused) commit()
-          focused = it.isFocused
+          if (it.isFocused != focused) {
+            focused = it.isFocused
+            onFocusChange(it.isFocused)
+          }
         }
         .defaultMinSize(minHeight = 40.dp)
         .clip(shape)
@@ -481,27 +536,14 @@ fun SettingsTextInput(
           horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
           Box(Modifier.weight(1f).padding(vertical = 10.dp)) {
-            if (text.isEmpty()) {
-              Text(
-                text = placeholder,
-                style = textStyle,
-                color = colors.onSurfaceDim,
-                maxLines = minLines,
-              )
+            if (value.isEmpty()) {
+              Text(placeholder, style = textStyle, color = colors.onSurfaceDim, maxLines = 1)
             }
             inner()
           }
-          if (secret && text.isNotEmpty()) {
-            KetchButton(
-              text = if (revealed) "Hide" else "Show",
-              onClick = { revealed = !revealed },
-              variant = KetchButtonVariant.Ghost,
-              size = KetchButtonSize.Small,
-              enabled = enabled,
-            )
-          }
-          actions?.invoke(this)
-          if (actions == null && !(secret && text.isNotEmpty())) {
+          if (trailing != null) {
+            trailing()
+          } else {
             Box(Modifier.padding(end = 8.dp))
           }
         }
