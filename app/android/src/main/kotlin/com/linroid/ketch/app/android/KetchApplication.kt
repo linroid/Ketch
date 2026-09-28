@@ -4,12 +4,16 @@ import android.app.Application
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okio.FileSystem
+import okio.Path.Companion.toOkioPath
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 
@@ -20,6 +24,19 @@ class KetchApplication : Application() {
    * across activity recreation, such as a rotation while its dialog is showing.
    */
   val incoming = IncomingDownloads()
+
+  /**
+   * The app's log files, kept for bug reports and shared from Settings → About. Held here so
+   * the process has one writer, even when the service is recreated.
+   */
+  val fileLogger: FileLogger by lazy {
+    FileLogger(
+      fileSystem = FileSystem.SYSTEM,
+      directory = filesDir.toOkioPath() / "logs",
+      dispatcher = Dispatchers.IO,
+      minLevel = LogLevel.DEBUG,
+    )
+  }
 
   // Reads outlive the activity that received the file, so a rotation cannot cancel them.
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <application>
+    <!-- Hands a copy of the logs to the share sheet; see LogFilesAction.android.kt. -->
+    <provider
+      android:name="com.linroid.ketch.app.log.LogFileProvider"
+      android:authorities="${applicationId}.logs"
+      android:exported="false"
+      android:grantUriPermissions="true" />
+  </application>
+
+</manifest>

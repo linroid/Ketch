@@ -237,6 +237,9 @@ cli/          # JVM CLI entry point
 - Platform-specific console: Logcat (Android); timestamped println elsewhere, with errors on
   stderr on the JVM (`FormattedConsoleLogger`)
 - Apps log at debug; the desktop app reads `KETCH_LOG_LEVEL`, the CLI `-v`/`--debug`
+- Desktop, Android and iOS apps also write `logs/ketch.log` in their data directory
+  (`FileLogger` in `app/shared`, rotated at 5 MiB, 3 files kept, combined with the console via
+  `Logger.combine`); Settings → About opens the folder (desktop) or shares a copy (phones)
 - `Ketch` logs every task state transition; torrent swarms log a debug summary every 30s
 - See [logging](docs/logging.md) for the format, troubleshooting and sensitive-data rules
 - `KetchLogger` uses `inline` functions with `Logger.None` fast-path for zero-cost disabled logging

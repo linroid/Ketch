@@ -100,7 +100,10 @@ class KetchService : Service() {
             taskStore = taskStore,
             config = config.download,
             name = instanceName,
-            logger = Logger.console(LogLevel.DEBUG),
+            logger = Logger.combine(
+              Logger.console(LogLevel.DEBUG),
+              (application as KetchApplication).fileLogger
+            ),
             additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )
         },

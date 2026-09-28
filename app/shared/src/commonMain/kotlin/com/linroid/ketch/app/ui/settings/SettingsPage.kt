@@ -42,6 +42,7 @@ import com.linroid.ketch.app.components.KetchSidebarItem
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.InstanceSettingsController
@@ -68,6 +69,8 @@ private val TWO_PANE_MIN_WIDTH = 760.dp
  * @param onTestAi call the AI provider with the saved settings.
  * @param onStartServer start the local server.
  * @param onStopServer stop the local server.
+ * @param fileLogger the app's log files, offered under About; `null`
+ *   when the app keeps none.
  */
 @Composable
 fun SettingsCategoryContent(
@@ -81,6 +84,7 @@ fun SettingsCategoryContent(
   onTestAi: () -> Unit,
   onStartServer: () -> Unit,
   onStopServer: () -> Unit,
+  fileLogger: FileLogger? = null,
 ) {
   when (category) {
     SettingsCategory.General -> GeneralSettings(appSettings, systemDeviceName)
@@ -102,7 +106,7 @@ fun SettingsCategoryContent(
       onChange = { aiSettings.save(it) },
       onTest = onTestAi,
     )
-    SettingsCategory.About -> AboutSettings()
+    SettingsCategory.About -> AboutSettings(fileLogger)
   }
 }
 

@@ -131,10 +131,47 @@ A magnet download (dates omitted, task IDs shortened):
 The apps choose their level as follows:
 
 - **Desktop**: debug by default; set `KETCH_LOG_LEVEL` to `verbose`, `debug`, `info`, `warn`
-  or `error`, for example `KETCH_LOG_LEVEL=verbose ./gradlew :app:desktop:run`
+  or `error`, for example `KETCH_LOG_LEVEL=verbose ./gradlew :app:desktop:run`. The level
+  applies to both the console and the log file
 - **CLI**: info by default; `-v`/`--verbose` for debug, `--debug` for verbose
 - **Android and iOS**: debug
 - **Web**: info, in the browser's developer console
+
+## App Log Files
+
+A packaged desktop app has no visible console, and Android and iOS users cannot reach Logcat or
+the Xcode console, so the desktop, Android and iOS apps also keep their logs in files. The web
+app logs to the browser console only.
+
+| App | Log folder |
+|---|---|
+| macOS | `~/Library/Application Support/ketch/logs/` |
+| Windows | `%APPDATA%\ketch\logs\` |
+| Linux | `$XDG_CONFIG_HOME/ketch/logs/`, or `~/.config/ketch/logs/` |
+| Android | `files/logs/` in the app's private storage |
+| iOS | `Library/Application Support/logs/` in the app's container |
+
+Records are appended to `ketch.log` in the [format above](#log-format), at the same level as the
+console, and earlier runs are kept. Before a record would take `ketch.log` past 5 MiB, the file
+is renamed to `ketch.1.log`, the previous `ketch.1.log` becomes `ketch.2.log` and the previous
+`ketch.2.log` is deleted, so the logs never take much more than 15 MiB.
+
+To attach them to a bug report, open **Settings → About → Troubleshooting**:
+
+- **Desktop**: *Open log folder* shows the folder in Finder, Explorer or the file manager.
+- **Android and iOS**: *Share logs* joins the files, oldest first, into `ketch-logs.txt` and
+  opens the system share sheet.
+
+Logging never waits for the disk: a log call only formats and queues its record, and one
+background writer appends the records in order, flushing whenever its queue runs empty. A
+record that cannot be written, for example on a full disk, is dropped.
+
+The apps send records to the console and the file with `Logger.combine`, which works with any
+`Logger`:
+
+```kotlin
+val logger = Logger.combine(Logger.console(LogLevel.DEBUG), myFileLogger)
+```
 
 ## Sensitive Data
 
@@ -144,14 +181,18 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
 - Query parameters with credential-like names (`passkey`, `token`, `X-Amz-Signature`, ...)
   are masked: `https://tracker.example/download.php?id=42&passkey=***`
 - URLs quoted in error messages are masked the same way in cause summaries and in stack
-  traces printed by `Logger.console()`. A custom `Logger`, including `KermitLogger`, receives
-  the original throwable, so a crash reporter still sees the real exception
+  traces printed by `Logger.console()` or written to the app log files. A custom `Logger`,
+  including `KermitLogger`, receives the original throwable, so a crash reporter still sees
+  the real exception
 - Magnet links keep only their `xt` topic and `dn` name; tracker and source parameters are
   counted, not printed
 - Tracker URLs are reduced to `scheme://host:port`, including URLs quoted in error messages,
   because paths and queries carry private tracker passkeys
 - Cookie and authorization header values are masked in HTTP debug logs, and request headers
   are never logged
+
+Logs still name the files you downloaded and the hosts and paths they came from, so review them
+before posting them publicly. The app log files stay on the device until the user shares them.
 
 When adding log lines, pass URLs through `redactUrl()` (and tracker URLs through
 `trackerLabel()` in `library:torrent`).
