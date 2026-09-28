@@ -118,7 +118,7 @@ Download the latest apps from [GitHub Releases](https://github.com/linroid/Ketch
 | Platform | Format |
 |---|---|
 | Android | `.apk` |
-| macOS (arm64) | `.dmg` |
+| macOS (x64, arm64) | `.dmg` |
 | Linux (x64, arm64) | `.deb` |
 | Windows (x64, arm64) | `.msi` |
 | iOS | Build from [source](app/ios/) via Xcode |
@@ -144,7 +144,7 @@ ketch https://example.com/file.zip
 ketch server --config /path/to/config.toml
 ```
 
-Supported platforms: **macOS** (arm64), **Linux** (x64, arm64), **Windows** (x64). See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.
+Supported platforms: **macOS** (x64, arm64), **Linux** (x64, arm64), **Windows** (x64). See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.
 
 ## How It Works
 

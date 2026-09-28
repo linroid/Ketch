@@ -88,11 +88,6 @@ main() {
 
   info "Installing ketch v${version} (${os}/${arch})"
 
-  # macOS CLI is only available for arm64
-  if [ "$os" = "macos" ] && [ "$arch" = "x64" ]; then
-    error "macOS x64 (Intel) builds are not available. Only arm64 (Apple Silicon) is supported."
-  fi
-
   # Windows via this script is best-effort
   if [ "$os" = "windows" ]; then
     warn "For Windows, consider downloading the .zip manually from:"
@@ -106,9 +101,11 @@ main() {
 
   local filename="ketch-cli-${version}-${os}-${arch}.${ext}"
   local url="https://github.com/${REPO}/releases/download/v${version}/${filename}"
-  local tmpdir
+  local tmpdir cleanup_command
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' EXIT
+  # Capture the path now: local variables are out of scope when the EXIT trap runs.
+  printf -v cleanup_command 'rm -rf -- %q' "$tmpdir"
+  trap "$cleanup_command" EXIT
 
   info "Downloading ${url}"
   if ! curl -fSL --progress-bar -o "${tmpdir}/${filename}" "$url"; then
