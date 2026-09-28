@@ -81,8 +81,9 @@ internal class DownloadCoordinator(
         DownloadProgress(pausedDownloaded, execution.totalBytes),
       )
 
-      entry.job.cancel()
-
+      // Save before cancelling: the cancelled execution then always saves last, with bytes that
+      // throttled progress had not published yet. Saving afterwards could overwrite that final
+      // snapshot with this older one.
       currentSegments?.let { segments ->
         log.d { "Saving pause state for taskId=$taskId" }
         handle.record.update {
@@ -93,6 +94,8 @@ internal class DownloadCoordinator(
           )
         }
       }
+
+      entry.job.cancel()
 
       execution.fileAccessor?.let { accessor ->
         try {
