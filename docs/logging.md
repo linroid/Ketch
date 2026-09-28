@@ -143,7 +143,9 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
 - Passwords in URLs are masked: `ftp://user:***@example.com/file`
 - Query parameters with credential-like names (`passkey`, `token`, `X-Amz-Signature`, ...)
   are masked: `https://tracker.example/download.php?id=42&passkey=***`
-- URLs quoted in error messages are masked the same way in cause summaries
+- URLs quoted in error messages are masked the same way in cause summaries and in stack
+  traces printed by `Logger.console()`. A custom `Logger`, including `KermitLogger`, receives
+  the original throwable, so a crash reporter still sees the real exception
 - Magnet links keep only their `xt` topic and `dn` name; tracker and source parameters are
   counted, not printed
 - Tracker URLs are reduced to `scheme://host:port`, including URLs quoted in error messages,

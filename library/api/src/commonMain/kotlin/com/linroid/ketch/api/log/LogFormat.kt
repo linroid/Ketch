@@ -16,7 +16,7 @@ import kotlin.time.ExperimentalTime
 fun Throwable.describeCauses(): String {
   val seen = mutableListOf<Throwable>()
   var current: Throwable? = this
-  while (current != null && seen.size < MAX_CAUSES && seen.none { it === current }) {
+  while (current != null && seen.size < MAX_LOGGED_CAUSES && seen.none { it === current }) {
     seen += current
     current = current.cause
   }
@@ -25,7 +25,7 @@ fun Throwable.describeCauses(): String {
     // Exception(cause) copies cause.toString() into its message; the next entry repeats it.
     val message = error.message?.takeIf { it.isNotBlank() && it != error.cause?.toString() }
       ?.replace('\n', ' ')
-      ?.let { text -> EMBEDDED_URL.replace(text) { redactUrl(it.value) } }
+      ?.let(::redactUrlsIn)
     if (message == null) name else "$name: $message"
   }
 }
@@ -82,12 +82,20 @@ private fun redactMagnet(url: String): String {
 }
 
 /**
+ * Every URL or magnet link quoted in [text] passed through [redactUrl]. Exception messages,
+ * such as Ktor's timeouts, quote the full request URL.
+ */
+internal fun redactUrlsIn(text: String): String = EMBEDDED_URL.replace(text) { redactUrl(it.value) }
+
+/**
  * Formats a console log line as `2026-01-31 14:03:12.345 [INFO] message`, followed by the
- * stack trace of [throwable] when present, so one write keeps a record together.
+ * stack trace of [throwable] when present, so one write keeps a record together. URLs in the
+ * stack trace's messages are redacted like those in log messages.
  */
 internal fun formatLogLine(level: LogLevel, message: String, throwable: Throwable? = null): String {
   val line = "${logTimestamp()} [${level.name}] $message"
-  return if (throwable == null) line else line + "\n" + throwable.stackTraceToString().trimEnd()
+  if (throwable == null) return line
+  return line + "\n" + redactUrlsIn(throwable.stackTraceToString().trimEnd())
 }
 
 @OptIn(ExperimentalTime::class)
@@ -111,9 +119,10 @@ private val logTimeZone: TimeZone by lazy {
 
 private fun Int.pad(length: Int): String = toString().padStart(length, '0')
 
-private const val MAX_CAUSES = 8
+/** Causes followed when describing or redacting an error chain, which may be cyclic. */
+internal const val MAX_LOGGED_CAUSES = 8
 
-private val EMBEDDED_URL = Regex("""[A-Za-z][A-Za-z0-9+.-]*://[^\s,;"'()\[\]]+""")
+private val EMBEDDED_URL = Regex("""(?:[A-Za-z][A-Za-z0-9+.-]*://|magnet:\?)[^\s,;"'()\[\]]+""")
 
 private val SENSITIVE_QUERY_KEY = Regex(
   "pass|token|secret|key|sig|auth|credential|session",

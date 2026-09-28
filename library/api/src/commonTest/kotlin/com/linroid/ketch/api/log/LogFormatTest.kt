@@ -98,6 +98,16 @@ class LogFormatTest {
   }
 
   @Test
+  fun formatLogLine_stackTraceQuotingUrls_isRedacted() {
+    val cause = IllegalStateException("Timeout [url=https://host.example/f?token=s3cr3t]")
+    val line = formatLogLine(LogLevel.ERROR, "[Tag] failed", RuntimeException("magnet:?xt=" +
+      "urn:btih:0123456789abcdef0123456789abcdef01234567&tr=udp%3A%2F%2Fpasskey", cause))
+    assertFalse("s3cr3t" in line)
+    assertFalse("passkey" in line)
+    assertTrue("https://host.example/f?token=***" in line)
+  }
+
+  @Test
   fun formatLogLine_throwable_appendsStackTrace() {
     val line = formatLogLine(LogLevel.WARN, "[Tag] failed", IllegalStateException("boom"))
     assertTrue(line.lines().first().endsWith("[WARN] [Tag] failed"))
