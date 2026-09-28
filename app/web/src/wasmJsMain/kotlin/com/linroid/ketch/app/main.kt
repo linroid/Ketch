@@ -5,6 +5,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.WebConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -20,6 +23,8 @@ import kotlin.io.encoding.Base64
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
   val body = document.body ?: return
+  // No embedded Ketch installs a logger here, so the remote client's logs need one.
+  KetchLogger.setLogger(Logger.console(LogLevel.INFO))
   val incoming = IncomingDownloads()
   // The browser holds files opened before this runs, so the first launch is not lost.
   consumeLaunchedFiles(

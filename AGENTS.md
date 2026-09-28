@@ -234,7 +234,11 @@ cli/          # JVM CLI entry point
 
 ### Logging System
 - `Logger.None` (default, zero overhead), `Logger.console()`, `KermitLogger`
-- Platform-specific console: Logcat (Android), NSLog (iOS), println/stderr (JVM), println (Wasm)
+- Platform-specific console: Logcat (Android); timestamped println elsewhere, with errors on
+  stderr on the JVM (`FormattedConsoleLogger`)
+- Apps log at debug; the desktop app reads `KETCH_LOG_LEVEL`, the CLI `-v`/`--debug`
+- `Ketch` logs every task state transition; torrent swarms log a debug summary every 30s
+- See [logging](docs/logging.md) for the format, troubleshooting and sensitive-data rules
 - `KetchLogger` uses `inline` functions with `Logger.None` fast-path for zero-cost disabled logging
 - `Logger` interface accepts `String` messages; lazy evaluation handled by `KetchLogger`
 
@@ -293,11 +297,19 @@ cli/          # JVM CLI entry point
 ### Logging
 - Use `KetchLogger` for all internal logging — instantiate per component:
   `private val log = KetchLogger("Coordinator")`
-- Tags: "Ketch", "Coordinator", "SegmentDownloader", "RangeDetector", "KtorHttpEngine",
-  "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
-  "FtpClient", "TorrentSource", "TokenBucket"
-- Levels: verbose (segment detail), debug (state changes), info (user events),
-  warn (retries), error (fatal)
+- Tags: "Ketch", "Coordinator", "Execution", "SegmentDownloader", "RangeDetector",
+  "KtorHttpEngine", "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource",
+  "FtpSource", "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession",
+  "TorrentSwarm", "TorrentTracker", "RemoteKetch", "RemoteTask", "TokenBucket"
+- Levels: verbose (segment and per-peer detail), debug (internal operations), info (user
+  events and state transitions), warn (retries, recoverable problems), error (fatal)
+- Include `taskId=` in every task-scoped message; torrent engine code also uses `logHash()`
+- Never log credentials: pass URLs through `redactUrl()`, tracker URLs through
+  `trackerLabel()`, and describe tracker errors with `describeWithoutUrls()`
+- Warnings without a stack trace name the cause with `error.describeCauses()`, not
+  `error.message`, which for `KetchError` is only a generic summary
+- Do not swallow failures silently: log best-effort work that fails (at debug when it is
+  expected to fail often), as `attempt("label") { ... }` does in the torrent engine
 - Use lazy lambdas: `log.d { "expensive $computation" }`
 - Keep log calls on one line when the message is short enough (within 100 chars)
 

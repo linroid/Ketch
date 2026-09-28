@@ -5,6 +5,8 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
@@ -59,6 +61,7 @@ class TorrentDownloadSource(
   private val metadataFetches = Semaphore(MAX_PENDING_METADATA)
   private val stateMutex = Mutex()
   private val states = linkedMapOf<String, TorrentResumeState>()
+  private val log = KetchLogger("TorrentSource")
   override val type: String = TYPE
   override val managesOwnFileIo: Boolean = true
 
@@ -71,6 +74,7 @@ class TorrentDownloadSource(
         created.start()
       } catch (e: IOException) {
         // Binding the peer listener is the only socket work here, such as a port still in use.
+        log.e(e) { "Torrent engine could not listen on port ${config.listenPort}" }
         throw KetchError.Network(e)
       }
       engine.store(created)
@@ -112,7 +116,9 @@ class TorrentDownloadSource(
    */
   suspend fun setAdditionalTrackers(urls: List<String>) = engineMutex.withLock {
     additionalTrackers.store(urls)
-    (engine.load() as? KotlinTorrentEngine)?.setAdditionalTrackers(urls)
+    val running = engine.load() as? KotlinTorrentEngine
+    if (running == null) log.d { "Extra trackers saved for the next engine start: ${urls.size}" }
+    running?.setAdditionalTrackers(urls)
   }
 
   override fun canHandle(url: String): Boolean {
@@ -147,9 +153,9 @@ class TorrentDownloadSource(
     privacy: TorrentDiscoveryPrivacy = config.discoveryPrivacy,
   ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
-    resolveV2Metainfo(null, bytes, config, privacy)?.let { return it }
+    resolveV2Metainfo(null, bytes, config, privacy)?.let { return it.logged("metainfo bytes") }
     val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
-    return resolved("torrent:${metadata.infoHash.hex}", metadata, privacy)
+    return resolved("torrent:${metadata.infoHash.hex}", metadata, privacy).logged("metainfo bytes")
   }
 
   override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
@@ -162,9 +168,14 @@ class TorrentDownloadSource(
     properties: Map<String, String> = emptyMap(),
   ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
+    log.d { "Resolving ${redactUrl(url)} (privacy=$privacy)" }
     return reportingFailures {
       if (url.startsWith("magnet:", true)) {
+        if (metadataFetches.availablePermits == 0) {
+          log.i { "Waiting for one of $MAX_PENDING_METADATA magnet metadata lookups to finish" }
+        }
         return@reportingFailures metadataFetches.withPermit { resolveMagnet(url, privacy) }
+          .logged("magnet")
       }
       val bytes = if (url.startsWith("https://", true) || url.startsWith("http://", true)) {
         try {
@@ -193,8 +204,17 @@ class TorrentDownloadSource(
           }
         }
       }
-      resolveV2Metainfo(url, bytes, config, privacy)
-        ?: resolved(url, TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes), privacy)
+      (resolveV2Metainfo(url, bytes, config, privacy)
+        ?: resolved(url, TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes), privacy))
+        .logged(if (url.startsWith("http", true)) "HTTP metainfo" else "metainfo file")
+    }
+  }
+
+  private fun ResolvedSource.logged(origin: String): ResolvedSource = also {
+    log.i {
+      "Resolved torrent from $origin: ${logHash(metadata[META_INFO_HASH].orEmpty())} " +
+        "\"$suggestedFileName\", ${metadata["format"] ?: "v1"}, files=${files.size}, " +
+        "totalBytes=$totalBytes"
     }
   }
 
@@ -324,6 +344,11 @@ class TorrentDownloadSource(
     val state = TorrentResumeState(hash, total, previous?.resumeData ?: "",
       selected.map { it.toString() }.toSet(), output, encodeBase64(bytes),
       version = 2, privacy = privacy)
+    log.i {
+      "Starting torrent taskId=${context.taskId} (${logHash(hash)}): " +
+        "files=${selected.size}/${metadata.files.size}, totalBytes=$total, output=$output, " +
+        "resume=${previous != null}"
+    }
     withActiveSlot(context, total) {
       tasks.reserve(context.taskId, hash)
       var session: TorrentSession? = null
@@ -345,8 +370,13 @@ class TorrentDownloadSource(
           }
           try {
             session.resume()
+            var lastState: TorrentSessionState? = null
             while (true) {
               val currentState = session.state.value
+              if (currentState != lastState) {
+                log.d { "Torrent taskId=${context.taskId} session state: $currentState" }
+                lastState = currentState
+              }
               val progress = (session as? KotlinTorrentSession)?.fileProgress()
                 ?: LongArray(metadata.files.size)
               var offset = 0L
@@ -375,7 +405,13 @@ class TorrentDownloadSource(
             if (!keepSeeding) session?.pause()
             updateResumeState(context)
             // Seeding is optional: a download waiting for this slot takes precedence.
-            if (keepSeeding) lent = slots.lend(context.taskId)
+            if (keepSeeding) {
+              lent = slots.lend(context.taskId)
+              log.i {
+                if (lent) "Torrent taskId=${context.taskId} keeps seeding"
+                else "Torrent taskId=${context.taskId} stops seeding for a waiting download"
+              }
+            }
           } finally {
             if (!lent) {
               engine.load()?.removeTorrent(hash)
@@ -414,6 +450,11 @@ class TorrentDownloadSource(
     val total = files.sumOf { it.size }
     val state = TorrentResumeState(hash, total, previous?.resumeData.orEmpty(), selected, output,
       encodeBase64(bytes), version = 3, privacy = privacy)
+    log.i {
+      "Starting v2 torrent taskId=${context.taskId} (${logHash(hash)}): " +
+        "files=${selected.size}/${resolved.files.size}, totalBytes=$total, output=$output, " +
+        "resume=${previous != null}"
+    }
     withActiveSlot(context, total) {
       tasks.reserve(context.taskId, hash)
       try {
@@ -437,8 +478,13 @@ class TorrentDownloadSource(
             var lastReceived = session.receivedBytes()
             try {
               session.resume()
+              var lastState: TorrentSessionState? = null
               while (true) {
                 val status = session.state.value
+                if (status != lastState) {
+                  log.d { "Torrent taskId=${context.taskId} session state: $status" }
+                  lastState = status
+                }
                 val progress = session.fileProgress()
                 var offset = 0L
                 context.segments.value = files.map { file ->
@@ -488,6 +534,10 @@ class TorrentDownloadSource(
     block: suspend () -> Boolean,
   ) {
     val evicted = slots.acquire(context.request.priority) {
+      log.i {
+        "Torrent taskId=${context.taskId} waits for one of ${config.maxActiveTorrents} " +
+          "active torrent slots"
+      }
       // The task holds a Ketch download slot, so it reports as downloading (which also lets it
       // be paused) at 0 bytes/s with its restored progress; waiting transfers nothing.
       context.reportedSpeed.value = 0
@@ -495,7 +545,10 @@ class TorrentDownloadSource(
     }
     var lent = false
     try {
-      evicted?.let { stopSession(it) }
+      evicted?.let {
+        log.i { "Stopping seeding taskId=$it to start taskId=${context.taskId}" }
+        stopSession(it)
+      }
       lent = block()
     } finally {
       if (!lent) withContext(NonCancellable) { slots.release() }
@@ -562,8 +615,11 @@ class TorrentDownloadSource(
       store.cleanup()
       stateMutex.withLock { states.remove(context.taskId) }
     } catch (e: CancellationException) { throw e
-    } catch (_: Exception) {
+    } catch (e: Exception) {
       // Unknown or legacy ownership is conservatively preserved.
+      log.w(e) {
+        "Kept torrent files of taskId=${context.taskId}: cleanup could not prove ownership"
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
 
 internal class RangeSupportDetector(
   private val httpEngine: HttpEngine,
@@ -8,7 +9,7 @@ internal class RangeSupportDetector(
   private val log = KetchLogger("RangeDetector")
 
   suspend fun detect(url: String, headers: Map<String, String> = emptyMap()): ServerInfo {
-    log.d { "Sending HEAD request to $url" }
+    log.d { "Sending HEAD request to ${redactUrl(url)}" }
     val serverInfo = httpEngine.head(url, headers)
     log.i {
       "Server info: contentLength=${serverInfo.contentLength}, " +

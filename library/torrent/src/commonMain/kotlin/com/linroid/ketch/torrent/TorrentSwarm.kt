@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
@@ -39,7 +40,9 @@ internal class TorrentSwarm(
   private val onCompleted: suspend () -> Unit = {},
   private val allowLocalDiscovery: Boolean = false,
   trackerOnly: Boolean = false,
+  private val logLabel: String = logHash(store.metadata.infoHash.hex),
 ) {
+  private val log = KetchLogger("TorrentSwarm")
   private val trackerRestricted = store.metadata.isPrivate || trackerOnly
   private val uploadSlots = Semaphore(4)
   private val connectedMutex = Mutex()
@@ -86,6 +89,11 @@ internal class TorrentSwarm(
     var discoveryClosed = false
     var complete = false
     var nextId = 0
+    // Counters since the last periodic summary, which explains a stalled swarm.
+    var discovered = 0
+    var connectFailures = 0
+    var corruptPieces = 0
+    var lastSummary = now()
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
       pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
         update.dropped)
@@ -93,6 +101,20 @@ internal class TorrentSwarm(
         if (endpoint !in attempts && endpoint !in pending &&
           attempts.size + pending.size < 4096) pending.addLast(endpoint)
       }
+    }
+    suspend fun logSummary() {
+      // The inline lambda only runs, and only reads the store, when logging is enabled.
+      log.d {
+        val verified = store.verifiedPieces().count { it }
+        val handshaken = connectedMutex.withLock { connected.size }
+        "Swarm $logLabel: pieces $verified/${store.pieceCount}, peers connected=$handshaken " +
+          "active=${active.size}/${connections()}, queued=${pending.size}, " +
+          "known=${attempts.size}, discovered=$discovered, failed=$connectFailures, " +
+          "corrupt=$corruptPieces, discovery=${if (discoveryClosed) "closed" else "open"}"
+      }
+      discovered = 0
+      connectFailures = 0
+      corruptPieces = 0
     }
     fun launchPeer(
       endpoint: PeerEndpoint,
@@ -134,6 +156,10 @@ internal class TorrentSwarm(
           onCompleted()
           complete = true
         }
+        if (now() - lastSummary >= SWARM_SUMMARY_INTERVAL_MS) {
+          lastSummary = now()
+          logSummary()
+        }
         if (complete && uploadPolicy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) break
         val expired = attemptedAt.filter { (endpoint, time) ->
           now() - time >= 300_000 && endpoint !in active && endpoint !in pending
@@ -156,6 +182,7 @@ internal class TorrentSwarm(
           launchPeer(endpoint, overhead)
         }
         if (discoveryClosed && pending.isEmpty() && active.isEmpty() && incoming == null) {
+          if (!complete) logSummary()
           check(complete) { "No peer could complete the torrent" }
           break
         }
@@ -168,6 +195,7 @@ internal class TorrentSwarm(
             else launchPeer(connection.remote, overhead, connection)
           }
           resets?.onReceive { done ->
+            log.d { "Swarm $logLabel: disconnecting ${active.size} peer(s) for a tracker change" }
             active.values.forEach { it.cancel() }
             active.values.forEach { it.join() }
             active.clear()
@@ -184,11 +212,19 @@ internal class TorrentSwarm(
             val endpoint = result.getOrNull()
             if (endpoint == null) discoveryClosed = true
             else if (endpoint !in attempts && attempts.size + pending.size < 4096 &&
-              endpoint !in pending) pending.addLast(endpoint)
+              endpoint !in pending) {
+              pending.addLast(endpoint)
+              discovered++
+            }
           }
           results.onReceive { (endpoint, failure) ->
             active.remove(endpoint)
             if (failure is TorrentStorageException) throw failure
+            if (failure != null) {
+              connectFailures++
+              if (failure is CorruptPieceException) corruptPieces++
+              log.v { "Peer $endpoint for $logLabel closed: ${failure.describeWithoutUrls()}" }
+            }
             if (failure !is IllegalArgumentException && (attempts[endpoint] ?: 0) < 3 &&
               !complete) {
               retryAt[endpoint] = now() + 1000L * (attempts[endpoint] ?: 1)
@@ -304,7 +340,12 @@ internal class TorrentSwarm(
                   lastUsefulPayload = TimeSource.Monotonic.markNow()
                   if (receivedBytes == current.bytes.size) {
                     val valid = storage { store.commit(current.index, current.bytes) }
-                    require(valid) { "Peer sent a corrupt piece" }
+                    if (!valid) {
+                      log.w {
+                        "Piece ${current.index} of $logLabel from $endpoint failed its hash check"
+                      }
+                      throw CorruptPieceException()
+                    }
                     scheduler.verified(current.index)
                     scheduler.release(id)
                     claim = null
@@ -455,6 +496,12 @@ private const val PEER_WIRE_BYTES = 2 * PeerWire.MAX_FRAME_SIZE
 
 internal class TorrentStorageException(cause: IOException) :
   Exception("Torrent storage failed", cause)
+
+/** An [IllegalArgumentException], so the swarm never retries the peer that sent the piece. */
+internal class CorruptPieceException : IllegalArgumentException("Peer sent a corrupt piece")
+
+/** How often a swarm logs its peer and piece counts at debug level. */
+internal const val SWARM_SUMMARY_INTERVAL_MS = 30_000L
 
 private suspend fun <T> storage(block: suspend () -> T): T = try {
   block()

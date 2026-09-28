@@ -85,7 +85,7 @@ internal class HttpDownloadSource(
     val reset = resolved.metadata[META_RATE_LIMIT_RESET]
       ?.toLongOrNull()
     val connections = applyRateLimit(
-      rangeLimitedConnections(context, resolved.supportsResume), remaining, reset,
+      context.taskId, rangeLimitedConnections(context, resolved.supportsResume), remaining, reset,
     )
 
     // Reuse existing segments with progress on retry (e.g., after
@@ -96,18 +96,18 @@ internal class HttpDownloadSource(
       existing.any { it.downloadedBytes > 0 }
     ) {
       log.i {
-        "Reusing segments with existing progress, " +
+        "Reusing segments with existing progress for taskId=${context.taskId}, " +
           "resegmenting to $connections connections"
       }
       SegmentCalculator.resegment(existing, connections)
     } else if (connections > 1) {
       log.i {
-        "Server supports ranges. Using $connections " +
-          "connections, totalBytes=$totalBytes"
+        "Server supports ranges. Using $connections connections for " +
+          "taskId=${context.taskId}, totalBytes=$totalBytes"
       }
       SegmentCalculator.calculateSegments(totalBytes, connections)
     } else {
-      log.i { "Single connection, totalBytes=$totalBytes" }
+      log.i { "Single connection for taskId=${context.taskId}, totalBytes=$totalBytes" }
       SegmentCalculator.singleSegment(totalBytes)
     }
 
@@ -143,7 +143,10 @@ internal class HttpDownloadSource(
     val serverInfo = detector.detect(context.url, context.headers)
 
     if (state.etag != null && serverInfo.etag != state.etag) {
-      log.w { "ETag mismatch - file has changed on server" }
+      log.w {
+        "ETag mismatch for taskId=${context.taskId} - file has changed on server: " +
+          "saved=${state.etag}, server=${serverInfo.etag}"
+      }
       throw KetchError.FileChanged(
         "ETag mismatch - file has changed on server",
       )
@@ -152,7 +155,10 @@ internal class HttpDownloadSource(
     if (state.lastModified != null &&
       serverInfo.lastModified != state.lastModified
     ) {
-      log.w { "Last-Modified mismatch - file has changed on server" }
+      log.w {
+        "Last-Modified mismatch for taskId=${context.taskId} - file has changed on server: " +
+          "saved=${state.lastModified}, server=${serverInfo.lastModified}"
+      }
       throw KetchError.FileChanged(
         "Last-Modified mismatch - file has changed on server",
       )
@@ -162,6 +168,7 @@ internal class HttpDownloadSource(
     val totalBytes = state.totalBytes
 
     val connections = applyRateLimit(
+      context.taskId,
       rangeLimitedConnections(context, serverInfo.supportsResume),
       serverInfo.rateLimitRemaining,
       serverInfo.rateLimitReset,
@@ -255,7 +262,7 @@ internal class HttpDownloadSource(
       }
       val downloader = SegmentDownloader(
         httpEngine, context.fileAccessor,
-        throttleLimiter, SpeedLimiter.Unlimited,
+        throttleLimiter, SpeedLimiter.Unlimited, context.taskId,
       )
       downloader.download(
         context.url, segment, context.headers, onProgress,
@@ -293,6 +300,7 @@ internal class HttpDownloadSource(
    *   as a conservative fallback.
    */
   private suspend fun applyRateLimit(
+    taskId: String,
     connections: Int,
     remaining: Long?,
     reset: Long?,
@@ -301,7 +309,7 @@ internal class HttpDownloadSource(
     if (remaining == 0L) {
       val delaySec = reset?.coerceAtLeast(1) ?: 1L
       log.i {
-        "Rate limit exhausted (remaining=0), " +
+        "Rate limit exhausted (remaining=0) for taskId=$taskId, " +
           "delaying ${delaySec}s before download"
       }
       delay(delaySec * 1000)
@@ -310,7 +318,7 @@ internal class HttpDownloadSource(
     if (remaining < connections) {
       val capped = remaining.toInt().coerceAtLeast(1)
       log.i {
-        "Capping connections from $connections to $capped " +
+        "Capping connections for taskId=$taskId from $connections to $capped " +
           "based on RateLimit-Remaining=$remaining"
       }
       return capped

@@ -1,39 +1,4 @@
 package com.linroid.ketch.api.log
 
-import com.linroid.ketch.api.log.LogLevel
-import com.linroid.ketch.api.log.Logger
-
 internal actual fun consoleLogger(minLevel: LogLevel): Logger =
-  object : Logger {
-    override fun v(message: String) {
-      if (minLevel <= LogLevel.VERBOSE) println("[VERBOSE] $message")
-    }
-
-    override fun d(message: String) {
-      if (minLevel <= LogLevel.DEBUG) println("[DEBUG] $message")
-    }
-
-    override fun i(message: String) {
-      if (minLevel <= LogLevel.INFO) println("[INFO] $message")
-    }
-
-    override fun w(message: String, throwable: Throwable?) {
-      if (minLevel <= LogLevel.WARN) {
-        println("[WARN] $message")
-        throwable?.let {
-          println("  Exception: ${it.message}")
-          println("  ${it.stackTraceToString()}")
-        }
-      }
-    }
-
-    override fun e(message: String, throwable: Throwable?) {
-      if (minLevel <= LogLevel.ERROR) {
-        println("[ERROR] $message")
-        throwable?.let {
-          println("  Exception: ${it.message}")
-          println("  ${it.stackTraceToString()}")
-        }
-      }
-    }
-  }
+  FormattedConsoleLogger(minLevel) { _, line -> println(line) }

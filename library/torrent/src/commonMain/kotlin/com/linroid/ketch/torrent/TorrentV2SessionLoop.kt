@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.channels.ChannelResult
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
@@ -8,6 +9,8 @@ import kotlinx.coroutines.selects.select
 
 /** Serializes session decisions while peer actors and the storage worker perform their own I/O. */
 internal object TorrentV2SessionLoop {
+  private val log = KetchLogger("TorrentSwarm")
+
   private class PeerState(val commands: SendChannel<PeerV2DownloadActor.Command>) {
     var choked = true
     var needed = 0
@@ -160,8 +163,20 @@ internal object TorrentV2SessionLoop {
       onProgress()
       var preference = 0
       var acceptingConnections = connections != null
+      val label = logHash(layout.infoHash.hex)
+      // Event driven: an idle swarm logs nothing, so the loop never wakes just to report.
+      var nextSummary = nowMs() + SWARM_SUMMARY_INTERVAL_MS
       while (!pieces.completed()) {
         pump()
+        if (nowMs() >= nextSummary) {
+          nextSummary = nowMs() + SWARM_SUMMARY_INTERVAL_MS
+          log.d {
+            val verified = store.verifiedPieces().count { it }
+            "V2 swarm $label: pieces $verified/${layout.pieceCount}, peers=${peers.size} " +
+              "unchoked=${peers.values.count { !it.choked }}, pendingCommits=" +
+              "${pieces.pendingCommitCount}"
+          }
+        }
         check(pool.size > 0 || pieces.pendingCommitCount > 0 || acceptingConnections) {
           "All torrent peers disconnected before completion"
         }
@@ -215,6 +230,10 @@ internal object TorrentV2SessionLoop {
               }
               is PeerV2Pool.Event.Message -> message(peerEvent.peer, peerEvent.value)
               is PeerV2Pool.Event.Closed -> {
+                log.v {
+                  "V2 peer of $label closed: " +
+                    (peerEvent.cause?.describeWithoutUrls() ?: "without error")
+                }
                 peers.remove(peerEvent.peer)
                 rarity.remove(peerEvent.peer)
                 pieces.detachPeer(peerEvent.peer.blocks)

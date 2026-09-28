@@ -10,6 +10,8 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
@@ -139,7 +141,7 @@ class RemoteKetch internal constructor(
   override suspend fun download(
     request: DownloadRequest,
   ): DownloadTask {
-    log.i { "Download: url=${request.url}" }
+    log.i { "Download: url=${redactUrl(request.url)}" }
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(request)
@@ -248,15 +250,17 @@ class RemoteKetch internal constructor(
 
   private suspend fun connectSse() {
     var reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS
+    var failures = 0
     while (true) {
       try {
         fetchAllTasks()
         _connectionState.value = ConnectionState.Connected
         reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS
+        failures = 0
         httpClient.sse(
           urlString = "/api/events",
         ) {
-          log.i { "Connected to /events" }
+          log.i { "Connected to $baseUrl/api/events" }
           incoming.collect { sseEvent ->
             val data = sseEvent.data ?: return@collect
             try {
@@ -269,15 +273,20 @@ class RemoteKetch internal constructor(
           }
         }
       } catch (_: UnauthorizedException) {
+        log.w { "Server $baseUrl rejected the API token (HTTP 401); not reconnecting" }
         _connectionState.value = ConnectionState.Unauthorized
         return
       } catch (error: Exception) {
-        log.e(error) { "Failed to connect" }
+        // The stack trace is printed once per outage, not on every reconnect attempt.
+        failures++
+        log.w(error.takeIf { failures == 1 }) {
+          "Connection to $baseUrl failed (attempt $failures): ${error.describeCauses()}"
+        }
       }
 
       _connectionState.value = ConnectionState.Disconnected()
 
-      log.d { "Reconnecting in ${reconnectDelayMs}ms" }
+      log.d { "Reconnecting to $baseUrl in ${reconnectDelayMs}ms" }
       delay(reconnectDelayMs)
       _connectionState.value = ConnectionState.Connecting
       reconnectDelayMs = (reconnectDelayMs * 2)
@@ -310,7 +319,12 @@ class RemoteKetch internal constructor(
   }
 
   internal suspend fun handleEvent(event: TaskEvent) {
-    log.i { "Handle event: $event" }
+    // Events carry request headers and segments; progress arrives several times a second.
+    if (event is TaskEvent.Progress) {
+      log.v { "Progress event for taskId=${event.taskId}" }
+    } else {
+      log.d { "Event ${event.eventType} for taskId=${event.taskId}" }
+    }
     when (event) {
       is TaskEvent.TaskAdded -> {
         try {

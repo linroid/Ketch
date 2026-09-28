@@ -1,5 +1,7 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.api.log.redactUrl
+
 /**
  * Parsed FTP URL components.
  *
@@ -37,7 +39,7 @@ internal data class FtpUrl(
         lower.startsWith("ftps://") -> true
         lower.startsWith("ftp://") -> false
         else -> throw IllegalArgumentException(
-          "Not an FTP URL: $url"
+          "Not an FTP URL: ${redactUrl(url)}"
         )
       }
 
@@ -85,14 +87,14 @@ internal data class FtpUrl(
         // IPv6: [host]:port
         val closeBracket = hostPort.indexOf(']')
         require(closeBracket > 0) {
-          "Invalid IPv6 address in URL: $url"
+          "Invalid IPv6 address in URL: ${redactUrl(url)}"
         }
         host = hostPort.substring(1, closeBracket)
         val afterBracket = hostPort.substring(closeBracket + 1)
         port = if (afterBracket.startsWith(':')) {
           afterBracket.substring(1).toIntOrNull()
             ?: throw IllegalArgumentException(
-              "Invalid port in URL: $url"
+              "Invalid port in URL: ${redactUrl(url)}"
             )
         } else {
           if (isTls) DEFAULT_FTPS_PORT else DEFAULT_FTP_PORT
@@ -103,7 +105,7 @@ internal data class FtpUrl(
           host = hostPort.substring(0, colonIndex)
           port = hostPort.substring(colonIndex + 1).toIntOrNull()
             ?: throw IllegalArgumentException(
-              "Invalid port in URL: $url"
+              "Invalid port in URL: ${redactUrl(url)}"
             )
         } else {
           host = hostPort
@@ -112,7 +114,7 @@ internal data class FtpUrl(
       }
 
       require(host.isNotEmpty()) {
-        "Missing host in URL: $url"
+        "Missing host in URL: ${redactUrl(url)}"
       }
 
       return FtpUrl(
