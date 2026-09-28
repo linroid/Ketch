@@ -6,9 +6,10 @@ import kotlinx.serialization.Serializable
  * Download configuration.
  *
  * @property defaultDirectory Default directory for saving downloaded files when
- *   [DownloadRequest.directory][com.linroid.ketch.api.DownloadRequest.destination] is `null`.
- *   `null` means use the platform default (e.g. `~/Downloads` on desktop,
- *   external storage on Android). Set explicitly to override.
+ *   [DownloadRequest.destination] does not name one. `null` means the
+ *   platform default: `~/Downloads` on JVM, the app's external
+ *   `Download` folder on Android, the app's Documents folder on iOS, and
+ *   `downloads` in the working directory elsewhere.
  * @property maxConnectionsPerDownload Maximum number of concurrent segment downloads per task.
  *   Each segment is a separate HTTP Range request. Servers that do not
  *   support Range requests always use a single segment regardless of

@@ -26,9 +26,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/**
+ * Runs downloads. [config] is read each time an execution starts, so
+ * runtime config changes reach downloads started or resumed afterwards.
+ */
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
-  private val config: DownloadConfig,
+  private val config: () -> DownloadConfig,
   private val fileNameResolver: FileNameResolver,
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
   private val dispatchers: KetchDispatchers,
@@ -254,7 +258,7 @@ internal class DownloadCoordinator(
       handle = handle,
       sourceResolver = sourceResolver,
       fileNameResolver = fileNameResolver,
-      config = config,
+      config = config(),
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
     )

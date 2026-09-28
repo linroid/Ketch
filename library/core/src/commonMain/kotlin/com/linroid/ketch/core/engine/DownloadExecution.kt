@@ -13,6 +13,7 @@ import com.linroid.ketch.api.isFile
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.KetchDispatchers
+import com.linroid.ketch.core.defaultDownloadDirectory
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.NoOpFileAccessor
@@ -161,7 +162,7 @@ internal class DownloadExecution(
       ?: fileNameResolver.resolve(request, resolvedUrl)
     val outputPath = resolveDestPath(
       destination = request.destination,
-      defaultDir = config.defaultDirectory ?: "downloads",
+      defaultDir = config.defaultDirectory ?: defaultDownloadDirectory(),
       serverFileName = fileName,
       deduplicate = true,
     )

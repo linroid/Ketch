@@ -35,10 +35,6 @@ fun MainViewController() = ComposeUIViewController {
     val configStore = FileConfigStore("$docsDir/config.toml")
     val config = configStore.load()
     val taskStore = createSqliteTaskStore(DriverFactory())
-    val downloadConfig = config.download.copy(
-      defaultDirectory = config.download.defaultDirectory
-        ?: docsDir,
-    )
     val instanceName = config.name
       ?: UIDevice.currentDevice.name
     InstanceManager(
@@ -48,7 +44,7 @@ fun MainViewController() = ComposeUIViewController {
           Ketch(
             httpEngine = KtorHttpEngine(),
             taskStore = taskStore,
-            config = downloadConfig,
+            config = config.download,
             name = instanceName,
             logger = Logger.console(),
             additionalSources = listOf(

@@ -31,6 +31,7 @@ import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.file.requireDownloadDirectory
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.RealDownloadTask
 import com.linroid.ketch.core.task.TaskController
@@ -96,7 +97,7 @@ class Ketch(
 
   private val httpSource = HttpDownloadSource(
     httpEngine = httpEngine,
-    maxConnections = config.maxConnectionsPerDownload,
+    maxConnections = { currentConfig.maxConnectionsPerDownload },
     progressIntervalMs = config.progressIntervalMs,
   )
 
@@ -113,7 +114,7 @@ class Ketch(
 
   private val coordinator = DownloadCoordinator(
     sourceResolver = sourceResolver,
-    config = config,
+    config = { currentConfig },
     fileNameResolver = fileNameResolver,
     globalLimiter = globalLimiter,
     dispatchers = dispatchers,
@@ -214,7 +215,9 @@ class Ketch(
       revision = KetchApi.REVISION,
       uptime = startMark.elapsedNow().inWholeSeconds,
       config = currentConfig,
-      system = currentSystemInfo(config.defaultDirectory ?: "downloads"),
+      system = currentSystemInfo(
+        currentConfig.defaultDirectory ?: defaultDownloadDirectory(),
+      ),
     )
   }
 
@@ -421,6 +424,10 @@ class Ketch(
   }
 
   override suspend fun updateConfig(config: DownloadConfig) {
+    val directory = config.defaultDirectory
+    if (directory != null && directory != currentConfig.defaultDirectory) {
+      requireDownloadDirectory(directory)
+    }
     currentConfig = config
 
     // Apply speed limit

@@ -153,7 +153,7 @@ class RateLimitTest {
     )
     val source = HttpDownloadSource(
       httpEngine = engine,
-      maxConnections = 4,
+      maxConnections = { 4 },
     )
     val resolved = source.resolve("https://example.com/file.zip")
     // maxSegments is based on maxConnections (4), rate limit capping

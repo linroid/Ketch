@@ -18,3 +18,5 @@ internal actual fun currentSystemInfo(directory: String): SystemInfo {
     usableSpace = 0L,
   )
 }
+
+internal actual fun defaultDownloadDirectory(): String = "downloads"

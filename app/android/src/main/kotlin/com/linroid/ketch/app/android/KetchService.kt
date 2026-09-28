@@ -9,7 +9,6 @@ import android.net.ConnectivityManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
-import android.os.Environment
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -80,12 +79,6 @@ class KetchService : Service() {
     )
     val config = configStore.load()
     val taskStore = createSqliteTaskStore(DriverFactory(this))
-    val downloadsDir = (getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-      ?: filesDir.resolve("downloads")).absolutePath
-    val downloadConfig = config.download.copy(
-      defaultDirectory = config.download.defaultDirectory
-        ?: downloadsDir,
-    )
     val instanceName = config.name
       ?: android.os.Build.MODEL
     instanceManager = InstanceManager(
@@ -97,7 +90,7 @@ class KetchService : Service() {
               getSystemService(ConnectivityManager::class.java)
             ),
             taskStore = taskStore,
-            config = downloadConfig,
+            config = config.download,
             name = instanceName,
             logger = Logger.console(),
             additionalSources = listOf(

@@ -81,10 +81,14 @@ interface KetchApi {
   /**
    * Updates the runtime download configuration.
    *
-   * Changes take effect immediately on all active downloads.
-   * For example, updating [DownloadConfig.speedLimit] adjusts
-   * the global speed limit, and updating
-   * [DownloadConfig.queue] adjusts concurrency settings.
+   * [DownloadConfig.speedLimit], [DownloadConfig.maxConcurrentDownloads]
+   * and [DownloadConfig.maxConnectionsPerHost] apply to active downloads
+   * immediately. [DownloadConfig.defaultDirectory] and
+   * [DownloadConfig.maxConnectionsPerDownload] apply to downloads started
+   * afterwards.
+   *
+   * @throws IllegalArgumentException if [DownloadConfig.defaultDirectory]
+   *   changed to a folder that does not exist on this instance
    */
   suspend fun updateConfig(config: DownloadConfig)
 

@@ -11,6 +11,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.Api
+import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.TaskEvent
 import com.linroid.ketch.endpoints.model.TaskSnapshot
@@ -202,6 +203,11 @@ class RemoteKetch internal constructor(
     val response = httpClient.put(Api.Config()) {
       contentType(ContentType.Application.Json)
       setBody(config)
+    }
+    if (response.status == HttpStatusCode.BadRequest) {
+      // The server explains why, e.g. a download folder that does not exist.
+      val message = runCatching { response.body<ErrorResponse>().message }.getOrNull()
+      throw IllegalArgumentException(message ?: "Invalid download settings")
     }
     checkSuccess(response)
   }

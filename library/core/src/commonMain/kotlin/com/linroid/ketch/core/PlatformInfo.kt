@@ -7,3 +7,6 @@ import com.linroid.ketch.api.SystemInfo
  * the given download [directory].
  */
 internal expect fun currentSystemInfo(directory: String): SystemInfo
+
+/** Folder used when [com.linroid.ketch.api.DownloadConfig.defaultDirectory] is `null`. */
+internal expect fun defaultDownloadDirectory(): String

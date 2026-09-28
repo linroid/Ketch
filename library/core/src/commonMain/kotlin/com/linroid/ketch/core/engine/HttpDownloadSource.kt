@@ -19,10 +19,13 @@ import kotlinx.serialization.json.Json
  * Encapsulates range detection, segment calculation, and parallel
  * segment downloads. This is the default source used for all
  * HTTP/HTTPS URLs.
+ *
+ * @param maxConnections default connection count, read on every use so
+ *   config changes reach downloads started afterwards.
  */
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
-  private val maxConnections: Int = 4,
+  private val maxConnections: () -> Int = { 4 },
   private val progressIntervalMs: Long = 200,
 ) : DownloadSource {
   private val log = KetchLogger("HttpSource")
@@ -49,7 +52,7 @@ internal class HttpDownloadSource(
       totalBytes = serverInfo.contentLength ?: -1,
       supportsResume = serverInfo.supportsResume,
       suggestedFileName = fileName,
-      maxSegments = if (serverInfo.supportsResume) maxConnections else 1,
+      maxSegments = if (serverInfo.supportsResume) maxConnections() else 1,
       metadata = buildMap {
         serverInfo.etag?.let { put(META_ETAG, it) }
         serverInfo.lastModified?.let { put(META_LAST_MODIFIED, it) }
@@ -268,7 +271,7 @@ internal class HttpDownloadSource(
       context.maxConnections.value > 0 ->
         context.maxConnections.value
       context.request.connections > 0 -> context.request.connections
-      else -> maxConnections
+      else -> maxConnections()
     }
   }
 

@@ -45,7 +45,15 @@ class InstanceManager(
    * `null` in remote-only mode (e.g. wasmJs/web).
    */
   private val embeddedInstance: EmbeddedInstance? =
-    if (factory.hasEmbedded) factory.createEmbedded() else null
+    if (factory.hasEmbedded) {
+      val embedded = factory.createEmbedded()
+      val store = configStore
+      if (store == null) embedded else {
+        embedded.copy(instance = ConfigPersistingKetchApi(embedded.instance, store))
+      }
+    } else {
+      null
+    }
 
   private val _instances =
     MutableStateFlow(listOfNotNull<InstanceEntry>(embeddedInstance))
