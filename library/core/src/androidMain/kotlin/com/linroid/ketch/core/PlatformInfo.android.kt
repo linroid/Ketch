@@ -1,5 +1,6 @@
 package com.linroid.ketch.core
 
+import android.os.Environment
 import com.linroid.ketch.api.SystemInfo
 import java.io.File
 
@@ -20,4 +21,11 @@ internal actual fun currentSystemInfo(directory: String): SystemInfo {
     freeSpace = dir.freeSpace,
     usableSpace = dir.usableSpace,
   )
+}
+
+internal actual fun defaultDownloadDirectory(): String {
+  val context = AndroidContext.get()
+  val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+    ?: File(context.filesDir, "downloads")
+  return dir.absolutePath
 }

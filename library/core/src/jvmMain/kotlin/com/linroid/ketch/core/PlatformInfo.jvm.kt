@@ -21,3 +21,6 @@ internal actual fun currentSystemInfo(directory: String): SystemInfo {
     usableSpace = dir.usableSpace,
   )
 }
+
+internal actual fun defaultDownloadDirectory(): String =
+  System.getProperty("user.home") + File.separator + "Downloads"

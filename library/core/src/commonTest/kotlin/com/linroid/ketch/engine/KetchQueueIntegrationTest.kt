@@ -15,6 +15,7 @@ import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskState
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -208,7 +210,10 @@ class KetchQueueIntegrationTest {
     withKetch { ketch, source, _ ->
       val running = ketch.download(request("running"))
       runCurrent()
-      val directory = "/ketch-config-test"
+      // updateConfig only accepts a folder that exists.
+      val folder = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "ketch-config-test"
+      platformFileSystem.createDirectories(folder)
+      val directory = folder.toString()
       ketch.updateConfig(
         DownloadConfig(
           defaultDirectory = directory,
@@ -231,6 +236,7 @@ class KetchQueueIntegrationTest {
       runCurrent()
       assertEquals(7, source.contexts.getValue("running").effectiveConnections())
       assertTrue(ketch.status().system.downloadDirectory.endsWith("ketch-config-test"))
+      platformFileSystem.deleteRecursively(folder)
     }
   }
 

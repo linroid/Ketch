@@ -92,6 +92,19 @@ class InstanceSettingsControllerTest {
   }
 
   @Test
+  fun `embedded change the instance rejects is not saved`() = runTest {
+    val store = RecordingConfigStore()
+    val api = SettingsKetchApi().apply { failUpdates = true }
+    val controller = InstanceSettingsController(api, AppSettingsController(store), this)
+
+    controller.updateDownload(DownloadConfig(defaultDirectory = "/missing"))
+    advanceUntilIdle()
+
+    assertEquals(DownloadConfig(), store.load().download)
+    assertNotNull(controller.downloadError)
+  }
+
+  @Test
   fun `embedded torrent trackers are saved and handed to the instance`() = runTest {
     val store = RecordingConfigStore()
     val applied = mutableListOf<TorrentSettings>()

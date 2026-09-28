@@ -91,12 +91,6 @@ private fun ApplicationScope.KetchWindow(
     val config = configStore.load()
     val dbPath = configDir + File.separator + "ketch.db"
     val taskStore = createSqliteTaskStore(DriverFactory(dbPath))
-    val defaultDownloadsDir = System.getProperty("user.home") +
-      File.separator + "Downloads"
-    val downloadConfig = config.download.copy(
-      defaultDirectory = config.download.defaultDirectory
-        ?: defaultDownloadsDir,
-    )
     val instanceName = config.name?.ifEmpty { null }
       ?: InetAddress.getLocalHost().hostName.removeSuffix(".local")
     val torrentSource = TorrentDownloadSource(
@@ -112,7 +106,7 @@ private fun ApplicationScope.KetchWindow(
           Ketch(
             httpEngine = KtorHttpEngine.withNetworkInterfaces(),
             taskStore = taskStore,
-            config = downloadConfig,
+            config = config.download,
             name = instanceName,
             logger = Logger.console(),
             additionalSources = listOf(FtpDownloadSource(), torrentSource),

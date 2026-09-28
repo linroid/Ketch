@@ -107,11 +107,14 @@ class InstanceSettingsController(
     }
   }
 
-  /** Saves [config] (embedded only) and applies it to the instance. */
+  /**
+   * Applies [config] to the instance and, for the embedded one, saves it
+   * once accepted, so a rejected value (e.g. a missing folder) is not
+   * used again on the next launch.
+   */
   fun updateDownload(config: DownloadConfig) {
     download = config
     downloadError = null
-    local?.saveDownload(config)
     scope.launch {
       // Rapid changes queue up here; each turn applies the newest value,
       // so the instance always ends on what the page shows.
@@ -121,6 +124,7 @@ class InstanceSettingsController(
         attempt(onError = { downloadError = it }) {
           api.updateConfig(latest)
           appliedDownload = latest
+          local?.saveDownload(latest)
         }
       }
     }

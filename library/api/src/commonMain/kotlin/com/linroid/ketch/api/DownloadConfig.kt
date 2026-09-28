@@ -12,8 +12,9 @@ import kotlinx.serialization.Serializable
  *
  * @property defaultDirectory Default directory for saving downloaded files when
  *   [DownloadRequest.destination] does not name a directory or full path.
- *   `null` means use the platform default (e.g. `~/Downloads` on desktop,
- *   external storage on Android). Set explicitly to override.
+ *   `null` means the platform default: `~/Downloads` on JVM, the app's
+ *   external `Download` folder on Android, the app's Documents folder on
+ *   iOS, and `downloads` in the working directory elsewhere.
  * @property maxConnectionsPerDownload Default number of concurrent connections per task, used
  *   when [DownloadRequest.connections] is `0`. HTTP(S) opens one Range request per segment and
  *   FTP(S) one connection per segment using REST offsets. Servers without Range (HTTP) or REST

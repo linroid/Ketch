@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.endpoints.model.ErrorResponse
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.put
@@ -15,6 +16,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -154,5 +156,27 @@ class ServerRoutesTest {
         setBody(newConfig)
       }
       assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+  @Test
+  fun `PUT config with missing folder is rejected and not applied`() =
+    testApplication {
+      val ketch = createTestKetch()
+      application {
+        val server = createTestServer(ketch = ketch)
+        with(server) { configureServer() }
+      }
+      val client = createClient {
+        install(ContentNegotiation) { json(json) }
+      }
+      val missing = Files.createTempDirectory("ketch-routes").resolve("missing").toString()
+      val response = client.put("/api/config") {
+        contentType(ContentType.Application.Json)
+        setBody(DownloadConfig(defaultDirectory = missing))
+      }
+      assertEquals(HttpStatusCode.BadRequest, response.status)
+      val error = json.decodeFromString<ErrorResponse>(response.bodyAsText())
+      assertTrue(missing in error.message)
+      assertEquals(DownloadConfig.Default, ketch.status().config)
     }
 }

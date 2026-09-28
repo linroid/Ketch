@@ -2,10 +2,13 @@ package com.linroid.ketch.core
 
 import com.linroid.ketch.api.SystemInfo
 import kotlinx.cinterop.ExperimentalForeignApi
+import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSFileSystemFreeSize
 import platform.Foundation.NSFileSystemSize
 import platform.Foundation.NSProcessInfo
+import platform.Foundation.NSSearchPathForDirectoriesInDomains
+import platform.Foundation.NSUserDomainMask
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun currentSystemInfo(directory: String): SystemInfo {
@@ -31,3 +34,10 @@ internal actual fun currentSystemInfo(directory: String): SystemInfo {
     usableSpace = freeSpace,
   )
 }
+
+/** The app's Documents folder, which the Files app shows. */
+@Suppress("UNCHECKED_CAST")
+internal actual fun defaultDownloadDirectory(): String =
+  (NSSearchPathForDirectoriesInDomains(
+    NSDocumentDirectory, NSUserDomainMask, true,
+  ) as List<String>).first()

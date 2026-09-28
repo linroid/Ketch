@@ -93,6 +93,9 @@ interface KetchApi {
    * [DownloadConfig.retryCount], [DownloadConfig.retryDelayMs],
    * [DownloadConfig.progressIntervalMs], [DownloadConfig.saveIntervalMs] and
    * [DownloadConfig.bufferSize].
+   *
+   * @throws IllegalArgumentException if [DownloadConfig.defaultDirectory]
+   *   changed to a folder that does not exist on this instance
    */
   suspend fun updateConfig(config: DownloadConfig)
 

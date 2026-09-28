@@ -31,6 +31,7 @@ import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.file.requireDownloadDirectory
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.RealDownloadTask
 import com.linroid.ketch.core.task.TaskController
@@ -211,7 +212,7 @@ class Ketch(
       revision = KetchApi.REVISION,
       uptime = startMark.elapsedNow().inWholeSeconds,
       config = config,
-      system = currentSystemInfo(config.defaultDirectory ?: "downloads"),
+      system = currentSystemInfo(config.defaultDirectory ?: defaultDownloadDirectory()),
     )
   }
 
@@ -441,6 +442,10 @@ class Ketch(
    * download when it starts or resumes. See [KetchApi.updateConfig].
    */
   override suspend fun updateConfig(config: DownloadConfig) {
+    val directory = config.defaultDirectory
+    if (directory != null && directory != currentConfig.defaultDirectory) {
+      requireDownloadDirectory(directory)
+    }
     currentConfig = config
 
     // Apply speed limit
