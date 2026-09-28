@@ -119,7 +119,41 @@ interface Logger {
      */
     fun console(minLevel: LogLevel = LogLevel.VERBOSE): Logger =
       consoleLogger(minLevel)
+
+    /**
+     * Logger that passes every record to each of [loggers] in order, for example to the
+     * console and to a file. Each logger applies its own level filter.
+     *
+     * [None] entries are skipped, and combining nothing else returns [None] itself, so
+     * logging stays free when every logger is disabled.
+     *
+     * ```kotlin
+     * val logger = Logger.combine(Logger.console(LogLevel.DEBUG), fileLogger)
+     * ```
+     */
+    fun combine(vararg loggers: Logger): Logger {
+      val active = loggers.filter { it !== None }
+      return when (active.size) {
+        0 -> None
+        1 -> active.single()
+        else -> CombinedLogger(active)
+      }
+    }
   }
+}
+
+private class CombinedLogger(private val loggers: List<Logger>) : Logger {
+  override fun v(message: String) = loggers.forEach { it.v(message) }
+
+  override fun d(message: String) = loggers.forEach { it.d(message) }
+
+  override fun i(message: String) = loggers.forEach { it.i(message) }
+
+  override fun w(message: String, throwable: Throwable?) =
+    loggers.forEach { it.w(message, throwable) }
+
+  override fun e(message: String, throwable: Throwable?) =
+    loggers.forEach { it.e(message, throwable) }
 }
 
 /**

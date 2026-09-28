@@ -89,11 +89,13 @@ private fun redactMagnet(url: String): String {
 internal fun redactUrlsIn(text: String): String = EMBEDDED_URL.replace(text) { redactUrl(it.value) }
 
 /**
- * Formats a console log line as `2026-01-31 14:03:12.345 [INFO] message`, followed by the
- * stack trace of [throwable] when present, so one write keeps a record together. URLs in the
- * stack trace's messages are redacted like those in log messages.
+ * Formats a log record as `2026-01-31 14:03:12.345 [INFO] message`, followed by the stack
+ * trace of [throwable] when present, so one write keeps a record together. URLs in the stack
+ * trace's messages are redacted like those in log messages.
+ *
+ * @suppress This is internal API and should not be used directly by library users.
  */
-internal fun formatLogLine(level: LogLevel, message: String, throwable: Throwable? = null): String {
+fun formatLogLine(level: LogLevel, message: String, throwable: Throwable? = null): String {
   val line = "${logTimestamp()} [${level.name}] $message"
   if (throwable == null) return line
   return line + "\n" + redactUrlsIn(throwable.stackTraceToString().trimEnd())

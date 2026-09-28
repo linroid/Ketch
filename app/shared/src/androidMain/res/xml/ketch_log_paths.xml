@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copies of the log files made for "Share logs" in Settings → About. -->
+<paths>
+  <cache-path name="logs" path="logs/" />
+</paths>

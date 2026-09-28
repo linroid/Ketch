@@ -23,6 +23,7 @@ import com.linroid.ketch.app.App
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
+import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.config.FileConfigStore
@@ -36,13 +37,19 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import okio.FileSystem
+import okio.Path.Companion.toOkioPath
 import java.awt.Desktop
 import java.io.File
 import java.net.InetAddress
 import java.util.concurrent.Executors
+import kotlin.time.Duration.Companion.seconds
 
 private val isMac = System.getProperty("os.name").startsWith("Mac")
 
@@ -70,11 +77,22 @@ fun main(args: Array<String>) {
     open(fileArguments(forwarded))
     focusRequests.tryEmit(Unit)
   } ?: return
+  val logLevel = logLevel()
+  val fileLogger = FileLogger(
+    fileSystem = FileSystem.SYSTEM,
+    directory = File(configDir).toOkioPath() / "logs",
+    dispatcher = Dispatchers.IO,
+    minLevel = logLevel,
+  )
+  // application() ends with exitProcess, which still runs shutdown hooks.
+  val closeLog = Thread { runBlocking { withTimeoutOrNull(2.seconds) { fileLogger.close() } } }
+  Runtime.getRuntime().addShutdownHook(closeLog)
+  val logger = Logger.combine(Logger.console(logLevel), fileLogger)
   installOpenFileHandler(::open)
   open(launchFiles)
 
   application {
-    KetchWindow(configDir, incoming, focusRequests, singleInstance)
+    KetchWindow(configDir, incoming, focusRequests, singleInstance, logger, fileLogger)
   }
 }
 
@@ -84,6 +102,8 @@ private fun ApplicationScope.KetchWindow(
   incoming: IncomingDownloads,
   focusRequests: Flow<Unit>,
   singleInstance: SingleInstance,
+  logger: Logger,
+  fileLogger: FileLogger,
 ) {
   val instanceManager = remember {
     val configStore = FileConfigStore(
@@ -109,7 +129,7 @@ private fun ApplicationScope.KetchWindow(
             taskStore = taskStore,
             config = config.download,
             name = instanceName,
-            logger = Logger.console(consoleLogLevel()),
+            logger = logger,
             additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )
         },
@@ -179,15 +199,16 @@ private fun ApplicationScope.KetchWindow(
         window.toFront()
       }
     }
-    App(instanceManager, aiProviderFactory, openSettings, incoming)
+    App(instanceManager, aiProviderFactory, openSettings, incoming, fileLogger)
   }
 }
 
 /**
- * Console log level from `KETCH_LOG_LEVEL` (`verbose`, `debug`, `info`, `warn` or `error`).
- * Defaults to debug; verbose adds per-segment, per-peer and protocol-level lines.
+ * Level for the console and the log file, from `KETCH_LOG_LEVEL` (`verbose`, `debug`, `info`,
+ * `warn` or `error`). Defaults to debug; verbose adds per-segment, per-peer and protocol-level
+ * lines.
  */
-private fun consoleLogLevel(): LogLevel {
+private fun logLevel(): LogLevel {
   val name = System.getenv("KETCH_LOG_LEVEL")?.trim() ?: return LogLevel.DEBUG
   return LogLevel.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
     ?: LogLevel.DEBUG

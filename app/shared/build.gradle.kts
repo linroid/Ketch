@@ -61,6 +61,8 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.config)
+      // FileLogger takes okio paths.
+      api(libs.okio)
       implementation(projects.library.remote)
 
       implementation(libs.kotlinx.coroutines.core)
@@ -82,6 +84,7 @@ kotlin {
       implementation(libs.kotlinx.coroutines.test)
     }
     androidMain.dependencies {
+      implementation(libs.androidx.core)
       implementation(projects.library.core)
       implementation(projects.library.ktor)
       implementation(projects.ai.discover)

@@ -43,6 +43,7 @@ import androidx.window.core.layout.WindowSizeClass
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppSettingsController
@@ -78,6 +79,7 @@ fun AppShell(
   aiSettings: AiSettingsController = remember { AiSettingsController() },
   openSettingsRequests: Flow<Unit> = emptyFlow(),
   incoming: IncomingDownloads? = null,
+  fileLogger: FileLogger? = null,
 ) {
   val scope = rememberCoroutineScope()
   val appState = remember(instanceManager, appSettings, aiSettings, incoming) {
@@ -221,6 +223,7 @@ fun AppShell(
       },
       onStartServer = { instanceManager.startServer() },
       onStopServer = { instanceManager.stopServer() },
+      fileLogger = fileLogger,
     )
   }
   val aiDraft = remember { AiDiscoverDraft() }
