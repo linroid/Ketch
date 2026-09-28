@@ -59,8 +59,8 @@ private val TWO_PANE_MIN_WIDTH = 760.dp
  *
  * @param appSettings this app's own config sections.
  * @param aiSettings AI discovery settings and provider.
- * @param instanceSettings download and network settings of the active
- *   instance.
+ * @param instanceSettings download, network and torrent settings of the
+ *   active instance.
  * @param instanceLabel name of the active instance.
  * @param systemDeviceName name this device goes by when none is set, or
  *   `null` when the app has no local instance (the web app).
@@ -86,6 +86,7 @@ fun SettingsCategoryContent(
     SettingsCategory.General -> GeneralSettings(appSettings, systemDeviceName)
     SettingsCategory.Downloads -> DownloadSettings(instanceSettings, instanceLabel)
     SettingsCategory.Network -> NetworkSettings(instanceSettings, instanceLabel)
+    SettingsCategory.BitTorrent -> BitTorrentSettings(instanceSettings, instanceLabel)
     SettingsCategory.RemoteAccess -> RemoteAccessSettings(
       config = appSettings.config.server,
       serverState = serverState,

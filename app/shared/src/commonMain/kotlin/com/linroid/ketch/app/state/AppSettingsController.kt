@@ -9,6 +9,7 @@ import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.ThemeMode
+import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.app.theme.KetchAccent
 
 /**
@@ -42,6 +43,11 @@ class AppSettingsController(
   /** Persists download engine settings. */
   fun saveDownload(download: DownloadConfig) {
     update { it.copy(download = download) }
+  }
+
+  /** Persists the embedded instance's BitTorrent settings. */
+  fun saveTorrent(torrent: TorrentSettings) {
+    update { it.copy(torrent = torrent) }
   }
 
   /** Persists daemon server settings. */

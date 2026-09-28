@@ -13,6 +13,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.InstanceSettingsController
+import com.linroid.ketch.config.TorrentSettings
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -88,6 +89,61 @@ class InstanceSettingsControllerTest {
 
     assertEquals(edited, store.load().download)
     assertEquals(listOf(edited), api.applied)
+  }
+
+  @Test
+  fun `embedded torrent trackers are saved and handed to the instance`() = runTest {
+    val store = RecordingConfigStore()
+    val applied = mutableListOf<TorrentSettings>()
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(),
+      local = AppSettingsController(store),
+      scope = this,
+      applyTorrent = { applied += it },
+    )
+    val edited = TorrentSettings(trackers = listOf("udp://tracker.example:1337/announce"))
+
+    controller.updateTorrent(edited)
+    advanceUntilIdle()
+
+    assertEquals(edited, store.load().torrent)
+    assertEquals(edited, controller.torrent)
+    assertEquals(listOf(edited), applied)
+  }
+
+  @Test
+  fun `a torrent change that fails to apply stays saved and is reported`() = runTest {
+    val store = RecordingConfigStore()
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(),
+      local = AppSettingsController(store),
+      scope = this,
+      applyTorrent = { throw IllegalStateException("Engine closed") },
+    )
+    val edited = TorrentSettings(trackers = listOf("https://tracker.example/announce"))
+
+    controller.updateTorrent(edited)
+    advanceUntilIdle()
+
+    assertEquals(edited, store.load().torrent)
+    assertEquals("Engine closed", controller.torrentError)
+  }
+
+  @Test
+  fun `remote instances offer no torrent settings`() = runTest {
+    val applied = mutableListOf<TorrentSettings>()
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(),
+      local = null,
+      scope = this,
+      applyTorrent = { applied += it },
+    )
+
+    assertNull(controller.torrent)
+    controller.updateTorrent(TorrentSettings(trackers = listOf("https://tracker.example/a")))
+    advanceUntilIdle()
+
+    assertEquals(emptyList(), applied)
   }
 
   @Test

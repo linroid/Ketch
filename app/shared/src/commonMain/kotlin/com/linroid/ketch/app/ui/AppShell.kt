@@ -197,13 +197,14 @@ fun AppShell(
     openSettingsRequests.collect { settingsOpen = true }
   }
   val settingsCategories = SettingsCategory.visible(instanceManager.isLocalServerSupported)
-  // Download and network settings belong to the active instance.
+  // Download, network and torrent settings belong to the active instance.
   val settingsInstance = activeInstance
   val instanceSettings = remember(settingsInstance) {
     InstanceSettingsController(
       api = settingsInstance?.instance ?: appState.activeApi.value,
       local = appSettings.takeIf { settingsInstance is EmbeddedInstance },
       scope = scope,
+      applyTorrent = instanceManager::applyTorrentSettings,
     )
   }
   val settingsContent: @Composable (SettingsCategory) -> Unit = { category ->

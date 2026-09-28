@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.config.TorrentSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -15,21 +16,25 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Settings that belong to the instance doing the downloads rather than
- * to this app: download limits and network interfaces.
+ * to this app: download limits, network interfaces and torrent trackers.
  *
  * Changes apply immediately. For the embedded instance, download
  * settings are also saved to this app's config file; a remote instance
  * keeps them until it restarts, since the server does not persist them.
+ * Torrent settings can only be changed on the embedded instance.
  *
  * @param api instance the settings are read from and applied to.
  * @param local settings controller of this app when [api] is the
  *   embedded instance; `null` for a remote one.
  * @param scope scope that runs the calls to [api].
+ * @param applyTorrent hands saved torrent settings to the embedded
+ *   instance, so they take effect without a restart.
  */
 class InstanceSettingsController(
   private val api: KetchApi,
   private val local: AppSettingsController?,
   private val scope: CoroutineScope,
+  private val applyTorrent: suspend (TorrentSettings) -> Unit = {},
 ) {
   /** Download settings, or `null` while a remote's are loading. */
   var download by mutableStateOf(local?.config?.download)
@@ -47,12 +52,24 @@ class InstanceSettingsController(
   var networkError by mutableStateOf<String?>(null)
     private set
 
+  /**
+   * Torrent settings of the embedded instance, or `null` for a remote
+   * one, whose trackers are set in its own config file.
+   */
+  val torrent: TorrentSettings? get() = local?.config?.torrent
+
+  /** Why the torrent settings could not be applied. */
+  var torrentError by mutableStateOf<String?>(null)
+    private set
+
   /** Whether the settings live on another device. */
   val isRemote: Boolean get() = local == null
 
   private val downloadLock = Mutex()
   private val networkLock = Mutex()
+  private val torrentLock = Mutex()
   private var appliedDownload: DownloadConfig? = null
+  private var appliedTorrent: TorrentSettings? = null
 
   // What the instance last reported, to fall back to when a change fails.
   private var confirmedNetworks: NetworkInterfaces? = null
@@ -104,6 +121,28 @@ class InstanceSettingsController(
         attempt(onError = { downloadError = it }) {
           api.updateConfig(latest)
           appliedDownload = latest
+        }
+      }
+    }
+  }
+
+  /**
+   * Saves [settings] and applies them to the embedded instance, where
+   * torrents pick them up as they start or resume. Does nothing for a
+   * remote instance.
+   */
+  fun updateTorrent(settings: TorrentSettings) {
+    val app = local ?: return
+    app.saveTorrent(settings)
+    torrentError = null
+    scope.launch {
+      // Like updateDownload: each turn applies the newest saved value.
+      torrentLock.withLock {
+        val latest = app.config.torrent
+        if (latest == appliedTorrent) return@withLock
+        attempt(onError = { torrentError = it }) {
+          applyTorrent(latest)
+          appliedTorrent = latest
         }
       }
     }
