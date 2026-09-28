@@ -21,7 +21,9 @@ import kotlinx.serialization.json.Json
  * segment downloads. This is the default source used for all
  * HTTP/HTTPS URLs. Connection count and progress interval defaults come
  * from [DownloadContext.config], so global configuration changes apply
- * to downloads started or resumed afterwards.
+ * to downloads started or resumed afterwards. Servers without byte-range
+ * support use a single connection, and a retry or resume restarts it
+ * from byte zero.
  */
 internal class HttpDownloadSource(
   private val httpEngine: HttpEngine,
@@ -89,10 +91,11 @@ internal class HttpDownloadSource(
     )
 
     // Reuse existing segments with progress on retry (e.g., after
-    // HTTP 429) instead of recalculating from scratch.
+    // HTTP 429) instead of recalculating from scratch. Without range
+    // support the transfer can only restart at byte zero.
     val existing = context.segments.value
     val segments = if (
-      existing.isNotEmpty() &&
+      resolved.supportsResume &&
       existing.any { it.downloadedBytes > 0 }
     ) {
       log.i {
@@ -174,7 +177,12 @@ internal class HttpDownloadSource(
       serverInfo.rateLimitReset,
     )
     val incompleteCount = segments.count { !it.isComplete }
-    if (incompleteCount > 0 && connections != incompleteCount) {
+    if (incompleteCount > 0 && !serverInfo.supportsResume) {
+      // Without range support every transfer starts at byte zero, so saved progress cannot be used.
+      log.w { "Server does not support ranges, restarting taskId=${context.taskId} from zero" }
+      segments = SegmentCalculator.singleSegment(totalBytes)
+      context.segments.value = segments
+    } else if (incompleteCount > 0 && connections != incompleteCount) {
       log.i {
         "Resegmenting for taskId=${context.taskId}: " +
           "$incompleteCount -> $connections connections"
