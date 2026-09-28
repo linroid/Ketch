@@ -30,8 +30,9 @@ maxConnectionsPerHost = 8
 # saveIntervalMs = 5000
 # bufferSize = 8192
 
-# Extra trackers added to public torrents as a fallback tier, e.g. when a
-# network blocks a torrent's own tracker. Private torrents ignore them.
+# Extra trackers announced alongside public torrents' own trackers, e.g. when
+# a network blocks a torrent's own tracker. Private torrents ignore them. The
+# apps edit this under Settings > BitTorrent.
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
 

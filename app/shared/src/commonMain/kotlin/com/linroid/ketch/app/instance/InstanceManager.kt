@@ -9,6 +9,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ServerConfig
+import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.RemoteKetch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -143,6 +144,15 @@ class InstanceManager(
   fun stopServer() {
     factory.stopServer()
     _serverState.value = ServerState.Stopped
+  }
+
+  /**
+   * Applies saved torrent [settings] to the embedded instance; torrents
+   * pick them up as they start or resume. Does nothing when the embedded
+   * instance has no torrent support, or there is none.
+   */
+  suspend fun applyTorrentSettings(settings: TorrentSettings) {
+    factory.applyTorrentSettings?.invoke(settings)
   }
 
   /**

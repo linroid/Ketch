@@ -378,6 +378,8 @@ fun <T> SettingsSegmented(
  * @param secret masks the text, with a Show/Hide toggle.
  * @param numeric accepts digits only.
  * @param decimal accepts digits and a decimal point.
+ * @param minLines height of the field in lines; above 1, Enter starts a
+ *   new line instead of saving.
  */
 @Composable
 fun SettingsTextInput(
@@ -393,8 +395,10 @@ fun SettingsTextInput(
   mono: Boolean = false,
   enabled: Boolean = true,
   width: Dp? = null,
+  minLines: Int = 1,
   actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
+  val multiLine = minLines > 1
   val colors = KetchTheme.colors
   val focusManager = LocalFocusManager.current
   var text by remember { mutableStateOf(value) }
@@ -437,7 +441,8 @@ fun SettingsTextInput(
         }
       },
       enabled = enabled,
-      singleLine = true,
+      singleLine = !multiLine,
+      minLines = minLines,
       textStyle = textStyle,
       cursorBrush = SolidColor(colors.primary),
       visualTransformation = if (secret && !revealed) {
@@ -452,7 +457,7 @@ fun SettingsTextInput(
           secret -> KeyboardType.Password
           else -> KeyboardType.Text
         },
-        imeAction = ImeAction.Done,
+        imeAction = if (multiLine) ImeAction.Default else ImeAction.Done,
         autoCorrectEnabled = false,
       ),
       keyboardActions = KeyboardActions(onDone = {
@@ -477,7 +482,12 @@ fun SettingsTextInput(
         ) {
           Box(Modifier.weight(1f).padding(vertical = 10.dp)) {
             if (text.isEmpty()) {
-              Text(placeholder, style = textStyle, color = colors.onSurfaceDim, maxLines = 1)
+              Text(
+                text = placeholder,
+                style = textStyle,
+                color = colors.onSurfaceDim,
+                maxLines = minLines,
+              )
             }
             inner()
           }

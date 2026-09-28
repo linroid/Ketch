@@ -72,11 +72,12 @@ including a development run, hands its files to the running app instead of openi
   support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates;
   a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
   The apps and CLI keep it in their config directory.
-- `additionalTrackers` (the apps' and CLI's `[torrent] trackers` in `config.toml`) adds trackers
-  to public torrents and public magnet lookups. Each one is announced alongside the torrent's own
-  trackers rather than as a later tier, so it helps when a network blocks the torrent's trackers.
-  Private torrents and tracker-only discovery never contact them.
-  `TorrentDownloadSource.setAdditionalTrackers` changes the list for torrents started later.
+- `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`; the apps edit
+  it under Settings → BitTorrent) adds trackers to public torrents and public magnet lookups. Each
+  one is announced alongside the torrent's own trackers rather than as a later tier, so it helps
+  when a network blocks the torrent's trackers. Private torrents and tracker-only discovery never
+  contact them. `TorrentDownloadSource.setAdditionalTrackers` changes the list for torrents started
+  or resumed later; the apps call it when the setting changes.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
   and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
   are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not

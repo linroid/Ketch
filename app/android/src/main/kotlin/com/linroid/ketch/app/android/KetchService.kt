@@ -29,6 +29,7 @@ import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
+import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,6 +89,12 @@ class KetchService : Service() {
     )
     val instanceName = config.name
       ?: android.os.Build.MODEL
+    val torrentSource = TorrentDownloadSource(
+      TorrentConfig(
+        stateDirectory = filesDir.resolve("torrent-state").absolutePath,
+        additionalTrackers = config.torrent.trackers,
+      ),
+    )
     instanceManager = InstanceManager(
       factory = InstanceFactory(
         deviceName = instanceName,
@@ -100,13 +107,7 @@ class KetchService : Service() {
             config = downloadConfig,
             name = instanceName,
             logger = Logger.console(),
-            additionalSources = listOf(
-              FtpDownloadSource(),
-              TorrentDownloadSource(com.linroid.ketch.torrent.TorrentConfig(
-                stateDirectory = filesDir.resolve("torrent-state").absolutePath,
-                additionalTrackers = configStore.load().torrent.trackers,
-              )),
-            ),
+            additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )
         },
         localServerFactory = { ketchApi ->
@@ -135,6 +136,7 @@ class KetchService : Service() {
             }
           }
         },
+        applyTorrentSettings = { torrentSource.setAdditionalTrackers(it.trackers) },
       ),
       initialRemotes = config.remotes,
       configStore = configStore,
