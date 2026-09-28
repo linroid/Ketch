@@ -6,3 +6,5 @@ internal actual fun resolveChildPath(
   directory: String,
   fileName: String,
 ): String = (directory.toPath() / fileName).toString()
+
+internal actual fun isContentUri(directory: String): Boolean = false

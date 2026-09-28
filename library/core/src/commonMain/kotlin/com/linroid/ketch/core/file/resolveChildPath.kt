@@ -11,3 +11,9 @@ internal expect fun resolveChildPath(
   directory: String,
   fileName: String,
 ): String
+
+/**
+ * Whether [directory] is a URI that [resolveChildPath] can create files in
+ * on this platform (Android `content://` documents), rather than a path.
+ */
+internal expect fun isContentUri(directory: String): Boolean

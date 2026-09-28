@@ -58,6 +58,18 @@ class KetchUpdateConfigTest {
   }
 
   @Test
+  fun updateConfig_urlAsDirectory_throws() = runTest {
+    withKetch(DownloadConfig(defaultDirectory = firstDir.path)) { ketch, _ ->
+      // content:// documents are only writable on Android.
+      for (url in listOf("https://example.com/downloads", "content://docs/tree/primary")) {
+        assertFailsWith<IllegalArgumentException> {
+          ketch.updateConfig(DownloadConfig(defaultDirectory = url))
+        }
+      }
+    }
+  }
+
+  @Test
   fun updateConfig_unchangedMissingDirectory_isAccepted() = runTest {
     // A folder deleted after startup must not block unrelated changes.
     val missing = File(firstDir, "missing").path

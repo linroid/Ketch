@@ -34,3 +34,6 @@ internal actual fun resolveChildPath(
   }
   return (directory.toPath() / fileName).toString()
 }
+
+internal actual fun isContentUri(directory: String): Boolean =
+  directory.startsWith("content://")

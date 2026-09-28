@@ -6,15 +6,16 @@ import okio.Path.Companion.toPath
 /**
  * Checks that [directory] is an existing folder, so a bad download folder
  * is rejected when it is configured instead of failing every download
- * later. URIs such as Android `content://` trees are not file system
- * paths and are accepted as they are.
+ * later. Android `content://` documents are not file system paths and are
+ * accepted as they are; any other URL is rejected.
  *
- * @throws IllegalArgumentException if [directory] is blank, missing, or
- *   not a folder
+ * @throws IllegalArgumentException if [directory] is blank, a URL this
+ *   platform cannot write to, missing, or not a folder
  */
 internal fun requireDownloadDirectory(directory: String) {
   require(directory.isNotBlank()) { "Download folder must not be blank" }
-  if ("://" in directory) return
+  if (isContentUri(directory)) return
+  require("://" !in directory) { "Download folder must be a folder path, not a URL: $directory" }
   val metadata = try {
     platformFileSystem.metadataOrNull(directory.toPath())
   } catch (e: IOException) {
