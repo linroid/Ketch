@@ -56,6 +56,21 @@ class HttpDownloadIntegrationTest {
   }
 
   @Test
+  fun resume_noRangeSupport_restartsFromZero() = runTest(timeout = 20.seconds) {
+    withFixture(65539, Mode.NO_RANGES_PAUSE_FIRST) { fixture ->
+      val task = fixture.start(connections = 4)
+      fixture.firstChunk.await()
+      task.pause()
+      assertTrue(task.segments.value.sumOf { it.downloadedBytes } > 0)
+      task.resume()
+      val state = task.state.first { it.isTerminal }
+      assertContentEquals(fixture.content, File(assertIs<DownloadState.Completed>(state).outputPath)
+        .readBytes())
+      assertEquals(listOf("bytes=0-65538", "bytes=0-65538"), fixture.requests.toList())
+    }
+  }
+
+  @Test
   fun download_ignoredRange_failsInsteadOfCorruptingFile() = runTest(timeout = 20.seconds) {
     withFixture(65539, Mode.IGNORE_RANGES) { fixture ->
       val state = assertIs<DownloadState.Failed>(fixture.download(connections = 4))
@@ -237,8 +252,8 @@ class HttpDownloadIntegrationTest {
   }
 
   private enum class Mode {
-    NORMAL, NO_RANGES, IGNORE_RANGES, WRONG_RANGE, FAIL_FIRST, TRUNCATE_FIRST, PAUSE_FIRST,
-    HEAD_FAIL_FIRST, NOT_FOUND, UNICODE_NAME
+    NORMAL, NO_RANGES, NO_RANGES_PAUSE_FIRST, IGNORE_RANGES, WRONG_RANGE, FAIL_FIRST,
+    TRUNCATE_FIRST, PAUSE_FIRST, HEAD_FAIL_FIRST, NOT_FOUND, UNICODE_NAME
   }
 
   private class Fixture(size: Int, private val mode: Mode) {
@@ -248,6 +263,8 @@ class HttpDownloadIntegrationTest {
     val etag = AtomicReference("fixture-v1")
     val headAttempts = AtomicInteger()
     private val attempts = AtomicInteger()
+    private val supportsRanges = mode != Mode.NO_RANGES && mode != Mode.NO_RANGES_PAUSE_FIRST
+    private val pauseFirst = mode == Mode.PAUSE_FIRST || mode == Mode.NO_RANGES_PAUSE_FIRST
     private val directory = Files.createTempDirectory("ketch-http-integration-").toFile()
     val output = File(directory, "download.bin")
     private val executor = Executors.newCachedThreadPool()
@@ -269,7 +286,7 @@ class HttpDownloadIntegrationTest {
         ) {
           transport.download(url, range, headers) { bytes ->
             onData(bytes)
-            if (mode == Mode.PAUSE_FIRST && firstChunk.complete(Unit)) awaitCancellation()
+            if (pauseFirst && firstChunk.complete(Unit)) awaitCancellation()
           }
         }
       }
@@ -294,7 +311,7 @@ class HttpDownloadIntegrationTest {
       server.createContext("/file") { exchange ->
         try {
           exchange.use {
-            if (mode != Mode.NO_RANGES) it.responseHeaders.add("Accept-Ranges", "bytes")
+            if (supportsRanges) it.responseHeaders.add("Accept-Ranges", "bytes")
             it.responseHeaders.add("ETag", etag.get())
             if (mode == Mode.UNICODE_NAME) {
               it.responseHeaders.add("Content-Disposition",
@@ -317,7 +334,7 @@ class HttpDownloadIntegrationTest {
               it.sendResponseHeaders(503, -1)
               return@use
             }
-            val ignore = mode == Mode.NO_RANGES || mode == Mode.IGNORE_RANGES
+            val ignore = !supportsRanges || mode == Mode.IGNORE_RANGES
             val (start, end) = if (range == null || ignore) {
               listOf(0, content.lastIndex)
             } else {

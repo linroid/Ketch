@@ -2,6 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.ServerInfo
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class HttpDownloadSourceTest {
@@ -42,6 +44,22 @@ class HttpDownloadSourceTest {
 
     assertEquals(1, engine.downloadCallCount)
     assertEquals(1000L, context.segments.value.single().downloadedBytes)
+  }
+
+  @Test
+  fun download_noRangeSupportRetry_restartsFromZero() = runTest {
+    val engine = FakeHttpEngine(serverInfo = NO_RANGES, failAfterBytes = 300)
+    val context = context()
+    val source = HttpDownloadSource(engine)
+    assertFailsWith<KetchError.Network> { source.download(context) }
+    assertEquals(300L, context.segments.value.single().downloadedBytes)
+
+    engine.failAfterBytes = -1
+    source.download(context)
+
+    val segment = context.segments.value.single()
+    assertEquals(0L, segment.start)
+    assertEquals(1000L, segment.downloadedBytes)
   }
 
   @Test
