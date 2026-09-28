@@ -209,9 +209,11 @@ cli/          # JVM CLI entry point
 - `AiSettings`: AI discovery provider, token, model, endpoint and search keys
 - `AppearanceConfig`: accent palette and light/dark `ThemeMode` (app-only;
   CLI and server ignore it)
-- `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`)
+- `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`),
+  edited on the embedded instance's BitTorrent settings page and applied to torrents as they
+  start or resume; a remote instance's trackers are only editable on that device
 - Apps edit it on the Settings destination, split into `SettingsCategory`
-  pages (General, Downloads, Network, Remote access, AI discovery, About).
+  pages (General, Downloads, Network, BitTorrent, Remote access, AI discovery, About).
   Wide windows open it as an overlay dialog (also ⌘, / Ctrl+, on desktop),
   narrow ones as a page. Changes apply as they are made; there are no Save
   buttons

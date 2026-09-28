@@ -41,6 +41,12 @@ fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
     val taskStore = createSqliteTaskStore(DriverFactory())
     val instanceName = config.name
       ?: UIDevice.currentDevice.name
+    val torrentSource = TorrentDownloadSource(
+      TorrentConfig(
+        stateDirectory = "$supportDir/torrent-state",
+        additionalTrackers = config.torrent.trackers,
+      ),
+    )
     InstanceManager(
       factory = InstanceFactory(
         deviceName = instanceName,
@@ -51,17 +57,10 @@ fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
             config = config.download,
             name = instanceName,
             logger = Logger.console(),
-            additionalSources = listOf(
-              FtpDownloadSource(),
-              TorrentDownloadSource(
-                TorrentConfig(
-                  stateDirectory = "$supportDir/torrent-state",
-                  additionalTrackers = configStore.load().torrent.trackers,
-                ),
-              ),
-            ),
+            additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )
         },
+        applyTorrentSettings = { torrentSource.setAdditionalTrackers(it.trackers) },
       ),
       initialRemotes = config.remotes,
       configStore = configStore,

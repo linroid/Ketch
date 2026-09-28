@@ -2,6 +2,7 @@ package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.RemoteKetch
 
 /**
@@ -18,11 +19,15 @@ import com.linroid.ketch.remote.RemoteKetch
  *   server exposing the embedded [KetchApi]. Receives the embedded
  *   KetchApi instance. When non-null, server controls appear in
  *   the Embedded instance entry. Provided by Android and JVM/Desktop.
+ * @param applyTorrentSettings applies changed torrent settings to the
+ *   torrent source of the embedded instance, so they take effect without
+ *   a restart. `null` when the embedded instance has no torrent support.
  */
 class InstanceFactory(
   val deviceName: String = "Embedded",
   private val embeddedFactory: (() -> KetchApi)? = null,
   private val localServerFactory: ((KetchApi) -> LocalServerHandle)? = null,
+  internal val applyTorrentSettings: (suspend (TorrentSettings) -> Unit)? = null,
 ) {
   /** Whether an embedded instance is available. */
   val hasEmbedded: Boolean get() = embeddedFactory != null

@@ -93,6 +93,12 @@ private fun ApplicationScope.KetchWindow(
     val taskStore = createSqliteTaskStore(DriverFactory(dbPath))
     val instanceName = config.name?.ifEmpty { null }
       ?: InetAddress.getLocalHost().hostName.removeSuffix(".local")
+    val torrentSource = TorrentDownloadSource(
+      TorrentConfig(
+        stateDirectory = configDir + File.separator + "torrent-state",
+        additionalTrackers = config.torrent.trackers,
+      ),
+    )
     InstanceManager(
       factory = InstanceFactory(
         deviceName = instanceName,
@@ -103,15 +109,7 @@ private fun ApplicationScope.KetchWindow(
             config = config.download,
             name = instanceName,
             logger = Logger.console(),
-            additionalSources = listOf(
-              FtpDownloadSource(),
-              TorrentDownloadSource(
-                TorrentConfig(
-                  stateDirectory = configDir + File.separator + "torrent-state",
-                  additionalTrackers = configStore.load().torrent.trackers,
-                ),
-              ),
-            ),
+            additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )
         },
         localServerFactory = { ketchApi ->
@@ -136,6 +134,7 @@ private fun ApplicationScope.KetchWindow(
             }
           }
         },
+        applyTorrentSettings = { torrentSource.setAdditionalTrackers(it.trackers) },
       ),
       initialRemotes = config.remotes,
       configStore = configStore,

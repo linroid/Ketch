@@ -16,6 +16,7 @@ enum class SettingsCategory(
   General("General", "Device name, theme and accent colour", KetchIcon.Settings),
   Downloads("Downloads", "Location, queue, speed and retries", KetchIcon.Active),
   Network("Network", "Network interfaces used for downloads", KetchIcon.Network),
+  BitTorrent("BitTorrent", "Extra trackers for public torrents", KetchIcon.FileTorrent),
   RemoteAccess("Remote access", "Control this device from other devices", KetchIcon.Server),
   Ai("AI discovery", "Model provider and web search", KetchIcon.Ai),
   About("About", "Version and project links", KetchIcon.Info);
