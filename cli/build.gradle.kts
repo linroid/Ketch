@@ -11,6 +11,10 @@ application {
   mainClass.set("com.linroid.ketch.cli.MainKt")
 }
 
+// Oracle GraalVM for JDK 21 stops at 21.0.9 on macOS Intel, which cannot read the current
+// reachability metadata, so the release builds that target with -PnativeImageJdk=25.
+val nativeImageJdk = providers.gradleProperty("nativeImageJdk").map(String::toInt).getOrElse(21)
+
 graalvmNative {
   toolchainDetection.set(true)
   binaries {
@@ -19,7 +23,7 @@ graalvmNative {
       mainClass.set("com.linroid.ketch.cli.MainKt")
       javaLauncher.set(
         project.extensions.getByType<JavaToolchainService>().launcherFor {
-          languageVersion.set(JavaLanguageVersion.of(21))
+          languageVersion.set(JavaLanguageVersion.of(nativeImageJdk))
           vendor.set(JvmVendorSpec.ORACLE)
         }
       )
@@ -30,9 +34,11 @@ graalvmNative {
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",
         "--initialize-at-build-time=ch.qos.logback",
         "--initialize-at-build-time=org.slf4j",
+        // Logback parses logback.xml at build time and keeps SAX helper objects from it.
+        "--initialize-at-build-time=org.xml.sax.helpers",
         // Ktor's OkHttp engine (under io.ktor) switches over this enum, so its
-        // build-time WhenMappings class initializes it.
-        "--initialize-at-build-time=okhttp3.Protocol",
+        // build-time WhenMappings class initializes it, along with its companion.
+        "--initialize-at-build-time=okhttp3.Protocol,okhttp3.Protocol\$Companion",
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",
