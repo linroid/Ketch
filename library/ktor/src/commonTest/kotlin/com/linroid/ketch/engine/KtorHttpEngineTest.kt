@@ -1,6 +1,8 @@
 package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -10,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class KtorHttpEngineTest {
@@ -114,6 +117,42 @@ class KtorHttpEngineTest {
         engine.download("https://example.com/file", 4L..7L) { delivered += it.size }
       }
       assertTrue(delivered <= 4)
+    }
+  }
+
+  @Test
+  fun headAndDownload_sensitiveResponseHeaders_areMaskedInLogs() = runTest {
+    val records = mutableListOf<String>()
+    KetchLogger.setLogger(object : Logger {
+      override fun v(message: String) {}
+      override fun d(message: String) {
+        records += message
+      }
+      override fun i(message: String) {}
+      override fun w(message: String, throwable: Throwable?) {}
+      override fun e(message: String, throwable: Throwable?) {}
+    })
+    val engine = KtorHttpEngine(HttpClient(MockEngine {
+      respond(
+        "abcdefgh",
+        HttpStatusCode.OK,
+        headersOf("Content-Length" to listOf("8"), "Set-Cookie" to listOf("session=s3cr3t")),
+      )
+    }))
+    try {
+      engine.head("https://example.com/file", emptyMap())
+      engine.download("https://example.com/file", 0L..7L) {}
+    } finally {
+      engine.close()
+      KetchLogger.setLogger(Logger.None)
+    }
+
+    val headerLines = listOf("HEAD 200 headers:", "GET 200 headers:").map { prefix ->
+      records.single { prefix in it }
+    }
+    headerLines.forEach { line ->
+      assertTrue(line.contains("Set-Cookie=***", ignoreCase = true), line)
+      assertFalse("s3cr3t" in line, line)
     }
   }
 

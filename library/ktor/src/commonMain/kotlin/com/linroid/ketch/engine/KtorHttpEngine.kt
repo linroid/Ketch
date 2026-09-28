@@ -43,11 +43,7 @@ class KtorHttpEngine(
       }
 
       if (logRequests) log.d {
-        "HEAD ${response.status.value} headers: " +
-          response.headers.entries().joinToString { (k, v) ->
-            // Cookies are session credentials; their presence is enough for troubleshooting.
-            if (k.lowercase() in SENSITIVE_HEADERS) "$k=***" else "$k=${v.joinToString(",")}"
-          }
+        "HEAD ${response.status.value} headers: ${describeHeaders(response.headers)}"
       }
 
       if (!response.status.isSuccess()) {
@@ -131,10 +127,7 @@ class KtorHttpEngine(
         val status = response.status
 
         if (logRequests) log.d {
-          "GET ${status.value} headers: " +
-            response.headers.entries().joinToString { (k, v) ->
-              "$k=${v.joinToString(",")}"
-            }
+          "GET ${status.value} headers: ${describeHeaders(response.headers)}"
         }
 
         if (!status.isSuccess()) {
@@ -218,6 +211,14 @@ class KtorHttpEngine(
     private const val DEFAULT_BUFFER_SIZE = 8192
     private val SENSITIVE_HEADERS = setOf("set-cookie", "cookie", "authorization")
     private val CONTENT_RANGE = Regex("""bytes (\d+)-(\d+)/(\d+|\*)""", RegexOption.IGNORE_CASE)
+
+    /** [headers] for a debug log line, with the values of [SENSITIVE_HEADERS] masked. */
+    private fun describeHeaders(headers: Headers): String =
+      headers.entries().joinToString { (name, values) ->
+        // Cookies are session credentials; their presence is enough for troubleshooting.
+        val value = if (name.lowercase() in SENSITIVE_HEADERS) "***" else values.joinToString(",")
+        "$name=$value"
+      }
 
     private fun matchesRange(value: String?, range: LongRange): Boolean {
       val match = value?.trim()?.let { CONTENT_RANGE.matchEntire(it) } ?: return false
