@@ -163,7 +163,7 @@ internal object TorrentV2SessionLoop {
       onProgress()
       var preference = 0
       var acceptingConnections = connections != null
-      val label = logHash(layout.infoHash.hex)
+      val label = "taskId=${store.taskId} (${logHash(layout.infoHash.hex)})"
       // Event driven: an idle swarm logs nothing, so the loop never wakes just to report.
       var nextSummary = nowMs() + SWARM_SUMMARY_INTERVAL_MS
       while (!pieces.completed()) {

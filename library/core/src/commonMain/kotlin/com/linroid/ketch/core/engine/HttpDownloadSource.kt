@@ -87,7 +87,7 @@ internal class HttpDownloadSource(
     val reset = resolved.metadata[META_RATE_LIMIT_RESET]
       ?.toLongOrNull()
     val connections = applyRateLimit(
-      context.taskId, rangeLimitedConnections(context, resolved.supportsResume), remaining, reset,
+      context.taskId, rangeLimitedConnections(context, resolved.supportsResume), remaining, reset
     )
 
     // Reuse existing segments with progress on retry (e.g., after
@@ -174,7 +174,7 @@ internal class HttpDownloadSource(
       context.taskId,
       rangeLimitedConnections(context, serverInfo.supportsResume),
       serverInfo.rateLimitRemaining,
-      serverInfo.rateLimitReset,
+      serverInfo.rateLimitReset
     )
     val incompleteCount = segments.count { !it.isComplete }
     if (incompleteCount > 0 && !serverInfo.supportsResume) {
@@ -270,7 +270,7 @@ internal class HttpDownloadSource(
       }
       val downloader = SegmentDownloader(
         httpEngine, context.fileAccessor,
-        throttleLimiter, SpeedLimiter.Unlimited, context.taskId,
+        throttleLimiter, SpeedLimiter.Unlimited, context.taskId
       )
       downloader.download(
         context.url, segment, context.headers, onProgress,

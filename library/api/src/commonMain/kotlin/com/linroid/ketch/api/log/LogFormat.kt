@@ -46,8 +46,9 @@ fun redactUrl(url: String): String {
 }
 
 private fun redactUserInfo(url: String, authorityStart: Int): String {
-  val authorityEnd = url.indexOfAny(charArrayOf('/', '?', '#'), authorityStart)
-    .let { if (it < 0) url.length else it }
+  // Like FtpUrl, only a slash ends the credentials: an unencoded password may contain ? or #.
+  // A query that holds an @ before any path is over-redacted, which never leaks.
+  val authorityEnd = url.indexOf('/', authorityStart).let { if (it < 0) url.length else it }
   val at = url.lastIndexOf('@', authorityEnd - 1)
   if (at < authorityStart) return url
   val colon = url.indexOf(':', authorityStart)

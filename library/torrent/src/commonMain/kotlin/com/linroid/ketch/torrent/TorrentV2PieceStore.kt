@@ -23,7 +23,7 @@ internal class TorrentV2PieceStore(
   private val document: TorrentV2Document,
   private val output: Path,
   selectedIds: Set<String>,
-  private val taskId: String,
+  val taskId: String,
   private val buffers: TorrentBufferBudget,
   private val storageSlots: Semaphore,
   private val fileSystem: FileSystem = torrentFileSystem,
