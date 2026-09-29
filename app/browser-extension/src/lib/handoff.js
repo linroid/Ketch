@@ -11,7 +11,7 @@ import {
 } from './request.js';
 
 /** Same limit as the server's `POST /api/resolve/content`. */
-const MAX_TORRENT_BYTES = 16 * 1024 * 1024;
+export const MAX_TORRENT_BYTES = 16 * 1024 * 1024;
 const TORRENT_FETCH_TIMEOUT_MS = 15_000;
 
 /**
@@ -41,7 +41,8 @@ const TORRENT_FETCH_TIMEOUT_MS = 15_000;
  * @param {import('./settings.js').Instance} instance
  * @param {Download} download
  * @param {import('./settings.js').Settings} settings
- * @param {{ timeoutMs?: number, deps?: HandoffDeps }} [options]
+ * @param {{ timeoutMs?: number, deps?: HandoffDeps }} [options] `timeoutMs` bounds the whole
+ *   hand-off, including fetching a `.torrent` file, so a held download is released in time
  * @returns {Promise<object>} snapshot of the created task
  */
 export async function sendToKetch(instance, download, settings, options = {}) {
@@ -50,13 +51,20 @@ export async function sendToKetch(instance, download, settings, options = {}) {
     throw new Error("Ketch can't download this kind of link");
   }
   const deps = options.deps ?? browserDeps();
-  const client = new KetchClient(instance, { fetch: deps.fetch, timeoutMs: options.timeoutMs });
+  const deadline = options.timeoutMs === undefined
+    ? undefined
+    : AbortSignal.timeout(options.timeoutMs);
+  const client = new KetchClient(instance, {
+    fetch: deps.fetch,
+    timeoutMs: options.timeoutMs,
+    signal: deadline,
+  });
 
   if (url.toLowerCase().startsWith('magnet:')) {
     return client.createTask({ url });
   }
   if (isTorrentFile(download) && !isTorrentUrl(url)) {
-    const content = await fetchTorrentFile(deps.fetch, url, settings.forwardCookies);
+    const content = await fetchTorrentFile(deps.fetch, url, settings.forwardCookies, deadline);
     const resolved = await client.resolveContent(content, download.fileName || undefined);
     return client.createTask({ url: resolved.url, resolvedSource: resolved });
   }
@@ -96,17 +104,53 @@ async function readCookies(deps, url, storeId) {
   }
 }
 
-async function fetchTorrentFile(fetchImpl, url, includeCookies) {
-  const response = await fetchImpl(url, {
-    credentials: includeCookies ? 'include' : 'omit',
-    signal: AbortSignal.timeout(TORRENT_FETCH_TIMEOUT_MS),
-  });
-  if (!response.ok) {
-    throw new Error(`Couldn't fetch the torrent file (HTTP ${response.status})`);
+async function fetchTorrentFile(fetchImpl, url, includeCookies, deadline) {
+  try {
+    const response = await fetchImpl(url, {
+      credentials: includeCookies ? 'include' : 'omit',
+      signal: deadline ?? AbortSignal.timeout(TORRENT_FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new Error(`Couldn't fetch the torrent file (HTTP ${response.status})`);
+    }
+    return await readAtMost(response, MAX_TORRENT_BYTES);
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      throw new Error('Timed out fetching the torrent file', { cause: error });
+    }
+    throw error;
   }
-  const content = new Uint8Array(await response.arrayBuffer());
-  if (content.byteLength > MAX_TORRENT_BYTES) {
-    throw new Error('The torrent file is too large');
+}
+
+/**
+ * Reads a response body, giving up as soon as it exceeds `limit`, so a mislabeled or endless
+ * response can't exhaust memory.
+ */
+async function readAtMost(response, limit) {
+  const tooLarge = () => new Error('The torrent file is too large');
+  if (Number(response.headers.get('Content-Length')) > limit) {
+    await response.body?.cancel();
+    throw tooLarge();
+  }
+  if (!response.body) return new Uint8Array(0);
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  const content = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    content.set(chunk, offset);
+    offset += chunk.byteLength;
   }
   return content;
 }

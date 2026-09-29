@@ -11,6 +11,18 @@ function recordingFetch(respond) {
   return { calls, fetch };
 }
 
+/** A fetch that never answers until its request is aborted. */
+function hangingFetch(url, init) {
+  return new Promise((resolve, reject) => {
+    // AbortSignal.timeout doesn't keep Node's event loop alive; this timer does.
+    const keepAlive = setTimeout(() => {}, 5_000);
+    init.signal.addEventListener('abort', () => {
+      clearTimeout(keepAlive);
+      reject(init.signal.reason);
+    });
+  });
+}
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -60,10 +72,17 @@ describe('KetchClient', () => {
   });
 
   test('a server that never answers times out', async () => {
-    const fetch = (url, init) => new Promise((resolve, reject) => {
-      init.signal.addEventListener('abort', () => reject(init.signal.reason));
+    const client = new KetchClient(
+      { url: 'http://10.0.0.1:8642' }, { fetch: hangingFetch, timeoutMs: 10 });
+    await assert.rejects(client.status(), { kind: FailureKind.TIMEOUT });
+  });
+
+  test('a shared deadline ends a request before its own timeout', async () => {
+    const client = new KetchClient({ url: 'http://10.0.0.1:8642' }, {
+      fetch: hangingFetch,
+      timeoutMs: 60_000,
+      signal: AbortSignal.timeout(10),
     });
-    const client = new KetchClient({ url: 'http://10.0.0.1:8642' }, { fetch, timeoutMs: 10 });
     await assert.rejects(client.status(), { kind: FailureKind.TIMEOUT });
   });
 

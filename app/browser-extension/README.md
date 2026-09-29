@@ -114,7 +114,7 @@ Chromium build, so it can be loaded as is while developing:
   Temporary Add-on** and select `build/firefox/manifest.json`.
 
 ```shell
-npm test        # unit tests, with Node's built-in test runner (Node 22+)
+npm test        # unit tests, with Node's built-in test runner (Node 22.2+)
 npm run build   # build/chrome, build/firefox and a zip of each for the stores
 ```
 

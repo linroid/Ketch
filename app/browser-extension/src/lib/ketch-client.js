@@ -38,16 +38,20 @@ export class KetchClient {
   #token;
   #fetch;
   #timeoutMs;
+  #signal;
 
   /**
    * @param {{ url: string, token?: string }} instance
-   * @param {{ fetch?: typeof fetch, timeoutMs?: number }} [options]
+   * @param {{ fetch?: typeof fetch, timeoutMs?: number, signal?: AbortSignal }} [options]
+   *   `timeoutMs` limits each request; `signal` aborts every request, e.g. at a deadline
+   *   shared by several of them
    */
   constructor(instance, options = {}) {
     this.#baseUrl = instance.url.replace(/\/+$/, '');
     this.#token = instance.token ?? '';
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.#signal = options.signal;
   }
 
   /** @returns {Promise<object>} the server's `KetchStatus` */
@@ -103,6 +107,8 @@ export class KetchClient {
       headers['Content-Type'] = 'application/octet-stream';
     }
     const doFetch = this.#fetch;
+    const timeout = AbortSignal.timeout(this.#timeoutMs);
+    const signal = this.#signal ? AbortSignal.any([timeout, this.#signal]) : timeout;
     let response;
     try {
       response = await doFetch(`${this.#baseUrl}${path}`, {
@@ -110,7 +116,7 @@ export class KetchClient {
         headers,
         body,
         credentials: 'omit',
-        signal: AbortSignal.timeout(this.#timeoutMs),
+        signal,
       });
     } catch (error) {
       if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {

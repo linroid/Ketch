@@ -1,21 +1,31 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { sendToKetch } from '../src/lib/handoff.js';
+import { MAX_TORRENT_BYTES, sendToKetch } from '../src/lib/handoff.js';
 import { normalizeSettings } from '../src/lib/settings.js';
 
 const instance = { id: 'nas', name: 'NAS', url: 'http://nas:8642', token: '' };
 const settings = normalizeSettings({ instances: [instance] });
 const TORRENT_BYTES = new TextEncoder().encode('d8:announce0:e');
 
+const TORRENT_DOWNLOAD = {
+  url: 'https://tracker.example/download.php?id=7',
+  fileName: 'ubuntu.torrent',
+  mime: 'application/x-bittorrent',
+};
+
 /** A browser and a Ketch server in one fetch: requests to nas:8642 go to Ketch. */
-function fakeDeps({ cookies = [{ name: 'sid', value: '42' }], getCookies } = {}) {
+function fakeDeps({
+  cookies = [{ name: 'sid', value: '42' }],
+  getCookies,
+  siteResponse = () => new Response(TORRENT_BYTES),
+} = {}) {
   const ketchCalls = [];
   const siteCalls = [];
   const cookieQueries = [];
   const fetch = async (url, init = {}) => {
     if (!url.startsWith(instance.url)) {
       siteCalls.push({ url, init });
-      return new Response(TORRENT_BYTES);
+      return siteResponse(init);
     }
     const body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
     ketchCalls.push({ path: url.slice(instance.url.length), body });
@@ -106,11 +116,7 @@ describe('sendToKetch', () => {
     async () => {
       const { deps, ketchCalls, siteCalls } = fakeDeps();
 
-      await sendToKetch(instance, {
-        url: 'https://tracker.example/download.php?id=7',
-        fileName: 'ubuntu.torrent',
-        mime: 'application/x-bittorrent',
-      }, settings, { deps });
+      await sendToKetch(instance, TORRENT_DOWNLOAD, settings, { deps });
 
       assert.equal(siteCalls.length, 1);
       assert.equal(siteCalls[0].init.credentials, 'include');
@@ -124,6 +130,62 @@ describe('sendToKetch', () => {
         },
       });
     });
+
+  test('gives up on a stalled .torrent fetch at the hand-off deadline', async () => {
+    const { deps, ketchCalls } = fakeDeps({
+      siteResponse: (init) => new Promise((resolve, reject) => {
+        // AbortSignal.timeout doesn't keep Node's event loop alive; this timer does.
+        const keepAlive = setTimeout(() => {}, 5_000);
+        init.signal.addEventListener('abort', () => {
+          clearTimeout(keepAlive);
+          reject(init.signal.reason);
+        });
+      }),
+    });
+    const started = Date.now();
+
+    await assert.rejects(
+      sendToKetch(instance, TORRENT_DOWNLOAD, settings, { deps, timeoutMs: 20 }),
+      /Timed out fetching the torrent file/,
+    );
+    assert.ok(Date.now() - started < 1_000);
+    assert.deepEqual(ketchCalls, []);
+  });
+
+  test('stops reading a .torrent response once it exceeds the size limit', async () => {
+    const chunk = new Uint8Array(1024 * 1024);
+    let pulls = 0;
+    const { deps, ketchCalls } = fakeDeps({
+      siteResponse: () => new Response(new ReadableStream({
+        pull(controller) {
+          pulls++;
+          if (pulls > 64) controller.close();
+          else controller.enqueue(chunk);
+        },
+      })),
+    });
+
+    await assert.rejects(
+      sendToKetch(instance, TORRENT_DOWNLOAD, settings, { deps }),
+      /too large/,
+    );
+    assert.ok(pulls <= MAX_TORRENT_BYTES / chunk.length + 2, `read ${pulls} chunks`);
+    assert.deepEqual(ketchCalls, []);
+  });
+
+  test('rejects a .torrent response that declares a size over the limit', async () => {
+    const { deps, ketchCalls } = fakeDeps({
+      siteResponse: () => new Response(TORRENT_BYTES, {
+        headers: { 'Content-Length': String(MAX_TORRENT_BYTES + 1) },
+      }),
+    });
+
+    await assert.rejects(
+      sendToKetch(instance, TORRENT_DOWNLOAD, settings, { deps }),
+      /too large/,
+    );
+    assert.deepEqual(ketchCalls, []);
+  });
 
   test('lets Ketch fetch a .torrent link it recognizes, with the browser headers', async () => {
     const { deps, ketchCalls, siteCalls } = fakeDeps();
