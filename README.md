@@ -11,9 +11,9 @@
 <p align="center">
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.10-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.20-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-4c8dec?logo=kotlin&logoColor=white)](https://kotlinlang.org/docs/multiplatform.html)
-[![Ktor](https://img.shields.io/badge/Ktor-3.4.0-087CFA.svg?logo=ktor&logoColor=white)](https://ktor.io)
+[![Ktor](https://img.shields.io/badge/Ktor-3.5.2-087CFA.svg?logo=ktor&logoColor=white)](https://ktor.io)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Android](https://img.shields.io/badge/Android-26+-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com)
 [![iOS](https://img.shields.io/badge/iOS-supported-000000.svg?logo=apple&logoColor=white)](https://developer.apple.com)
@@ -27,8 +27,8 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 
 - **Embed it** — Add downloads to your Android, iOS, or Desktop app with a simple API
 - **Run it as a daemon** — Self-hosted download server with REST API and real-time SSE events
-- **Control it remotely** — Manage a daemon from any client (mobile app, web UI, CLI, or AI agent)
-- **Extend it** — Pluggable architecture for custom protocols (FTP, BitTorrent, HLS, and more on the roadmap)
+- **Control it remotely** — Manage a daemon from any client (desktop or mobile app, or the web UI)
+- **Extend it** — Pluggable architecture for custom protocols (FTP and BitTorrent ship as modules; HLS and more on the roadmap)
 
 > [!WARNING]
 > 🚧 **Work in Progress** — This project is under active development. APIs may change. Contributions and feedback are welcome!
@@ -46,10 +46,11 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Scheduling** `✅` -- Schedule downloads for a specific time, after a delay, or based on conditions
 - **Automatic retry** `✅` -- Automatically retry failed downloads with smart backoff
 - **Daemon server** `✅` -- Run as a background service with REST API and real-time events
-- **Remote control** `✅` -- Manage a remote server from any client (mobile, desktop, web, or CLI)
+- **Remote control** `✅` -- Manage a remote server from any client (mobile, desktop, or web)
 - **Pluggable architecture** `✅` -- Swap out HTTP engines, storage backends, and download sources
 - **FTP/FTPS** `✅` -- Download from FTP servers with segmented parallel transfers and resume
-- **BitTorrent & Magnet** -- [Pure Kotlin v1 downloads](docs/torrent.md) on JVM, Android, and iOS
+- **BitTorrent & Magnet** -- [Pure Kotlin v1, v2 and hybrid downloads](docs/torrent.md) on JVM,
+  Android, and iOS
 - **Metalink** `🔜` -- Multi-source downloads with mirrors, checksums, and chunk verification
 - **WebDAV** `🔜` -- Download from WebDAV servers with resume support
 - **HLS streaming** `🔜` -- Download and merge HTTP Live Streaming videos
@@ -58,8 +59,10 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **Browser extension** `✅` -- [Send downloads, links and magnet links](app/browser-extension/)
   from Chrome, Edge, Firefox and other browsers to Ketch on this computer or a remote server
 - **AI-driven discovery** `🚧` -- Find download links from natural language queries using an
-  [LLM agent you configure in the app](docs/ai-discovery.md) (OpenAI, Anthropic, Gemini, Ollama)
-- **MCP server** `🔜` -- Expose Ketch capabilities as tools for AI agents via Model Context Protocol
+  [LLM agent you configure in the app](docs/ai-discovery.md) (OpenAI, Anthropic, Gemini, Ollama,
+  or any OpenAI-compatible endpoint), or with `ketch ai-discover`
+- **MCP server** `🚧` -- Expose Ketch capabilities as tools for AI agents via Model Context Protocol
+  with [`ketch mcp`](cli/README.md#mcp-server)
 
 ## Getting Started
 
@@ -77,9 +80,6 @@ dependencies {
 
 Start downloading:
 
-To distribute HTTP segments across Wi-Fi, Ethernet, or Android cellular networks, see
-[multiple network interfaces](docs/multiple-networks.md).
-
 ```kotlin
 val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
@@ -92,7 +92,7 @@ val ketch = Ketch(
 val task = ketch.download(
   DownloadRequest(
     url = "https://example.com/large-file.zip",
-    directory = "/path/to/downloads",
+    destination = Destination("/path/to/downloads/"),
   )
 )
 
@@ -103,12 +103,15 @@ task.state.collect { state ->
       val p = state.progress
       println("${(p.percent * 100).toInt()}%  ${p.bytesPerSecond / 1024} KB/s")
     }
-    is DownloadState.Completed -> println("Done: ${state.filePath}")
+    is DownloadState.Completed -> println("Done: ${state.outputPath}")
     is DownloadState.Failed -> println("Error: ${state.error}")
     else -> {}
   }
 }
 ```
+
+To distribute HTTP segments across Wi-Fi, Ethernet, or Android cellular networks, see
+[multiple network interfaces](docs/multiple-networks.md).
 
 See [Installation](docs/api.md) for version catalog setup, optional modules (SQLite persistence, Kermit logging, remote client), and the full API reference.
 
@@ -153,7 +156,8 @@ Supported platforms: **macOS** (x64, arm64), **Linux** (x64, arm64), **Windows**
 The [browser extension](app/browser-extension/) hands downloads from Chrome, Edge, Brave, Opera,
 Firefox and other browsers to Ketch. It captures downloads you start, adds **Download with Ketch**
 to the context menu, and takes over magnet links. It can send to the Ketch app on this computer
-(turn on Settings → Remote access → Server) and to any number of remote servers.
+(turn on Settings → Remote access → Server, or run `ketch server`) and to any number of remote
+servers.
 
 ## How It Works
 
@@ -164,6 +168,7 @@ to the context menu, and takes over magnet links. It can send to the Ketch app o
 5. **Throttle** -- Token-bucket speed limiter controls bandwidth per task and globally
 6. **Persist** -- Segment progress is saved to `TaskStore` so pause/resume works across restarts
 7. **Resume** -- On resume, validates server identity (ETag/Last-Modified) and file integrity, then continues
+   (servers without range support restart from the beginning)
 
 ## Documentation
 
@@ -171,7 +176,9 @@ to the context menu, and takes over magnet links. It can send to the Ketch app o
 - [API Reference](docs/api.md) -- Installation, module interfaces, configuration, error handling, and logging
 - [Logging](docs/logging.md) -- Logging system and configuration
 - [AI discovery](docs/ai-discovery.md) -- Providers, tokens, web search, and environment variables
-- [CLI](cli/README.md) -- Command-line interface for downloads and running the daemon
+- [BitTorrent](docs/torrent.md) -- Torrent and magnet support, configuration, and limitations
+- [Multiple networks](docs/multiple-networks.md) -- Distributing downloads across network interfaces
+- [CLI](cli/README.md) -- Command-line interface for downloads, the daemon, MCP, and AI discovery
 - [Browser extension](app/browser-extension/README.md) -- Setup, capture rules, permissions, and development
 
 ## Contributing

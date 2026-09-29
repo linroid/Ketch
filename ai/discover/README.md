@@ -11,6 +11,8 @@ them for safety, and returns a ranked list of candidates.
 
 The module depends on `library:api` and `config` (for the persisted
 `AiSettings`) — it is independent from the server and remote modules.
+It is a JVM module (Koog, Ktor CIO) used by the desktop and Android apps
+and the CLI.
 
 ## Architecture
 
@@ -39,6 +41,8 @@ ai/discover/
 │
 ├── search/                      # Web search abstraction
 │   ├── SearchProvider.kt        # Interface
+│   ├── BingSearchProvider.kt    # Bing Web Search API
+│   ├── GoogleSearchProvider.kt  # Google Programmable Search
 │   └── DummySearchProvider.kt   # No-op fallback
 │
 └── site/                        # Site profiling
@@ -134,10 +138,13 @@ ResourceDiscoveryService.discover()
 - Blocked if final score < 0.3
 
 ### Other Protections
-- Rate limiting: per-domain delays + global concurrent cap
-- Content size caps: 2 MB per fetch, 20 MB per request
-- robots.txt compliance
+- Content size cap: 2 MB per fetch
+- Budgets: the system prompt allows 6 searches, 10 page fetches and 15 HEAD
+  requests, and `AgentConfig.maxIterations` caps the agent's tool calls
 - Prompt injection defense: fetched content treated as untrusted data
+- Not wired in yet: `RateLimiter` (per-domain delays + global cap), robots.txt
+  checks from `SiteProfiler`, and the per-request limits marked in
+  [Configuration](#configuration)
 
 ## Usage
 
@@ -165,6 +172,8 @@ val result = aiModule.discoveryService.discover(
 for (candidate in result.candidates) {
   println("${candidate.title}: ${candidate.url}")
 }
+
+aiModule.close() // releases the module's HTTP clients
 ```
 
 ### With Progress Listener
@@ -221,11 +230,12 @@ sections are engine tuning knobs.
 | `AgentConfig` | `maxIterations` | `30` | Max agent tool-call iterations |
 | | `temperature` | `0.2` | LLM sampling temperature |
 | `FetcherConfig` | `maxContentBytes` | `2 MB` | Max content per fetch |
-| | `requestTimeoutMs` | `15000` | HTTP timeout |
-| | `maxFetchesPerRequest` | `20` | Fetch budget per discovery |
-| `DiscoveryConfig` | `maxConcurrentRequests` | `3` | Global concurrent cap |
+| | `requestTimeoutMs` | `15000` | HTTP timeout for fetches and search |
+| | `maxFetchesPerRequest` | `20` | Fetch budget per discovery (not enforced yet) |
+| | `maxTotalBytesPerRequest` | `20 MB` | Byte budget per discovery (not enforced yet) |
+| `DiscoveryConfig` | `maxConcurrentRequests` | `3` | Global concurrent cap (not enforced yet) |
 | | `userAgent` | `"KetchBot/1.0"` | User-Agent header |
-| | `allowedDomains` | `[]` | Domain allowlist (empty = all public) |
+| | `allowedDomains` | `[]` | Allowlist for `validateUrl`, plus `DiscoverQuery.sites` (empty = all public) |
 
 ## Testing
 
@@ -237,20 +247,22 @@ Tests cover:
 - `LlmClientFactoryTest` — provider/model resolution, endpoint normalization
 - `AiSettingsEnvTest` — environment credential fallbacks
 - `UrlValidatorTest` — SSRF protection (20 tests)
-- `RobotsTxtParserTest` — robots.txt parsing (13 tests)
-- `ContentExtractorTest` — HTML extraction (7 tests)
+- `RobotsTxtParserTest` — robots.txt parsing (11 tests)
+- `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)
 - `AgentOutputParserTest` — agent output parsing + validation (9 tests)
+- `BingSearchProviderTest`, `GoogleSearchProviderTest` — query building; their
+  `*IntegrationTest` classes parse responses from a mock engine
 
 ## Roadmap
 
-- [ ] **Real search provider** — integrate a web search API (Google Custom Search,
-  Brave Search, or SearXNG) to replace `DummySearchProvider`
+- [x] **Real search provider** — `BingSearchProvider` and `GoogleSearchProvider`
+  replace `DummySearchProvider` once configured
 - [ ] **Streaming step events** — expose `DiscoveryStepListener` callbacks as
   SSE events for real-time UI updates during discovery
-- [ ] **Download integration** — after discovery, allow one-click download of
-  selected candidates via `KetchApi.download()`
+- [x] **Download integration** — the apps download selected candidates via
+  `KetchApi.download()`
 - [ ] **Caching** — cache fetched page content and HEAD results to avoid
   redundant requests across similar queries
 - [ ] **Site-aware discovery** — leverage `SiteProfiler` data (sitemaps, RSS feeds)
