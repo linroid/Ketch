@@ -23,6 +23,21 @@ Hands downloads from your browser to Ketch, on this computer or on a remote serv
 
 Safari has no downloads API for extensions, so it isn't supported.
 
+## Installing
+
+Each [GitHub release](https://github.com/linroid/Ketch/releases) includes
+`ketch-extension-<version>-chrome.zip` and `ketch-extension-<version>-firefox.zip`. Until the
+extension is in the browser stores:
+
+- **Chromium browsers**: unzip the Chrome package, open `chrome://extensions` (or
+  `edge://extensions`), turn on **Developer mode**, choose **Load unpacked** and select the
+  unzipped folder.
+- **Firefox**: release versions of Firefox only install add-ons signed by Mozilla, and the
+  Firefox package is what gets submitted to addons.mozilla.org for signing. Until it is signed,
+  load it for the current session from `about:debugging#/runtime/this-firefox` with **Load
+  Temporary Add-on**, or install it in Firefox Developer Edition or Nightly with
+  `xpinstall.signatures.required` set to `false` in `about:config`.
+
 ## Setting up Ketch
 
 The extension talks to Ketch's REST API, so the Ketch server must be running:
@@ -115,13 +130,19 @@ Chromium build, so it can be loaded as is while developing:
 
 ```shell
 npm test        # unit tests, with Node's built-in test runner (Node 22.2+)
-npm run build   # build/chrome, build/firefox and a zip of each for the stores
+npm run build   # build/chrome, build/firefox and a zip of each
 ```
 
 The build copies `src/`, rewrites the manifest for Firefox (an event page instead of a service
 worker, plus its add-on id), checks that every file the manifest names exists, and zips each
 build. Keep `version` in `package.json` and `src/manifest.json` the same; the build fails
 otherwise. The icons are rendered from `art/icon-app.svg` by `art/render-icons.sh`.
+
+For a release tag, the release workflow runs `node build.mjs --version <version> --build <run
+number>` and attaches the zips to the GitHub release. Browsers only accept versions made of
+numbers, so `0.0.1-rc12` becomes `0.0.1.<run number>` in the manifests, and Chromium shows
+`0.0.1-rc12` as the version name. The run number makes every release newer than the one before,
+including a final release after its release candidates, which the stores require for updates.
 
 | Path | Contents |
 |---|---|

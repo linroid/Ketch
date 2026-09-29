@@ -123,6 +123,7 @@ Download the latest apps from [GitHub Releases](https://github.com/linroid/Ketch
 | Linux (x64, arm64) | `.deb` |
 | Windows (x64, arm64) | `.msi` |
 | iOS | Build from [source](app/ios/) via Xcode |
+| Browser extension (Chromium, Firefox) | `.zip` ([how to install](app/browser-extension/README.md#installing)) |
 
 ### CLI / Server
 

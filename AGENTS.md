@@ -236,7 +236,8 @@ cli/          # JVM CLI entry point
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no
   dependencies. `src/` loads unpacked in Chromium; `node build.mjs` writes `build/chrome`,
-  `build/firefox` (event page instead of service worker, gecko id) and store zips
+  `build/firefox` (event page instead of service worker, gecko id) and zips, which the release
+  workflow attaches to GitHub releases (manifest version: the tag's numbers plus the run number)
 - Talks to the daemon REST API (`POST /api/tasks`, `/api/resolve/content`, `/api/status`) of
   one or more instances: Ketch on this computer (`http://127.0.0.1:8642`) and remote servers,
   each with an optional bearer token. Captured downloads and magnets go to the default one
