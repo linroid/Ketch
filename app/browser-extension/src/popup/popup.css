@@ -1,0 +1,154 @@
+body {
+  width: 360px;
+  padding: 0 0 12px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface);
+}
+
+.instance-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#instance-picker {
+  flex: 1;
+  width: auto;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+
+.connection {
+  padding: 10px 12px 0;
+}
+
+.connection-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--danger-container);
+}
+
+.add {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 0;
+}
+
+.add-message {
+  margin: 6px 12px 0;
+}
+
+.add-message[data-tone="error"] {
+  color: var(--danger);
+}
+
+.capture {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.capture-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.recent h2 {
+  margin: 14px 12px 4px;
+  color: var(--text-sec);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tasks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 6px 12px;
+}
+
+.task:hover {
+  background: var(--hover);
+}
+
+.task-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-state {
+  grid-column: 1;
+  overflow: hidden;
+  color: var(--text-sec);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task[data-tone="done"] .task-state {
+  color: var(--success);
+}
+
+.task[data-tone="error"] .task-state {
+  color: var(--danger);
+}
+
+.task .icon {
+  grid-row: 1 / span 3;
+  grid-column: 2;
+}
+
+.progress {
+  grid-column: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line-soft);
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.task[data-tone="idle"] .progress > span {
+  background: var(--warning);
+}
+
+.empty {
+  margin: 4px 12px;
+}

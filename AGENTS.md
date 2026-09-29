@@ -49,6 +49,7 @@ app/
   desktop/    # Desktop (JVM) app
   web/        # Wasm browser app
   ios/        # Native iOS app (Xcode project, consumes shared module)
+  browser-extension/  # Chromium/Firefox extension that sends downloads to Ketch (plain JS)
 cli/          # JVM CLI entry point
 ```
 
@@ -232,6 +233,20 @@ cli/          # JVM CLI entry point
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
 
+### Browser Extension (`app/browser-extension`)
+- Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no
+  dependencies. `src/` loads unpacked in Chromium; `node build.mjs` writes `build/chrome`,
+  `build/firefox` (event page instead of service worker, gecko id) and store zips
+- Talks to the daemon REST API (`POST /api/tasks`, `/api/resolve/content`, `/api/status`) of
+  one or more instances: Ketch on this computer (`http://127.0.0.1:8642`) and remote servers,
+  each with an optional bearer token. Captured downloads and magnets go to the default one
+- Captures browser downloads (Chromium holds them in `onDeterminingFilename`, Firefox pauses
+  them) and falls back to the browser when Ketch fails; context menus per instance; a content
+  script sends trusted magnet link clicks
+- Forwards cookies, referrer and user agent as `DownloadRequest.headers`; `.torrent` downloads
+  whose URL Ketch would not recognize are fetched and resolved via `resolveContent`
+- Unit tests run with `node --test` in `app/browser-extension`; see its README
+
 ### Logging System
 - `Logger.None` (default, zero overhead), `Logger.console()`, `KermitLogger`
 - Platform-specific console: Logcat (Android); timestamped println elsewhere, with errors on
@@ -344,7 +359,5 @@ Planned features not yet implemented:
    supporting various media sites and extractors
 5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
-6. **Browser Extension** - Browser extension for intercepting and managing downloads
-   directly from the browser, integrating with the Ketch daemon server
-7. **MCP Server** - Expose Ketch capabilities as tools for AI agents via Model Context
+6. **MCP Server** - Expose Ketch capabilities as tools for AI agents via Model Context
    Protocol

@@ -1,0 +1,202 @@
+/* Shared by the popup and options page. Colors follow the app's KetchPalette (Signal accent). */
+:root {
+  color-scheme: light dark;
+  --bg: #f7f8fc;
+  --surface: #ffffff;
+  --panel: #f0f3f9;
+  --hover: #edeff0;
+  --line: #d8dfea;
+  --line-soft: #e6eaf2;
+  --text: #182238;
+  --text-sec: #58667c;
+  --accent: #4f5de4;
+  --accent-container: #e9ecff;
+  --on-accent: #ffffff;
+  --success: #237b43;
+  --warning: #996300;
+  --danger: #c73349;
+  --danger-container: #fce4e5;
+  --radius: 8px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101214;
+    --surface: #16191b;
+    --panel: #1b1d20;
+    --hover: #1f2225;
+    --line: #2b2e32;
+    --line-soft: #222427;
+    --text: #f0f2f4;
+    --text-sec: #a1a5a9;
+    --accent: #319cfc;
+    --accent-container: #01345e;
+    --on-accent: #ffffff;
+    --success: #54b66e;
+    --warning: #e6ac3d;
+    --danger: #f05f5a;
+    --danger-container: #3a1b1b;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 var(--font);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+}
+
+button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+button.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-sec);
+}
+
+button.icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+input[type="text"],
+input[type="url"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+/* A checkbox drawn as a switch; keeps native semantics and keyboard support. */
+input.switch {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 10px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+input.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s;
+}
+
+input.switch:checked {
+  background: var(--accent);
+}
+
+input.switch:checked::after {
+  transform: translateX(14px);
+}
+
+.status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-sec);
+}
+
+.status-dot[data-state="online"] {
+  background: var(--success);
+}
+
+.status-dot[data-state="offline"] {
+  background: var(--danger);
+}
+
+.muted {
+  color: var(--text-sec);
+}
+
+.error-text {
+  color: var(--danger);
+}
