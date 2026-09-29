@@ -49,12 +49,18 @@ import java.awt.Desktop
 import java.io.File
 import java.net.InetAddress
 import java.util.concurrent.Executors
+import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
 private val isMac = System.getProperty("os.name").startsWith("Mac")
 
 fun main(args: Array<String>) {
   val configDir = defaultConfigDir()
+  if (args.firstOrNull() == NativeMessagingHost.FLAG) {
+    // Started by a browser for the Ketch extension, not by the user.
+    runNativeMessagingHost(File(configDir))
+    return
+  }
   val incoming = IncomingDownloads()
   // Raised when a later launch hands over its files, to bring the window forward.
   val focusRequests = MutableSharedFlow<Unit>(
@@ -70,9 +76,13 @@ fun main(args: Array<String>) {
   }
 
   val launchFiles = fileArguments(args.toList())
+  val extensionServer = BrowserExtensionServer()
   val singleInstance = SingleInstance.acquire(
     File(configDir),
     launchFiles.map { it.path },
+    onRequest = { request ->
+      if (request == NativeMessagingHost.CONNECT_REQUEST) extensionServer.connect() else null
+    },
   ) { forwarded ->
     open(fileArguments(forwarded))
     focusRequests.tryEmit(Unit)
@@ -90,9 +100,25 @@ fun main(args: Array<String>) {
   val logger = Logger.combine(Logger.console(logLevel), fileLogger)
   installOpenFileHandler(::open)
   open(launchFiles)
+  registerNativeHost(File(configDir), logger)
 
   application {
-    KetchWindow(configDir, incoming, focusRequests, singleInstance, logger, fileLogger)
+    KetchWindow(
+      configDir, incoming, focusRequests, singleInstance, extensionServer, logger, fileLogger
+    )
+  }
+}
+
+/** Lets the browser extension find this app; see [NativeHostRegistration]. */
+private fun registerNativeHost(configDir: File, logger: Logger) {
+  thread(isDaemon = true, name = "ketch-native-host-registration") {
+    try {
+      val home = File(System.getProperty("user.home"))
+      val registered = NativeHostRegistration(configDir, home).register()
+      logger.d("[NativeHost] Registered for the browser extension: $registered")
+    } catch (e: Exception) {
+      logger.w("[NativeHost] Couldn't register for the browser extension", e)
+    }
   }
 }
 
@@ -102,6 +128,7 @@ private fun ApplicationScope.KetchWindow(
   incoming: IncomingDownloads,
   focusRequests: Flow<Unit>,
   singleInstance: SingleInstance,
+  extensionServer: BrowserExtensionServer,
   logger: Logger,
   fileLogger: FileLogger,
 ) {
@@ -131,7 +158,7 @@ private fun ApplicationScope.KetchWindow(
             name = instanceName,
             logger = logger,
             additionalSources = listOf(FtpDownloadSource(), torrentSource),
-          )
+          ).also(extensionServer::attach)
         },
         localServerFactory = { ketchApi ->
           // Reloaded here so a restart from Settings picks up the
@@ -172,6 +199,7 @@ private fun ApplicationScope.KetchWindow(
       }
     }
     onDispose {
+      extensionServer.close()
       instanceManager.close()
       singleInstance.close()
     }

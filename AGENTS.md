@@ -239,8 +239,15 @@ cli/          # JVM CLI entry point
   `build/firefox` (event page instead of service worker, gecko id) and zips, which the release
   workflow attaches to GitHub releases (manifest version: the tag's numbers plus the run number)
 - Talks to the daemon REST API (`POST /api/tasks`, `/api/resolve/content`, `/api/status`) of
-  one or more instances: Ketch on this computer (`http://127.0.0.1:8642`) and remote servers,
-  each with an optional bearer token. Captured downloads and magnets go to the default one
+  one or more instances: the Ketch app on this computer and servers (`ketch server`, other
+  devices), each with an optional bearer token. Captured downloads and magnets go to the
+  default one
+- The Ketch desktop app is reached through the native messaging host `com.linroid.ketch`, its own
+  launcher run with `--native-messaging-host` (`app/desktop`: `NativeMessagingHost`,
+  `NativeHostRegistration`, `BrowserExtensionServer`). The host asks the running app over
+  `SingleInstance`, opening it if needed, for a loopback-only `KetchServer` on a free port with a
+  per-run token, separate from the Settings server. The app registers the host with installed
+  browsers on every launch; the Chromium extension id is pinned by the manifest `key`
 - Captures browser downloads (Chromium holds them in `onDeterminingFilename`, Firefox pauses
   them) and falls back to the browser when Ketch fails; context menus per instance; a content
   script sends trusted magnet link clicks
