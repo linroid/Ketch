@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ketch</title>
+  <link rel="stylesheet" href="../ui/common.css">
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="popup.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <img src="../icons/icon-32.png" alt="" width="20" height="20">
+    <span id="instance-name" class="instance-name">Ketch</span>
+    <select id="instance-picker" aria-label="Ketch instance" hidden></select>
+    <button id="open-options" class="icon" type="button" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/>
+        <circle cx="15" cy="6" r="2"/>
+        <circle cx="9" cy="12" r="2"/>
+        <circle cx="17" cy="18" r="2"/>
+      </svg>
+    </button>
+  </header>
+
+  <section class="connection" aria-live="polite">
+    <div class="connection-line">
+      <span id="status-dot" class="status-dot"></span>
+      <span id="status-text" class="muted">Connecting…</span>
+    </div>
+    <p id="status-hint" class="hint" hidden></p>
+  </section>
+
+  <form id="add-form" class="add">
+    <input id="add-url" type="text" placeholder="Paste a link or magnet link" autocomplete="off"
+           spellcheck="false" aria-label="Link to download">
+    <button id="add-button" class="primary" type="submit">Download</button>
+  </form>
+  <p id="add-message" class="add-message" role="status" hidden></p>
+
+  <label class="capture">
+    <span class="capture-text">
+      Capture browser downloads
+      <small id="capture-target" class="muted" hidden></small>
+    </span>
+    <input id="capture" class="switch" type="checkbox" role="switch">
+  </label>
+
+  <section id="recent" class="recent" hidden>
+    <h2>Recent</h2>
+    <ul id="tasks" class="tasks"></ul>
+    <p id="tasks-empty" class="muted empty" hidden>No downloads yet.</p>
+  </section>
+</body>
+</html>

@@ -55,7 +55,8 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **HLS streaming** `🔜` -- Download and merge HTTP Live Streaming videos
 - **Media extraction** `🔜` -- Extract and download media from websites (like yt-dlp)
 - **Resource sniffer** `🔜` -- Detect downloadable resources from web pages
-- **Browser extension** `🔜` -- Intercept and manage downloads directly from your browser
+- **Browser extension** `✅` -- [Send downloads, links and magnet links](app/browser-extension/)
+  from Chrome, Edge, Firefox and other browsers to Ketch on this computer or a remote server
 - **AI-driven discovery** `🚧` -- Find download links from natural language queries using an
   [LLM agent you configure in the app](docs/ai-discovery.md) (OpenAI, Anthropic, Gemini, Ollama)
 - **MCP server** `🔜` -- Expose Ketch capabilities as tools for AI agents via Model Context Protocol
@@ -122,6 +123,7 @@ Download the latest apps from [GitHub Releases](https://github.com/linroid/Ketch
 | Linux (x64, arm64) | `.deb` |
 | Windows (x64, arm64) | `.msi` |
 | iOS | Build from [source](app/ios/) via Xcode |
+| Browser extension (Chromium, Firefox) | `.zip` ([how to install](app/browser-extension/README.md#installing)) |
 
 ### CLI / Server
 
@@ -146,6 +148,13 @@ ketch server --config /path/to/config.toml
 
 Supported platforms: **macOS** (x64, arm64), **Linux** (x64, arm64), **Windows** (x64). See the [CLI documentation](cli/README.md) for all commands, flags, and config file reference.
 
+### Browser Extension
+
+The [browser extension](app/browser-extension/) hands downloads from Chrome, Edge, Brave, Opera,
+Firefox and other browsers to Ketch. It captures downloads you start, adds **Download with Ketch**
+to the context menu, and takes over magnet links. It can send to the Ketch app on this computer
+(turn on Settings → Remote access → Server) and to any number of remote servers.
+
 ## How It Works
 
 1. **Resolve** -- Query the download source (HEAD request for HTTP) to get size, range support, identity headers
@@ -163,6 +172,7 @@ Supported platforms: **macOS** (x64, arm64), **Linux** (x64, arm64), **Windows**
 - [Logging](docs/logging.md) -- Logging system and configuration
 - [AI discovery](docs/ai-discovery.md) -- Providers, tokens, web search, and environment variables
 - [CLI](cli/README.md) -- Command-line interface for downloads and running the daemon
+- [Browser extension](app/browser-extension/README.md) -- Setup, capture rules, permissions, and development
 
 ## Contributing
 

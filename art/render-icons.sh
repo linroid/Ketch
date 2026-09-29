@@ -42,6 +42,11 @@ iconutil -c icns "$tmp/icon.iconset" -o icon.icns
 # iOS: an opaque square, the system applies the mask
 render icon-square.svg 1024 "$root/app/ios/Assets.xcassets/AppIcon.appiconset/icon-1024.png"
 
+# Browser extension
+for size in 16 32 48 128; do
+  render icon-app.svg "$size" "$root/app/browser-extension/src/icons/icon-$size.png"
+done
+
 # Web app
 render icon-app.svg 192 "$web/icon-192.png"
 render icon-app.svg 512 "$web/icon-512.png"

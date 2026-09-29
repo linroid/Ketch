@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ketch extension settings</title>
+  <link rel="stylesheet" href="../ui/common.css">
+  <link rel="stylesheet" href="options.css">
+  <script type="module" src="options.js"></script>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <img src="../icons/icon-48.png" alt="" width="40" height="40">
+      <div>
+        <h1>Ketch</h1>
+        <p class="muted">Send downloads from this browser to Ketch on this computer or a remote
+          server.</p>
+      </div>
+      <span id="saved" class="saved muted" role="status" hidden>Saved</span>
+    </header>
+
+    <div id="permission-banner" class="banner" hidden>
+      <p>Ketch needs access to websites to capture their downloads, send their cookies, and
+        reach your Ketch servers.</p>
+      <button id="grant-access" class="primary" type="button">Allow access</button>
+    </div>
+
+    <section>
+      <h2>Ketch instances</h2>
+      <p class="muted">Captured downloads and magnet links go to the default instance. Right-click
+        a link, image or video to send it to any of them.</p>
+      <div id="instances" class="instances"></div>
+      <button id="add-instance" type="button">Add remote instance</button>
+    </section>
+
+    <section>
+      <h2>Browser downloads</h2>
+      <label class="row">
+        <span class="row-text">Capture downloads
+          <small class="muted">Downloads you start in the browser go to Ketch instead. If Ketch
+            can't be reached, the browser downloads them as usual.</small>
+        </span>
+        <input id="intercept-downloads" class="switch" type="checkbox" role="switch">
+      </label>
+      <label class="row">
+        <span class="row-text">Leave small files to the browser
+          <small class="muted">Files smaller than this stay in the browser. Files of unknown size
+            always go to Ketch. 0 sends everything.</small>
+        </span>
+        <span class="size-field">
+          <input id="min-file-size" type="number" min="0" step="1" inputmode="decimal">
+          <span class="muted">MB</span>
+        </span>
+      </label>
+      <label class="row stacked">
+        <span class="row-text">Sites to leave to the browser
+          <small class="muted">One per line. Includes their subdomains, so example.com also
+            covers downloads.example.com.</small>
+        </span>
+        <textarea id="excluded-hosts" rows="3" spellcheck="false"
+                  placeholder="example.com"></textarea>
+      </label>
+      <label class="row">
+        <span class="row-text">Send cookies and referrer
+          <small class="muted">Lets Ketch download files that need you to be signed in. Ketch
+            stores them with the task so it can resume it later.</small>
+        </span>
+        <input id="forward-cookies" class="switch" type="checkbox" role="switch">
+      </label>
+    </section>
+
+    <section>
+      <h2>Links and notifications</h2>
+      <label class="row">
+        <span class="row-text">Send clicked magnet links to Ketch
+          <small class="muted">Alt+click a magnet link to open it in another app instead.</small>
+        </span>
+        <input id="capture-magnet-links" class="switch" type="checkbox" role="switch">
+      </label>
+      <label class="row">
+        <span class="row-text">Notify when a download is sent
+          <small class="muted">Problems are always shown.</small>
+        </span>
+        <input id="notifications" class="switch" type="checkbox" role="switch">
+      </label>
+    </section>
+
+    <section class="help">
+      <h2>Setting up Ketch</h2>
+      <dl>
+        <dt>On this computer</dt>
+        <dd>Open the Ketch app, go to Settings → Remote access and turn on <b>Server</b>. Turn
+          on <b>Start automatically</b> so the extension works whenever Ketch is open. With the
+          command line, run <code>ketch server</code>.</dd>
+        <dt>On another device</dt>
+        <dd>On that device, turn on <b>Server</b> and <b>Allow other devices</b>, then generate
+          an access token. Add the device here with its address, such as
+          <code>http://192.168.1.20:8642</code>, and the token. For <code>ketch server</code>,
+          set <code>apiToken</code> in its config.toml.</dd>
+      </dl>
+    </section>
+  </main>
+
+  <template id="instance-template">
+    <article class="instance">
+      <div class="instance-head">
+        <span class="status-dot"></span>
+        <input class="instance-name" type="text" aria-label="Name" placeholder="Name">
+        <label class="default-choice">
+          <input type="radio" name="default-instance"> Default
+        </label>
+      </div>
+      <div class="fields">
+        <label>Address
+          <input class="instance-url" type="text" placeholder="http://192.168.1.20:8642"
+                 spellcheck="false" autocomplete="off">
+        </label>
+        <label>Access token
+          <input class="instance-token" type="password" placeholder="Not required"
+                 autocomplete="off">
+        </label>
+      </div>
+      <p class="instance-status muted"></p>
+      <p class="instance-note" hidden>This address isn't encrypted: the access token and any
+        cookies sent with downloads travel over the network in plain text. Prefer https, or use it
+        only on a network you trust.</p>
+      <div class="instance-actions">
+        <button class="test" type="button">Test connection</button>
+        <button class="remove danger" type="button">Remove</button>
+      </div>
+    </article>
+  </template>
+</body>
+</html>

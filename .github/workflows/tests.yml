@@ -147,6 +147,43 @@ jobs:
           name: test-results-js
           path: '**/build/test-results/**/TEST-*.xml'
 
+  extension-tests:
+    name: Browser Extension Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/browser-extension
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run unit tests
+        run: |
+          mkdir -p build/test-results
+          node --test \
+            --test-reporter=spec --test-reporter-destination=stdout \
+            --test-reporter=junit --test-reporter-destination=build/test-results/TEST-browser-extension.xml
+
+      - name: Build Chromium and Firefox packages
+        run: node build.mjs
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-extension
+          path: app/browser-extension/build/*.zip
+          if-no-files-found: error
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-extension
+          path: app/browser-extension/build/test-results/TEST-*.xml
+
   torrent-desktop-tests:
     name: Torrent filesystem (${{ matrix.os }})
     strategy:
@@ -207,7 +244,7 @@ jobs:
   required-checks:
     name: Required Checks
     runs-on: ubuntu-24.04
-    needs: [ jvm-tests, android-tests, ios-tests, js-tests, torrent-desktop-tests, torrent-device-tests, publish-results ]
+    needs: [ jvm-tests, android-tests, ios-tests, js-tests, extension-tests, torrent-desktop-tests, torrent-device-tests, publish-results ]
     if: always()
     steps:
       - name: Require every test job to succeed on this revision
@@ -225,7 +262,7 @@ jobs:
   publish-results:
     name: Publish Test Results
     runs-on: ubuntu-latest
-    needs: [ jvm-tests, android-tests, ios-tests, js-tests, torrent-desktop-tests, torrent-device-tests ]
+    needs: [ jvm-tests, android-tests, ios-tests, js-tests, extension-tests, torrent-desktop-tests, torrent-device-tests ]
     if: always()
     steps:
       - name: Download test results
