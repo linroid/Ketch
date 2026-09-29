@@ -14,10 +14,10 @@ host = "0.0.0.0"
 port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
-# corsAllowedHosts = ["http://localhost:3000"]
+# corsAllowedHosts = ["localhost:3000"]  # host[:port] without a scheme, or "*"
 
 [download]
-# defaultDirectory = "~/Downloads"
+# defaultDirectory = "~/Downloads"  # ~ is your home folder
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
 maxConcurrentDownloads = 2

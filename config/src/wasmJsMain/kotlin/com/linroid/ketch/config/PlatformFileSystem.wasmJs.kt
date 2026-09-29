@@ -6,3 +6,5 @@ internal actual val platformFileSystem: FileSystem
   get() = throw UnsupportedOperationException(
     "FileSystem is not supported on Wasm/JS platform"
   )
+
+internal actual val userHomeDirectory: String? = null

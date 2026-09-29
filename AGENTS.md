@@ -225,13 +225,27 @@ cli/          # JVM CLI entry point
 - `ServerConfig`: host, port, API token, CORS, mDNS, `autoStart` (apps start
   the server on launch)
 - `RemoteConfig`: pre-configured remote server connections
-- `FileConfigStore`: platform-specific file persistence via okio
+- `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
+  `download.defaultDirectory` expands to the home directory when the file is loaded
 
 ### Daemon Server (`server/`)
 - Ktor-based REST API: create, list, pause, resume, cancel downloads
 - SSE event stream for real-time state updates
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
+- `ketch server` restores the tasks saved in `ketch.db` on start; CORS hosts are `host[:port]`
+  without a scheme (Ktor's `allowHost` rejects one)
+
+### Native CLI (`cli/`)
+- Released as a GraalVM native binary; reflection and resource metadata lives in
+  `META-INF/native-image/<module>/` of the module that needs it (`cli`, `library:mcp` for the MCP
+  SDK and `KetchToolSet`, `ai:discover` for `DiscoveryToolSet`). Koog tool sets use kotlin-reflect,
+  so new tool methods may need the types in their signatures registered
+- `NativeImageConfigTest` (in `cli` and `library:mcp`) checks that the metadata names existing
+  classes and covers every serializable MCP SDK type; build with `./gradlew :cli:nativeCompile`
+  and exercise `ketch mcp` to verify changes
+- `ketch mcp` keeps stdout for the JSON-RPC stream and redirects `System.out` to stderr, so the
+  banner, the console logger and Logback never corrupt it
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no
