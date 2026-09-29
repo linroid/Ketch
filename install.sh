@@ -48,7 +48,7 @@ detect_arch() {
   arch="$(uname -m)"
   case "$arch" in
     x86_64|amd64)  echo "x64" ;;
-    aarch64|arm64) echo "aarch64" ;;
+    aarch64|arm64) echo "arm64" ;;
     *) error "Unsupported architecture: $arch" ;;
   esac
 }
@@ -109,7 +109,16 @@ main() {
 
   info "Downloading ${url}"
   if ! curl -fSL --progress-bar -o "${tmpdir}/${filename}" "$url"; then
-    error "Download failed. Check that version v${version} exists and has a CLI build for ${os}/${arch}."
+    # Releases up to v0.0.1-rc12 named ARM64 archives "aarch64".
+    if [ "$arch" != "arm64" ]; then
+      error "Download failed. Check that version v${version} exists and has a CLI build for ${os}/${arch}."
+    fi
+    filename="ketch-cli-${version}-${os}-aarch64.${ext}"
+    url="https://github.com/${REPO}/releases/download/v${version}/${filename}"
+    info "Retrying with the legacy archive name: ${url}"
+    if ! curl -fSL --progress-bar -o "${tmpdir}/${filename}" "$url"; then
+      error "Download failed. Check that version v${version} exists and has a CLI build for ${os}/${arch}."
+    fi
   fi
 
   info "Extracting..."

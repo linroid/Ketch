@@ -26,7 +26,7 @@ jobs:
           - name: macOS-arm64
             runner: macos-14
             os: macos
-            arch: aarch64
+            arch: arm64
             ext: tar.gz
           # Oracle GraalVM for JDK 21 stops at 21.0.9 on macOS Intel, which
           # cannot read the current reachability metadata; JDK 25 can.
@@ -44,7 +44,7 @@ jobs:
           - name: Linux-arm64
             runner: ubuntu-24.04-arm
             os: linux
-            arch: aarch64
+            arch: arm64
             ext: tar.gz
           - name: Windows-x64
             runner: windows-latest
