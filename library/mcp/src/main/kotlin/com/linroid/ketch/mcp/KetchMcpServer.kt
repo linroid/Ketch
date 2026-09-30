@@ -11,6 +11,8 @@ import kotlinx.coroutines.Job
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
+import java.io.InputStream
+import java.io.OutputStream
 
 /**
  * Exposes a [KetchApi] instance as an MCP (Model Context Protocol)
@@ -36,19 +38,26 @@ class KetchMcpServer(
 
   /**
    * Starts the MCP server using stdio transport.
-   * Reads JSON-RPC messages from stdin and writes responses to stdout.
+   * Reads JSON-RPC messages from [input] and writes responses to [output].
    * This is the standard transport for MCP clients like Claude Desktop.
    *
-   * This function suspends until stdin reaches end of input.
+   * Nothing else may write to [output]. A process that also logs to
+   * stdout can redirect `System.out` to stderr and pass the original
+   * stream here.
+   *
+   * This function suspends until [input] reaches end of input.
+   *
+   * @param input the stream to read requests from, stdin by default
+   * @param output the stream to write responses to, stdout by default
    */
-  suspend fun startStdio() {
-    val transport = StdioServerTransport(
-      System.`in`.asSource().buffered(),
-      System.out.asSink().buffered()
-    )
+  suspend fun startStdio(
+    input: InputStream = System.`in`,
+    output: OutputStream = System.out,
+  ) {
+    val transport = StdioServerTransport(input.asSource().buffered(), output.asSink().buffered())
     // The server only reports closing on an explicit close(), while the stdio
     // transport closes itself at end of input. Register before connecting so
-    // an already closed stdin is not missed.
+    // an input that is already at its end is not missed.
     val done = Job()
     transport.onClose { done.complete() }
     configureMcpServer(toolRegistry).createSession(transport)

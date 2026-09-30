@@ -15,6 +15,8 @@ ketch-ktor = { module = "com.linroid.ketch:ktor", version.ref = "ketch" }
 ketch-sqlite = { module = "com.linroid.ketch:sqlite", version.ref = "ketch" }
 ketch-kermit = { module = "com.linroid.ketch:kermit", version.ref = "ketch" }
 ketch-remote = { module = "com.linroid.ketch:remote", version.ref = "ketch" }
+ketch-ftp = { module = "com.linroid.ketch:ftp", version.ref = "ketch" }
+ketch-torrent = { module = "com.linroid.ketch:torrent", version.ref = "ketch" }
 ```
 
 ```kotlin
@@ -30,13 +32,17 @@ kotlin {
       implementation(libs.ketch.kermit)  // Kermit logging
       implementation(libs.ketch.remote)  // Remote client for daemon server
     }
-    // SQLite persistence (not available on WasmJs)
+    // Android, iOS and JVM only: SQLite persistence (add ketch.ftp and ketch.torrent the same way)
     androidMain.dependencies { implementation(libs.ketch.sqlite) }
     iosMain.dependencies { implementation(libs.ketch.sqlite) }
     jvmMain.dependencies { implementation(libs.ketch.sqlite) }
   }
 }
 ```
+
+`core` targets Android, iOS, JVM, JavaScript (Node.js) and WasmWasi; `ktor`, `sqlite`, `ftp` and
+`torrent` target Android, iOS and JVM. Browser (WasmJs) apps use `remote` to control a daemon
+instead of running the engine in-process.
 
 The optional Kermit integration supports Android, JVM, iOS, JavaScript, and WasmJs.
 It does not support WASI because Kermit 2.1.0 does not publish a WASI variant. Projects with
@@ -61,12 +67,25 @@ so UI code works identically regardless of backend:
 ```kotlin
 interface KetchApi {
   val tasks: StateFlow<List<DownloadTask>>
+  suspend fun start()  // core: restore persisted tasks; remote: connect and sync
   suspend fun download(request: DownloadRequest): DownloadTask
+  suspend fun resolve(url: String, properties: Map<String, String> = emptyMap()): ResolvedSource
+  suspend fun resolveContent(content: ByteArray, fileName: String? = null): ResolvedSource
+  suspend fun status(): KetchStatus
   suspend fun updateConfig(config: DownloadConfig)
   fun close()
-  // ... plus backendLabel, version
+  // ... plus backendLabel, torrents, networkInterfaces(), updateNetworkInterfaces()
 }
 ```
+
+Call `start()` once before use; persisted tasks only appear in `tasks` after it. The library
+version is available as `KetchApi.VERSION` and `KetchApi.REVISION`.
+
+`resolve(url)` probes a URL (for HTTP, a HEAD request) and returns its size, resume support,
+suggested file name and, for multi-file sources such as torrents, the selectable `files`.
+`resolveContent(bytes, fileName)` does the same for file content the caller already holds, such
+as a picked `.torrent` file. Pass the result as `DownloadRequest.resolvedSource` (with its `url`
+as the request URL) to skip the probe; `selectedFileIds` picks a subset of `files`.
 
 `KetchApi.download(...)` returns a `DownloadTask` for controlling an
 individual download. Tasks expose reactive state and per-task actions:
@@ -75,6 +94,8 @@ individual download. Tasks expose reactive state and per-task actions:
 interface DownloadTask {
   val taskId: String
   val request: DownloadRequest
+  val requestState: StateFlow<DownloadRequest>  // request including runtime changes
+  val createdAt: Instant
   val state: StateFlow<DownloadState>
   val segments: StateFlow<List<Segment>>
 
@@ -117,6 +138,25 @@ interface HttpEngine {
 }
 ```
 
+`Ketch` implements `KetchApi`. Everything except the `HttpEngine` has a default:
+
+```kotlin
+val ketch = Ketch(
+  httpEngine = KtorHttpEngine(),
+  taskStore = createSqliteTaskStore(driverFactory), // default: InMemoryTaskStore()
+  config = DownloadConfig(),
+  name = "Ketch",                                   // reported by status()
+  additionalSources = listOf(FtpDownloadSource(), TorrentDownloadSource()),
+  logger = Logger.console(),                        // default: Logger.None
+)
+ketch.start()
+```
+
+HTTP(S) is always handled by the built-in source. `additionalSources` adds other protocols:
+`FtpDownloadSource` from `library:ftp` and `TorrentDownloadSource` from `library:torrent` (see
+[BitTorrent downloads](torrent.md)), or your own `DownloadSource`. The first source whose
+`canHandle(url)` matches is used. `fileNameResolver` and `dispatchers` can also be replaced.
+
 ### `library:ktor`
 
 Ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
@@ -126,7 +166,8 @@ Ready-made `HttpEngine` backed by Ktor Client with per-platform engines:
 | Android | OkHttp |
 | iOS | Darwin |
 | Desktop | CIO |
-| WasmJs | Js |
+
+On JavaScript and WasmWasi, pass your own `HttpEngine` to `Ketch`.
 
 For downloading across multiple interfaces, wrap network-bound engines in
 `MultiNetworkHttpEngine`. JVM provides `KtorHttpEngine.forLocalAddress(InetAddress)`;
@@ -146,21 +187,29 @@ Selection is runtime-only. SDK instances enable these controls with
 
 ```kotlin
 DownloadConfig(
-  maxConnectionsPerDownload = 4,  // max concurrent segments per task
-  retryCount = 3,                 // retries per segment
+  defaultDirectory = null,        // null = platform default, e.g. ~/Downloads on JVM
+  maxConnectionsPerDownload = 4,  // default concurrent segments per task
+  retryCount = 3,                 // automatic retries after a retryable failure
   retryDelayMs = 1000,            // base delay (exponential backoff)
   progressIntervalMs = 200,       // progress throttle
-  bufferSize = 8192,              // read buffer size
-  speedLimit = SpeedLimit.kbps(500), // global speed limit
-  maxConcurrentDownloads = 3,     // max simultaneous downloads (0 = unlimited)
-  maxConnectionsPerHost = 4,      // per-host limit (0 = unlimited)
+  saveIntervalMs = 5000,          // how often segment progress is persisted
+  bufferSize = 8192,              // FTP read buffer size
+  speedLimit = SpeedLimit.kbps(500), // global speed limit (default: Unlimited)
+  maxConcurrentDownloads = 2,     // max simultaneous downloads (0 = unlimited)
+  maxConnectionsPerHost = 8,      // max simultaneous downloads per host (0 = unlimited)
 )
 ```
+
+The values shown are the defaults, except `speedLimit`. A `null` `defaultDirectory` resolves to
+`~/Downloads` on JVM, the app's external `Download` folder on Android and the app's Documents
+folder on iOS.
 
 `ketch.updateConfig(config)` replaces the configuration at runtime. `speedLimit`,
 `maxConcurrentDownloads` and `maxConnectionsPerHost` apply immediately: raising a queue limit
 starts queued downloads, lowering one lets running downloads finish. All other fields apply to
 downloads that start or resume afterwards; pause and resume a running download to pick them up.
+A changed `defaultDirectory` that does not exist or is not a folder is rejected with
+`IllegalArgumentException`, and the previous configuration stays in effect.
 
 The per-host limit counts downloads by URL host (case-insensitive, ignoring user info and port).
 Magnet links, `torrent:` identifiers and local files are not counted.
@@ -187,8 +236,8 @@ Priority does not reserve or weight bandwidth among active downloads. Use per-ta
 ketch.download(
   DownloadRequest(
     url = "https://example.com/urgent.zip",
-    directory = "/downloads",
-    priority = DownloadPriority.URGENT  // preempts lower-priority tasks
+    destination = Destination("/downloads/"),  // trailing slash: a directory
+    priority = DownloadPriority.URGENT,  // preempts lower-priority tasks
   )
 )
 
@@ -196,9 +245,9 @@ ketch.download(
 ketch.download(
   DownloadRequest(
     url = "https://example.com/file.zip",
-    directory = "/downloads",
+    destination = Destination("/downloads/file.zip"),  // full path, used as-is
     schedule = DownloadSchedule.AtTime(startAt),
-    conditions = listOf(wifiOnlyCondition)
+    conditions = listOf(DownloadCondition.Test(wifiConnected)),  // Flow<Boolean>
   )
 )
 
@@ -220,13 +269,19 @@ All errors are modeled as a sealed class `KetchError`:
 | Type | Retryable | Description |
 |---|---|---|
 | `Network` | Yes | Connection / timeout failures |
-| `Http(code)` | 5xx only | Non-success HTTP status |
+| `Http(code)` | 5xx and 429 | Non-success HTTP status |
 | `Disk` | No | File I/O failures |
-| `Unsupported` | No | Server doesn't support required features |
-| `ValidationFailed` | No | ETag / Last-Modified mismatch on resume |
+| `Unsupported` | No | Server or source doesn't support a required feature |
+| `FileChanged` | No | ETag / Last-Modified (or FTP MDTM) mismatch on resume |
+| `CorruptResumeState` | No | Persisted resume state cannot be read |
 | `SourceError` | No | Error from a pluggable download source |
+| `AuthenticationFailed` | No | Credentials rejected, e.g. FTP 530 |
 | `Canceled` | No | Download was canceled |
 | `Unknown` | No | Unexpected errors |
+
+`KetchError.isRetryable` tells which errors Ketch retries automatically, up to
+`DownloadConfig.retryCount` times with exponential backoff. On HTTP 429 it also honors
+`Retry-After` and reduces the task's connections.
 
 ## Logging
 
@@ -241,6 +296,11 @@ Ketch(httpEngine = KtorHttpEngine(), logger = Logger.console())
 
 // Kermit structured logging (production)
 Ketch(httpEngine = KtorHttpEngine(), logger = KermitLogger(minSeverity = Severity.Debug))
+
+// Several backends at once, each with its own level
+Ketch(httpEngine = KtorHttpEngine(), logger = Logger.combine(Logger.console(LogLevel.INFO), other))
 ```
+
+`Logger` and `LogLevel` live in `com.linroid.ketch.api.log` (`library:api`).
 
 See [Logging](logging.md) for detailed documentation.

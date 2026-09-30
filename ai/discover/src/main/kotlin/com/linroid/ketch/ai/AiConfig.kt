@@ -46,7 +46,7 @@ data class AiConfig(
  * only resolve settings the user has switched on.
  *
  * Search works the same way: the selected provider's blank key (and,
- * for Google, engine id) are filled from `BING_SEARCH_API_KEY`, or
+ * for Google, engine id) are filled from `BRAVE_SEARCH_API_KEY`, or
  * `GOOGLE_SEARCH_API_KEY` / `GOOGLE_SEARCH_CX`, keeping every saved
  * value and never switching providers. Only untouched settings let the
  * environment pick a search provider.
@@ -104,8 +104,8 @@ private fun resolveSearchFromEnv(
   return when (search.provider) {
     // A chosen provider only has its own blanks filled; saved values
     // and the choice itself always win.
-    SearchProvider.Bing -> search.copy(
-      apiKey = search.apiKey.ifBlank { env(BING_KEY).orEmpty() },
+    SearchProvider.Brave -> search.copy(
+      apiKey = search.apiKey.ifBlank { env(BRAVE_KEY).orEmpty() },
     )
     SearchProvider.Google -> search.copy(
       apiKey = search.apiKey.ifBlank { env(GOOGLE_KEY).orEmpty() },
@@ -115,12 +115,12 @@ private fun resolveSearchFromEnv(
     // while nothing has been configured — the CLI's "export and go".
     SearchProvider.None -> {
       if (base != AiSettings()) return search
-      val bing = env(BING_KEY)
+      val brave = env(BRAVE_KEY)
       val googleKey = env(GOOGLE_KEY)
       val googleCx = env(GOOGLE_CX)
       when {
-        bing != null ->
-          SearchSettings(provider = SearchProvider.Bing, apiKey = bing)
+        brave != null ->
+          SearchSettings(provider = SearchProvider.Brave, apiKey = brave)
         googleKey != null && googleCx != null -> SearchSettings(
           provider = SearchProvider.Google,
           apiKey = googleKey,
@@ -132,7 +132,7 @@ private fun resolveSearchFromEnv(
   }
 }
 
-private const val BING_KEY = "BING_SEARCH_API_KEY"
+private const val BRAVE_KEY = "BRAVE_SEARCH_API_KEY"
 private const val GOOGLE_KEY = "GOOGLE_SEARCH_API_KEY"
 private const val GOOGLE_CX = "GOOGLE_SEARCH_CX"
 
@@ -145,23 +145,28 @@ private val ENV_PROVIDER_ORDER = listOf(
 /**
  * Fetcher security settings.
  *
- * @param maxContentBytes max content size per fetch in bytes
+ * @param maxContentBytes max page body bytes read per fetch
  * @param requestTimeoutMs request timeout in milliseconds
- * @param maxFetchesPerRequest max fetches per discovery request
- * @param maxTotalBytesPerRequest max total bytes per discovery
+ * @param maxFetchesPerRequest page fetches and HEAD requests the agent
+ *   may make in one discovery run; the default fits the 10 page
+ *   fetches and 15 HEAD requests the agent is told to stay within
+ * @param maxTotalBytesPerRequest page body bytes the agent may read in
+ *   one discovery run
  */
 data class FetcherConfig(
   val maxContentBytes: Long = 2L * 1024 * 1024,
   val requestTimeoutMs: Long = 15_000,
-  val maxFetchesPerRequest: Int = 20,
+  val maxFetchesPerRequest: Int = 25,
   val maxTotalBytesPerRequest: Long = 20L * 1024 * 1024,
 )
 
 /**
  * Discovery orchestration limits.
  *
- * @param maxConcurrentRequests max concurrent discovery requests
- * @param userAgent User-Agent string for fetching
+ * @param maxConcurrentRequests max page and HEAD requests in flight at
+ *   once, across all discovery runs of an [AiModule]
+ * @param userAgent User-Agent string for fetching; the part before `/`
+ *   is the token matched against robots.txt
  * @param allowedDomains allowlisted domains; empty = allow all public
  */
 data class DiscoveryConfig(

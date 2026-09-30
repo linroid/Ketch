@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.RealDownloadTask
@@ -20,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 class RealDownloadTaskTest {
@@ -102,6 +104,34 @@ class RealDownloadTaskTest {
 
     assertNull(store.load(task.taskId))
     assertEquals(0, task.request.connections)
+  }
+
+  @Test
+  fun reschedule_terminalState_isIgnored() = runTest {
+    val request = DownloadRequest(url = "https://example.com/file")
+    val now = Instant.fromEpochMilliseconds(0)
+    val terminalStates = listOf(
+      DownloadState.Completed("/tmp/file"),
+      DownloadState.Failed(KetchError.Network()),
+      DownloadState.Canceled,
+    )
+    for (state in terminalStates) {
+      val task = RealDownloadTask(
+        taskId = "task",
+        request = request,
+        createdAt = now,
+        initialState = state,
+        initialSegments = emptyList(),
+        controller = UnusedController,
+        taskStore = InMemoryTaskStore(),
+        record = TaskRecord(taskId = "task", request = request, createdAt = now, updatedAt = now),
+      )
+
+      task.reschedule(DownloadSchedule.AfterDelay(1.minutes))
+
+      assertEquals(state, task.state.value)
+      assertEquals(DownloadSchedule.Immediate, task.request.schedule)
+    }
   }
 
   private fun pausedTask(store: InMemoryTaskStore, controller: TaskController): RealDownloadTask {

@@ -11,6 +11,8 @@ them for safety, and returns a ranked list of candidates.
 
 The module depends on `library:api` and `config` (for the persisted
 `AiSettings`) — it is independent from the server and remote modules.
+It is a JVM module (Koog, Ktor CIO) used by the desktop and Android apps
+and the CLI.
 
 ## Architecture
 
@@ -32,13 +34,16 @@ ai/discover/
 │   └── DiscoveryStepListener.kt # Progress callback interface
 │
 ├── fetch/                       # HTTP fetching with security
-│   ├── SafeFetcher.kt           # SSRF-protected GET + HEAD
+│   ├── SafeFetcher.kt           # SSRF-protected GET + HEAD, validated redirects
 │   ├── UrlValidator.kt          # SSRF protection (blocks private IPs, non-HTTP)
 │   ├── ContentExtractor.kt      # HTML → text extraction
-│   └── RateLimiter.kt           # Per-domain + global rate limiting
+│   ├── RateLimiter.kt           # Per-host spacing + global concurrency cap
+│   └── FetchBudget.kt           # Per-run request and byte allowance
 │
 ├── search/                      # Web search abstraction
 │   ├── SearchProvider.kt        # Interface
+│   ├── BraveSearchProvider.kt   # Brave Search API
+│   ├── GoogleSearchProvider.kt  # Google Custom Search JSON API
 │   └── DummySearchProvider.kt   # No-op fallback
 │
 └── site/                        # Site profiling
@@ -81,8 +86,8 @@ that follows a structured 5-phase workflow:
 |------|-------------|---------|
 | `searchWeb(query, maxResults)` | Web search | `SearchProvider.search()` |
 | `searchSites(sites, query, maxResults)` | Site-restricted search | `SearchProvider.search(sites=)` |
-| `fetchPage(url)` | Fetch + extract text and links | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
-| `headUrl(url)` | HTTP HEAD for metadata | `SafeFetcher.head()` |
+| `fetchPage(url)` | Fetch + extract text and links (honors robots.txt) | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
+| `headUrl(url)` | HTTP HEAD for metadata and the final URL after redirects | `SafeFetcher.head()` |
 | `extractDownloads(pageText, baseUrl)` | Extract download links from HTML | `LinkExtractor` |
 | `validateUrl(url)` | SSRF + allowlist check | `UrlValidator` |
 | `emitStep(title, details)` | Report progress to the user | `DiscoveryStepListener` |
@@ -121,7 +126,10 @@ ResourceDiscoveryService.discover()
 - Blocks private/local IPs (loopback, link-local, site-local, carrier-grade NAT)
 - Blocks internal hostnames (`.local`, `.internal`, `localhost`, single-word)
 - Only allows `http` and `https` schemes
-- Applied before every fetch and HEAD request
+- Applied to every request, including each redirect hop: the fetcher's
+  Ktor client has `followRedirects = false`, and `SafeFetcher` follows
+  up to 10 redirects itself, validating each target before requesting it,
+  so a public URL cannot redirect to a private or loopback address
 
 ### Device Safety (`DeviceSafetyFilter`)
 - Base score 0.7, adjusted by heuristics:
@@ -134,9 +142,26 @@ ResourceDiscoveryService.discover()
 - Blocked if final score < 0.3
 
 ### Other Protections
-- Rate limiting: per-domain delays + global concurrent cap
-- Content size caps: 2 MB per fetch, 20 MB per request
-- robots.txt compliance
+- Rate limiting (`RateLimiter`, shared by all runs of an `AiModule`):
+  at least 1 s between requests to the same host, and at most
+  `maxConcurrentRequests` requests in flight at once
+- Per-run budget (`FetchBudget`): `fetchPage` and `headUrl` share
+  `maxFetchesPerRequest` requests, and page bodies share
+  `maxTotalBytesPerRequest` bytes; once either is spent the tools return
+  an error telling the agent to stop fetching
+- Content size cap: 2 MB per fetch. Bodies are streamed, so the cap
+  holds for responses without a `Content-Length`
+- robots.txt: `fetchPage` refuses paths the site disallows for the
+  `KetchBot` token (the `User-Agent` up to its `/`), checking every
+  redirect hop against its own origin's rules. A group naming `KetchBot`
+  replaces the `*` groups, as RFC 9309 specifies. Each origin's
+  robots.txt is read once per run and does not count toward the budget.
+  A missing or unreadable robots.txt allows everything; `*` and `$`
+  wildcards in rules are not supported, and `Crawl-delay` is not applied.
+  `headUrl` checks of candidate links are not subject to robots.txt
+- The system prompt also asks for at most 6 searches; that limit is
+  advisory, since search calls are not counted. `AgentConfig.maxIterations`
+  caps the agent's tool calls overall
 - Prompt injection defense: fetched content treated as untrusted data
 
 ## Usage
@@ -165,6 +190,8 @@ val result = aiModule.discoveryService.discover(
 for (candidate in result.candidates) {
   println("${candidate.title}: ${candidate.url}")
 }
+
+aiModule.close() // releases the module's HTTP clients
 ```
 
 ### With Progress Listener
@@ -215,17 +242,18 @@ sections are engine tuning knobs.
 | | `apiKey` | `""` | Provider API token (not needed for Ollama) |
 | | `model` | `""` | Model id; blank = provider default |
 | | `baseUrl` | `""` | Endpoint; blank = provider default |
-| `SearchSettings` | `provider` | `None` | `None`, `Bing`, `Google` |
-| | `apiKey` | `""` | Search API key |
+| `SearchSettings` | `provider` | `None` | `None`, `Brave`, `Google` |
+| | `apiKey` | `""` | Brave subscription token or Google API key |
 | | `cx` | `""` | Google Programmable Search engine id |
 | `AgentConfig` | `maxIterations` | `30` | Max agent tool-call iterations |
 | | `temperature` | `0.2` | LLM sampling temperature |
-| `FetcherConfig` | `maxContentBytes` | `2 MB` | Max content per fetch |
-| | `requestTimeoutMs` | `15000` | HTTP timeout |
-| | `maxFetchesPerRequest` | `20` | Fetch budget per discovery |
-| `DiscoveryConfig` | `maxConcurrentRequests` | `3` | Global concurrent cap |
+| `FetcherConfig` | `maxContentBytes` | `2 MB` | Max page body per fetch |
+| | `requestTimeoutMs` | `15000` | HTTP timeout for fetches and search |
+| | `maxFetchesPerRequest` | `25` | Page fetches + HEAD requests per discovery run |
+| | `maxTotalBytesPerRequest` | `20 MB` | Page body bytes per discovery run |
+| `DiscoveryConfig` | `maxConcurrentRequests` | `3` | Requests in flight across all runs |
 | | `userAgent` | `"KetchBot/1.0"` | User-Agent header |
-| | `allowedDomains` | `[]` | Domain allowlist (empty = all public) |
+| | `allowedDomains` | `[]` | Allowlist for `validateUrl`, plus `DiscoverQuery.sites` (empty = all public) |
 
 ## Testing
 
@@ -237,20 +265,30 @@ Tests cover:
 - `LlmClientFactoryTest` — provider/model resolution, endpoint normalization
 - `AiSettingsEnvTest` — environment credential fallbacks
 - `UrlValidatorTest` — SSRF protection (20 tests)
-- `RobotsTxtParserTest` — robots.txt parsing (13 tests)
-- `ContentExtractorTest` — HTML extraction (7 tests)
+- `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps
+- `RateLimiterTest` — per-host spacing and the concurrency cap
+- `FetchBudgetTest` — per-run request and byte allowance
+- `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects
+- `BraveSearchProviderTest` — request shape and response parsing
+- `RobotsTxtParserTest` — robots.txt parsing (11 tests)
+- `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)
 - `AgentOutputParserTest` — agent output parsing + validation (9 tests)
+- `GoogleSearchProviderTest` — query building; `GoogleSearchProviderIntegrationTest`
+  parses responses from a mock engine
 
 ## Roadmap
 
-- [ ] **Real search provider** — integrate a web search API (Google Custom Search,
-  Brave Search, or SearXNG) to replace `DummySearchProvider`
+- [x] **Real search provider** — `BraveSearchProvider` and `GoogleSearchProvider`
+  replace `DummySearchProvider` once configured
+- [ ] **Keyless search provider** — Google's Custom Search JSON API is closed to
+  new customers and shuts down on 2027-01-01, leaving Brave as the only option;
+  a self-hosted SearXNG provider would work without an API key
 - [ ] **Streaming step events** — expose `DiscoveryStepListener` callbacks as
   SSE events for real-time UI updates during discovery
-- [ ] **Download integration** — after discovery, allow one-click download of
-  selected candidates via `KetchApi.download()`
+- [x] **Download integration** — the apps download selected candidates via
+  `KetchApi.download()`
 - [ ] **Caching** — cache fetched page content and HEAD results to avoid
   redundant requests across similar queries
 - [ ] **Site-aware discovery** — leverage `SiteProfiler` data (sitemaps, RSS feeds)
