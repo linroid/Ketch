@@ -125,8 +125,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
   `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`
 - `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
-  `RateLimiter`
-- `com.linroid.ketch.ai.search` -- `SearchProvider`, `BingSearchProvider`,
+  `RateLimiter`, `FetchBudget`
+- `com.linroid.ketch.ai.search` -- `SearchProvider`, `BraveSearchProvider`,
   `GoogleSearchProvider`, `DummySearchProvider`
 - `com.linroid.ketch.ai.site` -- `SiteProfiler`, `SiteProfile`, `SiteProfileStore`,
   `RobotsTxtParser`
