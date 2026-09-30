@@ -5,8 +5,9 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.Buffer
+import kotlinx.io.IOException
+import kotlinx.io.RawSink
 import kotlinx.io.RawSource
-import kotlinx.io.buffered
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
@@ -55,31 +56,60 @@ class KetchMcpServerTest {
     }
 
   @Test
-  fun `serveStdio stops when cancelled while the input is still open`() =
+  fun `serveStdio stops and closes the input when cancelled while the input is still open`() =
     runTest(timeout = 10.seconds) {
-      // A client that neither writes nor closes: the read blocks until the test releases it
-      val release = CountDownLatch(1)
-      val openInput = object : RawSource {
-        override fun readAtMostTo(sink: Buffer, byteCount: Long): Long {
-          release.await()
-          return -1L
-        }
-
-        override fun close() {}
-      }
+      val input = OpenInput()
       try {
         val job = launch(start = CoroutineStart.UNDISPATCHED) {
-          serveStdio(ToolRegistry {}, openInput.buffered(), Buffer())
+          serveStdio(ToolRegistry {}, input, Buffer())
         }
         job.cancel()
         job.join()
+
+        assertTrue(input.isClosed)
       } finally {
-        release.countDown()
+        input.close()
+      }
+    }
+
+  @Test
+  fun `serveStdio stops and closes the input when writing a reply fails`() =
+    runTest(timeout = 10.seconds) {
+      val input = OpenInput(INITIALIZE)
+      val brokenOutput = object : RawSink {
+        override fun write(source: Buffer, byteCount: Long) = throw IOException("Broken pipe")
+        override fun flush() {}
+        override fun close() {}
+      }
+      try {
+        serveStdio(ToolRegistry {}, input, brokenOutput)
+
+        assertTrue(input.isClosed)
+      } finally {
+        input.close()
       }
     }
 
   private fun input(vararg lines: String): Buffer =
     Buffer().apply { lines.forEach { writeString(it + "\n") } }
+
+  /**
+   * Input from a client that sends [lines] and then keeps its end open. Like a socket, a blocked
+   * read ends when the stream is closed.
+   */
+  private class OpenInput(vararg lines: String) : RawSource {
+    private val pending = Buffer().apply { lines.forEach { writeString(it + "\n") } }
+    private val closed = CountDownLatch(1)
+    val isClosed: Boolean get() = closed.count == 0L
+
+    override fun readAtMostTo(sink: Buffer, byteCount: Long): Long {
+      if (!pending.exhausted()) return pending.readAtMostTo(sink, byteCount)
+      closed.await()
+      throw IOException("Stream closed")
+    }
+
+    override fun close() = closed.countDown()
+  }
 
   private fun replies(output: Buffer): List<JsonObject> =
     output.readString().lines().filter { it.isNotBlank() }
