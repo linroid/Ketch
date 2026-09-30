@@ -48,8 +48,9 @@ val ketch = Ketch(
 
 ## Log Levels
 
-- **Verbose**: Detailed diagnostics (segment progress, FTP commands, per-peer torrent events)
-- **Debug**: Internal operations (server detection, tracker announces, DHT, swarm summaries)
+- **Verbose**: Detailed diagnostics (speed limiter waits, FTP commands, per-peer torrent events)
+- **Debug**: Internal operations (server detection, segments, tracker announces, DHT, swarm
+  summaries)
 - **Info**: User-facing events (download start, state changes, completion, torrent lifecycle)
 - **Warn**: Recoverable problems (retries, changed server files, corrupt torrent pieces)
 - **Error**: Failures (a download giving up, an engine that cannot start)
@@ -64,16 +65,17 @@ val ketch = Ketch(
 - Magnet metadata lookups and their timeouts
 
 ### Debug Level (Recommended for Development)
-- Server info detection and segment calculations
+- Server info detection, segment calculations, and each segment's start and completion
 - File preallocation and resume validation
 - Tracker announces per tracker, DHT bootstrap and lookups
 - A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers,
   newly discovered and failed peers, corrupt pieces
 
 ### Verbose Level (For Detailed Diagnostics)
-- Segment-level progress details and speed limiter waits
+- Speed limiter waits
 - FTP protocol commands and replies
 - Individual torrent peer disconnects and rejected incoming connections
+- Each progress event `RemoteKetch` receives from a server
 
 ## Log Format
 

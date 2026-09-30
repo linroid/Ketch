@@ -205,8 +205,8 @@ private fun ApplicationScope.KetchWindow(
 
 /**
  * Level for the console and the log file, from `KETCH_LOG_LEVEL` (`verbose`, `debug`, `info`,
- * `warn` or `error`). Defaults to debug; verbose adds per-segment, per-peer and protocol-level
- * lines.
+ * `warn` or `error`). Defaults to debug, which includes segment start and completion; verbose
+ * adds speed limiter waits, FTP commands and replies, and per-peer torrent detail.
  */
 private fun logLevel(): LogLevel {
   val name = System.getenv("KETCH_LOG_LEVEL")?.trim() ?: return LogLevel.DEBUG
