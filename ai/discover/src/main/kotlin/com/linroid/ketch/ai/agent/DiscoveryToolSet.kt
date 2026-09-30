@@ -5,6 +5,7 @@ import ai.koog.agents.core.tools.annotations.Tool
 import ai.koog.agents.core.tools.reflect.ToolSet
 import com.linroid.ketch.ai.DiscoverResult
 import com.linroid.ketch.ai.fetch.ContentExtractor
+import com.linroid.ketch.ai.fetch.FetchBudget
 import com.linroid.ketch.ai.fetch.FetchResult
 import com.linroid.ketch.ai.fetch.HeadResult
 import com.linroid.ketch.ai.fetch.SafeFetcher
@@ -12,13 +13,19 @@ import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.fetch.ValidationResult
 import com.linroid.ketch.ai.search.SearchProvider
 import com.linroid.ketch.ai.search.SearchResult
+import com.linroid.ketch.ai.site.RobotsTxtRules
+import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.net.URI
 import kotlin.time.Instant
 
 /**
@@ -27,6 +34,10 @@ import kotlin.time.Instant
  * Each `@Tool` method wraps an existing utility (search, fetch,
  * validate, etc.) and returns a JSON-encoded string the LLM can
  * reason over.
+ *
+ * One instance serves one discovery run: page fetches and HEAD
+ * requests draw on [budget], and page fetches honor each site's
+ * robots.txt, read once per origin for the run.
  */
 @LLMDescription("Resource discovery tools for finding downloadable files")
 internal class DiscoveryToolSet(
@@ -35,12 +46,17 @@ internal class DiscoveryToolSet(
   private val urlValidator: UrlValidator,
   private val contentExtractor: ContentExtractor,
   private val linkExtractor: LinkExtractor,
+  private val siteProfiler: SiteProfiler,
+  private val budget: FetchBudget,
   private val stepListener: DiscoveryStepListener,
   private val json: Json,
   private val allowedDomains: List<String>,
 ) : ToolSet {
 
   private val log = KetchLogger("DiscoveryToolSet")
+
+  private val robotsMutex = Mutex()
+  private val robotsByOrigin = mutableMapOf<String, RobotsTxtRules?>()
 
   /** Sources fetched during this discovery run. */
   val fetchedSources: MutableList<DiscoverResult.Source> =
@@ -104,23 +120,43 @@ internal class DiscoveryToolSet(
     @LLMDescription("URL to fetch")
     url: String,
   ): String {
-    log.d { "fetchPage: $url" }
-    when (val v = urlValidator.validate(url)) {
-      is ValidationResult.Blocked ->
-        return errorJson(v.reason)
-      is ValidationResult.Valid -> { /* ok */ }
+    log.d { "fetchPage: ${redactUrl(url)}" }
+    val uri = when (val v = urlValidator.validate(url)) {
+      is ValidationResult.Blocked -> return errorJson(v.reason)
+      is ValidationResult.Valid -> v.uri
     }
 
-    return when (val result = fetcher.fetch(url)) {
+    val allowance = budget.reserveBytes(fetcher.maxContentBytes)
+    if (allowance == 0L) {
+      return errorJson(
+        "Page content budget of ${budget.maxBytes} bytes for this discovery is spent. " +
+          "Stop fetching and return your results.",
+      )
+    }
+    if (!budget.tryTakeRequest()) {
+      budget.returnBytes(allowance)
+      return errorJson(requestBudgetSpent())
+    }
+    if (!robotsAllow(uri)) {
+      budget.returnBytes(allowance)
+      log.d { "fetchPage: robots.txt disallows ${redactUrl(url)}" }
+      return errorJson("The site's robots.txt disallows fetching this page")
+    }
+
+    val result = fetcher.fetch(url, allowance)
+    budget.returnBytes(allowance - ((result as? FetchResult.Success)?.byteCount ?: 0))
+    return when (result) {
       is FetchResult.Success -> {
+        // Relative links resolve against the page that was served.
+        val pageUrl = result.finalUrl
         val title = contentExtractor.extractTitle(result.content)
         val text = contentExtractor.extract(result.content)
-        val links = linkExtractor.extract(result.content, url)
+        val links = linkExtractor.extract(result.content, pageUrl)
 
         fetchedSources.add(
           DiscoverResult.Source(
-            url = url,
-            title = title.ifEmpty { url },
+            url = pageUrl,
+            title = title.ifEmpty { pageUrl },
             fetchedAt = Instant.fromEpochMilliseconds(
               System.currentTimeMillis()
             ),
@@ -128,7 +164,7 @@ internal class DiscoveryToolSet(
         )
 
         buildJsonObject {
-          put("url", url)
+          put("url", pageUrl)
           put("title", title)
           put("text", text.take(MAX_TEXT_LENGTH))
           put("links", buildJsonArray {
@@ -154,7 +190,12 @@ internal class DiscoveryToolSet(
     @LLMDescription("URL to check")
     url: String,
   ): String {
-    log.d { "headUrl: $url" }
+    log.d { "headUrl: ${redactUrl(url)}" }
+    when (val v = urlValidator.validate(url)) {
+      is ValidationResult.Blocked -> return errorJson(v.reason)
+      is ValidationResult.Valid -> { /* ok */ }
+    }
+    if (!budget.tryTakeRequest()) return errorJson(requestBudgetSpent())
     return when (val result = fetcher.head(url)) {
       is HeadResult.Success -> buildJsonObject {
         put("url", result.finalUrl)
@@ -250,6 +291,26 @@ internal class DiscoveryToolSet(
 
   private fun errorJson(reason: String): String {
     return buildJsonObject { put("error", reason) }.toString()
+  }
+
+  private fun requestBudgetSpent(): String =
+    "Request budget of ${budget.maxRequests} page fetches and HEAD requests for this " +
+      "discovery is spent. Stop fetching and return your results."
+
+  /** Whether robots.txt at the origin of [uri] lets us fetch it. */
+  private suspend fun robotsAllow(uri: URI): Boolean {
+    val port = if (uri.port == -1) "" else ":${uri.port}"
+    val origin = "${uri.scheme.lowercase()}://${uri.host.lowercase()}$port"
+    val rules = robotsMutex.withLock {
+      // A missing robots.txt is cached as null, which getOrPut would treat as absent.
+      if (origin in robotsByOrigin) {
+        robotsByOrigin[origin]
+      } else {
+        siteProfiler.fetchRobotsRules(origin).also { robotsByOrigin[origin] = it }
+      }
+    }
+    val path = uri.rawPath.ifEmpty { "/" } + uri.rawQuery?.let { "?$it" }.orEmpty()
+    return siteProfiler.isAllowed(path, rules)
   }
 
   companion object {

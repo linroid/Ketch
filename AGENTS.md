@@ -107,8 +107,9 @@ cli/          # JVM CLI entry point
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
   `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`
 - `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
-  `RateLimiter`
-- `com.linroid.ketch.ai.search` -- `SearchProvider`, `DummySearchProvider`
+  `RateLimiter`, `FetchBudget`
+- `com.linroid.ketch.ai.search` -- `SearchProvider`, `BraveSearchProvider`,
+  `GoogleSearchProvider`, `DummySearchProvider`
 - `com.linroid.ketch.ai.site` -- `SiteProfiler`, `SiteProfile`, `SiteProfileStore`,
   `RobotsTxtParser`
 
