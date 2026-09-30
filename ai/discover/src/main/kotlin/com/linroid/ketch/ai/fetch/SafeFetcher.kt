@@ -14,11 +14,12 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.URLBuilder
 import io.ktor.http.isSuccess
 import io.ktor.http.takeFrom
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.io.readByteArray
+import java.io.ByteArrayOutputStream
 
 /**
  * SSRF-protected HTTP fetcher that validates every URL it requests
@@ -165,7 +166,7 @@ internal class SafeFetcher(
     }
     // The body is streamed, so a response without Content-Length stops
     // at the limit instead of being buffered whole.
-    val bytes = response.bodyAsChannel().readRemaining(limit).readByteArray()
+    val bytes = response.bodyAsChannel().readAtMost(limit)
     log.d { "Fetched ${bytes.size} bytes from ${redactUrl(finalUrl)}" }
     return FetchResult.Success(
       url = url,
@@ -174,6 +175,23 @@ internal class SafeFetcher(
       statusCode = response.status.value,
       byteCount = bytes.size.toLong(),
     )
+  }
+
+  /**
+   * Reads until [limit] bytes or the end of the body. Ktor's
+   * `readRemaining(max)` is not used: it can return more than `max`
+   * when more data arrives while it copies.
+   */
+  private suspend fun ByteReadChannel.readAtMost(limit: Long): ByteArray {
+    val out = ByteArrayOutputStream()
+    val chunk = ByteArray(READ_CHUNK_BYTES)
+    while (out.size() < limit) {
+      val wanted = minOf(chunk.size.toLong(), limit - out.size()).toInt()
+      val read = readAvailable(chunk, 0, wanted)
+      if (read == -1) break
+      out.write(chunk, 0, read)
+    }
+    return out.toByteArray()
   }
 
   /** Resolves a possibly relative [location] the way Ktor's redirect plugin does. */
@@ -192,6 +210,7 @@ internal class SafeFetcher(
     private const val DEFAULT_MAX_CONTENT_BYTES = 2L * 1024 * 1024
     private const val DEFAULT_USER_AGENT = "KetchBot/1.0"
     private const val DEFAULT_MAX_REDIRECTS = 10
+    private const val READ_CHUNK_BYTES = 8 * 1024
     private val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
   }
 }
