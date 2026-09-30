@@ -5,8 +5,9 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandler
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.respondOk
-import io.ktor.client.engine.mock.respondRedirect
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -17,88 +18,128 @@ import kotlin.test.assertTrue
 
 class SafeFetcherTest {
 
-  private val dns = fakeDns(
-    "github.com" to "203.0.113.1",
-    "objects.githubusercontent.com" to "203.0.113.2",
-    "example.com" to "203.0.113.3",
-    "metadata.example" to "169.254.169.254",
+  private val validator = UrlValidator(
+    resolve = fakeDns(
+      "example.com" to "93.184.215.14",
+      "cdn.example.net" to "151.101.1.1",
+      "127.0.0.1" to "127.0.0.1",
+    ),
   )
 
-  private val requested = mutableListOf<String>()
+  private fun fetcher(engine: MockEngine, maxRedirects: Int = 10) = SafeFetcher(
+    httpClient = HttpClient(engine) { followRedirects = false },
+    urlValidator = validator,
+    rateLimiter = RateLimiter(delayMs = 0),
+    maxRedirects = maxRedirects,
+  )
 
-  private fun fetcher(handler: MockRequestHandler): SafeFetcher {
-    val engine = MockEngine { request ->
-      requested += request.url.toString()
-      handler(request)
-    }
-    return SafeFetcher(HttpClient(engine) { followRedirects = false }, UrlValidator(dns))
-  }
+  private fun engine(handler: MockRequestHandler) = MockEngine(handler)
+
+  private fun redirectTo(location: String) =
+    headersOf(HttpHeaders.Location, location)
+
+  private val MockEngine.requestedUrls: List<String>
+    get() = requestHistory.map { it.url.toString() }
 
   @Test
-  fun head_crossDomainRedirect_reportsRequestedAndFinalUrl() = runTest {
-    val asset = "https://github.com/owner/repo/releases/download/v1/app.zip"
-    val cdn = "https://objects.githubusercontent.com/assets/app.zip"
-    val fetcher = fetcher { request ->
-      if (request.url.host == "github.com") {
-        respondRedirect(cdn)
+  fun fetch_redirectToLoopback_isBlockedBeforeRequest() = runTest {
+    val engine = engine { request ->
+      if (request.url.host == "example.com") {
+        respond("", HttpStatusCode.Found, redirectTo("http://127.0.0.1/admin"))
       } else {
-        respond("", headers = headersOf(HttpHeaders.ContentLength, "1024"))
+        respond("internal secret")
       }
     }
 
-    val result = assertIs<HeadResult.Success>(fetcher.head(asset))
+    val result = fetcher(engine).fetch("https://example.com/start")
 
-    assertEquals(asset, result.url)
-    assertEquals(cdn, result.finalUrl)
-    assertEquals(1024L, result.contentLength)
+    val failed = assertIs<FetchResult.Failed>(result)
+    assertTrue(failed.reason.startsWith("Redirect blocked"), failed.reason)
+    assertEquals(listOf("https://example.com/start"), engine.requestedUrls)
   }
 
   @Test
-  fun fetch_relativeRedirect_resolvesAgainstCurrentUrl() = runTest {
-    val fetcher = fetcher { request ->
-      if (request.url.encodedPath == "/a/b") respondRedirect("c") else respond("final page")
+  fun fetch_redirectChain_followsRelativeAndAbsoluteHops() = runTest {
+    val engine = engine { request ->
+      when (request.url.toString()) {
+        "https://example.com/a" -> respond("", HttpStatusCode.MovedPermanently, redirectTo("/b"))
+        "https://example.com/b" ->
+          respond("", HttpStatusCode.Found, redirectTo("https://cdn.example.net/page"))
+        else -> respond("hello")
+      }
     }
 
-    val result = assertIs<FetchResult.Success>(fetcher.fetch("https://example.com/a/b"))
+    val result = fetcher(engine).fetch("https://example.com/a")
 
-    assertEquals("https://example.com/a/c", result.finalUrl)
-    assertEquals("final page", result.content)
+    val success = assertIs<FetchResult.Success>(result)
+    assertEquals("https://example.com/a", success.url)
+    assertEquals("https://cdn.example.net/page", success.finalUrl)
+    assertEquals("hello", success.content)
   }
 
   @Test
-  fun fetch_redirectToPrivateAddress_isBlockedBeforeRequest() = runTest {
-    val fetcher = fetcher { respondRedirect("http://metadata.example/latest/meta-data") }
+  fun head_redirect_reportsFinalUrl() = runTest {
+    val engine = engine { request ->
+      if (request.url.host == "example.com") {
+        respond(
+          "",
+          HttpStatusCode.TemporaryRedirect,
+          redirectTo("https://cdn.example.net/file.iso"),
+        )
+      } else {
+        respond("", HttpStatusCode.OK, headersOf(HttpHeaders.ContentLength, "1234"))
+      }
+    }
 
-    val result = assertIs<FetchResult.Failed>(fetcher.fetch("http://example.com/go"))
+    val result = fetcher(engine).head("https://example.com/download")
 
-    assertTrue(result.reason.startsWith("Redirect blocked"), result.reason)
-    assertEquals(listOf("http://example.com/go"), requested)
+    val success = assertIs<HeadResult.Success>(result)
+    assertEquals("https://cdn.example.net/file.iso", success.finalUrl)
+    assertEquals(1234L, success.contentLength)
+    assertTrue(engine.requestHistory.all { it.method == HttpMethod.Head })
   }
 
   @Test
-  fun fetch_httpsToHttpRedirect_isRefused() = runTest {
-    val fetcher = fetcher { respondRedirect("http://example.com/plain") }
+  fun fetch_redirectLoop_stopsAtHopLimit() = runTest {
+    val engine = engine { respond("", HttpStatusCode.Found, redirectTo("/loop")) }
 
-    assertIs<FetchResult.Failed>(fetcher.fetch("https://example.com/"))
-    assertEquals(listOf("https://example.com/"), requested)
+    val result = fetcher(engine, maxRedirects = 3).fetch("https://example.com/loop")
+
+    val failed = assertIs<FetchResult.Failed>(result)
+    assertTrue(failed.reason.startsWith("Too many redirects"), failed.reason)
+    // The first request plus three redirects.
+    assertEquals(4, engine.requestHistory.size)
   }
 
   @Test
-  fun fetch_redirectLoop_stopsAfterMaxRedirects() = runTest {
-    val fetcher = fetcher { respondRedirect("https://example.com/loop") }
+  fun fetch_bodyWithoutLength_isCutAtLimit() = runTest {
+    val engine = engine { respond("x".repeat(100)) }
 
-    val result = assertIs<FetchResult.Failed>(fetcher.fetch("https://example.com/loop"))
+    val result = fetcher(engine).fetch("https://example.com/page", maxBytes = 10)
 
-    assertTrue(result.reason.startsWith("Too many redirects"), result.reason)
-    // The first request plus five redirects.
-    assertEquals(6, requested.size)
+    val success = assertIs<FetchResult.Success>(result)
+    assertEquals(10L, success.byteCount)
+    assertEquals("x".repeat(10), success.content)
+  }
+
+  @Test
+  fun fetch_declaredLengthOverLimit_fails() = runTest {
+    val engine = engine {
+      respond("", HttpStatusCode.OK, headersOf(HttpHeaders.ContentLength, "5000"))
+    }
+
+    val result = fetcher(engine).fetch("https://example.com/big", maxBytes = 100)
+
+    val failed = assertIs<FetchResult.Failed>(result)
+    assertTrue(failed.reason.startsWith("Content too large"), failed.reason)
   }
 
   @Test
   fun constructor_clientFollowingRedirects_isRejected() {
+    // Ktor follows redirects by default, which would skip hop validation.
     val client = HttpClient(MockEngine { respondOk() })
     assertFailsWith<IllegalArgumentException> {
-      SafeFetcher(client, UrlValidator(dns))
+      SafeFetcher(httpClient = client, urlValidator = validator)
     }
   }
 }

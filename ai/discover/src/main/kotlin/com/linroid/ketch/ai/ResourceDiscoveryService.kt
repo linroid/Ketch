@@ -11,9 +11,11 @@ import com.linroid.ketch.ai.agent.DiscoveryToolSet
 import com.linroid.ketch.ai.agent.LinkExtractor
 import com.linroid.ketch.ai.agent.SiteAllowlist
 import com.linroid.ketch.ai.fetch.ContentExtractor
+import com.linroid.ketch.ai.fetch.FetchBudget
 import com.linroid.ketch.ai.fetch.SafeFetcher
 import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.search.SearchProvider
+import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.serialization.json.Json
 import kotlin.time.TimeSource
@@ -30,6 +32,7 @@ class ResourceDiscoveryService internal constructor(
   private val fetcher: SafeFetcher,
   private val urlValidator: UrlValidator,
   private val contentExtractor: ContentExtractor,
+  private val siteProfiler: SiteProfiler,
   private val config: AiConfig,
   private val stepListener: DiscoveryStepListener,
 ) {
@@ -86,6 +89,11 @@ class ResourceDiscoveryService internal constructor(
       urlValidator = urlValidator,
       contentExtractor = contentExtractor,
       linkExtractor = linkExtractor,
+      siteProfiler = siteProfiler,
+      budget = FetchBudget(
+        maxRequests = config.fetcher.maxFetchesPerRequest,
+        maxBytes = config.fetcher.maxTotalBytesPerRequest,
+      ),
       stepListener = stepListener,
       json = json,
       allowlist = allowlist,
@@ -203,6 +211,9 @@ class ResourceDiscoveryService internal constructor(
       |   Call emitStep() after each significant action.
       |   Budget: max 6 search calls, max 10 fetchPage, max 15 headUrl.
       |   Stop early when you have enough high-confidence candidates.
+      |   fetchPage and headUrl share a hard budget; once either reports
+      |   the budget is spent, stop fetching and go to SCORE & FILTER.
+      |   Pages disallowed by the site's robots.txt cannot be fetched.
       |
       |4. SCORE & FILTER
       |   Score each candidate on:

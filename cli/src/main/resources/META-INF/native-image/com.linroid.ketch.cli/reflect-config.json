@@ -126,13 +126,13 @@
     "allDeclaredMethods": true
   },
   {
-    "name": "com.linroid.ketch.api.config.DownloadConfig",
+    "name": "com.linroid.ketch.api.DownloadConfig",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "com.linroid.ketch.api.config.DownloadConfig$Companion",
+    "name": "com.linroid.ketch.api.DownloadConfig$Companion",
     "allDeclaredMethods": true
   },
   {

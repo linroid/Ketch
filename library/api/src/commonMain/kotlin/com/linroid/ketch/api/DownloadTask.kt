@@ -82,13 +82,15 @@ interface DownloadTask {
   /**
    * Reschedules this download with a new schedule and optional conditions.
    * Active downloads are paused (preserving progress) before rescheduling.
-   * Works from any non-terminal state. The new schedule is persisted in
+   * Works from any non-terminal state; calls in a [terminal][DownloadState.isTerminal]
+   * state (completed, failed or canceled) are ignored. The new schedule is persisted in
    * [request] and survives a restart; like [DownloadRequest.conditions],
    * the conditions themselves are not persisted.
    *
    * @param schedule the new schedule to apply
    * @param conditions optional conditions that must be met before starting
-   * @throws KetchError if the task is in a terminal state
+   * @throws UnsupportedOperationException if the implementation cannot
+   *   reschedule, such as a task of a remote Ketch instance
    */
   suspend fun reschedule(
     schedule: DownloadSchedule,

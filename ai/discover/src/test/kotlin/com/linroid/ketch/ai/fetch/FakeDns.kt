@@ -4,11 +4,13 @@ import java.net.InetAddress
 import java.net.UnknownHostException
 
 /**
- * A [Dns] that answers from [records] (host to IP literal) and fails
- * every other lookup, so tests never reach a real resolver.
+ * Resolves each host in [hosts] to its fixed IP literal without touching
+ * the network; any other host fails like an unknown name.
  */
-internal fun fakeDns(vararg records: Pair<String, String>): Dns {
-  // An IP literal is parsed, never looked up.
-  val table = records.associate { (host, ip) -> host.lowercase() to InetAddress.getByName(ip) }
-  return Dns { host -> listOf(table[host.lowercase()] ?: throw UnknownHostException(host)) }
+internal fun fakeDns(vararg hosts: Pair<String, String>): (String) -> Array<InetAddress> {
+  val addresses = hosts.toMap()
+  return { host ->
+    val ip = addresses[host] ?: throw UnknownHostException(host)
+    arrayOf(InetAddress.getByName(ip))
+  }
 }

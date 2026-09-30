@@ -14,21 +14,26 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.URLBuilder
 import io.ktor.http.isSuccess
 import io.ktor.http.takeFrom
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
-import kotlinx.io.readString
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import java.io.ByteArrayOutputStream
+import java.net.URI
 
 /**
- * SSRF-protected HTTP fetcher that validates URLs before fetching
+ * SSRF-protected HTTP fetcher that validates every URL it requests
  * and enforces content size limits.
  *
- * Redirects are followed here rather than by the client, so every hop
- * is validated before it is requested and an HTTPS URL is never
- * downgraded to HTTP.
+ * Redirects are followed here, one hop at a time, so that each target
+ * is validated before it is requested: a public URL must not be able
+ * to redirect to a private or loopback address. [httpClient] must
+ * therefore be built with `followRedirects = false`.
  *
- * @param httpClient Ktor HTTP client for making requests, built with
- *   `followRedirects = false`
+ * @param httpClient Ktor HTTP client that does not follow redirects
  * @param urlValidator validator for SSRF protection
+ * @param rateLimiter spaces requests per host and caps concurrent ones
  * @param maxContentBytes maximum bytes to read per fetch (default 2 MB)
  * @param userAgent User-Agent header value
  * @param maxRedirects maximum redirects followed per request
@@ -36,7 +41,8 @@ import kotlinx.io.readString
 internal class SafeFetcher(
   private val httpClient: HttpClient,
   private val urlValidator: UrlValidator,
-  private val maxContentBytes: Long = DEFAULT_MAX_CONTENT_BYTES,
+  private val rateLimiter: RateLimiter = RateLimiter(),
+  val maxContentBytes: Long = DEFAULT_MAX_CONTENT_BYTES,
   private val userAgent: String = DEFAULT_USER_AGENT,
   private val maxRedirects: Int = DEFAULT_MAX_REDIRECTS,
 ) {
@@ -50,33 +56,42 @@ internal class SafeFetcher(
   private val log = KetchLogger("SafeFetcher")
 
   /**
-   * Fetches the content at [url] after SSRF validation.
+   * Fetches the content at [url], reading at most [maxBytes] of the
+   * body (capped at the fetcher's per-fetch limit).
    *
+   * @param checkHop runs on every URL about to be requested, redirect
+   *   targets included, after SSRF validation; a non-null result is
+   *   why that URL must not be requested, and ends the fetch
    * @return [FetchResult.Success] with the content, or
    *   [FetchResult.Failed] with a reason
    */
-  suspend fun fetch(url: String): FetchResult {
+  suspend fun fetch(
+    url: String,
+    maxBytes: Long = maxContentBytes,
+    checkHop: suspend (URI) -> String? = { null },
+  ): FetchResult {
+    val limit = maxBytes.coerceIn(0, maxContentBytes)
+    val fail: (String) -> FetchResult = { FetchResult.Failed(url, it) }
     return try {
-      send(url, HttpMethod.Get, failed = { FetchResult.Failed(url, it) }) { finalUrl, response ->
-        readBody(url, finalUrl, response)
+      exchange(url, HttpMethod.Get, checkHop, fail) { finalUrl, response ->
+        readBody(url, finalUrl, response, limit)
       }
-    } catch (e: CancellationException) {
-      throw e
     } catch (e: Exception) {
+      if (e is CancellationException) currentCoroutineContext().ensureActive()
       log.w(e) { "Fetch failed for ${redactUrl(url)}" }
       FetchResult.Failed(url, e.message ?: "Unknown error")
     }
   }
 
   /**
-   * Performs an HTTP HEAD request on [url] after SSRF validation.
+   * Performs an HTTP HEAD request on [url].
    *
    * @return [HeadResult.Success] with response metadata, or
    *   [HeadResult.Failed] with a reason
    */
   suspend fun head(url: String): HeadResult {
     return try {
-      send(url, HttpMethod.Head, failed = { HeadResult.Failed(url, it) }) { finalUrl, response ->
+      exchange(url, HttpMethod.Head, fail = { HeadResult.Failed(url, it) }) { finalUrl, response ->
         if (!response.status.isSuccess()) {
           HeadResult.Failed(url, "HTTP ${response.status.value}")
         } else {
@@ -85,108 +100,132 @@ internal class SafeFetcher(
             finalUrl = finalUrl,
             statusCode = response.status.value,
             contentType = response.headers[HttpHeaders.ContentType],
-            contentLength = response.headers[HttpHeaders.ContentLength]
-              ?.toLongOrNull(),
+            contentLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull(),
             lastModified = response.headers[HttpHeaders.LastModified],
             etag = response.headers[HttpHeaders.ETag],
           )
         }
       }
-    } catch (e: CancellationException) {
-      throw e
     } catch (e: Exception) {
+      if (e is CancellationException) currentCoroutineContext().ensureActive()
       log.w(e) { "HEAD failed for ${redactUrl(url)}" }
       HeadResult.Failed(url, e.message ?: "Unknown error")
     }
   }
 
   /**
-   * Requests [url] with [method], following up to [maxRedirects]
-   * redirects, and hands the final response to [onResponse]. Every hop
-   * is validated before it is requested; a blocked hop, an HTTPS to
-   * HTTP downgrade or too many redirects end the request with [failed].
+   * Sends [method] to [url] and hands the first response that is not a
+   * redirect to [handle] along with the URL that produced it. Each hop
+   * is validated, then passed to [checkHop], before it is requested; a
+   * refused hop, or more than [maxRedirects] redirects, ends the
+   * exchange through [fail].
    */
-  private suspend fun <T> send(
+  private suspend fun <T> exchange(
     url: String,
     method: HttpMethod,
-    failed: (reason: String) -> T,
-    onResponse: suspend (finalUrl: String, response: HttpResponse) -> T,
+    checkHop: suspend (URI) -> String? = { null },
+    fail: (reason: String) -> T,
+    handle: suspend (finalUrl: String, response: HttpResponse) -> T,
   ): T {
     var current = url
-    for (hop in 0..maxRedirects) {
-      val validation = urlValidator.validate(current)
-      if (validation is ValidationResult.Blocked) {
-        val reason = if (hop == 0) validation.reason else "Redirect blocked: ${validation.reason}"
-        log.w { "URL blocked: $reason" }
-        return failed(reason)
+    for (redirects in 0..maxRedirects) {
+      val uri = when (val validation = urlValidator.validate(current)) {
+        is ValidationResult.Blocked -> {
+          log.w { "Blocked ${redactUrl(current)}: ${validation.reason}" }
+          return fail(
+            if (redirects == 0) validation.reason else "Redirect blocked: ${validation.reason}",
+          )
+        }
+        is ValidationResult.Valid -> validation.uri
       }
-      val step: Step<T> = httpClient.prepareRequest(current) {
-        this.method = method
-        header(HttpHeaders.UserAgent, userAgent)
-      }.execute { response ->
-        val location = response.headers[HttpHeaders.Location]
-        if (response.status.value in REDIRECT_CODES && location != null) {
-          Step.Redirect(location)
-        } else {
-          Step.Done(onResponse(current, response))
+      checkHop(uri)?.let { reason ->
+        log.d { "Refused ${redactUrl(current)}: $reason" }
+        return fail(if (redirects == 0) reason else "Redirect refused: $reason")
+      }
+      val hop = rateLimiter.withPermit(uri.host) {
+        httpClient.prepareRequest(current) {
+          this.method = method
+          header(HttpHeaders.UserAgent, userAgent)
+        }.execute { response ->
+          val location = response.headers[HttpHeaders.Location]
+          if (response.status.value in REDIRECT_CODES && location != null) {
+            Hop.Redirect(resolveLocation(current, location))
+          } else {
+            Hop.Done(handle(current, response))
+          }
         }
       }
-      when (step) {
-        is Step.Done -> return step.result
-        is Step.Redirect -> {
-          val next = URLBuilder(current).takeFrom(step.location).buildString()
-          if (isHttps(current) && !isHttps(next)) {
-            return failed("Redirect from HTTPS to a non-HTTPS URL refused")
-          }
-          log.d { "Redirect ${redactUrl(current)} -> ${redactUrl(next)}" }
-          current = next
+      when (hop) {
+        is Hop.Done -> return hop.value
+        is Hop.Redirect -> {
+          log.d { "Redirect ${redactUrl(current)} -> ${redactUrl(hop.location)}" }
+          current = hop.location
         }
       }
     }
-    return failed("Too many redirects (max $maxRedirects)")
+    return fail("Too many redirects (max $maxRedirects)")
   }
 
   private suspend fun readBody(
     url: String,
     finalUrl: String,
     response: HttpResponse,
+    limit: Long,
   ): FetchResult {
     if (!response.status.isSuccess()) {
       return FetchResult.Failed(url, "HTTP ${response.status.value}")
     }
-
-    val contentLength = response.headers[HttpHeaders.ContentLength]
-      ?.toLongOrNull()
-    if (contentLength != null && contentLength > maxContentBytes) {
-      return FetchResult.Failed(
-        url,
-        "Content too large: $contentLength bytes" +
-          " (max $maxContentBytes)",
-      )
+    val declared = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+    if (declared != null && declared > limit) {
+      return FetchResult.Failed(url, "Content too large: $declared bytes (max $limit)")
     }
-
-    val body = response.bodyAsChannel().readRemaining(maxContentBytes).readString()
-    log.d { "Fetched ${body.length} chars from ${redactUrl(finalUrl)}" }
+    // The body is streamed, so a response without Content-Length stops
+    // at the limit instead of being buffered whole.
+    val bytes = response.bodyAsChannel().readAtMost(limit)
+    log.d { "Fetched ${bytes.size} bytes from ${redactUrl(finalUrl)}" }
     return FetchResult.Success(
       url = url,
       finalUrl = finalUrl,
-      content = body,
+      content = bytes.decodeToString(),
       statusCode = response.status.value,
+      byteCount = bytes.size.toLong(),
     )
   }
 
-  private fun isHttps(url: String): Boolean = url.startsWith("https://", ignoreCase = true)
+  /**
+   * Reads until [limit] bytes or the end of the body. Ktor's
+   * `readRemaining(max)` is not used: it can return more than `max`
+   * when more data arrives while it copies.
+   */
+  private suspend fun ByteReadChannel.readAtMost(limit: Long): ByteArray {
+    val out = ByteArrayOutputStream()
+    val chunk = ByteArray(READ_CHUNK_BYTES)
+    while (out.size() < limit) {
+      val wanted = minOf(chunk.size.toLong(), limit - out.size()).toInt()
+      val read = readAvailable(chunk, 0, wanted)
+      if (read == -1) break
+      out.write(chunk, 0, read)
+    }
+    return out.toByteArray()
+  }
 
-  /** Outcome of one hop: a redirect to follow, or the final result. */
-  private sealed interface Step<out T> {
-    data class Redirect(val location: String) : Step<Nothing>
-    data class Done<T>(val result: T) : Step<T>
+  /** Resolves a possibly relative [location] the way Ktor's redirect plugin does. */
+  private fun resolveLocation(current: String, location: String): String =
+    URLBuilder(current).apply {
+      parameters.clear()
+      takeFrom(location)
+    }.buildString()
+
+  private sealed interface Hop<out T> {
+    class Done<T>(val value: T) : Hop<T>
+    class Redirect(val location: String) : Hop<Nothing>
   }
 
   companion object {
     private const val DEFAULT_MAX_CONTENT_BYTES = 2L * 1024 * 1024
     private const val DEFAULT_USER_AGENT = "KetchBot/1.0"
-    private const val DEFAULT_MAX_REDIRECTS = 5
+    private const val DEFAULT_MAX_REDIRECTS = 10
+    private const val READ_CHUNK_BYTES = 8 * 1024
     private val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
   }
 }
@@ -198,14 +237,15 @@ internal sealed interface FetchResult {
   /**
    * Successfully fetched content.
    *
-   * @param finalUrl where the content was served from after redirects;
-   *   equal to [url] when there were none
+   * @property finalUrl URL the content came from after redirects
+   * @property byteCount body bytes read
    */
   data class Success(
     override val url: String,
     val finalUrl: String,
     val content: String,
     val statusCode: Int,
+    val byteCount: Long,
   ) : FetchResult
 
   /** Fetch failed or was blocked. */
@@ -222,8 +262,7 @@ internal sealed interface HeadResult {
   /**
    * Successful HEAD response with metadata.
    *
-   * @param finalUrl where the resource is served from after redirects;
-   *   equal to [url] when there were none
+   * @property finalUrl URL that answered after redirects
    */
   data class Success(
     override val url: String,

@@ -116,6 +116,38 @@ class AiSettingsTest {
   }
 
   @Test
+  fun `search provider is stored as its id`() {
+    val config = KetchConfig(
+      ai = AiSettings(search = SearchSettings(provider = SearchProvider.Brave, apiKey = "k")),
+    )
+    val encoded = ConfigStore.toml.encodeToString(KetchConfig.serializer(), config)
+    assertTrue(
+      encoded.contains("provider = \"brave\""),
+      "expected the provider id in TOML, got:\n$encoded",
+    )
+    val decoded = ConfigStore.toml.decodeFromString(KetchConfig.serializer(), encoded)
+    assertEquals(SearchProvider.Brave, decoded.ai.search.provider)
+  }
+
+  @Test
+  fun `a retired bing search provider loads as none`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[ai]
+      |enabled = true
+      |
+      |[ai.search]
+      |provider = "bing"
+      |apiKey = "old-key"
+      """.trimMargin(),
+    )
+    assertEquals(SearchProvider.None, decoded.ai.search.provider)
+    // The rest of the file still loads.
+    assertTrue(decoded.ai.enabled)
+  }
+
+  @Test
   fun `config without an ai section decodes to defaults`() {
     val decoded = ConfigStore.toml.decodeFromString(
       KetchConfig.serializer(),

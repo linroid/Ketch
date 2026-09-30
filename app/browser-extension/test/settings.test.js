@@ -68,32 +68,56 @@ describe('parseHostList', () => {
 });
 
 describe('normalizeSettings', () => {
-  test('missing settings start with Ketch on this computer as the default', () => {
+  test('missing settings start with the Ketch app on this computer as the default', () => {
     const settings = normalizeSettings(undefined);
-    assert.equal(settings.instances.length, 1);
-    assert.equal(settings.instances[0].id, LOCAL_INSTANCE_ID);
-    assert.equal(settings.instances[0].url, `http://127.0.0.1:${DEFAULT_PORT}`);
+    assert.deepEqual(settings.instances, [
+      { id: LOCAL_INSTANCE_ID, type: 'app', name: 'This computer' },
+    ]);
     assert.equal(settings.defaultInstanceId, LOCAL_INSTANCE_ID);
     assert.equal(settings.interceptDownloads, true);
   });
 
-  test('drops instances without an id or a valid address, and duplicate ids', () => {
+  test('drops servers without an id or a valid address, and duplicate ids', () => {
     const settings = normalizeSettings({
       instances: [
-        { id: 'nas', name: 'NAS', url: 'nas.local' },
-        { id: '', url: 'http://a' },
-        { id: 'broken', url: 'ftp://b' },
-        { id: 'nas', name: 'Duplicate', url: 'http://c' },
+        { id: 'nas', type: 'server', name: 'NAS', url: 'nas.local' },
+        { id: '', type: 'server', url: 'http://a' },
+        { id: 'broken', type: 'server', url: 'ftp://b' },
+        { id: 'nas', type: 'server', name: 'Duplicate', url: 'http://c' },
       ],
     });
     assert.deepEqual(settings.instances, [
-      { id: 'nas', name: 'NAS', url: `http://nas.local:${DEFAULT_PORT}`, token: '' },
+      {
+        id: 'nas',
+        type: 'server',
+        name: 'NAS',
+        url: `http://nas.local:${DEFAULT_PORT}`,
+        token: '',
+      },
     ]);
   });
 
-  test('falls back to the local instance when every instance is invalid', () => {
-    const settings = normalizeSettings({ instances: [{ id: 'x', url: '' }] });
-    assert.deepEqual(settings.instances.map((it) => it.id), [LOCAL_INSTANCE_ID]);
+  test('the Ketch app needs no address and keeps only one entry', () => {
+    const settings = normalizeSettings({
+      instances: [
+        { id: 'mine', type: 'app', name: ' Laptop ', url: 'ignored' },
+        { id: 'another', type: 'app' },
+      ],
+    });
+    assert.deepEqual(settings.instances, [{ id: 'mine', type: 'app', name: 'Laptop' }]);
+  });
+
+  test('instances saved before there were types stay servers', () => {
+    const settings = normalizeSettings({
+      instances: [{ id: 'local', name: 'This computer', url: 'http://127.0.0.1:8642' }],
+    });
+    assert.equal(settings.instances[0].type, 'server');
+    assert.equal(settings.instances[0].url, 'http://127.0.0.1:8642');
+  });
+
+  test('falls back to the Ketch app when every instance is invalid', () => {
+    const settings = normalizeSettings({ instances: [{ id: 'x', type: 'server', url: '' }] });
+    assert.deepEqual(settings.instances.map((it) => it.type), ['app']);
   });
 
   test('an unknown default falls back to the first instance', () => {

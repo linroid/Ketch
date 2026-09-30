@@ -22,9 +22,10 @@ import kotlin.concurrent.thread
 /**
  * Keeps one desktop app per user. Windows and Linux start a new process for every file opened
  * with Ketch, so a later launch hands its arguments to the running app over loopback and exits.
- * macOS delivers opened files to the running app itself.
+ * macOS delivers opened files to the running app itself. Other processes of this user, such as
+ * the browser extension's native messaging host, can also [request] a reply from the running app.
  *
- * A token in the owner-only endpoint file keeps other users on the machine from sending files.
+ * A token in the owner-only endpoint file keeps other users on the machine from reaching it.
  */
 internal class SingleInstance private constructor(
   private val lock: FileLock?,
@@ -44,16 +45,26 @@ internal class SingleInstance private constructor(
     private const val RETRY_DELAY_MS = 250L
     private const val TIMEOUT_MS = 5_000
 
+    /** Sent in place of an argument count to mark a [request], which expects a reply. */
+    private const val REQUEST = -1
+
+    /** How long a [request] waits for its reply; the app may still be starting up. */
+    private const val REPLY_TIMEOUT_MS = 30_000
+
     /**
      * Becomes the running instance and passes arguments forwarded by later launches to
      * [onArguments] on a background thread. Returns null once [args] are forwarded to the
      * instance already running, meaning this process should exit.
+     *
+     * [onRequest] answers each [request] on a thread of its own, so it may block; null sends
+     * no reply.
      *
      * If the running instance cannot be reached, this launch proceeds on its own.
      */
     fun acquire(
       dir: File,
       args: List<String>,
+      onRequest: (String) -> String? = { null },
       onArguments: (List<String>) -> Unit,
     ): SingleInstance? {
       dir.mkdirs()
@@ -83,35 +94,100 @@ internal class SingleInstance private constructor(
       writeEndpoint(File(dir, ENDPOINT_FILE), "${server.localPort}\n$token")
       thread(isDaemon = true, name = "ketch-single-instance") {
         while (!server.isClosed) {
+          val socket = try {
+            server.accept()
+          } catch (_: IOException) {
+            continue // Closed on exit.
+          }
           try {
-            server.accept().use { socket ->
-              socket.soTimeout = TIMEOUT_MS
-              receive(socket, token)?.let(onArguments)
+            socket.soTimeout = TIMEOUT_MS
+            when (val message = receive(socket, token)) {
+              is Message.Arguments -> {
+                socket.close()
+                onArguments(message.args)
+              }
+              is Message.Request -> thread(isDaemon = true, name = "ketch-single-instance-reply") {
+                reply(socket, onRequest, message.text)
+              }
+              null -> socket.close()
             }
           } catch (_: IOException) {
-            // Closed on exit, or a client that disconnected early.
+            // A client that disconnected early.
+            socket.close()
           }
         }
       }
       return SingleInstance(lock, server)
     }
 
-    private fun receive(socket: Socket, token: String): List<String>? {
+    /**
+     * Sends [message] to the running instance and returns its reply, or null when no instance
+     * is running, it did not answer in time, or it had no reply.
+     */
+    fun request(dir: File, message: String): String? {
+      val (port, token) = readEndpoint(dir) ?: return null
+      return try {
+        Socket().use { socket ->
+          socket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), port), TIMEOUT_MS)
+          socket.soTimeout = REPLY_TIMEOUT_MS
+          val output = DataOutputStream(socket.getOutputStream().buffered())
+          output.writeUTF(token)
+          output.writeInt(REQUEST)
+          output.writeUTF(message)
+          output.flush()
+          DataInputStream(socket.getInputStream().buffered()).readUTF().ifEmpty { null }
+        }
+      } catch (_: IOException) {
+        null
+      }
+    }
+
+    private sealed interface Message {
+      class Arguments(val args: List<String>) : Message
+      class Request(val text: String) : Message
+    }
+
+    private fun receive(socket: Socket, token: String): Message? {
       val input = DataInputStream(socket.getInputStream().buffered())
       val received = input.readUTF()
       if (!MessageDigest.isEqual(received.toByteArray(), token.toByteArray())) return null
       val count = input.readInt()
+      if (count == REQUEST) return Message.Request(input.readUTF())
       if (count !in 0..MAX_ARGUMENTS) return null
-      return List(count) { input.readUTF() }
+      return Message.Arguments(List(count) { input.readUTF() })
+    }
+
+    private fun reply(socket: Socket, onRequest: (String) -> String?, request: String) {
+      socket.use {
+        val reply = try {
+          onRequest(request)
+        } catch (e: Exception) {
+          System.err.println("Ketch: could not answer a request: ${e.message}")
+          null
+        }
+        try {
+          val output = DataOutputStream(it.getOutputStream().buffered())
+          output.writeUTF(reply.orEmpty())
+          output.flush()
+        } catch (_: IOException) {
+          // The requester gave up waiting.
+        }
+      }
+    }
+
+    private fun readEndpoint(dir: File): Pair<Int, String>? {
+      val endpoint = runCatching { File(dir, ENDPOINT_FILE).readLines() }.getOrNull()
+      val port = endpoint?.getOrNull(0)?.toIntOrNull() ?: return null
+      val token = endpoint.getOrNull(1) ?: return null
+      return port to token
     }
 
     private fun forward(dir: File, args: List<String>): Boolean {
       // The running instance may still be starting and not have published its endpoint yet.
       repeat(CONNECT_ATTEMPTS) {
-        val endpoint = runCatching { File(dir, ENDPOINT_FILE).readLines() }.getOrNull()
-        val port = endpoint?.getOrNull(0)?.toIntOrNull()
-        val token = endpoint?.getOrNull(1)
-        if (port != null && token != null) {
+        val endpoint = readEndpoint(dir)
+        if (endpoint != null) {
+          val (port, token) = endpoint
           try {
             Socket().use { socket ->
               socket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), port), TIMEOUT_MS)

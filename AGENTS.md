@@ -125,8 +125,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
   `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`, `SiteAllowlist`
 - `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
-  `RateLimiter`
-- `com.linroid.ketch.ai.search` -- `SearchProvider`, `BingSearchProvider`,
+  `RateLimiter`, `FetchBudget`
+- `com.linroid.ketch.ai.search` -- `SearchProvider`, `BraveSearchProvider`,
   `GoogleSearchProvider`, `DummySearchProvider`
 - `com.linroid.ketch.ai.site` -- `SiteProfiler`, `SiteProfile`, `SiteProfileStore`,
   `RobotsTxtParser`
@@ -259,8 +259,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, mDNS, `autoStart`
   (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections
-- `FileConfigStore`: platform-specific file persistence via okio; the web app uses
-  `WebConfigStore` (TOML in localStorage)
+- `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
+  `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
+  uses `WebConfigStore` (TOML in localStorage)
 
 ### Daemon Server (`library:server`)
 - Ktor-based REST API (`library:endpoints`): create, list, pause, resume, cancel, remove tasks;
@@ -273,12 +274,26 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   (DNS rebinding protection); with a token any `Host` is accepted
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
+- `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
+  cannot bind never resumes them; CORS hosts are `host[:port]` without a scheme (Ktor's
+  `allowHost` rejects one)
+
+### Native CLI (`cli/`)
+- Released as a GraalVM native binary; reflection and resource metadata lives in
+  `META-INF/native-image/<module>/` of the module that needs it (`cli`, `library:mcp` for the MCP
+  SDK and `KetchToolSet`, `ai:discover` for `DiscoveryToolSet`). Koog tool sets use kotlin-reflect,
+  so new tool methods may need the types in their signatures registered
+- `NativeImageConfigTest` (in `cli` and `library:mcp`) checks that the metadata names existing
+  classes and covers every serializable MCP SDK type; build with `./gradlew :cli:nativeCompile`
+  and exercise `ketch mcp` to verify changes
 
 ### MCP Server (`library:mcp`)
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
 - `KetchToolSet` provides 12 tools: list/get/start/pause/resume/cancel/remove downloads,
   `resolveUrl`, `getStatus`, `setSpeedLimit`, `setPriority`, `updateConfig`
-- `ketch mcp` runs it on stdio against a local engine
+- `ketch mcp` runs it on stdio against a local engine. It passes the real stdout to
+  `startStdio` and redirects `System.out` to stderr, so the banner, the console logger and
+  Logback never corrupt the JSON-RPC stream
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no
@@ -286,9 +301,15 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `build/firefox` (event page instead of service worker, gecko id) and zips, which the release
   workflow attaches to GitHub releases (manifest version: the tag's numbers plus the run number)
 - Talks to the daemon REST API (`/api/tasks`, task pause/resume, `/api/resolve/content`,
-  `/api/status`) of one or more instances: Ketch on this computer (`http://127.0.0.1:8642`)
-  and remote servers, each with an optional bearer token. Captured downloads and magnets go to
-  the default one
+  `/api/status`) of one or more instances: the Ketch app on this computer and servers
+  (`ketch server`, other devices), each with an optional bearer token. Captured downloads and
+  magnets go to the default one
+- The Ketch desktop app is reached through the native messaging host `com.linroid.ketch`, its own
+  launcher run with `--native-messaging-host` (`app/desktop`: `NativeMessagingHost`,
+  `NativeHostRegistration`, `BrowserExtensionServer`). The host asks the running app over
+  `SingleInstance`, opening it if needed, for a loopback-only `KetchServer` on a free port with a
+  per-run token, separate from the Settings server. The app registers the host with installed
+  browsers on every launch; the Chromium extension id is pinned by the manifest `key`
 - Captures browser downloads (Chromium holds them in `onDeterminingFilename`, Firefox pauses
   them) and falls back to the browser when Ketch fails; context menus per instance; a content
   script sends trusted magnet link clicks

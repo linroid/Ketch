@@ -7,9 +7,11 @@ import java.net.URI
  * Validates URLs against SSRF attacks by blocking requests to
  * private/local IP ranges and non-HTTP(S) schemes.
  *
- * @param dns resolves host names before their addresses are checked
+ * @param resolve looks up every address of a host name
  */
-internal class UrlValidator(private val dns: Dns = Dns.System) {
+internal class UrlValidator(
+  private val resolve: (String) -> Array<InetAddress> = InetAddress::getAllByName,
+) {
 
   /**
    * Validates the given [url] for safety.
@@ -27,7 +29,8 @@ internal class UrlValidator(private val dns: Dns = Dns.System) {
     val uri = try {
       URI(url)
     } catch (_: Exception) {
-      return ValidationResult.Blocked("Malformed URL: $url")
+      // The URL is left out: the reason is logged, and URLs can carry credentials.
+      return ValidationResult.Blocked("Malformed URL")
     }
 
     val scheme = uri.scheme?.lowercase()
@@ -47,7 +50,7 @@ internal class UrlValidator(private val dns: Dns = Dns.System) {
     }
 
     val addresses = try {
-      dns.lookup(host)
+      resolve(host)
     } catch (_: Exception) {
       return ValidationResult.Blocked(
         "DNS resolution failed for: $host"
@@ -96,21 +99,6 @@ internal class UrlValidator(private val dns: Dns = Dns.System) {
 
   companion object {
     private val ALLOWED_SCHEMES = setOf("http", "https")
-  }
-}
-
-/** Resolves host names; replaced in tests so they never touch the network. */
-internal fun interface Dns {
-  /**
-   * Returns the addresses of [host].
-   *
-   * @throws java.net.UnknownHostException if [host] does not resolve
-   */
-  fun lookup(host: String): List<InetAddress>
-
-  companion object {
-    /** The platform resolver. */
-    val System: Dns = Dns { host -> InetAddress.getAllByName(host).toList() }
   }
 }
 
