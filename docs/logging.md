@@ -13,12 +13,15 @@ val ketch = Ketch(
 )
 ```
 
+`Logger.console()` emits every level; pass a minimum, such as `Logger.console(LogLevel.INFO)`, to
+filter it.
+
 ### Option 2: Use Kermit for structured logging (Recommended)
 
 Add the dependency:
 ```kotlin
 dependencies {
-    implementation("com.linroid.ketch:kermit:1.0.0")
+    implementation("com.linroid.ketch:kermit:<latest-version>")
 }
 ```
 
@@ -48,7 +51,7 @@ val ketch = Ketch(
 
 ## Log Levels
 
-- **Verbose**: Detailed diagnostics (segment progress, FTP commands, per-peer torrent events)
+- **Verbose**: Detailed diagnostics (speed limiter waits, FTP commands, per-peer torrent events)
 - **Debug**: Internal operations (server detection, tracker announces, DHT, swarm summaries)
 - **Info**: User-facing events (download start, state changes, completion, torrent lifecycle)
 - **Warn**: Recoverable problems (retries, changed server files, corrupt torrent pieces)
@@ -64,16 +67,18 @@ val ketch = Ketch(
 - Magnet metadata lookups and their timeouts
 
 ### Debug Level (Recommended for Development)
-- Server info detection and segment calculations
+- HEAD requests, response headers and segment calculations
+- Each segment's start and completion
 - File preallocation and resume validation
 - Tracker announces per tracker, DHT bootstrap and lookups
 - A torrent swarm summary every 30 seconds: verified pieces, connected and queued peers,
   newly discovered and failed peers, corrupt pieces
 
 ### Verbose Level (For Detailed Diagnostics)
-- Segment-level progress details and speed limiter waits
+- Speed limiter waits
 - FTP protocol commands and replies
-- Individual torrent peer disconnects and rejected incoming connections
+- Individual torrent peer disconnects, failed metadata requests and rejected incoming connections
+- Progress events received from a remote instance
 
 ## Log Format
 
@@ -194,12 +199,14 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
 Logs still name the files you downloaded and the hosts and paths they came from, so review them
 before posting them publicly. The app log files stay on the device until the user shares them.
 
-When adding log lines, pass URLs through `redactUrl()` (and tracker URLs through
-`trackerLabel()` in `library:torrent`).
+When adding log lines, pass URLs through `redactUrl()` and name an error's causes with
+`describeCauses()`. In `library:torrent`, reduce tracker URLs with `trackerLabel()` and describe
+tracker errors with `describeWithoutUrls()`.
 
 ## Custom Logger Implementation
 
-You can implement your own logger by implementing the `Logger` interface:
+You can implement your own logger by implementing the `Logger` interface
+(`com.linroid.ketch.api.log.Logger`, in `library:api`):
 
 ```kotlin
 class CustomLogger : Logger {

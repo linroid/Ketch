@@ -1,11 +1,40 @@
 # Ketch CLI
 
-Command-line interface for Ketch. Supports single-file downloads, running the Ketch daemon server, and an MCP server for AI agents. Run `ketch --help` for every command and option, including `ai-discover`.
+Command-line interface for Ketch. Downloads a single file, runs the Ketch daemon server, serves
+Ketch to AI agents over MCP, and finds downloads with AI discovery.
+
+## Install
+
+Install the native binary (no JVM required) with the install script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/linroid/Ketch/main/install.sh | bash
+```
+
+The script installs `ketch` to `/usr/local/bin`, using `sudo` when that directory is not
+writable, and puts the license notices in `ketch-licenses` next to it. Set `KETCH_VERSION` to
+install a specific release instead of the latest, or `KETCH_INSTALL` to choose another directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/linroid/Ketch/main/install.sh \
+  | KETCH_INSTALL="$HOME/.local/bin" bash
+```
+
+You can also download an archive from
+[GitHub Releases](https://github.com/linroid/Ketch/releases/latest). Each one is named
+`ketch-cli-<version>-<os>-<arch>.tar.gz` (`.zip` on Windows) and contains the `ketch` binary and a
+`licenses` folder.
+
+| OS (`<os>`) | Architectures (`<arch>`) |
+|---|---|
+| `macos` | `x64`, `arm64` |
+| `linux` | `x64`, `arm64` |
+| `windows` | `x64` |
 
 ## Build & Run
 
 ```bash
-# Build the CLI
+# Build the CLI (also builds the web UI that `ketch server` serves)
 ./gradlew :cli:build
 
 # Run directly via Gradle
@@ -14,15 +43,42 @@ Command-line interface for Ketch. Supports single-file downloads, running the Ke
 # Or build the distribution and run the script
 ./gradlew :cli:installDist
 ./cli/build/install/cli/bin/cli <arguments>
+
+# Or build the native binary (requires an Oracle GraalVM for JDK 21 toolchain)
+./gradlew :cli:nativeCompile
+./cli/build/native/nativeCompile/ketch <arguments>
 ```
 
 ## Commands
 
+Running `ketch` without arguments, or with `--help` or `-h`, prints the usage.
+
+### Global options
+
+These flags can appear anywhere on the command line and apply to every command. Logs are written to
+the console at info level by default; see [logging](../docs/logging.md) for what each level shows.
+
+| Option | Description |
+|---|---|
+| `-v`, `--verbose` | Debug logging |
+| `--debug` | Verbose logging, including speed limiter waits and per-peer detail |
+
 ### Download a file
 
 ```bash
-ketch <url> [destination] [options]
+ketch [options] <url> [destination]
 ```
+
+Downloads HTTP(S) and FTP/FTPS URLs (`ftp://[user:password@]host[:port]/path`), magnet links, and
+`.torrent` URLs or files. Without a destination the file is saved in the current directory. An
+existing directory, or a path ending in a separator, keeps the file name from the source; any other
+path, including a bare file name such as `file.zip`, is the file path, relative to the current
+directory. Torrents follow the
+[torrent destination rules](../docs/torrent.md), and public ones also announce to the `[torrent]`
+trackers of the default [config file](#config-file-locations).
+
+The download is kept in memory only and is not recorded in the [task database](#database). The
+command exits when the download completes or fails.
 
 | Option | Description |
 |---|---|
@@ -31,19 +87,10 @@ ketch <url> [destination] [options]
 | `--max-concurrent <n>` | Max simultaneous downloads (default: 3) |
 | `--help`, `-h` | Show help message |
 
-The command downloads the URL, shows its progress and exits when the download finishes or fails.
-Relative destinations are resolved against the current directory:
-
-| Destination | Saved to |
-|---|---|
-| *(omitted)* | The current directory, using the file name from the server |
-| An existing directory, or a path ending in `/` | That directory, using the file name from the server |
-| A file name or path, such as `file.zip` or `out/file.zip` | That file, relative to the current directory |
-
 **Examples:**
 
 ```bash
-# Basic download into the current directory
+# Basic download
 ketch https://example.com/file.zip
 
 # Save as file.zip in the current directory
@@ -54,11 +101,18 @@ ketch https://example.com/file.zip /tmp/file.zip
 
 # With speed limit and priority
 ketch --speed-limit 1m --priority high https://example.com/file.zip
+
+# FTP with credentials, and a magnet link into a directory, with debug logs
+ketch ftp://user:secret@ftp.example.com/pub/file.iso
+ketch -v "magnet:?xt=urn:btih:<info-hash>" ~/Downloads/
 ```
 
 ### Server
 
-Start the Ketch daemon server with REST API and SSE event stream.
+Start the Ketch daemon server with REST API, SSE event stream, and the bundled web UI. It
+downloads HTTP(S), FTP/FTPS and BitTorrent sources, stores tasks in the
+[task database](#database) and restores them when it starts, and announces itself on the local
+network over mDNS unless `mdnsEnabled` is `false`.
 
 ```bash
 ketch server [options]
@@ -67,11 +121,11 @@ ketch server [options]
 | Option | Description |
 |---|---|
 | `--config <path>` | Path to a TOML config file |
-| `--generate-config` | Generate a default config file and exit |
+| `--generate-config` | Generate a default config file at the [default path](#config-file-locations) and exit |
 | `--host <address>` | Bind address (default: `0.0.0.0`) |
 | `--port <number>` | Port number, 1-65535 (default: `8642`) |
 | `--token <string>` | API bearer token for authentication |
-| `--cors <hosts>` | Comma-separated CORS allowed hosts as `host[:port]` without a scheme, or `*` for any |
+| `--cors <hosts>` | Comma-separated CORS allowed hosts without a scheme (e.g., `localhost:3000`), or `*` |
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--speed-limit <value>` | Global speed limit (e.g., `10m`, `500k`) |
 | `--help`, `-h` | Show help message |
@@ -85,7 +139,7 @@ ketch server
 # Custom port and download directory
 ketch server --port 9000 --dir /tmp/downloads
 
-# With authentication, allowing browser pages served from http://localhost:3000
+# With authentication and CORS
 ketch server --token my-secret --cors "localhost:3000"
 
 # With a config file, overriding the port
@@ -95,12 +149,12 @@ ketch server --config /path/to/config.toml --port 9999
 ketch server --generate-config
 ```
 
-The server restores the tasks saved in its database when it starts.
-
 ### MCP server
 
-Run Ketch as an [MCP](https://modelcontextprotocol.io) server over stdio, so AI agents can
-start and manage downloads.
+Run Ketch as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so AI
+agents can list, start, pause, resume, cancel and remove downloads, resolve URLs, and change speed
+limits, priorities and the download config. It uses the same config file and
+[task database](#database) as `ketch server`, and restores saved tasks when it starts.
 
 ```bash
 ketch mcp [options]
@@ -112,8 +166,8 @@ ketch mcp [options]
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--help`, `-h` | Show help message |
 
-Stdout carries only the MCP protocol; the banner and all logs go to stderr. Example client
-configuration (e.g. `claude_desktop_config.json`):
+Stdout carries only the MCP protocol; the banner and all logs go to stderr. Register it with your
+MCP client, for example in Claude Desktop's `claude_desktop_config.json`:
 
 ```json
 {
@@ -126,9 +180,38 @@ configuration (e.g. `claude_desktop_config.json`):
 }
 ```
 
+### AI discovery
+
+Ask an LLM agent to find download links for a natural-language query. It prints the candidates it
+found with their URL, file name, size and confidence.
+
+```bash
+ketch ai-discover <query> [options]
+```
+
+| Option | Description |
+|---|---|
+| `--sites <domains>` | Comma-separated domains to search first; a hint to the agent, not a hard limit |
+| `--max-results <n>` | Max candidates to return (default: 5) |
+
+The command reads the `[ai]` section of the default [config file](#config-file-locations), which
+the apps edit under Settings → AI discovery. Blank API keys are filled from `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`; without an `[ai]` section, exporting one of them is
+enough. See [AI discovery](../docs/ai-discovery.md) for providers, web search keys, and how
+settings and environment variables combine.
+
+**Examples:**
+
+```bash
+ketch ai-discover "latest Ubuntu 24.04 ISO"
+ketch ai-discover "ffmpeg release" --sites ffmpeg.org
+```
+
 ## Configuration File
 
-The `server` and `mcp` commands read a TOML configuration file. CLI flags always take precedence over config file values. The desktop app uses the same file.
+The `server` and `mcp` commands support TOML configuration files. CLI flags always take precedence
+over config file values. The download command reads only `[torrent]`, and `ai-discover` only
+`[ai]`, from the default path.
 
 ### Config file locations
 
@@ -138,7 +221,8 @@ The `server` and `mcp` commands read a TOML configuration file. CLI flags always
 | Linux | `$XDG_CONFIG_HOME/ketch/config.toml` (default: `~/.config/ketch/config.toml`) |
 | Windows | `%APPDATA%\ketch\config.toml` |
 
-If no `--config` flag is provided, the CLI automatically loads from the default path when the file exists.
+If no `--config` flag is provided, the CLI automatically loads from the default path when the file
+exists. The desktop app uses the same directory, so the CLI shares its settings and task database.
 
 ### Generating a config file
 
@@ -146,15 +230,13 @@ If no `--config` flag is provided, the CLI automatically loads from the default 
 ketch server --generate-config
 ```
 
-This creates a commented config file at the default location. Edit it to customize your setup.
+This creates a commented config file at the default location. Edit it to customize your setup. It
+never overwrites an existing file.
 
 ### Config file format
 
-Keys use the same camelCase names as the Kotlin properties. Unknown keys are ignored, so check the
-spelling if a setting has no effect.
-
 ```toml
-# Display name for this instance (optional).
+# Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
 
 [server]
@@ -162,14 +244,19 @@ host = "0.0.0.0"
 port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
-# corsAllowedHosts = ["localhost:3000"]  # host[:port] without a scheme, or "*"
+# corsAllowedHosts = ["localhost:3000"]
 
 [download]
-# defaultDirectory = "~/Downloads"  # ~ is your home folder
+# defaultDirectory = "/srv/downloads"
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
 maxConcurrentDownloads = 2
 maxConnectionsPerHost = 8
+# retryCount = 3
+# retryDelayMs = 1000
+# progressIntervalMs = 200
+# saveIntervalMs = 5000
+# bufferSize = 8192
 
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
@@ -177,11 +264,9 @@ maxConnectionsPerHost = 8
 
 ### Config reference
 
-#### Top level
-
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `name` | string | `"Ketch"` for the CLI | Display name for this instance |
+| `name` | string | `"Ketch"` | Instance name shown to clients and announced over mDNS |
 
 #### `[server]`
 
@@ -190,29 +275,32 @@ maxConnectionsPerHost = 8
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
 | `port` | int | `8642` | Port to listen on |
 | `apiToken` | string | *(none)* | Bearer token for API authentication |
-| `corsAllowedHosts` | string[] | `[]` | Allowed CORS hosts as `host[:port]` without a scheme, or `["*"]` for all |
-| `mdnsEnabled` | bool | `true` | Advertise the server on the local network via mDNS |
+| `corsAllowedHosts` | string[] | `[]` | Allowed CORS hosts without a scheme (e.g., `["localhost:3000"]`, or `["*"]` for all) |
+| `mdnsEnabled` | bool | `true` | Announce the server on the local network (`_ketch._tcp`) |
 
 #### `[download]`
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `defaultDirectory` | string | `~/Downloads` | Default save directory; a leading `~` is your home folder |
-| `speedLimit` | string | `"unlimited"` | Global speed limit (`"500k"`, `"10m"`, or bytes per second) |
-| `maxConnectionsPerDownload` | int | `4` | Concurrent connections (segments) per download |
-| `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads, `0` for unlimited |
-| `maxConnectionsPerHost` | int | `8` | Max simultaneous downloads per host, `0` for unlimited |
-| `retryCount` | int | `3` | Max retries after a retryable failure |
+| `speedLimit` | string | `"unlimited"` | Global speed limit (`"500k"`, `"10m"`, or bytes) |
+| `maxConnectionsPerDownload` | int | `4` | Connections (segments) per HTTP or FTP download |
+| `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads (`0` = unlimited) |
+| `maxConnectionsPerHost` | int | `8` | Max simultaneous downloads per host (`0` = unlimited) |
+| `retryCount` | int | `3` | Max automatic retries after a retryable failure |
 | `retryDelayMs` | int | `1000` | Base delay between retries (exponential backoff) |
 | `progressIntervalMs` | int | `200` | Progress update throttle interval |
 | `saveIntervalMs` | int | `5000` | Segment progress persistence interval |
-| `bufferSize` | int | `8192` | Read buffer size in bytes for FTP transfers |
+| `bufferSize` | int | `8192` | FTP read buffer size in bytes |
 
 #### `[torrent]`
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `trackers` | string[] | `[]` | Extra trackers announced for public torrents |
+| `trackers` | string[] | `[]` | Extra `http`, `https` or `udp` trackers that public torrents also announce to |
+
+The `[ai]` section is described in [AI discovery](../docs/ai-discovery.md#configtoml). The apps
+also keep `[[remotes]]`, `[appearance]` and `server.autoStart` in this file; the CLI ignores them.
 
 ## Speed Limit Format
 
@@ -224,14 +312,16 @@ Speed limits accept human-readable suffixes:
 | `m` | MB/s | `10m` = 10 MB/s |
 | *(none)* | bytes/s | `1048576` = 1 MB/s |
 
-Use `unlimited` to remove a limit.
+`unlimited` removes the limit.
 
 ## Database
 
-Task metadata is stored in a SQLite database at the platform config directory:
+Tasks of `ketch server` and `ketch mcp` are stored in a SQLite database in the config directory:
 
 | Platform | Default path |
 |---|---|
 | macOS | `~/Library/Application Support/ketch/ketch.db` |
-| Linux | `$XDG_CONFIG_HOME/ketch/ketch.db` |
+| Linux | `$XDG_CONFIG_HOME/ketch/ketch.db` (default: `~/.config/ketch/ketch.db`) |
 | Windows | `%APPDATA%\ketch\ketch.db` |
+
+BitTorrent DHT state is kept in the `torrent-state` folder of the same directory.
