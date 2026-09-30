@@ -510,6 +510,10 @@ private fun runAiDiscover(args: List<String>) {
     } catch (e: IllegalArgumentException) {
       println("Error: ${e.message}")
       return@runBlocking
+    } finally {
+      // The fetcher's OkHttp engine keeps an idle non-daemon thread for a minute after its
+      // last request, which would hold the process open that long
+      aiModule.close()
     }
 
     if (response.candidates.isEmpty()) {
