@@ -5,8 +5,7 @@ import java.io.File
 /** Default TOML config template for new installations. */
 const val DEFAULT_CONFIG_CONTENT = """# Ketch Configuration
 
-# Display name for this instance (optional).
-# Defaults to device name or hostname.
+# Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
 
 [server]
