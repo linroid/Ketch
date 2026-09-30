@@ -25,6 +25,7 @@ import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.cors.CORSConfig
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.resources.Resources
@@ -79,7 +80,35 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
+ * ## Browsers
+ *
+ * Without an [apiToken], the server answers `403 Forbidden` with an `origin_not_allowed`
+ * `ErrorResponse` to any request from a web page on another origin, including CORS
+ * preflights, and ignores [corsAllowedHosts]. Otherwise any site the user visits could
+ * create downloads that write anywhere the user can, list tasks, and pause or cancel them.
+ * A web page's request is one whose `Origin` is `http`, `https` or `null`; it is from another
+ * origin when that origin's host and port differ from the `Host` header. These pass:
+ * - clients outside a browser, such as the apps, `RemoteKetch` and `curl`, which send no
+ *   `Origin`
+ * - the web UI this server serves, whose pages share its origin
+ * - browser extensions, such as Ketch's own: a browser only lets them reach the server with
+ *   the host permission the user granted
+ *
+ * With an [apiToken], the server does not check `Origin`, since a page cannot learn the
+ * token, and [corsAllowedHosts] lists the origins whose pages may call the API. Browser
+ * extensions and other non-web origins are always allowed; they need the token like any
+ * client.
+ *
+ * Checking `Origin` does not stop DNS rebinding, where a page re-resolves its own domain to
+ * this machine and becomes same-origin with the API; its requests still name that domain in
+ * the `Host` header.
+ *
  * @param ketch the KetchApi instance to expose
+ * @param apiToken bearer token every API request must carry, or `null` for no
+ *   authentication, in which case web pages on other origins are refused
+ * @param corsAllowedHosts origins whose web pages may call the API when there is an
+ *   [apiToken]: `"*"` for any, a host such as `"localhost:3000"` for both `http` and
+ *   `https`, or an origin such as `"http://localhost:3000"`. Ignored without a token.
  * @param mdnsRegistrar mDNS service registrar for LAN discovery
  */
 class KetchServer(
@@ -174,15 +203,17 @@ class KetchServer(
 
     install(SSE)
 
-    if (corsAllowedHosts.isNotEmpty()) {
+    if (apiToken == null) {
+      install(CrossOriginGuard)
+      if (corsAllowedHosts.isNotEmpty()) {
+        log.w { "Ignoring corsAllowedHosts $corsAllowedHosts: they need an API token" }
+      }
+    } else if (corsAllowedHosts.isNotEmpty()) {
       install(CORS) {
-        if ("*" in corsAllowedHosts) {
-          anyHost()
-        } else {
-          corsAllowedHosts.forEach { host ->
-            allowHost(host)
-          }
-        }
+        corsAllowedHosts.forEach { allowCorsEntry(it) }
+        // Extensions reach the server through their host permission, not CORS; this only
+        // keeps the list from refusing them.
+        allowOrigins { !isWebOrigin(it) }
         allowMethod(HttpMethod.Get)
         allowMethod(HttpMethod.Post)
         allowMethod(HttpMethod.Put)
@@ -252,6 +283,19 @@ class KetchServer(
 
     /** DNS-SD service type for Ketch server discovery. */
     internal const val MDNS_SERVICE_TYPE = "_ketch._tcp"
+  }
+}
+
+/**
+ * Allows [entry] of `corsAllowedHosts`: `*`, a host for both `http` and `https`, or an origin
+ * with its scheme, which [CORSConfig.allowHost] only takes as a separate argument.
+ */
+private fun CORSConfig.allowCorsEntry(entry: String) {
+  val scheme = entry.substringBefore("://", "")
+  if (scheme.isEmpty()) {
+    allowHost(entry)
+  } else {
+    allowHost(entry.substringAfter("://").removeSuffix("/"), schemes = listOf(scheme))
   }
 }
 

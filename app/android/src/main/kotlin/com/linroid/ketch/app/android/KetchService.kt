@@ -119,8 +119,11 @@ class KetchService : Service() {
             port = serverConfig.port,
             apiToken = serverConfig.apiToken,
             name = saved.name ?: instanceName,
-            corsAllowedHosts = serverConfig.corsAllowedHosts
-              .takeIf { it.isNotEmpty() } ?: listOf("*"),
+            // With a token, pages on any site, such as the web app, may call the API, as
+            // they still need the token. Without one, KetchServer refuses them.
+            corsAllowedHosts = serverConfig.corsAllowedHosts.ifEmpty {
+              if (serverConfig.apiToken == null) emptyList() else listOf("*")
+            },
             mdnsEnabled = serverConfig.mdnsEnabled,
           )
           server.start(wait = false)

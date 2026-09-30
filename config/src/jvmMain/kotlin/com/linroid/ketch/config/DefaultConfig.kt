@@ -14,6 +14,8 @@ host = "0.0.0.0"
 port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
+# Origins whose web pages may call the API ("*" for any). Only used with
+# apiToken: without one, pages on other origins are always refused.
 # corsAllowedHosts = ["http://localhost:3000"]
 
 [download]

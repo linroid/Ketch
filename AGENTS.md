@@ -230,6 +230,10 @@ cli/          # JVM CLI entry point
 ### Daemon Server (`server/`)
 - Ktor-based REST API: create, list, pause, resume, cancel downloads
 - SSE event stream for real-time state updates
+- Without an API token, refuses requests from web pages on other origins (403
+  `origin_not_allowed`) and ignores `corsAllowedHosts`; its own web UI, browser extensions and
+  non-browser clients pass. With a token, `corsAllowedHosts` grants CORS, and the apps default
+  it to `*` so the hosted web app can connect
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
 

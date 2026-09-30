@@ -68,7 +68,7 @@ ketch server [options]
 | `--host <address>` | Bind address (default: `0.0.0.0`) |
 | `--port <number>` | Port number, 1-65535 (default: `8642`) |
 | `--token <string>` | API bearer token for authentication |
-| `--cors <origins>` | Comma-separated CORS allowed origins |
+| `--cors <origins>` | Comma-separated origins whose web pages may call the API, or `*`; needs `--token` (see [Web pages](#web-pages)) |
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--speed-limit <value>` | Global speed limit (e.g., `10m`, `500k`) |
 | `--help`, `-h` | Show help message |
@@ -91,6 +91,26 @@ ketch server --config /path/to/config.toml --port 9999
 # Generate a default config file
 ketch server --generate-config
 ```
+
+#### Web pages
+
+A browser lets any web page send requests to the server, so it checks where a browser request
+comes from:
+
+- **Without `--token`**, it refuses requests from web pages on another origin (a different host
+  or port) with `403 Forbidden` and an `origin_not_allowed` error, and ignores `--cors`.
+  Otherwise any site you visit could start downloads that write anywhere you can, list your
+  tasks, and pause or cancel them. These still work: the web UI this server serves, browser
+  extensions such as Ketch's own, and clients outside a browser, such as the Ketch apps and
+  `curl`.
+- **With `--token`**, `--cors` lists the origins whose pages may call the API, such as
+  `http://localhost:3000` (a bare `localhost:3000` allows both `http` and `https`), or `*` for
+  any. Pages still need the token, which they cannot learn. Without `--cors`, only the web UI
+  this server serves can use it from a browser.
+
+Behind a reverse proxy that rewrites the `Host` header, the web UI counts as another origin;
+set a token there. The Ketch apps' server follows the same rules, and allows any origin once
+it has an access token, so the web app can connect.
 
 ## Configuration File
 
@@ -122,8 +142,8 @@ This creates a commented config file at the default location. Edit it to customi
 [server]
 host = "0.0.0.0"
 port = 8642
-# api-token = "my-secret"
-# cors-allowed-hosts = ["http://localhost:3000"]
+# apiToken = "my-secret"
+# corsAllowedHosts = ["http://localhost:3000"]
 
 [download]
 # directory = "~/Downloads"
@@ -149,8 +169,8 @@ auto-start = true
 |---|---|---|---|
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
 | `port` | int | `8642` | Port to listen on |
-| `api-token` | string | *(none)* | Bearer token for API authentication |
-| `cors-allowed-hosts` | string[] | `[]` | Allowed CORS origins (e.g., `["*"]` for all) |
+| `apiToken` | string | *(none)* | Bearer token for API authentication |
+| `corsAllowedHosts` | string[] | `[]` | Origins whose web pages may call the API (`["*"]` for any); needs `apiToken` (see [Web pages](#web-pages)) |
 
 #### `[download]`
 

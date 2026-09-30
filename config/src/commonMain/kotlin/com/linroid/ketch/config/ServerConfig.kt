@@ -8,7 +8,10 @@ import kotlinx.serialization.Serializable
  * @property host bind address for the daemon server.
  * @property port listen port.
  * @property apiToken optional bearer token for authentication.
- * @property corsAllowedHosts allowed CORS origins.
+ * @property corsAllowedHosts origins whose web pages may call the API, such
+ *   as `"http://localhost:3000"`, or `"*"` for any. Only used with an
+ *   [apiToken]: without one, the server refuses pages on other origins. With
+ *   a token and no list, the apps allow any origin so the web app can connect.
  * @property mdnsEnabled whether to register via mDNS/DNS-SD.
  * @property autoStart whether the apps start the server when they
  *   launch. The CLI's `server` command always starts it.

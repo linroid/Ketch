@@ -178,7 +178,8 @@ The server module (`library:server`) wraps a `Ketch` instance with a Ktor HTTP s
 - **REST API**: Create, list, pause, resume, cancel downloads
 - **SSE**: Real-time event stream for state changes and progress updates
 - **Auth**: Optional bearer token via `KetchServerConfig.apiToken`
-- **CORS**: Configurable allowed origins for browser clients
+- **Browsers**: Without a token, requests from web pages on other origins are refused
+  (`CrossOriginGuard`); with one, `corsAllowedHosts` lists the origins that get CORS
 
 `RemoteKetch` (`library:remote`) is the client counterpart -- it implements `KetchApi`
 by calling the REST API and subscribing to SSE events. Auto-reconnects with exponential
