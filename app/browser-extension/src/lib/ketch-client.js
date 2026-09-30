@@ -13,6 +13,10 @@ export const FailureKind = Object.freeze({
   UNAUTHORIZED: 'unauthorized',
   /** The server answered but refused the request, e.g. an unsupported link. */
   REJECTED: 'rejected',
+  /** The Ketch desktop app hasn't registered itself with this browser. */
+  APP_NOT_INSTALLED: 'app_not_installed',
+  /** The Ketch app is closed, and the caller asked not to start it. */
+  APP_NOT_RUNNING: 'app_not_running',
 });
 
 /** A failed request to a Ketch server. */

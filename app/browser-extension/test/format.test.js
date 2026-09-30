@@ -91,15 +91,21 @@ describe('failureHint', () => {
   const unreachable = new KetchRequestError(FailureKind.UNREACHABLE, 'down');
 
   test('points at the app for a server on this computer', () => {
-    assert.match(failureHint(unreachable, { url: 'http://127.0.0.1:8642' }), /Remote access/);
+    const local = { type: 'server', url: 'http://127.0.0.1:8642' };
+    assert.match(failureHint(unreachable, local), /Remote access/);
   });
 
   test('points at the network for a remote server', () => {
-    assert.match(failureHint(unreachable, { url: 'http://nas:8642' }), /reachable/);
+    assert.match(failureHint(unreachable, { type: 'server', url: 'http://nas:8642' }), /reachable/);
+  });
+
+  test('guides setting up the Ketch app when it is missing', () => {
+    const missing = new KetchRequestError(FailureKind.APP_NOT_INSTALLED, 'missing');
+    assert.match(failureHint(missing, { type: 'app' }), /Install the Ketch desktop app/);
   });
 
   test('has nothing to add for a rejected request', () => {
     const rejected = new KetchRequestError(FailureKind.REJECTED, 'bad');
-    assert.equal(failureHint(rejected, { url: 'http://nas:8642' }), '');
+    assert.equal(failureHint(rejected, { type: 'server', url: 'http://nas:8642' }), '');
   });
 });

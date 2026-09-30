@@ -67,6 +67,15 @@ section > .muted {
   flex: 1;
 }
 
+.add-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.instance-kind {
+  font-size: 13px;
+}
+
 .instances {
   display: grid;
   gap: 12px;

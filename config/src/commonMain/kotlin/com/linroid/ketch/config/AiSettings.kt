@@ -1,7 +1,13 @@
 package com.linroid.ketch.config
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * LLM providers that can drive AI resource discovery.
@@ -73,24 +79,39 @@ enum class LlmProvider(
 /**
  * Web search providers used by the discovery agent's search tools.
  *
+ * Saved as [id]. An id this version does not know, such as `bing`
+ * (the Bing Search APIs were retired in August 2025), loads as [None]
+ * rather than failing the whole config file.
+ *
+ * @property id value stored in `config.toml`.
  * @property label human-readable provider name.
  * @property requiresApiKey whether the provider needs a key.
  * @property requiresCx whether the provider needs a search engine id.
  */
-@Serializable
+@Serializable(with = SearchProviderSerializer::class)
 enum class SearchProvider(
+  val id: String,
   val label: String,
   val requiresApiKey: Boolean,
   val requiresCx: Boolean,
 ) {
-  @SerialName("none")
-  None(label = "None", requiresApiKey = false, requiresCx = false),
+  None(id = "none", label = "None", requiresApiKey = false, requiresCx = false),
+  Brave(id = "brave", label = "Brave", requiresApiKey = true, requiresCx = false),
+  Google(id = "google", label = "Google", requiresApiKey = true, requiresCx = true),
+}
 
-  @SerialName("bing")
-  Bing(label = "Bing", requiresApiKey = true, requiresCx = false),
+internal object SearchProviderSerializer : KSerializer<SearchProvider> {
+  override val descriptor: SerialDescriptor =
+    PrimitiveSerialDescriptor("com.linroid.ketch.config.SearchProvider", PrimitiveKind.STRING)
 
-  @SerialName("google")
-  Google(label = "Google", requiresApiKey = true, requiresCx = true),
+  override fun serialize(encoder: Encoder, value: SearchProvider) {
+    encoder.encodeString(value.id)
+  }
+
+  override fun deserialize(decoder: Decoder): SearchProvider {
+    val id = decoder.decodeString()
+    return SearchProvider.entries.firstOrNull { it.id == id } ?: SearchProvider.None
+  }
 }
 
 /**
@@ -132,7 +153,7 @@ data class LlmSettings(
  * pointed at, but it cannot search the web.
  *
  * @property provider which search API to use.
- * @property apiKey Bing subscription key or Google API key.
+ * @property apiKey Brave subscription token or Google API key.
  * @property cx Google Programmable Search engine id.
  */
 @Serializable

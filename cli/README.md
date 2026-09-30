@@ -51,7 +51,7 @@ You can also download an archive from
 
 ## Commands
 
-Running `ketch` without arguments prints the usage.
+Running `ketch` without arguments, or with `--help` or `-h`, prints the usage.
 
 ### Global options
 
@@ -72,26 +72,29 @@ ketch [options] <url> [destination]
 Downloads HTTP(S) and FTP/FTPS URLs (`ftp://[user:password@]host[:port]/path`), magnet links, and
 `.torrent` URLs or files. Without a destination the file is saved in the current directory. An
 existing directory, or a path ending in a separator, keeps the file name from the source; any other
-path is used as the file path. A bare file name such as `file.zip` is saved in `~/Downloads`, so
-use `./file.zip` for the current directory. Torrents follow the
+path, including a bare file name such as `file.zip`, is the file path, relative to the current
+directory. Torrents follow the
 [torrent destination rules](../docs/torrent.md), and public ones also announce to the `[torrent]`
 trackers of the default [config file](#config-file-locations).
 
 The download is kept in memory only and is not recorded in the [task database](#database). The
-command pauses the download after two seconds and resumes it a second later, to demonstrate pause
-and resume.
+command exits when the download completes or fails.
 
 | Option | Description |
 |---|---|
 | `--speed-limit <value>` | Limit download speed (e.g., `500k`, `1m`, `10m`) |
 | `--priority <level>` | Set download priority: `low`, `normal`, `high`, `urgent` |
 | `--max-concurrent <n>` | Max simultaneous downloads (default: 3) |
+| `--help`, `-h` | Show help message |
 
 **Examples:**
 
 ```bash
 # Basic download
 ketch https://example.com/file.zip
+
+# Save as file.zip in the current directory
+ketch https://example.com/latest.zip file.zip
 
 # Download to a specific path
 ketch https://example.com/file.zip /tmp/file.zip
@@ -108,8 +111,8 @@ ketch -v "magnet:?xt=urn:btih:<info-hash>" ~/Downloads/
 
 Start the Ketch daemon server with REST API, SSE event stream, and the bundled web UI. It
 downloads HTTP(S), FTP/FTPS and BitTorrent sources, stores tasks in the
-[task database](#database), and announces itself on the local network over mDNS unless
-`mdnsEnabled` is `false`.
+[task database](#database) and restores them when it starts, and announces itself on the local
+network over mDNS unless `mdnsEnabled` is `false`.
 
 ```bash
 ketch server [options]
@@ -206,7 +209,8 @@ ketch mcp [options]
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--help`, `-h` | Show help message |
 
-Register it with your MCP client, for example in Claude Desktop's `claude_desktop_config.json`:
+Stdout carries only the MCP protocol; the banner and all logs go to stderr. Register it with your
+MCP client, for example in Claude Desktop's `claude_desktop_config.json`:
 
 ```json
 {
@@ -274,6 +278,9 @@ never overwrites an existing file.
 
 ### Config file format
 
+Keys are camelCase and match the Kotlin property names. Unknown keys are ignored without a
+warning, so a misspelled key silently keeps its default.
+
 ```toml
 # Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
@@ -304,6 +311,8 @@ maxConnectionsPerHost = 8
 
 ### Config reference
 
+`name` must appear before the first `[table]` header.
+
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `name` | string | `"Ketch"` | Instance name shown to clients and announced over mDNS |
@@ -313,7 +322,7 @@ maxConnectionsPerHost = 8
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
-| `port` | int | `8642` | Port to listen on |
+| `port` | int | `8642` | Port to listen on (1-65535) |
 | `apiToken` | string | *(none)* | Bearer token for API authentication |
 | `corsAllowedHosts` | string[] | `[]` | Origins whose web pages may call the API (`["*"]` for any); needs `apiToken` (see [Web pages](#web-pages)) |
 | `allowedHosts` | string[] | `[]` | Extra `Host` names or IPs accepted without `apiToken` (see [Accepted hosts](#accepted-hosts)) |
@@ -323,16 +332,20 @@ maxConnectionsPerHost = 8
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `defaultDirectory` | string | `~/Downloads` | Default save directory; `~` is not expanded, so use a full path |
+| `defaultDirectory` | string | `~/Downloads` | Default save directory; a leading `~` is your home folder |
 | `speedLimit` | string | `"unlimited"` | Global speed limit (`"500k"`, `"10m"`, or bytes) |
 | `maxConnectionsPerDownload` | int | `4` | Connections (segments) per HTTP or FTP download |
 | `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads (`0` = unlimited) |
 | `maxConnectionsPerHost` | int | `8` | Max simultaneous downloads per host (`0` = unlimited) |
 | `retryCount` | int | `3` | Max automatic retries after a retryable failure |
-| `retryDelayMs` | int | `1000` | Base delay between retries (exponential backoff) |
-| `progressIntervalMs` | int | `200` | Progress update throttle interval |
-| `saveIntervalMs` | int | `5000` | Segment progress persistence interval |
+| `retryDelayMs` | long | `1000` | Base delay between retries (exponential backoff) |
+| `progressIntervalMs` | long | `200` | Progress update throttle interval |
+| `saveIntervalMs` | long | `5000` | Segment progress persistence interval |
 | `bufferSize` | int | `8192` | FTP read buffer size in bytes |
+
+A file with an invalid value fails to load. `maxConnectionsPerDownload`, `progressIntervalMs`,
+`saveIntervalMs` and `bufferSize` must be greater than 0; the other counts and delays must not
+be negative.
 
 #### `[torrent]`
 
