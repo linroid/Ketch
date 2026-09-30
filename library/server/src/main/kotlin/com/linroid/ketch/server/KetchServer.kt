@@ -79,7 +79,35 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
+ * ## Host check
+ *
+ * Without an [apiToken], the server answers `403 Forbidden` with an `ErrorResponse` to any
+ * request whose `Host` header, ignoring the port, is not one of:
+ * - a loopback name or address: `localhost`, `*.localhost`, `127.0.0.0/8` or `[::1]`
+ * - an IP address of one of this machine's network interfaces
+ * - this machine's host name, or its mDNS name `<host>.local`
+ * - an entry of [allowedHosts]
+ *
+ * This blocks DNS rebinding: a web page can re-resolve its own domain to this machine and
+ * become same-origin with the API, which CORS cannot prevent, but its requests still carry
+ * that domain as `Host`. Ketch apps connect to servers they discover over mDNS by IP
+ * address, so they pass without configuration. Requests without a `Host` header pass too,
+ * as browsers always send one.
+ *
+ * With an [apiToken] the check is off: a page cannot learn the token, so the token already
+ * blocks the attack, and any name that reaches the server, such as a reverse proxy's or a
+ * `nas.local` alias, keeps working.
+ *
  * @param ketch the KetchApi instance to expose
+ * @param host bind address
+ * @param port listen port
+ * @param apiToken bearer token every API request must carry, or `null` for no
+ *   authentication and a `Host` header check instead
+ * @param name instance name advertised over mDNS
+ * @param corsAllowedHosts origins allowed to call the API from browsers, or `"*"` for any
+ * @param allowedHosts extra `Host` names or IP addresses accepted when there is no
+ *   [apiToken], for example a DNS name or a Docker host's address
+ * @param mdnsEnabled whether to advertise the server over mDNS
  * @param mdnsRegistrar mDNS service registrar for LAN discovery
  */
 class KetchServer(
@@ -89,6 +117,7 @@ class KetchServer(
   private val apiToken: String? = null,
   private val name: String = "Ketch",
   private val corsAllowedHosts: List<String> = emptyList(),
+  private val allowedHosts: List<String> = emptyList(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
 ) {
@@ -173,6 +202,11 @@ class KetchServer(
     install(Resources)
 
     install(SSE)
+
+    // Installed before CORS so preflights from a rebound domain are rejected too.
+    if (apiToken == null) {
+      install(hostValidation(HostValidator(allowedHosts)))
+    }
 
     if (corsAllowedHosts.isNotEmpty()) {
       install(CORS) {

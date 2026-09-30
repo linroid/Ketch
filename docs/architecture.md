@@ -222,6 +222,8 @@ resources in `library:endpoints` (`Api`) and shared with the client:
   `task_removed`, `state_changed` and `progress` events
 - **Auth**: Optional bearer token (`KetchServer(apiToken = ...)`, `[server] apiToken` in
   `config.toml`) required on every API route
+- **Host check**: Without a token, requests must name this machine in `Host` (loopback, an
+  interface IP, the host name or `<host>.local`, or `allowedHosts`), which blocks DNS rebinding
 - **CORS**: Configurable allowed origins for browser clients
 - **Discovery**: Advertised on the LAN over mDNS as `_ketch._tcp` unless disabled
 - **Web UI**: Serves the bundled web app when it is packaged with the server (the CLI build does)
