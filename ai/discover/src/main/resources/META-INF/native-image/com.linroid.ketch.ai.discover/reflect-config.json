@@ -1,0 +1,101 @@
+[
+  {
+    "name": "com.linroid.ketch.ai.agent.DiscoveryToolSet",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.ai.agent.DiscoveryToolSet$Companion"
+  },
+  {
+    "name": "com.linroid.ketch.ai.agent.DiscoveryStepListener"
+  },
+  {
+    "name": "com.linroid.ketch.ai.agent.LinkExtractor"
+  },
+  {
+    "name": "com.linroid.ketch.ai.DiscoverResult"
+  },
+  {
+    "name": "com.linroid.ketch.ai.DiscoverResult$Source"
+  },
+  {
+    "name": "com.linroid.ketch.ai.fetch.ContentExtractor"
+  },
+  {
+    "name": "com.linroid.ketch.ai.fetch.SafeFetcher"
+  },
+  {
+    "name": "com.linroid.ketch.ai.fetch.UrlValidator"
+  },
+  {
+    "name": "com.linroid.ketch.ai.search.SearchProvider"
+  },
+  {
+    "name": "com.linroid.ketch.api.log.KetchLogger"
+  },
+  {
+    "name": "ai.koog.agents.core.tools.reflect.ToolSet",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "ai.koog.agents.core.tools.reflect.ToolFromCallable"
+  },
+  {
+    "name": "ai.koog.agents.core.tools.annotations.Tool",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "ai.koog.agents.core.tools.annotations.LLMDescription",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "ai.koog.serialization.JSONElement",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.serialization.JSONElement$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "kotlin.Metadata",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "kotlin.coroutines.Continuation"
+  },
+  {
+    "name": "kotlin.jvm.internal.DefaultConstructorMarker"
+  },
+  {
+    "name": "kotlinx.serialization.json.Json"
+  },
+  {
+    "name": "kotlinx.serialization.json.JsonObject"
+  },
+  {
+    "name": "ai.koog.agents.core.agent.context.GraphAgentContextData"
+  },
+  {
+    "name": "ai.koog.agents.core.agent.context.PlannerAgentContextData"
+  },
+  {
+    "name": "ai.koog.agents.core.dsl.extension.ReceivedToolResults"
+  },
+  {
+    "name": "ai.koog.agents.core.dsl.extension.ToolCalls"
+  },
+  {
+    "name": "ai.koog.agents.core.feature.debugger.Debugger"
+  },
+  {
+    "name": "ai.koog.prompt.message.Message"
+  },
+  {
+    "name": "ai.koog.prompt.message.Message$Assistant"
+  },
+  {
+    "name": "ai.koog.serialization.JSONObject"
+  }
+]

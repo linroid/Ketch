@@ -22,6 +22,7 @@ dependencies {
   implementation(projects.library.sqlite)
   implementation(compose.desktop.currentOs)
   implementation(libs.kotlinx.coroutinesSwing)
+  implementation(libs.kotlinx.serialization.json)
   // SLF4J backend for Ktor server and Koog; much smaller than Logback.
   runtimeOnly(libs.slf4j.simple)
 

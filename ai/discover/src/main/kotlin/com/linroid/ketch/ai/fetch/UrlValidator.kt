@@ -6,8 +6,12 @@ import java.net.URI
 /**
  * Validates URLs against SSRF attacks by blocking requests to
  * private/local IP ranges and non-HTTP(S) schemes.
+ *
+ * @param resolve looks up every address of a host name
  */
-internal class UrlValidator {
+internal class UrlValidator(
+  private val resolve: (String) -> Array<InetAddress> = InetAddress::getAllByName,
+) {
 
   /**
    * Validates the given [url] for safety.
@@ -25,7 +29,8 @@ internal class UrlValidator {
     val uri = try {
       URI(url)
     } catch (_: Exception) {
-      return ValidationResult.Blocked("Malformed URL: $url")
+      // The URL is left out: the reason is logged, and URLs can carry credentials.
+      return ValidationResult.Blocked("Malformed URL")
     }
 
     val scheme = uri.scheme?.lowercase()
@@ -45,7 +50,7 @@ internal class UrlValidator {
     }
 
     val addresses = try {
-      InetAddress.getAllByName(host)
+      resolve(host)
     } catch (_: Exception) {
       return ValidationResult.Blocked(
         "DNS resolution failed for: $host"

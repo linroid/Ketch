@@ -183,6 +183,7 @@ fun AiDiscoverySettings(
     ) {
       SettingsSelectRow(
         title = "Search provider",
+        description = searchProviderHint(search.provider),
         value = search.provider,
         options = SearchProvider.entries,
         label = { it.label },
@@ -273,10 +274,19 @@ private fun providerHint(provider: LlmProvider): String = when (provider) {
     "Create a key in Google AI Studio at aistudio.google.com/apikey."
   LlmProvider.Ollama ->
     "No key needed. Run Ollama locally and pull a model first, " +
-      "for example: ollama pull qwen2.5:7b."
+      "for example: ollama pull ${LlmProvider.Ollama.defaultModel}."
   LlmProvider.OpenAiCompatible ->
     "For OpenRouter, DeepSeek, LM Studio, vLLM and similar servers — " +
       "use their endpoint and key."
+}
+
+private fun searchProviderHint(provider: SearchProvider): String? = when (provider) {
+  SearchProvider.None -> null
+  SearchProvider.Brave ->
+    "Create a subscription token at api-dashboard.search.brave.com."
+  SearchProvider.Google ->
+    "Google no longer accepts new Custom Search JSON API customers, " +
+      "and the API stops working on January 1, 2027."
 }
 
 /**
