@@ -404,7 +404,8 @@ private fun runServer(args: Array<String>) {
   if (serverConfig.corsAllowedHosts.isNotEmpty()) {
     println(
       "  CORS origins:  " +
-        serverConfig.corsAllowedHosts.joinToString(", ")
+        serverConfig.corsAllowedHosts.joinToString(", ") +
+        if (serverConfig.apiToken == null) " (ignored: needs --token)" else ""
     )
   }
   if (!downloadConfig.speedLimit.isUnlimited) {
@@ -745,8 +746,9 @@ private fun printServerUsage() {
   println("  --host <address>       Bind address (default: 0.0.0.0)")
   println("  --port <number>        Port number (default: 8642)")
   println("  --token <string>       API bearer token (optional)")
-  println("  --cors <hosts>         CORS allowed hosts as host[:port],")
-  println("                         comma-separated, or '*' (optional)")
+  println("  --cors <origins>       Origins whose web pages may call")
+  println("                         the API, comma-separated or '*';")
+  println("                         needs --token (optional)")
   println("  --allowed-hosts <names>")
   println("                         Extra Host names accepted without")
   println("                         a token, comma-separated (optional)")

@@ -224,7 +224,8 @@ resources in `library:endpoints` (`Api`) and shared with the client:
   `config.toml`) required on every API route
 - **Host check**: Without a token, requests must name this machine in `Host` (loopback, an
   interface IP, the host name or `<host>.local`, or `allowedHosts`), which blocks DNS rebinding
-- **CORS**: Configurable allowed origins for browser clients
+- **Browsers**: Without a token, requests from web pages on other origins are refused
+  (`CrossOriginGuard`); with one, `corsAllowedHosts` lists the origins that get CORS
 - **Discovery**: Advertised on the LAN over mDNS as `_ketch._tcp` unless disabled
 - **Web UI**: Serves the bundled web app when it is packaged with the server (the CLI build does)
 

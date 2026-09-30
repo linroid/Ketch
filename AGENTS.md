@@ -272,11 +272,15 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Without an API token, `HostValidator` answers 403 to requests whose `Host` is not a loopback
   name, an interface IP, the machine's host name or `<host>.local`, or in `allowedHosts`
   (DNS rebinding protection); with a token any `Host` is accepted
+- Without an API token, refuses requests from web pages on other origins (403
+  `origin_not_allowed`) and ignores `corsAllowedHosts`; its own web UI, browser extensions and
+  non-browser clients pass. With a token, `corsAllowedHosts` grants CORS (`host[:port]` for
+  both schemes, `scheme://host[:port]`, or `*`), and the apps default it to `*` so the hosted
+  web app can connect
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
 - `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
-  cannot bind never resumes them; CORS hosts are `host[:port]` without a scheme (Ktor's
-  `allowHost` rejects one)
+  cannot bind never resumes them
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in

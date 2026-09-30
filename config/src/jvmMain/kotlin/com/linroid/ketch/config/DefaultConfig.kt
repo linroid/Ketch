@@ -13,7 +13,10 @@ host = "0.0.0.0"
 port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
-# corsAllowedHosts = ["localhost:3000"]  # host[:port] without a scheme, or "*"
+# Origins whose web pages may call the API: host[:port] for http and https,
+# scheme://host[:port], or "*" for any. Only used with apiToken: without one,
+# pages on other origins are always refused.
+# corsAllowedHosts = ["localhost:3000"]
 # Without apiToken, requests must address this machine: localhost, one of its
 # IP addresses, its host name or <host>.local. List any other name used to
 # reach the server here.
