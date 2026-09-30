@@ -13,13 +13,15 @@ and native release archives include that directory beside the program.
 The shell installer retains archive notices in `ketch-licenses/` beside the installed
 executable. Older releases without a notices directory remain installable.
 
-The initial notices cover js-joda, Logback and JNA. They are not a complete
+The initial notices cover js-joda, Logback, SLF4J and JNA. They are not a complete
 transitive-dependency inventory. Keep upstream copyright statements unchanged.
 
 - Logback 1.6.3 is distributed using its EPL-2.0 option. The notices include the
   full EPL text and links to the corresponding upstream source archive and tag.
   Update both links when changing Logback; provide any distributed modifications
   to Logback under the applicable EPL terms.
+- Logback ships only with the CLI; the desktop app logs through slf4j-simple. Both
+  use SLF4J's MIT-licensed API.
 - JNA uses its Apache-2.0 option. Retain licenses for any bundled native components
   as well; choosing this option does not replace their separate terms.
 - js-joda's full BSD text is included. Preserve webpack's generated
@@ -28,7 +30,8 @@ transitive-dependency inventory. Keep upstream copyright statements unchanged.
 
 The Logback notice was obtained from the `v_1.6.3` upstream `LICENSE.txt`; EPL-2.0
 from SPDX's `license-list-data/text/EPL-2.0.txt`; the JNA notice from the 5.19.1
-JAR's `META-INF/LICENSE`; and js-joda's license from the installed npm package.
+JAR's `META-INF/LICENSE`; the SLF4J notice from the 2.0.18 slf4j-simple JAR's
+`META-INF/LICENSE.txt`; and js-joda's license from the installed npm package.
 
 Before publishing, audit the resolved runtime graph for each target, including
 native components and bundled JREs. Preserve each component's required license,
