@@ -80,7 +80,9 @@ fun AiDiscoverForm(
         onValueChange = { draft.sites = it },
         label = { Text("Websites (optional)") },
         placeholder = { Text("ubuntu.com, blender.org") },
-        supportingText = { Text("Separate website domains with commas.") },
+        supportingText = {
+          Text("Only these sites and their subdomains are used. Separate with commas.")
+        },
         singleLine = true, enabled = !loading,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),

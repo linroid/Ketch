@@ -125,7 +125,7 @@ ketch server [options]
 | `--host <address>` | Bind address (default: `0.0.0.0`) |
 | `--port <number>` | Port number, 1-65535 (default: `8642`) |
 | `--token <string>` | API bearer token for authentication |
-| `--cors <hosts>` | Comma-separated CORS allowed hosts without a scheme (e.g., `localhost:3000`), or `*` |
+| `--cors <origins>` | Comma-separated origins (`http://localhost:3000`), hosts for both `http` and `https` (`localhost:3000`), or `*`, whose web pages may call the API; needs `--token` (see [Web pages](#web-pages)) |
 | `--allowed-hosts <names>` | Comma-separated extra `Host` names accepted without a token |
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--speed-limit <value>` | Global speed limit (e.g., `10m`, `500k`) |
@@ -172,6 +172,26 @@ With `--token` or `apiToken` set, any `Host` is accepted, since a web page canno
 token. Set a token when the server is reached through another name, such as a reverse proxy or
 a DNS alias, instead of listing every name.
 
+#### Web pages
+
+A browser lets any web page send requests to the server, so it checks where a browser request
+comes from:
+
+- **Without `--token`**, it refuses requests from web pages on another origin (a different host
+  or port) with `403 Forbidden` and an `origin_not_allowed` error, and ignores `--cors`.
+  Otherwise any site you visit could start downloads that write anywhere you can, list your
+  tasks, and pause or cancel them. These still work: the web UI this server serves, browser
+  extensions such as Ketch's own, and clients outside a browser, such as the Ketch apps and
+  `curl`.
+- **With `--token`**, `--cors` lists the origins whose pages may call the API, such as
+  `http://localhost:3000` (a bare `localhost:3000` allows both `http` and `https`), or `*` for
+  any. Pages still need the token, which they cannot learn. Without `--cors`, only the web UI
+  this server serves can use it from a browser.
+
+Behind a reverse proxy that rewrites the `Host` header, the web UI counts as another origin;
+set a token there. The Ketch apps' server follows the same rules, and allows any origin once
+it has an access token, so the web app can connect.
+
 ### MCP server
 
 Run Ketch as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so AI
@@ -216,7 +236,7 @@ ketch ai-discover <query> [options]
 
 | Option | Description |
 |---|---|
-| `--sites <domains>` | Comma-separated domains to search first; a hint to the agent, not a hard limit |
+| `--sites <domains>` | Comma-separated domains to limit discovery to, subdomains included; redirects to download hosts are followed (see [AI discovery](../docs/ai-discovery.md#limiting-discovery-to-websites)) |
 | `--max-results <n>` | Max candidates to return (default: 5) |
 
 The command reads the `[ai]` section of the default [config file](#config-file-locations), which
@@ -264,6 +284,8 @@ Keys are camelCase and match the Kotlin property names. Unknown keys are ignored
 warning, so a misspelled key silently keeps its default.
 
 ```toml
+# Ketch Configuration
+
 # Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
 
@@ -272,23 +294,38 @@ host = "0.0.0.0"
 port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
-# corsAllowedHosts = ["localhost:3000"]
+# corsAllowedHosts = ["localhost:3000"]  # host[:port] without a scheme, or "*"
+# Without apiToken, requests must address this machine: localhost, one of its
+# IP addresses, its host name or <host>.local. List any other name used to
+# reach the server here.
 # allowedHosts = ["nas.example.com"]
 
 [download]
-# defaultDirectory = "/srv/downloads"
+# defaultDirectory = "~/Downloads"  # ~ is your home folder
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
 maxConcurrentDownloads = 2
 maxConnectionsPerHost = 8
+
+# Advanced settings (defaults are usually fine):
 # retryCount = 3
 # retryDelayMs = 1000
 # progressIntervalMs = 200
 # saveIntervalMs = 5000
 # bufferSize = 8192
 
+# Extra trackers announced alongside public torrents' own trackers, e.g. when
+# a network blocks a torrent's own tracker. Private torrents ignore them. The
+# apps edit this under Settings > BitTorrent.
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
+
+# Pre-configured remote servers.
+# [[remotes]]
+# host = "192.168.1.100"
+# port = 8642
+# apiToken = "token"
+# secure = false
 ```
 
 ### Config reference
@@ -306,7 +343,7 @@ maxConnectionsPerHost = 8
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
 | `port` | int | `8642` | Port to listen on (1-65535) |
 | `apiToken` | string | *(none)* | Bearer token for API authentication |
-| `corsAllowedHosts` | string[] | `[]` | Allowed CORS hosts without a scheme (e.g., `["localhost:3000"]`, or `["*"]` for all) |
+| `corsAllowedHosts` | string[] | `[]` | Origins whose web pages may call the API (`["*"]` for any); needs `apiToken` (see [Web pages](#web-pages)) |
 | `allowedHosts` | string[] | `[]` | Extra `Host` names or IPs accepted without `apiToken` (see [Accepted hosts](#accepted-hosts)) |
 | `mdnsEnabled` | bool | `true` | Announce the server on the local network (`_ketch._tcp`) |
 

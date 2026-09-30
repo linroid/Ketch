@@ -63,14 +63,10 @@ class AiModule(
       stepListener: DiscoveryStepListener = DiscoveryStepListener.None,
     ): AiModule {
       val urlValidator = UrlValidator()
-      val fetcherClient = HttpClient {
-        // SafeFetcher follows redirects itself so it can validate every
-        // hop; Ktor's redirect plugin would skip that check.
-        followRedirects = false
-        install(HttpTimeout) {
-          requestTimeoutMillis = config.fetcher.requestTimeoutMs
-        }
-      }
+      val fetcherClient = SafeFetcher.createHttpClient(
+        urlValidator = urlValidator,
+        requestTimeoutMs = config.fetcher.requestTimeoutMs,
+      )
       val fetcher = SafeFetcher(
         httpClient = fetcherClient,
         urlValidator = urlValidator,
