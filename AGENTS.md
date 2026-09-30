@@ -287,9 +287,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `META-INF/native-image/<module>/` of the module that needs it (`cli`, `library:mcp` for the MCP
   SDK and `KetchToolSet`, `ai:discover` for `DiscoveryToolSet`). Koog tool sets use kotlin-reflect,
   so new tool methods may need the types in their signatures registered
-- `NativeImageConfigTest` (in `cli` and `library:mcp`) checks that the metadata names existing
-  classes and covers every serializable MCP SDK type; build with `./gradlew :cli:nativeCompile`
-  and exercise `ketch mcp` to verify changes
+- Koog's Anthropic, Gemini and OpenAI Responses clients have Ktor find their request and response
+  serializers by class, and Gemini parts and Responses items use content-polymorphic serializers,
+  so `ai:discover` registers those classes too; the Ollama and chat-completions clients do not
+- `NativeImageConfigTest` (in `cli`, `library:mcp` and `ai:discover`) checks that the metadata
+  names existing classes and covers every serializable MCP SDK type and every subtype of Koog's
+  content-polymorphic types; build with `./gradlew :cli:nativeCompile` and exercise `ketch mcp`
+  and `ketch ai-discover` with each LLM provider to verify changes
 
 ### MCP Server (`library:mcp`)
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge

@@ -583,6 +583,8 @@ private fun runMcp(args: List<String>) {
 
   // stdout carries the JSON-RPC stream, so keep it for the transport and send everything
   // else to stderr: the banner, the console logger, Logback and any library output.
+  // Logback's console appender looks up System.out on every write, so this also covers the
+  // Logback that -v or --debug initialized before this point.
   val protocolOut = System.out
   System.setOut(System.err)
   printBanner()
