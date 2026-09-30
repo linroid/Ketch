@@ -17,9 +17,12 @@ export const MAGNET_CAPTURE_KEY = 'captureMagnetLinks';
 /**
  * @typedef {object} Instance
  * @property {string} id stable identifier, used in context menu ids
+ * @property {'app' | 'server'} type `app` is the Ketch app on this computer, reached through
+ *   native messaging; `server` is a Ketch server at `url`, such as `ketch server` or another
+ *   device
  * @property {string} name label shown in menus and the popup
- * @property {string} url base address of the Ketch server, without a trailing slash
- * @property {string} token bearer token; empty when the server does not require one
+ * @property {string} [url] base address of a server, without a trailing slash
+ * @property {string} [token] a server's bearer token; empty when it does not require one
  */
 
 /**
@@ -34,14 +37,12 @@ export const MAGNET_CAPTURE_KEY = 'captureMagnetLinks';
  * @property {boolean} notifications notify when a download is sent or falls back
  */
 
-/** @returns {Instance} */
+/** Name of the Ketch app instance unless the user renames it. */
+const LOCAL_INSTANCE_NAME = 'This computer';
+
+/** @returns {Instance} the Ketch app on this computer */
 export function localInstance() {
-  return {
-    id: LOCAL_INSTANCE_ID,
-    name: 'This computer',
-    url: `http://127.0.0.1:${DEFAULT_PORT}`,
-    token: '',
-  };
+  return { id: LOCAL_INSTANCE_ID, type: 'app', name: LOCAL_INSTANCE_NAME };
 }
 
 /** @returns {Settings} */
@@ -137,7 +138,10 @@ export function normalizeSettings(raw) {
   const instances = [];
   for (const candidate of Array.isArray(source.instances) ? source.instances : []) {
     const instance = normalizeInstance(candidate);
-    if (instance && !instances.some((it) => it.id === instance.id)) instances.push(instance);
+    if (!instance || instances.some((it) => it.id === instance.id)) continue;
+    // There is one Ketch app on this computer.
+    if (instance.type === 'app' && instances.some((it) => it.type === 'app')) continue;
+    instances.push(instance);
   }
   if (instances.length === 0) instances.push(localInstance());
   const defaultInstanceId = instances.some((it) => it.id === source.defaultInstanceId)
@@ -161,15 +165,21 @@ function normalizeInstance(candidate) {
   if (!candidate || typeof candidate !== 'object') return null;
   const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
   if (!id) return null;
+  const name = typeof candidate.name === 'string' ? candidate.name.trim() : '';
+  // Instances saved before there were types all had an address.
+  const type = candidate.type === 'app' || (candidate.type !== 'server' && !candidate.url)
+    ? 'app'
+    : 'server';
+  if (type === 'app') return { id, type, name: name || LOCAL_INSTANCE_NAME };
   let url;
   try {
     url = normalizeServerUrl(candidate.url);
   } catch {
     return null;
   }
-  const name = typeof candidate.name === 'string' ? candidate.name.trim() : '';
   return {
     id,
+    type,
     name: name || new URL(url).host,
     url,
     token: typeof candidate.token === 'string' ? candidate.token.trim() : '',

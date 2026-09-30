@@ -124,4 +124,6 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.ktor.client.cio)
   implementation(libs.logback)
+
+  testImplementation(libs.kotlin.test)
 }

@@ -1,9 +1,11 @@
+import { withEndpoint } from '../lib/connection.js';
 import { ext } from '../lib/ext.js';
 import { describeStatus, failureHint } from '../lib/format.js';
 import { KetchClient } from '../lib/ketch-client.js';
 import {
   isLoopbackUrl,
   loadSettings,
+  localInstance,
   newInstanceId,
   normalizeServerUrl,
   onSettingsChanged,
@@ -23,9 +25,9 @@ const toggles = {
 };
 
 /**
- * The page's form is the source of truth: every change is collected from it and saved. An
- * instance card keeps the last valid address it was saved with in `dataset.savedUrl`; a card
- * without one is a draft that is not saved until its address is valid.
+ * The page's form is the source of truth: every change is collected from it and saved. A server
+ * card keeps the last valid address it was saved with in `dataset.savedUrl`; one without is a
+ * draft that is not saved until its address is valid. The Ketch app's card has no address.
  */
 init().catch((error) => console.error('Ketch: could not load the settings page', error));
 
@@ -35,13 +37,20 @@ async function init() {
     addCard(instance, instance.id === settings.defaultInstanceId);
   }
   fillPreferences(settings);
-  updateRemoveButtons();
-  document.querySelectorAll('.instance').forEach(checkConnection);
+  updateInstanceButtons();
+  // Opening this page doesn't start the Ketch app; its "Test connection" button does.
+  document.querySelectorAll('.instance').forEach((card) => checkConnection(card));
 
-  $('add-instance').addEventListener('click', () => {
-    const card = addCard({ id: newInstanceId(), name: '', url: '', token: '' }, false);
-    updateRemoveButtons();
+  $('add-server').addEventListener('click', () => {
+    const card = addCard({ id: newInstanceId(), type: 'server', name: '', url: '', token: '' });
+    updateInstanceButtons();
     card.querySelector('.instance-url').focus();
+  });
+  $('add-app').addEventListener('click', () => {
+    const taken = document.querySelector(`.instance[data-id="${localInstance().id}"]`);
+    const card = addCard({ ...localInstance(), id: taken ? newInstanceId() : localInstance().id });
+    persist();
+    checkConnection(card);
   });
   for (const toggle of Object.values(toggles)) toggle.addEventListener('change', persist);
   $('min-file-size').addEventListener('change', persist);
@@ -68,32 +77,44 @@ function fillPreferences(settings) {
   }
 }
 
-function addCard(instance, isDefault) {
-  const card = $('instance-template').content.firstElementChild.cloneNode(true);
+function addCard(instance, isDefault = false) {
+  const app = instance.type === 'app';
+  const template = $(app ? 'app-instance-template' : 'instance-template');
+  const card = template.content.firstElementChild.cloneNode(true);
   card.dataset.id = instance.id;
-  card.dataset.savedUrl = instance.url;
+  card.dataset.type = instance.type;
   const nameInput = card.querySelector('.instance-name');
-  const urlInput = card.querySelector('.instance-url');
-  const tokenInput = card.querySelector('.instance-token');
   const defaultRadio = card.querySelector('input[type="radio"]');
   nameInput.value = instance.name;
-  urlInput.value = instance.url;
-  tokenInput.value = instance.token;
   defaultRadio.checked = isDefault;
-  defaultRadio.disabled = !instance.url;
-  updateNote(card);
-
   nameInput.addEventListener('change', persist);
-  urlInput.addEventListener('change', () => onUrlChanged(card));
-  tokenInput.addEventListener('change', () => {
-    persist();
-    checkConnection(card);
-  });
   defaultRadio.addEventListener('change', persist);
-  card.querySelector('.test').addEventListener('click', () => checkConnection(card));
   card.querySelector('.remove').addEventListener('click', () => removeCard(card));
+  card.querySelector('.test').addEventListener('click', () => {
+    checkConnection(card, { launch: true });
+  });
+  if (!app) {
+    card.dataset.savedUrl = instance.url;
+    const urlInput = card.querySelector('.instance-url');
+    const tokenInput = card.querySelector('.instance-token');
+    urlInput.value = instance.url;
+    tokenInput.value = instance.token;
+    defaultRadio.disabled = !instance.url;
+    updateNote(card);
+    urlInput.addEventListener('change', () => onUrlChanged(card));
+    tokenInput.addEventListener('change', () => {
+      persist();
+      checkConnection(card);
+    });
+  }
   $('instances').append(card);
+  updateInstanceButtons();
   return card;
+}
+
+/** Whether the card is saved: the Ketch app always is, a server once its address is valid. */
+function isSaved(card) {
+  return card.dataset.type === 'app' || Boolean(card.dataset.savedUrl);
 }
 
 function onUrlChanged(card) {
@@ -117,19 +138,24 @@ function removeCard(card) {
   const wasDefault = card.querySelector('input[type="radio"]').checked;
   card.remove();
   if (wasDefault) {
-    const next = [...document.querySelectorAll('.instance')].find((it) => it.dataset.savedUrl);
+    const next = [...document.querySelectorAll('.instance')].find(isSaved);
     if (next) next.querySelector('input[type="radio"]').checked = true;
   }
-  updateRemoveButtons();
+  updateInstanceButtons();
   persist();
 }
 
-/** The last saved instance can't be removed: captured downloads need somewhere to go. */
-function updateRemoveButtons() {
-  const saved = [...document.querySelectorAll('.instance')].filter((it) => it.dataset.savedUrl);
-  document.querySelectorAll('.instance').forEach((card) => {
+/**
+ * The last saved instance can't be removed, since captured downloads need somewhere to go, and
+ * the Ketch app can be added back once removed.
+ */
+function updateInstanceButtons() {
+  const cards = [...document.querySelectorAll('.instance')];
+  const saved = cards.filter(isSaved);
+  for (const card of cards) {
     card.querySelector('.remove').disabled = saved.length === 1 && saved[0] === card;
-  });
+  }
+  $('add-app').hidden = cards.some((card) => card.dataset.type === 'app');
 }
 
 function updateNote(card) {
@@ -138,10 +164,12 @@ function updateNote(card) {
     !url || url.startsWith('https:') || isLoopbackUrl(url);
 }
 
-async function checkConnection(card) {
+/** Shows whether the card's instance answers; only `launch` starts the Ketch app. */
+async function checkConnection(card, { launch = false } = {}) {
+  const app = card.dataset.type === 'app';
   const url = card.dataset.savedUrl;
   const dot = card.querySelector('.status-dot');
-  if (!url) {
+  if (!app && !url) {
     dot.removeAttribute('data-state');
     showCardStatus(card, 'info', 'Enter the address of a Ketch server.');
     return;
@@ -149,16 +177,20 @@ async function checkConnection(card) {
   const check = String(Number(card.dataset.check ?? 0) + 1);
   card.dataset.check = check;
   dot.removeAttribute('data-state');
-  showCardStatus(card, 'info', 'Connecting…');
-  const instance = { url, token: card.querySelector('.instance-token').value.trim() };
+  showCardStatus(card, 'info', launch && app ? 'Opening Ketch…' : 'Connecting…');
+  const instance = app
+    ? { type: 'app' }
+    : { type: 'server', url, token: card.querySelector('.instance-token').value.trim() };
   try {
-    const status = await new KetchClient(instance, { timeoutMs: CHECK_TIMEOUT_MS }).status();
+    const status = await withEndpoint(instance, (endpoint) => {
+      return new KetchClient(endpoint, { timeoutMs: CHECK_TIMEOUT_MS }).status();
+    }, { launch });
     if (card.dataset.check !== check) return;
     if (!status.version) throw new Error('This address does not look like a Ketch server');
     dot.dataset.state = 'online';
     showCardStatus(card, 'info', describeStatus(status, { withOs: true }));
     const nameInput = card.querySelector('.instance-name');
-    if (!nameInput.value.trim() && status.name) {
+    if (!app && !nameInput.value.trim() && status.name) {
       nameInput.value = status.name;
       persist();
     }
@@ -179,15 +211,19 @@ function showCardStatus(card, tone, text) {
 let savedTimer;
 
 async function persist() {
-  const cards = [...document.querySelectorAll('.instance')].filter((it) => it.dataset.savedUrl);
+  const cards = [...document.querySelectorAll('.instance')].filter(isSaved);
   const defaultCard = cards.find((it) => it.querySelector('input[type="radio"]').checked);
   const saved = await saveSettings({
-    instances: cards.map((card) => ({
-      id: card.dataset.id,
-      name: card.querySelector('.instance-name').value,
-      url: card.dataset.savedUrl,
-      token: card.querySelector('.instance-token').value,
-    })),
+    instances: cards.map((card) => {
+      const common = { id: card.dataset.id, name: card.querySelector('.instance-name').value };
+      if (card.dataset.type === 'app') return { ...common, type: 'app' };
+      return {
+        ...common,
+        type: 'server',
+        url: card.dataset.savedUrl,
+        token: card.querySelector('.instance-token').value,
+      };
+    }),
     defaultInstanceId: defaultCard?.dataset.id,
     interceptDownloads: toggles.interceptDownloads.checked,
     forwardCookies: toggles.forwardCookies.checked,
@@ -202,7 +238,7 @@ async function persist() {
     card.querySelector('.instance-name').value = instance.name;
     card.querySelector('input[type="radio"]').checked = instance.id === saved.defaultInstanceId;
   }
-  updateRemoveButtons();
+  updateInstanceButtons();
   $('saved').hidden = false;
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => {
