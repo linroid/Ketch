@@ -40,19 +40,35 @@ internal class RateLimiter(
    */
   suspend fun <T> withPermit(host: String, block: suspend () -> T): T {
     val key = host.lowercase()
-    // Each caller reserves its start time under the lock, so two
-    // callers never both see an idle host and start together.
-    val waitMs = mutex.withLock {
-      val now = nowMs()
-      // Hosts whose spacing has passed need no entry; dropping them
-      // keeps the map from growing for the life of the app.
-      nextStart.values.removeAll { it <= now }
-      val start = maxOf(now, nextStart[key] ?: now)
-      nextStart[key] = start + delayMs
-      start - now
+    while (true) {
+      // The host's start time is reserved only while holding a slot, so
+      // callers that queued for a slot cannot start back to back. No
+      // slot is held while waiting out the spacing.
+      val waitMs = slots.withPermit {
+        val wait = reserve(key)
+        if (wait == 0L) return block()
+        wait
+      }
+      delay(waitMs)
     }
-    if (waitMs > 0) delay(waitMs)
-    return slots.withPermit { block() }
+  }
+
+  /**
+   * Reserves a start for [key] now and returns `0`, or returns how long
+   * to wait before [key] may start.
+   */
+  private suspend fun reserve(key: String): Long = mutex.withLock {
+    val now = nowMs()
+    // Hosts whose spacing has passed need no entry; dropping them
+    // keeps the map from growing for the life of the app.
+    nextStart.values.removeAll { it <= now }
+    val next = nextStart[key]
+    if (next != null) {
+      next - now
+    } else {
+      nextStart[key] = now + delayMs
+      0L
+    }
   }
 
   companion object {

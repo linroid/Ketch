@@ -152,7 +152,9 @@ ResourceDiscoveryService.discover()
 - Content size cap: 2 MB per fetch. Bodies are streamed, so the cap
   holds for responses without a `Content-Length`
 - robots.txt: `fetchPage` refuses paths the site disallows for the
-  `KetchBot` token (the `User-Agent` up to its `/`). Each origin's
+  `KetchBot` token (the `User-Agent` up to its `/`), checking every
+  redirect hop against its own origin's rules. A group naming `KetchBot`
+  replaces the `*` groups, as RFC 9309 specifies. Each origin's
   robots.txt is read once per run and does not count toward the budget.
   A missing or unreadable robots.txt allows everything; `*` and `$`
   wildcards in rules are not supported, and `Crawl-delay` is not applied.

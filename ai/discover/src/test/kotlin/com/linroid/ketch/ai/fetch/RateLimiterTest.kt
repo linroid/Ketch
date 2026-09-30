@@ -52,4 +52,19 @@ class RateLimiterTest {
 
     assertEquals(500L, secondStart)
   }
+
+  @Test
+  fun withPermit_sameHostQueuedForSlot_staysSpacedWhenSlotFrees() = runTest {
+    val limiter = limiter(delayMs = 1000, maxConcurrent = 1)
+    val starts = mutableListOf<Long>()
+
+    listOf(
+      launch { limiter.withPermit("other.example") { delay(2000) } },
+      launch { limiter.withPermit("example.com") { starts += testScheduler.currentTime } },
+      launch { limiter.withPermit("example.com") { starts += testScheduler.currentTime } },
+    ).joinAll()
+
+    // Both waited for the slot; the second still starts a delay later.
+    assertEquals(listOf(2000L, 3000L), starts)
+  }
 }

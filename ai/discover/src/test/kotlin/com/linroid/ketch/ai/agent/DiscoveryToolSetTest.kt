@@ -88,6 +88,24 @@ class DiscoveryToolSetTest {
   }
 
   @Test
+  fun fetchPage_redirectToDisallowedPath_isNotFollowed() = runTest {
+    val engine = MockEngine { request ->
+      when (request.url.encodedPath) {
+        "/robots.txt" -> respond("User-agent: *\nDisallow: /private")
+        "/go" ->
+          respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "/private/notes"))
+        else -> respond("<html>private</html>")
+      }
+    }
+
+    val result = parse(toolSet(engine).fetchPage("https://example.com/go"))
+
+    val error = assertNotNull(result.error())
+    assertTrue("robots.txt" in error, error)
+    assertEquals(listOf("/robots.txt", "/go"), engine.requestedPaths)
+  }
+
+  @Test
   fun fetchPage_missingRobots_allowsAndIsReadOncePerOrigin() = runTest {
     val engine = MockEngine(site(robots = null))
     val tools = toolSet(engine)

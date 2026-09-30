@@ -91,7 +91,8 @@ Every page and HEAD request goes through the same safeguards:
   budget is spent the agent returns what it has found.
 - Requests to the same host are at least a second apart, and at most
   three run at once.
-- Pages a site's `robots.txt` disallows for `KetchBot` are not fetched.
+- Pages a site's `robots.txt` disallows for `KetchBot` are not fetched,
+  even when a redirect leads to them.
   Checking a download link's size and type with a HEAD request is not
   treated as crawling.
 

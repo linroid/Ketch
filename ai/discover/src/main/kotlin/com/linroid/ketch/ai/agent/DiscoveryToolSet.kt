@@ -121,9 +121,9 @@ internal class DiscoveryToolSet(
     url: String,
   ): String {
     log.d { "fetchPage: ${redactUrl(url)}" }
-    val uri = when (val v = urlValidator.validate(url)) {
+    when (val v = urlValidator.validate(url)) {
       is ValidationResult.Blocked -> return errorJson(v.reason)
-      is ValidationResult.Valid -> v.uri
+      is ValidationResult.Valid -> { /* ok */ }
     }
 
     val allowance = budget.reserveBytes(fetcher.maxContentBytes)
@@ -137,13 +137,10 @@ internal class DiscoveryToolSet(
       budget.returnBytes(allowance)
       return errorJson(requestBudgetSpent())
     }
-    if (!robotsAllow(uri)) {
-      budget.returnBytes(allowance)
-      log.d { "fetchPage: robots.txt disallows ${redactUrl(url)}" }
-      return errorJson("The site's robots.txt disallows fetching this page")
-    }
 
-    val result = fetcher.fetch(url, allowance)
+    // robots.txt is checked on every hop: an allowed URL may redirect
+    // to a disallowed one.
+    val result = fetcher.fetch(url, allowance, checkHop = ::robotsRefusal)
     budget.returnBytes(allowance - ((result as? FetchResult.Success)?.byteCount ?: 0))
     return when (result) {
       is FetchResult.Success -> {
@@ -297,8 +294,8 @@ internal class DiscoveryToolSet(
     "Request budget of ${budget.maxRequests} page fetches and HEAD requests for this " +
       "discovery is spent. Stop fetching and return your results."
 
-  /** Whether robots.txt at the origin of [uri] lets us fetch it. */
-  private suspend fun robotsAllow(uri: URI): Boolean {
+  /** Why robots.txt forbids fetching [uri], or `null` when it allows it. */
+  private suspend fun robotsRefusal(uri: URI): String? {
     val port = if (uri.port == -1) "" else ":${uri.port}"
     val origin = "${uri.scheme.lowercase()}://${uri.host.lowercase()}$port"
     val rules = robotsMutex.withLock {
@@ -310,7 +307,12 @@ internal class DiscoveryToolSet(
       }
     }
     val path = uri.rawPath.ifEmpty { "/" } + uri.rawQuery?.let { "?$it" }.orEmpty()
-    return siteProfiler.isAllowed(path, rules)
+    return if (siteProfiler.isAllowed(path, rules)) {
+      null
+    } else {
+      // No path: SafeFetcher logs the reason, and a query can carry tokens.
+      "robots.txt at $origin disallows this page"
+    }
   }
 
   companion object {

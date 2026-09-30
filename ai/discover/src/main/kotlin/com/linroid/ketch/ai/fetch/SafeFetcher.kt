@@ -20,6 +20,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.ByteArrayOutputStream
+import java.net.URI
 
 /**
  * SSRF-protected HTTP fetcher that validates every URL it requests
@@ -58,13 +59,21 @@ internal class SafeFetcher(
    * Fetches the content at [url], reading at most [maxBytes] of the
    * body (capped at the fetcher's per-fetch limit).
    *
+   * @param checkHop runs on every URL about to be requested, redirect
+   *   targets included, after SSRF validation; a non-null result is
+   *   why that URL must not be requested, and ends the fetch
    * @return [FetchResult.Success] with the content, or
    *   [FetchResult.Failed] with a reason
    */
-  suspend fun fetch(url: String, maxBytes: Long = maxContentBytes): FetchResult {
+  suspend fun fetch(
+    url: String,
+    maxBytes: Long = maxContentBytes,
+    checkHop: suspend (URI) -> String? = { null },
+  ): FetchResult {
     val limit = maxBytes.coerceIn(0, maxContentBytes)
+    val fail: (String) -> FetchResult = { FetchResult.Failed(url, it) }
     return try {
-      exchange(url, HttpMethod.Get, fail = { FetchResult.Failed(url, it) }) { finalUrl, response ->
+      exchange(url, HttpMethod.Get, checkHop, fail) { finalUrl, response ->
         readBody(url, finalUrl, response, limit)
       }
     } catch (e: Exception) {
@@ -107,27 +116,33 @@ internal class SafeFetcher(
   /**
    * Sends [method] to [url] and hands the first response that is not a
    * redirect to [handle] along with the URL that produced it. Each hop
-   * is validated before it is requested; a blocked hop, or more than
-   * [maxRedirects] redirects, ends the exchange through [fail].
+   * is validated, then passed to [checkHop], before it is requested; a
+   * refused hop, or more than [maxRedirects] redirects, ends the
+   * exchange through [fail].
    */
   private suspend fun <T> exchange(
     url: String,
     method: HttpMethod,
+    checkHop: suspend (URI) -> String? = { null },
     fail: (reason: String) -> T,
     handle: suspend (finalUrl: String, response: HttpResponse) -> T,
   ): T {
     var current = url
     for (redirects in 0..maxRedirects) {
-      val host = when (val validation = urlValidator.validate(current)) {
+      val uri = when (val validation = urlValidator.validate(current)) {
         is ValidationResult.Blocked -> {
           log.w { "Blocked ${redactUrl(current)}: ${validation.reason}" }
           return fail(
             if (redirects == 0) validation.reason else "Redirect blocked: ${validation.reason}",
           )
         }
-        is ValidationResult.Valid -> validation.uri.host
+        is ValidationResult.Valid -> validation.uri
       }
-      val hop = rateLimiter.withPermit(host) {
+      checkHop(uri)?.let { reason ->
+        log.d { "Refused ${redactUrl(current)}: $reason" }
+        return fail(if (redirects == 0) reason else "Redirect refused: $reason")
+      }
+      val hop = rateLimiter.withPermit(uri.host) {
         httpClient.prepareRequest(current) {
           this.method = method
           header(HttpHeaders.UserAgent, userAgent)
