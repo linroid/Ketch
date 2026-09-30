@@ -37,6 +37,7 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.Locale
+import kotlin.system.exitProcess
 
 /** Ketch library log level, derived from CLI flags. */
 private var ketchLogLevel = LogLevel.INFO
@@ -629,6 +630,9 @@ private fun runMcp(args: List<String>) {
     ketch.start()
     mcpServer.startStdio(output = protocolOut)
   }
+  // The client closed stdin, which ends the MCP session. Exit rather than rely on every
+  // library thread being a daemon; the shutdown hook above closes Ketch.
+  exitProcess(0)
 }
 
 private fun printMcpError(message: String) {
