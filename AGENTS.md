@@ -286,8 +286,6 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   names existing classes and covers every serializable MCP SDK type and every subtype of Koog's
   content-polymorphic types; build with `./gradlew :cli:nativeCompile` and exercise `ketch mcp`
   and `ketch ai-discover` with each LLM provider to verify changes
-- `ketch mcp` keeps stdout for the JSON-RPC stream and redirects `System.out` to stderr, so the
-  banner, the console logger and Logback never corrupt it
 
 ### MCP Server (`library:mcp`)
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge

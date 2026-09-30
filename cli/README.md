@@ -90,7 +90,7 @@ command exits when the download completes or fails.
 **Examples:**
 
 ```bash
-# Basic download into the current directory
+# Basic download
 ketch https://example.com/file.zip
 
 # Save as file.zip in the current directory
