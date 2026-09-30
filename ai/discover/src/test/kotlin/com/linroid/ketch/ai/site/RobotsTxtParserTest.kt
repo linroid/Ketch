@@ -53,6 +53,36 @@ class RobotsTxtParserTest {
   }
 
   @Test
+  fun parse_specificGroupPresent_ignoresWildcardGroup() {
+    val content = """
+      User-agent: *
+      Allow: /private
+      Disallow: /tmp/
+
+      User-agent: KetchBot
+      Disallow: /private
+    """.trimIndent()
+
+    val rules = parser.parse(content, userAgent = "KetchBot")
+
+    assertEquals(listOf(RobotRule(path = "/private", allowed = false)), rules.rules)
+    assertFalse(parser.isAllowed("/private/page", rules))
+  }
+
+  @Test
+  fun parse_consecutiveUserAgentLines_shareOneGroup() {
+    val content = """
+      User-agent: KetchBot
+      User-agent: Googlebot
+      Disallow: /shared/
+    """.trimIndent()
+
+    val rules = parser.parse(content, userAgent = "KetchBot")
+
+    assertEquals(listOf(RobotRule(path = "/shared/", allowed = false)), rules.rules)
+  }
+
+  @Test
   fun parse_extractsSitemaps() {
     val content = """
       User-agent: *
@@ -164,5 +194,18 @@ class RobotsTxtParserTest {
     assertFalse(
       parser.isAllowed("/admin/secret", rules),
     )
+  }
+
+  @Test
+  fun isAllowed_equalLengthAllowAndDisallow_prefersAllow() {
+    val rules = RobotsTxtRules(
+      rules = listOf(
+        RobotRule(path = "/page", allowed = false),
+        RobotRule(path = "/page", allowed = true),
+      ),
+      sitemaps = emptyList(),
+      crawlDelay = null,
+    )
+    assertTrue(parser.isAllowed("/page", rules))
   }
 }

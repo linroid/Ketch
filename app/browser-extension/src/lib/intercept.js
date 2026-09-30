@@ -66,7 +66,8 @@ export function captureDecision(item, settings, extensionId) {
 
 /** @returns {boolean} whether `url` is a file served by one of the configured instances */
 function servedByKetch(url, settings) {
-  return settings.instances.some((instance) => new URL(instance.url).origin === url.origin);
+  return settings.instances.some((instance) =>
+    instance.url && new URL(instance.url).origin === url.origin);
 }
 
 function skip(reason) {

@@ -19,7 +19,7 @@ Open **Settings** from the sidebar (desktop) or the bottom bar
 | API key | Required for everything except Ollama. |
 | Model | Blank uses the provider default (see below). |
 | Endpoint | Blank uses the provider default; required for OpenAI-compatible. |
-| Web search | None, Bing, or Google Programmable Search, plus credentials. |
+| Web search | None, Brave, or Google Programmable Search, plus credentials. |
 
 Changes are saved as you make them — there is no Save button — and the
 discovery engine is rebuilt in place, without restarting the app. **Test**
@@ -67,8 +67,34 @@ the endpoint with or without the trailing `/v1`; both work.
 
 Without a search provider the agent can only read pages it is pointed at
 (the *Limit to websites* field on the Discover page), so results are
-thin. Bing needs a subscription key; Google needs an API key plus a
-Programmable Search engine id (`cx`).
+thin.
+
+- **Brave** needs a Brave Search API subscription token, created at
+  `api-dashboard.search.brave.com`.
+- **Google** needs an API key plus a Programmable Search engine id
+  (`cx`). Google has closed the Custom Search JSON API to new customers
+  and turns it off on January 1, 2027, so only existing keys work.
+
+Bing is no longer offered: Microsoft retired the Bing Search APIs on
+August 11, 2025. A config file that still says `provider = "bing"`
+loads with web search set to None; pick another provider in Settings.
+
+## What the agent may fetch
+
+Every page and HEAD request goes through the same safeguards:
+
+- Only public `http` and `https` addresses are reached. Redirects are
+  followed one hop at a time (at most 10), and each hop is checked, so a
+  public page cannot redirect the agent to your router or `localhost`.
+- A discovery run may make 25 page fetches and HEAD requests in total
+  and read 20 MB of page content, with at most 2 MB per page. When the
+  budget is spent the agent returns what it has found.
+- Requests to the same host are at least a second apart, and at most
+  three run at once.
+- Pages a site's `robots.txt` disallows for `KetchBot` are not fetched,
+  even when a redirect leads to them.
+  Checking a download link's size and type with a HEAD request is not
+  treated as crawling.
 
 ## Environment variables
 
@@ -80,7 +106,7 @@ keeps tokens out of the config file and makes CI and CLI use easy:
 | `OPENAI_API_KEY` | OpenAI and OpenAI-compatible providers |
 | `ANTHROPIC_API_KEY` | Anthropic |
 | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | Google Gemini |
-| `BING_SEARCH_API_KEY` | Bing web search |
+| `BRAVE_SEARCH_API_KEY` | Brave web search |
 | `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` | Google web search |
 
 Rules:
@@ -90,7 +116,7 @@ Rules:
 - **In the apps, the Enable switch decides.** An exported key fills in a
   blank token once you switch discovery on, but it never switches the
   feature — or the Discover tab — on by itself.
-- **Web search follows the same rule.** Once you pick Bing or Google, a
+- **Web search follows the same rule.** Once you pick Brave or Google, a
   blank key (and Google's engine id) is filled from that provider's
   variables; saved values are kept and your choice is never switched to
   another provider.
@@ -99,10 +125,11 @@ Rules:
   discovery on — the "export a key and go" path. Once anything is
   configured, the environment only fills blank credentials there too.
 
-The settings page judges the form the way the engine will: when a blank
-field is covered by the environment it says so under the status line,
-and **Test** works with the token left empty. It also works
-with the switch off, so you can check a key before turning discovery on.
+The settings page judges the form the way the engine will: a blank API
+key that the environment supplies is noted under the **API key** field
+and counts as filled in the status line, and **Test** works with the
+token left empty. It also works with the switch off, so you can check a
+key before turning discovery on.
 
 ## config.toml
 
@@ -123,7 +150,7 @@ cx = "..."
 ```
 
 Provider values are `openai`, `anthropic`, `google`, `ollama`,
-`openai-compatible`; search providers are `none`, `bing`, `google`. A
+`openai-compatible`; search providers are `none`, `brave`, `google`. A
 config file without an `[ai]` section keeps the defaults (discovery off).
 
 ## Where the tab goes
@@ -138,6 +165,9 @@ returns you to Downloads.
 
 Discovery runs in-process on the desktop and Android apps and in the
 CLI. iOS and the web app have no local engine, so their settings page
-reports AI discovery as unavailable. See
+reports AI discovery as unavailable. The daemon's REST API has no
+discovery endpoints: with a remote instance selected, the desktop and
+Android apps still run discovery on the device, and the candidates you
+pick are downloaded by that instance. See
 [ai/discover/README.md](../ai/discover/README.md) for the engine
 internals.

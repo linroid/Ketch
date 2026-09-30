@@ -42,6 +42,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.util.concurrent.CountDownLatch
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -59,27 +60,61 @@ import kotlin.coroutines.cancellation.CancellationException
  *
  * ## API Endpoints
  *
- * ### Tasks
- * - `GET    /api/tasks`            — list all tasks
- * - `POST   /api/tasks`            — create a new download
- * - `GET    /api/tasks/{id}`       — get task by ID
- * - `POST   /api/tasks/{id}/pause` — pause a download
- * - `POST   /api/tasks/{id}/resume`— resume a download
- * - `POST   /api/tasks/{id}/cancel`— cancel a download
- * - `DELETE /api/tasks/{id}`       — remove a task
- * - `PUT    /api/tasks/{id}/speed-limit` — set task speed limit
- * - `PUT    /api/tasks/{id}/priority`    — set task priority
+ * Paths are defined by the `Api` resources in `library:endpoints`.
  *
  * ### Server
- * - `GET  /api/status`       — server health and task counts
- * - `PUT  /api/speed-limit`  — set global speed limit
- * - `POST /api/resolve`      — resolve URL metadata without downloading
+ * - `GET  /api/status`             — server health and task counts
+ * - `PUT  /api/config`             — update the download configuration, e.g. speed limit
+ * - `GET  /api/network-interfaces` — discover interfaces and current selection
+ * - `PUT  /api/network-interfaces` — select interfaces for new HTTP requests
+ * - `POST /api/resolve`            — resolve URL metadata without downloading
+ * - `POST /api/resolve/content`    — resolve metadata from uploaded file bytes (`?fileName=`)
  *
- * ### Events
+ * ### Tasks
+ * - `GET    /api/tasks`                  — list all tasks
+ * - `POST   /api/tasks`                  — create a new download
+ * - `GET    /api/tasks/{id}`             — get task by ID
+ * - `POST   /api/tasks/{id}/pause`       — pause a download
+ * - `POST   /api/tasks/{id}/resume`      — resume a download (`?destination=`)
+ * - `POST   /api/tasks/{id}/cancel`      — cancel a download
+ * - `DELETE /api/tasks/{id}`             — remove a task (`?deleteFiles=true`)
+ * - `PUT    /api/tasks/{id}/speed-limit` — set task speed limit
+ * - `PUT    /api/tasks/{id}/priority`    — set task priority
+ * - `PUT    /api/tasks/{id}/connections` — set task connections
+ *
+ * ### Events (SSE)
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
+ * ## Host check
+ *
+ * Without an [apiToken], the server answers `403 Forbidden` with an `ErrorResponse` to any
+ * request whose `Host` header, ignoring the port, is not one of:
+ * - a loopback name or address: `localhost`, `*.localhost`, `127.0.0.0/8` or `[::1]`
+ * - an IP address of one of this machine's network interfaces
+ * - this machine's host name, or its mDNS name `<host>.local`
+ * - an entry of [allowedHosts]
+ *
+ * This blocks DNS rebinding: a web page can re-resolve its own domain to this machine and
+ * become same-origin with the API, which CORS cannot prevent, but its requests still carry
+ * that domain as `Host`. Ketch apps connect to servers they discover over mDNS by IP
+ * address, so they pass without configuration. Requests without a `Host` header pass too,
+ * as browsers always send one.
+ *
+ * With an [apiToken] the check is off: a page cannot learn the token, so the token already
+ * blocks the attack, and any name that reaches the server, such as a reverse proxy's or a
+ * `nas.local` alias, keeps working.
+ *
  * @param ketch the KetchApi instance to expose
+ * @param host bind address
+ * @param port listen port
+ * @param apiToken bearer token every API request must carry, or `null` for no
+ *   authentication and a `Host` header check instead
+ * @param name instance name advertised over mDNS
+ * @param corsAllowedHosts origins allowed to call the API from browsers, or `"*"` for any
+ * @param allowedHosts extra `Host` names or IP addresses accepted when there is no
+ *   [apiToken], for example a DNS name or a Docker host's address
+ * @param mdnsEnabled whether to advertise the server over mDNS
  * @param mdnsRegistrar mDNS service registrar for LAN discovery
  */
 class KetchServer(
@@ -89,11 +124,13 @@ class KetchServer(
   private val apiToken: String? = null,
   private val name: String = "Ketch",
   private val corsAllowedHosts: List<String> = emptyList(),
+  private val allowedHosts: List<String> = emptyList(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
 ) {
   private val log = KetchLogger("KetchServer")
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+  private val stopped = CountDownLatch(1)
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
     host = host,
@@ -102,7 +139,8 @@ class KetchServer(
   )
 
   /**
-   * Starts the daemon server.
+   * Starts the daemon server. The server is listening when this returns or
+   * starts waiting; a failure to bind, such as a port in use, is thrown.
    *
    * @param wait when `true` (default), blocks the calling thread
    *   until the server is stopped. Set to `false` for non-blocking.
@@ -110,18 +148,34 @@ class KetchServer(
   fun start(wait: Boolean = true) {
     check(scope.isActive) { "Server has been stopped" }
     log.i { "Starting server on ${host}:${port}" }
-    engine.start(wait = wait)
+    engine.start(wait = false)
     startMdnsRegistration()
+    if (wait) awaitStop()
   }
+
+  /** Blocks the calling thread until [stop] is called. */
+  fun awaitStop() {
+    stopped.await()
+  }
+
+  /**
+   * Returns the port the server accepts connections on. With `port = 0` the system picks a free
+   * port, which is known once the server has started.
+   */
+  suspend fun port(): Int = engine.engine.resolvedConnectors().first().port
 
   /** Stops the daemon server gracefully. */
   fun stop() {
     log.i { "Stopping server" }
     scope.cancel()
-    engine.stop(
-      gracePeriodMillis = 1000,
-      timeoutMillis = 5000,
-    )
+    try {
+      engine.stop(
+        gracePeriodMillis = 1000,
+        timeoutMillis = 5000,
+      )
+    } finally {
+      stopped.countDown()
+    }
   }
 
   private fun startMdnsRegistration() {
@@ -173,6 +227,11 @@ class KetchServer(
     install(Resources)
 
     install(SSE)
+
+    // Installed before CORS so preflights from a rebound domain are rejected too.
+    if (apiToken == null) {
+      install(hostValidation(HostValidator(allowedHosts)))
+    }
 
     if (corsAllowedHosts.isNotEmpty()) {
       install(CORS) {

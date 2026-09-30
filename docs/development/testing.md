@@ -5,8 +5,9 @@
 - **Framework**: `kotlin.test` (`@Test`, `assertEquals`, `assertFailsWith`, `assertTrue`, etc.)
 - **Coroutines**: `kotlinx-coroutines-test` (`runTest` for suspend functions)
 - **Server**: `ktor-server-test-host` (`testApplication` for REST API tests)
-- **Source sets**: write tests in `commonTest` by default; use `jvmTest`/`iosTest`/`wasmJsTest`
-  only for platform-specific behavior
+- **Source sets**: write tests in `commonTest` by default; use `jvmTest`, `iosTest` or
+  `androidDeviceTest` only for platform-specific behavior. JVM-only modules (`library:server`,
+  `ai:discover`, `app:desktop`) use `src/test`
 - **No external assertion libraries** — use `kotlin.test` assertions only
 - **No mocking libraries** — write hand-crafted fakes (e.g., `FakeHttpEngine`)
 
@@ -75,11 +76,23 @@ coverage of completed segment progress.
 
 `HttpDownloadIntegrationTest` uses a loopback HTTP server, real Ktor connections, temporary
 output files, and SQLite task storage. It covers empty and small files, uneven segments,
-servers without range support, invalid range responses, interrupted transfers, HTTP retries,
-pause/resume, cancellation cleanup, live connection changes, changed server identity,
-SQLite restart/resume, truncated local files, and UTF-8 server filenames. Each case has a
-bounded timeout and closes its clients, server, database, and temporary files.
+servers without range support (including resuming from zero), invalid range responses,
+interrupted transfers, HTTP retries, pause/resume, cancellation cleanup, live connection
+changes, changed server identity, SQLite restart/resume, truncated local files, and UTF-8
+server filenames. Each case has a bounded timeout and closes its clients, server, database, and
+temporary files.
 
 Common tests also check response validation without sockets and regression cases for segment
 progress snapshots, cancellation, and resegmentation. Keep fault-injection tests local so they
 remain reproducible without relying on a public server to misbehave.
+
+## Other Suites
+
+- iOS simulator tests of `library:core`, `library:ftp` and `library:torrent` are skipped unless
+  `-PenableIosSimulatorTests=true` is passed to `iosSimulatorArm64Test`; JS tests run on Node.js
+  with `jsNodeTest`
+- The browser extension has its own unit tests: `npm test` (`node --test`, Node 22.2+) in
+  `app/browser-extension`
+- Torrent interoperability (Transmission, libtorrent), the opt-in public swarm test
+  (`-PpublicTorrentTests=true`), benchmarks and memory measurements are described in
+  [torrent verification](torrent-verification.md)
