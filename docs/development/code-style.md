@@ -17,7 +17,8 @@ Follow the formatting rules defined in `.editorconfig`:
 - Import order: `*`, `java.**`, `javax.**`, `kotlin.**`, `^`
 
 ### Spacing
-- Space before/after colons: no space before type colon, space after type colon
+- Space before/after colons: no space before type colon, space after type colon; spaces on
+  both sides of a supertype colon (`class A : B`)
 - Spaces around operators:
   - Assignment operators: yes
   - Arithmetic operators (additive, multiplicative): yes
@@ -63,6 +64,7 @@ When writing Kotlin code for this project:
   translating, or adapting code; retain its source revision, license, and required notices.
 - **Naming**: Use meaningful, descriptive names
 - **Functions**: Keep focused and concise
-- **Sealed hierarchies**: Use sealed classes/interfaces for closed type hierarchies (e.g., `KetchError`)
+- **Sealed hierarchies**: Use sealed classes/interfaces for closed type hierarchies
+  (e.g., `KetchError`)
 - **Simplicity**: Favor simple correctness over micro-optimizations
 - **Final newline**: Always end files with a trailing empty line
