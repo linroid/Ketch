@@ -4,8 +4,8 @@ Hands downloads from your browser to Ketch, on this computer or on a remote serv
 
 - **Captures downloads**: files you download in the browser go to Ketch instead. When Ketch
   can't be reached, the browser downloads them as usual.
-- **Context menu**: right-click a link, image, video or audio and choose **Download with
-  Ketch**. With several Ketch instances, a submenu lets you pick one.
+- **Context menu**: right-click a link, image, video or audio and choose **Download link with
+  Ketch** (or image, video, audio). With several Ketch instances, a submenu lets you pick one.
 - **Magnet links**: clicking a magnet link adds it to Ketch. Alt+click opens it in another app.
 - **Torrent files**: a `.torrent` download becomes a torrent task, even when the site serves it
   from a script such as `download.php?id=7`.
@@ -91,10 +91,13 @@ Nothing is sent anywhere except to the Ketch instances you add.
 |---|---|
 | `downloads` | Capture downloads and cancel them in the browser once Ketch has them |
 | `cookies` | Send a site's cookies to Ketch so downloads that need a session work |
-| `contextMenus` | The **Download with Ketch** menu items |
+| `contextMenus` | The **Download … with Ketch** menu items |
 | `notifications` | Tell you when a download was sent, or why it wasn't |
 | `storage` | Settings, including instance addresses and access tokens |
 | Access to all sites | Read cookies for any download, see magnet link clicks, and reach Ketch at any address |
+
+If the browser hasn't granted access to all sites, the settings page shows an **Allow access**
+button.
 
 Things to know:
 
@@ -136,7 +139,8 @@ npm run build   # build/chrome, build/firefox and a zip of each
 The build copies `src/`, rewrites the manifest for Firefox (an event page instead of a service
 worker, plus its add-on id), checks that every file the manifest names exists, and zips each
 build. Keep `version` in `package.json` and `src/manifest.json` the same; the build fails
-otherwise. The icons are rendered from `art/icon-app.svg` by `art/render-icons.sh`.
+otherwise. The icons are rendered from the repository's `art/icon-app.svg` by
+`art/render-icons.sh`.
 
 For a release tag, the release workflow runs `node build.mjs --version <version> --build <run
 number>` and attaches the zips to the GitHub release. Browsers only accept versions made of
@@ -150,8 +154,12 @@ including a final release after its release candidates, which the stores require
 | `src/content/magnet.js` | Sends clicked magnet links to the background script |
 | `src/popup/` | Toolbar popup |
 | `src/options/` | Settings page |
+| `src/ui/common.css` | Styles shared by the popup and the settings page |
 | `src/lib/settings.js` | Settings, instances and their validation |
 | `src/lib/ketch-client.js` | Client for the Ketch REST API |
-| `src/lib/handoff.js` | Builds a download request with cookies and creates the task |
+| `src/lib/handoff.js` | Creates the task with cookies, or resolves a fetched `.torrent` file first |
+| `src/lib/request.js` | Builds the download request and headers; recognizes torrents |
 | `src/lib/intercept.js` | Which browser downloads are captured |
+| `src/lib/format.js` | Text for tasks, sizes and connection problems |
+| `src/lib/ext.js` | The `browser` or `chrome` API namespace |
 | `test/` | Unit tests |

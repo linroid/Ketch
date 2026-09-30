@@ -1,13 +1,13 @@
 # Kotlin torrent downloads
 
-`library:torrent` downloads BitTorrent v1, v2, and hybrid content in common Kotlin on JVM 11+, Android 26+, and iOS
-(arm64 and arm64 simulator). The desktop app, Android app, iOS app, CLI, and daemon register
-`TorrentDownloadSource`. Browsers control the daemon through `RemoteKetch`.
+`library:torrent` downloads BitTorrent v1, v2, and hybrid content in common Kotlin on JVM 11+,
+Android 26+, and iOS (arm64 and arm64 simulator). The desktop app, Android app, iOS app, CLI, and
+daemon register `TorrentDownloadSource`. Browsers control the daemon through `RemoteKetch`; the
+[browser extension](../app/browser-extension/README.md) sends clicked magnet links and `.torrent`
+downloads to an instance's REST API.
 
 ```kotlin
-val torrents = TorrentDownloadSource(
-  TorrentConfig(),
-)
+val torrents = TorrentDownloadSource(TorrentConfig())
 val ketch = Ketch(
   httpEngine = KtorHttpEngine(),
   additionalSources = listOf(torrents),
@@ -28,10 +28,11 @@ ketch.close()
 
 For v1, a single-file destination names the file; a multi-file destination names the root folder.
 For v2/hybrid, the destination always names a root folder, including single-file torrents. Files
-inside it use the sanitized paths shown by resolution. An empty selection downloads every file. IDs retain their original metainfo indices.
-Progress counts verified selected bytes. In v1, a piece spanning selected and skipped files needs all
-its bytes for verification; skipped boundary bytes live in a hidden task sidecar, not in skipped
-output files. Network speed includes received payload, including those boundary bytes/retries.
+inside it use the sanitized paths shown by resolution. An empty selection downloads every file.
+IDs retain their original metainfo indices. Progress counts verified selected bytes. In v1, a
+piece spanning selected and skipped files needs all its bytes for verification; skipped boundary
+bytes live in a hidden task sidecar, not in skipped output files. Network speed includes received
+payload, including those boundary bytes/retries.
 
 For SDK-provided bytes, call `ketch.resolveContent(bytes, "name.torrent")` (or
 `torrents.resolveMetainfo(bytes)` on the source) and pass the returned source as
@@ -40,7 +41,10 @@ through `RemoteKetch`, which uploads the bytes to the daemon's `POST /api/resolv
 apps use it for `.torrent` files dropped onto the window. Local `.torrent` paths and
 `file:` URLs also work. HTTP(S) metainfo is bounded and fetched through the HTTP engine; tracker
 passkeys are not logged by the torrent HTTP adapter. Avoid enabling application-level URL logging
-for private tracker URLs. A supplied HTTP engine remains owned by its caller.
+for private tracker URLs. A supplied HTTP engine remains owned by its caller. Torrent log lines
+reduce tracker URLs to `scheme://host:port` and magnets to their topic and name. At debug level,
+each running swarm logs a summary every 30 seconds; see
+[troubleshooting](logging.md#troubleshooting) for reading it when a magnet or torrent stalls.
 
 ## Opening `.torrent` files in the apps
 
@@ -71,13 +75,15 @@ including a development run, hands its files to the running app instead of openi
 - Public magnets use BEP 9 metadata exchange, DHT, trackers, and explicit peers. Public swarms
   support peer exchange for v1. Configure `stateDirectory` to persist DHT routing candidates;
   a restart then reaches known nodes directly, even where the bootstrap names do not resolve.
-  The apps and CLI keep it in their config directory.
-- `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`; the apps edit
-  it under Settings → BitTorrent) adds trackers to public torrents and public magnet lookups. Each
-  one is announced alongside the torrent's own trackers rather than as a later tier, so it helps
-  when a network blocks the torrent's trackers. Private torrents and tracker-only discovery never
-  contact them. `TorrentDownloadSource.setAdditionalTrackers` changes the list for torrents started
-  or resumed later; the apps call it when the setting changes.
+  The apps and CLI keep it in a `torrent-state` folder in their app data directory.
+- `additionalTrackers` (`[torrent] trackers` in the apps' and CLI's `config.toml`) adds `http`,
+  `https` or `udp` trackers to public torrents and public magnet lookups; invalid URLs are ignored
+  and at most 64 are used. Each one is announced alongside the torrent's own trackers rather than
+  as a later tier, so it helps when a network blocks the torrent's trackers. Private torrents and
+  tracker-only discovery never contact them. `TorrentDownloadSource.setAdditionalTrackers` changes
+  the list for torrents started or resumed later. The apps edit the embedded instance's list under
+  Settings → BitTorrent and apply it this way; a remote instance's list can only be changed on
+  that device.
 - Private metainfo disables DHT and peer exchange, keeps one working tracker until failover,
   and disconnects its old peers before switching. Public-mode magnets that reveal private metadata
   are rejected; use tracker-only resolution or authenticated metainfo. Partial selections do not
