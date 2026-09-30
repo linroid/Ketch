@@ -1,6 +1,7 @@
 package com.linroid.ketch.ai.agent
 
 import com.linroid.ketch.ai.fetch.UrlValidator
+import com.linroid.ketch.ai.fetch.fakeDns
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,8 +9,15 @@ import kotlin.test.assertTrue
 
 class AgentOutputParserTest {
 
+  private val dns = fakeDns(
+    "example.com" to "203.0.113.1",
+    "bit.ly" to "203.0.113.2",
+    "releases.ubuntu.com" to "203.0.113.3",
+    "notubuntu.com" to "203.0.113.4",
+  )
+
   private val parser = AgentOutputParser(
-    urlValidator = UrlValidator(),
+    urlValidator = UrlValidator(dns),
     safetyFilter = DeviceSafetyFilter(),
     json = Json { ignoreUnknownKeys = true; isLenient = true },
   )
@@ -107,6 +115,21 @@ class AgentOutputParserTest {
     // Confidence should be adjusted (multiplied by safety score)
     // so it won't be exactly 1.0
     assertTrue(result[0].confidence <= 1.0f)
+  }
+
+  @Test
+  fun parse_allowlist_keepsOnlyCandidatesOnAllowedSites() {
+    // The source page is not checked: only where the file is served matters.
+    val output = """[
+      {"name":"ISO","url":"https://releases.ubuntu.com/24.04/ubuntu.iso",
+       "fileType":"iso","sourcePageUrl":"https://example.com/blog",
+       "description":"","confidence":0.9,"deviceSafetyNotes":""},
+      {"name":"Lookalike","url":"https://notubuntu.com/ubuntu.iso",
+       "fileType":"iso","sourcePageUrl":"https://notubuntu.com",
+       "description":"","confidence":0.9,"deviceSafetyNotes":""}
+    ]"""
+    val result = parser.parse(output, SiteAllowlist.of(listOf("ubuntu.com")))
+    assertEquals(listOf("https://releases.ubuntu.com/24.04/ubuntu.iso"), result.map { it.url })
   }
 
   @Test

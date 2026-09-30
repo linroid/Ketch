@@ -31,6 +31,7 @@ ai/discover/
 │   ├── AgentOutputParser.kt     # Parse + validate agent JSON output
 │   ├── DeviceSafetyFilter.kt    # URL safety scoring
 │   ├── LinkExtractor.kt         # Download link extraction from HTML
+│   ├── SiteAllowlist.kt         # Websites a run is limited to
 │   └── DiscoveryStepListener.kt # Progress callback interface
 │
 ├── fetch/                       # HTTP fetching with security
@@ -84,12 +85,12 @@ that follows a structured 5-phase workflow:
 
 | Tool | Description | Backend |
 |------|-------------|---------|
-| `searchWeb(query, maxResults)` | Web search | `SearchProvider.search()` |
-| `searchSites(sites, query, maxResults)` | Site-restricted search | `SearchProvider.search(sites=)` |
-| `fetchPage(url)` | Fetch + extract text and links (honors robots.txt) | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
-| `headUrl(url)` | HTTP HEAD for metadata and the final URL after redirects | `SafeFetcher.head()` |
+| `searchWeb(query, maxResults)` | Web search, scoped to the allowed sites | `SearchProvider.search()` |
+| `searchSites(sites, query, maxResults)` | Site-restricted search; the sites must be allowed | `SearchProvider.search(sites=)` |
+| `fetchPage(url)` | Fetch + extract text and links (allowed sites only; honors robots.txt) | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
+| `headUrl(url)` | HTTP HEAD for metadata and the final URL after redirects (allowed sites only) | `SafeFetcher.head()` |
 | `extractDownloads(pageText, baseUrl)` | Extract download links from HTML | `LinkExtractor` |
-| `validateUrl(url)` | SSRF + allowlist check | `UrlValidator` |
+| `validateUrl(url)` | SSRF + allowed-site check | `UrlValidator` + `SiteAllowlist` |
 | `emitStep(title, details)` | Report progress to the user | `DiscoveryStepListener` |
 
 ## Data Flow
@@ -100,7 +101,8 @@ DiscoverQuery (query, sites, maxResults, fileTypes)
          ▼
 ResourceDiscoveryService.discover()
          │
-         ├── Build DiscoveryToolSet (with allowedDomains)
+         ├── SiteAllowlist.forRun(allowedDomains, query.sites)
+         ├── Build DiscoveryToolSet (with the allowlist)
          ├── Create Koog AIAgent (system prompt + tools)
          ├── agent.run(userMessage)
          │       │
@@ -110,8 +112,9 @@ ResourceDiscoveryService.discover()
          │       │
          │       └── Returns JSON array of candidates
          │
-         ├── AgentOutputParser.parse(agentOutput)
+         ├── AgentOutputParser.parse(agentOutput, allowlist)
          │       ├── Extract JSON from markdown/raw text
+         │       ├── Drop candidates outside the allowed sites
          │       ├── UrlValidator.validate() each URL
          │       ├── DeviceSafetyFilter.evaluate() each URL
          │       ├── Adjust confidence by safety score
@@ -130,6 +133,23 @@ ResourceDiscoveryService.discover()
   Ktor client has `followRedirects = false`, and `SafeFetcher` follows
   up to 10 redirects itself, validating each target before requesting it,
   so a public URL cannot redirect to a private or loopback address
+
+### Site allowlist (`SiteAllowlist`)
+- Built per run from `DiscoverQuery.sites`, narrowed to
+  `DiscoveryConfig.allowedDomains`; with neither set, any public site is
+  allowed
+- A domain covers its subdomains (`ubuntu.com` allows
+  `releases.ubuntu.com`, not `notubuntu.com`); a scheme, path, port or
+  leading `www.` in an entry is ignored
+- Enforced in the tools and the output parser: `searchWeb` passes the
+  sites to the provider and drops off-list results, `searchSites`,
+  `fetchPage` and `headUrl` refuse other hosts with
+  `{"error": ..., "allowedSites": [...]}`, and `AgentOutputParser` drops
+  candidates on other hosts
+- Redirects a listed site answers with are followed, so `github.com`
+  release assets served from `objects.githubusercontent.com` still
+  resolve. `headUrl` returns the requested `url` plus `finalUrl`, and the
+  agent is told to report the requested URL
 
 ### Device Safety (`DeviceSafetyFilter`)
 - Base score 0.7, adjusted by heuristics:
@@ -253,7 +273,7 @@ sections are engine tuning knobs.
 | | `maxTotalBytesPerRequest` | `20 MB` | Page body bytes per discovery run |
 | `DiscoveryConfig` | `maxConcurrentRequests` | `3` | Requests in flight across all runs |
 | | `userAgent` | `"KetchBot/1.0"` | User-Agent header |
-| | `allowedDomains` | `[]` | Allowlist for `validateUrl`, plus `DiscoverQuery.sites` (empty = all public) |
+| | `allowedDomains` | `[]` | Caps every run's sites; `DiscoverQuery.sites` only narrows it (empty = all public) |
 
 ## Testing
 
@@ -268,15 +288,19 @@ Tests cover:
 - `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps
 - `RateLimiterTest` — per-host spacing and the concurrency cap
 - `FetchBudgetTest` — per-run request and byte allowance
-- `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects
+- `SiteAllowlistTest` — site normalization, subdomain matching, config/query overlap (10 tests)
+- `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects, allowlist enforcement
 - `BraveSearchProviderTest` — request shape and response parsing
 - `RobotsTxtParserTest` — robots.txt parsing (11 tests)
 - `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)
-- `AgentOutputParserTest` — agent output parsing + validation (9 tests)
+- `AgentOutputParserTest` — agent output parsing, validation + allowlist (10 tests)
 - `GoogleSearchProviderTest` — query building; `GoogleSearchProviderIntegrationTest`
   parses responses from a mock engine
+
+Tests that need DNS answers resolve hosts through the `fakeDns` helper
+(`src/test/.../fetch/FakeDns.kt`) and serve HTTP from Ktor's `MockEngine`.
 
 ## Roadmap
 

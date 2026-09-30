@@ -123,7 +123,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverResult`,
   `RankedCandidate`
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
-  `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`
+  `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`, `SiteAllowlist`
 - `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
   `RateLimiter`, `FetchBudget`
 - `com.linroid.ketch.ai.search` -- `SearchProvider`, `BraveSearchProvider`,
@@ -230,7 +230,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   Koog models, and `temperature` is only sent to models that accept it
 - 7 agent tools: `searchWeb`, `searchSites`, `fetchPage`, `headUrl`,
   `extractDownloads`, `validateUrl`, `emitStep`
-- SSRF protection, device safety scoring, rate limiting
+- SSRF protection on every redirect hop, device safety scoring, rate limiting
+- `DiscoverQuery.sites` ("Limit to websites", CLI `--sites`) is a hard allowlist,
+  subdomains included, capped by `DiscoveryConfig.allowedDomains`: the tools refuse
+  other hosts and the output parser drops their candidates, but redirects a listed
+  site answers with (e.g. github.com to its CDN) are followed
 - JVM/Android only (uses Koog + Ktor CIO client)
 - See [AI discovery configuration](docs/ai-discovery.md)
 
