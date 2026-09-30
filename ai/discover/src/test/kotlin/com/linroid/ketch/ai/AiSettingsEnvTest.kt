@@ -90,12 +90,12 @@ class AiSettingsEnvTest {
   }
 
   @Test
-  fun `bing search credentials are picked up from the environment`() {
+  fun `brave search credentials are picked up from the environment`() {
     val settings = resolveAiSettingsFromEnv(
-      getenv = env("BING_SEARCH_API_KEY" to "bing-key"),
+      getenv = env("BRAVE_SEARCH_API_KEY" to "brave-key"),
     )
-    assertEquals(SearchProvider.Bing, settings.search.provider)
-    assertEquals("bing-key", settings.search.apiKey)
+    assertEquals(SearchProvider.Brave, settings.search.provider)
+    assertEquals("brave-key", settings.search.apiKey)
   }
 
   @Test
@@ -118,14 +118,14 @@ class AiSettingsEnvTest {
   fun `configured search settings win over the environment`() {
     val base = AiSettings(
       search = SearchSettings(
-        provider = SearchProvider.Bing, apiKey = "stored",
+        provider = SearchProvider.Brave, apiKey = "stored",
       ),
     )
     val settings = resolveAiSettingsFromEnv(
       base = base,
       getenv = env("GOOGLE_SEARCH_API_KEY" to "key", "GOOGLE_SEARCH_CX" to "cx"),
     )
-    assertEquals(SearchProvider.Bing, settings.search.provider)
+    assertEquals(SearchProvider.Brave, settings.search.provider)
     assertEquals("stored", settings.search.apiKey)
   }
 
@@ -149,7 +149,7 @@ class AiSettingsEnvTest {
 
   @Test
   fun `a chosen search provider is never switched to another one`() {
-    // Review case: a Bing key in the environment used to silently
+    // Review case: a search key in the environment used to silently
     // replace an incomplete Google choice.
     val base = AiSettings(
       enabled = true,
@@ -157,23 +157,23 @@ class AiSettingsEnvTest {
     )
     val settings = resolveAiSettingsFromEnv(
       base = base,
-      getenv = env("BING_SEARCH_API_KEY" to "bing-key"),
+      getenv = env("BRAVE_SEARCH_API_KEY" to "brave-key"),
     )
     assertEquals(SearchProvider.Google, settings.search.provider)
     assertFalse(settings.search.isComplete)
   }
 
   @Test
-  fun `a chosen bing provider gets its blank key from the environment`() {
+  fun `a chosen brave provider gets its blank key from the environment`() {
     val base = AiSettings(
       enabled = true,
-      search = SearchSettings(provider = SearchProvider.Bing),
+      search = SearchSettings(provider = SearchProvider.Brave),
     )
     val settings = resolveAiSettingsFromEnv(
       base = base,
-      getenv = env("BING_SEARCH_API_KEY" to "bing-key"),
+      getenv = env("BRAVE_SEARCH_API_KEY" to "brave-key"),
     )
-    assertEquals("bing-key", settings.search.apiKey)
+    assertEquals("brave-key", settings.search.apiKey)
   }
 
   @Test
@@ -185,7 +185,7 @@ class AiSettingsEnvTest {
     )
     val settings = resolveAiSettingsFromEnv(
       base = base,
-      getenv = env("BING_SEARCH_API_KEY" to "bing-key"),
+      getenv = env("BRAVE_SEARCH_API_KEY" to "brave-key"),
     )
     assertEquals(SearchProvider.None, settings.search.provider)
   }

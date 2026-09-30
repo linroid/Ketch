@@ -4,6 +4,7 @@ import com.linroid.ketch.server.mdns.MdnsRegistrar
 import java.net.ServerSocket
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -100,6 +101,21 @@ class MdnsRegistrationTest {
     } finally {
       server.stop()
     }
+  }
+
+  @Test
+  fun `blocking start registers mdns while the server runs`() {
+    val registrar = FakeMdnsRegistrar()
+    val (server, _) = createServer(port = findFreePort(), registrar = registrar)
+    val runner = thread { server.start(wait = true) }
+    try {
+      assertTrue(registrar.registerLatch.await(5, TimeUnit.SECONDS))
+      assertTrue(runner.isAlive)
+    } finally {
+      server.stop()
+    }
+    runner.join(5_000)
+    assertFalse(runner.isAlive)
   }
 
   @Test
