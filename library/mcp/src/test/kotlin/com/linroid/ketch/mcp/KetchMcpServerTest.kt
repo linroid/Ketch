@@ -1,9 +1,17 @@
 package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.ToolRegistry
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolvedSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -29,6 +37,7 @@ import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -125,6 +134,20 @@ class KetchMcpServerTest {
       }
     }
 
+  @Test
+  fun `startStdio answers a call to a KetchToolSet tool`() =
+    runTest(timeout = 10.seconds) {
+      val requests = listOf(INITIALIZE, INITIALIZED, LIST_DOWNLOADS)
+      val output = ByteArrayOutputStream()
+      KetchMcpServer(EmptyKetchApi())
+        .startStdio(requests.joinToString("\n", postfix = "\n").byteInputStream(), output)
+
+      val replies = replies(Buffer().apply { write(output.toByteArray()) })
+      assertEquals(listOf(1, 2).map(::JsonPrimitive), replies.map { it["id"] })
+      val result = replies[1].getValue("result").jsonObject
+      assertNull(result["isError"], "listDownloads failed: $result")
+    }
+
   private fun input(vararg lines: String): Buffer =
     Buffer().apply { lines.forEach { writeString(it + "\n") } }
 
@@ -161,6 +184,28 @@ class KetchMcpServerTest {
     }
   }
 
+  private class EmptyKetchApi : KetchApi {
+    override val backendLabel = "Empty"
+    override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(emptyList())
+
+    override suspend fun download(request: DownloadRequest): DownloadTask =
+      throw UnsupportedOperationException()
+
+    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+      throw UnsupportedOperationException()
+
+    override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
+      throw UnsupportedOperationException()
+
+    override suspend fun start() {}
+
+    override suspend fun status(): KetchStatus = throw UnsupportedOperationException()
+
+    override suspend fun updateConfig(config: DownloadConfig) {}
+
+    override fun close() {}
+  }
+
   private fun replies(output: Buffer): List<JsonObject> =
     output.readString().lines().filter { it.isNotBlank() }
       .map { Json.parseToJsonElement(it).jsonObject }
@@ -172,5 +217,7 @@ class KetchMcpServerTest {
     const val INITIALIZED = """{"jsonrpc":"2.0","method":"notifications/initialized"}"""
     const val TOOLS_LIST = """{"jsonrpc":"2.0","id":2,"method":"tools/list"}"""
     const val PING = """{"jsonrpc":"2.0","id":3,"method":"ping"}"""
+    const val LIST_DOWNLOADS = """{"jsonrpc":"2.0","id":2,"method":"tools/call",""" +
+      """"params":{"name":"listDownloads","arguments":{}}}"""
   }
 }
