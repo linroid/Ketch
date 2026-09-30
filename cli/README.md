@@ -151,7 +151,8 @@ ketch server --generate-config
 Run Ketch as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so AI
 agents can list, start, pause, resume, cancel and remove downloads, resolve URLs, and change speed
 limits, priorities and the download config. It uses the same config file and
-[task database](#database) as `ketch server`, and restores saved tasks when it starts.
+[task database](#database) as `ketch server`, and restores saved tasks when it starts. Stdout
+carries only MCP messages; the version banner, logs and other output go to stderr.
 
 ```bash
 ketch mcp [options]

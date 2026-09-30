@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.PrintStream
 import java.util.Locale
 
 /** Ketch library log level, derived from CLI flags. */
@@ -46,6 +47,10 @@ private var ketchLogLevel = LogLevel.INFO
 fun main(args: Array<String>) {
   // Parse global flags before subcommand dispatch
   val remaining = applyGlobalFlags(args.toMutableList())
+
+  // MCP messages own stdout, so the banner, logs and any other output go to stderr.
+  val stdout = System.out
+  if (remaining.firstOrNull() == "mcp") System.setOut(System.err)
 
   println("Ketch CLI - Version ${KetchApi.VERSION} (${KetchApi.REVISION})")
   println()
@@ -65,7 +70,7 @@ fun main(args: Array<String>) {
       return
     }
     "mcp" -> {
-      runMcp(remaining.drop(1))
+      runMcp(remaining.drop(1), stdout)
       return
     }
   }
@@ -601,7 +606,7 @@ private fun runAiDiscover(args: List<String>) {
   }
 }
 
-private fun runMcp(args: List<String>) {
+private fun runMcp(args: List<String>, stdout: PrintStream) {
   var configPath: String? = null
   var cliDownloadDir: String? = null
 
@@ -675,7 +680,7 @@ private fun runMcp(args: List<String>) {
 
   runBlocking {
     ketch.start()
-    mcpServer.startStdio()
+    mcpServer.startStdio(output = stdout)
   }
 }
 

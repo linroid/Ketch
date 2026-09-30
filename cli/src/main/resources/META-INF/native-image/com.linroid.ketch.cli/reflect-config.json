@@ -242,6 +242,97 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "com.linroid.ketch.mcp.KetchToolSet",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.api.SpeedLimit",
+    "methods": [
+      {"name": "box-impl", "parameterTypes": ["long"]},
+      {"name": "unbox-impl", "parameterTypes": []}
+    ]
+  },
+  {
+    "name": "ai.koog.serialization.JSONElement",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.serialization.JSONElement$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.JSONRPCResponse",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.JSONRPCResponse$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.JSONRPCError",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.JSONRPCError$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.RequestId$NumberId",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.RequestId$NumberId$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.RequestId$StringId",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.RequestId$StringId$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.InitializeResult",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.InitializeResult$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.ListToolsResult",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.ListToolsResult$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.CallToolResult",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.CallToolResult$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.EmptyResult",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.EmptyResult$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.TextContent",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "io.modelcontextprotocol.kotlin.sdk.types.TextContent$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
     "name": "kotlin.internal.jdk8.JDK8PlatformImplementations",
     "allDeclaredConstructors": true,
     "allDeclaredFields": true,
