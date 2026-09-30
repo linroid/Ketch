@@ -222,14 +222,17 @@ cli/          # JVM CLI entry point
   (`InstanceSettingsController`): pushed live via `KetchApi.updateConfig` /
   `updateNetworkInterfaces`, and saved to `config.toml` only for the
   embedded instance
-- `ServerConfig`: host, port, API token, CORS, mDNS, `autoStart` (apps start
-  the server on launch)
+- `ServerConfig`: host, port, API token, CORS, `allowedHosts`, mDNS, `autoStart`
+  (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections
 - `FileConfigStore`: platform-specific file persistence via okio
 
 ### Daemon Server (`server/`)
 - Ktor-based REST API: create, list, pause, resume, cancel downloads
 - SSE event stream for real-time state updates
+- Without an API token, `HostValidator` answers 403 to requests whose `Host` is not a loopback
+  name, an interface IP, the machine's host name or `<host>.local`, or in `allowedHosts`
+  (DNS rebinding protection); with a token any `Host` is accepted
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
 
