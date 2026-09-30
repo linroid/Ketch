@@ -1,6 +1,7 @@
 # Ketch browser extension
 
-Hands downloads from your browser to Ketch, on this computer or on a remote server such as a NAS.
+Hands downloads from your browser to Ketch: the Ketch app on this computer, which the extension
+opens when it needs it, or a Ketch server elsewhere, such as a NAS.
 
 - **Captures downloads**: files you download in the browser go to Ketch instead. When Ketch
   can't be reached, the browser downloads them as usual.
@@ -40,16 +41,18 @@ extension is in the browser stores:
 
 ## Setting up Ketch
 
-The extension talks to Ketch's REST API, so the Ketch server must be running:
-
-- **Ketch app on this computer**: open Settings → Remote access and turn on **Server**. Turn on
-  **Start automatically** as well, so the extension works whenever the app is open. The extension
-  is set up for this out of the box, at `http://127.0.0.1:8642`.
-- **CLI**: run `ketch server`.
+- **Ketch app on this computer**: install the desktop app and open it once. It registers itself
+  with the browsers you have used (Chrome, Chromium, Edge, Brave, Vivaldi, Arc and Firefox), and
+  the extension is set up for it out of the box. From then on the extension opens Ketch when a
+  download needs it; there is no server to turn on or token to copy. For a browser installed
+  after Ketch, open Ketch once more.
+- **CLI, or a browser installed as a Flatpak or Snap** (which can't start other apps): run
+  `ketch server`, or turn on Settings → Remote access → Server in the app, then choose **Add
+  server** in the extension's settings and enter `http://127.0.0.1:8642`.
 - **Another device**: on that device, turn on **Server** and **Allow other devices** and generate
   an access token (for `ketch server`, set `apiToken` in `config.toml`). In the extension's
-  settings, choose **Add remote instance** and enter its address, such as
-  `http://192.168.1.20:8642`, and the token. A bare host such as `nas.local` gets port 8642.
+  settings, choose **Add server** and enter its address, such as `http://192.168.1.20:8642`, and
+  the token. A bare host such as `nas.local` gets port 8642.
 
 ## Instances
 
@@ -61,6 +64,25 @@ The extension can send downloads to several Ketch instances. One of them is the 
 
 Each instance card in the settings page shows whether it can be reached. Captured downloads fall
 back to the browser only when the default instance fails; they never switch to another instance.
+
+## How the extension reaches the Ketch app
+
+The Ketch app on this computer is reached through
+[native messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging):
+
+1. The browser starts the host `com.linroid.ketch`, which is the Ketch app's own launcher run with
+   `--native-messaging-host`. Only this extension may start it.
+2. The host asks the running app for a connection, over the channel the app already uses to keep
+   a single instance. If Ketch is closed, the host opens it and waits for it, up to 30 seconds.
+3. The app replies with the address and token of a server only for the extension: it listens on
+   `127.0.0.1` only, on a port the system picks, with a token made for this run of the app. It is
+   separate from the server in Settings → Remote access, which stays off unless you turn it on.
+4. The extension keeps that address and token in memory for the browser session and talks to it
+   like to any Ketch server. When the app is restarted, it asks the host again.
+
+Looking at the popup or the settings page never opens Ketch; sending a download, **Open Ketch**
+in the popup and **Test connection** do. A captured download waits for Ketch to start (up to 45
+seconds) before the browser takes it back.
 
 ## How capturing works
 
@@ -90,6 +112,7 @@ Nothing is sent anywhere except to the Ketch instances you add.
 | Permission | Why |
 |---|---|
 | `downloads` | Capture downloads and cancel them in the browser once Ketch has them |
+| `nativeMessaging` | Reach and open the Ketch app on this computer |
 | `cookies` | Send a site's cookies to Ketch so downloads that need a session work |
 | `contextMenus` | The **Download … with Ketch** menu items |
 | `notifications` | Tell you when a download was sent, or why it wasn't |
@@ -104,8 +127,8 @@ Things to know:
 - With **Send cookies and referrer** on (the default), Ketch stores the cookies with the task so
   it can resume it later, in its task database on the device that downloads. Turn the option off
   for downloads that don't need a session.
-- Access tokens are stored in the browser's extension storage, like the apps store them in
-  `config.toml`.
+- Access tokens of servers are stored in the browser's extension storage, like the apps store
+  them in `config.toml`. The Ketch app's token only lives in memory, for the browser session.
 - Over plain `http://` to another device, the token and cookies travel unencrypted. The settings
   page warns about such addresses; prefer `https://` behind a reverse proxy, or use a trusted
   network.
@@ -120,6 +143,12 @@ Things to know:
   browser keeps partitioned for third-party frames aren't sent.
 - Streaming media (HLS, DASH, `blob:` videos) has no single file to download.
 - Firefox for Android isn't supported: it has no downloads API.
+- The Ketch app registers with the browsers listed under [Setting up Ketch](#setting-up-ketch).
+  In Opera, and in browsers installed as a Flatpak or Snap, add Ketch as a server instead.
+- Uninstalling the app leaves its registration behind: files in the browsers'
+  `NativeMessagingHosts` directories, or registry values on Windows.
+- Native messaging was tested with Chrome on macOS. The Windows and Linux registration and
+  launch code has unit tests but hasn't run against real browsers yet.
 
 ## Development
 
@@ -136,9 +165,15 @@ npm test        # unit tests, with Node's built-in test runner (Node 22.2+)
 npm run build   # build/chrome, build/firefox and a zip of each
 ```
 
+The `key` in `src/manifest.json` pins the Chromium extension id to
+`kddcjkhnjcjhekohejnehplbnjclbdbl`, whether it is loaded unpacked or from a release zip, because
+the Ketch app only lets the ids it lists start its host (`NativeHostRegistration` in
+`app/desktop`). Extension stores assign their own id: add it there when publishing, and leave the
+`key` out of a store upload. Firefox identifies the add-on by its gecko id instead.
+
 The build copies `src/`, rewrites the manifest for Firefox (an event page instead of a service
-worker, plus its add-on id), checks that every file the manifest names exists, and zips each
-build. Keep `version` in `package.json` and `src/manifest.json` the same; the build fails
+worker, its add-on id, and no `key`), checks that every file the manifest names exists, and zips
+each build. Keep `version` in `package.json` and `src/manifest.json` the same; the build fails
 otherwise. The icons are rendered from the repository's `art/icon-app.svg` by
 `art/render-icons.sh`.
 
@@ -157,6 +192,7 @@ including a final release after its release candidates, which the stores require
 | `src/ui/common.css` | Styles shared by the popup and the settings page |
 | `src/lib/settings.js` | Settings, instances and their validation |
 | `src/lib/ketch-client.js` | Client for the Ketch REST API |
+| `src/lib/connection.js` | Reaches the Ketch app through native messaging |
 | `src/lib/handoff.js` | Creates the task with cookies, or resolves a fetched `.torrent` file first |
 | `src/lib/request.js` | Builds the download request and headers; recognizes torrents |
 | `src/lib/intercept.js` | Which browser downloads are captured |

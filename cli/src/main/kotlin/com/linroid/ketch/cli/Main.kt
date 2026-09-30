@@ -415,9 +415,11 @@ private fun runServer(args: Array<String>) {
   }
   println()
 
-  // Restore the tasks saved in the database by earlier runs
+  // Listen before restoring the tasks saved by earlier runs, so a daemon that cannot start,
+  // e.g. because another one uses the port, never resumes downloads into the same files
+  server.start(wait = false)
   runBlocking { ketch.start() }
-  server.start(wait = true)
+  server.awaitStop()
 }
 
 private fun runAiDiscover(args: List<String>) {
@@ -712,7 +714,7 @@ private fun printUsage() {
   println("    GEMINI_API_KEY         Google Gemini")
   println()
   println("  Search env vars (checked in order):")
-  println("    BING_SEARCH_API_KEY    Use Bing Web Search API")
+  println("    BRAVE_SEARCH_API_KEY   Use Brave Search API")
   println("    GOOGLE_SEARCH_API_KEY  Use Google Custom Search")
   println("    GOOGLE_SEARCH_CX      Google Search Engine ID")
   println()

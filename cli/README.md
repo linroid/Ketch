@@ -51,7 +51,7 @@ You can also download an archive from
 
 ## Commands
 
-Running `ketch` without arguments, or with `--help`, prints the usage.
+Running `ketch` without arguments, or with `--help` or `-h`, prints the usage.
 
 ### Global options
 
@@ -72,14 +72,13 @@ ketch [options] <url> [destination]
 Downloads HTTP(S) and FTP/FTPS URLs (`ftp://[user:password@]host[:port]/path`), magnet links, and
 `.torrent` URLs or files. Without a destination the file is saved in the current directory. An
 existing directory, or a path ending in a separator, keeps the file name from the source; any other
-path is used as the file path. Relative paths, including a bare file name such as `file.zip`, are
-resolved against the current directory. Torrents follow the
+path, including a bare file name such as `file.zip`, is the file path, relative to the current
+directory. Torrents follow the
 [torrent destination rules](../docs/torrent.md), and public ones also announce to the `[torrent]`
 trackers of the default [config file](#config-file-locations).
 
-The command shows the progress and exits when the download finishes or fails. The download is kept
-in memory only and is not recorded in the [task database](#database). Unknown options and extra
-arguments are rejected.
+The download is kept in memory only and is not recorded in the [task database](#database). The
+command exits when the download completes or fails.
 
 | Option | Description |
 |---|---|
@@ -259,6 +258,9 @@ never overwrites an existing file.
 
 ### Config file format
 
+Keys are camelCase and match the Kotlin property names. Unknown keys are ignored without a
+warning, so a misspelled key silently keeps its default.
+
 ```toml
 # Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
@@ -289,6 +291,8 @@ maxConnectionsPerHost = 8
 
 ### Config reference
 
+`name` must appear before the first `[table]` header.
+
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `name` | string | `"Ketch"` | Instance name shown to clients and announced over mDNS |
@@ -298,7 +302,7 @@ maxConnectionsPerHost = 8
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
-| `port` | int | `8642` | Port to listen on |
+| `port` | int | `8642` | Port to listen on (1-65535) |
 | `apiToken` | string | *(none)* | Bearer token for API authentication |
 | `corsAllowedHosts` | string[] | `[]` | Allowed CORS hosts without a scheme (e.g., `["localhost:3000"]`, or `["*"]` for all) |
 | `allowedHosts` | string[] | `[]` | Extra `Host` names or IPs accepted without `apiToken` (see [Accepted hosts](#accepted-hosts)) |
@@ -314,10 +318,14 @@ maxConnectionsPerHost = 8
 | `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads (`0` = unlimited) |
 | `maxConnectionsPerHost` | int | `8` | Max simultaneous downloads per host (`0` = unlimited) |
 | `retryCount` | int | `3` | Max automatic retries after a retryable failure |
-| `retryDelayMs` | int | `1000` | Base delay between retries (exponential backoff) |
-| `progressIntervalMs` | int | `200` | Progress update throttle interval |
-| `saveIntervalMs` | int | `5000` | Segment progress persistence interval |
+| `retryDelayMs` | long | `1000` | Base delay between retries (exponential backoff) |
+| `progressIntervalMs` | long | `200` | Progress update throttle interval |
+| `saveIntervalMs` | long | `5000` | Segment progress persistence interval |
 | `bufferSize` | int | `8192` | FTP read buffer size in bytes |
+
+A file with an invalid value fails to load. `maxConnectionsPerDownload`, `progressIntervalMs`,
+`saveIntervalMs` and `bufferSize` must be greater than 0; the other counts and delays must not
+be negative.
 
 #### `[torrent]`
 

@@ -66,10 +66,10 @@ function targetManifests({ version: manifestVersion, versionName }) {
 
 /**
  * Firefox runs Manifest V3 background scripts as an event page rather than a service worker,
- * and identifies the add-on by its gecko id.
+ * and identifies the add-on by its gecko id rather than by the Chromium `key`.
  */
 function firefoxManifest(base) {
-  const { background, minimum_chrome_version: _, ...rest } = base;
+  const { background, key: _key, minimum_chrome_version: _version, ...rest } = base;
   return {
     ...rest,
     background: { scripts: [background.service_worker], type: background.type },

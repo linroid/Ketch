@@ -1,5 +1,6 @@
 /** Hands a download over to a Ketch instance. */
 
+import { withEndpoint } from './connection.js';
 import { ext } from './ext.js';
 import { KetchClient } from './ketch-client.js';
 import {
@@ -29,6 +30,7 @@ const TORRENT_FETCH_TIMEOUT_MS = 15_000;
  * @property {string | undefined} userAgent
  * @property {(url: string, storeId?: string) => Promise<{ name: string, value: string }[]>}
  *   getCookies
+ * @property {import('./connection.js').ConnectionDeps} [connection] reaches the Ketch app
  */
 
 /**
@@ -41,8 +43,9 @@ const TORRENT_FETCH_TIMEOUT_MS = 15_000;
  * @param {import('./settings.js').Instance} instance
  * @param {Download} download
  * @param {import('./settings.js').Settings} settings
- * @param {{ timeoutMs?: number, deps?: HandoffDeps }} [options] `timeoutMs` bounds the whole
- *   hand-off, including fetching a `.torrent` file, so a held download is released in time
+ * @param {{ timeoutMs?: number, deps?: HandoffDeps }} [options] `timeoutMs` bounds fetching a
+ *   `.torrent` file and the requests to Ketch, so a held download is released in time. Starting
+ *   the Ketch app takes longer and has its own limit.
  * @returns {Promise<object>} snapshot of the created task
  */
 export async function sendToKetch(instance, download, settings, options = {}) {
@@ -51,32 +54,40 @@ export async function sendToKetch(instance, download, settings, options = {}) {
     throw new Error("Ketch can't download this kind of link");
   }
   const deps = options.deps ?? browserDeps();
-  const deadline = options.timeoutMs === undefined
+  const deadline = () => options.timeoutMs === undefined
     ? undefined
     : AbortSignal.timeout(options.timeoutMs);
-  const client = new KetchClient(instance, {
-    fetch: deps.fetch,
-    timeoutMs: options.timeoutMs,
-    signal: deadline,
-  });
 
+  let request;
+  let torrentContent;
   if (url.toLowerCase().startsWith('magnet:')) {
-    return client.createTask({ url });
+    request = { url };
+  } else if (isTorrentFile(download) && !isTorrentUrl(url)) {
+    torrentContent = await fetchTorrentFile(deps.fetch, url, settings.forwardCookies, deadline());
+  } else {
+    const cookies = settings.forwardCookies
+      ? await readCookies(deps, url, download.cookieStoreId)
+      : [];
+    const headers = buildHeaders({
+      cookies,
+      referrer: settings.forwardCookies ? download.referrer : undefined,
+      userAgent: deps.userAgent,
+    });
+    request = buildDownloadRequest({ url, fileName: download.fileName, headers });
   }
-  if (isTorrentFile(download) && !isTorrentUrl(url)) {
-    const content = await fetchTorrentFile(deps.fetch, url, settings.forwardCookies, deadline);
-    const resolved = await client.resolveContent(content, download.fileName || undefined);
-    return client.createTask({ url: resolved.url, resolvedSource: resolved });
-  }
-  const cookies = settings.forwardCookies
-    ? await readCookies(deps, url, download.cookieStoreId)
-    : [];
-  const headers = buildHeaders({
-    cookies,
-    referrer: settings.forwardCookies ? download.referrer : undefined,
-    userAgent: deps.userAgent,
-  });
-  return client.createTask(buildDownloadRequest({ url, fileName: download.fileName, headers }));
+
+  return withEndpoint(instance, async (endpoint) => {
+    const client = new KetchClient(endpoint, {
+      fetch: deps.fetch,
+      timeoutMs: options.timeoutMs,
+      signal: deadline(),
+    });
+    if (torrentContent) {
+      const resolved = await client.resolveContent(torrentContent, download.fileName || undefined);
+      return client.createTask({ url: resolved.url, resolvedSource: resolved });
+    }
+    return client.createTask(request);
+  }, { deps: deps.connection });
 }
 
 /**
