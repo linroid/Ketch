@@ -80,6 +80,25 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
+ * ## Host check
+ *
+ * Without an [apiToken], the server answers `403 Forbidden` with an `ErrorResponse` to any
+ * request whose `Host` header, ignoring the port, is not one of:
+ * - a loopback name or address: `localhost`, `*.localhost`, `127.0.0.0/8` or `[::1]`
+ * - an IP address of one of this machine's network interfaces
+ * - this machine's host name, or its mDNS name `<host>.local`
+ * - an entry of [allowedHosts]
+ *
+ * This blocks DNS rebinding: a web page can re-resolve its own domain to this machine and
+ * become same-origin with the API, which CORS cannot prevent, but its requests still carry
+ * that domain as `Host`. Ketch apps connect to servers they discover over mDNS by IP
+ * address, so they pass without configuration. Requests without a `Host` header pass too,
+ * as browsers always send one.
+ *
+ * With an [apiToken] the check is off: a page cannot learn the token, so the token already
+ * blocks the attack, and any name that reaches the server, such as a reverse proxy's or a
+ * `nas.local` alias, keeps working.
+ *
  * ## Browsers
  *
  * Without an [apiToken], the server answers `403 Forbidden` with an `origin_not_allowed`
@@ -99,16 +118,21 @@ import kotlin.coroutines.cancellation.CancellationException
  * extensions and other non-web origins are always allowed; they need the token like any
  * client.
  *
- * Checking `Origin` does not stop DNS rebinding, where a page re-resolves its own domain to
- * this machine and becomes same-origin with the API; its requests still name that domain in
- * the `Host` header.
+ * Checking `Origin` does not stop DNS rebinding, where a page becomes same-origin with the
+ * API; the host check does.
  *
  * @param ketch the KetchApi instance to expose
+ * @param host bind address
+ * @param port listen port
  * @param apiToken bearer token every API request must carry, or `null` for no
- *   authentication, in which case web pages on other origins are refused
+ *   authentication, a `Host` header check, and refusing web pages on other origins instead
+ * @param name instance name advertised over mDNS
  * @param corsAllowedHosts origins whose web pages may call the API when there is an
  *   [apiToken]: `"*"` for any, a host such as `"localhost:3000"` for both `http` and
  *   `https`, or an origin such as `"http://localhost:3000"`. Ignored without a token.
+ * @param allowedHosts extra `Host` names or IP addresses accepted when there is no
+ *   [apiToken], for example a DNS name or a Docker host's address
+ * @param mdnsEnabled whether to advertise the server over mDNS
  * @param mdnsRegistrar mDNS service registrar for LAN discovery
  */
 class KetchServer(
@@ -118,6 +142,7 @@ class KetchServer(
   private val apiToken: String? = null,
   private val name: String = "Ketch",
   private val corsAllowedHosts: List<String> = emptyList(),
+  private val allowedHosts: List<String> = emptyList(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
 ) {
@@ -204,6 +229,8 @@ class KetchServer(
     install(SSE)
 
     if (apiToken == null) {
+      // Nothing else stops web pages: refuse rebound domains, then pages on other origins.
+      install(hostValidation(HostValidator(allowedHosts)))
       install(CrossOriginGuard)
       if (corsAllowedHosts.isNotEmpty()) {
         log.w { "Ignoring corsAllowedHosts $corsAllowedHosts: they need an API token" }

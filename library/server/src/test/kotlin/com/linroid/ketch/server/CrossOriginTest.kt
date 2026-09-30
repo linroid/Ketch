@@ -75,7 +75,8 @@ class CrossOriginTest {
 
   @Test
   fun `web ui served by the server passes without a token`() = testApplication {
-    serve(KetchServer(createTestKetch()))
+    // Names other than this machine's must pass the host check first.
+    serve(KetchServer(createTestKetch(), allowedHosts = listOf("ketch.local", "ketch.example")))
     val cases = listOf(
       "http://127.0.0.1:8642" to LOCAL_HOST,
       "http://[::1]:8642" to "[::1]:8642",
@@ -100,6 +101,18 @@ class CrossOriginTest {
       header(HttpHeaders.Origin, "http://127.0.0.1:3000")
     }
     assertEquals(HttpStatusCode.Forbidden, response.status)
+  }
+
+  @Test
+  fun `host check answers first when both checks refuse a request`() = testApplication {
+    serve(KetchServer(createTestKetch()))
+    val response = client.get("/api/tasks") {
+      header(HttpHeaders.Host, "attacker.example:8642")
+      header(HttpHeaders.Origin, "https://other.example")
+    }
+    assertEquals(HttpStatusCode.Forbidden, response.status)
+    val error = Json.decodeFromString<ErrorResponse>(response.bodyAsText())
+    assertEquals("host_not_allowed", error.error)
   }
 
   @Test

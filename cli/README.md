@@ -123,6 +123,7 @@ ketch server [options]
 | `--port <number>` | Port number, 1-65535 (default: `8642`) |
 | `--token <string>` | API bearer token for authentication |
 | `--cors <origins>` | Comma-separated origins (`http://localhost:3000`), hosts for both `http` and `https` (`localhost:3000`), or `*`, whose web pages may call the API; needs `--token` (see [Web pages](#web-pages)) |
+| `--allowed-hosts <names>` | Comma-separated extra `Host` names accepted without a token |
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--speed-limit <value>` | Global speed limit (e.g., `10m`, `500k`) |
 | `--help`, `-h` | Show help message |
@@ -144,7 +145,29 @@ ketch server --config /path/to/config.toml --port 9999
 
 # Generate a default config file
 ketch server --generate-config
+
+# Without a token, also accept requests addressed to a DNS alias
+ketch server --allowed-hosts nas.example.com
 ```
+
+#### Accepted hosts
+
+Without an API token, the server only answers requests whose `Host` header (ignoring the port)
+names this machine:
+
+- `localhost`, `*.localhost`, `127.0.0.0/8` or `[::1]`
+- an IP address of one of the machine's network interfaces, such as `192.168.1.20`
+- the machine's host name, or its mDNS name `<host>.local` (for example `my-mac.local`)
+- a name or IP address listed in `--allowed-hosts` or `allowedHosts`
+
+Anything else gets `403 Forbidden` with a `host_not_allowed` error. This stops DNS rebinding,
+where a web page points its own domain at your machine to reach the API from the browser.
+Ketch apps connect to servers they discover on the network by IP address, and the browser
+extension defaults to `http://127.0.0.1:8642`, so neither needs configuration.
+
+With `--token` or `apiToken` set, any `Host` is accepted, since a web page cannot learn the
+token. Set a token when the server is reached through another name, such as a reverse proxy or
+a DNS alias, instead of listing every name.
 
 #### Web pages
 
@@ -261,6 +284,7 @@ port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
 # corsAllowedHosts = ["localhost:3000"]
+# allowedHosts = ["nas.example.com"]
 
 [download]
 # defaultDirectory = "/srv/downloads"
@@ -292,6 +316,7 @@ maxConnectionsPerHost = 8
 | `port` | int | `8642` | Port to listen on |
 | `apiToken` | string | *(none)* | Bearer token for API authentication |
 | `corsAllowedHosts` | string[] | `[]` | Origins whose web pages may call the API (`["*"]` for any); needs `apiToken` (see [Web pages](#web-pages)) |
+| `allowedHosts` | string[] | `[]` | Extra `Host` names or IPs accepted without `apiToken` (see [Accepted hosts](#accepted-hosts)) |
 | `mdnsEnabled` | bool | `true` | Announce the server on the local network (`_ketch._tcp`) |
 
 #### `[download]`

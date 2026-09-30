@@ -17,6 +17,10 @@ port = 8642
 # Origins whose web pages may call the API ("*" for any). Only used with
 # apiToken: without one, pages on other origins are always refused.
 # corsAllowedHosts = ["http://localhost:3000"]
+# Without apiToken, requests must address this machine: localhost, one of its
+# IP addresses, its host name or <host>.local. List any other name used to
+# reach the server here.
+# allowedHosts = ["nas.example.com"]
 
 [download]
 # defaultDirectory = "~/Downloads"

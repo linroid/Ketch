@@ -149,6 +149,7 @@ private fun ApplicationScope.KetchWindow(
             corsAllowedHosts = serverConfig.corsAllowedHosts.ifEmpty {
               if (serverConfig.apiToken == null) emptyList() else listOf("*")
             },
+            allowedHosts = serverConfig.allowedHosts,
             mdnsEnabled = serverConfig.mdnsEnabled,
           )
           server.start(wait = false)
