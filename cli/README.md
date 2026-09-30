@@ -116,62 +116,114 @@ This creates a commented config file at the default location. Edit it to customi
 
 ### Config file format
 
+Keys are camelCase and match the Kotlin property names. Unknown keys are ignored without a
+warning, so a misspelled key silently keeps its default. `--generate-config` writes this
+template:
+
 ```toml
-# Ketch Server Configuration
+# Ketch Configuration
+
+# Display name for this instance (optional).
+# Defaults to device name or hostname.
+# name = "My Ketch"
 
 [server]
 host = "0.0.0.0"
 port = 8642
-# api-token = "my-secret"
-# cors-allowed-hosts = ["http://localhost:3000"]
+# apiToken = "my-secret"
+# mdnsEnabled = true
+# corsAllowedHosts = ["http://localhost:3000"]
 
 [download]
-# directory = "~/Downloads"
-# speed-limit = "10m"  # Suffixes: k = KB/s, m = MB/s, or raw bytes
-max-connections = 4
-retry-count = 3
-retry-delay-ms = 1000
-progress-update-interval-ms = 200
-segment-save-interval-ms = 5000
-buffer-size = 8192
+# defaultDirectory = "~/Downloads"
+# speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
+maxConnectionsPerDownload = 4
+maxConcurrentDownloads = 2
+maxConnectionsPerHost = 8
 
-[download.queue]
-max-concurrent-downloads = 3
-max-connections-per-host = 4
-auto-start = true
+# Advanced settings (defaults are usually fine):
+# retryCount = 3
+# retryDelayMs = 1000
+# progressIntervalMs = 200
+# saveIntervalMs = 5000
+# bufferSize = 8192
+
+# Extra trackers announced alongside public torrents' own trackers, e.g. when
+# a network blocks a torrent's own tracker. Private torrents ignore them. The
+# apps edit this under Settings > BitTorrent.
+# [torrent]
+# trackers = ["udp://tracker.opentrackr.org:1337/announce"]
+
+# Pre-configured remote servers.
+# [[remotes]]
+# host = "192.168.1.100"
+# port = 8642
+# apiToken = "token"
+# secure = false
 ```
 
+`~` is not expanded: set `defaultDirectory` to an absolute path such as
+`"/home/me/Downloads"`.
+
 ### Config reference
+
+#### Top level
+
+`name` must appear before the first `[table]` header.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | *(none)* | Name shown to clients; unset: `"Ketch"` (CLI), device name (apps) |
 
 #### `[server]`
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
-| `port` | int | `8642` | Port to listen on |
-| `api-token` | string | *(none)* | Bearer token for API authentication |
-| `cors-allowed-hosts` | string[] | `[]` | Allowed CORS origins (e.g., `["*"]` for all) |
+| `port` | int | `8642` | Port to listen on (1-65535) |
+| `apiToken` | string | *(none)* | Bearer token for API authentication |
+| `corsAllowedHosts` | string[] | `[]` | Allowed CORS origins (e.g., `["*"]` for all) |
+| `mdnsEnabled` | bool | `true` | Advertise the server on the local network via mDNS/DNS-SD |
+| `autoStart` | bool | `false` | Start the server when the apps launch; `ketch server` ignores it |
 
 #### `[download]`
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `directory` | string | `~/Downloads` | Default save directory |
-| `speed-limit` | string | *(unlimited)* | Global speed limit (`"500k"`, `"10m"`, or bytes) |
-| `max-connections` | int | `4` | Max concurrent segments per download |
-| `retry-count` | int | `3` | Max retry attempts per segment |
-| `retry-delay-ms` | int | `1000` | Base delay between retries (exponential backoff) |
-| `progress-update-interval-ms` | int | `200` | Progress update throttle interval |
-| `segment-save-interval-ms` | int | `5000` | Segment progress persistence interval |
-| `buffer-size` | int | `8192` | Download buffer size in bytes |
+| `defaultDirectory` | string | *(none)* | Save directory (absolute); unset: `Downloads` in home |
+| `speedLimit` | string | `"unlimited"` | Global speed limit (`"500k"`, `"10m"`, or bytes) |
+| `maxConnectionsPerDownload` | int | `4` | Connections (segments) per download, > 0 |
+| `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads; `0` = unlimited |
+| `maxConnectionsPerHost` | int | `8` | Max simultaneous downloads per host; `0` = unlimited |
+| `retryCount` | int | `3` | Max automatic retries after a retryable failure |
+| `retryDelayMs` | long | `1000` | Base delay between retries (exponential backoff) |
+| `progressIntervalMs` | long | `200` | Minimum interval between progress updates, > 0 |
+| `saveIntervalMs` | long | `5000` | Segment progress persistence interval, > 0 |
+| `bufferSize` | int | `8192` | Read buffer size in bytes for FTP data transfers, > 0 |
 
-#### `[download.queue]`
+#### `[torrent]`
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `max-concurrent-downloads` | int | `3` | Max simultaneous downloads |
-| `max-connections-per-host` | int | `4` | Max connections per host |
-| `auto-start` | bool | `true` | Automatically start queued downloads |
+| `trackers` | string[] | `[]` | Extra `http`, `https` or `udp` trackers for public torrents |
+
+#### `[[remotes]]`
+
+Remote servers the apps list for connection; the CLI does not read them. Repeat the table once
+per server.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `host` | string | *(required)* | Remote server hostname or IP |
+| `port` | int | `8642` | Remote server port |
+| `apiToken` | string | *(none)* | Bearer token for the remote server |
+| `secure` | bool | `false` | Connect over HTTPS instead of HTTP |
+
+#### Other sections
+
+- `[ai]`, `[ai.llm]`, `[ai.search]`: AI resource discovery, used by `ketch ai-discover`; see
+  [AI discovery](../docs/ai-discovery.md#configtoml).
+- `[appearance]`: `accent` and `theme` for the apps; the CLI ignores it.
 
 ## Speed Limit Format
 
