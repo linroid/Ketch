@@ -6,8 +6,11 @@ import ai.koog.agents.mcp.server.configureMcpServer
 import ai.koog.agents.mcp.server.startMcpServer
 import com.linroid.ketch.api.KetchApi
 import io.ktor.server.engine.ApplicationEngineFactory
-import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.io.Sink
+import kotlinx.io.Source
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
@@ -26,7 +29,7 @@ import java.io.OutputStream
  * ```kotlin
  * val ketch = Ketch(httpEngine = KtorHttpEngine())
  * val mcp = KetchMcpServer(ketch)
- * mcp.startStdio()  // suspends until closed
+ * mcp.startStdio()  // suspends until the client closes stdin
  * ```
  */
 class KetchMcpServer(
@@ -45,7 +48,9 @@ class KetchMcpServer(
    * stdout can redirect `System.out` to stderr and pass the original
    * stream here.
    *
-   * This function suspends until the server is closed.
+   * This function suspends until the client closes [input], which is how
+   * the MCP stdio transport ends a session. Requests read before then are
+   * still answered. The session closes both streams.
    *
    * @param input the stream to read requests from, stdin by default
    * @param output the stream to write responses to, stdout by default
@@ -54,12 +59,7 @@ class KetchMcpServer(
     input: InputStream = System.`in`,
     output: OutputStream = System.out,
   ) {
-    val server = configureMcpServer(toolRegistry)
-    val transport = StdioServerTransport(input.asSource().buffered(), output.asSink().buffered())
-    server.createSession(transport)
-    val done = Job()
-    server.onClose { done.complete() }
-    done.join()
+    serveStdio(toolRegistry, input.asSource().buffered(), output.asSink().buffered())
   }
 
   /**
@@ -85,5 +85,29 @@ class KetchMcpServer(
     val done = Job()
     server.onClose { done.complete() }
     done.join()
+  }
+}
+
+/**
+ * Serves [tools] over the MCP stdio transport on [input] and [output], suspending until [input]
+ * ends and the replies to the requests read before then are written.
+ */
+internal suspend fun serveStdio(tools: ToolRegistry, input: Source, output: Sink) {
+  val server = configureMcpServer(tools)
+  val transport = StdioTransport(input, output)
+  // Server.onClose only fires on Server.close(), so wait for the transport instead. The listener
+  // is registered before createSession starts reading, so input that has already ended cannot
+  // close the transport unobserved.
+  val closed = Job()
+  transport.onClose { closed.complete() }
+  try {
+    server.createSession(transport)
+    closed.join()
+  } finally {
+    withContext(NonCancellable) {
+      server.close()
+      // In case cancellation interrupted createSession before the server tracked the session
+      transport.close()
+    }
   }
 }

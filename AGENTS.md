@@ -290,6 +290,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `ketch mcp` runs it on stdio against a local engine. It passes the real stdout to
   `startStdio` and redirects `System.out` to stderr, so the banner, the console logger and
   Logback never corrupt the JSON-RPC stream
+- Stdio uses Ketch's own `StdioTransport`: when stdin ends it answers the requests already read,
+  then closes, and `startStdio` returns (`Server.onClose` only fires on `Server.close()`, so it
+  waits for the transport). The SDK's `StdioServerTransport` drops those replies. `ketch mcp`
+  then exits normally, as every thread left is a daemon; its shutdown hook closes `Ketch`
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no
@@ -392,8 +396,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
   "TorrentTracker", "RemoteKetch", "RemoteTask", "TokenBucket", "SqliteStore", "SqliteDriver",
-  "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes"; `ai:discover`, mDNS and app
-  code tag by component name (e.g. "DiscoveryService", "KetchService")
+  "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes", "McpStdio"; `ai:discover`, mDNS
+  and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
   problems), error (fatal)
