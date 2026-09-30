@@ -45,7 +45,7 @@ class KetchMcpServerTest {
       serveStdio(ToolRegistry {}, Buffer(), Buffer())
     }
 
-  // Real threads and streams: the input stays open until both responses have arrived.
+  // Real threads and streams: the input stays open until each response has arrived.
   @Test
   fun `startStdio answers a tool call on the given output`() = runBlocking {
     val requests = PipedOutputStream()
@@ -55,19 +55,12 @@ class KetchMcpServerTest {
       KetchMcpServer(EmptyKetchApi()).startStdio(input, output)
     }
     try {
-      val lines = listOf(INITIALIZE_REQUEST, INITIALIZED_NOTIFICATION, LIST_DOWNLOADS_CALL)
-      requests.write(lines.joinToString("\n", postfix = "\n").toByteArray())
-      requests.flush()
-      val written = withTimeout(30.seconds) {
-        var written: List<String>
-        do {
-          delay(50)
-          written = output.toString().lines().filter { it.isNotEmpty() }
-        } while (written.size < 2)
-        written
-      }
+      // A client sends nothing else until the server has answered initialize.
+      requests.send(INITIALIZE_REQUEST)
+      awaitLines(output, 1)
+      requests.send(INITIALIZED_NOTIFICATION, LIST_DOWNLOADS_CALL)
+      val responses = awaitLines(output, 2).map { Json.parseToJsonElement(it).jsonObject }
 
-      val responses = written.map { Json.parseToJsonElement(it).jsonObject }
       assertEquals(listOf("1", "2"), responses.map { it.getValue("id").jsonPrimitive.content })
       val result = responses[1].getValue("result").jsonObject
       assertNull(result["isError"], "listDownloads failed: $result")
@@ -76,6 +69,22 @@ class KetchMcpServerTest {
       server.cancel()
     }
   }
+
+  private fun PipedOutputStream.send(vararg messages: String) {
+    write(messages.joinToString("\n", postfix = "\n").toByteArray())
+    flush()
+  }
+
+  /** Waits until [output] holds [count] complete lines and returns them. */
+  private suspend fun awaitLines(output: ByteArrayOutputStream, count: Int): List<String> =
+    withTimeout(30.seconds) {
+      var lines: List<String>
+      do {
+        delay(50)
+        lines = output.toString().substringBeforeLast('\n', "").lines()
+      } while (lines.size < count || lines.last().isEmpty())
+      lines
+    }
 
   private class EmptyKetchApi : KetchApi {
     override val backendLabel = "Empty"
