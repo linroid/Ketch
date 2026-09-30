@@ -17,6 +17,7 @@ import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.search.SearchProvider
 import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.config.LlmSettings
 import kotlinx.serialization.json.Json
 import kotlin.time.TimeSource
 
@@ -35,6 +36,7 @@ class ResourceDiscoveryService internal constructor(
   private val siteProfiler: SiteProfiler,
   private val config: AiConfig,
   private val stepListener: DiscoveryStepListener,
+  private val resolveLlm: (LlmSettings) -> ResolvedLlm? = LlmClientFactory::resolve,
 ) {
 
   private val log = KetchLogger("DiscoveryService")
@@ -70,8 +72,8 @@ class ResourceDiscoveryService internal constructor(
       requested = query.sites,
     )
 
-    val llm = LlmClientFactory.resolve(config.llm)
-    if (!config.enabled || llm == null) {
+    val llm = if (config.enabled) resolveLlm(config.llm) else null
+    if (llm == null) {
       log.d { "AI discovery not configured, returning empty result" }
       return DiscoverResult(
         query = query.query,
@@ -79,7 +81,16 @@ class ResourceDiscoveryService internal constructor(
         sources = emptyList(),
       )
     }
+    // Every run builds its own LLM client, and the HTTP engine behind it
+    // is only released by closing it.
+    return llm.executor.use { runAgent(query, allowlist, llm) }
+  }
 
+  private suspend fun runAgent(
+    query: DiscoverQuery,
+    allowlist: SiteAllowlist,
+    llm: ResolvedLlm,
+  ): DiscoverResult {
     val startMark = TimeSource.Monotonic.markNow()
     log.i { "Discovery: query=\"${query.query}\", sites=$allowlist" }
 
@@ -148,16 +159,18 @@ class ResourceDiscoveryService internal constructor(
    * @throws IllegalStateException if the settings are incomplete
    */
   suspend fun verifyConnection(): String {
-    val llm = checkNotNull(LlmClientFactory.resolve(config.llm)) {
+    val llm = checkNotNull(resolveLlm(config.llm)) {
       "AI discovery is not fully configured"
     }
     log.i { "Verifying ${config.llm.provider.label} connection" }
-    val reply = llm.executor.execute(
-      prompt = prompt("ketch-verify") {
-        user("Reply with the single word: OK")
-      },
-      model = llm.model,
-    )
+    val reply = llm.executor.use { executor ->
+      executor.execute(
+        prompt = prompt("ketch-verify") {
+          user("Reply with the single word: OK")
+        },
+        model = llm.model,
+      )
+    }
     return reply.textContent().trim()
   }
 

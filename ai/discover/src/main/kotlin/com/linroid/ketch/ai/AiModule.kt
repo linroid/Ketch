@@ -41,8 +41,10 @@ class AiModule(
   /**
    * Releases the HTTP clients this module created.
    *
-   * Call it when replacing a module after a settings change; the Ktor
-   * engines own thread pools that would otherwise be leaked.
+   * Call it once the module is no longer used, such as when replacing
+   * it after a settings change or before a command-line run ends; the
+   * Ktor engines own thread pools that would otherwise be leaked, and
+   * the fetcher's keeps the JVM from exiting for up to a minute.
    */
   fun close() {
     httpClients.forEach(HttpClient::close)
