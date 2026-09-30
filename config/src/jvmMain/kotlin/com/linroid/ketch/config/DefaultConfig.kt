@@ -15,6 +15,10 @@ port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
 # corsAllowedHosts = ["localhost:3000"]  # host[:port] without a scheme, or "*"
+# Without apiToken, requests must address this machine: localhost, one of its
+# IP addresses, its host name or <host>.local. List any other name used to
+# reach the server here.
+# allowedHosts = ["nas.example.com"]
 
 [download]
 # defaultDirectory = "~/Downloads"  # ~ is your home folder

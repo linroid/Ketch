@@ -146,6 +146,7 @@ private fun ApplicationScope.KetchWindow(
             name = saved.name?.ifEmpty { null } ?: instanceName,
             corsAllowedHosts = serverConfig.corsAllowedHosts
               .takeIf { it.isNotEmpty() } ?: listOf("*"),
+            allowedHosts = serverConfig.allowedHosts,
             mdnsEnabled = serverConfig.mdnsEnabled,
           )
           server.start(wait = false)
