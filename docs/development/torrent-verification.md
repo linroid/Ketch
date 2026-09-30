@@ -19,10 +19,14 @@ TRANSMISSION_DAEMON=/path/to/transmission-daemon ./gradlew :library:torrent:jvmT
 KETCH_TORRENT_BENCHMARK=1 ./gradlew :library:torrent:jvmTest --tests '*TorrentBenchmarkTest*'
 ```
 
-Transmission 4.1.3 (macOS) and 4.0.5 (Ubuntu fixture) are accepted explicitly. The other independent
-client is libtorrent4j 2.1.0-39. Set `KETCH_NATIVE_CLI` and `KETCH_JVM_CLI` alongside
-`TRANSMISSION_DAEMON` to exercise the built executables against the same independent seeder.
-The Gradle test cache tracks these opt-in environment values.
+`test-fixtures/torrent/clients.properties` pins the independent clients: Transmission 4.1.3, built
+from its SHA-256-verified source archive by `tools/torrent/build_transmission.py`, and libtorrent4j
+2.1.0-39. A Transmission binary of any other version fails the test. `-PtorrentConformance=true`
+makes the Transmission scenario required and never restores torrent results from the test cache;
+the [fixture README](../../test-fixtures/torrent/README.md) covers the build and the evidence
+verifier. Set `KETCH_NATIVE_CLI` and `KETCH_JVM_CLI` alongside `TRANSMISSION_DAEMON` to exercise
+the built executables against the same independent seeder. The Gradle test cache tracks these
+opt-in environment values.
 
 `PublicSwarmTest` downloads the current Debian netinst image (about 750 MiB) from the public
 swarm through a magnet with Debian's HTTP tracker and a UDP tracker, pauses once payload arrives,
@@ -36,8 +40,11 @@ resumes, and checks the result against Debian's published `SHA256SUMS`. It is ex
 Network restrictions on trackers, DHT bootstrap or peers fail the test rather than skipping it.
 
 CI runs JVM/Android host, iOS simulator and JS regression suites; extra macOS/Windows jobs exercise
-the OS filesystem adapters. The Android emulator job requires a nonzero executed test count, since
-an AGP connected-test task can otherwise succeed without running instrumentation.
+the OS filesystem adapters. The JVM job builds the pinned Transmission, runs with
+`-PtorrentConformance=true` and `:library:torrent:verifyNoNativeTorrentRuntime`, then requires
+every scenario in `test-fixtures/torrent/scenarios.json` to have executed. The Android emulator
+job requires a nonzero executed test count, since an AGP connected-test task can otherwise succeed
+without running instrumentation.
 
 ## Public v2/hybrid workflow
 
@@ -64,7 +71,8 @@ that reviewed head, not newly executed tests or evidence for uncommitted follow-
 It covers metainfo and tracker-only magnets, external piece-layer authentication, hybrid IDs across
 padding, selective output, live limits, pause, source recreation from serialized task records,
 rechecking modified data, ownership-journal recovery before a source checkpoint, safe removal,
-corrupt proofs, and source shutdown during metadata resolution. The tests execute on JVM and iOS.
+corrupt proofs, and source shutdown during metadata resolution. The tests execute on JVM, Android
+host and iOS.
 
 `PublicV2IndependentSeederTest` resolves pure v2 and hybrid magnets, fetches their external hash
 layers, and downloads exact payload through Ketch from the pinned test-only libtorrent peer.
@@ -151,6 +159,22 @@ Security boundaries, migration behavior and explicitly deferred protocols are do
 [the support guide](../torrent.md). Treat the throughput/memory numbers as a baseline to improve,
 not a performance guarantee.
 
+The final local torrent counts were 275 JVM tests, 265 Android host tests, 266 iOS simulator tests,
+and one Android device test, with zero failures. Core counts were 203 JVM and 200 each on Android
+host, iOS simulator and JS. The server suite passed 42 tests. Counts include opt-in JVM fixture
+methods, which return early when their required environment variables are absent; the recorded
+independent-client runs explicitly set those variables.
+
+Desktop packaging can select a non-Homebrew JDK with `-PdesktopJavaHome=/path/to/jdk`.
+The Graal CLI build is `:cli:nativeCompile`; JVM distribution is `:cli:installDist`.
+Local package checks reused the original checkout's built web assets through `-PprebuiltWebDir`;
+web source was not changed by this work.
+
+Windows filesystem CI passed after replacing Java's unavailable fileKey with OS handle identity.
+The deterministic core handoff fixture holds the old source checkpoint open while requesting
+resume, and requires both pause and resume to wait for checkpoint completion. The full local
+regression/package command passed again after that correction (418 Gradle tasks).
+
 ### Session state memory
 
 `TorrentSessionMemoryTest` checks that session admission (`maxSessionStateBytes`) bounds the heap
@@ -182,18 +206,3 @@ session heap (64 MiB / 1.72). It admits five 30k-piece, 1,000-file torrents of e
 the 100k-piece, 10k-file v2 torrent. v2 charges about 1.1 MiB of fixed per-session state sized
 for 500 peers, which dominates small torrents. These are JVM figures; ART object layouts differ,
 and transient peaks while checking or decoding a checkpoint are not sampled.
-
-The final local torrent counts were 275 JVM tests, 265 Android host tests, 266 iOS simulator tests,
-and one Android device test, with zero failures. Core counts were 203 JVM and 200 each on Android host, iOS simulator and JS. The server suite passed 42 tests. Counts include opt-in JVM fixture
-methods, which return early when their required environment variables are absent; the recorded
-independent-client runs explicitly set those variables.
-
-Desktop packaging can select a non-Homebrew JDK with `-PdesktopJavaHome=/path/to/jdk`.
-The Graal CLI build is `:cli:nativeCompile`; JVM distribution is `:cli:installDist`.
-Local package checks reused the original checkout's built web assets through `-PprebuiltWebDir`;
-web source was not changed by this work.
-
-Windows filesystem CI passed after replacing Java's unavailable fileKey with OS handle identity.
-The deterministic core handoff fixture holds the old source checkpoint open while requesting
-resume, and requires both pause and resume to wait for checkpoint completion. The full local
-regression/package command passed again after that correction (418 Gradle tasks).
