@@ -72,7 +72,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-jvm
+          name: test-results-jvm-attempt-${{ github.run_attempt }}
           path: '**/build/test-results/**/TEST-*.xml'
 
   android-tests:
@@ -95,7 +95,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-android
+          name: test-results-android-attempt-${{ github.run_attempt }}
           path: '**/build/test-results/**/TEST-*.xml'
 
   ios-tests:
@@ -121,7 +121,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-ios
+          name: test-results-ios-attempt-${{ github.run_attempt }}
           path: '**/build/test-results/**/TEST-*.xml'
 
   js-tests:
@@ -144,7 +144,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-js
+          name: test-results-js-attempt-${{ github.run_attempt }}
           path: '**/build/test-results/**/TEST-*.xml'
 
   extension-tests:
@@ -181,7 +181,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-extension
+          name: test-results-extension-attempt-${{ github.run_attempt }}
           path: app/browser-extension/build/test-results/TEST-*.xml
 
   torrent-desktop-tests:
@@ -203,7 +203,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: test-results-torrent-${{ matrix.os }}
+          name: test-results-torrent-${{ matrix.os }}-attempt-${{ github.run_attempt }}
           path: '**/build/test-results/**/TEST-*.xml'
 
   torrent-device-tests:
@@ -238,7 +238,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: test-results-torrent-device
+          name: test-results-torrent-device-attempt-${{ github.run_attempt }}
           path: library/torrent/build/outputs/androidTest-results/**/TEST-*.xml
 
   required-checks:
@@ -269,12 +269,38 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: test-results-*
+          path: test-results
           # Host jobs use identical report paths. Keep each artifact in its own directory.
           merge-multiple: false
+
+      # Re-running failed jobs keeps the earlier attempt's artifacts, and download-artifact picks
+      # between same-named artifacts by ID, which does not follow upload order. Artifact names
+      # carry the run attempt instead, and only the newest attempt of each job is published.
+      - name: Keep the latest attempt of each job's results
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, shutil
+          latest = {}
+          for directory in sorted(pathlib.Path('test-results').iterdir()):
+              match = re.fullmatch(r'(.+)-attempt-(\d+)', directory.name)
+              assert match, f'Artifact name without a run attempt: {directory.name}'
+              job, attempt = match[1], int(match[2])
+              previous = latest.get(job)
+              if previous and previous[0] > attempt:
+                  stale = directory
+              else:
+                  stale = previous and previous[1]
+                  latest[job] = (attempt, directory)
+              if stale:
+                  print(f'Skipping superseded results: {stale.name}')
+                  shutil.rmtree(stale)
+          for job, (attempt, directory) in sorted(latest.items()):
+              print(f'Publishing {job} from attempt {attempt}')
+          PY
 
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          files: '**/TEST-*.xml'
+          files: 'test-results/**/TEST-*.xml'
           action_fail: true
           action_fail_on_inconclusive: true
