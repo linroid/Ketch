@@ -37,6 +37,7 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.Locale
+import kotlin.system.exitProcess
 
 /** Ketch library log level, derived from CLI flags. */
 private var ketchLogLevel = LogLevel.INFO
@@ -404,7 +405,8 @@ private fun runServer(args: Array<String>) {
   if (serverConfig.corsAllowedHosts.isNotEmpty()) {
     println(
       "  CORS origins:  " +
-        serverConfig.corsAllowedHosts.joinToString(", ")
+        serverConfig.corsAllowedHosts.joinToString(", ") +
+        if (serverConfig.apiToken == null) " (ignored: needs --token)" else ""
     )
   }
   if (!downloadConfig.speedLimit.isUnlimited) {
@@ -425,6 +427,11 @@ private fun runServer(args: Array<String>) {
 private fun runAiDiscover(args: List<String>) {
   if (args.isEmpty()) {
     println("Usage: ketch ai-discover <query> [--sites domain1,domain2]")
+    println()
+    println("  --sites <domains>    Only search, read and return links from")
+    println("                       these sites and their subdomains;")
+    println("                       redirects to download hosts are followed")
+    println("  --max-results <n>    Max results (default: 5)")
     println()
     println("Examples:")
     println("  ketch ai-discover \"latest Ubuntu 24.04 ISO\"")
@@ -488,7 +495,7 @@ private fun runAiDiscover(args: List<String>) {
   )
   println("Discovering resources for: \"$query\"")
   if (sites.isNotEmpty()) {
-    println("Sites: ${sites.joinToString(", ")}")
+    println("Limited to: ${sites.joinToString(", ")}")
   }
   println()
 
@@ -498,7 +505,12 @@ private fun runAiDiscover(args: List<String>) {
       sites = sites,
       maxResults = maxResults,
     )
-    val response = aiModule.discoveryService.discover(discoverQuery)
+    val response = try {
+      aiModule.discoveryService.discover(discoverQuery)
+    } catch (e: IllegalArgumentException) {
+      println("Error: ${e.message}")
+      return@runBlocking
+    }
 
     if (response.candidates.isEmpty()) {
       println("No candidates found.")
@@ -571,6 +583,8 @@ private fun runMcp(args: List<String>) {
 
   // stdout carries the JSON-RPC stream, so keep it for the transport and send everything
   // else to stderr: the banner, the console logger, Logback and any library output.
+  // Logback's console appender looks up System.out on every write, so this also covers the
+  // Logback that -v or --debug initialized before this point.
   val protocolOut = System.out
   System.setOut(System.err)
   printBanner()
@@ -618,6 +632,9 @@ private fun runMcp(args: List<String>) {
     ketch.start()
     mcpServer.startStdio(output = protocolOut)
   }
+  // The client closed stdin, which ends the MCP session. Exit rather than rely on every
+  // library thread being a daemon; the shutdown hook above closes Ketch.
+  exitProcess(0)
 }
 
 private fun printMcpError(message: String) {
@@ -700,7 +717,8 @@ private fun printUsage() {
   println()
   println("AI Discovery:")
   println("  ai-discover <query>      Discover downloadable resources")
-  println("    --sites <domains>      Comma-separated domain allowlist")
+  println("    --sites <domains>      Only use these comma-separated sites")
+  println("                           (subdomains included)")
   println("    --max-results <n>      Max results (default: 5)")
   println("                           Configure the provider in the")
   println("                           app's Settings page, or export a")
@@ -734,8 +752,9 @@ private fun printServerUsage() {
   println("  --host <address>       Bind address (default: 0.0.0.0)")
   println("  --port <number>        Port number (default: 8642)")
   println("  --token <string>       API bearer token (optional)")
-  println("  --cors <hosts>         CORS allowed hosts as host[:port],")
-  println("                         comma-separated, or '*' (optional)")
+  println("  --cors <origins>       Origins whose web pages may call")
+  println("                         the API, comma-separated or '*';")
+  println("                         needs --token (optional)")
   println("  --allowed-hosts <names>")
   println("                         Extra Host names accepted without")
   println("                         a token, comma-separated (optional)")

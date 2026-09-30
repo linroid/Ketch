@@ -88,9 +88,18 @@ class SiteProfiler internal constructor(
    *   readable robots.txt, which allows every path
    */
   internal suspend fun fetchRobotsRules(origin: String): RobotsTxtRules? {
-    return when (val result = fetcher.fetch("$origin/robots.txt", MAX_ROBOTS_BYTES)) {
+    val url = "$origin/robots.txt"
+    return when (val result = fetcher.fetch(url, MAX_ROBOTS_BYTES, truncate = true)) {
       is FetchResult.Success -> {
-        val rules = robotsTxtParser.parse(result.content, robotsUserAgent)
+        // A longer file is parsed up to the limit (RFC 9309, section 2.5).
+        // The line the cut went through is dropped: a partial Allow path
+        // would allow more than the full rule does.
+        val content = if (result.truncated) {
+          result.content.substringBeforeLast('\n', missingDelimiterValue = "")
+        } else {
+          result.content
+        }
+        val rules = robotsTxtParser.parse(content, robotsUserAgent)
         log.d {
           "robots.txt for $origin: ${rules.rules.size} rules, " +
             "${rules.sitemaps.size} sitemaps, crawlDelay=${rules.crawlDelay}"
@@ -130,8 +139,8 @@ class SiteProfiler internal constructor(
   }
 
   companion object {
-    /** RFC 9309 requires parsing at least 500 KiB of robots.txt. */
-    private const val MAX_ROBOTS_BYTES = 500L * 1024
+    /** RFC 9309 requires parsing at least 500 KiB of robots.txt, and allows stopping there. */
+    internal const val MAX_ROBOTS_BYTES = 500L * 1024
 
     private val FEED_LINK_PATTERN = Regex(
       "<link[^>]*type=\"application/" +

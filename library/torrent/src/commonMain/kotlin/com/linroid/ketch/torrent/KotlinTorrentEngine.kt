@@ -207,6 +207,9 @@ internal class KotlinTorrentEngine(
           try { http.close() } finally {
             cache.close()
             checkNotNull(scope.coroutineContext[Job]).join()
+            // join() can return while another thread is still running the completion handler
+            // that closes the ledger, so return the credit before stop() does.
+            admissions.close()
           }
         }
       }

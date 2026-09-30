@@ -9,6 +9,7 @@ import com.linroid.ketch.ai.agent.DeviceSafetyFilter
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.agent.DiscoveryToolSet
 import com.linroid.ketch.ai.agent.LinkExtractor
+import com.linroid.ketch.ai.agent.SiteAllowlist
 import com.linroid.ketch.ai.fetch.ContentExtractor
 import com.linroid.ketch.ai.fetch.FetchBudget
 import com.linroid.ketch.ai.fetch.SafeFetcher
@@ -54,10 +55,20 @@ class ResourceDiscoveryService internal constructor(
   /**
    * Discovers downloadable resources matching [query].
    *
-   * @throws IllegalArgumentException if the query text is blank
+   * The run is limited to [DiscoverQuery.sites] narrowed to
+   * [DiscoveryConfig.allowedDomains]; see [DiscoverQuery] for what that
+   * covers.
+   *
+   * @throws IllegalArgumentException if the query text is blank, if
+   *   [DiscoverQuery.sites] names no domain, or if none of its sites lie
+   *   within [DiscoveryConfig.allowedDomains]
    */
   suspend fun discover(query: DiscoverQuery): DiscoverResult {
     require(query.query.isNotBlank()) { "Query must not be blank" }
+    val allowlist = SiteAllowlist.forRun(
+      configured = config.discovery.allowedDomains,
+      requested = query.sites,
+    )
 
     val llm = LlmClientFactory.resolve(config.llm)
     if (!config.enabled || llm == null) {
@@ -70,10 +81,7 @@ class ResourceDiscoveryService internal constructor(
     }
 
     val startMark = TimeSource.Monotonic.markNow()
-    log.i { "Discovery: query=\"${query.query}\"" }
-
-    val allowedDomains = config.discovery.allowedDomains +
-      query.sites
+    log.i { "Discovery: query=\"${query.query}\", sites=$allowlist" }
 
     val toolSet = DiscoveryToolSet(
       searchProvider = searchProvider,
@@ -88,7 +96,7 @@ class ResourceDiscoveryService internal constructor(
       ),
       stepListener = stepListener,
       json = json,
-      allowedDomains = allowedDomains,
+      allowlist = allowlist,
     )
 
     val agent = AIAgent(
@@ -103,7 +111,7 @@ class ResourceDiscoveryService internal constructor(
       maxIterations = config.agent.maxIterations,
     )
 
-    val userMessage = buildUserMessage(query)
+    val userMessage = buildUserMessage(query, allowlist)
 
     val agentOutput = try {
       agent.run(userMessage)
@@ -116,7 +124,7 @@ class ResourceDiscoveryService internal constructor(
       )
     }
 
-    val candidates = outputParser.parse(agentOutput)
+    val candidates = outputParser.parse(agentOutput, allowlist)
       .take(query.maxResults)
 
     val elapsed = startMark.elapsedNow()
@@ -153,11 +161,16 @@ class ResourceDiscoveryService internal constructor(
     return reply.textContent().trim()
   }
 
-  private fun buildUserMessage(query: DiscoverQuery): String {
+  private fun buildUserMessage(
+    query: DiscoverQuery,
+    allowlist: SiteAllowlist,
+  ): String {
     return buildString {
       appendLine("Find downloadable files for: ${query.query}")
-      if (query.sites.isNotEmpty()) {
-        appendLine("Preferred sites: ${query.sites.joinToString()}")
+      if (allowlist.isRestricted) {
+        appendLine(
+          "Allowed sites (subdomains included): ${allowlist.domains.joinToString()}"
+        )
       }
       if (query.fileTypes.isNotEmpty()) {
         appendLine(
@@ -185,7 +198,10 @@ class ResourceDiscoveryService internal constructor(
       |   Call emitStep("Plan", <your plan>).
       |
       |3. DISCOVER (iterative loop)
-      |   If preferred sites given: searchSites() first, then searchWeb().
+      |   If allowed sites are given, the run is limited to them (and their
+      |   subdomains): searches only cover them, fetchPage() and headUrl()
+      |   refuse other domains, and candidates elsewhere are discarded.
+      |   Do not try other domains. Redirects are followed for you.
       |   For promising results:
       |     a) validateUrl() — check safety
       |     b) fetchPage() — read the page
@@ -219,7 +235,7 @@ class ResourceDiscoveryService internal constructor(
       |   [
       |     {
       |       "name": "human-readable name",
-      |       "url": "direct download URL",
+      |       "url": "direct download URL (the url you checked, not a finalUrl)",
       |       "fileType": "zip|pdf|iso|...",
       |       "sourcePageUrl": "page where link was found",
       |       "sizeBytes": 12345,

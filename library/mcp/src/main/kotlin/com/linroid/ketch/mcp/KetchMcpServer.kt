@@ -8,6 +8,10 @@ import com.linroid.ketch.api.KetchApi
 import io.ktor.server.engine.ApplicationEngineFactory
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.io.Sink
+import kotlinx.io.Source
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
@@ -45,7 +49,8 @@ class KetchMcpServer(
    * stdout can redirect `System.out` to stderr and pass the original
    * stream here.
    *
-   * This function suspends until [input] reaches end of input.
+   * This function suspends until the client closes [input], as the MCP
+   * stdio transport expects the server to stop at that point.
    *
    * @param input the stream to read requests from, stdin by default
    * @param output the stream to write responses to, stdout by default
@@ -54,14 +59,7 @@ class KetchMcpServer(
     input: InputStream = System.`in`,
     output: OutputStream = System.out,
   ) {
-    val transport = StdioServerTransport(input.asSource().buffered(), output.asSink().buffered())
-    // The server only reports closing on an explicit close(), while the stdio
-    // transport closes itself at end of input. Register before connecting so
-    // an input that is already at its end is not missed.
-    val done = Job()
-    transport.onClose { done.complete() }
-    configureMcpServer(toolRegistry).createSession(transport)
-    done.join()
+    serveStdio(toolRegistry, input.asSource().buffered(), output.asSink().buffered())
   }
 
   /**
@@ -87,5 +85,25 @@ class KetchMcpServer(
     val done = Job()
     server.onClose { done.complete() }
     done.join()
+  }
+}
+
+/**
+ * Serves [tools] over the MCP stdio transport on [input] and [output], suspending until
+ * [input] reaches its end.
+ */
+internal suspend fun serveStdio(tools: ToolRegistry, input: Source, output: Sink) {
+  val server = configureMcpServer(tools)
+  val transport = StdioServerTransport(input, output)
+  // Server.onClose only fires on Server.close(), so wait for the transport, which closes
+  // at the end of input. Registered before the session starts reading, so an input that
+  // is already at its end cannot close it unobserved.
+  val closed = Job()
+  transport.onClose { closed.complete() }
+  server.createSession(transport)
+  try {
+    closed.join()
+  } finally {
+    withContext(NonCancellable) { server.close() }
   }
 }
