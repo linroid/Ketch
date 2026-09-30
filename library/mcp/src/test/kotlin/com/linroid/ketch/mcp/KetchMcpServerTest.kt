@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SystemInfo
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -26,9 +27,12 @@ import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
@@ -36,6 +40,7 @@ import java.io.PipedOutputStream
 import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -139,7 +144,7 @@ class KetchMcpServerTest {
     runTest(timeout = 10.seconds) {
       val requests = listOf(INITIALIZE, INITIALIZED, LIST_DOWNLOADS)
       val output = ByteArrayOutputStream()
-      KetchMcpServer(EmptyKetchApi())
+      KetchMcpServer(FakeKetchApi())
         .startStdio(requests.joinToString("\n", postfix = "\n").byteInputStream(), output)
 
       val replies = replies(Buffer().apply { write(output.toByteArray()) })
@@ -147,6 +152,91 @@ class KetchMcpServerTest {
       val result = replies[1].getValue("result").jsonObject
       assertNull(result["isError"], "listDownloads failed: $result")
     }
+
+  @Test
+  fun `tools list requires only the parameters without a default value`() =
+    runTest(timeout = 10.seconds) {
+      val tools = result(FakeKetchApi(), TOOLS_LIST).getValue("tools").jsonArray
+      val schemas = tools.associate { tool ->
+        val name = tool.jsonObject.getValue("name").jsonPrimitive.content
+        name to tool.jsonObject.getValue("inputSchema").jsonObject
+      }
+
+      assertEquals(
+        mapOf(
+          "listDownloads" to emptyList(),
+          "getDownload" to listOf("taskId"),
+          "startDownload" to listOf("url"),
+          "pauseDownload" to listOf("taskId"),
+          "resumeDownload" to listOf("taskId"),
+          "cancelDownload" to listOf("taskId"),
+          "removeDownload" to listOf("taskId"),
+          "resolveUrl" to listOf("url"),
+          "getStatus" to emptyList(),
+          "setSpeedLimit" to listOf("taskId", "speedLimit"),
+          "setPriority" to listOf("taskId", "priority"),
+          "updateConfig" to emptyList(),
+        ),
+        schemas.mapValues { (_, schema) ->
+          schema.getValue("required").jsonArray.map { it.jsonPrimitive.content }
+        },
+      )
+      // Optional parameters are still described
+      assertEquals(
+        setOf("url", "destination", "connections", "priority", "speedLimit"),
+        schemas.getValue("startDownload").getValue("properties").jsonObject.keys,
+      )
+    }
+
+  @Test
+  fun `tools call returns the JSON of a tool without encoding it again`() =
+    runTest(timeout = 10.seconds) {
+      val status = Json.parseToJsonElement(toolText(FakeKetchApi(), "getStatus"))
+
+      assertEquals("Ketch", assertIs<JsonObject>(status)["name"]?.jsonPrimitive?.content)
+    }
+
+  @Test
+  fun `tools call uses the default of a parameter the client leaves out`() =
+    runTest(timeout = 10.seconds) {
+      val ketch = FakeKetchApi()
+      toolText(ketch, "updateConfig", buildJsonObject { put("maxConcurrentDownloads", 7) })
+
+      assertEquals(DownloadConfig(maxConcurrentDownloads = 7), ketch.config)
+    }
+
+  /** The result a [KetchMcpServer] for [ketch] gives [request], sent after the handshake. */
+  private suspend fun result(ketch: KetchApi, request: String): JsonObject {
+    val requests = listOf(INITIALIZE, INITIALIZED, request)
+    val output = ByteArrayOutputStream()
+    KetchMcpServer(ketch)
+      .startStdio(requests.joinToString("\n", postfix = "\n").byteInputStream(), output)
+
+    val reply = replies(Buffer().apply { write(output.toByteArray()) }).last()
+    return assertNotNull(reply["result"], "Request failed: $reply").jsonObject
+  }
+
+  /** Calls the tool [name] of a [KetchMcpServer] for [ketch] and returns the text of its result. */
+  private suspend fun toolText(
+    ketch: KetchApi,
+    name: String,
+    arguments: JsonObject = JsonObject(emptyMap()),
+  ): String {
+    val request = buildJsonObject {
+      put("jsonrpc", "2.0")
+      put("id", 2)
+      put("method", "tools/call")
+      put(
+        "params",
+        buildJsonObject {
+          put("name", name)
+          put("arguments", arguments)
+        },
+      )
+    }
+    val content = result(ketch, request.toString()).getValue("content").jsonArray.single()
+    return content.jsonObject.getValue("text").jsonPrimitive.content
+  }
 
   private fun input(vararg lines: String): Buffer =
     Buffer().apply { lines.forEach { writeString(it + "\n") } }
@@ -184,8 +274,11 @@ class KetchMcpServerTest {
     }
   }
 
-  private class EmptyKetchApi : KetchApi {
-    override val backendLabel = "Empty"
+  private class FakeKetchApi : KetchApi {
+    var config = DownloadConfig()
+      private set
+
+    override val backendLabel = "Fake"
     override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(emptyList())
 
     override suspend fun download(request: DownloadRequest): DownloadTask =
@@ -199,9 +292,31 @@ class KetchMcpServerTest {
 
     override suspend fun start() {}
 
-    override suspend fun status(): KetchStatus = throw UnsupportedOperationException()
+    override suspend fun status() = KetchStatus(
+      name = "Ketch",
+      version = "1.0.0",
+      revision = "abc1234",
+      uptime = 0,
+      config = config,
+      system = SystemInfo(
+        os = "TestOS",
+        arch = "test",
+        separator = "/",
+        javaVersion = "21",
+        availableProcessors = 1,
+        maxMemory = 0,
+        totalMemory = 0,
+        freeMemory = 0,
+        downloadDirectory = "/downloads",
+        totalSpace = 0,
+        freeSpace = 0,
+        usableSpace = 0,
+      ),
+    )
 
-    override suspend fun updateConfig(config: DownloadConfig) {}
+    override suspend fun updateConfig(config: DownloadConfig) {
+      this.config = config
+    }
 
     override fun close() {}
   }

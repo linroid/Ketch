@@ -10,6 +10,7 @@ import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.agent.DiscoveryToolSet
 import com.linroid.ketch.ai.agent.LinkExtractor
 import com.linroid.ketch.ai.agent.SiteAllowlist
+import com.linroid.ketch.ai.agent.asDeclaredTools
 import com.linroid.ketch.ai.fetch.ContentExtractor
 import com.linroid.ketch.ai.fetch.FetchBudget
 import com.linroid.ketch.ai.fetch.SafeFetcher
@@ -103,7 +104,7 @@ class ResourceDiscoveryService internal constructor(
       promptExecutor = llm.executor,
       llmModel = llm.model,
       systemPrompt = SYSTEM_PROMPT,
-      toolRegistry = ToolRegistry { tools(toolSet) },
+      toolRegistry = ToolRegistry { tools(toolSet.asDeclaredTools()) },
       // Newer frontier models reject sampling parameters with a 400,
       // so the temperature only goes out when the model advertises it.
       temperature = config.agent.temperature

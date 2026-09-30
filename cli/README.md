@@ -209,6 +209,9 @@ ketch mcp [options]
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--help`, `-h` | Show help message |
 
+Each tool returns a JSON document as the text of its result. Parameters that have a default,
+such as everything but `url` in `startDownload`, are optional in the tool's input schema.
+
 Stdout carries only the MCP protocol; the banner and all logs go to stderr. The server exits once
 the client closes stdin, after answering the requests it has already read, so it can also be
 scripted, e.g. `printf '%s\n' '<request>' | ketch mcp`. Register it with your MCP client, for

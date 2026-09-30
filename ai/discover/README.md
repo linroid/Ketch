@@ -28,6 +28,7 @@ ai/discover/
 │
 ├── agent/                       # Agent-driven discovery
 │   ├── DiscoveryToolSet.kt      # 7 @Tool methods for the LLM agent
+│   ├── DeclaredTools.kt         # Koog tools with optional parameters and plain text results
 │   ├── AgentOutputParser.kt     # Parse + validate agent JSON output
 │   ├── DeviceSafetyFilter.kt    # URL safety scoring
 │   ├── LinkExtractor.kt         # Download link extraction from HTML
@@ -86,13 +87,17 @@ that follows a structured 5-phase workflow:
 
 | Tool | Description | Backend |
 |------|-------------|---------|
-| `searchWeb(query, maxResults)` | Web search, scoped to the allowed sites | `SearchProvider.search()` |
-| `searchSites(sites, query, maxResults)` | Site-restricted search; the sites must be allowed | `SearchProvider.search(sites=)` |
+| `searchWeb(query, maxResults = 5)` | Web search, scoped to the allowed sites | `SearchProvider.search()` |
+| `searchSites(sites, query, maxResults = 5)` | Site-restricted search; the sites must be allowed | `SearchProvider.search(sites=)` |
 | `fetchPage(url)` | Fetch + extract text and links (allowed sites only; honors robots.txt) | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
 | `headUrl(url)` | HTTP HEAD for metadata and the final URL after redirects (allowed sites only) | `SafeFetcher.head()` |
 | `extractDownloads(pageText, baseUrl)` | Extract download links from HTML | `LinkExtractor` |
 | `validateUrl(url)` | SSRF + allowed-site check | `UrlValidator` + `SiteAllowlist` |
 | `emitStep(title, details)` | Report progress to the user | `DiscoveryStepListener` |
+
+The tools are registered through `asDeclaredTools()` rather than Koog's `tools(toolSet)`, which
+(as of Koog 1.2.0) tells the model that `maxResults` is required and sends each result as a
+quoted, escaped JSON string instead of the JSON the tool returned.
 
 ## Data Flow
 

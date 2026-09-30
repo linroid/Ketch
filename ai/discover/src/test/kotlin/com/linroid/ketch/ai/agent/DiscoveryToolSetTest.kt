@@ -1,5 +1,8 @@
 package com.linroid.ketch.ai.agent
 
+import ai.koog.agents.core.tools.Tool
+import ai.koog.serialization.kotlinx.KotlinxSerializer
+import ai.koog.serialization.kotlinx.toKoogJSONObject
 import com.linroid.ketch.ai.fetch.ContentExtractor
 import com.linroid.ketch.ai.fetch.FetchBudget
 import com.linroid.ketch.ai.fetch.RateLimiter
@@ -21,9 +24,11 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -289,6 +294,53 @@ class DiscoveryToolSetTest {
 
     assertFalse(offList.getValue("ok").jsonPrimitive.boolean)
     assertTrue(onList.getValue("ok").jsonPrimitive.boolean)
+  }
+
+  @Test
+  fun asDeclaredTools_parametersWithDefaults_areOptional() {
+    val tools = toolSet(MockEngine { respond("") }).asDeclaredTools().associateBy { it.name }
+
+    assertEquals(
+      mapOf(
+        "searchWeb" to listOf("query"),
+        "searchSites" to listOf("sites", "query"),
+        "fetchPage" to listOf("url"),
+        "headUrl" to listOf("url"),
+        "extractDownloads" to listOf("pageText", "baseUrl"),
+        "validateUrl" to listOf("url"),
+        "emitStep" to listOf("title", "details"),
+      ),
+      tools.mapValues { (_, tool) -> tool.descriptor.requiredParameters.map { it.name } },
+    )
+    // Optional parameters are still described
+    val searchWeb = tools.getValue("searchWeb").descriptor
+    assertEquals(listOf("maxResults"), searchWeb.optionalParameters.map { it.name })
+  }
+
+  @Test
+  fun asDeclaredTools_toolResult_isNotEncodedAgain() = runTest {
+    val toolSet = toolSet(MockEngine { respond("") })
+    val tools = toolSet.asDeclaredTools().associateBy { it.name }
+
+    val step = tools.getValue("emitStep").call(
+      buildJsonObject {
+        put("title", "Plan")
+        put("details", "Search the release page")
+      },
+    )
+    val validation = tools.getValue("validateUrl").call(
+      buildJsonObject { put("url", "https://example.com/app.zip") },
+    )
+
+    assertEquals("ok", step)
+    assertEquals(toolSet.validateUrl("https://example.com/app.zip"), validation)
+  }
+
+  /** Calls this tool with [arguments] and returns the text the model receives. */
+  private suspend fun <TArgs, TResult> Tool<TArgs, TResult>.call(arguments: JsonObject): String {
+    val serializer = KotlinxSerializer()
+    val result = execute(decodeArgs(arguments.toKoogJSONObject(), serializer))
+    return encodeResultToString(result, serializer)
   }
 
   private fun parseUrls(json: String): List<String> {
