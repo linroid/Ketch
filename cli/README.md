@@ -209,8 +209,10 @@ ketch mcp [options]
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--help`, `-h` | Show help message |
 
-Stdout carries only the MCP protocol; the banner and all logs go to stderr. Register it with your
-MCP client, for example in Claude Desktop's `claude_desktop_config.json`:
+Stdout carries only the MCP protocol; the banner and all logs go to stderr. The server exits once
+the client closes stdin, after answering the requests it has already read, so it can also be
+scripted, e.g. `printf '%s\n' '<request>' | ketch mcp`. Register it with your MCP client, for
+example in Claude Desktop's `claude_desktop_config.json`:
 
 ```json
 {

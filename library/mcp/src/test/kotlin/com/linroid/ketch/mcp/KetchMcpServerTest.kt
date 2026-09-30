@@ -8,21 +8,24 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.io.Buffer
+import kotlinx.io.IOException
+import kotlinx.io.RawSink
+import kotlinx.io.RawSource
 import kotlinx.io.asSink
 import kotlinx.io.asSource
-import kotlinx.io.buffered
+import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -30,42 +33,62 @@ import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
+import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
-// The "returns" tests pass by returning before the timeout: the MCP stdio transport expects
-// the server to stop once the client closes its input.
+// Each test also checks that serveStdio returns before the timeout: the MCP stdio transport
+// expects the server to stop once the client closes its input.
 class KetchMcpServerTest {
 
   @Test
-  fun `serveStdio returns when the client closes its input`() =
+  fun `serveStdio answers a request sent just before the input ends`() =
     runTest(timeout = 10.seconds) {
-      val input = Buffer().apply { writeString(INITIALIZE_REQUEST + "\n") }
-      serveStdio(ToolRegistry {}, input, Buffer())
+      val output = Buffer()
+      serveStdio(ToolRegistry {}, input(INITIALIZE), output)
+
+      val replies = replies(output)
+      assertEquals(listOf(JsonPrimitive(1)), replies.map { it["id"] })
+      assertTrue("result" in replies.single())
     }
 
   @Test
-  fun `serveStdio returns when the input is already at its end`() =
+  fun `serveStdio answers every request read before the input ends in order`() =
     runTest(timeout = 10.seconds) {
-      serveStdio(ToolRegistry {}, Buffer(), Buffer())
+      val output = Buffer()
+      serveStdio(ToolRegistry {}, input(INITIALIZE, INITIALIZED, TOOLS_LIST, PING), output)
+
+      val replies = replies(output)
+      assertEquals(listOf(1, 2, 3).map(::JsonPrimitive), replies.map { it["id"] })
+      assertTrue(replies.all { "result" in it })
+    }
+
+  @Test
+  fun `serveStdio returns when the input has already ended`() =
+    runTest(timeout = 10.seconds) {
+      val output = Buffer()
+      serveStdio(ToolRegistry {}, Buffer(), output)
+
+      assertEquals("", output.readString())
     }
 
   @Test
   fun `serveStdio writes its responses to the output`() =
     runTest(timeout = 10.seconds) {
       val requests = PipedOutputStream()
-      val input = PipedInputStream(requests).asSource().buffered()
+      val input = PipedInputStream(requests).asSource()
       val output = FirstLineOutputStream()
       val server = launch(Dispatchers.IO) {
-        serveStdio(ToolRegistry {}, input, output.asSink().buffered())
+        serveStdio(ToolRegistry {}, input, output.asSink())
       }
 
-      // The input stays open until the response arrives: the server stops at its end
+      // The input stays open until the response arrives: replies must not wait for its end
       withContext(Dispatchers.IO) {
-        requests.write((INITIALIZE_REQUEST + "\n").encodeToByteArray())
+        requests.write((INITIALIZE + "\n").encodeToByteArray())
         requests.flush()
       }
       val response = Json.parseToJsonElement(output.firstLine.await()).jsonObject
@@ -76,46 +99,75 @@ class KetchMcpServerTest {
       server.join()
     }
 
-  // Real threads and streams: the input stays open until each response has arrived.
   @Test
-  fun `startStdio answers a tool call on the given output`() = runBlocking {
-    val requests = PipedOutputStream()
-    val input = PipedInputStream(requests)
-    val output = ByteArrayOutputStream()
-    val server = launch(Dispatchers.IO) {
-      KetchMcpServer(EmptyKetchApi()).startStdio(input, output)
-    }
-    try {
-      // A client sends nothing else until the server has answered initialize.
-      requests.send(INITIALIZE_REQUEST)
-      awaitLines(output, 1)
-      requests.send(INITIALIZED_NOTIFICATION, LIST_DOWNLOADS_CALL)
-      val responses = awaitLines(output, 2).map { Json.parseToJsonElement(it).jsonObject }
+  fun `serveStdio stops and closes the input when cancelled while the input is still open`() =
+    runTest(timeout = 10.seconds) {
+      val input = OpenInput()
+      try {
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+          serveStdio(ToolRegistry {}, input, Buffer())
+        }
+        job.cancel()
+        job.join()
 
-      assertEquals(listOf(1, 2), responses.map { it["id"]?.jsonPrimitive?.int })
-      val result = responses[1].getValue("result").jsonObject
+        assertTrue(input.isClosed)
+      } finally {
+        input.close()
+      }
+    }
+
+  @Test
+  fun `serveStdio stops and closes the input when writing a reply fails`() =
+    runTest(timeout = 10.seconds) {
+      val input = OpenInput(INITIALIZE)
+      val brokenOutput = object : RawSink {
+        override fun write(source: Buffer, byteCount: Long) = throw IOException("Broken pipe")
+        override fun flush() {}
+        override fun close() {}
+      }
+      try {
+        serveStdio(ToolRegistry {}, input, brokenOutput)
+
+        assertTrue(input.isClosed)
+      } finally {
+        input.close()
+      }
+    }
+
+  @Test
+  fun `startStdio answers a call to a KetchToolSet tool`() =
+    runTest(timeout = 10.seconds) {
+      val requests = listOf(INITIALIZE, INITIALIZED, LIST_DOWNLOADS)
+      val output = ByteArrayOutputStream()
+      KetchMcpServer(EmptyKetchApi())
+        .startStdio(requests.joinToString("\n", postfix = "\n").byteInputStream(), output)
+
+      val replies = replies(Buffer().apply { write(output.toByteArray()) })
+      assertEquals(listOf(1, 2).map(::JsonPrimitive), replies.map { it["id"] })
+      val result = replies[1].getValue("result").jsonObject
       assertNull(result["isError"], "listDownloads failed: $result")
-    } finally {
-      requests.close()
-      server.cancel()
     }
-  }
 
-  private fun PipedOutputStream.send(vararg messages: String) {
-    write(messages.joinToString("\n", postfix = "\n").toByteArray())
-    flush()
-  }
+  private fun input(vararg lines: String): Buffer =
+    Buffer().apply { lines.forEach { writeString(it + "\n") } }
 
-  /** Waits until [output] holds [count] complete lines and returns them. */
-  private suspend fun awaitLines(output: ByteArrayOutputStream, count: Int): List<String> =
-    withTimeout(30.seconds) {
-      var lines: List<String>
-      do {
-        delay(50)
-        lines = output.toString().substringBeforeLast('\n', "").lines()
-      } while (lines.size < count || lines.last().isEmpty())
-      lines
+  /**
+   * Input from a client that sends [lines] and then keeps its end open. Like a socket, a blocked
+   * read ends when the stream is closed.
+   */
+  private class OpenInput(vararg lines: String) : RawSource {
+    private val pending = Buffer().apply { lines.forEach { writeString(it + "\n") } }
+    private val closed = CountDownLatch(1)
+    val isClosed: Boolean get() = closed.count == 0L
+
+    override fun readAtMostTo(sink: Buffer, byteCount: Long): Long {
+      if (!pending.exhausted()) return pending.readAtMostTo(sink, byteCount)
+      closed.await()
+      throw IOException("Stream closed")
     }
+
+    override fun close() = closed.countDown()
+  }
 
   /** Collects bytes until the first newline, which ends one JSON-RPC message. */
   private class FirstLineOutputStream : OutputStream() {
@@ -154,13 +206,18 @@ class KetchMcpServerTest {
     override fun close() {}
   }
 
+  private fun replies(output: Buffer): List<JsonObject> =
+    output.readString().lines().filter { it.isNotBlank() }
+      .map { Json.parseToJsonElement(it).jsonObject }
+
   private companion object {
-    const val INITIALIZE_REQUEST = """{"jsonrpc":"2.0","id":1,"method":"initialize",""" +
+    const val INITIALIZE = """{"jsonrpc":"2.0","id":1,"method":"initialize",""" +
       """"params":{"protocolVersion":"2025-06-18","capabilities":{},""" +
       """"clientInfo":{"name":"test","version":"1"}}}"""
-    const val INITIALIZED_NOTIFICATION =
-      """{"jsonrpc":"2.0","method":"notifications/initialized"}"""
-    const val LIST_DOWNLOADS_CALL = """{"jsonrpc":"2.0","id":2,"method":"tools/call",""" +
+    const val INITIALIZED = """{"jsonrpc":"2.0","method":"notifications/initialized"}"""
+    const val TOOLS_LIST = """{"jsonrpc":"2.0","id":2,"method":"tools/list"}"""
+    const val PING = """{"jsonrpc":"2.0","id":3,"method":"ping"}"""
+    const val LIST_DOWNLOADS = """{"jsonrpc":"2.0","id":2,"method":"tools/call",""" +
       """"params":{"name":"listDownloads","arguments":{}}}"""
   }
 }
