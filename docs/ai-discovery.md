@@ -99,10 +99,11 @@ Rules:
   discovery on — the "export a key and go" path. Once anything is
   configured, the environment only fills blank credentials there too.
 
-The settings page judges the form the way the engine will: when a blank
-field is covered by the environment it says so under the status line,
-and **Test** works with the token left empty. It also works
-with the switch off, so you can check a key before turning discovery on.
+The settings page judges the form the way the engine will: a blank API
+key that the environment supplies is noted under the **API key** field
+and counts as filled in the status line, and **Test** works with the
+token left empty. It also works with the switch off, so you can check a
+key before turning discovery on.
 
 ## config.toml
 
@@ -138,6 +139,9 @@ returns you to Downloads.
 
 Discovery runs in-process on the desktop and Android apps and in the
 CLI. iOS and the web app have no local engine, so their settings page
-reports AI discovery as unavailable. See
+reports AI discovery as unavailable. The daemon's REST API has no
+discovery endpoints: with a remote instance selected, the desktop and
+Android apps still run discovery on the device, and the candidates you
+pick are downloaded by that instance. See
 [ai/discover/README.md](../ai/discover/README.md) for the engine
 internals.
