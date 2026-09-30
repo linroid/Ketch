@@ -167,7 +167,9 @@ data class FetcherConfig(
  *   once, across all discovery runs of an [AiModule]
  * @param userAgent User-Agent string for fetching; the part before `/`
  *   is the token matched against robots.txt
- * @param allowedDomains allowlisted domains; empty = allow all public
+ * @param allowedDomains domains every discovery is limited to, subdomains
+ *   included; empty = all public sites. [DiscoverQuery.sites] can only
+ *   narrow this list, never widen it.
  */
 data class DiscoveryConfig(
   val maxConcurrentRequests: Int = 3,

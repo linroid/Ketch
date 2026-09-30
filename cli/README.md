@@ -214,7 +214,7 @@ ketch ai-discover <query> [options]
 
 | Option | Description |
 |---|---|
-| `--sites <domains>` | Comma-separated domains to search first; a hint to the agent, not a hard limit |
+| `--sites <domains>` | Comma-separated domains to limit discovery to, subdomains included; redirects to download hosts are followed (see [AI discovery](../docs/ai-discovery.md#limiting-discovery-to-websites)) |
 | `--max-results <n>` | Max candidates to return (default: 5) |
 
 The command reads the `[ai]` section of the default [config file](#config-file-locations), which
@@ -262,6 +262,8 @@ Keys are camelCase and match the Kotlin property names. Unknown keys are ignored
 warning, so a misspelled key silently keeps its default.
 
 ```toml
+# Ketch Configuration
+
 # Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
 
@@ -270,23 +272,38 @@ host = "0.0.0.0"
 port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
-# corsAllowedHosts = ["localhost:3000"]
+# corsAllowedHosts = ["localhost:3000"]  # host[:port] without a scheme, or "*"
+# Without apiToken, requests must address this machine: localhost, one of its
+# IP addresses, its host name or <host>.local. List any other name used to
+# reach the server here.
 # allowedHosts = ["nas.example.com"]
 
 [download]
-# defaultDirectory = "/srv/downloads"
+# defaultDirectory = "~/Downloads"  # ~ is your home folder
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
 maxConcurrentDownloads = 2
 maxConnectionsPerHost = 8
+
+# Advanced settings (defaults are usually fine):
 # retryCount = 3
 # retryDelayMs = 1000
 # progressIntervalMs = 200
 # saveIntervalMs = 5000
 # bufferSize = 8192
 
+# Extra trackers announced alongside public torrents' own trackers, e.g. when
+# a network blocks a torrent's own tracker. Private torrents ignore them. The
+# apps edit this under Settings > BitTorrent.
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
+
+# Pre-configured remote servers.
+# [[remotes]]
+# host = "192.168.1.100"
+# port = 8642
+# apiToken = "token"
+# secure = false
 ```
 
 ### Config reference
