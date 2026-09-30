@@ -282,6 +282,7 @@ private fun runServer(args: Array<String>) {
   var cliPort: Int? = null
   var cliToken: String? = null
   var cliCorsOrigins: List<String>? = null
+  var cliAllowedHosts: List<String>? = null
   var cliDownloadDir: String? = null
   var cliSpeedLimit: SpeedLimit? = null
   var configPath: String? = null
@@ -351,6 +352,14 @@ private fun runServer(args: Array<String>) {
         }
         cliCorsOrigins = args[++i].split(",").map { it.trim() }
       }
+      "--allowed-hosts" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --allowed-hosts requires a value")
+          printServerUsage()
+          return
+        }
+        cliAllowedHosts = args[++i].split(",").map { it.trim() }
+      }
       "--dir" -> {
         if (i + 1 >= args.size) {
           System.err.println("Error: --dir requires a value")
@@ -416,6 +425,8 @@ private fun runServer(args: Array<String>) {
       apiToken = cliToken ?: fileConfig.server.apiToken,
       corsAllowedHosts = cliCorsOrigins
         ?: fileConfig.server.corsAllowedHosts,
+      allowedHosts = cliAllowedHosts
+        ?: fileConfig.server.allowedHosts,
     ),
     download = fileConfig.download.copy(
       defaultDirectory = cliDownloadDir
@@ -451,6 +462,7 @@ private fun runServer(args: Array<String>) {
     apiToken = serverConfig.apiToken,
     name = instanceName,
     corsAllowedHosts = serverConfig.corsAllowedHosts,
+    allowedHosts = serverConfig.allowedHosts,
     mdnsEnabled = serverConfig.mdnsEnabled,
   )
 
@@ -470,6 +482,8 @@ private fun runServer(args: Array<String>) {
   }
   if (serverConfig.apiToken != null) {
     println("  Auth:          enabled")
+  } else if (serverConfig.allowedHosts.isNotEmpty()) {
+    println("  Allowed hosts: " + serverConfig.allowedHosts.joinToString(", "))
   }
   if (serverConfig.corsAllowedHosts.isNotEmpty()) {
     println(
@@ -791,6 +805,9 @@ private fun printServerUsage() {
   println("  --token <string>       API bearer token (optional)")
   println("  --cors <origins>       CORS allowed origins,")
   println("                         comma-separated (optional)")
+  println("  --allowed-hosts <names>")
+  println("                         Extra Host names accepted without")
+  println("                         a token, comma-separated (optional)")
   println("  --dir <path>           Download directory")
   println("                         (default: ~/Downloads)")
   println("  --speed-limit <value>  Global speed limit")
