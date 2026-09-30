@@ -254,6 +254,9 @@ never overwrites an existing file.
 
 ### Config file format
 
+Keys are camelCase and match the Kotlin property names. Unknown keys are ignored without a
+warning, so a misspelled key silently keeps its default.
+
 ```toml
 # Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
@@ -284,6 +287,8 @@ maxConnectionsPerHost = 8
 
 ### Config reference
 
+`name` must appear before the first `[table]` header.
+
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `name` | string | `"Ketch"` | Instance name shown to clients and announced over mDNS |
@@ -293,7 +298,7 @@ maxConnectionsPerHost = 8
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
-| `port` | int | `8642` | Port to listen on |
+| `port` | int | `8642` | Port to listen on (1-65535) |
 | `apiToken` | string | *(none)* | Bearer token for API authentication |
 | `corsAllowedHosts` | string[] | `[]` | Allowed CORS hosts without a scheme (e.g., `["localhost:3000"]`, or `["*"]` for all) |
 | `allowedHosts` | string[] | `[]` | Extra `Host` names or IPs accepted without `apiToken` (see [Accepted hosts](#accepted-hosts)) |
@@ -309,10 +314,14 @@ maxConnectionsPerHost = 8
 | `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads (`0` = unlimited) |
 | `maxConnectionsPerHost` | int | `8` | Max simultaneous downloads per host (`0` = unlimited) |
 | `retryCount` | int | `3` | Max automatic retries after a retryable failure |
-| `retryDelayMs` | int | `1000` | Base delay between retries (exponential backoff) |
-| `progressIntervalMs` | int | `200` | Progress update throttle interval |
-| `saveIntervalMs` | int | `5000` | Segment progress persistence interval |
+| `retryDelayMs` | long | `1000` | Base delay between retries (exponential backoff) |
+| `progressIntervalMs` | long | `200` | Progress update throttle interval |
+| `saveIntervalMs` | long | `5000` | Segment progress persistence interval |
 | `bufferSize` | int | `8192` | FTP read buffer size in bytes |
+
+A file with an invalid value fails to load. `maxConnectionsPerDownload`, `progressIntervalMs`,
+`saveIntervalMs` and `bufferSize` must be greater than 0; the other counts and delays must not
+be negative.
 
 #### `[torrent]`
 
