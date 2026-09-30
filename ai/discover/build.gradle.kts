@@ -20,8 +20,10 @@ dependencies {
   // Koog's HTTP client implementation, found through ServiceLoader.
   runtimeOnly(libs.koog.http.client.ktor)
 
-  // Ktor client for fetching
+  // Ktor client for fetching. SafeFetcher uses the OkHttp engine because,
+  // unlike CIO, it accepts a custom DNS resolver.
   implementation(libs.ktor.client.cio)
+  implementation(libs.ktor.client.okhttp)
   implementation(libs.ktor.client.contentNegotiation)
   implementation(libs.ktor.serialization.json)
 

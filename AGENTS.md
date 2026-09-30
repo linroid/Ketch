@@ -124,8 +124,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `RankedCandidate`
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
   `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`, `SiteAllowlist`
-- `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
-  `RateLimiter`, `FetchBudget`
+- `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ValidatingDns`,
+  `ContentExtractor`, `RateLimiter`, `FetchBudget`
 - `com.linroid.ketch.ai.search` -- `SearchProvider`, `BraveSearchProvider`,
   `GoogleSearchProvider`, `DummySearchProvider`
 - `com.linroid.ketch.ai.site` -- `SiteProfiler`, `SiteProfile`, `SiteProfileStore`,
@@ -230,12 +230,14 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   Koog models, and `temperature` is only sent to models that accept it
 - 7 agent tools: `searchWeb`, `searchSites`, `fetchPage`, `headUrl`,
   `extractDownloads`, `validateUrl`, `emitStep`
-- SSRF protection on every redirect hop, device safety scoring, rate limiting
+- SSRF protection on every redirect hop, device safety scoring, rate limiting; the
+  fetcher also resolves hosts through the validator when it connects, so DNS
+  rebinding cannot reach a private address
 - `DiscoverQuery.sites` ("Limit to websites", CLI `--sites`) is a hard allowlist,
   subdomains included, capped by `DiscoveryConfig.allowedDomains`: the tools refuse
   other hosts and the output parser drops their candidates, but redirects a listed
   site answers with (e.g. github.com to its CDN) are followed
-- JVM/Android only (uses Koog + Ktor CIO client)
+- JVM/Android only (uses Koog + Ktor CIO and OkHttp clients)
 - See [AI discovery configuration](docs/ai-discovery.md)
 
 ### Configuration (`config/`)
@@ -431,7 +433,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
    v2 incoming/upload/seeding/PEX, hybrid v1-only peers, uTP and encryption remain unimplemented.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
-7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO); iOS and
+7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and
    the web app report AI discovery as unavailable
 8. AI API tokens are stored in plain text in `config.toml`, like the server
    `apiToken`; use environment variables on shared machines

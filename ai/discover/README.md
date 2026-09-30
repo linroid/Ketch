@@ -37,6 +37,7 @@ ai/discover/
 ├── fetch/                       # HTTP fetching with security
 │   ├── SafeFetcher.kt           # SSRF-protected GET + HEAD, validated redirects
 │   ├── UrlValidator.kt          # SSRF protection (blocks private IPs, non-HTTP)
+│   ├── ValidatingDns.kt         # OkHttp DNS that only returns validated addresses
 │   ├── ContentExtractor.kt      # HTML → text extraction
 │   ├── RateLimiter.kt           # Per-host spacing + global concurrency cap
 │   └── FetchBudget.kt           # Per-run request and byte allowance
@@ -133,6 +134,17 @@ ResourceDiscoveryService.discover()
   Ktor client has `followRedirects = false`, and `SafeFetcher` follows
   up to 10 redirects itself, validating each target before requesting it,
   so a public URL cannot redirect to a private or loopback address
+- Applied again when connecting, against DNS rebinding. Validation
+  resolves the host and the HTTP client resolves it again to connect, so
+  a host could otherwise answer the check with a public address and the
+  connection with `127.0.0.1` or `10.x`. `SafeFetcher.createHttpClient`
+  builds the fetcher's client on Ktor's OkHttp engine, since CIO takes no
+  custom resolver, with `ValidatingDns`: it resolves through
+  `UrlValidator` and refuses the host if any address is blocked, so the
+  client only connects to addresses that passed the check. IP-literal
+  URLs skip DNS and are checked by validation alone
+- The fetcher's client never uses a proxy, including a JVM or system
+  proxy: a proxy would resolve the host itself, out of reach of the check
 
 ### Site allowlist (`SiteAllowlist`)
 - Built per run from `DiscoverQuery.sites`, narrowed to
@@ -176,8 +188,11 @@ ResourceDiscoveryService.discover()
   redirect hop against its own origin's rules. A group naming `KetchBot`
   replaces the `*` groups, as RFC 9309 specifies. Each origin's
   robots.txt is read once per run and does not count toward the budget.
-  A missing or unreadable robots.txt allows everything; `*` and `$`
-  wildcards in rules are not supported, and `Crawl-delay` is not applied.
+  Rules match as path prefixes with RFC 9309 wildcards: `*` matches any
+  run of characters and a trailing `$` anchors the end of the path; the
+  longest matching rule wins. Only the first 500 KiB of a larger file
+  are parsed, without the line the cut falls in. A missing or unreadable
+  robots.txt allows everything, and `Crawl-delay` is not applied.
   `headUrl` checks of candidate links are not subject to robots.txt
 - The system prompt also asks for at most 6 searches; that limit is
   advisory, since search calls are not counted. `AgentConfig.maxIterations`
@@ -286,12 +301,16 @@ Tests cover:
 - `AiSettingsEnvTest` — environment credential fallbacks
 - `UrlValidatorTest` — SSRF protection (20 tests)
 - `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps
+  and truncation, and no connection when a host rebinds to loopback after
+  validation
+- `ValidatingDnsTest` — connect-time lookups refuse rebound and mixed hosts
 - `RateLimiterTest` — per-host spacing and the concurrency cap
 - `FetchBudgetTest` — per-run request and byte allowance
 - `SiteAllowlistTest` — site normalization, subdomain matching, config/query overlap (10 tests)
 - `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects, allowlist enforcement
 - `BraveSearchProviderTest` — request shape and response parsing
-- `RobotsTxtParserTest` — robots.txt parsing (11 tests)
+- `RobotsTxtParserTest` — robots.txt groups, longest match, `*` and `$` wildcards
+- `SiteProfilerTest` — robots.txt over 500 KiB is parsed up to the limit
 - `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)

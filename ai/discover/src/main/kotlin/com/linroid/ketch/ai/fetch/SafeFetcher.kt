@@ -3,7 +3,9 @@ package com.linroid.ketch.ai.fetch
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRedirect
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.pluginOrNull
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareRequest
@@ -20,6 +22,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.ByteArrayOutputStream
+import java.net.Proxy
 import java.net.URI
 
 /**
@@ -31,7 +34,13 @@ import java.net.URI
  * to redirect to a private or loopback address. [httpClient] must
  * therefore be built with `followRedirects = false`.
  *
- * @param httpClient Ktor HTTP client that does not follow redirects
+ * Validation resolves the host, and so does the client when it
+ * connects. [createHttpClient] builds a client that resolves through
+ * [urlValidator] as well, so a host that passes validation with a
+ * public address cannot then be reached at a private one.
+ *
+ * @param httpClient Ktor HTTP client that does not follow redirects,
+ *   normally from [createHttpClient]
  * @param urlValidator validator for SSRF protection
  * @param rateLimiter spaces requests per host and caps concurrent ones
  * @param maxContentBytes maximum bytes to read per fetch (default 2 MB)
@@ -59,6 +68,8 @@ internal class SafeFetcher(
    * Fetches the content at [url], reading at most [maxBytes] of the
    * body (capped at the fetcher's per-fetch limit).
    *
+   * @param truncate keep the first bytes of a body over the limit
+   *   instead of failing when its `Content-Length` declares it too large
    * @param checkHop runs on every URL about to be requested, redirect
    *   targets included, after SSRF validation; a non-null result is
    *   why that URL must not be requested, and ends the fetch
@@ -68,13 +79,14 @@ internal class SafeFetcher(
   suspend fun fetch(
     url: String,
     maxBytes: Long = maxContentBytes,
+    truncate: Boolean = false,
     checkHop: suspend (URI) -> String? = { null },
   ): FetchResult {
     val limit = maxBytes.coerceIn(0, maxContentBytes)
     val fail: (String) -> FetchResult = { FetchResult.Failed(url, it) }
     return try {
       exchange(url, HttpMethod.Get, checkHop, fail) { finalUrl, response ->
-        readBody(url, finalUrl, response, limit)
+        readBody(url, finalUrl, response, limit, truncate)
       }
     } catch (e: Exception) {
       if (e is CancellationException) currentCoroutineContext().ensureActive()
@@ -142,18 +154,25 @@ internal class SafeFetcher(
         log.d { "Refused ${redactUrl(current)}: $reason" }
         return fail(if (redirects == 0) reason else "Redirect refused: $reason")
       }
-      val hop = rateLimiter.withPermit(uri.host) {
-        httpClient.prepareRequest(current) {
-          this.method = method
-          header(HttpHeaders.UserAgent, userAgent)
-        }.execute { response ->
-          val location = response.headers[HttpHeaders.Location]
-          if (response.status.value in REDIRECT_CODES && location != null) {
-            Hop.Redirect(resolveLocation(current, location))
-          } else {
-            Hop.Done(handle(current, response))
+      val hop = try {
+        rateLimiter.withPermit(uri.host) {
+          httpClient.prepareRequest(current) {
+            this.method = method
+            header(HttpHeaders.UserAgent, userAgent)
+          }.execute { response ->
+            val location = response.headers[HttpHeaders.Location]
+            if (response.status.value in REDIRECT_CODES && location != null) {
+              Hop.Redirect(resolveLocation(current, location))
+            } else {
+              Hop.Done(handle(current, response))
+            }
           }
         }
+      } catch (e: BlockedHostException) {
+        // The host passed validation, then resolved to a blocked address
+        // when the client connected (DNS rebinding).
+        log.w { "Blocked ${redactUrl(current)} on connect: ${e.reason}" }
+        return fail(if (redirects == 0) e.reason else "Redirect blocked: ${e.reason}")
       }
       when (hop) {
         is Hop.Done -> return hop.value
@@ -171,24 +190,28 @@ internal class SafeFetcher(
     finalUrl: String,
     response: HttpResponse,
     limit: Long,
+    truncate: Boolean,
   ): FetchResult {
     if (!response.status.isSuccess()) {
       return FetchResult.Failed(url, "HTTP ${response.status.value}")
     }
     val declared = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
-    if (declared != null && declared > limit) {
+    if (!truncate && declared != null && declared > limit) {
       return FetchResult.Failed(url, "Content too large: $declared bytes (max $limit)")
     }
     // The body is streamed, so a response without Content-Length stops
     // at the limit instead of being buffered whole.
-    val bytes = response.bodyAsChannel().readAtMost(limit)
-    log.d { "Fetched ${bytes.size} bytes from ${redactUrl(finalUrl)}" }
+    val channel = response.bodyAsChannel()
+    val bytes = channel.readAtMost(limit)
+    val truncated = bytes.size.toLong() == limit && channel.awaitContent()
+    log.d { "Fetched ${bytes.size} bytes from ${redactUrl(finalUrl)}, truncated=$truncated" }
     return FetchResult.Success(
       url = url,
       finalUrl = finalUrl,
       content = bytes.decodeToString(),
       statusCode = response.status.value,
       byteCount = bytes.size.toLong(),
+      truncated = truncated,
     )
   }
 
@@ -222,6 +245,24 @@ internal class SafeFetcher(
   }
 
   companion object {
+    /**
+     * Builds the client a [SafeFetcher] needs: it does not follow
+     * redirects, resolves hosts through [ValidatingDns] so that it only
+     * connects to addresses [urlValidator] accepts, and never uses a
+     * proxy, which would resolve hosts out of reach of that check.
+     */
+    fun createHttpClient(urlValidator: UrlValidator, requestTimeoutMs: Long): HttpClient =
+      HttpClient(OkHttp) {
+        followRedirects = false
+        engine {
+          dns = ValidatingDns(urlValidator)
+          proxy = Proxy.NO_PROXY
+        }
+        install(HttpTimeout) {
+          requestTimeoutMillis = requestTimeoutMs
+        }
+      }
+
     private const val DEFAULT_MAX_CONTENT_BYTES = 2L * 1024 * 1024
     private const val DEFAULT_USER_AGENT = "KetchBot/1.0"
     private const val DEFAULT_MAX_REDIRECTS = 10
@@ -239,6 +280,7 @@ internal sealed interface FetchResult {
    *
    * @property finalUrl URL the content came from after redirects
    * @property byteCount body bytes read
+   * @property truncated the body went on past the bytes read
    */
   data class Success(
     override val url: String,
@@ -246,6 +288,7 @@ internal sealed interface FetchResult {
     val content: String,
     val statusCode: Int,
     val byteCount: Long,
+    val truncated: Boolean = false,
   ) : FetchResult
 
   /** Fetch failed or was blocked. */
