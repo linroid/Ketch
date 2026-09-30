@@ -255,8 +255,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, mDNS, `autoStart`
   (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections
-- `FileConfigStore`: platform-specific file persistence via okio; the web app uses
-  `WebConfigStore` (TOML in localStorage)
+- `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
+  `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
+  uses `WebConfigStore` (TOML in localStorage)
 
 ### Daemon Server (`library:server`)
 - Ktor-based REST API (`library:endpoints`): create, list, pause, resume, cancel, remove tasks;
@@ -269,12 +270,26 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   (DNS rebinding protection); with a token any `Host` is accepted
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
+- `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
+  cannot bind never resumes them; CORS hosts are `host[:port]` without a scheme (Ktor's
+  `allowHost` rejects one)
+
+### Native CLI (`cli/`)
+- Released as a GraalVM native binary; reflection and resource metadata lives in
+  `META-INF/native-image/<module>/` of the module that needs it (`cli`, `library:mcp` for the MCP
+  SDK and `KetchToolSet`, `ai:discover` for `DiscoveryToolSet`). Koog tool sets use kotlin-reflect,
+  so new tool methods may need the types in their signatures registered
+- `NativeImageConfigTest` (in `cli` and `library:mcp`) checks that the metadata names existing
+  classes and covers every serializable MCP SDK type; build with `./gradlew :cli:nativeCompile`
+  and exercise `ketch mcp` to verify changes
 
 ### MCP Server (`library:mcp`)
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
 - `KetchToolSet` provides 12 tools: list/get/start/pause/resume/cancel/remove downloads,
   `resolveUrl`, `getStatus`, `setSpeedLimit`, `setPriority`, `updateConfig`
-- `ketch mcp` runs it on stdio against a local engine
+- `ketch mcp` runs it on stdio against a local engine. It passes the real stdout to
+  `startStdio` and redirects `System.out` to stderr, so the banner, the console logger and
+  Logback never corrupt the JSON-RPC stream
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no

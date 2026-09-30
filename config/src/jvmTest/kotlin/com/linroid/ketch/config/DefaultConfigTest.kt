@@ -1,5 +1,7 @@
 package com.linroid.ketch.config
 
+import java.io.File
+import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -13,5 +15,27 @@ class DefaultConfigTest {
     )
     assertEquals(TorrentSettings(), decoded.torrent)
     assertEquals(8642, decoded.server.port)
+  }
+
+  @Test
+  fun `commented examples are usable once uncommented`() {
+    // Uncomment `# key = value` and `# [section]` lines, leaving the prose comments
+    val example = Regex("^# (?=\\[|\\w+ = )", RegexOption.MULTILINE)
+    val content = DEFAULT_CONFIG_CONTENT.replace(example, "")
+    val dir = createTempDirectory("ketch-config").toFile()
+    try {
+      val file = File(dir, "config.toml").apply { writeText(content) }
+      val config = FileConfigStore(file.path).load()
+
+      val home = System.getProperty("user.home").trimEnd('/', '\\')
+      assertEquals("$home/Downloads", config.download.defaultDirectory)
+      // Ktor's CORS allowHost rejects a scheme in the host, failing server startup
+      assertEquals(listOf("localhost:3000"), config.server.corsAllowedHosts)
+      assertEquals("My Ketch", config.name)
+      assertEquals(1, config.remotes.size)
+      assertEquals(1, config.torrent.trackers.size)
+    } finally {
+      dir.deleteRecursively()
+    }
   }
 }

@@ -51,7 +51,7 @@ You can also download an archive from
 
 ## Commands
 
-Running `ketch` without arguments prints the usage.
+Running `ketch` without arguments, or with `--help` or `-h`, prints the usage.
 
 ### Global options
 
@@ -72,26 +72,29 @@ ketch [options] <url> [destination]
 Downloads HTTP(S) and FTP/FTPS URLs (`ftp://[user:password@]host[:port]/path`), magnet links, and
 `.torrent` URLs or files. Without a destination the file is saved in the current directory. An
 existing directory, or a path ending in a separator, keeps the file name from the source; any other
-path is used as the file path. A bare file name such as `file.zip` is saved in `~/Downloads`, so
-use `./file.zip` for the current directory. Torrents follow the
+path, including a bare file name such as `file.zip`, is the file path, relative to the current
+directory. Torrents follow the
 [torrent destination rules](../docs/torrent.md), and public ones also announce to the `[torrent]`
 trackers of the default [config file](#config-file-locations).
 
 The download is kept in memory only and is not recorded in the [task database](#database). The
-command pauses the download after two seconds and resumes it a second later, to demonstrate pause
-and resume.
+command exits when the download completes or fails.
 
 | Option | Description |
 |---|---|
 | `--speed-limit <value>` | Limit download speed (e.g., `500k`, `1m`, `10m`) |
 | `--priority <level>` | Set download priority: `low`, `normal`, `high`, `urgent` |
 | `--max-concurrent <n>` | Max simultaneous downloads (default: 3) |
+| `--help`, `-h` | Show help message |
 
 **Examples:**
 
 ```bash
 # Basic download
 ketch https://example.com/file.zip
+
+# Save as file.zip in the current directory
+ketch https://example.com/latest.zip file.zip
 
 # Download to a specific path
 ketch https://example.com/file.zip /tmp/file.zip
@@ -108,8 +111,8 @@ ketch -v "magnet:?xt=urn:btih:<info-hash>" ~/Downloads/
 
 Start the Ketch daemon server with REST API, SSE event stream, and the bundled web UI. It
 downloads HTTP(S), FTP/FTPS and BitTorrent sources, stores tasks in the
-[task database](#database), and announces itself on the local network over mDNS unless
-`mdnsEnabled` is `false`.
+[task database](#database) and restores them when it starts, and announces itself on the local
+network over mDNS unless `mdnsEnabled` is `false`.
 
 ```bash
 ketch server [options]
@@ -186,7 +189,8 @@ ketch mcp [options]
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--help`, `-h` | Show help message |
 
-Register it with your MCP client, for example in Claude Desktop's `claude_desktop_config.json`:
+Stdout carries only the MCP protocol; the banner and all logs go to stderr. Register it with your
+MCP client, for example in Claude Desktop's `claude_desktop_config.json`:
 
 ```json
 {
@@ -308,7 +312,7 @@ maxConnectionsPerHost = 8
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `defaultDirectory` | string | `~/Downloads` | Default save directory; `~` is not expanded, so use a full path |
+| `defaultDirectory` | string | `~/Downloads` | Default save directory; a leading `~` is your home folder |
 | `speedLimit` | string | `"unlimited"` | Global speed limit (`"500k"`, `"10m"`, or bytes) |
 | `maxConnectionsPerDownload` | int | `4` | Connections (segments) per HTTP or FTP download |
 | `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads (`0` = unlimited) |
