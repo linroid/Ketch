@@ -10,9 +10,15 @@ dependencies {
   api(projects.config)
 
   // Koog framework for LLM integration
-  implementation(libs.koog.agents)
-  // Gemini support; not part of the koog-agents aggregate.
+  // Only the modules discovery uses; the koog-agents aggregate also bundles Bedrock (AWS SDK),
+  // OpenTelemetry and Apache HttpClient, which bloat the apps.
+  implementation(libs.koog.agents.core)
+  implementation(libs.koog.anthropic.client)
+  implementation(libs.koog.openai.client)
+  implementation(libs.koog.ollama.client)
   implementation(libs.koog.google.client)
+  // Koog's HTTP client implementation, found through ServiceLoader.
+  runtimeOnly(libs.koog.http.client.ktor)
 
   // Ktor client for fetching
   implementation(libs.ktor.client.cio)
