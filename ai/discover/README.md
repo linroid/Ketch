@@ -139,8 +139,9 @@ ResourceDiscoveryService.discover()
 
 ### Other Protections
 - Content size cap: 2 MB per fetch
-- Budgets: the system prompt allows 6 searches, 10 page fetches and 15 HEAD
-  requests, and `AgentConfig.maxIterations` caps the agent's tool calls
+- Budgets: the system prompt asks for at most 6 searches, 10 page fetches and
+  15 HEAD requests. These are advisory, since the tools don't count calls;
+  `AgentConfig.maxIterations` is the only hard cap on the agent's tool calls
 - Prompt injection defense: fetched content treated as untrusted data
 - Not wired in yet: `RateLimiter` (per-domain delays + global cap), robots.txt
   checks from `SiteProfiler`, and the per-request limits marked in

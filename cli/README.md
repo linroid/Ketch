@@ -187,7 +187,7 @@ ketch ai-discover <query> [options]
 
 | Option | Description |
 |---|---|
-| `--sites <domains>` | Comma-separated domains to limit the search to |
+| `--sites <domains>` | Comma-separated domains to search first; a hint to the agent, not a hard limit |
 | `--max-results <n>` | Max candidates to return (default: 5) |
 
 The command reads the `[ai]` section of the default [config file](#config-file-locations), which
