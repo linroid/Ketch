@@ -21,9 +21,6 @@
 -dontwarn io.lettuce.**
 -dontwarn io.micrometer.**
 -dontwarn io.netty.**
-# Prevent ProGuard from computing common supertypes for netty logging
-# classes that reference missing Log4J2 superclasses.
--keep class io.netty.util.internal.logging.** { *; }
 -dontwarn io.opentelemetry.**
 -dontwarn javax.annotation.**
 -dontwarn javax.enterprise.**
