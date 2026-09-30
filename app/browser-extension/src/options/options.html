@@ -31,7 +31,10 @@
       <p class="muted">Captured downloads and magnet links go to the default instance. Right-click
         a link, image or video to send it to any of them.</p>
       <div id="instances" class="instances"></div>
-      <button id="add-instance" type="button">Add remote instance</button>
+      <div class="add-buttons">
+        <button id="add-app" type="button" hidden>Add Ketch on this computer</button>
+        <button id="add-server" type="button">Add server</button>
+      </div>
     </section>
 
     <section>
@@ -90,17 +93,41 @@
       <h2>Setting up Ketch</h2>
       <dl>
         <dt>On this computer</dt>
-        <dd>Open the Ketch app, go to Settings → Remote access and turn on <b>Server</b>. Turn
-          on <b>Start automatically</b> so the extension works whenever Ketch is open. With the
-          command line, run <code>ketch server</code>.</dd>
+        <dd>Install the Ketch desktop app and open it once, so your browsers can find it. After
+          that, the extension opens Ketch whenever a download needs it; there is no server to
+          turn on or token to copy.</dd>
         <dt>On another device</dt>
-        <dd>On that device, turn on <b>Server</b> and <b>Allow other devices</b>, then generate
-          an access token. Add the device here with its address, such as
-          <code>http://192.168.1.20:8642</code>, and the token. For <code>ketch server</code>,
-          set <code>apiToken</code> in its config.toml.</dd>
+        <dd>On that device, open Settings → Remote access, turn on <b>Server</b> and <b>Allow
+          other devices</b>, then generate an access token. Add the device here with
+          <b>Add server</b>, its address, such as <code>http://192.168.1.20:8642</code>, and the
+          token. For <code>ketch server</code>, set <code>apiToken</code> in its
+          config.toml.</dd>
+        <dt>Command line or sandboxed browsers</dt>
+        <dd>To use <code>ketch server</code> on this computer, or from a browser installed as a
+          Flatpak or Snap, which can't start other apps, add it as a server at
+          <code>http://127.0.0.1:8642</code>.</dd>
       </dl>
     </section>
   </main>
+
+  <template id="app-instance-template">
+    <article class="instance">
+      <div class="instance-head">
+        <span class="status-dot"></span>
+        <input class="instance-name" type="text" aria-label="Name" placeholder="This computer">
+        <label class="default-choice">
+          <input type="radio" name="default-instance"> Default
+        </label>
+      </div>
+      <p class="instance-kind muted">The Ketch app on this computer. The extension opens it when
+        a download needs it.</p>
+      <p class="instance-status muted"></p>
+      <div class="instance-actions">
+        <button class="test" type="button">Test connection</button>
+        <button class="remove danger" type="button">Remove</button>
+      </div>
+    </article>
+  </template>
 
   <template id="instance-template">
     <article class="instance">

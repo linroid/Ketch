@@ -4,7 +4,6 @@ import ch.qos.logback.classic.Level
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
-import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
@@ -33,7 +32,6 @@ import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -47,120 +45,48 @@ fun main(args: Array<String>) {
   // Parse global flags before subcommand dispatch
   val remaining = applyGlobalFlags(args.toMutableList())
 
-  // `ketch mcp` speaks MCP on stdout, so its banner goes to stderr with the other diagnostics
-  val console = if (remaining.firstOrNull() == "mcp") System.err else System.out
-  console.println("Ketch CLI - Version ${KetchApi.VERSION} (${KetchApi.REVISION})")
-  console.println()
-
-  if (remaining.isEmpty()) {
-    printUsage()
+  // The MCP server owns stdout, so it prints the banner to stderr itself
+  if (remaining.firstOrNull() == "mcp") {
+    runMcp(remaining.drop(1))
     return
   }
 
-  when (remaining[0]) {
-    "server" -> {
-      runServer(remaining.drop(1).toTypedArray())
-      return
-    }
-    "ai-discover" -> {
-      runAiDiscover(remaining.drop(1))
-      return
-    }
-    "mcp" -> {
-      runMcp(remaining.drop(1))
-      return
-    }
-  }
+  printBanner()
 
-  var url: String? = null
-  var dest: String? = null
-  var speedLimit = SpeedLimit.Unlimited
-  var priority = DownloadPriority.NORMAL
-  var maxConcurrent = 3
-
-  var i = 0
-  while (i < remaining.size) {
-    when (remaining[i]) {
-      "--speed-limit" -> {
-        if (i + 1 >= remaining.size) {
-          println("Error: --speed-limit requires a value")
-          println()
-          printUsage()
-          return
-        }
-        speedLimit = SpeedLimit.parse(remaining[i + 1]) ?: run {
-          println("Error: invalid speed limit '${remaining[i + 1]}'")
-          println()
-          printUsage()
-          return
-        }
-        i += 2
+  when (remaining.firstOrNull()) {
+    null -> printUsage()
+    "server" -> runServer(remaining.drop(1).toTypedArray())
+    "ai-discover" -> runAiDiscover(remaining.drop(1))
+    else -> when (val parsed = parseDownloadArgs(remaining)) {
+      DownloadArgs.Help -> printUsage()
+      is DownloadArgs.Invalid -> {
+        System.err.println("Error: ${parsed.message}")
+        println()
+        printUsage()
       }
-      "--priority" -> {
-        if (i + 1 >= remaining.size) {
-          println("Error: --priority requires a value")
-          println()
-          printUsage()
-          return
-        }
-        priority = parsePriority(remaining[i + 1]) ?: run {
-          println("Error: invalid priority '${remaining[i + 1]}'")
-          println("  Valid values: low, normal, high, urgent")
-          println()
-          printUsage()
-          return
-        }
-        i += 2
-      }
-      "--max-concurrent" -> {
-        if (i + 1 >= remaining.size) {
-          println("Error: --max-concurrent requires a value")
-          println()
-          printUsage()
-          return
-        }
-        maxConcurrent = remaining[i + 1].toIntOrNull() ?: run {
-          println("Error: invalid number '${remaining[i + 1]}'")
-          println()
-          printUsage()
-          return
-        }
-        if (maxConcurrent <= 0) {
-          println("Error: --max-concurrent must be > 0")
-          return
-        }
-        i += 2
-      }
-      else -> {
-        if (url == null) url = remaining[i]
-        else if (dest == null) dest = remaining[i]
-        i++
-      }
+      is DownloadArgs.Download -> runDownload(parsed)
     }
   }
+}
 
-  if (url == null) {
-    printUsage()
-    return
-  }
+private fun printBanner() {
+  println("Ketch CLI - Version ${KetchApi.VERSION} (${KetchApi.REVISION})")
+  println()
+}
 
-  // A trailing separator marks a Destination as a directory
-  val destination = when {
-    dest == null -> Destination("./")
-    File(dest).isDirectory && !dest.endsWith(File.separatorChar) ->
-      Destination(dest + File.separatorChar)
-    else -> Destination(dest)
-  }
+private fun runDownload(args: DownloadArgs.Download) {
+  val speedLimit = args.speedLimit
+  val destination = resolveDestination(args.destination)
 
-  println("Downloading: $url")
+  println("Downloading: ${args.url}")
   println("Destination: ${destination.value}")
   if (!speedLimit.isUnlimited) {
     println("Speed limit: ${formatBytes(speedLimit.bytesPerSecond)}/s")
   }
-  if (priority != DownloadPriority.NORMAL) {
-    println("Priority: $priority")
+  if (args.priority != DownloadPriority.NORMAL) {
+    println("Priority: ${args.priority}")
   }
-  println("Max concurrent: $maxConcurrent")
+  println("Max concurrent: ${args.maxConcurrent}")
   println()
 
   val config = DownloadConfig(
@@ -168,7 +94,7 @@ fun main(args: Array<String>) {
     retryCount = 3,
     retryDelayMs = 1000,
     progressIntervalMs = 200,
-    maxConcurrentDownloads = maxConcurrent,
+    maxConcurrentDownloads = args.maxConcurrent,
   )
 
   val ketch = Ketch(
@@ -180,10 +106,10 @@ fun main(args: Array<String>) {
 
   runBlocking {
     val request = DownloadRequest(
-      url = url,
+      url = args.url,
       destination = destination,
       speedLimit = speedLimit,
-      priority = priority,
+      priority = args.priority,
     )
 
     val task = ketch.download(request)
@@ -222,19 +148,8 @@ fun main(args: Array<String>) {
       }
     }
 
-    // Demonstrate pause/resume
-    val pauseDemo = launch {
-      delay(2000)
-      println("\n\n--- Demonstrating pause ---")
-      task.pause()
-      delay(1000)
-      println("--- Resuming download ---\n")
-      task.resume()
-    }
-
     val result = task.await()
     monitor.cancel()
-    pauseDemo.cancel()
 
     result.fold(
       onSuccess = { path -> println("\nDownload completed: $path") },
@@ -283,6 +198,7 @@ private fun runServer(args: Array<String>) {
   var cliPort: Int? = null
   var cliToken: String? = null
   var cliCorsOrigins: List<String>? = null
+  var cliAllowedHosts: List<String>? = null
   var cliDownloadDir: String? = null
   var cliSpeedLimit: SpeedLimit? = null
   var configPath: String? = null
@@ -352,6 +268,14 @@ private fun runServer(args: Array<String>) {
         }
         cliCorsOrigins = args[++i].split(",").map { it.trim() }
       }
+      "--allowed-hosts" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --allowed-hosts requires a value")
+          printServerUsage()
+          return
+        }
+        cliAllowedHosts = args[++i].split(",").map { it.trim() }
+      }
       "--dir" -> {
         if (i + 1 >= args.size) {
           System.err.println("Error: --dir requires a value")
@@ -417,6 +341,8 @@ private fun runServer(args: Array<String>) {
       apiToken = cliToken ?: fileConfig.server.apiToken,
       corsAllowedHosts = cliCorsOrigins
         ?: fileConfig.server.corsAllowedHosts,
+      allowedHosts = cliAllowedHosts
+        ?: fileConfig.server.allowedHosts,
     ),
     download = fileConfig.download.copy(
       defaultDirectory = cliDownloadDir
@@ -452,6 +378,7 @@ private fun runServer(args: Array<String>) {
     apiToken = serverConfig.apiToken,
     name = instanceName,
     corsAllowedHosts = serverConfig.corsAllowedHosts,
+    allowedHosts = serverConfig.allowedHosts,
     mdnsEnabled = serverConfig.mdnsEnabled,
   )
 
@@ -471,6 +398,8 @@ private fun runServer(args: Array<String>) {
   }
   if (serverConfig.apiToken != null) {
     println("  Auth:          enabled")
+  } else if (serverConfig.allowedHosts.isNotEmpty()) {
+    println("  Allowed hosts: " + serverConfig.allowedHosts.joinToString(", "))
   }
   if (serverConfig.corsAllowedHosts.isNotEmpty()) {
     println(
@@ -486,7 +415,11 @@ private fun runServer(args: Array<String>) {
   }
   println()
 
-  server.start(wait = true)
+  // Listen before restoring the tasks saved by earlier runs, so a daemon that cannot start,
+  // e.g. because another one uses the port, never resumes downloads into the same files
+  server.start(wait = false)
+  runBlocking { ketch.start() }
+  server.awaitStop()
 }
 
 private fun runAiDiscover(args: List<String>) {
@@ -616,30 +549,31 @@ private fun runMcp(args: List<String>) {
       }
       "--config" -> {
         if (i + 1 >= args.size) {
-          System.err.println("Error: --config requires a value")
-          printMcpUsage()
+          printMcpError("--config requires a value")
           return
         }
         configPath = args[++i]
       }
       "--dir" -> {
         if (i + 1 >= args.size) {
-          System.err.println("Error: --dir requires a value")
-          printMcpUsage()
+          printMcpError("--dir requires a value")
           return
         }
         cliDownloadDir = args[++i]
+      }
+      else -> {
+        printMcpError("unknown option '${args[i]}'")
+        return
       }
     }
     i++
   }
 
-  // stdout must carry only MCP messages. Keep it for the transport and send everything else
-  // printed from here on to stderr, which MCP clients show as server logs: the Ketch console
-  // logger, Logback's console appender (it reads System.out on every write) and libraries
-  // that print, such as kotlin-logging's startup message.
+  // stdout carries the JSON-RPC stream, so keep it for the transport and send everything
+  // else to stderr: the banner, the console logger, Logback and any library output.
   val protocolOut = System.out
   System.setOut(System.err)
+  printBanner()
 
   val fileConfig = if (configPath != null) {
     FileConfigStore(configPath).load()
@@ -684,6 +618,11 @@ private fun runMcp(args: List<String>) {
     ketch.start()
     mcpServer.startStdio(output = protocolOut)
   }
+}
+
+private fun printMcpError(message: String) {
+  System.err.println("Error: $message")
+  System.err.println("Run `ketch mcp --help` for usage.")
 }
 
 private fun printMcpUsage() {
@@ -773,7 +712,7 @@ private fun printUsage() {
   println("    GEMINI_API_KEY         Google Gemini")
   println()
   println("  Search env vars (checked in order):")
-  println("    BING_SEARCH_API_KEY    Use Bing Web Search API")
+  println("    BRAVE_SEARCH_API_KEY   Use Brave Search API")
   println("    GOOGLE_SEARCH_API_KEY  Use Google Custom Search")
   println("    GOOGLE_SEARCH_CX      Google Search Engine ID")
   println()
@@ -795,8 +734,11 @@ private fun printServerUsage() {
   println("  --host <address>       Bind address (default: 0.0.0.0)")
   println("  --port <number>        Port number (default: 8642)")
   println("  --token <string>       API bearer token (optional)")
-  println("  --cors <origins>       CORS allowed origins,")
-  println("                         comma-separated (optional)")
+  println("  --cors <hosts>         CORS allowed hosts as host[:port],")
+  println("                         comma-separated, or '*' (optional)")
+  println("  --allowed-hosts <names>")
+  println("                         Extra Host names accepted without")
+  println("                         a token, comma-separated (optional)")
   println("  --dir <path>           Download directory")
   println("                         (default: ~/Downloads)")
   println("  --speed-limit <value>  Global speed limit")
@@ -815,16 +757,6 @@ private fun printServerUsage() {
   println("  ketch server --speed-limit 10m")
   println("  ketch server --config /path/to/config.toml")
   println("  ketch server --generate-config")
-}
-
-private fun parsePriority(value: String): DownloadPriority? {
-  return when (value.trim().lowercase()) {
-    "low" -> DownloadPriority.LOW
-    "normal" -> DownloadPriority.NORMAL
-    "high" -> DownloadPriority.HIGH
-    "urgent" -> DownloadPriority.URGENT
-    else -> null
-  }
 }
 
 private fun formatBytes(bytes: Long): String {

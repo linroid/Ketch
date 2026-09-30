@@ -41,13 +41,14 @@ class KetchMcpServer(
    * Reads JSON-RPC messages from [input] and writes responses to [output].
    * This is the standard transport for MCP clients like Claude Desktop.
    *
-   * [output] must carry nothing but MCP messages. A process that also logs to the console
-   * can pass its original stdout here and point `System.out` at stderr.
+   * Nothing else may write to [output]. A process that also logs to
+   * stdout can redirect `System.out` to stderr and pass the original
+   * stream here.
    *
    * This function suspends until the server is closed.
    *
-   * @param input stream the client writes requests to (default: stdin)
-   * @param output stream the client reads responses from (default: stdout)
+   * @param input the stream to read requests from, stdin by default
+   * @param output the stream to write responses to, stdout by default
    */
   suspend fun startStdio(
     input: InputStream = System.`in`,

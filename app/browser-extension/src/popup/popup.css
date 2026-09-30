@@ -45,6 +45,14 @@ body {
   background: var(--danger-container);
 }
 
+.hint[data-tone="info"] {
+  background: var(--panel);
+}
+
+.open-app {
+  margin-top: 8px;
+}
+
 .add {
   display: flex;
   gap: 8px;
