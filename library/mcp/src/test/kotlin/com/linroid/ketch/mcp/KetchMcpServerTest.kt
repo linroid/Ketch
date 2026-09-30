@@ -1,22 +1,34 @@
 package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.ToolRegistry
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.io.Buffer
 import kotlinx.io.IOException
 import kotlinx.io.RawSink
 import kotlinx.io.RawSource
+import kotlinx.io.asSink
+import kotlinx.io.asSource
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.io.ByteArrayOutputStream
+import java.io.OutputStream
+import java.io.PipedInputStream
+import java.io.PipedOutputStream
 import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -53,6 +65,29 @@ class KetchMcpServerTest {
       serveStdio(ToolRegistry {}, Buffer(), output)
 
       assertEquals("", output.readString())
+    }
+
+  @Test
+  fun `serveStdio writes its responses to the output`() =
+    runTest(timeout = 10.seconds) {
+      val requests = PipedOutputStream()
+      val input = PipedInputStream(requests).asSource()
+      val output = FirstLineOutputStream()
+      val server = launch(Dispatchers.IO) {
+        serveStdio(ToolRegistry {}, input, output.asSink())
+      }
+
+      // The input stays open until the response arrives: replies must not wait for its end
+      withContext(Dispatchers.IO) {
+        requests.write((INITIALIZE + "\n").encodeToByteArray())
+        requests.flush()
+      }
+      val response = Json.parseToJsonElement(output.firstLine.await()).jsonObject
+
+      assertEquals(1, response["id"]?.jsonPrimitive?.int)
+      assertNotNull(response["result"])
+      withContext(Dispatchers.IO) { requests.close() }
+      server.join()
     }
 
   @Test
@@ -109,6 +144,21 @@ class KetchMcpServerTest {
     }
 
     override fun close() = closed.countDown()
+  }
+
+  /** Collects bytes until the first newline, which ends one JSON-RPC message. */
+  private class FirstLineOutputStream : OutputStream() {
+    private val buffer = ByteArrayOutputStream()
+    val firstLine = CompletableDeferred<String>()
+
+    @Synchronized
+    override fun write(b: Int) {
+      if (b == '\n'.code) {
+        firstLine.complete(buffer.toString(Charsets.UTF_8))
+      } else {
+        buffer.write(b)
+      }
+    }
   }
 
   private fun replies(output: Buffer): List<JsonObject> =
