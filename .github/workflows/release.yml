@@ -212,7 +212,12 @@ jobs:
         run: |
           SRC=$(find app/desktop/build/compose/binaries/main-release -name "*.${{ matrix.ext }}")
           DEST="app/desktop/build/ketch-desktop-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}.${{ matrix.ext }}"
-          cp "$SRC" "$DEST"
+          if [ "${{ matrix.ext }}" = dmg ]; then
+            # jpackage writes a zlib (UDZO) image; LZMA (ULMO, macOS 10.15+) is much smaller.
+            hdiutil convert "$SRC" -format ULMO -o "$DEST"
+          else
+            cp "$SRC" "$DEST"
+          fi
 
       - uses: actions/upload-artifact@v7
         with:

@@ -34,6 +34,7 @@ sqldelight = "2.3.2"
 graalvmNative = "1.1.12"
 mavenPublish = "0.37.0"
 logback = "1.6.3"
+slf4j = "2.0.18"
 material3 = "1.12.0-alpha03"
 material3-adaptive = "1.3.0-beta02"
 
@@ -68,13 +69,18 @@ okio-wasifilesystem = { module = "com.squareup.okio:okio-wasifilesystem", versio
 okio-nodefilesystem = { module = "com.squareup.okio:okio-nodefilesystem", version.ref = "okio" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
-koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
+koog-agents-core = { module = "ai.koog:agents-core", version.ref = "koog" }
+koog-http-client-ktor = { module = "ai.koog:http-client-ktor", version.ref = "koog" }
+koog-anthropic-client = { module = "ai.koog:prompt-executor-anthropic-client", version.ref = "koog" }
+koog-openai-client = { module = "ai.koog:prompt-executor-openai-client", version.ref = "koog" }
+koog-ollama-client = { module = "ai.koog:prompt-executor-ollama-client", version.ref = "koog" }
 koog-mcp-server = { module = "ai.koog:agents-mcp-server", version.ref = "koog-mcp" }
 koog-google-client = { module = "ai.koog:prompt-executor-google-client", version.ref = "koog-google" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
