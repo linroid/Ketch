@@ -2,11 +2,17 @@ package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.mcp.server.McpServerTransportType
+import ai.koog.agents.mcp.server.configureMcpServer
 import ai.koog.agents.mcp.server.startMcpServer
-import ai.koog.agents.mcp.server.startStdioMcpServer
 import com.linroid.ketch.api.KetchApi
 import io.ktor.server.engine.ApplicationEngineFactory
+import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import kotlinx.coroutines.Job
+import kotlinx.io.asSink
+import kotlinx.io.asSource
+import kotlinx.io.buffered
+import java.io.InputStream
+import java.io.OutputStream
 
 /**
  * Exposes a [KetchApi] instance as an MCP (Model Context Protocol)
@@ -32,13 +38,24 @@ class KetchMcpServer(
 
   /**
    * Starts the MCP server using stdio transport.
-   * Reads JSON-RPC messages from stdin and writes responses to stdout.
+   * Reads JSON-RPC messages from [input] and writes responses to [output].
    * This is the standard transport for MCP clients like Claude Desktop.
    *
+   * [output] must carry nothing but MCP messages. A process that also logs to the console
+   * can pass its original stdout here and point `System.out` at stderr.
+   *
    * This function suspends until the server is closed.
+   *
+   * @param input stream the client writes requests to (default: stdin)
+   * @param output stream the client reads responses from (default: stdout)
    */
-  suspend fun startStdio() {
-    val server = startStdioMcpServer(toolRegistry)
+  suspend fun startStdio(
+    input: InputStream = System.`in`,
+    output: OutputStream = System.out,
+  ) {
+    val server = configureMcpServer(toolRegistry)
+    val transport = StdioServerTransport(input.asSource().buffered(), output.asSink().buffered())
+    server.createSession(transport)
     val done = Job()
     server.onClose { done.complete() }
     done.join()

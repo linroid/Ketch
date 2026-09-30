@@ -47,8 +47,10 @@ fun main(args: Array<String>) {
   // Parse global flags before subcommand dispatch
   val remaining = applyGlobalFlags(args.toMutableList())
 
-  println("Ketch CLI - Version ${KetchApi.VERSION} (${KetchApi.REVISION})")
-  println()
+  // `ketch mcp` speaks MCP on stdout, so its banner goes to stderr with the other diagnostics
+  val console = if (remaining.firstOrNull() == "mcp") System.err else System.out
+  console.println("Ketch CLI - Version ${KetchApi.VERSION} (${KetchApi.REVISION})")
+  console.println()
 
   if (remaining.isEmpty()) {
     printUsage()
@@ -614,8 +616,7 @@ private fun runMcp(args: List<String>) {
       }
       "--config" -> {
         if (i + 1 >= args.size) {
-          println("Error: --config requires a value")
-          println()
+          System.err.println("Error: --config requires a value")
           printMcpUsage()
           return
         }
@@ -623,8 +624,7 @@ private fun runMcp(args: List<String>) {
       }
       "--dir" -> {
         if (i + 1 >= args.size) {
-          println("Error: --dir requires a value")
-          println()
+          System.err.println("Error: --dir requires a value")
           printMcpUsage()
           return
         }
@@ -633,6 +633,13 @@ private fun runMcp(args: List<String>) {
     }
     i++
   }
+
+  // stdout must carry only MCP messages. Keep it for the transport and send everything else
+  // printed from here on to stderr, which MCP clients show as server logs: the Ketch console
+  // logger, Logback's console appender (it reads System.out on every write) and libraries
+  // that print, such as kotlin-logging's startup message.
+  val protocolOut = System.out
+  System.setOut(System.err)
 
   val fileConfig = if (configPath != null) {
     FileConfigStore(configPath).load()
@@ -675,7 +682,7 @@ private fun runMcp(args: List<String>) {
 
   runBlocking {
     ketch.start()
-    mcpServer.startStdio()
+    mcpServer.startStdio(output = protocolOut)
   }
 }
 
