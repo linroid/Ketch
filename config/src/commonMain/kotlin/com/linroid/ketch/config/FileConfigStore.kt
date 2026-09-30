@@ -10,6 +10,9 @@ import okio.buffer
  * new content is written to `<path>.tmp`, then atomically
  * moved to [path]. On load, a leftover `.tmp` file from an
  * interrupted save is recovered or cleaned up.
+ *
+ * A leading `~` in the download directory expands to the user's
+ * home directory on the JVM, where the file is edited by hand.
  */
 class FileConfigStore(private val path: String) : ConfigStore {
   private val tmpPath = "$path.tmp"
@@ -35,7 +38,7 @@ class FileConfigStore(private val path: String) : ConfigStore {
     }
     return ConfigStore.toml.decodeFromString(
       KetchConfig.serializer(), content,
-    )
+    ).expandHome(userHomeDirectory)
   }
 
   override fun save(config: KetchConfig) {

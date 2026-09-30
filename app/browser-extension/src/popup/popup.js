@@ -1,7 +1,8 @@
+import { withEndpoint } from '../lib/connection.js';
 import { ext } from '../lib/ext.js';
 import { describeStatus, describeTaskState, failureHint, taskName } from '../lib/format.js';
 import { sendToKetch } from '../lib/handoff.js';
-import { KetchClient } from '../lib/ketch-client.js';
+import { FailureKind, KetchClient } from '../lib/ketch-client.js';
 import { isSupportedLinkUrl } from '../lib/request.js';
 import { findInstance, loadSettings, saveSettings } from '../lib/settings.js';
 
@@ -20,7 +21,6 @@ const $ = (id) => document.getElementById(id);
 
 let settings;
 let instance;
-let client;
 let online = false;
 let refreshTimer;
 /** Bumped when the shown instance changes, so late responses for the old one are dropped. */
@@ -41,20 +41,31 @@ async function init() {
   $('capture').addEventListener('change', onCaptureChanged);
   $('add-form').addEventListener('submit', onAdd);
   $('tasks').addEventListener('click', onTaskAction);
+  $('open-app').addEventListener('click', onOpenApp);
   $('open-options').addEventListener('click', () => {
     ext.runtime.openOptionsPage();
     window.close();
   });
 }
 
+/**
+ * Runs `action` with a client for the shown instance. Looking at the popup never starts the
+ * Ketch app; the "Open Ketch" button and sending a download do.
+ */
+function withClient(action, { launch = false } = {}) {
+  return withEndpoint(instance, (endpoint) => {
+    return action(new KetchClient(endpoint, { timeoutMs: REQUEST_TIMEOUT_MS }));
+  }, { launch });
+}
+
 function showInstance(id) {
   instance = findInstance(settings, id);
-  client = new KetchClient(instance, { timeoutMs: REQUEST_TIMEOUT_MS });
   renderPicker();
   online = false;
   $('status-dot').removeAttribute('data-state');
   $('status-text').textContent = 'Connecting…';
   $('status-hint').hidden = true;
+  $('open-app').hidden = true;
   $('recent').hidden = true;
   $('tasks').replaceChildren();
   generation++;
@@ -65,10 +76,10 @@ async function refresh() {
   clearTimeout(refreshTimer);
   const current = generation;
   try {
-    const [status, tasks] = await Promise.all([
+    const [status, tasks] = await withClient((client) => Promise.all([
       online ? null : client.status(),
       client.listTasks(),
-    ]);
+    ]));
     if (current !== generation) return;
     if (status) showOnline(status);
     renderTasks(tasks);
@@ -84,17 +95,40 @@ function showOnline(status) {
   $('status-dot').dataset.state = 'online';
   $('status-text').textContent = describeStatus(status);
   $('status-hint').hidden = true;
+  $('open-app').hidden = true;
   $('recent').hidden = false;
 }
 
 function showOffline(error) {
   online = false;
-  $('status-dot').dataset.state = 'offline';
+  // A closed app isn't a problem: it opens when a download needs it.
+  const closed = error?.kind === FailureKind.APP_NOT_RUNNING;
+  if (closed) {
+    $('status-dot').removeAttribute('data-state');
+  } else {
+    $('status-dot').dataset.state = 'offline';
+  }
   $('status-text').textContent = error?.message ?? String(error);
   const hint = instance ? failureHint(error, instance) : '';
   $('status-hint').textContent = hint;
+  $('status-hint').dataset.tone = closed ? 'info' : 'error';
   $('status-hint').hidden = !hint;
+  $('open-app').hidden = !closed;
   $('recent').hidden = true;
+}
+
+async function onOpenApp() {
+  $('open-app').disabled = true;
+  $('status-text').textContent = 'Opening Ketch…';
+  $('status-hint').hidden = true;
+  try {
+    await withClient((client) => client.status(), { launch: true });
+  } catch (error) {
+    showOffline(error);
+  } finally {
+    $('open-app').disabled = false;
+  }
+  refresh();
 }
 
 function renderPicker() {
@@ -160,9 +194,9 @@ async function onTaskAction(event) {
   button.disabled = true;
   try {
     if (button.dataset.action === 'pause') {
-      await client.pauseTask(taskId);
+      await withClient((client) => client.pauseTask(taskId));
     } else {
-      await client.resumeTask(taskId);
+      await withClient((client) => client.resumeTask(taskId));
     }
   } catch (error) {
     showAddMessage(error.message, 'error');

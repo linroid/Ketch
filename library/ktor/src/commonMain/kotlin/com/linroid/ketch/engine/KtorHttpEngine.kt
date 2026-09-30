@@ -23,7 +23,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * [HttpEngine] implementation backed by a Ktor [HttpClient].
  *
  * Uses platform-specific Ktor engines: OkHttp (Android), Darwin (iOS),
- * CIO (JVM), and Js (WasmJs/JS).
+ * and CIO (JVM).
  *
  * @param client the Ktor HTTP client to use, or a default client
  *   with infinite timeouts (suitable for large downloads)
