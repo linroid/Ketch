@@ -62,12 +62,14 @@ internal class KotlinTorrentSession(
   private val trackerWorkspace = AtomicReference<TorrentBufferBudget.Lease?>(null)
 
   init {
-    checkNotNull(scope.coroutineContext[Job]).invokeOnCompletion {
-      // Every edit/save is a child of this scope; none can still reference the committed override.
-      store.discardTrackerConfiguration()
-      trackerOwner.exchange(null)?.close()
-      trackerWorkspace.exchange(null)?.close()
-    }
+    checkNotNull(scope.coroutineContext[Job]).invokeOnCompletion { releaseTrackerState() }
+  }
+
+  /** Every edit/save is a child of [scope]; none can still reference the committed override. */
+  private fun releaseTrackerState() {
+    store.discardTrackerConfiguration()
+    trackerOwner.exchange(null)?.close()
+    trackerWorkspace.exchange(null)?.close()
   }
 
   suspend fun trackerConfiguration(): TrackerConfigurationSnapshot = lifecycle.withLock {
@@ -418,6 +420,8 @@ internal class KotlinTorrentSession(
       job?.cancelAndJoin()
       job = null
       checkNotNull(scope.coroutineContext[Job]).cancelAndJoin()
+      // join() can return before the completion handler has run on the completing thread.
+      releaseTrackerState()
       incoming.cancel()
       resets.cancel()
       closed = true

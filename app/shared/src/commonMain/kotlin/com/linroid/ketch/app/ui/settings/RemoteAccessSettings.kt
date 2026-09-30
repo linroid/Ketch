@@ -105,9 +105,10 @@ fun RemoteAccessSettings(
       SettingsRow(
         title = "Access token",
         description = when {
-          token.isNotEmpty() -> "Other devices must enter this token to connect."
-          lanOpen -> "Without a token, anyone on your network can control your downloads."
-          else -> "Optional while only this device can connect."
+          token.isNotEmpty() -> "Other devices and the web app must enter this token to connect."
+          lanOpen -> "Without a token, anyone on your network can control your downloads, " +
+            "and the web app can't connect."
+          else -> "Needed for the web app. Optional otherwise while only this device can connect."
         },
         descriptionColor = if (token.isEmpty() && lanOpen) colors.warning
           else colors.onSurfaceVariant,

@@ -123,9 +123,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverResult`,
   `RankedCandidate`
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
-  `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`
-- `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
-  `RateLimiter`, `FetchBudget`
+  `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`, `SiteAllowlist`
+- `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ValidatingDns`,
+  `ContentExtractor`, `RateLimiter`, `FetchBudget`
 - `com.linroid.ketch.ai.search` -- `SearchProvider`, `BraveSearchProvider`,
   `GoogleSearchProvider`, `DummySearchProvider`
 - `com.linroid.ketch.ai.site` -- `SiteProfiler`, `SiteProfile`, `SiteProfileStore`,
@@ -230,8 +230,14 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   Koog models, and `temperature` is only sent to models that accept it
 - 7 agent tools: `searchWeb`, `searchSites`, `fetchPage`, `headUrl`,
   `extractDownloads`, `validateUrl`, `emitStep`
-- SSRF protection, device safety scoring, rate limiting
-- JVM/Android only (uses Koog + Ktor CIO client)
+- SSRF protection on every redirect hop, device safety scoring, rate limiting; the
+  fetcher also resolves hosts through the validator when it connects, so DNS
+  rebinding cannot reach a private address
+- `DiscoverQuery.sites` ("Limit to websites", CLI `--sites`) is a hard allowlist,
+  subdomains included, capped by `DiscoveryConfig.allowedDomains`: the tools refuse
+  other hosts and the output parser drops their candidates, but redirects a listed
+  site answers with (e.g. github.com to its CDN) are followed
+- JVM/Android only (uses Koog + Ktor CIO and OkHttp clients)
 - See [AI discovery configuration](docs/ai-discovery.md)
 
 ### Configuration (`config/`)
@@ -268,20 +274,28 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Without an API token, `HostValidator` answers 403 to requests whose `Host` is not a loopback
   name, an interface IP, the machine's host name or `<host>.local`, or in `allowedHosts`
   (DNS rebinding protection); with a token any `Host` is accepted
+- Without an API token, refuses requests from web pages on other origins (403
+  `origin_not_allowed`) and ignores `corsAllowedHosts`; its own web UI, browser extensions and
+  non-browser clients pass. With a token, `corsAllowedHosts` grants CORS (`host[:port]` for
+  both schemes, `scheme://host[:port]`, or `*`), and the apps default it to `*` so the hosted
+  web app can connect
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
 - `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
-  cannot bind never resumes them; CORS hosts are `host[:port]` without a scheme (Ktor's
-  `allowHost` rejects one)
+  cannot bind never resumes them
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
   `META-INF/native-image/<module>/` of the module that needs it (`cli`, `library:mcp` for the MCP
   SDK and `KetchToolSet`, `ai:discover` for `DiscoveryToolSet`). Koog tool sets use kotlin-reflect,
   so new tool methods may need the types in their signatures registered
-- `NativeImageConfigTest` (in `cli` and `library:mcp`) checks that the metadata names existing
-  classes and covers every serializable MCP SDK type; build with `./gradlew :cli:nativeCompile`
-  and exercise `ketch mcp` to verify changes
+- Koog's Anthropic, Gemini and OpenAI Responses clients have Ktor find their request and response
+  serializers by class, and Gemini parts and Responses items use content-polymorphic serializers,
+  so `ai:discover` registers those classes too; the Ollama and chat-completions clients do not
+- `NativeImageConfigTest` (in `cli`, `library:mcp` and `ai:discover`) checks that the metadata
+  names existing classes and covers every serializable MCP SDK type and every subtype of Koog's
+  content-polymorphic types; build with `./gradlew :cli:nativeCompile` and exercise `ketch mcp`
+  and `ketch ai-discover` with each LLM provider to verify changes
 
 ### MCP Server (`library:mcp`)
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
@@ -419,7 +433,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
    v2 incoming/upload/seeding/PEX, hybrid v1-only peers, uTP and encryption remain unimplemented.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
-7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO); iOS and
+7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and
    the web app report AI discovery as unavailable
 8. AI API tokens are stored in plain text in `config.toml`, like the server
    `apiToken`; use environment variables on shared machines

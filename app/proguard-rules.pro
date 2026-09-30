@@ -3,13 +3,10 @@
 # Library-specific rules (serialization, Ktor, coroutines, SQLDelight) are now
 # shipped as consumer-rules.pro inside each library module's AAR.
 
-# SLF4J / Logback (from library:server, JVM-only)
+# SLF4J (from library:server and Koog, JVM-only). The desktop app logs through slf4j-simple,
+# which SLF4J finds through ServiceLoader.
 -dontwarn org.slf4j.**
--dontwarn ch.qos.logback.**
--keep class ch.qos.logback.classic.spi.LogbackServiceProvider { *; }
--keep class ch.qos.logback.classic.Logger { *; }
--keep class ch.qos.logback.core.** { *; }
--keep class ch.qos.logback.classic.** { *; }
+-keep class org.slf4j.simple.SimpleServiceProvider { <init>(); }
 -dontwarn org.osgi.**
 -dontwarn aQute.bnd.**
 -dontwarn edu.umd.cs.findbugs.**
@@ -24,9 +21,6 @@
 -dontwarn io.lettuce.**
 -dontwarn io.micrometer.**
 -dontwarn io.netty.**
-# Prevent ProGuard from computing common supertypes for netty logging
-# classes that reference missing Log4J2 superclasses.
--keep class io.netty.util.internal.logging.** { *; }
 -dontwarn io.opentelemetry.**
 -dontwarn javax.annotation.**
 -dontwarn javax.enterprise.**

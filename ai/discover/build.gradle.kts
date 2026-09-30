@@ -10,12 +10,20 @@ dependencies {
   api(projects.config)
 
   // Koog framework for LLM integration
-  implementation(libs.koog.agents)
-  // Gemini support; not part of the koog-agents aggregate.
+  // Only the modules discovery uses; the koog-agents aggregate also bundles Bedrock (AWS SDK),
+  // OpenTelemetry and Apache HttpClient, which bloat the apps.
+  implementation(libs.koog.agents.core)
+  implementation(libs.koog.anthropic.client)
+  implementation(libs.koog.openai.client)
+  implementation(libs.koog.ollama.client)
   implementation(libs.koog.google.client)
+  // Koog's HTTP client implementation, found through ServiceLoader.
+  runtimeOnly(libs.koog.http.client.ktor)
 
-  // Ktor client for fetching
+  // Ktor client for fetching. SafeFetcher uses the OkHttp engine because,
+  // unlike CIO, it accepts a custom DNS resolver.
   implementation(libs.ktor.client.cio)
+  implementation(libs.ktor.client.okhttp)
   implementation(libs.ktor.client.contentNegotiation)
   implementation(libs.ktor.serialization.json)
 

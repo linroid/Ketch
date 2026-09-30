@@ -86,9 +86,11 @@ class RobotsTxtParser internal constructor() {
   /**
    * Checks if a URL [path] is allowed based on [rules].
    *
-   * Uses longest-match semantics: more specific rules take
-   * precedence, and an allow rule wins a tie with a disallow rule of
-   * the same length.
+   * Rule paths match as prefixes, where `*` matches any run of
+   * characters and a trailing `$` anchors the rule at the end of
+   * [path] (RFC 9309, section 2.2.3). Uses longest-match semantics:
+   * the longest matching rule path takes precedence, and an allow rule
+   * wins a tie with a disallow rule of the same length.
    */
   fun isAllowed(path: String, rules: RobotsTxtRules): Boolean {
     if (rules.rules.isEmpty()) return true
@@ -97,7 +99,7 @@ class RobotsTxtParser internal constructor() {
     var bestLength = -1
 
     for (rule in rules.rules) {
-      if (!path.startsWith(rule.path)) continue
+      if (!matches(path, rule.path)) continue
       val length = rule.path.length
       if (length > bestLength || (length == bestLength && rule.allowed)) {
         bestMatch = rule
@@ -106,6 +108,25 @@ class RobotsTxtParser internal constructor() {
     }
 
     return bestMatch?.allowed ?: true
+  }
+
+  private fun matches(path: String, pattern: String): Boolean {
+    val anchored = pattern.endsWith('$')
+    val parts = pattern.removeSuffix("$").split('*')
+    if (!path.startsWith(parts.first())) return false
+    var end = parts.first().length
+    for (i in 1 until parts.size) {
+      val part = parts[i]
+      if (anchored && i == parts.lastIndex) {
+        // The last literal must end the path, after what matched so far.
+        return path.length - part.length >= end && path.endsWith(part)
+      }
+      // The leftmost match of each literal leaves the most room for the rest.
+      val found = path.indexOf(part, end)
+      if (found < 0) return false
+      end = found + part.length
+    }
+    return !anchored || end == path.length
   }
 
   private class GroupRules {
