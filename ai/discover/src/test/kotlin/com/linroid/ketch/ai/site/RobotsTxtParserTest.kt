@@ -208,4 +208,43 @@ class RobotsTxtParserTest {
     )
     assertTrue(parser.isAllowed("/page", rules))
   }
+
+  @Test
+  fun isAllowed_wildcardWithEndAnchor_matchesOnlyThatExtension() {
+    val rules = parser.parse("User-agent: *\nDisallow: /*.zip$")
+
+    assertFalse(parser.isAllowed("/releases/file.zip", rules))
+    assertTrue(parser.isAllowed("/releases/file.zip.html", rules))
+    assertTrue(parser.isAllowed("/releases/", rules))
+  }
+
+  @Test
+  fun isAllowed_wildcardInMiddle_matchesAnyRunOfCharacters() {
+    val rules = parser.parse("User-agent: *\nDisallow: /*/private/")
+
+    assertFalse(parser.isAllowed("/team/a/private/notes", rules))
+    // The wildcard sits between two slashes, so a top-level /private/ does not match.
+    assertTrue(parser.isAllowed("/private/notes", rules))
+  }
+
+  @Test
+  fun isAllowed_endAnchorWithoutWildcard_matchesExactPathOnly() {
+    val rules = parser.parse("User-agent: *\nDisallow: /$")
+
+    assertFalse(parser.isAllowed("/", rules))
+    assertTrue(parser.isAllowed("/page", rules))
+  }
+
+  @Test
+  fun isAllowed_wildcardRules_longestPatternWins() {
+    val content = """
+      User-agent: *
+      Disallow: /*.pdf$
+      Allow: /public/*.pdf$
+    """.trimIndent()
+    val rules = parser.parse(content)
+
+    assertTrue(parser.isAllowed("/public/guide.pdf", rules))
+    assertFalse(parser.isAllowed("/drafts/guide.pdf", rules))
+  }
 }

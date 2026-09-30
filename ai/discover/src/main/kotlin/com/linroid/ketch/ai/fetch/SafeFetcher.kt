@@ -68,6 +68,8 @@ internal class SafeFetcher(
    * Fetches the content at [url], reading at most [maxBytes] of the
    * body (capped at the fetcher's per-fetch limit).
    *
+   * @param truncate keep the first bytes of a body over the limit
+   *   instead of failing when its `Content-Length` declares it too large
    * @param checkHop runs on every URL about to be requested, redirect
    *   targets included, after SSRF validation; a non-null result is
    *   why that URL must not be requested, and ends the fetch
@@ -77,13 +79,14 @@ internal class SafeFetcher(
   suspend fun fetch(
     url: String,
     maxBytes: Long = maxContentBytes,
+    truncate: Boolean = false,
     checkHop: suspend (URI) -> String? = { null },
   ): FetchResult {
     val limit = maxBytes.coerceIn(0, maxContentBytes)
     val fail: (String) -> FetchResult = { FetchResult.Failed(url, it) }
     return try {
       exchange(url, HttpMethod.Get, checkHop, fail) { finalUrl, response ->
-        readBody(url, finalUrl, response, limit)
+        readBody(url, finalUrl, response, limit, truncate)
       }
     } catch (e: Exception) {
       if (e is CancellationException) currentCoroutineContext().ensureActive()
@@ -187,24 +190,28 @@ internal class SafeFetcher(
     finalUrl: String,
     response: HttpResponse,
     limit: Long,
+    truncate: Boolean,
   ): FetchResult {
     if (!response.status.isSuccess()) {
       return FetchResult.Failed(url, "HTTP ${response.status.value}")
     }
     val declared = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
-    if (declared != null && declared > limit) {
+    if (!truncate && declared != null && declared > limit) {
       return FetchResult.Failed(url, "Content too large: $declared bytes (max $limit)")
     }
     // The body is streamed, so a response without Content-Length stops
     // at the limit instead of being buffered whole.
-    val bytes = response.bodyAsChannel().readAtMost(limit)
-    log.d { "Fetched ${bytes.size} bytes from ${redactUrl(finalUrl)}" }
+    val channel = response.bodyAsChannel()
+    val bytes = channel.readAtMost(limit)
+    val truncated = bytes.size.toLong() == limit && channel.awaitContent()
+    log.d { "Fetched ${bytes.size} bytes from ${redactUrl(finalUrl)}, truncated=$truncated" }
     return FetchResult.Success(
       url = url,
       finalUrl = finalUrl,
       content = bytes.decodeToString(),
       statusCode = response.status.value,
       byteCount = bytes.size.toLong(),
+      truncated = truncated,
     )
   }
 
@@ -273,6 +280,7 @@ internal sealed interface FetchResult {
    *
    * @property finalUrl URL the content came from after redirects
    * @property byteCount body bytes read
+   * @property truncated the body went on past the bytes read
    */
   data class Success(
     override val url: String,
@@ -280,6 +288,7 @@ internal sealed interface FetchResult {
     val content: String,
     val statusCode: Int,
     val byteCount: Long,
+    val truncated: Boolean = false,
   ) : FetchResult
 
   /** Fetch failed or was blocked. */

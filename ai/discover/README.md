@@ -168,8 +168,11 @@ ResourceDiscoveryService.discover()
   redirect hop against its own origin's rules. A group naming `KetchBot`
   replaces the `*` groups, as RFC 9309 specifies. Each origin's
   robots.txt is read once per run and does not count toward the budget.
-  A missing or unreadable robots.txt allows everything; `*` and `$`
-  wildcards in rules are not supported, and `Crawl-delay` is not applied.
+  Rules match as path prefixes with RFC 9309 wildcards: `*` matches any
+  run of characters and a trailing `$` anchors the end of the path; the
+  longest matching rule wins. Only the first 500 KiB of a larger file
+  are parsed, without the line the cut falls in. A missing or unreadable
+  robots.txt allows everything, and `Crawl-delay` is not applied.
   `headUrl` checks of candidate links are not subject to robots.txt
 - The system prompt also asks for at most 6 searches; that limit is
   advisory, since search calls are not counted. `AgentConfig.maxIterations`
@@ -277,14 +280,16 @@ Tests cover:
 - `LlmClientFactoryTest` — provider/model resolution, endpoint normalization
 - `AiSettingsEnvTest` — environment credential fallbacks
 - `UrlValidatorTest` — SSRF protection (20 tests)
-- `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps,
-  and no connection when a host rebinds to loopback after validation
+- `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps
+  and truncation, and no connection when a host rebinds to loopback after
+  validation
 - `ValidatingDnsTest` — connect-time lookups refuse rebound and mixed hosts
 - `RateLimiterTest` — per-host spacing and the concurrency cap
 - `FetchBudgetTest` — per-run request and byte allowance
 - `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects
 - `BraveSearchProviderTest` — request shape and response parsing
-- `RobotsTxtParserTest` — robots.txt parsing (11 tests)
+- `RobotsTxtParserTest` — robots.txt groups, longest match, `*` and `$` wildcards
+- `SiteProfilerTest` — robots.txt over 500 KiB is parsed up to the limit
 - `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)

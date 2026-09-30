@@ -18,6 +18,7 @@ import java.net.SocketTimeoutException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -138,6 +139,29 @@ class SafeFetcherTest {
 
     val failed = assertIs<FetchResult.Failed>(result)
     assertTrue(failed.reason.startsWith("Content too large"), failed.reason)
+  }
+
+  @Test
+  fun fetch_truncateWithDeclaredLengthOverLimit_keepsFirstBytes() = runTest {
+    val body = "x".repeat(100)
+    val engine = engine {
+      respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentLength, "${body.length}"))
+    }
+
+    val result = fetcher(engine).fetch("https://example.com/big", maxBytes = 10, truncate = true)
+
+    val success = assertIs<FetchResult.Success>(result)
+    assertEquals("x".repeat(10), success.content)
+    assertTrue(success.truncated)
+  }
+
+  @Test
+  fun fetch_bodyExactlyAtLimit_isNotTruncated() = runTest {
+    val engine = engine { respond("x".repeat(10)) }
+
+    val result = fetcher(engine).fetch("https://example.com/page", maxBytes = 10)
+
+    assertFalse(assertIs<FetchResult.Success>(result).truncated)
   }
 
   @Test
