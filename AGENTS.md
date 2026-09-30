@@ -116,13 +116,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### `library:server`, `library:mcp` (JVM only)
 - `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`; `server.api` holds the routes and
   `server.mdns` the `MdnsRegistrar` implementations
-- `com.linroid.ketch.mcp` -- `KetchMcpServer`, `KetchToolSet`
+- `com.linroid.ketch.mcp` -- `KetchMcpServer`, `KetchToolSet`, `asDeclaredTools()`
 
 ### `ai:discover` (JVM/Android only)
 - `com.linroid.ketch.ai` -- `AiModule`, `AiConfig`, `LlmClientFactory`,
   `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverResult`,
   `RankedCandidate`
-- `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
+- `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `asDeclaredTools()`, `AgentOutputParser`,
   `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`, `SiteAllowlist`
 - `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ValidatingDns`,
   `ContentExtractor`, `RateLimiter`, `FetchBudget`
@@ -301,6 +301,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
 - `KetchToolSet` provides 12 tools: list/get/start/pause/resume/cancel/remove downloads,
   `resolveUrl`, `getStatus`, `setSpeedLimit`, `setPriority`, `updateConfig`
+- Register Koog tool sets with `asDeclaredTools()` (`library:mcp` and `ai:discover` each have a
+  copy), not `tools(toolSet)`: Koog 1.2.0 describes every parameter of a `@Tool` method as
+  required and JSON-encodes a `String` result again. The adapter makes parameters with default
+  values optional and passes `String` results on as they are, so tools return their JSON as text
 - `ketch mcp` runs it on stdio against a local engine. It passes the real stdout to
   `startStdio` and redirects `System.out` to stderr, so the banner, the console logger and
   Logback never corrupt the JSON-RPC stream
