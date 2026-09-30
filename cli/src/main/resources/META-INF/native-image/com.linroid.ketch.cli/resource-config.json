@@ -2,7 +2,6 @@
   "resources": [
     {"pattern": "META-INF/.*.kotlin_module$"},
     {"pattern": "META-INF/services/.*"},
-    {"pattern": ".*.kotlin_builtins"},
-    {"pattern": "kotlinx-schema.properties"}
+    {"pattern": ".*.kotlin_builtins"}
   ]
 }

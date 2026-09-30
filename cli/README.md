@@ -51,7 +51,7 @@ You can also download an archive from
 
 ## Commands
 
-Running `ketch` without arguments prints the usage.
+Running `ketch` without arguments, or with `--help` or `-h`, prints the usage.
 
 ### Global options
 
@@ -72,26 +72,29 @@ ketch [options] <url> [destination]
 Downloads HTTP(S) and FTP/FTPS URLs (`ftp://[user:password@]host[:port]/path`), magnet links, and
 `.torrent` URLs or files. Without a destination the file is saved in the current directory. An
 existing directory, or a path ending in a separator, keeps the file name from the source; any other
-path is used as the file path. A bare file name such as `file.zip` is saved in `~/Downloads`, so
-use `./file.zip` for the current directory. Torrents follow the
+path, including a bare file name such as `file.zip`, is the file path, relative to the current
+directory. Torrents follow the
 [torrent destination rules](../docs/torrent.md), and public ones also announce to the `[torrent]`
 trackers of the default [config file](#config-file-locations).
 
 The download is kept in memory only and is not recorded in the [task database](#database). The
-command pauses the download after two seconds and resumes it a second later, to demonstrate pause
-and resume.
+command exits when the download completes or fails.
 
 | Option | Description |
 |---|---|
 | `--speed-limit <value>` | Limit download speed (e.g., `500k`, `1m`, `10m`) |
 | `--priority <level>` | Set download priority: `low`, `normal`, `high`, `urgent` |
 | `--max-concurrent <n>` | Max simultaneous downloads (default: 3) |
+| `--help`, `-h` | Show help message |
 
 **Examples:**
 
 ```bash
 # Basic download
 ketch https://example.com/file.zip
+
+# Save as file.zip in the current directory
+ketch https://example.com/latest.zip file.zip
 
 # Download to a specific path
 ketch https://example.com/file.zip /tmp/file.zip
@@ -108,8 +111,8 @@ ketch -v "magnet:?xt=urn:btih:<info-hash>" ~/Downloads/
 
 Start the Ketch daemon server with REST API, SSE event stream, and the bundled web UI. It
 downloads HTTP(S), FTP/FTPS and BitTorrent sources, stores tasks in the
-[task database](#database), and announces itself on the local network over mDNS unless
-`mdnsEnabled` is `false`.
+[task database](#database) and restores them when it starts, and announces itself on the local
+network over mDNS unless `mdnsEnabled` is `false`.
 
 ```bash
 ketch server [options]
@@ -122,7 +125,8 @@ ketch server [options]
 | `--host <address>` | Bind address (default: `0.0.0.0`) |
 | `--port <number>` | Port number, 1-65535 (default: `8642`) |
 | `--token <string>` | API bearer token for authentication |
-| `--cors <hosts>` | Comma-separated CORS allowed hosts without a scheme (e.g., `localhost:3000`), or `*` |
+| `--cors <origins>` | Comma-separated origins (`http://localhost:3000`), hosts for both `http` and `https` (`localhost:3000`), or `*`, whose web pages may call the API; needs `--token` (see [Web pages](#web-pages)) |
+| `--allowed-hosts <names>` | Comma-separated extra `Host` names accepted without a token |
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--speed-limit <value>` | Global speed limit (e.g., `10m`, `500k`) |
 | `--help`, `-h` | Show help message |
@@ -144,15 +148,56 @@ ketch server --config /path/to/config.toml --port 9999
 
 # Generate a default config file
 ketch server --generate-config
+
+# Without a token, also accept requests addressed to a DNS alias
+ketch server --allowed-hosts nas.example.com
 ```
+
+#### Accepted hosts
+
+Without an API token, the server only answers requests whose `Host` header (ignoring the port)
+names this machine:
+
+- `localhost`, `*.localhost`, `127.0.0.0/8` or `[::1]`
+- an IP address of one of the machine's network interfaces, such as `192.168.1.20`
+- the machine's host name, or its mDNS name `<host>.local` (for example `my-mac.local`)
+- a name or IP address listed in `--allowed-hosts` or `allowedHosts`
+
+Anything else gets `403 Forbidden` with a `host_not_allowed` error. This stops DNS rebinding,
+where a web page points its own domain at your machine to reach the API from the browser.
+Ketch apps connect to servers they discover on the network by IP address, and the browser
+extension defaults to `http://127.0.0.1:8642`, so neither needs configuration.
+
+With `--token` or `apiToken` set, any `Host` is accepted, since a web page cannot learn the
+token. Set a token when the server is reached through another name, such as a reverse proxy or
+a DNS alias, instead of listing every name.
+
+#### Web pages
+
+A browser lets any web page send requests to the server, so it checks where a browser request
+comes from:
+
+- **Without `--token`**, it refuses requests from web pages on another origin (a different host
+  or port) with `403 Forbidden` and an `origin_not_allowed` error, and ignores `--cors`.
+  Otherwise any site you visit could start downloads that write anywhere you can, list your
+  tasks, and pause or cancel them. These still work: the web UI this server serves, browser
+  extensions such as Ketch's own, and clients outside a browser, such as the Ketch apps and
+  `curl`.
+- **With `--token`**, `--cors` lists the origins whose pages may call the API, such as
+  `http://localhost:3000` (a bare `localhost:3000` allows both `http` and `https`), or `*` for
+  any. Pages still need the token, which they cannot learn. Without `--cors`, only the web UI
+  this server serves can use it from a browser.
+
+Behind a reverse proxy that rewrites the `Host` header, the web UI counts as another origin;
+set a token there. The Ketch apps' server follows the same rules, and allows any origin once
+it has an access token, so the web app can connect.
 
 ### MCP server
 
 Run Ketch as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so AI
 agents can list, start, pause, resume, cancel and remove downloads, resolve URLs, and change speed
 limits, priorities and the download config. It uses the same config file and
-[task database](#database) as `ketch server`, and restores saved tasks when it starts. Stdout
-carries only MCP messages; the version banner, logs and other output go to stderr.
+[task database](#database) as `ketch server`, and restores saved tasks when it starts.
 
 ```bash
 ketch mcp [options]
@@ -164,7 +209,8 @@ ketch mcp [options]
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--help`, `-h` | Show help message |
 
-Register it with your MCP client, for example in Claude Desktop's `claude_desktop_config.json`:
+Stdout carries only the MCP protocol; the banner and all logs go to stderr. Register it with your
+MCP client, for example in Claude Desktop's `claude_desktop_config.json`:
 
 ```json
 {
@@ -188,7 +234,7 @@ ketch ai-discover <query> [options]
 
 | Option | Description |
 |---|---|
-| `--sites <domains>` | Comma-separated domains to search first; a hint to the agent, not a hard limit |
+| `--sites <domains>` | Comma-separated domains to limit discovery to, subdomains included; redirects to download hosts are followed (see [AI discovery](../docs/ai-discovery.md#limiting-discovery-to-websites)) |
 | `--max-results <n>` | Max candidates to return (default: 5) |
 
 The command reads the `[ai]` section of the default [config file](#config-file-locations), which
@@ -232,7 +278,12 @@ never overwrites an existing file.
 
 ### Config file format
 
+Keys are camelCase and match the Kotlin property names. Unknown keys are ignored without a
+warning, so a misspelled key silently keeps its default.
+
 ```toml
+# Ketch Configuration
+
 # Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
 
@@ -241,25 +292,43 @@ host = "0.0.0.0"
 port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
-# corsAllowedHosts = ["localhost:3000"]
+# corsAllowedHosts = ["localhost:3000"]  # host[:port] without a scheme, or "*"
+# Without apiToken, requests must address this machine: localhost, one of its
+# IP addresses, its host name or <host>.local. List any other name used to
+# reach the server here.
+# allowedHosts = ["nas.example.com"]
 
 [download]
-# defaultDirectory = "/srv/downloads"
+# defaultDirectory = "~/Downloads"  # ~ is your home folder
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
 maxConcurrentDownloads = 2
 maxConnectionsPerHost = 8
+
+# Advanced settings (defaults are usually fine):
 # retryCount = 3
 # retryDelayMs = 1000
 # progressIntervalMs = 200
 # saveIntervalMs = 5000
 # bufferSize = 8192
 
+# Extra trackers announced alongside public torrents' own trackers, e.g. when
+# a network blocks a torrent's own tracker. Private torrents ignore them. The
+# apps edit this under Settings > BitTorrent.
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
+
+# Pre-configured remote servers.
+# [[remotes]]
+# host = "192.168.1.100"
+# port = 8642
+# apiToken = "token"
+# secure = false
 ```
 
 ### Config reference
+
+`name` must appear before the first `[table]` header.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -270,25 +339,30 @@ maxConnectionsPerHost = 8
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
-| `port` | int | `8642` | Port to listen on |
+| `port` | int | `8642` | Port to listen on (1-65535) |
 | `apiToken` | string | *(none)* | Bearer token for API authentication |
-| `corsAllowedHosts` | string[] | `[]` | Allowed CORS hosts without a scheme (e.g., `["localhost:3000"]`, or `["*"]` for all) |
+| `corsAllowedHosts` | string[] | `[]` | Origins whose web pages may call the API (`["*"]` for any); needs `apiToken` (see [Web pages](#web-pages)) |
+| `allowedHosts` | string[] | `[]` | Extra `Host` names or IPs accepted without `apiToken` (see [Accepted hosts](#accepted-hosts)) |
 | `mdnsEnabled` | bool | `true` | Announce the server on the local network (`_ketch._tcp`) |
 
 #### `[download]`
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `defaultDirectory` | string | `~/Downloads` | Default save directory; `~` is not expanded, so use a full path |
+| `defaultDirectory` | string | `~/Downloads` | Default save directory; a leading `~` is your home folder |
 | `speedLimit` | string | `"unlimited"` | Global speed limit (`"500k"`, `"10m"`, or bytes) |
 | `maxConnectionsPerDownload` | int | `4` | Connections (segments) per HTTP or FTP download |
 | `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads (`0` = unlimited) |
 | `maxConnectionsPerHost` | int | `8` | Max simultaneous downloads per host (`0` = unlimited) |
 | `retryCount` | int | `3` | Max automatic retries after a retryable failure |
-| `retryDelayMs` | int | `1000` | Base delay between retries (exponential backoff) |
-| `progressIntervalMs` | int | `200` | Progress update throttle interval |
-| `saveIntervalMs` | int | `5000` | Segment progress persistence interval |
+| `retryDelayMs` | long | `1000` | Base delay between retries (exponential backoff) |
+| `progressIntervalMs` | long | `200` | Progress update throttle interval |
+| `saveIntervalMs` | long | `5000` | Segment progress persistence interval |
 | `bufferSize` | int | `8192` | FTP read buffer size in bytes |
+
+A file with an invalid value fails to load. `maxConnectionsPerDownload`, `progressIntervalMs`,
+`saveIntervalMs` and `bufferSize` must be greater than 0; the other counts and delays must not
+be negative.
 
 #### `[torrent]`
 

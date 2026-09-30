@@ -31,18 +31,21 @@ ai/discover/
 │   ├── AgentOutputParser.kt     # Parse + validate agent JSON output
 │   ├── DeviceSafetyFilter.kt    # URL safety scoring
 │   ├── LinkExtractor.kt         # Download link extraction from HTML
+│   ├── SiteAllowlist.kt         # Websites a run is limited to
 │   └── DiscoveryStepListener.kt # Progress callback interface
 │
 ├── fetch/                       # HTTP fetching with security
-│   ├── SafeFetcher.kt           # SSRF-protected GET + HEAD
+│   ├── SafeFetcher.kt           # SSRF-protected GET + HEAD, validated redirects
 │   ├── UrlValidator.kt          # SSRF protection (blocks private IPs, non-HTTP)
+│   ├── ValidatingDns.kt         # OkHttp DNS that only returns validated addresses
 │   ├── ContentExtractor.kt      # HTML → text extraction
-│   └── RateLimiter.kt           # Per-domain + global rate limiting
+│   ├── RateLimiter.kt           # Per-host spacing + global concurrency cap
+│   └── FetchBudget.kt           # Per-run request and byte allowance
 │
 ├── search/                      # Web search abstraction
 │   ├── SearchProvider.kt        # Interface
-│   ├── BingSearchProvider.kt    # Bing Web Search API
-│   ├── GoogleSearchProvider.kt  # Google Programmable Search
+│   ├── BraveSearchProvider.kt   # Brave Search API
+│   ├── GoogleSearchProvider.kt  # Google Custom Search JSON API
 │   └── DummySearchProvider.kt   # No-op fallback
 │
 └── site/                        # Site profiling
@@ -83,12 +86,12 @@ that follows a structured 5-phase workflow:
 
 | Tool | Description | Backend |
 |------|-------------|---------|
-| `searchWeb(query, maxResults)` | Web search | `SearchProvider.search()` |
-| `searchSites(sites, query, maxResults)` | Site-restricted search | `SearchProvider.search(sites=)` |
-| `fetchPage(url)` | Fetch + extract text and links | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
-| `headUrl(url)` | HTTP HEAD for metadata | `SafeFetcher.head()` |
+| `searchWeb(query, maxResults)` | Web search, scoped to the allowed sites | `SearchProvider.search()` |
+| `searchSites(sites, query, maxResults)` | Site-restricted search; the sites must be allowed | `SearchProvider.search(sites=)` |
+| `fetchPage(url)` | Fetch + extract text and links (allowed sites only; honors robots.txt) | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
+| `headUrl(url)` | HTTP HEAD for metadata and the final URL after redirects (allowed sites only) | `SafeFetcher.head()` |
 | `extractDownloads(pageText, baseUrl)` | Extract download links from HTML | `LinkExtractor` |
-| `validateUrl(url)` | SSRF + allowlist check | `UrlValidator` |
+| `validateUrl(url)` | SSRF + allowed-site check | `UrlValidator` + `SiteAllowlist` |
 | `emitStep(title, details)` | Report progress to the user | `DiscoveryStepListener` |
 
 ## Data Flow
@@ -99,7 +102,8 @@ DiscoverQuery (query, sites, maxResults, fileTypes)
          ▼
 ResourceDiscoveryService.discover()
          │
-         ├── Build DiscoveryToolSet (with allowedDomains)
+         ├── SiteAllowlist.forRun(allowedDomains, query.sites)
+         ├── Build DiscoveryToolSet (with the allowlist)
          ├── Create Koog AIAgent (system prompt + tools)
          ├── agent.run(userMessage)
          │       │
@@ -109,8 +113,9 @@ ResourceDiscoveryService.discover()
          │       │
          │       └── Returns JSON array of candidates
          │
-         ├── AgentOutputParser.parse(agentOutput)
+         ├── AgentOutputParser.parse(agentOutput, allowlist)
          │       ├── Extract JSON from markdown/raw text
+         │       ├── Drop candidates outside the allowed sites
          │       ├── UrlValidator.validate() each URL
          │       ├── DeviceSafetyFilter.evaluate() each URL
          │       ├── Adjust confidence by safety score
@@ -125,7 +130,38 @@ ResourceDiscoveryService.discover()
 - Blocks private/local IPs (loopback, link-local, site-local, carrier-grade NAT)
 - Blocks internal hostnames (`.local`, `.internal`, `localhost`, single-word)
 - Only allows `http` and `https` schemes
-- Applied before every fetch and HEAD request
+- Applied to every request, including each redirect hop: the fetcher's
+  Ktor client has `followRedirects = false`, and `SafeFetcher` follows
+  up to 10 redirects itself, validating each target before requesting it,
+  so a public URL cannot redirect to a private or loopback address
+- Applied again when connecting, against DNS rebinding. Validation
+  resolves the host and the HTTP client resolves it again to connect, so
+  a host could otherwise answer the check with a public address and the
+  connection with `127.0.0.1` or `10.x`. `SafeFetcher.createHttpClient`
+  builds the fetcher's client on Ktor's OkHttp engine, since CIO takes no
+  custom resolver, with `ValidatingDns`: it resolves through
+  `UrlValidator` and refuses the host if any address is blocked, so the
+  client only connects to addresses that passed the check. IP-literal
+  URLs skip DNS and are checked by validation alone
+- The fetcher's client never uses a proxy, including a JVM or system
+  proxy: a proxy would resolve the host itself, out of reach of the check
+
+### Site allowlist (`SiteAllowlist`)
+- Built per run from `DiscoverQuery.sites`, narrowed to
+  `DiscoveryConfig.allowedDomains`; with neither set, any public site is
+  allowed
+- A domain covers its subdomains (`ubuntu.com` allows
+  `releases.ubuntu.com`, not `notubuntu.com`); a scheme, path, port or
+  leading `www.` in an entry is ignored
+- Enforced in the tools and the output parser: `searchWeb` passes the
+  sites to the provider and drops off-list results, `searchSites`,
+  `fetchPage` and `headUrl` refuse other hosts with
+  `{"error": ..., "allowedSites": [...]}`, and `AgentOutputParser` drops
+  candidates on other hosts
+- Redirects a listed site answers with are followed, so `github.com`
+  release assets served from `objects.githubusercontent.com` still
+  resolve. `headUrl` returns the requested `url` plus `finalUrl`, and the
+  agent is told to report the requested URL
 
 ### Device Safety (`DeviceSafetyFilter`)
 - Base score 0.7, adjusted by heuristics:
@@ -138,14 +174,30 @@ ResourceDiscoveryService.discover()
 - Blocked if final score < 0.3
 
 ### Other Protections
-- Content size cap: 2 MB per fetch
-- Budgets: the system prompt asks for at most 6 searches, 10 page fetches and
-  15 HEAD requests. These are advisory, since the tools don't count calls;
-  `AgentConfig.maxIterations` is the only hard cap on the agent's tool calls
+- Rate limiting (`RateLimiter`, shared by all runs of an `AiModule`):
+  at least 1 s between requests to the same host, and at most
+  `maxConcurrentRequests` requests in flight at once
+- Per-run budget (`FetchBudget`): `fetchPage` and `headUrl` share
+  `maxFetchesPerRequest` requests, and page bodies share
+  `maxTotalBytesPerRequest` bytes; once either is spent the tools return
+  an error telling the agent to stop fetching
+- Content size cap: 2 MB per fetch. Bodies are streamed, so the cap
+  holds for responses without a `Content-Length`
+- robots.txt: `fetchPage` refuses paths the site disallows for the
+  `KetchBot` token (the `User-Agent` up to its `/`), checking every
+  redirect hop against its own origin's rules. A group naming `KetchBot`
+  replaces the `*` groups, as RFC 9309 specifies. Each origin's
+  robots.txt is read once per run and does not count toward the budget.
+  Rules match as path prefixes with RFC 9309 wildcards: `*` matches any
+  run of characters and a trailing `$` anchors the end of the path; the
+  longest matching rule wins. Only the first 500 KiB of a larger file
+  are parsed, without the line the cut falls in. A missing or unreadable
+  robots.txt allows everything, and `Crawl-delay` is not applied.
+  `headUrl` checks of candidate links are not subject to robots.txt
+- The system prompt also asks for at most 6 searches; that limit is
+  advisory, since search calls are not counted. `AgentConfig.maxIterations`
+  caps the agent's tool calls overall
 - Prompt injection defense: fetched content treated as untrusted data
-- Not wired in yet: `RateLimiter` (per-domain delays + global cap), robots.txt
-  checks from `SiteProfiler`, and the per-request limits marked in
-  [Configuration](#configuration)
 
 ## Usage
 
@@ -225,18 +277,18 @@ sections are engine tuning knobs.
 | | `apiKey` | `""` | Provider API token (not needed for Ollama) |
 | | `model` | `""` | Model id; blank = provider default |
 | | `baseUrl` | `""` | Endpoint; blank = provider default |
-| `SearchSettings` | `provider` | `None` | `None`, `Bing`, `Google` |
-| | `apiKey` | `""` | Search API key |
+| `SearchSettings` | `provider` | `None` | `None`, `Brave`, `Google` |
+| | `apiKey` | `""` | Brave subscription token or Google API key |
 | | `cx` | `""` | Google Programmable Search engine id |
 | `AgentConfig` | `maxIterations` | `30` | Max agent tool-call iterations |
 | | `temperature` | `0.2` | LLM sampling temperature |
-| `FetcherConfig` | `maxContentBytes` | `2 MB` | Max content per fetch |
+| `FetcherConfig` | `maxContentBytes` | `2 MB` | Max page body per fetch |
 | | `requestTimeoutMs` | `15000` | HTTP timeout for fetches and search |
-| | `maxFetchesPerRequest` | `20` | Fetch budget per discovery (not enforced yet) |
-| | `maxTotalBytesPerRequest` | `20 MB` | Byte budget per discovery (not enforced yet) |
-| `DiscoveryConfig` | `maxConcurrentRequests` | `3` | Global concurrent cap (not enforced yet) |
+| | `maxFetchesPerRequest` | `25` | Page fetches + HEAD requests per discovery run |
+| | `maxTotalBytesPerRequest` | `20 MB` | Page body bytes per discovery run |
+| `DiscoveryConfig` | `maxConcurrentRequests` | `3` | Requests in flight across all runs |
 | | `userAgent` | `"KetchBot/1.0"` | User-Agent header |
-| | `allowedDomains` | `[]` | Allowlist for `validateUrl`, plus `DiscoverQuery.sites` (empty = all public) |
+| | `allowedDomains` | `[]` | Caps every run's sites; `DiscoverQuery.sites` only narrows it (empty = all public) |
 
 ## Testing
 
@@ -248,18 +300,34 @@ Tests cover:
 - `LlmClientFactoryTest` — provider/model resolution, endpoint normalization
 - `AiSettingsEnvTest` — environment credential fallbacks
 - `UrlValidatorTest` — SSRF protection (20 tests)
-- `RobotsTxtParserTest` — robots.txt parsing (11 tests)
+- `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps
+  and truncation, and no connection when a host rebinds to loopback after
+  validation
+- `ValidatingDnsTest` — connect-time lookups refuse rebound and mixed hosts
+- `RateLimiterTest` — per-host spacing and the concurrency cap
+- `FetchBudgetTest` — per-run request and byte allowance
+- `SiteAllowlistTest` — site normalization, subdomain matching, config/query overlap (10 tests)
+- `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects, allowlist enforcement
+- `BraveSearchProviderTest` — request shape and response parsing
+- `RobotsTxtParserTest` — robots.txt groups, longest match, `*` and `$` wildcards
+- `SiteProfilerTest` — robots.txt over 500 KiB is parsed up to the limit
 - `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)
-- `AgentOutputParserTest` — agent output parsing + validation (9 tests)
-- `BingSearchProviderTest`, `GoogleSearchProviderTest` — query building; their
-  `*IntegrationTest` classes parse responses from a mock engine
+- `AgentOutputParserTest` — agent output parsing, validation + allowlist (10 tests)
+- `GoogleSearchProviderTest` — query building; `GoogleSearchProviderIntegrationTest`
+  parses responses from a mock engine
+
+Tests that need DNS answers resolve hosts through the `fakeDns` helper
+(`src/test/.../fetch/FakeDns.kt`) and serve HTTP from Ktor's `MockEngine`.
 
 ## Roadmap
 
-- [x] **Real search provider** — `BingSearchProvider` and `GoogleSearchProvider`
+- [x] **Real search provider** — `BraveSearchProvider` and `GoogleSearchProvider`
   replace `DummySearchProvider` once configured
+- [ ] **Keyless search provider** — Google's Custom Search JSON API is closed to
+  new customers and shuts down on 2027-01-01, leaving Brave as the only option;
+  a self-hosted SearXNG provider would work without an API key
 - [ ] **Streaming step events** — expose `DiscoveryStepListener` callbacks as
   SSE events for real-time UI updates during discovery
 - [x] **Download integration** — the apps download selected candidates via

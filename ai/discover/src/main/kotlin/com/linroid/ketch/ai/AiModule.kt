@@ -2,9 +2,10 @@ package com.linroid.ketch.ai
 
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.fetch.ContentExtractor
+import com.linroid.ketch.ai.fetch.RateLimiter
 import com.linroid.ketch.ai.fetch.SafeFetcher
 import com.linroid.ketch.ai.fetch.UrlValidator
-import com.linroid.ketch.ai.search.BingSearchProvider
+import com.linroid.ketch.ai.search.BraveSearchProvider
 import com.linroid.ketch.ai.search.DummySearchProvider
 import com.linroid.ketch.ai.search.GoogleSearchProvider
 import com.linroid.ketch.ai.search.SearchProvider
@@ -62,20 +63,25 @@ class AiModule(
       stepListener: DiscoveryStepListener = DiscoveryStepListener.None,
     ): AiModule {
       val urlValidator = UrlValidator()
-      val fetcherClient = HttpClient {
-        install(HttpTimeout) {
-          requestTimeoutMillis = config.fetcher.requestTimeoutMs
-        }
-      }
+      val fetcherClient = SafeFetcher.createHttpClient(
+        urlValidator = urlValidator,
+        requestTimeoutMs = config.fetcher.requestTimeoutMs,
+      )
       val fetcher = SafeFetcher(
         httpClient = fetcherClient,
         urlValidator = urlValidator,
+        rateLimiter = RateLimiter(
+          maxConcurrent = config.discovery.maxConcurrentRequests,
+        ),
         maxContentBytes = config.fetcher.maxContentBytes,
         userAgent = config.discovery.userAgent,
       )
       val contentExtractor = ContentExtractor()
       val siteProfileStore = SiteProfileStore()
-      val siteProfiler = SiteProfiler(fetcher)
+      val siteProfiler = SiteProfiler(
+        fetcher = fetcher,
+        robotsUserAgent = config.discovery.userAgent.substringBefore('/'),
+      )
 
       val searchClient = createSearchClient(config.fetcher.requestTimeoutMs)
       val resolvedSearchProvider =
@@ -86,6 +92,7 @@ class AiModule(
         fetcher = fetcher,
         urlValidator = urlValidator,
         contentExtractor = contentExtractor,
+        siteProfiler = siteProfiler,
         config = config,
         stepListener = stepListener,
       )
@@ -119,8 +126,8 @@ class AiModule(
         }
         DummySearchProvider()
       }
-      settings.provider == SearchProviderKind.Bing ->
-        BingSearchProvider(httpClient, settings.apiKey)
+      settings.provider == SearchProviderKind.Brave ->
+        BraveSearchProvider(httpClient, settings.apiKey)
       settings.provider == SearchProviderKind.Google ->
         GoogleSearchProvider(httpClient, settings.apiKey, settings.cx)
       else -> DummySearchProvider()

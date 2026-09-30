@@ -2,12 +2,23 @@ package com.linroid.ketch.ai.fetch
 
 import java.net.InetAddress
 import java.net.URI
+import java.net.UnknownHostException
 
 /**
  * Validates URLs against SSRF attacks by blocking requests to
  * private/local IP ranges and non-HTTP(S) schemes.
+ *
+ * [validate] checks a URL before it is requested, and
+ * [resolvePublicAddresses] applies the same host check again when the
+ * HTTP client connects (see [ValidatingDns]). Both look the host up with
+ * [resolve], so a name that answers the first lookup with a public
+ * address and the second with a private one is still refused.
+ *
+ * @param resolve looks up every address of a host name
  */
-internal class UrlValidator {
+internal class UrlValidator(
+  private val resolve: (String) -> Array<InetAddress> = InetAddress::getAllByName,
+) {
 
   /**
    * Validates the given [url] for safety.
@@ -25,7 +36,8 @@ internal class UrlValidator {
     val uri = try {
       URI(url)
     } catch (_: Exception) {
-      return ValidationResult.Blocked("Malformed URL: $url")
+      // The URL is left out: the reason is logged, and URLs can carry credentials.
+      return ValidationResult.Blocked("Malformed URL")
     }
 
     val scheme = uri.scheme?.lowercase()
@@ -38,29 +50,40 @@ internal class UrlValidator {
     val host = uri.host
       ?: return ValidationResult.Blocked("Missing host in URL")
 
+    try {
+      resolvePublicAddresses(host)
+    } catch (e: BlockedHostException) {
+      return ValidationResult.Blocked(e.reason)
+    }
+    return ValidationResult.Valid(uri)
+  }
+
+  /**
+   * Resolves [host] and returns its addresses, provided the name does
+   * not look internal and none of the addresses is private or local.
+   *
+   * @throws BlockedHostException if the host fails either check or
+   *   cannot be resolved
+   */
+  fun resolvePublicAddresses(host: String): List<InetAddress> {
     if (isInternalHostname(host)) {
-      return ValidationResult.Blocked(
-        "Blocked internal hostname: $host"
-      )
+      throw BlockedHostException("Blocked internal hostname: $host")
     }
 
     val addresses = try {
-      InetAddress.getAllByName(host)
-    } catch (_: Exception) {
-      return ValidationResult.Blocked(
-        "DNS resolution failed for: $host"
-      )
+      resolve(host)
+    } catch (e: Exception) {
+      throw BlockedHostException("DNS resolution failed for: $host", e)
     }
 
     for (addr in addresses) {
       if (isBlockedAddress(addr)) {
-        return ValidationResult.Blocked(
+        throw BlockedHostException(
           "Blocked private/local IP: ${addr.hostAddress} (host: $host)"
         )
       }
     }
-
-    return ValidationResult.Valid(uri)
+    return addresses.toList()
   }
 
   private fun isInternalHostname(host: String): Boolean {
@@ -94,6 +117,20 @@ internal class UrlValidator {
 
   companion object {
     private val ALLOWED_SCHEMES = setOf("http", "https")
+  }
+}
+
+/**
+ * Thrown when a host is refused for the given [reason]. It is an
+ * [UnknownHostException] so that an HTTP client treats a refused lookup
+ * like one that found no address and does not connect.
+ */
+internal class BlockedHostException(
+  val reason: String,
+  cause: Throwable? = null,
+) : UnknownHostException(reason) {
+  init {
+    if (cause != null) initCause(cause)
   }
 }
 

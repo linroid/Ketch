@@ -8,10 +8,14 @@ import kotlin.time.Instant
 /**
  * Profiles a site by fetching robots.txt, discovering sitemaps,
  * and looking for RSS/Atom feed links.
+ *
+ * @param robotsUserAgent product token matched against robots.txt
+ *   `User-agent` lines
  */
 class SiteProfiler internal constructor(
   private val fetcher: SafeFetcher,
   private val robotsTxtParser: RobotsTxtParser = RobotsTxtParser(),
+  private val robotsUserAgent: String = RobotsTxtParser.DEFAULT_USER_AGENT,
 ) {
 
   private val log = KetchLogger("SiteProfiler")
@@ -22,27 +26,9 @@ class SiteProfiler internal constructor(
    */
   suspend fun profile(domain: String): SiteProfile {
     log.d { "Profiling $domain" }
-    val robotsResult = fetchRobotsTxt(domain)
-    val sitemaps = mutableListOf<String>()
-    var robotsTxtRules: RobotsTxtRules? = null
-    var hasRobotsTxt = false
-    var crawlDelay: Int? = null
-
-    when (robotsResult) {
-      is FetchResult.Success -> {
-        hasRobotsTxt = true
-        robotsTxtRules = robotsTxtParser.parse(robotsResult.content)
-        sitemaps.addAll(robotsTxtRules.sitemaps)
-        crawlDelay = robotsTxtRules.crawlDelay
-        log.d {
-          "robots.txt: ${robotsTxtRules.rules.size} rules, " +
-            "${sitemaps.size} sitemaps, crawlDelay=$crawlDelay"
-        }
-      }
-      is FetchResult.Failed -> {
-        log.d { "No robots.txt: ${robotsResult.reason}" }
-      }
-    }
+    val robotsTxtRules = fetchRobotsRules("https://$domain")
+    val sitemaps = robotsTxtRules?.sitemaps.orEmpty().toMutableList()
+    val crawlDelay = robotsTxtRules?.crawlDelay
 
     // Try default sitemap location if none in robots.txt
     if (sitemaps.isEmpty()) {
@@ -67,7 +53,7 @@ class SiteProfiler internal constructor(
     return SiteProfile(
       domain = domain,
       robotsTxtRules = robotsTxtRules,
-      hasRobotsTxt = hasRobotsTxt,
+      hasRobotsTxt = robotsTxtRules != null,
       sitemaps = sitemaps,
       rssFeeds = rssFeeds,
       crawlDelay = crawlDelay,
@@ -78,22 +64,53 @@ class SiteProfiler internal constructor(
   }
 
   /**
-   * Checks if [urlPath] is allowed by robots.txt for [domain].
+   * Checks if [urlPath] is allowed by the robots.txt in [profile].
    *
    * @return `true` if allowed or no robots.txt exists
    */
   fun isAllowed(
     urlPath: String,
     profile: SiteProfile,
-  ): Boolean {
-    val rules = profile.robotsTxtRules ?: return true
-    return robotsTxtParser.isAllowed(urlPath, rules)
-  }
+  ): Boolean = isAllowed(urlPath, profile.robotsTxtRules)
 
-  private suspend fun fetchRobotsTxt(
-    domain: String,
-  ): FetchResult {
-    return fetcher.fetch("https://$domain/robots.txt")
+  /**
+   * Checks if [urlPath] (path plus query) is allowed by [rules].
+   *
+   * @return `true` if allowed or [rules] is `null` (no robots.txt)
+   */
+  internal fun isAllowed(urlPath: String, rules: RobotsTxtRules?): Boolean =
+    rules == null || robotsTxtParser.isAllowed(urlPath, rules)
+
+  /**
+   * Fetches and parses `robots.txt` at [origin] (`scheme://host[:port]`).
+   *
+   * @return the rules for our user agent, or `null` when there is no
+   *   readable robots.txt, which allows every path
+   */
+  internal suspend fun fetchRobotsRules(origin: String): RobotsTxtRules? {
+    val url = "$origin/robots.txt"
+    return when (val result = fetcher.fetch(url, MAX_ROBOTS_BYTES, truncate = true)) {
+      is FetchResult.Success -> {
+        // A longer file is parsed up to the limit (RFC 9309, section 2.5).
+        // The line the cut went through is dropped: a partial Allow path
+        // would allow more than the full rule does.
+        val content = if (result.truncated) {
+          result.content.substringBeforeLast('\n', missingDelimiterValue = "")
+        } else {
+          result.content
+        }
+        val rules = robotsTxtParser.parse(content, robotsUserAgent)
+        log.d {
+          "robots.txt for $origin: ${rules.rules.size} rules, " +
+            "${rules.sitemaps.size} sitemaps, crawlDelay=${rules.crawlDelay}"
+        }
+        rules
+      }
+      is FetchResult.Failed -> {
+        log.d { "No robots.txt for $origin: ${result.reason}" }
+        null
+      }
+    }
   }
 
   private suspend fun discoverFeeds(
@@ -122,6 +139,9 @@ class SiteProfiler internal constructor(
   }
 
   companion object {
+    /** RFC 9309 requires parsing at least 500 KiB of robots.txt, and allows stopping there. */
+    internal const val MAX_ROBOTS_BYTES = 500L * 1024
+
     private val FEED_LINK_PATTERN = Regex(
       "<link[^>]*type=\"application/" +
         "(?:rss|atom)\\+xml\"[^>]*href=\"([^\"]+)\"",

@@ -4,6 +4,7 @@ import com.linroid.ketch.ai.RankedCandidate
 import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.fetch.ValidationResult
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -22,8 +23,14 @@ internal class AgentOutputParser(
   /**
    * Parses the agent output text, validates URLs, applies the
    * device safety filter, and deduplicates by URL.
+   *
+   * Candidates whose URL lies outside [allowlist] are dropped; the page
+   * they were found on is not checked.
    */
-  fun parse(agentOutput: String): List<RankedCandidate> {
+  fun parse(
+    agentOutput: String,
+    allowlist: SiteAllowlist = SiteAllowlist.Unrestricted,
+  ): List<RankedCandidate> {
     val jsonStr = extractJsonArray(agentOutput)
     if (jsonStr == null) {
       log.w { "No JSON array found in agent output" }
@@ -38,14 +45,19 @@ internal class AgentOutputParser(
     }
 
     return candidates
-      .mapNotNull { c -> validateAndFilter(c) }
+      .mapNotNull { c -> validateAndFilter(c, allowlist) }
       .distinctBy { it.url }
       .sortedByDescending { it.confidence }
   }
 
   private fun validateAndFilter(
     c: AgentCandidate,
+    allowlist: SiteAllowlist,
   ): RankedCandidate? {
+    if (!allowlist.allows(c.url)) {
+      log.d { "Outside allowed sites: ${redactUrl(c.url)}" }
+      return null
+    }
     when (val v = urlValidator.validate(c.url)) {
       is ValidationResult.Blocked -> {
         log.d { "Blocked URL: ${c.url} (${v.reason})" }

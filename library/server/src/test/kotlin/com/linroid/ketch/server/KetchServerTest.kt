@@ -5,9 +5,13 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import java.net.HttpURLConnection
+import java.net.URI
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class KetchServerTest {
 
@@ -43,6 +47,28 @@ class KetchServerTest {
       >(body)
       assertEquals(0, taskList.tasks.size)
     }
+
+  @Test
+  fun `port returns the free port the system picked for port 0`() {
+    val server = KetchServer(
+      createTestKetch(),
+      host = "127.0.0.1",
+      port = 0,
+      apiToken = "secret",
+      mdnsEnabled = false,
+    )
+    server.start(wait = false)
+    try {
+      val port = runBlocking { server.port() }
+      assertTrue(port > 0)
+      val connection = URI("http://127.0.0.1:$port/api/status").toURL()
+        .openConnection() as HttpURLConnection
+      connection.setRequestProperty("Authorization", "Bearer secret")
+      assertEquals(200, connection.responseCode)
+    } finally {
+      server.stop()
+    }
+  }
 
   @Test
   fun `get unknown task returns 404`() = testApplication {

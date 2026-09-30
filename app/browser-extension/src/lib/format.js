@@ -135,9 +135,16 @@ export function describeStatus(status, { withOs = false } = {}) {
  * @returns {string} empty when there is nothing specific to suggest
  */
 export function failureHint(error, instance) {
+  const app = instance.type === 'app';
   switch (error?.kind) {
+    case FailureKind.APP_NOT_INSTALLED:
+      return 'Install the Ketch desktop app and open it once, then try again. With "ketch ' +
+        'server", or a browser installed as a Flatpak or Snap, add Ketch as a server instead.';
+    case FailureKind.APP_NOT_RUNNING:
+      return 'Ketch opens by itself when you send it a download.';
     case FailureKind.UNREACHABLE:
     case FailureKind.TIMEOUT:
+      if (app) return 'Open Ketch and try again.';
       return isLoopbackUrl(instance.url)
         ? 'Open Ketch and turn on Settings → Remote access → Server, or run "ketch server".'
         : 'Check that the server is running and this address is reachable from here.';

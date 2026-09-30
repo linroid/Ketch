@@ -123,10 +123,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `ResourceDiscoveryService`, `DiscoverQuery`, `DiscoverResult`,
   `RankedCandidate`
 - `com.linroid.ketch.ai.agent` -- `DiscoveryToolSet`, `AgentOutputParser`,
-  `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`
-- `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ContentExtractor`,
-  `RateLimiter`
-- `com.linroid.ketch.ai.search` -- `SearchProvider`, `BingSearchProvider`,
+  `DeviceSafetyFilter`, `LinkExtractor`, `DiscoveryStepListener`, `SiteAllowlist`
+- `com.linroid.ketch.ai.fetch` -- `SafeFetcher`, `UrlValidator`, `ValidatingDns`,
+  `ContentExtractor`, `RateLimiter`, `FetchBudget`
+- `com.linroid.ketch.ai.search` -- `SearchProvider`, `BraveSearchProvider`,
   `GoogleSearchProvider`, `DummySearchProvider`
 - `com.linroid.ketch.ai.site` -- `SiteProfiler`, `SiteProfile`, `SiteProfileStore`,
   `RobotsTxtParser`
@@ -230,8 +230,14 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   Koog models, and `temperature` is only sent to models that accept it
 - 7 agent tools: `searchWeb`, `searchSites`, `fetchPage`, `headUrl`,
   `extractDownloads`, `validateUrl`, `emitStep`
-- SSRF protection, device safety scoring, rate limiting
-- JVM/Android only (uses Koog + Ktor CIO client)
+- SSRF protection on every redirect hop, device safety scoring, rate limiting; the
+  fetcher also resolves hosts through the validator when it connects, so DNS
+  rebinding cannot reach a private address
+- `DiscoverQuery.sites` ("Limit to websites", CLI `--sites`) is a hard allowlist,
+  subdomains included, capped by `DiscoveryConfig.allowedDomains`: the tools refuse
+  other hosts and the output parser drops their candidates, but redirects a listed
+  site answers with (e.g. github.com to its CDN) are followed
+- JVM/Android only (uses Koog + Ktor CIO and OkHttp clients)
 - See [AI discovery configuration](docs/ai-discovery.md)
 
 ### Configuration (`config/`)
@@ -252,11 +258,12 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   (`InstanceSettingsController`): pushed live via `KetchApi.updateConfig` /
   `updateNetworkInterfaces`. Downloads settings are saved to `config.toml` only for the
   embedded instance; the network selection is runtime-only and never saved
-- `ServerConfig`: host, port, API token, CORS, mDNS, `autoStart` (apps start
-  the server on launch)
+- `ServerConfig`: host, port, API token, CORS, `allowedHosts`, mDNS, `autoStart`
+  (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections
-- `FileConfigStore`: platform-specific file persistence via okio; the web app uses
-  `WebConfigStore` (TOML in localStorage)
+- `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
+  `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
+  uses `WebConfigStore` (TOML in localStorage)
 
 ### Daemon Server (`library:server`)
 - Ktor-based REST API (`library:endpoints`): create, list, pause, resume, cancel, remove tasks;
@@ -264,14 +271,39 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   resolving URLs or uploaded file content
 - SSE event stream for real-time state updates
 - Optional bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`)
+- Without an API token, `HostValidator` answers 403 to requests whose `Host` is not a loopback
+  name, an interface IP, the machine's host name or `<host>.local`, or in `allowedHosts`
+  (DNS rebinding protection); with a token any `Host` is accepted
+- Without an API token, refuses requests from web pages on other origins (403
+  `origin_not_allowed`) and ignores `corsAllowedHosts`; its own web UI, browser extensions and
+  non-browser clients pass. With a token, `corsAllowedHosts` grants CORS (`host[:port]` for
+  both schemes, `scheme://host[:port]`, or `*`), and the apps default it to `*` so the hosted
+  web app can connect
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
+- `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
+  cannot bind never resumes them
+
+### Native CLI (`cli/`)
+- Released as a GraalVM native binary; reflection and resource metadata lives in
+  `META-INF/native-image/<module>/` of the module that needs it (`cli`, `library:mcp` for the MCP
+  SDK and `KetchToolSet`, `ai:discover` for `DiscoveryToolSet`). Koog tool sets use kotlin-reflect,
+  so new tool methods may need the types in their signatures registered
+- Koog's Anthropic, Gemini and OpenAI Responses clients have Ktor find their request and response
+  serializers by class, and Gemini parts and Responses items use content-polymorphic serializers,
+  so `ai:discover` registers those classes too; the Ollama and chat-completions clients do not
+- `NativeImageConfigTest` (in `cli`, `library:mcp` and `ai:discover`) checks that the metadata
+  names existing classes and covers every serializable MCP SDK type and every subtype of Koog's
+  content-polymorphic types; build with `./gradlew :cli:nativeCompile` and exercise `ketch mcp`
+  and `ketch ai-discover` with each LLM provider to verify changes
 
 ### MCP Server (`library:mcp`)
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
 - `KetchToolSet` provides 12 tools: list/get/start/pause/resume/cancel/remove downloads,
   `resolveUrl`, `getStatus`, `setSpeedLimit`, `setPriority`, `updateConfig`
-- `ketch mcp` runs it on stdio against a local engine
+- `ketch mcp` runs it on stdio against a local engine. It passes the real stdout to
+  `startStdio` and redirects `System.out` to stderr, so the banner, the console logger and
+  Logback never corrupt the JSON-RPC stream
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no
@@ -279,9 +311,15 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `build/firefox` (event page instead of service worker, gecko id) and zips, which the release
   workflow attaches to GitHub releases (manifest version: the tag's numbers plus the run number)
 - Talks to the daemon REST API (`/api/tasks`, task pause/resume, `/api/resolve/content`,
-  `/api/status`) of one or more instances: Ketch on this computer (`http://127.0.0.1:8642`)
-  and remote servers, each with an optional bearer token. Captured downloads and magnets go to
-  the default one
+  `/api/status`) of one or more instances: the Ketch app on this computer and servers
+  (`ketch server`, other devices), each with an optional bearer token. Captured downloads and
+  magnets go to the default one
+- The Ketch desktop app is reached through the native messaging host `com.linroid.ketch`, its own
+  launcher run with `--native-messaging-host` (`app/desktop`: `NativeMessagingHost`,
+  `NativeHostRegistration`, `BrowserExtensionServer`). The host asks the running app over
+  `SingleInstance`, opening it if needed, for a loopback-only `KetchServer` on a free port with a
+  per-run token, separate from the Settings server. The app registers the host with installed
+  browsers on every launch; the Chromium extension id is pinned by the manifest `key`
 - Captures browser downloads (Chromium holds them in `onDeterminingFilename`, Firefox pauses
   them) and falls back to the browser when Ketch fails; context menus per instance; a content
   script sends trusted magnet link clicks
@@ -395,7 +433,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
    v2 incoming/upload/seeding/PEX, hybrid v1-only peers, uTP and encryption remain unimplemented.
 6. FTPS (FTP over TLS) only works on JVM/Android; iOS throws `KetchError.Unsupported`
    (blocked by [KTOR-7475](https://youtrack.jetbrains.com/issue/KTOR-7475))
-7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO); iOS and
+7. `ai:discover` is JVM/Android only (depends on Koog + Ktor CIO/OkHttp); iOS and
    the web app report AI discovery as unavailable
 8. AI API tokens are stored in plain text in `config.toml`, like the server
    `apiToken`; use environment variables on shared machines

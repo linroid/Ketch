@@ -1,0 +1,350 @@
+[
+  {
+    "name": "com.linroid.ketch.ai.agent.DiscoveryToolSet",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.ai.agent.DiscoveryToolSet$Companion"
+  },
+  {
+    "name": "com.linroid.ketch.ai.agent.DiscoveryStepListener"
+  },
+  {
+    "name": "com.linroid.ketch.ai.agent.LinkExtractor"
+  },
+  {
+    "name": "com.linroid.ketch.ai.DiscoverResult"
+  },
+  {
+    "name": "com.linroid.ketch.ai.DiscoverResult$Source"
+  },
+  {
+    "name": "com.linroid.ketch.ai.fetch.ContentExtractor"
+  },
+  {
+    "name": "com.linroid.ketch.ai.fetch.FetchBudget"
+  },
+  {
+    "name": "com.linroid.ketch.ai.fetch.SafeFetcher"
+  },
+  {
+    "name": "com.linroid.ketch.ai.fetch.UrlValidator"
+  },
+  {
+    "name": "com.linroid.ketch.ai.search.SearchProvider"
+  },
+  {
+    "name": "com.linroid.ketch.ai.site.RobotsTxtRules"
+  },
+  {
+    "name": "com.linroid.ketch.ai.site.SiteProfiler"
+  },
+  {
+    "name": "com.linroid.ketch.api.log.KetchLogger"
+  },
+  {
+    "name": "ai.koog.agents.core.tools.reflect.ToolSet",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "ai.koog.agents.core.tools.reflect.ToolFromCallable"
+  },
+  {
+    "name": "ai.koog.agents.core.tools.annotations.Tool",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "ai.koog.agents.core.tools.annotations.LLMDescription",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "ai.koog.serialization.JSONElement",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.serialization.JSONElement$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "kotlin.Metadata",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "kotlin.coroutines.Continuation"
+  },
+  {
+    "name": "kotlin.jvm.internal.DefaultConstructorMarker"
+  },
+  {
+    "name": "kotlinx.serialization.json.Json"
+  },
+  {
+    "name": "kotlinx.serialization.json.JsonObject"
+  },
+  {
+    "name": "ai.koog.agents.core.agent.context.GraphAgentContextData"
+  },
+  {
+    "name": "ai.koog.agents.core.agent.context.PlannerAgentContextData"
+  },
+  {
+    "name": "ai.koog.agents.core.dsl.extension.ReceivedToolResults"
+  },
+  {
+    "name": "ai.koog.agents.core.dsl.extension.ToolCalls"
+  },
+  {
+    "name": "ai.koog.agents.core.feature.debugger.Debugger"
+  },
+  {
+    "name": "ai.koog.prompt.message.Message"
+  },
+  {
+    "name": "ai.koog.prompt.message.Message$Assistant"
+  },
+  {
+    "name": "ai.koog.serialization.JSONObject"
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.anthropic.models.AnthropicResponse",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.anthropic.models.AnthropicResponse$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GoogleRequest",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GoogleRequest$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GoogleResponse",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GoogleResponse$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$FileData",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$FileData$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$FunctionCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$FunctionCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$FunctionResponse",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$FunctionResponse$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$InlineData",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$InlineData$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$Text",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.google.models.GooglePart$Text$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.OpenAIResponsesAPIResponse",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.OpenAIResponsesAPIResponse$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$CodeInterpreterToolCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$CodeInterpreterToolCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$ComputerToolCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$ComputerToolCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$ComputerToolCallOutput",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$ComputerToolCallOutput$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$CustomToolCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$CustomToolCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$CustomToolCallOutput",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$CustomToolCallOutput$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$FileSearchToolCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$FileSearchToolCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$FunctionToolCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$FunctionToolCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$FunctionToolCallOutput",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$FunctionToolCallOutput$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$ImageGenerationCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$ImageGenerationCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$InputMessage",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$InputMessage$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$ItemReference",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$ItemReference$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$LocalShellCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$LocalShellCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$LocalShellCallOutput",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$LocalShellCallOutput$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$McpApprovalRequest",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$McpApprovalRequest$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$McpApprovalResponse",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$McpApprovalResponse$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$McpListTools",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$McpListTools$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$McpToolCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$McpToolCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$OutputMessage",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$OutputMessage$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$Reasoning",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$Reasoning$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$Text",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$Text$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$WebSearchToolCall",
+    "fields": [{"name": "Companion"}]
+  },
+  {
+    "name": "ai.koog.prompt.executor.clients.openai.models.Item$WebSearchToolCall$Companion",
+    "methods": [{"name": "serializer", "parameterTypes": []}]
+  }
+]

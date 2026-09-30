@@ -19,7 +19,7 @@ Open **Settings** from the sidebar (desktop) or the bottom bar
 | API key | Required for everything except Ollama. |
 | Model | Blank uses the provider default (see below). |
 | Endpoint | Blank uses the provider default; required for OpenAI-compatible. |
-| Web search | None, Bing, or Google Programmable Search, plus credentials. |
+| Web search | None, Brave, or Google Programmable Search, plus credentials. |
 
 Changes are saved as you make them — there is no Save button — and the
 discovery engine is rebuilt in place, without restarting the app. **Test**
@@ -65,10 +65,68 @@ the endpoint with or without the trailing `/v1`; both work.
 
 ## Web search
 
-Without a search provider the agent can only read pages it is pointed at
-(the *Limit to websites* field on the Discover page), so results are
-thin. Bing needs a subscription key; Google needs an API key plus a
-Programmable Search engine id (`cx`).
+Without a search provider the agent can only read pages whose address
+it already knows, such as the home pages of the sites listed under
+*Limit to websites* (below), so results are thin.
+
+- **Brave** needs a Brave Search API subscription token, created at
+  `api-dashboard.search.brave.com`.
+- **Google** needs an API key plus a Programmable Search engine id
+  (`cx`). Google has closed the Custom Search JSON API to new customers
+  and turns it off on January 1, 2027, so only existing keys work.
+
+Bing is no longer offered: Microsoft retired the Bing Search APIs on
+August 11, 2025. A config file that still says `provider = "bing"`
+loads with web search set to None; pick another provider in Settings.
+
+## What the agent may fetch
+
+Every page and HEAD request goes through the same safeguards:
+
+- Only public `http` and `https` addresses are reached. Redirects are
+  followed one hop at a time (at most 10), and each hop is checked, so a
+  public page cannot redirect the agent to your router or `localhost`.
+- A discovery run may make 25 page fetches and HEAD requests in total
+  and read 20 MB of page content, with at most 2 MB per page. When the
+  budget is spent the agent returns what it has found.
+- Requests to the same host are at least a second apart, and at most
+  three run at once.
+- Pages a site's `robots.txt` disallows for `KetchBot` are not fetched,
+  even when a redirect leads to them.
+  Checking a download link's size and type with a HEAD request is not
+  treated as crawling.
+
+## Limiting discovery to websites
+
+The **Limit to websites** field on the Discover page (`--sites` in the
+CLI, `DiscoverQuery.sites` in code) is a hard limit, not a hint. Enter
+domains separated by commas, or leave it empty to use any public site.
+With sites listed:
+
+- **Searches** only cover those sites; results elsewhere are dropped.
+- **Pages and download links** on other domains are refused: the agent
+  can neither read them nor check their size.
+- **Results** on other domains are discarded, even when the agent found
+  the link on a listed site.
+
+Each domain covers its subdomains: `ubuntu.com` also allows
+`releases.ubuntu.com`, but not `notubuntu.com` or
+`ubuntu.com.example.net`. A scheme, path, port or leading `www.` is
+ignored, so pasting `https://www.blender.org/download/` limits discovery
+to `blender.org`. A list with no usable domain in it is rejected with an
+error instead of searching everywhere.
+
+The limit applies to the addresses the agent asks for, not to the
+redirects a listed site answers with. GitHub, for example, serves
+release assets from `objects.githubusercontent.com`: with `github.com`
+listed, the agent can still check those downloads, and results keep the
+`github.com` link (a result pointing at the CDN address would be
+dropped). Every redirect hop still goes through the safeguards above.
+
+Code that embeds the engine can also set
+`DiscoveryConfig.allowedDomains`. That list caps every run: the sites a
+query names can only narrow it, and a query whose sites all fall outside
+it fails with an error.
 
 ## Environment variables
 
@@ -80,7 +138,7 @@ keeps tokens out of the config file and makes CI and CLI use easy:
 | `OPENAI_API_KEY` | OpenAI and OpenAI-compatible providers |
 | `ANTHROPIC_API_KEY` | Anthropic |
 | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | Google Gemini |
-| `BING_SEARCH_API_KEY` | Bing web search |
+| `BRAVE_SEARCH_API_KEY` | Brave web search |
 | `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_CX` | Google web search |
 
 Rules:
@@ -90,7 +148,7 @@ Rules:
 - **In the apps, the Enable switch decides.** An exported key fills in a
   blank token once you switch discovery on, but it never switches the
   feature — or the Discover tab — on by itself.
-- **Web search follows the same rule.** Once you pick Bing or Google, a
+- **Web search follows the same rule.** Once you pick Brave or Google, a
   blank key (and Google's engine id) is filled from that provider's
   variables; saved values are kept and your choice is never switched to
   another provider.
@@ -124,7 +182,7 @@ cx = "..."
 ```
 
 Provider values are `openai`, `anthropic`, `google`, `ollama`,
-`openai-compatible`; search providers are `none`, `bing`, `google`. A
+`openai-compatible`; search providers are `none`, `brave`, `google`. A
 config file without an `[ai]` section keeps the defaults (discovery off).
 
 ## Where the tab goes

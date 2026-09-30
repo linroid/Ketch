@@ -17,6 +17,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
@@ -47,14 +48,19 @@ import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 import java.awt.Desktop
 import java.io.File
-import java.net.InetAddress
 import java.util.concurrent.Executors
+import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
 private val isMac = System.getProperty("os.name").startsWith("Mac")
 
 fun main(args: Array<String>) {
   val configDir = defaultConfigDir()
+  if (args.firstOrNull() == NativeMessagingHost.FLAG) {
+    // Started by a browser for the Ketch extension, not by the user.
+    runNativeMessagingHost(File(configDir))
+    return
+  }
   val incoming = IncomingDownloads()
   // Raised when a later launch hands over its files, to bring the window forward.
   val focusRequests = MutableSharedFlow<Unit>(
@@ -70,9 +76,13 @@ fun main(args: Array<String>) {
   }
 
   val launchFiles = fileArguments(args.toList())
+  val extensionServer = BrowserExtensionServer()
   val singleInstance = SingleInstance.acquire(
     File(configDir),
     launchFiles.map { it.path },
+    onRequest = { request ->
+      if (request == NativeMessagingHost.CONNECT_REQUEST) extensionServer.connect() else null
+    },
   ) { forwarded ->
     open(fileArguments(forwarded))
     focusRequests.tryEmit(Unit)
@@ -88,20 +98,43 @@ fun main(args: Array<String>) {
   val closeLog = Thread { runBlocking { withTimeoutOrNull(2.seconds) { fileLogger.close() } } }
   Runtime.getRuntime().addShutdownHook(closeLog)
   val logger = Logger.combine(Logger.console(logLevel), fileLogger)
+  // Ketch installs it too, but the host name below is resolved before Ketch exists.
+  KetchLogger.setLogger(logger)
   installOpenFileHandler(::open)
   open(launchFiles)
+  registerNativeHost(File(configDir), logger)
+  // Before the UI thread starts: this can run a command and, as a last resort, wait on a lookup.
+  val hostName = localHostName()
 
   application {
-    KetchWindow(configDir, incoming, focusRequests, singleInstance, logger, fileLogger)
+    KetchWindow(
+      configDir, hostName, incoming, focusRequests, singleInstance, extensionServer, logger,
+      fileLogger
+    )
+  }
+}
+
+/** Lets the browser extension find this app; see [NativeHostRegistration]. */
+private fun registerNativeHost(configDir: File, logger: Logger) {
+  thread(isDaemon = true, name = "ketch-native-host-registration") {
+    try {
+      val home = File(System.getProperty("user.home"))
+      val registered = NativeHostRegistration(configDir, home).register()
+      logger.d("[NativeHost] Registered for the browser extension: $registered")
+    } catch (e: Exception) {
+      logger.w("[NativeHost] Couldn't register for the browser extension", e)
+    }
   }
 }
 
 @Composable
 private fun ApplicationScope.KetchWindow(
   configDir: String,
+  hostName: String,
   incoming: IncomingDownloads,
   focusRequests: Flow<Unit>,
   singleInstance: SingleInstance,
+  extensionServer: BrowserExtensionServer,
   logger: Logger,
   fileLogger: FileLogger,
 ) {
@@ -112,8 +145,7 @@ private fun ApplicationScope.KetchWindow(
     val config = configStore.load()
     val dbPath = configDir + File.separator + "ketch.db"
     val taskStore = createSqliteTaskStore(DriverFactory(dbPath))
-    val instanceName = config.name?.ifEmpty { null }
-      ?: InetAddress.getLocalHost().hostName.removeSuffix(".local")
+    val instanceName = config.name?.ifEmpty { null } ?: hostName
     val torrentSource = TorrentDownloadSource(
       TorrentConfig(
         stateDirectory = configDir + File.separator + "torrent-state",
@@ -131,7 +163,7 @@ private fun ApplicationScope.KetchWindow(
             name = instanceName,
             logger = logger,
             additionalSources = listOf(FtpDownloadSource(), torrentSource),
-          )
+          ).also(extensionServer::attach)
         },
         localServerFactory = { ketchApi ->
           // Reloaded here so a restart from Settings picks up the
@@ -144,8 +176,12 @@ private fun ApplicationScope.KetchWindow(
             port = serverConfig.port,
             apiToken = serverConfig.apiToken,
             name = saved.name?.ifEmpty { null } ?: instanceName,
-            corsAllowedHosts = serverConfig.corsAllowedHosts
-              .takeIf { it.isNotEmpty() } ?: listOf("*"),
+            // With a token, pages on any site, such as the web app, may call the API, as
+            // they still need the token. Without one, KetchServer refuses them.
+            corsAllowedHosts = serverConfig.corsAllowedHosts.ifEmpty {
+              if (serverConfig.apiToken == null) emptyList() else listOf("*")
+            },
+            allowedHosts = serverConfig.allowedHosts,
             mdnsEnabled = serverConfig.mdnsEnabled,
           )
           server.start(wait = false)
@@ -172,6 +208,7 @@ private fun ApplicationScope.KetchWindow(
       }
     }
     onDispose {
+      extensionServer.close()
       instanceManager.close()
       singleInstance.close()
     }
@@ -205,8 +242,8 @@ private fun ApplicationScope.KetchWindow(
 
 /**
  * Level for the console and the log file, from `KETCH_LOG_LEVEL` (`verbose`, `debug`, `info`,
- * `warn` or `error`). Defaults to debug; verbose adds per-segment, per-peer and protocol-level
- * lines.
+ * `warn` or `error`). Defaults to debug, which includes segment start and completion; verbose
+ * adds speed limiter waits, FTP commands and replies, and per-peer torrent detail.
  */
 private fun logLevel(): LogLevel {
   val name = System.getenv("KETCH_LOG_LEVEL")?.trim() ?: return LogLevel.DEBUG

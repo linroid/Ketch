@@ -2,6 +2,8 @@ package com.linroid.ketch.app.desktop
 
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
@@ -44,6 +46,57 @@ class SingleInstanceTest {
       SingleInstance.acquire(dir, listOf("/tmp/a.torrent")) { }
       assertNull(received.poll(500, TimeUnit.MILLISECONDS))
     }
+  }
+
+  @Test
+  fun request_whileRunning_returnsTheReply() {
+    val received = LinkedBlockingQueue<List<String>>()
+    SingleInstance.acquire(
+      dir,
+      emptyList(),
+      onRequest = { request -> "reply to $request" },
+    ) { received.put(it) }!!.use {
+      assertEquals("reply to connect", SingleInstance.request(dir, "connect"))
+      // Requests are not launches: the app gets no arguments and doesn't raise its window.
+      assertNull(received.poll(200, TimeUnit.MILLISECONDS))
+    }
+  }
+
+  @Test
+  fun request_answeredSlowly_doesNotHoldUpForwardedFiles() {
+    val received = LinkedBlockingQueue<List<String>>()
+    val release = CountDownLatch(1)
+    SingleInstance.acquire(
+      dir,
+      emptyList(),
+      onRequest = {
+        release.await(5, TimeUnit.SECONDS)
+        "late"
+      },
+    ) { received.put(it) }!!.use {
+      val reply = Executors.newSingleThreadExecutor().submit<String?> {
+        SingleInstance.request(dir, "connect")
+      }
+      assertNull(SingleInstance.acquire(dir, listOf("/downloads/a.torrent")) { })
+      assertEquals(listOf("/downloads/a.torrent"), received.poll(5, TimeUnit.SECONDS))
+      release.countDown()
+      assertEquals("late", reply.get(5, TimeUnit.SECONDS))
+    }
+  }
+
+  @Test
+  fun request_withoutAnswer_returnsNull() {
+    SingleInstance.acquire(dir, emptyList()) { }!!.use {
+      assertNull(SingleInstance.request(dir, "unknown"))
+    }
+  }
+
+  @Test
+  fun request_withoutRunningInstance_returnsNull() {
+    assertNull(SingleInstance.request(dir, "connect"))
+    // An app that exited leaves its endpoint file behind.
+    SingleInstance.acquire(dir, emptyList(), onRequest = { "reply" }) { }!!.close()
+    assertNull(SingleInstance.request(dir, "connect"))
   }
 
   @Test
