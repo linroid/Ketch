@@ -143,6 +143,12 @@ class KetchServer(
     startMdnsRegistration()
   }
 
+  /**
+   * Returns the port the server accepts connections on. With `port = 0` the system picks a free
+   * port, which is known once the server has started.
+   */
+  suspend fun port(): Int = engine.engine.resolvedConnectors().first().port
+
   /** Stops the daemon server gracefully. */
   fun stop() {
     log.i { "Stopping server" }
