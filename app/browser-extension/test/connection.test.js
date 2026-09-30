@@ -75,6 +75,23 @@ describe('withEndpoint', () => {
     assert.deepEqual(stored(), restarted);
   });
 
+  test('does not repeat the action when the same app only dropped the connection', async () => {
+    // The app kept its address and token, so it may have handled the first attempt already.
+    const { deps, messages, stored } = fakeApp(endpoint, endpoint);
+    await withEndpoint(app, async () => {}, { deps });
+    let attempts = 0;
+    const dropped = unreachable();
+
+    await assert.rejects(withEndpoint(app, async () => {
+      attempts++;
+      throw dropped;
+    }, { deps }), dropped);
+
+    assert.equal(attempts, 1);
+    assert.equal(messages.length, 2);
+    assert.deepEqual(stored(), endpoint);
+  });
+
   test('other failures are not retried', async () => {
     const { deps, messages } = fakeApp(endpoint);
     await withEndpoint(app, async () => {}, { deps });

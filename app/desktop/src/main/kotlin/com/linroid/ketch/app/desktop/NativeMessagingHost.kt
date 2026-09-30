@@ -54,19 +54,32 @@ internal class NativeMessagingHost(
   }
 
   private fun connect(launch: Boolean): String {
-    requestApp()?.let { return it }
-    if (!launch) return errorReply("not_running", "Ketch isn't running")
-    try {
-      launchApp()
-    } catch (e: IOException) {
-      return errorReply("launch_failed", "Couldn't start Ketch: ${e.message}")
+    val first = requestApp()
+    if (first == null) {
+      if (!launch) return errorReply("not_running", "Ketch isn't running")
+      try {
+        launchApp()
+      } catch (e: IOException) {
+        return errorReply("launch_failed", "Couldn't start Ketch: ${e.message}")
+      }
+    } else if (!first.isNotReady()) {
+      return first
     }
+    // Starting: the app answers once it runs, and says it isn't ready until it has loaded.
+    var last = first
     val deadline = TimeSource.Monotonic.markNow() + startTimeout
     while (deadline.hasNotPassedNow()) {
       Thread.sleep(pollInterval.inWholeMilliseconds)
-      requestApp()?.let { return it }
+      val reply = requestApp() ?: continue
+      if (!reply.isNotReady()) return reply
+      last = reply
     }
-    return errorReply("not_started", "Ketch didn't start in time")
+    return last ?: errorReply("not_started", "Ketch didn't start in time")
+  }
+
+  private fun String.isNotReady(): Boolean {
+    val reply = runCatching { Json.parseToJsonElement(this) as? JsonObject }.getOrNull()
+    return reply?.get("error")?.jsonPrimitive?.contentOrNull == NOT_READY
   }
 
   companion object {
@@ -78,6 +91,9 @@ internal class NativeMessagingHost(
 
     /** Name of the host, as the extension and the host manifests know it. */
     const val NAME = "com.linroid.ketch"
+
+    /** Error the app replies with while it is still loading after start. */
+    const val NOT_READY = "not_ready"
   }
 }
 

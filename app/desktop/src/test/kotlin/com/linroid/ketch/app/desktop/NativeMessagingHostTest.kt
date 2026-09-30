@@ -103,6 +103,47 @@ class NativeMessagingHostTest {
   }
 
   @Test
+  fun connect_appStillLoading_keepsAskingUntilItIsReady() {
+    val notReady = """{"error":"not_ready","message":"Ketch is still starting"}"""
+    for (launch in listOf(true, false)) {
+      val answers = ArrayDeque(listOf(notReady, notReady, reply))
+      val host = NativeMessagingHost(
+        requestApp = { answers.removeFirst() },
+        launchApp = { error("Must not launch a running app") },
+        pollInterval = 1.milliseconds,
+      )
+      assertEquals(reply, host.handle("""{"type":"connect","launch":$launch}"""))
+    }
+  }
+
+  @Test
+  fun connect_launchedAppLoading_waitsPastNotReady() {
+    val notReady = """{"error":"not_ready","message":"Ketch is still starting"}"""
+    val answers = ArrayDeque(listOf(null, null, notReady, reply))
+    var launches = 0
+    val host = NativeMessagingHost(
+      requestApp = { answers.removeFirst() },
+      launchApp = { launches++ },
+      pollInterval = 1.milliseconds,
+    )
+
+    assertEquals(reply, host.handle("""{"type":"connect"}"""))
+    assertEquals(1, launches)
+  }
+
+  @Test
+  fun connect_appNeverFinishesLoading_repliesThatItIsStillStarting() {
+    val notReady = """{"error":"not_ready","message":"Ketch is still starting"}"""
+    val host = NativeMessagingHost(
+      requestApp = { notReady },
+      launchApp = { },
+      startTimeout = 20.milliseconds,
+      pollInterval = 5.milliseconds,
+    )
+    assertEquals(notReady, host.handle("""{"type":"connect"}"""))
+  }
+
+  @Test
   fun connect_appNeverStarts_givesUpAfterTheTimeout() {
     val host = NativeMessagingHost(
       requestApp = { null },

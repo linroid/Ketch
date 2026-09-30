@@ -34,7 +34,9 @@ let connecting;
  *
  * For the Ketch app on this computer, the app hands them over through native messaging, starting
  * first if needed. They are kept for the browser session and asked for again when the app no
- * longer answers there, which also restarts it.
+ * longer answers there, which also restarts it. `action` then runs again only if the app came
+ * back with a new address or token: that app can't have seen the first attempt, whereas one that
+ * merely dropped a connection may have created a task already.
  *
  * @template T
  * @param {import('./settings.js').Instance} instance
@@ -47,6 +49,7 @@ export async function withEndpoint(instance, action, { launch = true, deps } = {
   if (instance.type !== 'app') return action(instance);
   const connection = deps ?? browserDeps();
   const cached = await connection.loadEndpoint();
+  let staleError;
   if (cached) {
     try {
       return await action(cached);
@@ -55,6 +58,7 @@ export async function withEndpoint(instance, action, { launch = true, deps } = {
       if (error?.kind !== FailureKind.UNREACHABLE && error?.kind !== FailureKind.UNAUTHORIZED) {
         throw error;
       }
+      staleError = error;
       await connection.saveEndpoint(undefined);
     }
   }
@@ -68,6 +72,9 @@ export async function withEndpoint(instance, action, { launch = true, deps } = {
     endpoint = await connectToApp(connection, false);
   }
   await connection.saveEndpoint(endpoint);
+  if (staleError && endpoint.url === cached.url && endpoint.token === cached.token) {
+    throw staleError;
+  }
   return action(endpoint);
 }
 

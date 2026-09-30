@@ -42,7 +42,7 @@ internal class BrowserExtensionServer(
       val ketch = try {
         api.get(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
       } catch (_: TimeoutException) {
-        return errorReply("not_ready", "Ketch is still starting")
+        return errorReply(NativeMessagingHost.NOT_READY, "Ketch is still starting")
       }
       try {
         startServer(ketch, newToken())
