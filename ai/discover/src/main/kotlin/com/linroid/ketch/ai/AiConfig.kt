@@ -162,7 +162,9 @@ data class FetcherConfig(
  *
  * @param maxConcurrentRequests max concurrent discovery requests
  * @param userAgent User-Agent string for fetching
- * @param allowedDomains allowlisted domains; empty = allow all public
+ * @param allowedDomains domains every discovery is limited to, subdomains
+ *   included; empty = all public sites. [DiscoverQuery.sites] can only
+ *   narrow this list, never widen it.
  */
 data class DiscoveryConfig(
   val maxConcurrentRequests: Int = 3,

@@ -65,10 +65,45 @@ the endpoint with or without the trailing `/v1`; both work.
 
 ## Web search
 
-Without a search provider the agent can only read pages it is pointed at
-(the *Limit to websites* field on the Discover page), so results are
-thin. Bing needs a subscription key; Google needs an API key plus a
-Programmable Search engine id (`cx`).
+Without a search provider the agent can only read pages whose address
+it already knows, such as the home pages of the sites listed under
+*Limit to websites* (below), so results are thin. Bing needs a
+subscription key; Google needs an API key plus a Programmable Search
+engine id (`cx`).
+
+## Limiting discovery to websites
+
+The **Limit to websites** field on the Discover page (`--sites` in the
+CLI, `DiscoverQuery.sites` in code) is a hard limit, not a hint. Enter
+domains separated by commas, or leave it empty to use any public site.
+With sites listed:
+
+- **Searches** only cover those sites; results elsewhere are dropped.
+- **Pages and download links** on other domains are refused: the agent
+  can neither read them nor check their size.
+- **Results** on other domains are discarded, even when the agent found
+  the link on a listed site.
+
+Each domain covers its subdomains: `ubuntu.com` also allows
+`releases.ubuntu.com`, but not `notubuntu.com` or
+`ubuntu.com.example.net`. A scheme, path, port or leading `www.` is
+ignored, so pasting `https://www.blender.org/download/` limits discovery
+to `blender.org`. A list with no usable domain in it is rejected with an
+error instead of searching everywhere.
+
+The limit applies to the addresses the agent asks for, not to the
+redirects a listed site answers with. GitHub, for example, serves
+release assets from `objects.githubusercontent.com`: with `github.com`
+listed, the agent can still check those downloads, and results keep the
+`github.com` link (a result pointing at the CDN address would be
+dropped). Every redirect hop still goes through the checks that keep
+discovery away from private and local addresses, and an HTTPS link is
+never downgraded to HTTP.
+
+Code that embeds the engine can also set
+`DiscoveryConfig.allowedDomains`. That list caps every run: the sites a
+query names can only narrow it, and a query whose sites all fall outside
+it fails with an error.
 
 ## Environment variables
 

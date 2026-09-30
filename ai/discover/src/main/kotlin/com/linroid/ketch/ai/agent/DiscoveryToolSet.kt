@@ -13,9 +13,11 @@ import com.linroid.ketch.ai.fetch.ValidationResult
 import com.linroid.ketch.ai.search.SearchProvider
 import com.linroid.ketch.ai.search.SearchResult
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -27,6 +29,10 @@ import kotlin.time.Instant
  * Each `@Tool` method wraps an existing utility (search, fetch,
  * validate, etc.) and returns a JSON-encoded string the LLM can
  * reason over.
+ *
+ * While [allowlist] is restricted, searches only cover the allowed
+ * sites and `fetchPage`/`headUrl` refuse URLs on other hosts with an
+ * error JSON. Redirects those requests receive are still followed.
  */
 @LLMDescription("Resource discovery tools for finding downloadable files")
 internal class DiscoveryToolSet(
@@ -37,7 +43,7 @@ internal class DiscoveryToolSet(
   private val linkExtractor: LinkExtractor,
   private val stepListener: DiscoveryStepListener,
   private val json: Json,
-  private val allowedDomains: List<String>,
+  private val allowlist: SiteAllowlist,
 ) : ToolSet {
 
   private val log = KetchLogger("DiscoveryToolSet")
@@ -48,7 +54,8 @@ internal class DiscoveryToolSet(
 
   @Tool
   @LLMDescription(
-    "Search the web for pages matching a query. " +
+    "Search the web for pages matching a query. When the run is " +
+      "limited to allowed sites, only those sites are searched. " +
       "Returns JSON array of {url, title, snippet}.",
   )
   suspend fun searchWeb(
@@ -60,18 +67,17 @@ internal class DiscoveryToolSet(
     log.d { "searchWeb: query=\"$query\", max=$maxResults" }
     val results = searchProvider.search(
       query = query,
+      sites = allowlist.domains,
       maxResults = maxResults.coerceIn(1, 10),
     )
-    return json.encodeToString(
-      ListSerializer(SearchResult.serializer()),
-      results,
-    )
+    return encodeResults(results)
   }
 
   @Tool
   @LLMDescription(
     "Search within specific sites for pages matching a query. " +
-      "Returns JSON array of {url, title, snippet}.",
+      "When the run is limited to allowed sites, the sites must be " +
+      "among them. Returns JSON array of {url, title, snippet}.",
   )
   suspend fun searchSites(
     @LLMDescription("Comma-separated list of domains to search within")
@@ -81,41 +87,43 @@ internal class DiscoveryToolSet(
     @LLMDescription("Maximum number of results (1-10)")
     maxResults: Int = 5,
   ): String {
-    val siteList = sites.split(",").map { it.trim() }
-      .filter { it.isNotBlank() }
+    val siteList = sites.split(",").map { SiteAllowlist.normalize(it) }
+      .filter { it.isNotEmpty() }
     log.d { "searchSites: sites=$siteList, query=\"$query\"" }
+    val outside = siteList.filterNot(allowlist::allowsHost)
+    if (outside.isNotEmpty()) {
+      log.d { "searchSites refused: $outside outside allowed sites" }
+      return outsideAllowlistJson(outside.joinToString())
+    }
     val results = searchProvider.search(
       query = query,
-      sites = siteList,
+      sites = siteList.ifEmpty { allowlist.domains },
       maxResults = maxResults.coerceIn(1, 10),
     )
-    return json.encodeToString(
-      ListSerializer(SearchResult.serializer()),
-      results,
-    )
+    return encodeResults(results)
   }
 
   @Tool
   @LLMDescription(
     "Fetch a web page, extract its text content and download " +
-      "links. Returns JSON with text and links fields.",
+      "links. Returns JSON with text and links fields, plus finalUrl " +
+      "when the page redirected.",
   )
   suspend fun fetchPage(
     @LLMDescription("URL to fetch")
     url: String,
   ): String {
-    log.d { "fetchPage: $url" }
-    when (val v = urlValidator.validate(url)) {
-      is ValidationResult.Blocked ->
-        return errorJson(v.reason)
-      is ValidationResult.Valid -> { /* ok */ }
+    log.d { "fetchPage: ${redactUrl(url)}" }
+    if (!allowlist.allows(url)) {
+      log.d { "fetchPage refused: ${redactUrl(url)} outside allowed sites" }
+      return outsideAllowlistJson(url)
     }
 
     return when (val result = fetcher.fetch(url)) {
       is FetchResult.Success -> {
         val title = contentExtractor.extractTitle(result.content)
         val text = contentExtractor.extract(result.content)
-        val links = linkExtractor.extract(result.content, url)
+        val links = linkExtractor.extract(result.content, result.finalUrl)
 
         fetchedSources.add(
           DiscoverResult.Source(
@@ -129,6 +137,7 @@ internal class DiscoveryToolSet(
 
         buildJsonObject {
           put("url", url)
+          if (result.finalUrl != url) put("finalUrl", result.finalUrl)
           put("title", title)
           put("text", text.take(MAX_TEXT_LENGTH))
           put("links", buildJsonArray {
@@ -148,16 +157,24 @@ internal class DiscoveryToolSet(
   @Tool
   @LLMDescription(
     "Perform an HTTP HEAD request to get metadata " +
-      "(content-type, size, last-modified) without downloading.",
+      "(content-type, size, last-modified) without downloading. " +
+      "Follows redirects; after one, finalUrl is where the file is " +
+      "served from, but report url as the candidate.",
   )
   suspend fun headUrl(
     @LLMDescription("URL to check")
     url: String,
   ): String {
-    log.d { "headUrl: $url" }
+    log.d { "headUrl: ${redactUrl(url)}" }
+    if (!allowlist.allows(url)) {
+      log.d { "headUrl refused: ${redactUrl(url)} outside allowed sites" }
+      return outsideAllowlistJson(url)
+    }
+
     return when (val result = fetcher.head(url)) {
       is HeadResult.Success -> buildJsonObject {
-        put("url", result.finalUrl)
+        put("url", result.url)
+        if (result.finalUrl != result.url) put("finalUrl", result.finalUrl)
         put("status", result.statusCode)
         result.contentType?.let { put("contentType", it) }
         result.contentLength?.let {
@@ -198,38 +215,21 @@ internal class DiscoveryToolSet(
 
   @Tool
   @LLMDescription(
-    "Validate a URL for safety (SSRF, scheme, allowlist). " +
+    "Validate a URL for safety (SSRF, scheme, allowed sites). " +
       "Returns JSON with ok boolean and reason.",
   )
   fun validateUrl(
     @LLMDescription("URL to validate")
     url: String,
   ): String {
-    val validation = urlValidator.validate(url)
-    val ssrfOk = validation is ValidationResult.Valid
-
-    val domainOk = if (allowedDomains.isEmpty()) {
-      true
+    val reason = if (!allowlist.allows(url)) {
+      outsideAllowlistMessage(url)
     } else {
-      val host = try {
-        java.net.URI(url).host?.lowercase() ?: ""
-      } catch (_: Exception) {
-        ""
-      }
-      allowedDomains.any { d ->
-        host == d || host.endsWith(".$d")
-      }
-    }
-
-    val ok = ssrfOk && domainOk
-    val reason = when {
-      !ssrfOk -> (validation as ValidationResult.Blocked).reason
-      !domainOk -> "Domain not in allowlist"
-      else -> "OK"
+      (urlValidator.validate(url) as? ValidationResult.Blocked)?.reason
     }
     return buildJsonObject {
-      put("ok", ok)
-      put("reason", reason)
+      put("ok", reason == null)
+      put("reason", reason ?: "OK")
     }.toString()
   }
 
@@ -248,8 +248,31 @@ internal class DiscoveryToolSet(
     return "ok"
   }
 
+  /**
+   * Encodes search [results], dropping hits outside the allowed sites:
+   * providers apply `site:` filters loosely.
+   */
+  private fun encodeResults(results: List<SearchResult>): String {
+    return json.encodeToString(
+      ListSerializer(SearchResult.serializer()),
+      results.filter { allowlist.allows(it.url) },
+    )
+  }
+
   private fun errorJson(reason: String): String {
     return buildJsonObject { put("error", reason) }.toString()
+  }
+
+  private fun outsideAllowlistJson(subject: String): String {
+    return buildJsonObject {
+      put("error", outsideAllowlistMessage(subject))
+      put("allowedSites", buildJsonArray { allowlist.domains.forEach { add(it) } })
+    }.toString()
+  }
+
+  private fun outsideAllowlistMessage(subject: String): String {
+    return "Not on the allowed sites: $subject. This run may only use " +
+      "${allowlist.domains.joinToString()} (subdomains included)."
   }
 
   companion object {

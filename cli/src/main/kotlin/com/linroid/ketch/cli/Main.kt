@@ -505,6 +505,11 @@ private fun runAiDiscover(args: List<String>) {
   if (args.isEmpty()) {
     println("Usage: ketch ai-discover <query> [--sites domain1,domain2]")
     println()
+    println("  --sites <domains>    Only search, read and return links from")
+    println("                       these sites and their subdomains;")
+    println("                       redirects to download hosts are followed")
+    println("  --max-results <n>    Max results (default: 5)")
+    println()
     println("Examples:")
     println("  ketch ai-discover \"latest Ubuntu 24.04 ISO\"")
     println("  ketch ai-discover \"ffmpeg release\" --sites ffmpeg.org")
@@ -567,7 +572,7 @@ private fun runAiDiscover(args: List<String>) {
   )
   println("Discovering resources for: \"$query\"")
   if (sites.isNotEmpty()) {
-    println("Sites: ${sites.joinToString(", ")}")
+    println("Limited to: ${sites.joinToString(", ")}")
   }
   println()
 
@@ -577,7 +582,12 @@ private fun runAiDiscover(args: List<String>) {
       sites = sites,
       maxResults = maxResults,
     )
-    val response = aiModule.discoveryService.discover(discoverQuery)
+    val response = try {
+      aiModule.discoveryService.discover(discoverQuery)
+    } catch (e: IllegalArgumentException) {
+      println("Error: ${e.message}")
+      return@runBlocking
+    }
 
     if (response.candidates.isEmpty()) {
       println("No candidates found.")
@@ -768,7 +778,8 @@ private fun printUsage() {
   println()
   println("AI Discovery:")
   println("  ai-discover <query>      Discover downloadable resources")
-  println("    --sites <domains>      Comma-separated domain allowlist")
+  println("    --sites <domains>      Only use these comma-separated sites")
+  println("                           (subdomains included)")
   println("    --max-results <n>      Max results (default: 5)")
   println("                           Configure the provider in the")
   println("                           app's Settings page, or export a")

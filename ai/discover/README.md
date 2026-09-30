@@ -31,10 +31,11 @@ ai/discover/
 │   ├── AgentOutputParser.kt     # Parse + validate agent JSON output
 │   ├── DeviceSafetyFilter.kt    # URL safety scoring
 │   ├── LinkExtractor.kt         # Download link extraction from HTML
+│   ├── SiteAllowlist.kt         # Websites a run is limited to
 │   └── DiscoveryStepListener.kt # Progress callback interface
 │
 ├── fetch/                       # HTTP fetching with security
-│   ├── SafeFetcher.kt           # SSRF-protected GET + HEAD
+│   ├── SafeFetcher.kt           # SSRF-protected GET + HEAD, validates each redirect
 │   ├── UrlValidator.kt          # SSRF protection (blocks private IPs, non-HTTP)
 │   ├── ContentExtractor.kt      # HTML → text extraction
 │   └── RateLimiter.kt           # Per-domain + global rate limiting
@@ -83,12 +84,12 @@ that follows a structured 5-phase workflow:
 
 | Tool | Description | Backend |
 |------|-------------|---------|
-| `searchWeb(query, maxResults)` | Web search | `SearchProvider.search()` |
-| `searchSites(sites, query, maxResults)` | Site-restricted search | `SearchProvider.search(sites=)` |
-| `fetchPage(url)` | Fetch + extract text and links | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
-| `headUrl(url)` | HTTP HEAD for metadata | `SafeFetcher.head()` |
+| `searchWeb(query, maxResults)` | Web search, scoped to the allowed sites | `SearchProvider.search()` |
+| `searchSites(sites, query, maxResults)` | Site-restricted search; the sites must be allowed | `SearchProvider.search(sites=)` |
+| `fetchPage(url)` | Fetch + extract text and links (allowed sites only) | `SafeFetcher` + `ContentExtractor` + `LinkExtractor` |
+| `headUrl(url)` | HTTP HEAD for metadata, following redirects (allowed sites only) | `SafeFetcher.head()` |
 | `extractDownloads(pageText, baseUrl)` | Extract download links from HTML | `LinkExtractor` |
-| `validateUrl(url)` | SSRF + allowlist check | `UrlValidator` |
+| `validateUrl(url)` | SSRF + allowed-site check | `UrlValidator` + `SiteAllowlist` |
 | `emitStep(title, details)` | Report progress to the user | `DiscoveryStepListener` |
 
 ## Data Flow
@@ -99,7 +100,8 @@ DiscoverQuery (query, sites, maxResults, fileTypes)
          ▼
 ResourceDiscoveryService.discover()
          │
-         ├── Build DiscoveryToolSet (with allowedDomains)
+         ├── SiteAllowlist.forRun(allowedDomains, query.sites)
+         ├── Build DiscoveryToolSet (with the allowlist)
          ├── Create Koog AIAgent (system prompt + tools)
          ├── agent.run(userMessage)
          │       │
@@ -109,8 +111,9 @@ ResourceDiscoveryService.discover()
          │       │
          │       └── Returns JSON array of candidates
          │
-         ├── AgentOutputParser.parse(agentOutput)
+         ├── AgentOutputParser.parse(agentOutput, allowlist)
          │       ├── Extract JSON from markdown/raw text
+         │       ├── Drop candidates outside the allowed sites
          │       ├── UrlValidator.validate() each URL
          │       ├── DeviceSafetyFilter.evaluate() each URL
          │       ├── Adjust confidence by safety score
@@ -125,7 +128,26 @@ ResourceDiscoveryService.discover()
 - Blocks private/local IPs (loopback, link-local, site-local, carrier-grade NAT)
 - Blocks internal hostnames (`.local`, `.internal`, `localhost`, single-word)
 - Only allows `http` and `https` schemes
-- Applied before every fetch and HEAD request
+- Applied to every request and every redirect hop: `SafeFetcher` follows
+  redirects itself (at most 5) and refuses HTTPS to HTTP downgrades, so
+  its `HttpClient` must be built with `followRedirects = false`
+
+### Site allowlist (`SiteAllowlist`)
+- Built per run from `DiscoverQuery.sites`, narrowed to
+  `DiscoveryConfig.allowedDomains`; with neither set, any public site is
+  allowed
+- A domain covers its subdomains (`ubuntu.com` allows
+  `releases.ubuntu.com`, not `notubuntu.com`); a scheme, path, port or
+  leading `www.` in an entry is ignored
+- Enforced in the tools and the output parser: `searchWeb` passes the
+  sites to the provider and drops off-list results, `searchSites`,
+  `fetchPage` and `headUrl` refuse other hosts with
+  `{"error": ..., "allowedSites": [...]}`, and `AgentOutputParser` drops
+  candidates on other hosts
+- Redirects a listed site answers with are followed, so `github.com`
+  release assets served from `objects.githubusercontent.com` still
+  resolve. `headUrl` returns the requested `url` plus `finalUrl`, and the
+  agent is told to report the requested URL
 
 ### Device Safety (`DeviceSafetyFilter`)
 - Base score 0.7, adjusted by heuristics:
@@ -236,7 +258,7 @@ sections are engine tuning knobs.
 | | `maxTotalBytesPerRequest` | `20 MB` | Byte budget per discovery (not enforced yet) |
 | `DiscoveryConfig` | `maxConcurrentRequests` | `3` | Global concurrent cap (not enforced yet) |
 | | `userAgent` | `"KetchBot/1.0"` | User-Agent header |
-| | `allowedDomains` | `[]` | Allowlist for `validateUrl`, plus `DiscoverQuery.sites` (empty = all public) |
+| | `allowedDomains` | `[]` | Caps every run's sites; `DiscoverQuery.sites` only narrows it (empty = all public) |
 
 ## Testing
 
@@ -248,13 +270,19 @@ Tests cover:
 - `LlmClientFactoryTest` — provider/model resolution, endpoint normalization
 - `AiSettingsEnvTest` — environment credential fallbacks
 - `UrlValidatorTest` — SSRF protection (20 tests)
+- `SafeFetcherTest` — redirect following with per-hop SSRF checks (6 tests)
+- `SiteAllowlistTest` — site normalization, subdomain matching, config/query overlap (10 tests)
+- `DiscoveryToolSetTest` — allowlist enforcement in the agent tools (10 tests)
 - `RobotsTxtParserTest` — robots.txt parsing (11 tests)
 - `ContentExtractorTest` — HTML extraction (9 tests)
 - `LinkExtractorTest` — download link extraction (7 tests)
 - `DeviceSafetyFilterTest` — URL safety scoring (10 tests)
-- `AgentOutputParserTest` — agent output parsing + validation (9 tests)
+- `AgentOutputParserTest` — agent output parsing, validation + allowlist (10 tests)
 - `BingSearchProviderTest`, `GoogleSearchProviderTest` — query building; their
   `*IntegrationTest` classes parse responses from a mock engine
+
+Tests that need DNS answers resolve hosts through the `fakeDns` helper
+(`src/test/.../fetch/FakeDns.kt`) and serve HTTP from Ktor's `MockEngine`.
 
 ## Roadmap
 

@@ -63,6 +63,8 @@ class AiModule(
     ): AiModule {
       val urlValidator = UrlValidator()
       val fetcherClient = HttpClient {
+        // SafeFetcher follows redirects itself to validate every hop.
+        followRedirects = false
         install(HttpTimeout) {
           requestTimeoutMillis = config.fetcher.requestTimeoutMs
         }

@@ -6,8 +6,10 @@ import java.net.URI
 /**
  * Validates URLs against SSRF attacks by blocking requests to
  * private/local IP ranges and non-HTTP(S) schemes.
+ *
+ * @param dns resolves host names before their addresses are checked
  */
-internal class UrlValidator {
+internal class UrlValidator(private val dns: Dns = Dns.System) {
 
   /**
    * Validates the given [url] for safety.
@@ -45,7 +47,7 @@ internal class UrlValidator {
     }
 
     val addresses = try {
-      InetAddress.getAllByName(host)
+      dns.lookup(host)
     } catch (_: Exception) {
       return ValidationResult.Blocked(
         "DNS resolution failed for: $host"
@@ -94,6 +96,21 @@ internal class UrlValidator {
 
   companion object {
     private val ALLOWED_SCHEMES = setOf("http", "https")
+  }
+}
+
+/** Resolves host names; replaced in tests so they never touch the network. */
+internal fun interface Dns {
+  /**
+   * Returns the addresses of [host].
+   *
+   * @throws java.net.UnknownHostException if [host] does not resolve
+   */
+  fun lookup(host: String): List<InetAddress>
+
+  companion object {
+    /** The platform resolver. */
+    val System: Dns = Dns { host -> InetAddress.getAllByName(host).toList() }
   }
 }
 
