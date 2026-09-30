@@ -42,6 +42,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.util.concurrent.CountDownLatch
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -94,6 +95,7 @@ class KetchServer(
 ) {
   private val log = KetchLogger("KetchServer")
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+  private val stopped = CountDownLatch(1)
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
     host = host,
@@ -102,7 +104,8 @@ class KetchServer(
   )
 
   /**
-   * Starts the daemon server.
+   * Starts the daemon server. The server is listening when this returns or
+   * starts waiting; a failure to bind, such as a port in use, is thrown.
    *
    * @param wait when `true` (default), blocks the calling thread
    *   until the server is stopped. Set to `false` for non-blocking.
@@ -110,18 +113,28 @@ class KetchServer(
   fun start(wait: Boolean = true) {
     check(scope.isActive) { "Server has been stopped" }
     log.i { "Starting server on ${host}:${port}" }
-    engine.start(wait = wait)
+    engine.start(wait = false)
     startMdnsRegistration()
+    if (wait) awaitStop()
+  }
+
+  /** Blocks the calling thread until [stop] is called. */
+  fun awaitStop() {
+    stopped.await()
   }
 
   /** Stops the daemon server gracefully. */
   fun stop() {
     log.i { "Stopping server" }
     scope.cancel()
-    engine.stop(
-      gracePeriodMillis = 1000,
-      timeoutMillis = 5000,
-    )
+    try {
+      engine.stop(
+        gracePeriodMillis = 1000,
+        timeoutMillis = 5000,
+      )
+    } finally {
+      stopped.countDown()
+    }
   }
 
   private fun startMdnsRegistration() {

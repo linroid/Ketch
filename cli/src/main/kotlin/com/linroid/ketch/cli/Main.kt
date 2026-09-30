@@ -401,9 +401,11 @@ private fun runServer(args: Array<String>) {
   }
   println()
 
-  // Restore the tasks saved in the database by earlier runs
+  // Listen before restoring the tasks saved by earlier runs, so a daemon that cannot start,
+  // e.g. because another one uses the port, never resumes downloads into the same files
+  server.start(wait = false)
   runBlocking { ketch.start() }
-  server.start(wait = true)
+  server.awaitStop()
 }
 
 private fun runAiDiscover(args: List<String>) {
