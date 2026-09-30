@@ -17,6 +17,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.App
@@ -47,7 +48,6 @@ import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 import java.awt.Desktop
 import java.io.File
-import java.net.InetAddress
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.seconds
 
@@ -88,17 +88,22 @@ fun main(args: Array<String>) {
   val closeLog = Thread { runBlocking { withTimeoutOrNull(2.seconds) { fileLogger.close() } } }
   Runtime.getRuntime().addShutdownHook(closeLog)
   val logger = Logger.combine(Logger.console(logLevel), fileLogger)
+  // Ketch installs it too, but the host name below is resolved before Ketch exists.
+  KetchLogger.setLogger(logger)
   installOpenFileHandler(::open)
   open(launchFiles)
+  // Before the UI thread starts: this can run a command and, as a last resort, wait on a lookup.
+  val hostName = localHostName()
 
   application {
-    KetchWindow(configDir, incoming, focusRequests, singleInstance, logger, fileLogger)
+    KetchWindow(configDir, hostName, incoming, focusRequests, singleInstance, logger, fileLogger)
   }
 }
 
 @Composable
 private fun ApplicationScope.KetchWindow(
   configDir: String,
+  hostName: String,
   incoming: IncomingDownloads,
   focusRequests: Flow<Unit>,
   singleInstance: SingleInstance,
@@ -112,8 +117,7 @@ private fun ApplicationScope.KetchWindow(
     val config = configStore.load()
     val dbPath = configDir + File.separator + "ketch.db"
     val taskStore = createSqliteTaskStore(DriverFactory(dbPath))
-    val instanceName = config.name?.ifEmpty { null }
-      ?: InetAddress.getLocalHost().hostName.removeSuffix(".local")
+    val instanceName = config.name?.ifEmpty { null } ?: hostName
     val torrentSource = TorrentDownloadSource(
       TorrentConfig(
         stateDirectory = configDir + File.separator + "torrent-state",
