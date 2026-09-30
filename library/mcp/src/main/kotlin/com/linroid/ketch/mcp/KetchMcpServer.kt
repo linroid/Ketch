@@ -2,11 +2,19 @@ package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.mcp.server.McpServerTransportType
+import ai.koog.agents.mcp.server.configureMcpServer
 import ai.koog.agents.mcp.server.startMcpServer
-import ai.koog.agents.mcp.server.startStdioMcpServer
 import com.linroid.ketch.api.KetchApi
 import io.ktor.server.engine.ApplicationEngineFactory
+import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.io.Sink
+import kotlinx.io.Source
+import kotlinx.io.asSink
+import kotlinx.io.asSource
+import kotlinx.io.buffered
 
 /**
  * Exposes a [KetchApi] instance as an MCP (Model Context Protocol)
@@ -35,13 +43,11 @@ class KetchMcpServer(
    * Reads JSON-RPC messages from stdin and writes responses to stdout.
    * This is the standard transport for MCP clients like Claude Desktop.
    *
-   * This function suspends until the server is closed.
+   * This function suspends until the client closes stdin, as the MCP
+   * stdio transport expects the server to stop at that point.
    */
   suspend fun startStdio() {
-    val server = startStdioMcpServer(toolRegistry)
-    val done = Job()
-    server.onClose { done.complete() }
-    done.join()
+    serveStdio(toolRegistry, System.`in`.asSource().buffered(), System.out.asSink().buffered())
   }
 
   /**
@@ -67,5 +73,25 @@ class KetchMcpServer(
     val done = Job()
     server.onClose { done.complete() }
     done.join()
+  }
+}
+
+/**
+ * Serves [tools] over the MCP stdio transport on [input] and [output], suspending until
+ * [input] reaches its end.
+ */
+internal suspend fun serveStdio(tools: ToolRegistry, input: Source, output: Sink) {
+  val server = configureMcpServer(tools)
+  val transport = StdioServerTransport(input, output)
+  // Server.onClose only fires on Server.close(), so wait for the transport, which closes
+  // at the end of input. Registered before the session starts reading, so an input that
+  // is already at its end cannot close it unobserved.
+  val closed = Job()
+  transport.onClose { closed.complete() }
+  server.createSession(transport)
+  try {
+    closed.join()
+  } finally {
+    withContext(NonCancellable) { server.close() }
   }
 }
