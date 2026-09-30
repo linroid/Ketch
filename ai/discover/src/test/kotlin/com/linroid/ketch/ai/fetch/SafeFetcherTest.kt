@@ -9,12 +9,18 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.SocketTimeoutException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class SafeFetcherTest {
 
@@ -132,6 +138,28 @@ class SafeFetcherTest {
 
     val failed = assertIs<FetchResult.Failed>(result)
     assertTrue(failed.reason.startsWith("Content too large"), failed.reason)
+  }
+
+  @Test
+  fun fetch_hostRebindsToLoopbackAfterValidation_neverConnects() = runTest(timeout = 20.seconds) {
+    // Validation sees a public address; the client's lookup at connect time gets loopback.
+    val validator = UrlValidator(resolve = rebindingDns("93.184.215.14", "127.0.0.1"))
+    ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+      val url = "http://rebind.example:${server.localPort}/admin"
+
+      val client = SafeFetcher.createHttpClient(validator, requestTimeoutMs = 10_000)
+      val result = client.use {
+        val fetcher = SafeFetcher(it, validator, RateLimiter(delayMs = 0))
+        // Real sockets: keep the client's request timeout off the virtual test clock.
+        withContext(Dispatchers.IO) { fetcher.fetch(url) }
+      }
+
+      val failed = assertIs<FetchResult.Failed>(result)
+      assertTrue(failed.reason.contains("127.0.0.1"), failed.reason)
+      // A connection would be waiting in the backlog even though nothing accepted it.
+      server.soTimeout = 200
+      assertFailsWith<SocketTimeoutException> { server.accept() }
+    }
   }
 
   @Test

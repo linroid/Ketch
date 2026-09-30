@@ -36,6 +36,7 @@ ai/discover/
 ├── fetch/                       # HTTP fetching with security
 │   ├── SafeFetcher.kt           # SSRF-protected GET + HEAD, validated redirects
 │   ├── UrlValidator.kt          # SSRF protection (blocks private IPs, non-HTTP)
+│   ├── ValidatingDns.kt         # OkHttp DNS that only returns validated addresses
 │   ├── ContentExtractor.kt      # HTML → text extraction
 │   ├── RateLimiter.kt           # Per-host spacing + global concurrency cap
 │   └── FetchBudget.kt           # Per-run request and byte allowance
@@ -130,6 +131,17 @@ ResourceDiscoveryService.discover()
   Ktor client has `followRedirects = false`, and `SafeFetcher` follows
   up to 10 redirects itself, validating each target before requesting it,
   so a public URL cannot redirect to a private or loopback address
+- Applied again when connecting, against DNS rebinding. Validation
+  resolves the host and the HTTP client resolves it again to connect, so
+  a host could otherwise answer the check with a public address and the
+  connection with `127.0.0.1` or `10.x`. `SafeFetcher.createHttpClient`
+  builds the fetcher's client on Ktor's OkHttp engine, since CIO takes no
+  custom resolver, with `ValidatingDns`: it resolves through
+  `UrlValidator` and refuses the host if any address is blocked, so the
+  client only connects to addresses that passed the check. IP-literal
+  URLs skip DNS and are checked by validation alone
+- The fetcher's client never uses a proxy, including a JVM or system
+  proxy: a proxy would resolve the host itself, out of reach of the check
 
 ### Device Safety (`DeviceSafetyFilter`)
 - Base score 0.7, adjusted by heuristics:
@@ -265,7 +277,9 @@ Tests cover:
 - `LlmClientFactoryTest` — provider/model resolution, endpoint normalization
 - `AiSettingsEnvTest` — environment credential fallbacks
 - `UrlValidatorTest` — SSRF protection (20 tests)
-- `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps
+- `SafeFetcherTest` — validated redirect hops, hop limit, final URL, size caps,
+  and no connection when a host rebinds to loopback after validation
+- `ValidatingDnsTest` — connect-time lookups refuse rebound and mixed hosts
 - `RateLimiterTest` — per-host spacing and the concurrency cap
 - `FetchBudgetTest` — per-run request and byte allowance
 - `DiscoveryToolSetTest` — robots.txt, shared budget, links after redirects

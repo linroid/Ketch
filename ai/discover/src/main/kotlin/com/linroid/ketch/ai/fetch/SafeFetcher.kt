@@ -3,7 +3,9 @@ package com.linroid.ketch.ai.fetch
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRedirect
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.pluginOrNull
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareRequest
@@ -20,6 +22,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.ByteArrayOutputStream
+import java.net.Proxy
 import java.net.URI
 
 /**
@@ -31,7 +34,13 @@ import java.net.URI
  * to redirect to a private or loopback address. [httpClient] must
  * therefore be built with `followRedirects = false`.
  *
- * @param httpClient Ktor HTTP client that does not follow redirects
+ * Validation resolves the host, and so does the client when it
+ * connects. [createHttpClient] builds a client that resolves through
+ * [urlValidator] as well, so a host that passes validation with a
+ * public address cannot then be reached at a private one.
+ *
+ * @param httpClient Ktor HTTP client that does not follow redirects,
+ *   normally from [createHttpClient]
  * @param urlValidator validator for SSRF protection
  * @param rateLimiter spaces requests per host and caps concurrent ones
  * @param maxContentBytes maximum bytes to read per fetch (default 2 MB)
@@ -142,18 +151,25 @@ internal class SafeFetcher(
         log.d { "Refused ${redactUrl(current)}: $reason" }
         return fail(if (redirects == 0) reason else "Redirect refused: $reason")
       }
-      val hop = rateLimiter.withPermit(uri.host) {
-        httpClient.prepareRequest(current) {
-          this.method = method
-          header(HttpHeaders.UserAgent, userAgent)
-        }.execute { response ->
-          val location = response.headers[HttpHeaders.Location]
-          if (response.status.value in REDIRECT_CODES && location != null) {
-            Hop.Redirect(resolveLocation(current, location))
-          } else {
-            Hop.Done(handle(current, response))
+      val hop = try {
+        rateLimiter.withPermit(uri.host) {
+          httpClient.prepareRequest(current) {
+            this.method = method
+            header(HttpHeaders.UserAgent, userAgent)
+          }.execute { response ->
+            val location = response.headers[HttpHeaders.Location]
+            if (response.status.value in REDIRECT_CODES && location != null) {
+              Hop.Redirect(resolveLocation(current, location))
+            } else {
+              Hop.Done(handle(current, response))
+            }
           }
         }
+      } catch (e: BlockedHostException) {
+        // The host passed validation, then resolved to a blocked address
+        // when the client connected (DNS rebinding).
+        log.w { "Blocked ${redactUrl(current)} on connect: ${e.reason}" }
+        return fail(if (redirects == 0) e.reason else "Redirect blocked: ${e.reason}")
       }
       when (hop) {
         is Hop.Done -> return hop.value
@@ -222,6 +238,24 @@ internal class SafeFetcher(
   }
 
   companion object {
+    /**
+     * Builds the client a [SafeFetcher] needs: it does not follow
+     * redirects, resolves hosts through [ValidatingDns] so that it only
+     * connects to addresses [urlValidator] accepts, and never uses a
+     * proxy, which would resolve hosts out of reach of that check.
+     */
+    fun createHttpClient(urlValidator: UrlValidator, requestTimeoutMs: Long): HttpClient =
+      HttpClient(OkHttp) {
+        followRedirects = false
+        engine {
+          dns = ValidatingDns(urlValidator)
+          proxy = Proxy.NO_PROXY
+        }
+        install(HttpTimeout) {
+          requestTimeoutMillis = requestTimeoutMs
+        }
+      }
+
     private const val DEFAULT_MAX_CONTENT_BYTES = 2L * 1024 * 1024
     private const val DEFAULT_USER_AGENT = "KetchBot/1.0"
     private const val DEFAULT_MAX_REDIRECTS = 10

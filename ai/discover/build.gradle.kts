@@ -14,8 +14,10 @@ dependencies {
   // Gemini support; not part of the koog-agents aggregate.
   implementation(libs.koog.google.client)
 
-  // Ktor client for fetching
+  // Ktor client for fetching. SafeFetcher uses the OkHttp engine because,
+  // unlike CIO, it accepts a custom DNS resolver.
   implementation(libs.ktor.client.cio)
+  implementation(libs.ktor.client.okhttp)
   implementation(libs.ktor.client.contentNegotiation)
   implementation(libs.ktor.serialization.json)
 
