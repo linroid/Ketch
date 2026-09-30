@@ -16,6 +16,7 @@ import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.FileConfigStore
+import com.linroid.ketch.config.HomeExpandingConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.TorrentSettings
@@ -383,7 +384,7 @@ private fun runServer(args: Array<String>) {
   // or empty defaults
   val fileConfig = if (configPath != null) {
     try {
-      FileConfigStore(configPath).load()
+      HomeExpandingConfigStore(FileConfigStore(configPath)).load()
     } catch (e: Exception) {
       System.err.println("Error loading config: ${e.message}")
       return
@@ -393,7 +394,7 @@ private fun runServer(args: Array<String>) {
     if (File(defaultPath).exists()) {
       try {
         println("Loading config from $defaultPath")
-        FileConfigStore(defaultPath).load()
+        HomeExpandingConfigStore(FileConfigStore(defaultPath)).load()
       } catch (e: Exception) {
         System.err.println(
           "Error loading config from $defaultPath: ${e.message}"
@@ -635,11 +636,11 @@ private fun runMcp(args: List<String>) {
   }
 
   val fileConfig = if (configPath != null) {
-    FileConfigStore(configPath).load()
+    HomeExpandingConfigStore(FileConfigStore(configPath)).load()
   } else {
     val defaultPath = defaultConfigPath()
     if (File(defaultPath).exists()) {
-      FileConfigStore(defaultPath).load()
+      HomeExpandingConfigStore(FileConfigStore(defaultPath)).load()
     } else {
       KetchConfig()
     }

@@ -27,6 +27,7 @@ import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.config.FileConfigStore
+import com.linroid.ketch.config.HomeExpandingConfigStore
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -106,8 +107,8 @@ private fun ApplicationScope.KetchWindow(
   fileLogger: FileLogger,
 ) {
   val instanceManager = remember {
-    val configStore = FileConfigStore(
-      configDir + File.separator + "config.toml",
+    val configStore = HomeExpandingConfigStore(
+      FileConfigStore(configDir + File.separator + "config.toml"),
     )
     val config = configStore.load()
     val dbPath = configDir + File.separator + "ketch.db"

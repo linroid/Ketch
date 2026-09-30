@@ -105,9 +105,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
-  `WebConfigStore` (WasmJs, localStorage), `ServerConfig`, `RemoteConfig`, `AiSettings`,
-  `LlmSettings`, `LlmProvider`, `SearchSettings`, `SearchProvider`, `TorrentSettings`,
-  `AppearanceConfig`, `AccentColor`, `ThemeMode`
+  `HomeExpandingConfigStore` (JVM), `WebConfigStore` (WasmJs, localStorage), `ServerConfig`,
+  `RemoteConfig`, `AiSettings`, `LlmSettings`, `LlmProvider`, `SearchSettings`,
+  `SearchProvider`, `TorrentSettings`, `AppearanceConfig`, `AccentColor`, `ThemeMode`
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
@@ -257,6 +257,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `RemoteConfig`: pre-configured remote server connections
 - `FileConfigStore`: platform-specific file persistence via okio; the web app uses
   `WebConfigStore` (TOML in localStorage)
+- `HomeExpandingConfigStore`: wraps the store on the JVM (CLI `server`/`mcp`, desktop
+  app) so a leading `~` in `download.defaultDirectory` means the user's home directory
 
 ### Daemon Server (`library:server`)
 - Ktor-based REST API (`library:endpoints`): create, list, pause, resume, cancel, remove tasks;

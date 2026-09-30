@@ -232,6 +232,8 @@ never overwrites an existing file.
 ### Config file format
 
 ```toml
+# Ketch Configuration
+
 # Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
 
@@ -243,19 +245,31 @@ port = 8642
 # corsAllowedHosts = ["localhost:3000"]
 
 [download]
-# defaultDirectory = "/srv/downloads"
+# defaultDirectory = "~/Downloads"  # A leading ~ is your home directory
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
 maxConcurrentDownloads = 2
 maxConnectionsPerHost = 8
+
+# Advanced settings (defaults are usually fine):
 # retryCount = 3
 # retryDelayMs = 1000
 # progressIntervalMs = 200
 # saveIntervalMs = 5000
 # bufferSize = 8192
 
+# Extra trackers announced alongside public torrents' own trackers, e.g. when
+# a network blocks a torrent's own tracker. Private torrents ignore them. The
+# apps edit this under Settings > BitTorrent.
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
+
+# Pre-configured remote servers.
+# [[remotes]]
+# host = "192.168.1.100"
+# port = 8642
+# apiToken = "token"
+# secure = false
 ```
 
 ### Config reference
@@ -278,7 +292,7 @@ maxConnectionsPerHost = 8
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `defaultDirectory` | string | `~/Downloads` | Default save directory; `~` is not expanded, so use a full path |
+| `defaultDirectory` | string | `~/Downloads` | Default save directory; a leading `~` is your home directory |
 | `speedLimit` | string | `"unlimited"` | Global speed limit (`"500k"`, `"10m"`, or bytes) |
 | `maxConnectionsPerDownload` | int | `4` | Connections (segments) per HTTP or FTP download |
 | `maxConcurrentDownloads` | int | `2` | Max simultaneous downloads (`0` = unlimited) |

@@ -5,8 +5,7 @@ import java.io.File
 /** Default TOML config template for new installations. */
 const val DEFAULT_CONFIG_CONTENT = """# Ketch Configuration
 
-# Display name for this instance (optional).
-# Defaults to device name or hostname.
+# Instance name shown to clients and announced over mDNS
 # name = "My Ketch"
 
 [server]
@@ -14,10 +13,10 @@ host = "0.0.0.0"
 port = 8642
 # apiToken = "my-secret"
 # mdnsEnabled = true
-# corsAllowedHosts = ["http://localhost:3000"]
+# corsAllowedHosts = ["localhost:3000"]
 
 [download]
-# defaultDirectory = "~/Downloads"
+# defaultDirectory = "~/Downloads"  # A leading ~ is your home directory
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
 maxConcurrentDownloads = 2
