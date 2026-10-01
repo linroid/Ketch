@@ -10,6 +10,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.app.util.TaskOrigin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -122,13 +123,10 @@ internal fun AiCandidate.toRequest(query: String): DownloadRequest = DownloadReq
   destination = fileName?.takeIf { it.isNotBlank() }?.let(::Destination),
   headers = if (sourceUrl.isNotBlank()) mapOf("Referer" to sourceUrl) else emptyMap(),
   properties = buildMap {
-    put(ORIGIN_PROPERTY, "discover")
+    put(TaskOrigin.PROPERTY, TaskOrigin.Discover.id)
     if (query.isNotBlank()) put(QUERY_PROPERTY, query)
   },
 )
-
-/** Request property naming the surface a download was added from. */
-internal const val ORIGIN_PROPERTY = "ketch.origin"
 
 /** Request property holding the Discover query that found a download. */
 internal const val QUERY_PROPERTY = "ketch.query"

@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.AppMessage
@@ -225,6 +226,29 @@ class AppStateCommandsTest {
     assertEquals(listOf("pause", "resume"), running.calls)
     assertEquals(listOf("pause", "resume"), queued.calls)
     assertTrue(alreadyPaused.calls.isEmpty())
+    controller.close()
+  }
+
+  @Test
+  fun retryFailed_errorWithNothingToResume_downloadsAgain() = runTest {
+    val api = RecordingKetchApi()
+    val controller = controller(api)
+    val dropped = api.add(DownloadState.Failed(KetchError.Network()))
+    val changed = api.add(DownloadState.Failed(KetchError.FileChanged("ETag changed")))
+    val refused = api.add(DownloadState.Failed(KetchError.Http(416)))
+    val unsupported = api.add(DownloadState.Failed(KetchError.Unsupported()))
+
+    controller.state.retryFailed()
+    runCurrent()
+
+    assertEquals(listOf("resume"), dropped.calls)
+    listOf(changed, refused, unsupported).forEach {
+      assertEquals(listOf("remove deleteFiles=true"), it.calls)
+    }
+    assertEquals(
+      listOf(changed, refused, unsupported).map { it.request.url },
+      api.requests.map { it.url },
+    )
     controller.close()
   }
 

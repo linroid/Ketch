@@ -17,6 +17,7 @@ import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageAction
@@ -31,8 +32,10 @@ import com.linroid.ketch.app.instance.LanServerDiscovery
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.DroppedFile
+import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.remote.ConnectionState
@@ -771,7 +774,7 @@ class AppState(
   fun remove(tasks: List<DownloadTask>, deleteFiles: Boolean = false) {
     if (tasks.isEmpty()) return
     deferRemoval(tasks, deleteFiles, label = "Remove") { count ->
-      if (count == 1) "Removed ${tasks.single().requestState.value.label()}"
+      if (count == 1) "Removed ${tasks.single().displayName()}"
       else "Removed ${downloads(count)}"
     }
   }
@@ -793,7 +796,7 @@ class AppState(
       undo = { reportFailures("resume", runEach(paused) { it.resume() }) },
     )
     val title = if (tasks.size == 1) {
-      "Discarded progress of ${tasks.single().requestState.value.label()}"
+      "Discarded progress of ${tasks.single().displayName()}"
     } else {
       "Discarded progress of ${downloads(tasks.size)}"
     }
@@ -808,7 +811,7 @@ class AppState(
     val entry = deviceOf(task) ?: return@launch
     val key = TaskKey(entry.deviceId, task.taskId)
     trackPending(key, "download again") {
-      val name = task.requestState.value.label()
+      val name = task.displayName()
       catchingUnlessCancelled { restart(entry, task) }
         .onSuccess {
           messages.post(MessageLevel.Success, "Restarted $name", deviceId = entry.deviceId)
@@ -833,7 +836,7 @@ class AppState(
     val entry = deviceOf(task)
     val before = task.state.value
     val previousPriority = task.requestState.value.priority
-    val name = task.requestState.value.label()
+    val name = task.displayName()
     val running = entry?.let { visibleTasks(it) }.orEmpty()
       .filter { it !== task && it.state.value is DownloadState.Downloading }
     return runTaskCommand(task, "start $name now") {
@@ -849,7 +852,7 @@ class AppState(
       val title = buildString {
         append("Started $name now")
         if (preempted.isNotEmpty()) {
-          val names = preempted.joinToString(", ") { it.requestState.value.label() }
+          val names = preempted.joinToString(", ") { it.displayName() }
           append(" · paused $names to make room")
         }
       }
@@ -885,7 +888,7 @@ class AppState(
         val (task, e) = failures.first()
         postError(
           title = if (failures.size == 1) {
-            "Couldn't send ${task.requestState.value.label()} to $targetName"
+            "Couldn't send ${task.displayName()} to $targetName"
           } else {
             "Couldn't send ${downloads(failures.size)} to $targetName"
           },
@@ -895,7 +898,7 @@ class AppState(
         )
         return@launch
       }
-      val what = if (sent.size == 1) sent.single().first.requestState.value.label()
+      val what = if (sent.size == 1) sent.single().first.displayName()
       else downloads(sent.size)
       val failedNote = if (failures.isEmpty()) "" else " · ${failures.size} failed"
       if (move) {
@@ -972,7 +975,7 @@ class AppState(
     when (event) {
       is ActivityEvent.Added -> messages.post(
         level = MessageLevel.Info,
-        title = onDevice(event.taskKey.deviceId, "Added ${event.request.label()}"),
+        title = onDevice(event.taskKey.deviceId, "Added ${displayName(event.request)}"),
         taskKey = event.taskKey,
         deviceId = event.taskKey.deviceId,
         toast = ToastMode.Silent,
@@ -980,7 +983,7 @@ class AppState(
       is ActivityEvent.Completed -> messages.post(
         level = MessageLevel.Success,
         title = onDevice(event.taskKey.deviceId, "Download complete"),
-        detail = (listOf(event.request.label()) + transferSummary(event.state))
+        detail = (listOf(displayName(event.request, event.state)) + transferSummary(event.state))
           .joinToString(" · "),
         taskKey = event.taskKey,
         deviceId = event.taskKey.deviceId,
@@ -998,7 +1001,7 @@ class AppState(
       is ActivityEvent.Failed -> messages.post(
         level = MessageLevel.Error,
         title = onDevice(event.taskKey.deviceId, "Download failed"),
-        detail = "${event.request.label()}: ${event.state.error.message}",
+        detail = "${displayName(event.request, event.state)}: ${event.state.error.message}",
         taskKey = event.taskKey,
         deviceId = event.taskKey.deviceId,
         actions = listOf(MessageAction("Retry") { retry(event.taskKey) }),
@@ -1132,7 +1135,7 @@ class AppState(
   private fun retry(key: TaskKey) {
     val entry = instances.value.firstOrNull { it.deviceId == key.deviceId } ?: return
     val task = entry.instance.tasks.value.firstOrNull { it.taskId == key.taskId } ?: return
-    runTaskCommand(task, "retry ${task.requestState.value.label()}") { resume() }
+    runTaskCommand(task, "retry ${task.displayName()}") { resume() }
   }
 
   /** Adds each of [requests] to [entry] on its own and reports the outcome. */
@@ -1152,12 +1155,12 @@ class AppState(
       result.exceptionOrNull()?.let { request to it }
     }
     failed.forEach { (request, e) ->
-      log.w { "Couldn't add ${request.label()}: ${e.describeCauses()}" }
+      log.w { "Couldn't add ${redactUrl(request.url)}: ${e.describeCauses()}" }
     }
     reportAdded(
       entry = entry,
       added = added,
-      failures = failed.map { (request, e) -> request.label() to e },
+      failures = failed.map { (request, e) -> displayName(request) to e },
       offerOptions = offerOptions,
       retry = { scope.launch { addRequests(entry, failed.map { it.first }, offerOptions) } },
     )
@@ -1186,7 +1189,7 @@ class AppState(
     })
     val single = added.singleOrNull()?.takeIf { failures.isEmpty() }
     val title = if (single != null) {
-      "Added ${single.requestState.value.label()} → $deviceName"
+      "Added ${single.displayName()} → $deviceName"
     } else {
       "Added ${downloads(added.size)} → $deviceName" +
         if (failures.isEmpty()) "" else " · ${failures.size} failed"
@@ -1246,7 +1249,7 @@ class AppState(
     }
     val (task, e) = failures.first()
     val device = deviceOf(task)
-    val what = if (failures.size == 1) task.requestState.value.label()
+    val what = if (failures.size == 1) task.displayName()
     else downloads(failures.size)
     postError(
       title = "Couldn't $command $what on ${nameOf(device)}",
@@ -1356,10 +1359,8 @@ internal suspend fun <R> catchingUnlessCancelled(block: suspend () -> R): Result
     Result.failure(e)
   }
 
-/** Whether a failure leaves progress that cannot be reused, so a retry has to start over. */
-private fun KetchError.needsFreshStart(): Boolean =
-  this is KetchError.FileChanged || this is KetchError.CorruptResumeState ||
-    (this is KetchError.Http && code == 416)
+/** Whether a failure leaves nothing to resume, so a retry has to start over. */
+private fun KetchError.needsFreshStart(): Boolean = toCopy().primary == RowAction.DownloadAgain
 
 private fun downloads(count: Int): String = if (count == 1) "1 download" else "$count downloads"
 
@@ -1374,17 +1375,8 @@ private fun scheduledNote(schedules: List<DownloadSchedule>): String? {
   return "${schedules.size} scheduled still start at $hh:$mm"
 }
 
-/** A short name for messages: the file name of the destination or the URL. */
-private fun DownloadRequest.label(): String {
-  val fromDestination = destination?.takeUnless { it.isDirectory() }?.value
-    ?.let { extractFilename(it.replace('\\', '/')) }
-  if (!fromDestination.isNullOrBlank()) return fromDestination
-  if (url.startsWith("magnet:", ignoreCase = true)) {
-    val name = url.substringAfter("dn=", "").substringBefore('&').replace('+', ' ')
-    return name.ifBlank { "magnet link" }
-  }
-  return extractFilename(url).ifBlank { url }
-}
+/** Name of this task for messages, from its current request and state. */
+private fun DownloadTask.displayName(): String = displayName(requestState.value, state.value)
 
 /**
  * This request as another device should run it: a folder or file path of this device is

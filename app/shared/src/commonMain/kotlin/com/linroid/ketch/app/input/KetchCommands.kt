@@ -57,7 +57,7 @@ object KetchCommands {
   val Palette: KetchCommand = command(
     id = "palette",
     label = "Command palette",
-    icon = KetchIcon.Search,
+    icon = KetchIcon.Command,
     mac = KeyChord(Key.K, primary = true),
     web = listOf(KeyChord(Key.K, primary = true), KeyChord(Key.K)),
     inMenus = true,
@@ -89,7 +89,7 @@ object KetchCommands {
   val Discover: KetchCommand = command(
     id = "discover",
     label = "Discover",
-    icon = KetchIcon.Ai,
+    icon = KetchIcon.Discover,
     mac = KeyChord(Key.E, primary = true),
     inMenus = true,
   )
@@ -98,7 +98,7 @@ object KetchCommands {
   val Devices: KetchCommand = command(
     id = "devices",
     label = "Devices",
-    icon = KetchIcon.Local,
+    icon = KetchIcon.Devices,
     mac = KeyChord(Key.Zero, primary = true),
     inMenus = true,
   )
@@ -119,7 +119,7 @@ object KetchCommands {
   val AllDevices: KetchCommand = command(
     id = "device.all",
     label = "All devices",
-    icon = KetchIcon.Remote,
+    icon = KetchIcon.Fleet,
     mac = KeyChord(Key.Zero, primary = true, alt = true),
     pc = KeyChord(Key.Zero, alt = true),
     web = listOf(KeyChord(Key.Zero, alt = true, shift = true)),
@@ -130,7 +130,7 @@ object KetchCommands {
   val SwitchDevice: KetchCommand = command(
     id = "device.switcher",
     label = "Switch device…",
-    icon = KetchIcon.Local,
+    icon = KetchIcon.Devices,
     mac = KeyChord(Key.D, primary = true, shift = true),
   )
 
@@ -167,7 +167,7 @@ object KetchCommands {
   val SlowLane: KetchCommand = command(
     id = "slowLane",
     label = "Slow lane",
-    icon = KetchIcon.Speed,
+    icon = KetchIcon.SlowLane,
     mac = KeyChord(Key.L, primary = true, shift = true),
     web = listOf(KeyChord(Key.L, shift = true)),
     inMenus = true,
@@ -177,7 +177,7 @@ object KetchCommands {
   val ToggleInspector: KetchCommand = command(
     id = "inspector.toggle",
     label = "Toggle inspector",
-    icon = KetchIcon.Info,
+    icon = KetchIcon.Inspector,
     mac = KeyChord(Key.I, primary = true),
     web = listOf(KeyChord(Key.I)),
     inMenus = true,
@@ -187,7 +187,7 @@ object KetchCommands {
   val ToggleSidebar: KetchCommand = command(
     id = "sidebar.toggle",
     label = "Toggle sidebar",
-    icon = null,
+    icon = KetchIcon.Sidebar,
     mac = KeyChord(Key.S, primary = true, ctrl = true),
     pc = KeyChord(Key.S, primary = true, shift = true),
     inMenus = true,
@@ -197,7 +197,7 @@ object KetchCommands {
   val Activity: KetchCommand = command(
     id = "activity",
     label = "Activity",
-    icon = null,
+    icon = KetchIcon.Bell,
     mac = KeyChord(Key.J, primary = true),
     inMenus = true,
   )
@@ -206,7 +206,7 @@ object KetchCommands {
   val Undo: KetchCommand = command(
     id = "undo",
     label = "Undo",
-    icon = null,
+    icon = KetchIcon.Undo,
     mac = KeyChord(Key.Z, primary = true),
     inMenus = true,
     yieldsToTextField = true,
@@ -225,7 +225,7 @@ object KetchCommands {
   val Shortcuts: KetchCommand = command(
     id = "shortcuts",
     label = "Keyboard shortcuts",
-    icon = null,
+    icon = KetchIcon.Command,
     mac = KeyChord(Key.Slash, primary = true),
     web = listOf(KeyChord(Key.Slash, shift = true)),
     inMenus = true,
@@ -367,7 +367,7 @@ object KetchCommands {
   val Open: KetchCommand = command(
     id = "list.open",
     label = "Open",
-    icon = null,
+    icon = KetchIcon.Open,
     scope = CommandScope.List,
     mac = KeyChord(Key.Enter),
     inMenus = true,
@@ -377,7 +377,7 @@ object KetchCommands {
   val Reveal: KetchCommand = command(
     id = "list.reveal",
     label = "Show in folder",
-    icon = KetchIcon.Folder,
+    icon = KetchIcon.Reveal,
     scope = CommandScope.List,
     mac = KeyChord(Key.Enter, primary = true),
     inMenus = true,
@@ -408,7 +408,7 @@ object KetchCommands {
   val CopyLink: KetchCommand = command(
     id = "list.copyLink",
     label = "Copy link",
-    icon = KetchIcon.Link,
+    icon = KetchIcon.Copy,
     scope = CommandScope.List,
     mac = KeyChord(Key.C, primary = true),
     inMenus = true,
@@ -418,7 +418,7 @@ object KetchCommands {
   val CopyPath: KetchCommand = command(
     id = "list.copyPath",
     label = "Copy file path",
-    icon = KetchIcon.FileGeneric,
+    icon = KetchIcon.Copy,
     scope = CommandScope.List,
     mac = KeyChord(Key.C, primary = true, alt = true),
   )
@@ -456,7 +456,7 @@ object KetchCommands {
   val RaisePriority: KetchCommand = command(
     id = "list.priorityUp",
     label = "Raise priority",
-    icon = null,
+    icon = KetchIcon.ChevronUp,
     scope = CommandScope.List,
     mac = KeyChord(Key.DirectionUp, primary = true, alt = true),
   )
@@ -465,7 +465,7 @@ object KetchCommands {
   val LowerPriority: KetchCommand = command(
     id = "list.priorityDown",
     label = "Lower priority",
-    icon = null,
+    icon = KetchIcon.ChevronDown,
     scope = CommandScope.List,
     mac = KeyChord(Key.DirectionDown, primary = true, alt = true),
   )
@@ -510,7 +510,7 @@ object KetchCommands {
   val IntakeDiscover: KetchCommand = command(
     id = "intake.discover",
     label = "Discover",
-    icon = KetchIcon.Ai,
+    icon = KetchIcon.Discover,
     scope = CommandScope.Intake,
     mac = KeyChord(Key.Enter, alt = true),
   )
@@ -585,7 +585,7 @@ object KetchCommands {
   val PaletteDiscover: KetchCommand = command(
     id = "palette.discover",
     label = "Discover",
-    icon = KetchIcon.Ai,
+    icon = KetchIcon.Discover,
     scope = CommandScope.Palette,
     mac = KeyChord(Key.Enter, alt = true),
   )

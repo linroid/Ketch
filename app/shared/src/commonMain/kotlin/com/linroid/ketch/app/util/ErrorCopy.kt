@@ -260,7 +260,7 @@ private fun browserName(request: DownloadRequest): String? {
       else -> null
     }
   }
-  val fromBrowser = request.properties[ORIGIN_PROPERTY] == "browser"
+  val fromBrowser = TaskOrigin.of(request) == TaskOrigin.Browser
   return named ?: if (fromBrowser) "your browser" else null
 }
 
@@ -291,5 +291,3 @@ private fun Throwable.causeChain(): List<Throwable> {
   }
   return chain
 }
-
-private const val ORIGIN_PROPERTY = "ketch.origin"

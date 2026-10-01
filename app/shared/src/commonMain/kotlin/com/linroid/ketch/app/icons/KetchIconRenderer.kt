@@ -24,7 +24,7 @@ fun KetchIconImage(
   icon: KetchIcon,
   modifier: Modifier = Modifier,
   size: Dp = 20.dp,
-  tint: Color = KetchTheme.colors.onBackground,
+  tint: Color = KetchTheme.colors.textPrimary,
 ) {
   val colorFilter = remember(tint) { ColorFilter.tint(tint) }
   Image(
