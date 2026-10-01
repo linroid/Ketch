@@ -1,8 +1,13 @@
 package com.linroid.ketch.app
 
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import com.linroid.ketch.api.log.KetchLogger
@@ -15,10 +20,13 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
+import com.linroid.ketch.app.theme.rememberKetchFontsLoaded
 import kotlinx.browser.document
 import kotlinx.browser.window
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
@@ -60,9 +68,24 @@ fun main() {
       }
       onDispose { instanceManager.close() }
     }
-    App(instanceManager, incoming = incoming)
+    // The splash in index.html stays until the fonts are cached, so text never flashes in a
+    // fallback font. A font that fails to load must not keep the app hidden.
+    var fontWaitOver by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+      delay(FONT_WAIT_LIMIT)
+      fontWaitOver = true
+    }
+    if (rememberKetchFontsLoaded() || fontWaitOver) {
+      LaunchedEffect(Unit) {
+        withFrameNanos {}
+        document.getElementById("splash")?.remove()
+      }
+      App(instanceManager, incoming = incoming)
+    }
   }
 }
+
+private val FONT_WAIT_LIMIT = 5.seconds
 
 /**
  * Receives `.torrent` files opened with the installed web app, via the manifest's

@@ -4,85 +4,153 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 
+/**
+ * Text styles. Inter for text, Inter Display for titles and large numerals, JetBrains Mono for
+ * URLs, paths and hashes, never for speeds or sizes. Every `numeral*` style uses tabular
+ * figures, so digits do not jitter as progress ticks.
+ *
+ * @property pageTitle desktop page header.
+ * @property largeTitle phone large title, onboarding and empty-state titles.
+ * @property titleL dialogs, the intake sheet and the Devices page title.
+ * @property titleM inspector file name, device-card name and setting group titles.
+ * @property bodyStrong list-row name.
+ * @property body body text.
+ * @property bodyS secondary body text and inspector values.
+ * @property cell table cells.
+ * @property cellStrong the table's Name column.
+ * @property caption row meta, hints and reasons.
+ * @property label buttons, sidebar items and tabs.
+ * @property labelS chips, pills and menu shortcut hints.
+ * @property eyebrow group headers, the table header and card labels; uppercase the text with
+ *   [eyebrowText].
+ * @property numeralXL device-card speed and the phone Pulse sheet.
+ * @property numeralL inspector speed.
+ * @property numeral row speed, size, ETA and percentage, and the Pulse bar speed.
+ * @property numeralS tab counts, sidebar live lines and the rail readout.
+ * @property mono URLs, paths, hashes, task IDs and cURL.
+ * @property monoS lane index and hash snippets.
+ */
 @Immutable
 data class KetchTypography(
-  // Display / section headers
-  val displayLarge: TextStyle,
-  val displayMedium: TextStyle,
-  val displaySmall: TextStyle,
+  val pageTitle: TextStyle,
+  val largeTitle: TextStyle,
+  val titleL: TextStyle,
+  val titleM: TextStyle,
+  val bodyStrong: TextStyle,
+  val body: TextStyle,
+  val bodyS: TextStyle,
+  val cell: TextStyle,
+  val cellStrong: TextStyle,
+  val caption: TextStyle,
+  val label: TextStyle,
+  val labelS: TextStyle,
+  val eyebrow: TextStyle,
+  val numeralXL: TextStyle,
+  val numeralL: TextStyle,
+  val numeral: TextStyle,
+  val numeralS: TextStyle,
+  val mono: TextStyle,
+  val monoS: TextStyle,
+) {
+  @Deprecated("Use largeTitle.", ReplaceWith("largeTitle"))
+  val displayLarge: TextStyle get() = largeTitle
 
-  // Body
-  val bodyLarge: TextStyle,
-  val bodyMedium: TextStyle,
-  val bodySmall: TextStyle,
+  @Deprecated("Use pageTitle.", ReplaceWith("pageTitle"))
+  val displayMedium: TextStyle get() = pageTitle
 
-  // Labels
-  val labelLarge: TextStyle,
-  val labelMedium: TextStyle,
-  val labelSmall: TextStyle,
+  @Deprecated("Use titleL.", ReplaceWith("titleL"))
+  val displaySmall: TextStyle get() = titleL
 
-  // Monospace — for sizes / speeds / URLs
-  val monoMedium: TextStyle,
-  val monoSmall: TextStyle,
-  val monoXSmall: TextStyle,
-)
+  @Deprecated("Use body.", ReplaceWith("body"))
+  val bodyLarge: TextStyle get() = body
 
-// Platform-safe defaults. Wire in bundled Inter + JetBrains Mono resources later.
-val KetchSans: FontFamily = FontFamily.SansSerif
-val KetchMono: FontFamily = FontFamily.Monospace
+  @Deprecated("Use bodyS.", ReplaceWith("bodyS"))
+  val bodyMedium: TextStyle get() = bodyS
 
+  @Deprecated("Use caption.", ReplaceWith("caption"))
+  val bodySmall: TextStyle get() = caption
+
+  @Deprecated("Use label.", ReplaceWith("label"))
+  val labelLarge: TextStyle get() = label
+
+  @Deprecated("Use labelS.", ReplaceWith("labelS"))
+  val labelMedium: TextStyle get() = labelS
+
+  @Deprecated("Use eyebrow.", ReplaceWith("eyebrow"))
+  val labelSmall: TextStyle get() = eyebrow
+
+  @Deprecated("Use numeral; speeds and sizes are never monospace.", ReplaceWith("numeral"))
+  val monoMedium: TextStyle get() = numeral
+
+  @Deprecated("Use mono.", ReplaceWith("mono"))
+  val monoSmall: TextStyle get() = mono
+
+  @Deprecated("Use monoS.", ReplaceWith("monoS"))
+  val monoXSmall: TextStyle get() = monoS
+}
+
+/**
+ * [text] as an eyebrow label shows it, in uppercase. Text styles cannot change case, so
+ * labels set in [KetchTypography.eyebrow] go through this instead of uppercasing by hand.
+ */
+fun eyebrowText(text: String): String = text.uppercase()
+
+/**
+ * Builds the text styles from [sans] (Inter), [display] (Inter Display) and [mono]. At
+ * [KetchDensity.Comfortable] row names and captions are a step larger.
+ */
 fun ketchTypography(
-  sans: FontFamily = KetchSans,
-  mono: FontFamily = KetchMono,
-): KetchTypography = KetchTypography(
-  displayLarge = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.SemiBold,
-    fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.3).sp,
-  ),
-  displayMedium = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.SemiBold,
-    fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.25).sp,
-  ),
-  displaySmall = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.SemiBold,
-    fontSize = 20.sp, lineHeight = 26.sp, letterSpacing = (-0.2).sp,
-  ),
-  bodyLarge = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.Normal,
-    fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = (-0.1).sp,
-  ),
-  bodyMedium = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.Normal,
-    fontSize = 13.sp, lineHeight = 18.sp, letterSpacing = 0.sp,
-  ),
-  bodySmall = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.Normal,
-    fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.sp,
-  ),
-  labelLarge = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.Medium,
-    fontSize = 13.sp, lineHeight = 16.sp, letterSpacing = 0.sp,
-  ),
-  labelMedium = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.Medium,
-    fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.sp,
-  ),
-  labelSmall = TextStyle(
-    fontFamily = sans, fontWeight = FontWeight.Medium,
-    fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.6.sp,
-  ),
-  monoMedium = TextStyle(
-    fontFamily = mono, fontWeight = FontWeight.Medium,
-    fontSize = 13.sp, lineHeight = 18.sp, letterSpacing = (-0.2).sp,
-  ),
-  monoSmall = TextStyle(
-    fontFamily = mono, fontWeight = FontWeight.Normal,
-    fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.sp,
-  ),
-  monoXSmall = TextStyle(
-    fontFamily = mono, fontWeight = FontWeight.Medium,
-    fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.3.sp,
-  ),
-)
+  sans: FontFamily = FontFamily.SansSerif,
+  display: FontFamily = sans,
+  mono: FontFamily = FontFamily.Monospace,
+  density: KetchDensity = KetchDensity.Compact,
+): KetchTypography {
+  val comfortable = density == KetchDensity.Comfortable
+  fun style(
+    family: FontFamily,
+    weight: FontWeight,
+    size: Int,
+    lineHeight: Int,
+    tracking: TextUnit = 0.sp,
+    tabular: Boolean = false,
+  ) = TextStyle(
+    fontFamily = family,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = lineHeight.sp,
+    letterSpacing = tracking,
+    fontFeatureSettings = if (tabular) "tnum" else null,
+  )
+  return KetchTypography(
+    pageTitle = style(display, FontWeight.SemiBold, 22, 28, (-0.3).sp),
+    largeTitle = style(display, FontWeight.Bold, 28, 34, (-0.5).sp),
+    titleL = style(sans, FontWeight.SemiBold, 20, 26, (-0.3).sp),
+    titleM = style(sans, FontWeight.SemiBold, 15, 20, (-0.1).sp),
+    bodyStrong = if (comfortable) {
+      style(sans, FontWeight.Medium, 15, 20)
+    } else {
+      style(sans, FontWeight.Medium, 14, 20)
+    },
+    body = style(sans, FontWeight.Normal, 14, 20),
+    bodyS = style(sans, FontWeight.Normal, 13, 18),
+    cell = style(sans, FontWeight.Normal, 13, 18),
+    cellStrong = style(sans, FontWeight.Medium, 13, 18),
+    caption = if (comfortable) {
+      style(sans, FontWeight.Normal, 13, 18)
+    } else {
+      style(sans, FontWeight.Normal, 12, 16)
+    },
+    label = style(sans, FontWeight.Medium, 13, 16),
+    labelS = style(sans, FontWeight.Medium, 12, 16),
+    eyebrow = style(sans, FontWeight.SemiBold, 11, 14, 0.8.sp),
+    numeralXL = style(display, FontWeight.SemiBold, 40, 44, (-1).sp, tabular = true),
+    numeralL = style(display, FontWeight.SemiBold, 20, 24, (-0.3).sp, tabular = true),
+    numeral = style(sans, FontWeight.Medium, 13, 18, tabular = true),
+    numeralS = style(sans, FontWeight.Medium, 11, 14, tabular = true),
+    mono = style(mono, FontWeight.Normal, 12, 18),
+    monoS = style(mono, FontWeight.Normal, 11, 16),
+  )
+}

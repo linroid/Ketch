@@ -2,9 +2,30 @@ package com.linroid.ketch.app.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
+/** Elevation levels; [Modifier.ketchSurface] draws their shadows. */
+enum class KetchElevationLevel {
+  /** Flat: rows, the table and the sidebar. */
+  E0,
+
+  /** The content card and the docked inspector. */
+  E1,
+
+  /** Device cards, hovered pills, the selection bar and the Pulse popover. */
+  E2,
+
+  /** Menus, toasts, tooltips, popovers and the overlay inspector. */
+  E3,
+
+  /** Dialogs, the intake sheet and the command palette. */
+  E4,
+}
+
+/** One drop shadow, as a design tool describes it (x/y offset, blur, spread). */
 @Immutable
 data class ShadowLayer(
   val offsetX: Dp,
@@ -12,64 +33,82 @@ data class ShadowLayer(
   val blur: Dp,
   val spread: Dp,
   val color: Color,
-)
-
-@Immutable
-data class KetchElevation(
-  val level0: List<ShadowLayer> = emptyList(),
-  val level1: List<ShadowLayer>,
-  val level2: List<ShadowLayer>,
-  val level3: List<ShadowLayer>,
-  val level4: List<ShadowLayer>,
-  val level5: List<ShadowLayer>,
 ) {
-  val button: List<ShadowLayer> get() = level1
-  val card: List<ShadowLayer> get() = level2
-  val popover: List<ShadowLayer> get() = level3
-  val dialog: List<ShadowLayer> get() = level4
-  val window: List<ShadowLayer> get() = level5
+  /** This layer as a Compose [Shadow] for `Modifier.dropShadow`. */
+  fun toShadow(): Shadow = Shadow(
+    radius = blur,
+    color = color,
+    spread = spread,
+    offset = DpOffset(offsetX, offsetY),
+  )
 }
 
-fun lightKetchElevation(): KetchElevation = KetchElevation(
-  level1 = listOf(
-    ShadowLayer(0.dp, 1.dp, 2.dp, 0.dp, Color(0x14000000)),
-    ShadowLayer(0.dp, 0.dp, 0.dp, (-0.5).dp, Color(0x14000000)),
-  ),
-  level2 = listOf(
-    ShadowLayer(0.dp, 2.dp, 4.dp, 0.dp, Color(0x0F000000)),
-    ShadowLayer(0.dp, 4.dp, 12.dp, 0.dp, Color(0x0A000000)),
-  ),
-  level3 = listOf(
-    ShadowLayer(0.dp, 4.dp, 8.dp, 0.dp, Color(0x14000000)),
-    ShadowLayer(0.dp, 8.dp, 24.dp, 0.dp, Color(0x0F000000)),
-  ),
-  level4 = listOf(
-    ShadowLayer(0.dp, 12.dp, 16.dp, 0.dp, Color(0x1F000000)),
-    ShadowLayer(0.dp, 24.dp, 48.dp, 0.dp, Color(0x14000000)),
-  ),
-  level5 = listOf(
-    ShadowLayer(0.dp, 1.dp, 2.dp, 0.dp, Color(0x0A000000)),
-    ShadowLayer(0.dp, 20.dp, 50.dp, 0.dp, Color(0x24000000)),
-  ),
-)
+/**
+ * Shadow layers of each [KetchElevationLevel], drawn in order.
+ *
+ * @property isDark whether raised surfaces also get the dark theme's top highlight.
+ */
+@Immutable
+data class KetchElevation(
+  val e0: List<ShadowLayer>,
+  val e1: List<ShadowLayer>,
+  val e2: List<ShadowLayer>,
+  val e3: List<ShadowLayer>,
+  val e4: List<ShadowLayer>,
+  val isDark: Boolean,
+) {
+  /** Shadow layers of [level]. */
+  fun layers(level: KetchElevationLevel): List<ShadowLayer> = when (level) {
+    KetchElevationLevel.E0 -> e0
+    KetchElevationLevel.E1 -> e1
+    KetchElevationLevel.E2 -> e2
+    KetchElevationLevel.E3 -> e3
+    KetchElevationLevel.E4 -> e4
+  }
 
-fun darkKetchElevation(): KetchElevation = KetchElevation(
-  level1 = listOf(
-    ShadowLayer(0.dp, 1.dp, 2.dp, 0.dp, Color(0x40000000)),
-  ),
-  level2 = listOf(
-    ShadowLayer(0.dp, 2.dp, 4.dp, 0.dp, Color(0x33000000)),
-    ShadowLayer(0.dp, 4.dp, 12.dp, 0.dp, Color(0x26000000)),
-  ),
-  level3 = listOf(
-    ShadowLayer(0.dp, 4.dp, 8.dp, 0.dp, Color(0x40000000)),
-    ShadowLayer(0.dp, 8.dp, 24.dp, 0.dp, Color(0x33000000)),
-  ),
-  level4 = listOf(
-    ShadowLayer(0.dp, 12.dp, 16.dp, 0.dp, Color(0x59000000)),
-    ShadowLayer(0.dp, 24.dp, 48.dp, 0.dp, Color(0x40000000)),
-  ),
-  level5 = listOf(
-    ShadowLayer(0.dp, 20.dp, 50.dp, 0.dp, Color(0x66000000)),
-  ),
-)
+  @Deprecated("Use e0.", ReplaceWith("e0"))
+  val level0: List<ShadowLayer> get() = e0
+
+  @Deprecated("Use e1.", ReplaceWith("e1"))
+  val level1: List<ShadowLayer> get() = e1
+
+  @Deprecated("Use e2.", ReplaceWith("e2"))
+  val level2: List<ShadowLayer> get() = e2
+
+  @Deprecated("Use e3.", ReplaceWith("e3"))
+  val level3: List<ShadowLayer> get() = e3
+
+  @Deprecated("Use e4.", ReplaceWith("e4"))
+  val level4: List<ShadowLayer> get() = e4
+
+  @Deprecated("Use e4.", ReplaceWith("e4"))
+  val level5: List<ShadowLayer> get() = e4
+}
+
+/** Elevation of the light or [dark] theme; dark shadows are three times as strong. */
+fun ketchElevation(dark: Boolean): KetchElevation {
+  val alphaScale = if (dark) 3f else 1f
+  fun layer(y: Int, blur: Int, alpha: Float, spread: Int = 0) = ShadowLayer(
+    offsetX = 0.dp,
+    offsetY = y.dp,
+    blur = blur.dp,
+    spread = spread.dp,
+    color = ShadowInk.copy(alpha = (alpha * alphaScale).coerceAtMost(1f)),
+  )
+  return KetchElevation(
+    e0 = emptyList(),
+    e1 = listOf(layer(1, 2, 0.06f), layer(8, 24, 0.08f, spread = -4)),
+    e2 = listOf(layer(1, 2, 0.05f), layer(4, 12, 0.06f)),
+    e3 = listOf(layer(4, 12, 0.10f), layer(16, 40, 0.16f, spread = -8)),
+    e4 = listOf(layer(12, 24, 0.12f), layer(32, 64, 0.24f, spread = -12)),
+    isDark = dark,
+  )
+}
+
+@Deprecated("Use ketchElevation(dark = false).", ReplaceWith("ketchElevation(dark = false)"))
+fun lightKetchElevation(): KetchElevation = ketchElevation(dark = false)
+
+@Deprecated("Use ketchElevation(dark = true).", ReplaceWith("ketchElevation(dark = true)"))
+fun darkKetchElevation(): KetchElevation = ketchElevation(dark = true)
+
+private val ShadowInk = Color(0xFF0F172A)
