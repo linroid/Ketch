@@ -45,8 +45,8 @@ fun AiDiscoverForm(
 ) {
   val loading = state is AiDiscoverState.Loading
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    Text("What would you like to find?", style = KetchTheme.typography.bodyLarge,
-      color = KetchTheme.colors.onBackground)
+    Text("What would you like to find?", style = KetchTheme.typography.body,
+      color = KetchTheme.colors.textPrimary)
     OutlinedTextField(
       value = draft.query,
       onValueChange = { draft.query = it },
@@ -57,8 +57,8 @@ fun AiDiscoverForm(
       modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search description" },
     )
     if (state is AiDiscoverState.Idle) {
-      Text("Try an example", style = KetchTheme.typography.labelSmall,
-        color = KetchTheme.colors.onSurfaceDim)
+      Text("Try an example", style = KetchTheme.typography.eyebrow,
+        color = KetchTheme.colors.textTertiary)
       FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf("Ubuntu desktop ISO", "Blender for macOS", "Sample audio files").forEach { query ->
@@ -68,7 +68,11 @@ fun AiDiscoverForm(
       }
     }
     KetchButton(
-      text = if (draft.showSites) "Hide website filter" else if (draft.sites.isNotBlank()) "Website filter applied" else "Limit to websites",
+      text = when {
+        draft.showSites -> "Hide website filter"
+        draft.sites.isNotBlank() -> "Website filter applied"
+        else -> "Limit to websites"
+      },
       leadingIcon = KetchIcon.Filter,
       variant = KetchButtonVariant.Ghost,
       size = KetchButtonSize.Small,
@@ -123,15 +127,19 @@ fun AiDiscoverResults(
       modifier = Modifier.padding(vertical = 12.dp),
     ) {
       CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-      Text("Looking for downloadable links…", style = KetchTheme.typography.bodyMedium,
-        color = colors.onSurfaceVariant)
+      Text("Looking for downloadable links…", style = KetchTheme.typography.bodyS,
+        color = colors.textSecondary)
     }
     is AiDiscoverState.Error -> KetchCard {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Couldn't find links", style = KetchTheme.typography.bodyLarge, color = colors.error)
-        Text(state.message, style = KetchTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+        Text(
+          "Couldn't find links",
+          style = KetchTheme.typography.body,
+          color = colors.status.failed.color,
+        )
+        Text(state.message, style = KetchTheme.typography.bodyS, color = colors.textSecondary)
         Text("Your search is saved. Try again or adjust the description.",
-          style = KetchTheme.typography.bodySmall, color = colors.onSurfaceDim)
+          style = KetchTheme.typography.caption, color = colors.textTertiary)
       }
     }
     is AiDiscoverState.Results -> {
@@ -139,10 +147,10 @@ fun AiDiscoverResults(
       val selected = draft.selectedCandidates(state)
       Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(if (candidates.isEmpty()) "No links found" else "${candidates.size} links found",
-          style = KetchTheme.typography.displaySmall, color = colors.onBackground)
+          style = KetchTheme.typography.titleL, color = colors.textPrimary)
         Text(if (candidates.isEmpty()) "Try a more specific file name or remove the website filter."
           else "Results for “${draft.submittedQuery}”",
-          style = KetchTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+          style = KetchTheme.typography.bodyS, color = colors.textSecondary)
         if (candidates.isNotEmpty()) {
           FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -180,11 +188,15 @@ private fun CandidateItem(candidate: AiCandidate, selected: Boolean, onToggle: (
     Row(
       verticalAlignment = Alignment.Top,
       modifier = Modifier.fillMaxWidth()
-        .background(if (selected) colors.primaryContainer else colors.surface)
+        .background(if (selected) colors.accentSoft else colors.surface)
         .toggleable(value = selected, role = Role.Checkbox, onValueChange = { onToggle() })
         .padding(12.dp),
     ) {
-      Checkbox(checked = selected, onCheckedChange = null, modifier = Modifier.padding(end = 12.dp, top = 2.dp))
+      Checkbox(
+        checked = selected,
+        onCheckedChange = null,
+        modifier = Modifier.padding(end = 12.dp, top = 2.dp),
+      )
       KetchFileTypeChip(
         fileName = candidate.fileName ?: extractFilename(candidate.url),
         sourceUrl = candidate.url,
@@ -194,14 +206,14 @@ private fun CandidateItem(candidate: AiCandidate, selected: Boolean, onToggle: (
       )
       Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.weight(1f)) {
         Text(candidate.title.ifBlank { candidate.fileName ?: candidate.url },
-          style = KetchTheme.typography.bodyLarge, color = colors.onBackground)
-        Text(candidate.url, style = KetchTheme.typography.bodySmall,
-          color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+          style = KetchTheme.typography.body, color = colors.textPrimary)
+        Text(candidate.url, style = KetchTheme.typography.caption,
+          color = colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (candidate.description.isNotBlank()) Text(candidate.description,
-          style = KetchTheme.typography.bodySmall, color = colors.onSurfaceVariant,
+          style = KetchTheme.typography.caption, color = colors.textSecondary,
           maxLines = 3, overflow = TextOverflow.Ellipsis)
         candidate.fileSize?.takeIf { it > 0 }?.let {
-          Text(formatBytes(it), style = KetchTheme.typography.labelSmall, color = colors.onSurfaceDim)
+          Text(formatBytes(it), style = KetchTheme.typography.eyebrow, color = colors.textTertiary)
         }
       }
     }

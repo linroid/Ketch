@@ -9,10 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +17,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchTheme
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
@@ -171,10 +170,7 @@ fun AddRemoteServerDialog(
                 Text(info)
               },
               leadingContent = {
-                Icon(
-                  Icons.Filled.Dns,
-                  contentDescription = null,
-                )
+                KetchIconImage(KetchIcon.Server, tint = KetchTheme.colors.textSecondary)
               },
               modifier = Modifier
                 .fillMaxWidth()

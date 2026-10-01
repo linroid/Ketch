@@ -18,7 +18,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -26,6 +25,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -61,8 +62,8 @@ fun InstanceSelectorSheet(
   val instances by instanceManager.instances.collectAsState()
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
-  val isCompact = !currentWindowAdaptiveInfo().windowSizeClass
-    .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+  val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+  val isCompact = windowWidth.value < WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
 
   val instanceList: @Composable () -> Unit = {
     Column(
@@ -74,8 +75,8 @@ fun InstanceSelectorSheet(
     ) {
       Text(
         "Choose where to manage your downloads.",
-        style = type.bodyMedium,
-        color = colors.onSurfaceVariant,
+        style = type.bodyS,
+        color = colors.textSecondary,
         modifier = Modifier.padding(bottom = 6.dp),
       )
       instances.forEach { entry ->
@@ -86,8 +87,8 @@ fun InstanceSelectorSheet(
           modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(if (isActive) colors.primaryContainer else colors.surface)
-            .border(1.dp, if (isActive) colors.primary else colors.outlineVariant, shape)
+            .background(if (isActive) colors.accentSoft else colors.surface)
+            .border(1.dp, if (isActive) colors.accent else colors.hairline, shape)
             .selectable(
               selected = isActive,
               enabled = switchingInstance == null,
@@ -101,7 +102,7 @@ fun InstanceSelectorSheet(
           KetchIconImage(
             icon = if (entry is EmbeddedInstance) KetchIcon.Local else KetchIcon.Remote,
             size = 24.dp,
-            tint = if (isActive) colors.primary else colors.onSurfaceVariant,
+            tint = if (isActive) colors.accent else colors.textSecondary,
           )
           Column(
             modifier = Modifier.weight(1f),
@@ -109,15 +110,15 @@ fun InstanceSelectorSheet(
           ) {
             Text(
               text = entry.label,
-              style = type.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-              color = colors.onBackground,
+              style = type.body.copy(fontWeight = FontWeight.SemiBold),
+              color = colors.textPrimary,
               maxLines = 2,
               overflow = TextOverflow.Ellipsis,
             )
             Text(
               text = if (entry is RemoteInstance) "${entry.host}:${entry.port}" else "This device",
-              style = type.bodySmall,
-              color = colors.onSurfaceVariant,
+              style = type.caption,
+              color = colors.textSecondary,
               maxLines = 2,
               overflow = TextOverflow.Ellipsis,
             )
@@ -139,7 +140,7 @@ fun InstanceSelectorSheet(
               strokeWidth = 2.dp,
             )
           } else if (isActive) {
-            KetchIconImage(icon = KetchIcon.Check, size = 20.dp, tint = colors.primary)
+            KetchIconImage(icon = KetchIcon.Check, size = 20.dp, tint = colors.accent)
           }
           if (entry is RemoteInstance) {
             KetchIconButton(
@@ -164,7 +165,7 @@ fun InstanceSelectorSheet(
         modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
-        Text("Download instances", style = type.displaySmall, color = colors.onBackground)
+        Text("Download instances", style = type.titleL, color = colors.textPrimary)
         instanceList()
         KetchButton(
           text = "Add remote server",
@@ -178,10 +179,14 @@ fun InstanceSelectorSheet(
     AlertDialog(
       onDismissRequest = onDismiss,
       containerColor = colors.surface,
-      title = { Text("Download instances", style = type.displaySmall, color = colors.onBackground) },
+      title = { Text("Download instances", style = type.titleL, color = colors.textPrimary) },
       text = { instanceList() },
       confirmButton = {
-        KetchButton(text = "Add remote server", leadingIcon = KetchIcon.Plus, onClick = onAddRemoteServer)
+        KetchButton(
+          text = "Add remote server",
+          leadingIcon = KetchIcon.Plus,
+          onClick = onAddRemoteServer,
+        )
       },
       dismissButton = {
         KetchButton(text = "Done", variant = KetchButtonVariant.Ghost, onClick = onDismiss)

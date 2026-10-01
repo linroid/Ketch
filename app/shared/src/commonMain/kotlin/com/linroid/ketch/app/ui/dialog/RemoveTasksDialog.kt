@@ -260,29 +260,3 @@ fun RemoveTasksDialog(
     }
   }
 }
-
-/**
- * Asks before removing one download together with its file.
- *
- * @param totalBytes size of the file, or `null` when unknown.
- * @param deleteFiles whether the box that deletes the file starts checked.
- */
-@Deprecated("Use RemoveTasksDialog, which also covers several downloads and the Trash.")
-@Composable
-fun RemoveDownloadDialog(
-  fileName: String,
-  deviceName: String,
-  totalBytes: Long?,
-  onDismiss: () -> Unit,
-  onConfirm: (deleteFiles: Boolean) -> Unit,
-  deleteFiles: Boolean = true,
-) {
-  val item = RemovalItem(name = fileName, hasFile = true, bytes = totalBytes ?: 0)
-  RemoveTasksDialog(
-    plan = RemovalPlan(listOf(item), trash = false),
-    deviceName = deviceName,
-    onDismiss = onDismiss,
-    onConfirm = onConfirm,
-    withFiles = deleteFiles,
-  )
-}

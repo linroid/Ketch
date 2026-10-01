@@ -1,14 +1,4 @@
 ui/AiDiscoveryContent.kt:RoundedCornerShape(<number>.dp:2
-ui/dialog/AddDownloadDialog.kt:MaterialTheme.:33
-ui/dialog/AddDownloadDialog.kt:RoundedCornerShape(<number>.dp:4
-ui/dialog/AddDownloadDialog.kt:androidx.compose.material.icons:6
 ui/dialog/AddRemoteServerDialog.kt:MaterialTheme.:9
 ui/dialog/AddRemoteServerDialog.kt:RoundedCornerShape(<number>.dp:2
-ui/dialog/AddRemoteServerDialog.kt:androidx.compose.material.icons:2
 ui/dialog/InstanceSelectorSheet.kt:RoundedCornerShape(<number>.dp:1
-ui/settings/SettingsComponents.kt:<number>.sp:1
-ui/settings/SettingsComponents.kt:RoundedCornerShape(<number>.dp:8
-ui/settings/SettingsDialog.kt:RoundedCornerShape(<number>.dp:1
-ui/settings/SettingsPage.kt:RoundedCornerShape(<number>.dp:1
-ui/sidebar/SidebarNavigation.kt:<number>.sp:3
-ui/sidebar/SidebarNavigation.kt:RoundedCornerShape(<number>.dp:3
