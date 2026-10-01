@@ -121,9 +121,12 @@ object KetchBackground {
     val observers = listOf(
       center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, queue) {
         // Downloads iOS keeps running need no pausing.
-        if (continued?.running?.value != true) {
-          pauser.enterBackground()?.let(::holdBackgroundTime)
+        val work = if (continued?.running?.value == true) {
+          pauser.keepRunningInBackground()
+        } else {
+          pauser.enterBackground()
         }
+        work?.let(::holdBackgroundTime)
       },
       center.addObserverForName(UIApplicationWillEnterForegroundNotification, null, queue) {
         pauser.enterForeground()
@@ -422,6 +425,15 @@ internal class BackgroundPauser(
       }
     }.also { suspension = it }
   }
+
+  /**
+   * Commits pending operations as Ketch goes to the background while iOS keeps its downloads
+   * running: iOS may still end Ketch once they finish.
+   *
+   * @return the job committing them, which Ketch must stay running for, or `null` when none
+   *   wait for their Undo window.
+   */
+  fun keepRunningInBackground(): Job? = commitPending().takeUnless { it.isCompleted }
 
   /** Resumes the tasks paused for the background once any pausing in progress has finished. */
   fun enterForeground(): Job {

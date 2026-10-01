@@ -37,6 +37,8 @@ final class ContinuedDownloads: NSObject, ContinuedProcessing {
   // Each request gets an identifier of its own under the prefix that Ketch-Info.plist permits.
   private let prefix = (Bundle.main.bundleIdentifier ?? "Ketch") + ".downloads."
   private var task: BGContinuedProcessingTask?
+  // The request Ketch made last, which only its own launch takes on.
+  private var requested: String?
   private var latest: BackgroundProgress?
 
   func begin(progress: BackgroundProgress) -> Bool {
@@ -53,6 +55,7 @@ final class ContinuedDownloads: NSObject, ContinuedProcessing {
       self.run(task)
     }
     guard registered else { return false }
+    requested = identifier
     let request = BGContinuedProcessingTaskRequest(
       identifier: identifier,
       title: progress.title,
@@ -64,6 +67,7 @@ final class ContinuedDownloads: NSObject, ContinuedProcessing {
       try BGTaskScheduler.shared.submit(request)
       return true
     } catch {
+      requested = nil
       latest = nil
       return false
     }
@@ -77,14 +81,15 @@ final class ContinuedDownloads: NSObject, ContinuedProcessing {
   }
 
   func end(success: Bool) {
+    requested = nil
     latest = nil
     task?.setTaskCompleted(success: success)
     task = nil
   }
 
   private func run(_ task: BGContinuedProcessingTask) {
-    // Ketch ended the work before iOS started it.
-    guard let latest else {
+    // Ketch ended the work, or asked again, before iOS started it.
+    guard task.identifier == requested, let latest else {
       task.setTaskCompleted(success: true)
       return
     }
@@ -100,6 +105,7 @@ final class ContinuedDownloads: NSObject, ContinuedProcessing {
   private func expire(_ task: BGContinuedProcessingTask) {
     guard self.task === task else { return }
     self.task = nil
+    requested = nil
     latest = nil
     KetchBackground.shared.continuedProcessingExpired()
     task.setTaskCompleted(success: false)

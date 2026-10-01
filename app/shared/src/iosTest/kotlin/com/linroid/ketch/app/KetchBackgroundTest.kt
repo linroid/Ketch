@@ -99,6 +99,35 @@ class KetchBackgroundTest {
   }
 
   @Test
+  fun keepRunningInBackground_pendingRemoval_commitsWithoutPausing() = runTest {
+    val api = RecordingKetchApi()
+    val running = api.add(downloading)
+    val ops = PendingOps(backgroundScope)
+    val removal = CompletableDeferred<Unit>()
+    ops.register("Remove", commit = { removal.await() })
+    val pauser = pauser(api, this, commitPending = ops::flush)
+
+    val work = assertNotNull(pauser.keepRunningInBackground())
+    runCurrent()
+
+    assertTrue(work.isActive)
+    removal.complete(Unit)
+    work.join()
+    assertTrue(running.calls.isEmpty())
+    assertTrue(saved.ids.isEmpty())
+    assertTrue(notices.isEmpty())
+  }
+
+  @Test
+  fun keepRunningInBackground_nothingPending_returnsNull() = runTest {
+    val api = RecordingKetchApi()
+    val running = api.add(downloading)
+
+    assertNull(pauser(api, this).keepRunningInBackground())
+    assertTrue(running.calls.isEmpty())
+  }
+
+  @Test
   fun enterForeground_afterBackground_resumesTasksStillPaused() = runTest {
     val api = RecordingKetchApi()
     val first = api.add(downloading)
