@@ -31,7 +31,6 @@ fun SettingsHost(state: AppState, target: SettingsTarget?, onClose: () -> Unit) 
   val scope = rememberCoroutineScope()
   val instances by state.instances.collectAsState()
   val active by state.activeInstance.collectAsState()
-  val serverState by state.serverState.collectAsState()
   val fileLogger = LocalFileLogger.current
   val instanceManager = state.instanceManager
   val aiSettings = state.aiSettings
@@ -39,16 +38,13 @@ fun SettingsHost(state: AppState, target: SettingsTarget?, onClose: () -> Unit) 
   val content: @Composable (SettingsCategory) -> Unit = { category ->
     SettingsCategoryContent(
       category = category,
+      state = state,
+      // Download, speed, network, torrent and sharing settings belong to the active device.
+      device = active,
       appSettings = state.appSettings,
       aiSettings = aiSettings,
-      // Download, network and torrent settings belong to the active device.
-      instanceSettings = state.instanceSettings,
-      instanceLabel = active?.label ?: "this device",
       systemDeviceName = instances.firstOrNull { it is EmbeddedInstance }?.label,
-      serverState = serverState,
       onTestAi = { scope.launch { aiSettings.testConnection(aiSettings.settings) } },
-      onStartServer = { instanceManager.startServer() },
-      onStopServer = { instanceManager.stopServer() },
       fileLogger = fileLogger,
     )
   }
@@ -77,7 +73,8 @@ private fun SettingsTarget.Page.category(): SettingsCategory? = when (this) {
   -> null
   SettingsTarget.Page.Discover -> SettingsCategory.Ai
   SettingsTarget.Page.About -> SettingsCategory.About
-  SettingsTarget.Page.Downloads, SettingsTarget.Page.Speed -> SettingsCategory.Downloads
+  SettingsTarget.Page.Downloads -> SettingsCategory.Downloads
+  SettingsTarget.Page.Speed -> SettingsCategory.Speed
   SettingsTarget.Page.Network -> SettingsCategory.Network
   SettingsTarget.Page.BitTorrent -> SettingsCategory.BitTorrent
   SettingsTarget.Page.Sharing -> SettingsCategory.RemoteAccess

@@ -2,65 +2,59 @@ package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.NetworkInterfaceInfo
-import com.linroid.ketch.app.components.KetchBadge
-import com.linroid.ketch.app.components.KetchBadgeTone
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
-import com.linroid.ketch.app.state.InstanceSettingsController
+import com.linroid.ketch.app.components.KetchChip
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.util.pairingAddresses
 
 /**
- * Picks the network interfaces the active instance spreads HTTP
- * requests over.
- *
- * @param instanceLabel name of the instance whose interfaces are shown.
+ * The networks [device] spreads its HTTP requests over, as chips: the system's default
+ * connection, or any set of its interfaces. The choice applies at once and lasts until the
+ * device restarts.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NetworkSettings(
-  controller: InstanceSettingsController,
-  instanceLabel: String,
-) {
+fun NetworkSettings(state: AppState, device: InstanceEntry) {
+  val controller = state.settingsFor(device)
   LaunchedEffect(controller) { controller.loadNetworks() }
   val networks = controller.networks
-  Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+  val spacing = KetchTheme.spacing
+  Column(verticalArrangement = Arrangement.spacedBy(spacing.sectionGap)) {
     controller.networkError?.let {
       SettingsNotice(text = it, tone = NoticeTone.Error)
     }
     when {
-      networks == null -> Text(
-        text = "Looking for network interfaces on $instanceLabel…",
-        style = KetchTheme.typography.bodyMedium,
-        color = KetchTheme.colors.onSurfaceVariant,
-      )
+      networks == null -> SettingsLoading("Looking for networks on ${device.label}…")
       !networks.supported -> SettingsNotice(
-        text = "$instanceLabel can't choose network interfaces, so downloads use " +
-          "the system's default connection.",
+        text = "${device.label} can't choose networks, so downloads use the connection its " +
+          "system picks.",
         tone = NoticeTone.Info,
       )
       else -> {
         val selected = networks.config.interfaceIds
         val available = networks.available.associateBy { it.id }
-        // Keep selected interfaces that went away visible so they can be
-        // unticked.
+        // Keep selected interfaces that went away visible so they can be unticked.
         val missing = selected.filter { it !in available }
           .map { NetworkInterfaceInfo(id = it, name = it, addresses = emptyList()) }
         SettingsGroup(
-          title = "Network interfaces",
+          title = "Networks",
           footer = if (selected.isEmpty()) {
-            "None selected: downloads use the system's default connection."
+            "Downloads use the connection the system picks. Pick networks to spread HTTP " +
+              "downloads across them; FTP and torrents keep the default. Resets when " +
+              "${device.label} restarts."
           } else {
-            "HTTP downloads are spread across the ticked interfaces; FTP and " +
-              "torrents use the default connection. Resets when $instanceLabel restarts."
+            "Requests are spread across the selected networks; FTP and torrents use the " +
+              "default connection. Resets when ${device.label} restarts."
           },
           action = {
             KetchButton(
@@ -68,44 +62,53 @@ fun NetworkSettings(
               onClick = { controller.loadNetworks() },
               variant = KetchButtonVariant.Ghost,
               size = KetchButtonSize.Small,
+              leadingIcon = KetchIcon.Retry,
             )
           },
         ) {
-          if (networks.available.isEmpty() && missing.isEmpty()) {
-            SettingsRow(
-              title = "No interfaces found",
-              description = "Connect to a network, then refresh.",
-            )
-          }
-          (networks.available + missing).forEach { info ->
-            val checked = info.id in selected
-            val gone = info.id !in available
-            SettingsRow(
-              title = info.name,
-              description = if (gone) {
-                "Not connected right now"
-              } else {
-                info.addresses.joinToString(", ").ifEmpty { "No address" }
-              },
-              modifier = Modifier.toggleable(
-                value = checked,
-                role = Role.Checkbox,
-                onValueChange = { tick ->
-                  controller.selectNetworks(
-                    if (tick) selected + info.id else selected - info.id,
-                  )
-                },
-              ),
-              leading = { Checkbox(checked = checked, onCheckedChange = null) },
-              trailing = if (gone) {
-                { KetchBadge("Offline", KetchBadgeTone.Warning) }
-              } else {
-                null
-              },
-            )
+          SettingsRow(
+            title = "Spread downloads across",
+            description = if (networks.available.isEmpty() && missing.isEmpty()) {
+              "No networks found. Connect to Wi-Fi or Ethernet, then refresh."
+            } else {
+              null
+            },
+          ) {
+            FlowRow(
+              horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+              verticalArrangement = Arrangement.spacedBy(spacing.s2),
+            ) {
+              KetchChip(
+                label = "System default",
+                selected = selected.isEmpty(),
+                onClick = { if (selected.isNotEmpty()) controller.selectNetworks(emptyList()) },
+              )
+              (networks.available + missing).forEach { info ->
+                val ticked = info.id in selected
+                KetchChip(
+                  label = chipLabel(info, gone = info.id !in available),
+                  selected = ticked,
+                  leadingIcon = if (info.id in available) KetchIcon.Network else KetchIcon.Warning,
+                  onClick = {
+                    val ids = if (ticked) selected - info.id else selected + info.id
+                    controller.selectNetworks(ids)
+                  },
+                )
+              }
+            }
           }
         }
       }
     }
   }
+}
+
+/**
+ * "en0 · 192.168.1.20", "utun3" without a routable IPv4 address, whose IPv6 ones are too long
+ * for a chip, or "en5 · not connected".
+ */
+private fun chipLabel(info: NetworkInterfaceInfo, gone: Boolean): String {
+  if (gone) return "${info.name} · not connected"
+  val address = pairingAddresses(listOf(info)).firstOrNull()
+  return if (address == null) info.name else "${info.name} · $address"
 }

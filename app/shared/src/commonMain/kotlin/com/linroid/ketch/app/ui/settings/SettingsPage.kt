@@ -41,11 +41,11 @@ import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchSidebarItem
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
-import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppSettingsController
-import com.linroid.ketch.app.state.InstanceSettingsController
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.theme.KetchTheme
 
@@ -58,46 +58,35 @@ private val TWO_PANE_MIN_WIDTH = 760.dp
  *
  * Changes are applied as they are made, so there is nothing to save.
  *
+ * @param state the app, whose device pages edit [device].
+ * @param device device whose download, speed, network, torrent and sharing settings are shown;
+ *   `null` while none is connected.
  * @param appSettings this app's own config sections.
  * @param aiSettings AI discovery settings and provider.
- * @param instanceSettings download, network and torrent settings of the
- *   active instance.
- * @param instanceLabel name of the active instance.
  * @param systemDeviceName name this device goes by when none is set, or
  *   `null` when the app has no local instance (the web app).
- * @param serverState whether the local server is running.
  * @param onTestAi call the AI provider with the saved settings.
- * @param onStartServer start the local server.
- * @param onStopServer stop the local server.
  * @param fileLogger the app's log files, offered under About; `null`
  *   when the app keeps none.
  */
 @Composable
 fun SettingsCategoryContent(
   category: SettingsCategory,
+  state: AppState,
+  device: InstanceEntry?,
   appSettings: AppSettingsController,
   aiSettings: AiSettingsController,
-  instanceSettings: InstanceSettingsController,
-  instanceLabel: String,
   systemDeviceName: String?,
-  serverState: ServerState,
   onTestAi: () -> Unit,
-  onStartServer: () -> Unit,
-  onStopServer: () -> Unit,
   fileLogger: FileLogger? = null,
 ) {
   when (category) {
     SettingsCategory.General -> GeneralSettings(appSettings, systemDeviceName)
-    SettingsCategory.Downloads -> DownloadSettings(instanceSettings, instanceLabel)
-    SettingsCategory.Network -> NetworkSettings(instanceSettings, instanceLabel)
-    SettingsCategory.BitTorrent -> BitTorrentSettings(instanceSettings, instanceLabel)
-    SettingsCategory.RemoteAccess -> RemoteAccessSettings(
-      config = appSettings.config.server,
-      serverState = serverState,
-      onChange = { appSettings.saveServer(it) },
-      onStart = onStartServer,
-      onStop = onStopServer,
-    )
+    SettingsCategory.Downloads -> device?.let { DownloadSettings(state, it) } ?: NoDeviceNotice()
+    SettingsCategory.Speed -> device?.let { SpeedSettingsPage(state, it) } ?: NoDeviceNotice()
+    SettingsCategory.Network -> device?.let { NetworkSettings(state, it) } ?: NoDeviceNotice()
+    SettingsCategory.BitTorrent -> device?.let { BitTorrentSettings(state, it) } ?: NoDeviceNotice()
+    SettingsCategory.RemoteAccess -> device?.let { SharingSettings(state, it) } ?: NoDeviceNotice()
     SettingsCategory.Ai -> AiDiscoverySettings(
       settings = aiSettings.settings,
       supported = aiSettings.supported,
