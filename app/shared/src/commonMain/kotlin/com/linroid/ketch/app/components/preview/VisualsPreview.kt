@@ -223,7 +223,7 @@ private fun Devices() {
     DeviceHealth.Live,
     DeviceHealth.Connecting,
     DeviceHealth.Offline(),
-    DeviceHealth.Unauthorized,
+    DeviceHealth.Unauthorized
   )
   Section("Pennants") {
     listOf(
@@ -249,7 +249,7 @@ private fun Devices() {
       ConnectionState.Connected,
       ConnectionState.Connecting,
       ConnectionState.Disconnected(),
-      ConnectionState.Unauthorized,
+      ConnectionState.Unauthorized
     )
     states.forEach { ConnectionStatusDot(it) }
     states.forEach { ConnectionStatusChip(it, isActive = true) }
@@ -272,7 +272,7 @@ private fun Devices() {
         summary = "1.8 TB free · 2 active · Slow lane",
         shortcut = "⌘⌥2",
       ),
-      DeviceOption("den", "Den-PC", DeviceHealth.Offline(), shortcut = "⌘⌥3"),
+      DeviceOption("den", "Den-PC", DeviceHealth.Offline(), shortcut = "⌘⌥3")
     )
     var target by remember { mutableStateOf("local") }
     DeviceTargetChip(selectedId = target, options = options, onSelect = { target = it.id })

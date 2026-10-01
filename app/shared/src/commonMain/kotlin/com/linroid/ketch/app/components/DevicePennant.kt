@@ -3,6 +3,7 @@ package com.linroid.ketch.app.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Text
@@ -123,7 +124,8 @@ fun DevicePennant(
           .align(Alignment.TopEnd)
           .offset(x = BadgeOverhang, y = -BadgeOverhang)
           .sizeIn(minWidth = BadgeSize, minHeight = BadgeSize)
-          .background(colors.dangerFill, KetchTheme.shapes.badge),
+          .background(colors.dangerFill, KetchTheme.shapes.badge)
+          .padding(horizontal = KetchTheme.spacing.s0_5),
       ) {
         Text(
           text = failureBadge(failures),

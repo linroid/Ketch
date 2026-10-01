@@ -63,7 +63,7 @@ fun KetchLogoTile(
             this.contentDescription = contentDescription
             role = Role.Image
           }
-        },
+        }
       ),
   ) {
     KetchIconImage(KetchIcon.Sail, size = size * GLYPH_SHARE, tint = Color.White)

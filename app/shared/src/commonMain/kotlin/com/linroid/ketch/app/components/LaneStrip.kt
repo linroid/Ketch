@@ -49,8 +49,11 @@ object LaneStripDefaults {
   /** Under the second line of a list row. */
   val RowHeight: Dp = 4.dp
 
-  /** In the table's Progress column. */
+  /** In the table's Progress column and the Devices page's device lane. */
   val CellHeight: Dp = 6.dp
+
+  /** One connection's own lane in the Connections tab. */
+  val LaneHeight: Dp = 8.dp
 
   /** Under the name in the inspector header. */
   val HeaderHeight: Dp = 10.dp
@@ -78,6 +81,10 @@ object LaneStripDefaults {
  * one run in the completed color, an ember sheen crosses it once and [onCompletionShown] runs, so
  * the caller can remove the strip. Paused, waiting and failed tasks show their map without heads.
  * Under reduce motion nothing glides, springs, flashes or shimmers, and the sheen is skipped.
+ *
+ * The strip animates from one snapshot of a file to the next; a snapshot of a file of another
+ * size starts over without motion. A place that shows different tasks in turn, such as the
+ * inspector, keys the strip by task so a completion or re-split never carries over.
  *
  * @param state state of the task, which picks the colors and gives the size when there are no
  *   segments.
@@ -147,7 +154,8 @@ private fun DownloadState.laneProgress(): DownloadProgress? = when (this) {
 }
 
 /**
- * The strip behind [LaneStrip], also drawn by the older segment components.
+ * The strip behind [LaneStrip], also drawn by the older segment components. A single connection's
+ * own lane is one segment moved to start at byte 0, with no [progress].
  *
  * @param heads whether unfinished segments carry write heads.
  */
@@ -168,22 +176,20 @@ internal fun LaneStripCanvas(
   val corner = KetchTheme.shapes.xs
   val palettes = remember(colors) { LanePalettes(colors) }
   val strip = remember {
-    LaneStripState().apply { update(segments, progress, stalled, glideAt = 1f) }
+    LaneStripState().apply { update(segments, progress, stalled, glideAt = 1f, resegAt = 1f) }
   }
   val scope = rememberCoroutineScope()
   val completionShown by rememberUpdatedState(onCompletionShown)
 
   LaunchedEffect(segments, progress, stalled) {
-    if (!strip.update(segments, progress, stalled, strip.glide.value)) return@LaunchedEffect
+    val changed = strip.update(segments, progress, stalled, strip.glide.value, strip.reseg.value)
+    if (!changed) return@LaunchedEffect
     if (strip.layout.resegmented && !motion.reduced) {
-      scope.launch {
-        strip.reseg.snapTo(0f)
-        strip.reseg.animateTo(1f, motion.progressSpring)
-      }
-      scope.launch {
-        strip.flash.snapTo(1f)
-        strip.flash.animateTo(0f, tween(SEAM_FLASH_MILLIS, easing = LinearEasing))
-      }
+      // Snapped here, so no frame draws the new seams at rest before they spring.
+      strip.reseg.snapTo(0f)
+      strip.flash.snapTo(1f)
+      scope.launch { strip.reseg.animateTo(1f, motion.progressSpring) }
+      scope.launch { strip.flash.animateTo(0f, tween(SEAM_FLASH_MILLIS, easing = LinearEasing)) }
     }
     strip.glide.snapTo(0f)
     strip.glide.animateTo(1f, motion.headGlide)
@@ -235,7 +241,7 @@ internal fun LaneStripCanvas(
         } else {
           ProgressBarRangeInfo.Indeterminate
         }
-      },
+      }
   ) {
     val frame = strip.frame
     frame.layout = strip.layout
@@ -249,12 +255,8 @@ internal fun LaneStripCanvas(
     val done = phase == LanePhase.Completed
     // Until the phase effect has seen the completion, keep drawing the lanes it fades from.
     val completing = done && strip.phase != null && strip.phase != LanePhase.Completed
-    val elapsed = (if (completing) 0f else strip.completion.value) * (fadeMillis + sheenMillis)
-    val fade = when {
-      !done -> 0f
-      fadeMillis > 0 -> (elapsed / fadeMillis).coerceIn(0f, 1f)
-      else -> 1f
-    }
+    val completion = if (completing) 0f else strip.completion.value
+    val fade = if (done) completionFade(completion, fadeMillis, sheenMillis) else 0f
     clipPath(strip.clipPath(size, radius)) {
       if (count == 0 && !done) {
         if (phase == LanePhase.Downloading && frame.layout.fraction == null) {
@@ -268,7 +270,7 @@ internal fun LaneStripCanvas(
       }
       if (done) {
         drawRect(colors.status.completed.color, alpha = COMPLETED_ALPHA * fade)
-        val sheen = if (sheenMillis > 0) (elapsed - fadeMillis) / sheenMillis else 1f
+        val sheen = completionSheen(completion, fadeMillis, sheenMillis)
         if (sheen > 0f && sheen < 1f) drawSheen(strip, colors.brandEmber, sheen)
       }
     }
@@ -341,6 +343,7 @@ private fun DrawScope.drawHeads(frame: LaneFrame, head: Color, stalled: Color) {
   val overhang = HeadOverhang.toPx()
   val glow = HeadGlow.toPx()
   val headHeight = size.height + overhang * 2
+  if (width < headWidth) return
   for (i in 0 until layout.count) {
     if (!layout.unfinished[i]) continue
     val x = ((frame.start(i) + frame.filled(i)) * width)
@@ -391,7 +394,7 @@ private class LanePalettes(colors: KetchColors) {
   val paused: List<Color> = colors.laneRamp(colors.status.paused.color)
   val waiting: List<Color> = colors.laneRamp(colors.status.queued.color)
   val failed: List<Color> = listOf(
-    colors.textTertiary.copy(alpha = FAILED_ALPHA).compositeOver(colors.surfaceSunken),
+    colors.textTertiary.copy(alpha = FAILED_ALPHA).compositeOver(colors.surfaceSunken)
   )
 
   fun of(phase: LanePhase): List<Color> = when (phase) {
@@ -434,13 +437,14 @@ private class LaneStripState {
 
   /**
    * Takes a new snapshot, starting the glide from where the fills are drawn when the current
-   * glide is at [glideAt]. Returns whether anything changed.
+   * glide is at [glideAt] and the re-split spring at [resegAt]. Returns whether anything changed.
    */
   fun update(
     segments: List<Segment>,
     progress: DownloadProgress?,
     stalled: Set<Long>,
     glideAt: Float,
+    resegAt: Float,
   ): Boolean {
     if (segments === this.segments && progress == this.progress && stalled == this.stalled) {
       return false
@@ -448,7 +452,7 @@ private class LaneStripState {
     this.segments = segments
     this.progress = progress
     this.stalled = stalled
-    layout = laneLayout(segments, progress, stalled, previous = layout, glide = glideAt)
+    layout = laneLayout(segments, progress, stalled, layout, glide = glideAt, reseg = resegAt)
     return true
   }
 
@@ -483,18 +487,22 @@ private class LaneStripState {
  * @property count number of segments.
  * @property keys first byte of each segment, which identifies its lane between snapshots.
  * @property starts where each segment begins.
- * @property startsFrom where each segment begins when a re-split springs: the old write head a
- *   new seam grows from, or [starts] for every other segment.
+ * @property startsFrom where each segment begins when the re-split spring starts: the old write
+ *   head a new seam grows from, where an earlier seam was drawn, or [starts].
  * @property ends where each segment ends.
  * @property fillsFrom where each downloaded part ended when the glide to [fills] started.
  * @property fills where each downloaded part ends.
  * @property colors index into the lane ramp; finished neighbours share the first one's.
  * @property unfinished whether each segment still has bytes to download.
  * @property seams whether a seam separates each segment from the one before it.
- * @property newSeams whether that seam appeared with this snapshot, as when connections changed.
+ * @property newSeams whether that seam came with the latest re-split, and flashes while it lasts.
  * @property stalled whether each segment has received no data for a while.
  * @property fraction downloaded share of the file, or `null` when its size is unknown.
  * @property total size of the file in bytes, or 0 when unknown.
+ * @property segmented whether the lanes are the task's segments rather than one lane standing for
+ *   its progress.
+ * @property resegmented whether this snapshot re-split the file, so its new seams start to spring
+ *   and flash.
  */
 internal class LaneLayout(
   val count: Int,
@@ -511,10 +519,9 @@ internal class LaneLayout(
   val stalled: BooleanArray,
   val fraction: Float?,
   val total: Long,
+  val segmented: Boolean,
+  val resegmented: Boolean,
 ) {
-  /** Whether new seams appeared with this snapshot. */
-  val resegmented: Boolean get() = newSeams.any { it }
-
   /** Where segment [i]'s downloaded part is drawn [glide] of the way through the glide. */
   fun displayedFill(i: Int, glide: Float): Float = lerp(fillsFrom[i], fills[i], glide)
 
@@ -535,15 +542,21 @@ internal class LaneLayout(
       stalled = BooleanArray(0),
       fraction = null,
       total = 0,
+      segmented = false,
+      resegmented = false,
     )
   }
 }
 
 /**
- * Lays out [segments], or a single lane from [progress] when there are none. Segments whose
- * first byte matches one of [previous] glide from where it was drawn [glide] of the way through
- * its own glide; seams that were not there before grow from the write head of the segment they
- * split.
+ * Lays out [segments], or a single lane from [progress] when there are none.
+ *
+ * Only a [previous] snapshot of a file of the same size animates into this one. Segments whose
+ * first byte matches one of its segments glide from where that one was drawn [glide] of the way
+ * through its own glide. Seams that were not there before grow from the write head of the segment
+ * they split. Seams of an earlier re-split that are still springing, [reseg] of the way, carry on
+ * from where they are: to the end of that spring, or from where they are drawn when this
+ * snapshot re-splits again.
  */
 internal fun laneLayout(
   segments: List<Segment>,
@@ -551,6 +564,7 @@ internal fun laneLayout(
   stalled: Set<Long> = emptySet(),
   previous: LaneLayout? = null,
   glide: Float = 1f,
+  reseg: Float = 1f,
 ): LaneLayout {
   val sorted = when {
     segments.isNotEmpty() -> segments.sortedBy { it.start }
@@ -560,11 +574,13 @@ internal fun laneLayout(
         start = 0,
         end = progress.totalBytes - 1,
         downloadedBytes = progress.downloadedBytes.coerceIn(0, progress.totalBytes),
-      ),
+      )
     )
     else -> return LaneLayout.Empty
   }
   val total = maxOf(sorted.maxOf { it.end } + 1, progress?.totalBytes ?: 0)
+  // Only empty files, such as a torrent's zero-byte one: nothing to place.
+  if (total <= 0) return LaneLayout.Empty
   val count = sorted.size
   fun share(bytes: Long): Float = (bytes.toDouble() / total).toFloat()
 
@@ -584,22 +600,36 @@ internal fun laneLayout(
   val seams = BooleanArray(count) { it > 0 && seamed && unfinished[it] && unfinished[it - 1] }
   val stalledLanes = BooleanArray(count) { keys[it] in stalled }
 
+  val segmented = segments.isNotEmpty()
   val fillsFrom = fills.copyOf()
   val startsFrom = starts.copyOf()
   val newSeams = BooleanArray(count)
-  if (previous != null && previous.count > 0) {
-    val scale = if (previous.total > 0) previous.total.toFloat() / total else 1f
+  var resegmented = false
+  if (previous != null && previous.count > 0 && previous.total == total) {
+    val matches = IntArray(count) { previous.keys.indexOfKey(keys[it]) }
     for (i in 0 until count) {
-      val match = previous.keys.indexOfKey(keys[i])
+      val match = matches[i]
       if (match >= 0) {
-        fillsFrom[i] = (previous.displayedFill(match, glide) * scale).coerceIn(starts[i], ends[i])
+        fillsFrom[i] = previous.displayedFill(match, glide).coerceIn(starts[i], ends[i])
       }
-      if (!seams[i] || match >= 0 && previous.seams[match]) continue
+      // The first segments of a download that showed one lane for its progress split nothing.
+      if (!previous.segmented || !seams[i] || match >= 0 && previous.seams[match]) continue
       newSeams[i] = true
+      resegmented = true
       val split = previous.keys.indexAtOrBefore(keys[i])
       if (split >= 0 && previous.unfinished[split]) {
-        val head = previous.displayedFill(split, glide) * scale
-        startsFrom[i] = head.coerceIn(previous.starts[split] * scale, starts[i])
+        val head = previous.displayedFill(split, glide)
+        startsFrom[i] = head.coerceIn(previous.starts[split], starts[i])
+      }
+    }
+    for (i in 0 until count) {
+      val match = matches[i]
+      if (match < 0 || newSeams[i]) continue
+      if (resegmented) {
+        startsFrom[i] = lerp(previous.startsFrom[match], previous.starts[match], reseg)
+      } else {
+        startsFrom[i] = previous.startsFrom[match]
+        newSeams[i] = seams[i] && previous.newSeams[match]
       }
     }
   }
@@ -618,7 +648,29 @@ internal fun laneLayout(
     stalled = stalledLanes,
     fraction = share(sorted.sumOf { it.downloadedBytes.coerceIn(0, it.totalBytes) }),
     total = total,
+    segmented = segmented,
+    resegmented = resegmented,
   )
+}
+
+/**
+ * How far a completed strip has faded from its lanes into the completed color, from 0 to 1,
+ * [completion] of the way through the fade of [fadeMillis] and the sheen of [sheenMillis] after
+ * it. Without a fade, as under reduce motion, it is faded at once.
+ */
+internal fun completionFade(completion: Float, fadeMillis: Int, sheenMillis: Int): Float {
+  if (fadeMillis <= 0) return 1f
+  return (completion * (fadeMillis + sheenMillis) / fadeMillis).coerceIn(0f, 1f)
+}
+
+/**
+ * Where the completion sheen is, [completion] of the way through the fade and the sheen: it
+ * crosses the strip between 0 and 1 and is not drawn outside them. Without a sheen, as under
+ * reduce motion, it is never drawn.
+ */
+internal fun completionSheen(completion: Float, fadeMillis: Int, sheenMillis: Int): Float {
+  if (sheenMillis <= 0) return 1f
+  return (completion * (fadeMillis + sheenMillis) - fadeMillis) / sheenMillis
 }
 
 /**

@@ -106,7 +106,7 @@ fun KetchDot(
       .drawBehind {
         if (halo != null) drawHalo(color, halo.value, motion.pulseAlpha, motion.pulseGrowth)
         drawCircle(color)
-      },
+      }
   )
 }
 

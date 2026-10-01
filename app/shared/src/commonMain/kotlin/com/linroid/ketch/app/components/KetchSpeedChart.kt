@@ -60,7 +60,7 @@ data class SpeedLimitLine(val bytesPerSecond: Long, val label: String? = null)
  * the right. The y-axis runs from zero to a round ceiling above the peak and every limit, which
  * [showAxis] labels top-left. Limits are dashed lines in the throttled color. With [timeLabel],
  * hovering (or dragging on touch) shows a crosshair labelled with the sample's time and total
- * speed, such as "11:42:08 · 9.8 MB/s".
+ * speed, such as "11:42:08 · 9.8 MB/s". [modifier] gives the chart its size.
  *
  * @param slots samples the width holds; the longest band's by default.
  * @param showAxis whether to label the ceiling; sparklines leave it off.
@@ -92,9 +92,9 @@ fun KetchSpeedChart(
   lineColor: Color = KetchTheme.colors.accent,
   normalize: Boolean = true,
 ) {
-  val scale = if (normalize) 1f else NORMALIZED_SCALE.toFloat()
-  val band = remember(samples, lineColor, scale) {
-    SpeedBand(samples.map { (it * scale).toLong() }, lineColor)
+  val band = remember(samples, lineColor, normalize) {
+    val peak = if (normalize) samples.maxOrNull()?.takeIf { it > 0f } ?: 1f else 1f
+    SpeedBand(samples.map { (it / peak * NORMALIZED_SCALE).toLong() }, lineColor)
   }
   SpeedChart(
     bands = listOf(band),
@@ -103,7 +103,7 @@ fun KetchSpeedChart(
     slots = samples.size,
     showAxis = false,
     timeLabel = null,
-    ceiling = if (normalize) null else NORMALIZED_SCALE,
+    ceiling = NORMALIZED_SCALE,
   )
 }
 
@@ -204,7 +204,7 @@ private fun SpeedChart(
             drawCircle(colors.accent, radius = stroke.width * 2, center = Offset(x, y))
             val text = measurer.measure(
               "${timeLabel(index)} · ${formatBytes(totals[index])}/s",
-              type.numeralS,
+              type.numeralS
             )
             val pad = labelGap * 2
             val boxWidth = text.size.width + pad * 2
@@ -218,7 +218,7 @@ private fun SpeedChart(
             drawText(text, colors.inverseOnSurface, Offset(boxLeft + pad, labelGap))
           }
         }
-      },
+      }
   )
 }
 

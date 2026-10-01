@@ -36,7 +36,7 @@ class KetchSpeedChartTest {
     val bands = listOf(
       SpeedBand(listOf(1L, 2L, 3L), Color.Black),
       SpeedBand(listOf(10L, 20L), Color.Black),
-      SpeedBand(listOf(-5L), Color.Black),
+      SpeedBand(listOf(-5L), Color.Black)
     )
 
     assertEquals(listOf(1L, 12L, 23L), stackedTotals(bands, slots = 3).toList())

@@ -113,7 +113,7 @@ fun SailLanesIllustration(
           }
           drawRoundRect(colors.textTertiary, hullTopLeft, hullSize, radius, alpha = HULL_ALPHA)
         }
-      },
+      }
   )
 }
 

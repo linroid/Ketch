@@ -87,7 +87,7 @@ fun KetchSegmentDetail(
           phase = LanePhase.Downloading,
           progress = null,
           modifier = Modifier.weight(1f),
-          height = if (compact) LaneStripDefaults.CellHeight else LaneBarHeight,
+          height = if (compact) LaneStripDefaults.CellHeight else LaneStripDefaults.LaneHeight,
           heads = false,
         )
         if (!compact) {
@@ -134,6 +134,5 @@ private fun segmentsOf(progress: List<Float>, widths: List<Float>?): List<Segmen
 private const val NOTIONAL_SIZE = 1_000_000L
 private val RowHeight = 20.dp
 private val CompactRowHeight = 14.dp
-private val LaneBarHeight = 8.dp
 private val IndexWidth = 22.dp
 private val PercentWidth = 38.dp
