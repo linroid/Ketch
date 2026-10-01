@@ -28,18 +28,30 @@ import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.components.SpeedLimitPickerPresets
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.instance.DevicePresence
+import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.LocalClock
+import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.PulseState
+import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
+import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.darkKetchColors
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.formatBytes
@@ -59,7 +71,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transform
 import kotlin.math.roundToInt
-import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -67,19 +78,31 @@ import kotlin.time.Instant
 private val isMac = System.getProperty("os.name").startsWith("Mac")
 
 /**
- * What the tray icon, the menu bar, the Dock and the taskbar show: the Pulse of the active scope,
- * taken at most once a second, and the failures the user has not looked at yet.
+ * What the tray icon, the menu bar, the Dock and the taskbar show, taken at most once a second:
+ * the Pulse of the window's scope, the Pulse of every device the app keeps connected, what each
+ * device is doing, and the failures the user has not looked at yet.
  *
  * Create it with [rememberDesktopStatus] and share it between [KetchTray], [KetchMenuBar] and
  * [TaskbarFeedback].
  */
 @Stable
 class DesktopStatus internal constructor() {
-  /** Pulse of the active scope. */
+  /** Pulse of the devices the main window shows. */
   var pulse: PulseState by mutableStateOf(PulseState())
     private set
 
-  /** Failed tasks that appeared since the Failed tab was last viewed. */
+  /**
+   * Pulse of every device the app keeps connected (this computer, the active device and the
+   * watched ones), which the tray and the Dock sum up whichever device the window shows.
+   */
+  var fleet: PulseState by mutableStateOf(PulseState())
+    private set
+
+  /** Every configured device and what it is doing, for the tray's Devices menu. */
+  var devices: List<DevicePresence> by mutableStateOf(emptyList())
+    private set
+
+  /** Failed tasks on [fleet] that appeared since the Failed tab last showed their device. */
   var unseenFailures: Int by mutableStateOf(0)
     private set
 
@@ -95,18 +118,30 @@ class DesktopStatus internal constructor() {
   /** Emits when tasks fail, for the Dock's request for attention. */
   internal val newFailures: SharedFlow<Unit> = failures.asSharedFlow()
 
-  /** Takes [pulse] as the current status. While [viewingFailures], its failures count as seen. */
-  internal fun update(pulse: PulseState, viewingFailures: Boolean) {
+  /**
+   * Takes [pulse], [devices] and [fleet] as the current status. While [viewingFailures], the
+   * failures of [pulse]'s devices count as seen.
+   */
+  internal fun update(
+    pulse: PulseState,
+    viewingFailures: Boolean,
+    devices: List<DevicePresence> = this.devices,
+    fleet: PulseState = pulse,
+  ) {
     this.pulse = pulse
-    if (watch.update(pulse.devices, viewingFailures) > 0) failures.tryEmit(Unit)
+    this.fleet = fleet
+    this.devices = devices
+    val viewed = if (viewingFailures) pulse.devices.mapTo(HashSet()) { it.deviceId } else emptySet()
+    if (watch.update(fleet.devices, viewed) > 0) failures.tryEmit(Unit)
     unseenFailures = watch.unseen
   }
 }
 
 /**
- * Creates the [DesktopStatus] of [controller], following [pulse].
+ * Creates the [DesktopStatus] of [controller], following [pulse] and the controller's devices.
  *
- * @param pulse the Pulse of the active scope, such as the state of the controller's Pulse model.
+ * @param pulse the Pulse of the window's scope, such as the state of the controller's Pulse
+ *   model.
  * @param windowFocused whether the main window has focus; failures count as seen while it shows
  *   the Failed tab.
  */
@@ -121,26 +156,82 @@ fun rememberDesktopStatus(
   val currentViewing by rememberUpdatedState(viewing)
   SideEffect { status.windowFocused = windowFocused }
   LaunchedEffect(status, pulse) {
-    pulse.throttleLatest(STATUS_INTERVAL).collect { status.update(it, currentViewing) }
+    val localMode = controller.speedMode?.mode ?: flowOf(SpeedMode.Full)
+    combine(
+      pulse,
+      controller.pulse.devices,
+      controller.instanceManager.presence,
+      localMode,
+      ::StatusReading,
+    ).throttleLatest(STATUS_INTERVAL).collect { reading ->
+      val fleet = fleetPulse(reading.presence, reading.pulses, reading.localMode)
+      status.update(reading.pulse, currentViewing, reading.presence, fleet)
+    }
   }
   LaunchedEffect(status, viewing) {
-    if (viewing) status.update(status.pulse, viewingFailures = true)
+    if (viewing) status.update(status.pulse, viewingFailures = true, fleet = status.fleet)
   }
   return status
 }
 
+private class StatusReading(
+  val pulse: PulseState,
+  val pulses: List<DevicePulse>,
+  val presence: List<DevicePresence>,
+  val localMode: SpeedMode,
+)
+
+/**
+ * The Pulse of every device the app keeps connected, in the order of [presence]: each as
+ * [pulses] knows it, else as its presence reports it, without the byte totals behind the
+ * progress ring and the finish time. Until the presence is in, the online devices of [pulses].
+ * [localMode] is this computer's speed mode, the one the status sentence names.
+ */
+internal fun fleetPulse(
+  presence: List<DevicePresence>,
+  pulses: List<DevicePulse>,
+  localMode: SpeedMode,
+): PulseState {
+  val known = pulses.associateBy { it.deviceId }
+  val devices = if (presence.isEmpty()) {
+    pulses.filter { it.health.isOnline }
+  } else {
+    presence.filter { it.connected }.map { known[it.deviceId] ?: it.toPulse() }
+  }
+  return PulseState(devices = devices, allDevices = devices.size > 1, mode = localMode)
+}
+
+private fun DevicePresence.toPulse(): DevicePulse = DevicePulse(
+  deviceId = deviceId,
+  name = name,
+  health = health,
+  counts = counts,
+  failures = failures,
+  speed = speed,
+  cap = cap,
+  downloadedBytes = 0,
+  sizeBytes = 0,
+  sizesKnown = false,
+  pendingBytes = 0,
+  disk = disk,
+  history = history,
+)
+
 /**
  * The tray icon (the menu bar extra on macOS) and its menu: the status sentence, adding
- * downloads, pausing and resuming everything, the speed mode, the last finished downloads, and
- * the window, Settings and Quit. Clicking the icon on Windows and Linux shows the window.
+ * downloads, pausing and resuming everything, the speed mode, each device with what it is doing
+ * and its own actions, the last finished downloads, and the window, Settings and Quit. Clicking
+ * the icon on Windows and Linux shows the window.
  *
- * The icon is the sail with a ring for the overall progress and a dot for failures not seen yet,
- * dimmed while everything is paused. On macOS it is a template image, which the menu bar tints.
+ * The icon, its tooltip and the status sentence sum up every device the app keeps connected:
+ * the sail with a ring for the overall progress and a dot for failures not seen yet, dimmed
+ * while everything is paused. On macOS it is a template image, which the menu bar tints.
  * Nothing shows where the system has no tray.
  *
- * @param status the Pulse and unseen failures to show.
+ * @param status the Pulse, devices and unseen failures to show.
  * @param actions shows the window and quits the app.
  * @param speedMode switches the active device's speed mode; `null` leaves out the Speed menu.
+ *   This computer's own Speed menu, under Devices, follows the controller's speed mode.
  * @param state sends notifications from the icon, see [TrayNotifier].
  */
 @Composable
@@ -161,16 +252,34 @@ fun ApplicationScope.KetchTray(
   }
   val recent by remember(controller) { recentDownloads(controller) }.collectAsState(emptyList())
   val speed = speedMode?.let { traySpeed(it) }
-  val pulse = status.pulse
-  val entries = trayMenu(TrayContext(pulse, speed, recent))
+  val localSpeed = controller.speedMode?.let { traySpeed(it) }
+  val devices = status.devices.map { trayDevice(controller.state, it, localSpeed) }
+  val fleet = status.fleet
+  val now = LocalClock.current.now()
+  val entries = trayMenu(TrayContext(fleet, speed, recent, now, devices))
   Tray(
-    icon = rememberTrayIcon(pulse, status.unseenFailures),
+    icon = rememberTrayIcon(fleet, status.unseenFailures),
     state = state,
-    tooltip = trayTooltip(pulse),
+    tooltip = trayTooltip(fleet, now),
     onAction = actions.showWindow,
   ) {
     MenuEntries(entries, KeyboardPlatform.current, commands::perform)
   }
+}
+
+// This computer's Speed menu switches its speed mode; a device without one gets its speed limit,
+// as the app last read it, else as the device last reported it.
+private fun trayDevice(
+  state: AppState,
+  device: DevicePresence,
+  localSpeed: TraySpeed?,
+): TrayDevice {
+  if (device.entry is EmbeddedInstance && localSpeed != null) {
+    return TrayDevice(device, speed = localSpeed)
+  }
+  val limit = state.settingsFor(device.entry).download?.speedLimit
+    ?: device.status?.config?.speedLimit
+  return TrayDevice(device, limit = limit)
 }
 
 /**
@@ -182,7 +291,7 @@ fun ApplicationScope.KetchTray(
 internal data class RecentDownload(val name: String, val path: String)
 
 /**
- * The speed mode of the active device, for the Speed menu.
+ * A speed mode, for a Speed menu.
  *
  * @property mode the mode chosen.
  * @property slowLane speed of the slow lane.
@@ -195,34 +304,53 @@ internal data class TraySpeed(
 )
 
 /**
+ * A device under the tray's Devices menu.
+ *
+ * @property presence what the device is doing.
+ * @property speed its speed mode, for its Speed menu; `null` for a device without one.
+ * @property limit for a device without a speed mode, its download speed limit, which its Speed
+ *   menu picks; `null` while unknown, which leaves the menu out.
+ */
+internal data class TrayDevice(
+  val presence: DevicePresence,
+  val speed: TraySpeed? = null,
+  val limit: SpeedLimit? = null,
+)
+
+/**
  * What the tray menu reflects.
  *
- * @property speed the speed mode; `null` leaves out the Speed menu.
+ * @property pulse every device the app keeps connected, which the status sentence, Pause all
+ *   and Resume all sum up.
+ * @property speed the active device's speed mode; `null` leaves out the Speed menu.
  * @property recent finished downloads, newest first.
  * @property now the time the status sentence's clock times are relative to.
+ * @property devices every configured device, in the order of the app's devices.
  */
 internal data class TrayContext(
   val pulse: PulseState,
   val speed: TraySpeed?,
   val recent: List<RecentDownload>,
-  val now: Instant = Clock.System.now(),
+  val now: Instant,
+  val devices: List<TrayDevice> = emptyList(),
 )
 
-/** The tray menu in [context]; the Devices section joins it with All devices. */
+/** The tray menu in [context]. */
 internal fun trayMenu(context: TrayContext): List<MenuEntry> = buildList {
-  fun command(command: KetchCommand, enabled: Boolean = true) =
-    MenuEntry.Item(MenuAction.Run(command), command.label, enabled)
+  fun command(command: KetchCommand) = MenuEntry.Item(MenuAction.Run(command), command.label)
 
-  val counts = context.pulse.counts
+  val counts = context.pulse.onlineCounts
+  val targets = context.pulse.devices.filter { it.health.isOnline }.map { it.deviceId }
   add(MenuEntry.Header(context.pulse.sentence(now = context.now)))
   add(command(KetchCommands.Add))
   add(command(KetchCommands.AddClipboardLink))
   add(command(KetchCommands.OpenTorrent))
   add(MenuEntry.Separator)
-  add(command(KetchCommands.PauseAll, enabled = counts.downloading + counts.waiting > 0))
-  add(command(KetchCommands.ResumeAll, enabled = counts.paused > 0))
+  add(pauseAll(targets, counts))
+  add(resumeAll(targets, counts))
   context.speed?.let { add(speedMenu(it)) }
   add(MenuEntry.Separator)
+  add(MenuEntry.Submenu("Devices", devicesMenu(context.devices)))
   add(
     MenuEntry.Submenu(
       label = "Recent",
@@ -238,6 +366,125 @@ internal fun trayMenu(context: TrayContext): List<MenuEntry> = buildList {
   add(command(KetchCommands.Quit))
 }
 
+/**
+ * Task counts of the online devices in this Pulse; a device that is not online may still list
+ * tasks as downloading from when it last was.
+ */
+internal val PulseState.onlineCounts: PulseCounts
+  get() = devices.filter { it.health.isOnline }
+    .fold(PulseCounts()) { sum, device -> sum + device.counts }
+
+/**
+ * What [device] is doing, after its name in the Devices menu: "6.4 MB/s · 2 active",
+ * "2 waiting", "3 paused" or "Idle", then "Slow lane" and "1 failed" when they apply; or why it
+ * cannot be reached.
+ */
+internal fun trayDeviceStatus(device: DevicePresence): String {
+  val health = device.health
+  return when {
+    health == DeviceHealth.Unauthorized -> "Needs token"
+    !device.connected -> "Not connected"
+    health is DeviceHealth.Offline -> "Offline"
+    health == DeviceHealth.Connecting -> "Connecting"
+    else -> {
+      val counts = device.counts
+      val parts = buildList {
+        when {
+          counts.downloading > 0 -> {
+            add(formatSpeed(device.speed))
+            add("${counts.downloading} active")
+          }
+          counts.waiting > 0 -> add("${counts.waiting} waiting")
+          counts.paused > 0 -> add("${counts.paused} paused")
+        }
+        if (device.speedMode.isSlowLane && counts.downloading + counts.waiting > 0) {
+          add(speedModeName(SpeedLimitMode.SlowLane))
+        }
+        if (device.failures > 0) add("${device.failures} failed")
+      }
+      parts.joinToString(" · ").ifEmpty { "Idle" }
+    }
+  }
+}
+
+private fun devicesMenu(devices: List<TrayDevice>): List<MenuEntry> = buildList {
+  devices.forEach { add(deviceMenu(it)) }
+  if (devices.isNotEmpty()) add(MenuEntry.Separator)
+  add(MenuEntry.Item(MenuAction.AddDevice, ADD_DEVICE))
+}
+
+// Show, then what the device's state allows: its downloads' actions while it is online, Retry
+// now while it is offline, and a new token once it rejected its own.
+private fun deviceMenu(device: TrayDevice): MenuEntry.Submenu {
+  val presence = device.presence
+  val id = presence.deviceId
+  val health = presence.health
+  val entries = buildList {
+    add(MenuEntry.Item(MenuAction.ShowDevice(id), "Show"))
+    when {
+      health == DeviceHealth.Unauthorized -> {
+        add(MenuEntry.Item(MenuAction.EnterToken(id), "Enter token…"))
+      }
+      !presence.connected -> Unit
+      health is DeviceHealth.Offline -> add(MenuEntry.Item(MenuAction.Reconnect(id), "Retry now"))
+      health.isOnline -> addAll(onlineEntries(device))
+    }
+    if (presence.entry is RemoteInstance) {
+      add(MenuEntry.Separator)
+      add(
+        MenuEntry.Item(
+          action = MenuAction.StayConnected(id, watch = !presence.watched),
+          label = "Stay connected",
+          checked = presence.watched,
+        ),
+      )
+    }
+  }
+  return MenuEntry.Submenu("${presence.name} — ${trayDeviceStatus(presence)}", entries)
+}
+
+private fun onlineEntries(device: TrayDevice): List<MenuEntry> = buildList {
+  val presence = device.presence
+  val id = presence.deviceId
+  add(MenuEntry.Separator)
+  add(pauseAll(listOf(id), presence.counts))
+  add(resumeAll(listOf(id), presence.counts))
+  if (presence.failures > 0) {
+    add(MenuEntry.Item(MenuAction.RetryFailed(listOf(id)), "Retry ${presence.failures} failed"))
+  }
+  device.speed?.let { add(speedMenu(it)) }
+  device.limit?.let { add(limitMenu(id, it)) }
+  add(MenuEntry.Separator)
+  add(MenuEntry.Item(MenuAction.AddClipboardLink(id), "Add clipboard link here"))
+}
+
+private fun pauseAll(deviceIds: List<String>, counts: PulseCounts) = MenuEntry.Item(
+  action = MenuAction.PauseAll(deviceIds),
+  label = KetchCommands.PauseAll.label,
+  enabled = counts.downloading + counts.waiting > 0,
+)
+
+private fun resumeAll(deviceIds: List<String>, counts: PulseCounts) = MenuEntry.Item(
+  action = MenuAction.ResumeAll(deviceIds),
+  label = KetchCommands.ResumeAll.label,
+  enabled = counts.paused > 0,
+)
+
+// The speed limits the app's picker offers, and the device's own when it is none of them.
+private fun limitMenu(deviceId: String, limit: SpeedLimit): MenuEntry.Submenu {
+  val choices = (SpeedLimitPickerPresets + limit).distinct().sortedBy { it.bytesPerSecond }
+  return MenuEntry.Submenu(
+    label = "Speed",
+    entries = choices.map { choice ->
+      MenuEntry.Item(
+        action = MenuAction.SetSpeedLimit(deviceId, choice),
+        label = formatSpeedLimit(choice),
+        checked = choice == limit,
+      )
+    },
+  )
+}
+
 private fun speedMenu(speed: TraySpeed): MenuEntry.Submenu {
   fun choice(mode: SpeedLimitMode, label: String, enabled: Boolean = true) = MenuEntry.Item(
     action = MenuAction.SetSpeedMode(mode),
@@ -245,7 +492,7 @@ private fun speedMenu(speed: TraySpeed): MenuEntry.Submenu {
     enabled = enabled,
     checked = speed.mode == mode,
   )
-  val slowLane = "${speedModeName(SpeedLimitMode.SlowLane)} · ${formatSpeed(speed.slowLane)}"
+  val slowLane = "${speedModeName(SpeedLimitMode.SlowLane)} · ${formatSpeedLimit(speed.slowLane)}"
   return MenuEntry.Submenu(
     label = "Speed",
     entries = listOf(
@@ -261,17 +508,17 @@ private fun speedMenu(speed: TraySpeed): MenuEntry.Submenu {
 }
 
 /** "Ketch — ↓ 4.2 MB/s · 3 active" while downloading, else "Ketch — " and the sentence. */
-internal fun trayTooltip(pulse: PulseState, now: Instant = Clock.System.now()): String {
-  val downloading = pulse.counts.downloading
+internal fun trayTooltip(pulse: PulseState, now: Instant): String {
+  val downloading = pulse.onlineCounts.downloading
   val summary = if (downloading > 0) {
-    "↓ ${formatBytes(pulse.totalSpeed)}/s · $downloading active"
+    "↓ ${formatSpeed(pulse.totalSpeed)} · $downloading active"
   } else {
     pulse.sentence(now = now)
   }
   return "Ketch — $summary"
 }
 
-private fun formatSpeed(limit: SpeedLimit): String = "${formatBytes(limit.bytesPerSecond)}/s"
+private fun formatSpeed(bytesPerSecond: Long): String = "${formatBytes(bytesPerSecond)}/s"
 
 @Composable
 private fun traySpeed(speedMode: SpeedModeController): TraySpeed {
@@ -309,7 +556,7 @@ private fun recentDownloads(controller: AppController): Flow<List<RecentDownload
 @Composable
 private fun rememberTrayIcon(pulse: PulseState, unseenFailures: Int): Painter {
   val sail = rememberVectorPainter(KetchIcon.Sail.imageVector)
-  val counts = pulse.counts
+  val counts = pulse.onlineCounts
   val active = counts.downloading > 0
   // Steps keep the icon from being redrawn for changes too small to see.
   val progress = pulse.progress?.takeIf { active }

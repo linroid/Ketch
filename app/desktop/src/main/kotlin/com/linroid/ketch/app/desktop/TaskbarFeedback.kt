@@ -25,12 +25,12 @@ import kotlin.math.roundToInt
 private val osName = System.getProperty("os.name")
 
 /**
- * Shows the downloads on the Dock icon (macOS) or the taskbar button (Windows): a badge with the
- * active count or "!" for unseen failures, the overall progress, and on macOS one bounce for each
- * failure while the window is unfocused. Linux shows nothing. Every call checks that the system
- * supports it.
+ * Shows the downloads of every device the app keeps connected on the Dock icon (macOS) or the
+ * taskbar button (Windows): a badge with the active count or "!" for unseen failures, the overall
+ * progress, and on macOS one bounce for each failure while the window is unfocused. Linux shows
+ * nothing. Every call checks that the system supports it.
  *
- * @param status the Pulse and unseen failures to show.
+ * @param status the [fleet][DesktopStatus.fleet] and unseen failures to show.
  * @param badgeMode what the badge shows, from the `[desktop]` settings.
  * @param window the main window, which Windows draws the progress and the badge on; `null` while
  *   it has none.
@@ -38,7 +38,7 @@ private val osName = System.getProperty("os.name")
 @Composable
 fun TaskbarFeedback(status: DesktopStatus, badgeMode: DockBadgeMode, window: Window? = null) {
   val taskbar = remember { TaskbarApplier.create() } ?: return
-  val model = taskbarModel(status.pulse, status.unseenFailures, badgeMode)
+  val model = taskbarModel(status.fleet, status.unseenFailures, badgeMode)
   LaunchedEffect(taskbar, model, window) { taskbar.apply(model, window) }
   LaunchedEffect(taskbar, status) {
     status.newFailures.collect { if (!status.windowFocused) taskbar.requestAttention() }
@@ -98,7 +98,7 @@ internal fun taskbarModel(
   unseenFailures: Int,
   mode: DockBadgeMode,
 ): TaskbarModel {
-  val counts = pulse.counts
+  val counts = pulse.onlineCounts
   val active = counts.downloading + counts.waiting
   val failed = unseenFailures > 0
   val badge = when {
@@ -136,11 +136,11 @@ internal class FailureWatch {
     private set
 
   /**
-   * Takes the failures of [devices]; while [viewing], those of [devices] count as seen.
+   * Takes the failures of [devices]; those of the devices in [viewed] count as seen.
    *
    * @return how many tasks turned failed since the last update.
    */
-  fun update(devices: List<DevicePulse>, viewing: Boolean): Int {
+  fun update(devices: List<DevicePulse>, viewed: Set<String>): Int {
     var new = 0
     for (device in devices) {
       val previous = known[device.deviceId]
@@ -156,7 +156,7 @@ internal class FailureWatch {
           DeviceFailures(tasks, failures, minOf(previous.unseen + more, failures))
         }
       }
-      known[device.deviceId] = if (viewing) next.copy(unseen = 0) else next
+      known[device.deviceId] = if (device.deviceId in viewed) next.copy(unseen = 0) else next
     }
     unseen = devices.sumOf { known[it.deviceId]?.unseen ?: 0 }
     return new
