@@ -19,7 +19,6 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -63,7 +62,7 @@ class DevicePresenceTest {
     val manager = InstanceManager(
       factory = fakes.factory,
       initialRemotes = remotes,
-      context = StandardTestDispatcher(testScheduler),
+      context = backgroundScope.coroutineContext,
       clock = ListFixtures.clock(this),
     )
     manager.presence
@@ -166,6 +165,52 @@ class DevicePresenceTest {
 
     assertEquals(1, inBackground)
     assertEquals(0, manager.presence.value.single().unseenFailures)
+    manager.close()
+  }
+
+  @Test
+  fun presence_freshClientLoadsSeenFailures_keepsThemSeen() = runTest {
+    val fakes = FakeInstanceFactory()
+    val manager = manager(fakes)
+    val failed = tasks(List(2) { DownloadState.Failed(KetchError.Network()) })
+    fakes.remotes.single().tasks.value = failed
+    manager.switchTo(manager.instances.value.last())
+    settle()
+    manager.switchTo(manager.instances.value.first())
+    settle()
+    assertEquals(0, manager.presenceOf("nas.local:8642").unseenFailures)
+
+    fakes.stateOnStart = ConnectionState.Connecting
+    manager.reconnect(manager.instances.value.last() as RemoteInstance)
+    runCurrent()
+    // Like RemoteKetch, the fresh client lists the tasks just before it reports Connected.
+    val client = fakes.remotes.last()
+    client.tasks.value = tasks(List(2) { DownloadState.Failed(KetchError.Network()) })
+    client.connection.value = ConnectionState.Connected
+    settle()
+
+    val presence = manager.presenceOf("nas.local:8642")
+    assertEquals(2, presence.failures)
+    assertEquals(0, presence.unseenFailures)
+    manager.close()
+  }
+
+  @Test
+  fun presence_freshClientNotConnected_keepsLastKnownCounts() = runTest {
+    val fakes = FakeInstanceFactory()
+    val manager = manager(fakes)
+    fakes.remotes.single().tasks.value = tasks(everyState)
+    settle()
+
+    fakes.stateOnStart = ConnectionState.Connecting
+    manager.reconnect(manager.instances.value.last() as RemoteInstance)
+    settle()
+
+    val presence = manager.presenceOf("nas.local:8642")
+    assertEquals(DeviceHealth.Connecting, presence.health)
+    val listed = everyState.count(StatusFilter.All::matches)
+    assertEquals(listed, presence.counts.count(StatusFilter.All))
+    assertEquals(0, presence.speed)
     manager.close()
   }
 

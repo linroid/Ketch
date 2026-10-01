@@ -1,6 +1,8 @@
 package com.linroid.ketch.app.instance
 
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.app.FakeInstanceFactory
+import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.FakeRemote
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListFixtures
@@ -10,7 +12,6 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.UiPreferences
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -35,6 +36,14 @@ class InstanceManagerKeepAliveTest {
     }
   }
 
+  private class Engine : KetchApi by FakeKetchApi("Core") {
+    var starts = 0
+
+    override suspend fun start() {
+      starts++
+    }
+  }
+
   private val nas = RemoteConfig(host = "nas.local")
   private val den = RemoteConfig(host = "den-pc")
 
@@ -49,7 +58,7 @@ class InstanceManagerKeepAliveTest {
       initialRemotes = remotes,
       configStore = store,
       keepAlive = keepAlive,
-      context = StandardTestDispatcher(testScheduler),
+      context = backgroundScope.coroutineContext,
       clock = ListFixtures.clock(this),
     )
     runCurrent()
@@ -117,6 +126,20 @@ class InstanceManagerKeepAliveTest {
     val nas = manager.remote("nas.local")
     assertEquals(ConnectionState.Connected, nas.connectionState.value)
     assertFalse((nas.instance as FakeRemote).closed)
+    manager.close()
+  }
+
+  @Test
+  fun switchTo_backToEmbedded_keepsItsEngineRunning() = runTest {
+    val engine = Engine()
+    val manager = manager(FakeInstanceFactory(embeddedFactory = { engine }))
+
+    manager.switchTo(manager.remote("nas.local"))
+    manager.switchTo(manager.instances.value.first())
+    runCurrent()
+
+    assertEquals(1, engine.starts)
+    assertSame(engine, manager.activeApi.value)
     manager.close()
   }
 
@@ -238,6 +261,25 @@ class InstanceManagerKeepAliveTest {
     assertEquals(DeviceScope.Single(LOCAL_DEVICE_ID), manager.deviceScope.value)
     val remaining = manager.instances.value.filterIsInstance<RemoteInstance>()
     assertEquals(listOf("den-pc"), remaining.map { it.host })
+    manager.close()
+  }
+
+  @Test
+  fun removeInstance_activeRemoteWithoutEmbedded_showsNoDevice() = runTest {
+    val fakes = FakeInstanceFactory(embeddedFactory = null)
+    val remotes = listOf(nas, den, RemoteConfig(host = "pi"))
+    val manager = manager(fakes, remotes)
+    manager.switchTo(manager.remote("nas.local"))
+    val client = manager.remote("nas.local").instance as FakeRemote
+
+    manager.removeInstance(manager.remote("nas.local"))
+    runCurrent()
+
+    assertTrue(client.closed)
+    assertNull(manager.activeInstance.value)
+    assertEquals(DeviceScope.Single(LOCAL_DEVICE_ID), manager.deviceScope.value)
+    val left = manager.instances.value.map { (it as RemoteInstance).host }
+    assertEquals(listOf("den-pc", "pi"), left)
     manager.close()
   }
 
