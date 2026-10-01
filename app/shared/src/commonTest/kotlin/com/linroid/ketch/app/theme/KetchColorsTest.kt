@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.theme
 
+import com.linroid.ketch.remote.ConnectionState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -32,6 +33,17 @@ class KetchColorsTest {
     val paused = colors.laneRamp(colors.status.paused.color)
     assertEquals(colors.status.paused.color, paused.first())
     assertTrue(paused.none { it in colors.lanes })
+  }
+
+  @Test fun healthColor_eachConnectionState_usesItsStatusColor() {
+    for (colors in listOf(lightKetchColors(), darkKetchColors())) {
+      val status = colors.status
+      assertEquals(status.completed.color, colors.healthColor(null))
+      assertEquals(status.completed.color, colors.healthColor(ConnectionState.Connected))
+      assertEquals(status.paused.color, colors.healthColor(ConnectionState.Connecting))
+      assertEquals(status.failed.color, colors.healthColor(ConnectionState.Disconnected()))
+      assertEquals(status.failed.color, colors.healthColor(ConnectionState.Unauthorized))
+    }
   }
 
   @Test fun inverseAccent_everyAccent_isTheOtherThemesAccentText() {

@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.remote.ConnectionState
 
 /**
  * Color tokens of the Ketch design system, for one accent in one theme.
@@ -98,6 +99,16 @@ data class KetchColors(
   /** Tint of [hue] for chips and chart bands. */
   fun deviceTint(hue: FileTypeHue): Color {
     return if (isDark) hue.dark.copy(alpha = 0.16f) else hue.light.copy(alpha = 0.13f)
+  }
+
+  /**
+   * Health of a device's connection [state], or of the embedded device when it is `null`.
+   * Pennant rings, connection dots and the Pulse bar badge all use it.
+   */
+  fun healthColor(state: ConnectionState?): Color = when (state) {
+    null, is ConnectionState.Connected -> status.completed.color
+    is ConnectionState.Connecting -> status.paused.color
+    is ConnectionState.Disconnected, is ConnectionState.Unauthorized -> status.failed.color
   }
 
   @Deprecated("Use canvas.", ReplaceWith("canvas"))

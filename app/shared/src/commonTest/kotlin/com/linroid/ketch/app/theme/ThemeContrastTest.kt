@@ -61,6 +61,9 @@ class ThemeContrastTest {
       assertReadable("textSecondary on selected over $name", colors.textSecondary, selected)
       val glow = wash.ember.compositeOver(stop)
       assertReadable("textSecondary on ember over $name", colors.textSecondary, glow)
+      val selectedOnGlow = colors.sidebarItemSelected.compositeOver(glow)
+      val pair = "textSecondary on selected over ember over $name"
+      assertReadable(pair, colors.textSecondary, selectedOnGlow)
     }
   }
 

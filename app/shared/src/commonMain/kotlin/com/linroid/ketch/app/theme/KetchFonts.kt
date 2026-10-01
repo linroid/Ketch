@@ -32,7 +32,7 @@ private val MonoFonts = listOf(KetchFont(Res.font.jetbrainsmono_regular, FontWei
  * The text styles at [density], set in the bundled Inter, Inter Display and JetBrains Mono.
  *
  * Characters outside the bundled Latin, Greek and Cyrillic subsets, such as CJK, fall back to
- * the system fonts.
+ * the system fonts. The web has no system fonts to fall back to.
  */
 @Composable
 fun rememberKetchTypography(density: KetchDensity = KetchDensity.Compact): KetchTypography {

@@ -49,7 +49,8 @@ val LocalKetchMotion = staticCompositionLocalOf<KetchMotion> {
  * @param accent the accent palette.
  * @param density the density preference; Auto picks by input method.
  * @param reduceMotion whether motion is reduced; follows the system by default.
- * @param windowChrome space the window's own controls take inside the content.
+ * @param windowChrome space the window's own controls take inside the content; by default the
+ *   value an enclosing `LocalWindowChrome` provider set, so a host can provide it around `App`.
  */
 @Composable
 fun KetchTheme(
@@ -57,7 +58,7 @@ fun KetchTheme(
   accent: KetchAccent = KetchAccent.Signal,
   density: DensityMode = DensityMode.Auto,
   reduceMotion: Boolean = rememberReduceMotion(),
-  windowChrome: WindowChrome = WindowChrome.None,
+  windowChrome: WindowChrome = LocalWindowChrome.current,
   content: @Composable () -> Unit,
 ) {
   DensityHost(density) { resolvedDensity ->
@@ -117,10 +118,12 @@ object KetchTheme {
     @Composable @ReadOnlyComposable
     get() = LocalKetchMotion.current
 
+  /** Control sizes of the current density. */
   val density: KetchDensity
     @Composable @ReadOnlyComposable
     get() = LocalKetchDensity.current
 
+  /** Space the window's own controls take inside the content. */
   val windowChrome: WindowChrome
     @Composable @ReadOnlyComposable
     get() = LocalWindowChrome.current
