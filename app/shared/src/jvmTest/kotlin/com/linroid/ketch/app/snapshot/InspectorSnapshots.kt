@@ -64,6 +64,13 @@ class InspectorSnapshots {
   fun enabled() = requireSnapshots()
 
   @Test
+  fun inspector_inTheApp_rendersInTheDownloadsPage() {
+    val sizes = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
+    appSnapshots("inspector-app", sizes = sizes) { inspect(UBUNTU) }
+    appSnapshots("inspector-app-failed", sizes = listOf(SnapshotSize.Desktop)) { inspect(FAILED) }
+  }
+
+  @Test
   fun inspector_eachState_rendersDocked() {
     for (theme in SnapshotTheme.entries) {
       for ((file, name) in STATES) {
@@ -147,6 +154,12 @@ class InspectorSnapshots {
           click(230.dp, 576.dp)
         },
       ) { inspect(UBUNTU) }
+      inspector("inspector-tab-connections", Docked, theme, interact = { click(200.dp, 248.dp) }) {
+        inspect(UBUNTU)
+      }
+      inspector("inspector-tab-activity", Docked, theme, interact = { click(292.dp, 248.dp) }) {
+        inspect(UBUNTU)
+      }
       inspector("inspector-copy-hover", Docked, theme, interact = { hover(220.dp, 551.dp) }) {
         inspect(UBUNTU)
       }
