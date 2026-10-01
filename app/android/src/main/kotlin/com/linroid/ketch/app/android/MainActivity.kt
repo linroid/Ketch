@@ -15,22 +15,40 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.app.App
+import com.linroid.ketch.app.feedback.AndroidNotifier
+import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.RowAction
+import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.state.rememberAppController
+import com.linroid.ketch.app.util.displayName
+import com.linroid.ketch.app.util.toCopy
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 class MainActivity : ComponentActivity() {
 
   private var service: KetchService? by mutableStateOf(null)
+  private var notificationLink: NotificationLink? by mutableStateOf(null)
   private val ketchApplication get() = application as KetchApplication
   private val requestNotificationPermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
@@ -46,6 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onServiceConnected(name: ComponentName, binder: IBinder) {
       val connected = (binder as KetchService.LocalBinder).service
       service = connected
+      connected.setInFront(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
       offerNotificationsAfterFirstAdd(connected.instanceManager)
     }
 
@@ -74,10 +93,20 @@ class MainActivity : ComponentActivity() {
     setContent {
       val svc = service
       if (svc != null) {
-        App(
+        val controller = rememberAppController(
           svc.instanceManager,
           svc.aiProviderFactory,
-          incoming = ketchApplication.incoming,
+          ketchApplication.incoming,
+        )
+        val link = notificationLink
+        LaunchedEffect(controller, link) {
+          if (link == null) return@LaunchedEffect
+          controller.state.open(link)
+          notificationLink = null
+        }
+        App(
+          controller,
+          activityEvents = svc.activityEvents,
           fileLogger = ketchApplication.fileLogger,
         )
       }
@@ -89,8 +118,29 @@ class MainActivity : ComponentActivity() {
     handleIntent(intent)
   }
 
-  /** Hands a `.torrent` file opened with Ketch to the app, which keeps it until handled. */
+  // The service's events show as toasts only while the activity is resumed.
+  override fun onResume() {
+    super.onResume()
+    service?.setInFront(true)
+  }
+
+  override fun onPause() {
+    service?.setInFront(false)
+    super.onPause()
+  }
+
+  /**
+   * Shows what a tapped notification is about, or hands a `.torrent` file opened with Ketch to
+   * the app, which keeps it until handled.
+   */
   private fun handleIntent(intent: Intent?) {
+    val link = AndroidNotifier.linkOf(intent)
+    if (link != null) {
+      // Buttons do not dismiss their notification.
+      if (link.retry) link.taskKey?.let { AndroidNotifier.cancel(this, it) }
+      notificationLink = link
+      return
+    }
     if (intent?.action != Intent.ACTION_VIEW) return
     val uri = intent.data ?: return
     ketchApplication.openFile(uri)
@@ -176,5 +226,38 @@ class MainActivity : ComponentActivity() {
     const val PERMISSION_PREFS = "permissions"
     const val KEY_NOTIFICATIONS_OFFERED = "notifications_offered"
     const val KEY_NOTIFICATIONS_DUE = "notifications_due"
+  }
+}
+
+// A tap can start the app before its device has loaded the task.
+private val TASK_LOAD_TIMEOUT = 10.seconds
+
+/**
+ * Shows what a notification tap asks for: the device it is about, the status tab or the task,
+ * which Retry also retries.
+ */
+private suspend fun AppState.open(link: NotificationLink) {
+  val key = link.taskKey
+  val entry = instances.value.firstOrNull { it.deviceId == (key?.deviceId ?: LOCAL_DEVICE_ID) }
+    ?: return
+  if (entry != activeInstance.value) switchInstance(entry)
+  link.filter?.let { statusFilter = it }
+  if (key == null) return
+  val task = withTimeoutOrNull(TASK_LOAD_TIMEOUT) {
+    entry.instance.tasks.mapNotNull { tasks -> tasks.firstOrNull { it.taskId == key.taskId } }
+      .first()
+  } ?: return
+  if (!statusFilter.matches(task.state.value)) statusFilter = StatusFilter.All
+  inspect(key)
+  if (link.retry) retry(task)
+}
+
+// A failure that resuming cannot fix starts over, as Retry does in the app.
+private fun AppState.retry(task: DownloadTask) {
+  val failed = task.state.value as? DownloadState.Failed ?: return
+  if (failed.error.toCopy().primary == RowAction.DownloadAgain) {
+    redownload(task)
+  } else {
+    runTaskCommand(task, "retry ${displayName(task.request, failed)}") { resume() }
   }
 }
