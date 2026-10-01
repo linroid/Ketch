@@ -9,16 +9,156 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     <style>
+        :root {
+            --canvas: #EEF1F8;
+            --accent: #4F5DE4;
+            --track: rgba(102, 112, 128, 0.12);
+            --hull: rgba(102, 112, 128, 0.2);
+            color-scheme: light dark;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --canvas: #0C0E13;
+                --accent: #5563F0;
+                --track: rgba(133, 141, 156, 0.12);
+                --hull: rgba(133, 141, 156, 0.2);
+            }
+        }
         html, body {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background: var(--canvas);
+        }
+        /* Sail lanes shown until the app's fonts have loaded; main.kt removes it. */
+        #splash {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--canvas);
+        }
+        #splash svg {
+            width: min(280px, 56vw);
+            height: auto;
+        }
+        #splash .track {
+            fill: var(--track);
+        }
+        #splash .hull {
+            fill: var(--hull);
+        }
+        #splash .fill {
+            fill: var(--accent);
+            transform-box: fill-box;
+            transform-origin: 0 50%;
+            transform: scaleX(0);
+            animation: lane-fill 5s cubic-bezier(0.2, 0, 0, 1) infinite both;
+            animation-delay: calc(var(--i) * 90ms);
+        }
+        #splash .fill.ember {
+            fill: url(#ember);
+        }
+        #splash .glow-accent {
+            stop-color: var(--accent);
+            stop-opacity: 0.12;
+        }
+        #splash .glow-ember {
+            stop-color: #E0482B;
+            stop-opacity: 0.06;
+        }
+        #splash .glow-end {
+            stop-color: #E0482B;
+            stop-opacity: 0;
+        }
+        /* Fill for 1.8 s, hold for 2 s, then clear and start again. */
+        @keyframes lane-fill {
+            0% { transform: scaleX(0); opacity: 1; }
+            36% { transform: scaleX(1); opacity: 1; }
+            76% { transform: scaleX(1); opacity: 1; }
+            90% { transform: scaleX(1); opacity: 0; }
+            100% { transform: scaleX(0); opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #splash .fill {
+                animation: none;
+                transform: none;
+            }
         }
     </style>
 </head>
 <body>
+<div id="splash" role="status" aria-label="Loading Ketch">
+    <svg viewBox="200 196 624 600" aria-hidden="true">
+      <defs>
+        <linearGradient id="ember" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FFB25B"/>
+          <stop offset="1" stop-color="#E0482B"/>
+        </linearGradient>
+        <radialGradient id="glow" cx="512" cy="480" r="320" gradientUnits="userSpaceOnUse">
+          <stop class="glow-accent" offset="0"/>
+          <stop class="glow-ember" offset="0.6"/>
+          <stop class="glow-end" offset="1"/>
+        </radialGradient>
+        <clipPath id="lane0"><path d="M325.2,228.5Q346.4,253.9 366.4,280L318,280L318,231Q318,220 325.2,228.5Z"/></clipPath>
+        <clipPath id="lane1"><path d="M318,296L378.5,296Q400.6,325.5 421,356L318,356L318,296Z"/></clipPath>
+        <clipPath id="lane2"><path d="M318,372L431.6,372Q450.9,401.6 468.8,432L318,432L318,372Z"/></clipPath>
+        <clipPath id="lane3"><path d="M318,448L478.1,448Q495,477.6 510.5,508L318,508L318,448Z"/></clipPath>
+        <clipPath id="lane4"><path d="M318,524L518.6,524Q533.3,553.6 546.8,584L318,584L318,524Z"/></clipPath>
+        <clipPath id="lane5"><path d="M318,600L553.7,600Q566.5,629.6 578,660L318,660L318,600Z"/></clipPath>
+        <clipPath id="lane6"><path d="M611.1,380.2Q632.6,405.5 652.1,432L604,432L604,382.8Q604,372 611.1,380.2Z"/></clipPath>
+        <clipPath id="lane7"><path d="M604,448L663.7,448Q684.3,477.3 702.7,508L604,508L604,448Z"/></clipPath>
+        <clipPath id="lane8"><path d="M604,524L712,524Q728.8,553.4 743.5,584L604,584L604,524Z"/></clipPath>
+        <clipPath id="lane9"><path d="M604,600L751,600Q764.4,629.4 776,660L604,660L604,600Z"/></clipPath>
+      </defs>
+      <rect x="200" y="196" width="624" height="600" fill="url(#glow)"/>
+      <path class="track" d="M325.2,228.5Q346.4,253.9 366.4,280L318,280L318,231Q318,220 325.2,228.5Z"/>
+      <g clip-path="url(#lane0)">
+        <rect class="fill ember" style="--i: 0" x="318" y="220" width="49.4" height="60"/>
+      </g>
+      <path class="track" d="M318,296L378.5,296Q400.6,325.5 421,356L318,356L318,296Z"/>
+      <g clip-path="url(#lane1)">
+        <rect class="fill" style="--i: 1" x="318" y="296" width="104" height="60" fill-opacity="0.72"/>
+      </g>
+      <path class="track" d="M318,372L431.6,372Q450.9,401.6 468.8,432L318,432L318,372Z"/>
+      <g clip-path="url(#lane2)">
+        <rect class="fill" style="--i: 2" x="318" y="372" width="151.8" height="60" fill-opacity="0.88"/>
+      </g>
+      <path class="track" d="M318,448L478.1,448Q495,477.6 510.5,508L318,508L318,448Z"/>
+      <g clip-path="url(#lane3)">
+        <rect class="fill" style="--i: 3" x="318" y="448" width="193.5" height="60" fill-opacity="0.6"/>
+      </g>
+      <path class="track" d="M318,524L518.6,524Q533.3,553.6 546.8,584L318,584L318,524Z"/>
+      <g clip-path="url(#lane4)">
+        <rect class="fill" style="--i: 4" x="318" y="524" width="229.8" height="60" fill-opacity="0.94"/>
+      </g>
+      <path class="track" d="M318,600L553.7,600Q566.5,629.6 578,660L318,660L318,600Z"/>
+      <g clip-path="url(#lane5)">
+        <rect class="fill" style="--i: 5" x="318" y="600" width="261" height="60" fill-opacity="0.66"/>
+      </g>
+      <path class="track" d="M611.1,380.2Q632.6,405.5 652.1,432L604,432L604,382.8Q604,372 611.1,380.2Z"/>
+      <g clip-path="url(#lane6)">
+        <rect class="fill" style="--i: 6" x="604" y="372" width="49.1" height="60" fill-opacity="0.8"/>
+      </g>
+      <path class="track" d="M604,448L663.7,448Q684.3,477.3 702.7,508L604,508L604,448Z"/>
+      <g clip-path="url(#lane7)">
+        <rect class="fill" style="--i: 7" x="604" y="448" width="99.7" height="60" fill-opacity="0.54"/>
+      </g>
+      <path class="track" d="M604,524L712,524Q728.8,553.4 743.5,584L604,584L604,524Z"/>
+      <g clip-path="url(#lane8)">
+        <rect class="fill" style="--i: 8" x="604" y="524" width="140.5" height="60" fill-opacity="1"/>
+      </g>
+      <path class="track" d="M604,600L751,600Q764.4,629.4 776,660L604,660L604,600Z"/>
+      <g clip-path="url(#lane9)">
+        <rect class="fill" style="--i: 9" x="604" y="600" width="173" height="60" fill-opacity="0.72"/>
+      </g>
+      <path class="hull" d="M241.2,686L789.9,686Q816,686 798.8,705.1C742.2,760.1 651,781 530.7,781C409.9,781 313.9,766.4 232.7,706.2Q208,686 241.2,686Z"/>
+    </svg>
+</div>
 <script src="ketch-web.js"></script>
 </body>
 </html>

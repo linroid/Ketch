@@ -13,8 +13,8 @@ and native release archives include that directory beside the program.
 The shell installer retains archive notices in `ketch-licenses/` beside the installed
 executable. Older releases without a notices directory remain installable.
 
-The initial notices cover js-joda, Logback, SLF4J and JNA. They are not a complete
-transitive-dependency inventory. Keep upstream copyright statements unchanged.
+The notices cover js-joda, Logback, SLF4J, JNA and the fonts the apps bundle. They are
+not a complete transitive-dependency inventory. Keep upstream copyright statements unchanged.
 
 - Logback 1.6.3 is distributed using its EPL-2.0 option. The notices include the
   full EPL text and links to the corresponding upstream source archive and tag.
@@ -27,6 +27,10 @@ transitive-dependency inventory. Keep upstream copyright statements unchanged.
 - js-joda's full BSD text is included. Preserve webpack's generated
   `*.LICENSE.txt` files too: they carry additional copyright statements and are
   referenced by the minified JavaScript.
+- The apps bundle subsets of Inter 4.1, Inter Display 4.1 and JetBrains Mono 2.304
+  (`app/shared/src/commonMain/composeResources/font/`) under the SIL OFL 1.1. The notices
+  carry both OFL texts and describe the subsetting; neither font declares a Reserved Font
+  Name. Update them when the fonts or their subsets change.
 
 The Logback notice was obtained from the `v_1.6.3` upstream `LICENSE.txt`; EPL-2.0
 from SPDX's `license-list-data/text/EPL-2.0.txt`; the JNA notice from the 5.19.1

@@ -131,4 +131,8 @@ tasks.named<Test>("jvmTest") {
   outputs.upToDateWhen { !updateTokenAllowlist }
   outputs.cacheIf { !updateTokenAllowlist }
   systemProperty("updateTokenAllowlist", updateTokenAllowlist.toString())
+  // The guard reads the source text itself, comments included, not the compiled classes.
+  inputs.dir("src/commonMain/kotlin")
+    .withPropertyName("tokenGuardSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
 }
