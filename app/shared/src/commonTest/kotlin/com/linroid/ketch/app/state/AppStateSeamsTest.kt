@@ -1,0 +1,151 @@
+package com.linroid.ketch.app.state
+
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.FakeKetchApi
+import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.feedback.ActivityEvent
+import com.linroid.ketch.app.instance.InstanceFactory
+import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.ui.feedback.toastDetail
+import com.linroid.ketch.app.ui.intake.initialUrl
+import com.linroid.ketch.config.KetchConfig
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+class AppStateSeamsTest {
+
+  private val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=ubuntu"
+
+  private fun TestScope.appState(
+    api: KetchApi = FakeKetchApi(),
+    incoming: IncomingDownloads = IncomingDownloads(),
+    config: KetchConfig = KetchConfig(),
+  ): AppState {
+    val store = RecordingConfigStore(config)
+    val manager = InstanceManager(
+      factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
+      configStore = store,
+    )
+    return AppState(
+      instanceManager = manager,
+      scope = backgroundScope,
+      appSettings = AppSettingsController(store),
+      incoming = incoming,
+    )
+  }
+
+  @Test
+  fun incomingLinks_offered_openTheAddDialogWithTheFirstLink() = runTest {
+    val incoming = IncomingDownloads()
+    val state = appState(incoming = incoming)
+
+    incoming.offerLinks(listOf(magnet, "https://example.com/b.iso"), LinkSource.OpenUrl)
+    runCurrent()
+
+    assertTrue(state.showAddDialog)
+    assertEquals(magnet, initialUrl(assertNotNull(state.intakeRequest)))
+  }
+
+  @Test
+  fun closeAddDialog_afterIncomingLinks_completesThemAndShowsTheNext() = runTest {
+    val incoming = IncomingDownloads()
+    val state = appState(incoming = incoming)
+    incoming.offerLinks(listOf(magnet), LinkSource.OpenUrl)
+    incoming.offerLinks(listOf("https://example.com/b.iso"), LinkSource.Share)
+    runCurrent()
+
+    state.closeAddDialog()
+    runCurrent()
+
+    assertEquals("https://example.com/b.iso", initialUrl(assertNotNull(state.intakeRequest)))
+    state.closeAddDialog()
+    runCurrent()
+    assertFalse(state.showAddDialog)
+    assertTrue(incoming.pendingLinks.value.isEmpty())
+  }
+
+  @Test
+  fun incomingLinks_whileAnOpenedFileShows_waitForIt() = runTest {
+    val incoming = IncomingDownloads()
+    val state = appState(incoming = incoming)
+    incoming.offer(IncomingDownload.Ready("a.torrent", byteArrayOf(1)))
+    incoming.offerLinks(listOf(magnet), LinkSource.OpenUrl)
+    runCurrent()
+
+    assertEquals("a.torrent", state.openedDownload?.label)
+    state.closeAddDialog()
+    runCurrent()
+
+    assertTrue(state.showAddDialog)
+    assertEquals(magnet, initialUrl(assertNotNull(state.intakeRequest)))
+  }
+
+  @Test
+  fun addDroppedText_link_opensTheAddDialogPrefilled() = runTest {
+    val state = appState()
+
+    state.addDroppedText("  https://example.com/ubuntu.iso\n")
+    runCurrent()
+
+    assertTrue(state.showAddDialog)
+    assertEquals(
+      "https://example.com/ubuntu.iso",
+      initialUrl(assertNotNull(state.intakeRequest))
+    )
+  }
+
+  @Test
+  fun pulse_embeddedSpeedLimit_isTheCap() = runTest {
+    val config = KetchConfig(download = DownloadConfig(speedLimit = SpeedLimit.mbps(5)))
+    val state = appState(config = config)
+
+    runCurrent()
+
+    assertEquals(SpeedLimit.mbps(5), state.pulse.state.value.cap)
+  }
+
+  @Test
+  fun showDownloads_fromAnotherTab_resetsTheTabAndAsksTheShell() = runTest {
+    val state = appState()
+    state.statusFilter = StatusFilter.Failed
+    var requests = 0
+    backgroundScope.launch { state.downloadsRequests.collect { requests++ } }
+    runCurrent()
+
+    state.showDownloads()
+    runCurrent()
+
+    assertEquals(StatusFilter.All, state.statusFilter)
+    assertEquals(1, requests)
+  }
+
+  @Test
+  fun report_failedDownload_toastNamesTheFileAndTheProblem() = runTest {
+    val state = appState()
+    val request = DownloadRequest(url = "https://example.com/files/q3-report.pdf")
+
+    state.report(
+      ActivityEvent.Failed(
+        taskKey = TaskKey(LOCAL_DEVICE_ID, "t1"),
+        request = request,
+        state = DownloadState.Failed(KetchError.Http(403)),
+      )
+    )
+
+    val message = state.messages.active.value.single()
+    assertEquals("Download failed", message.title)
+    assertEquals("q3-report.pdf: Access denied (403)", toastDetail(message))
+  }
+}

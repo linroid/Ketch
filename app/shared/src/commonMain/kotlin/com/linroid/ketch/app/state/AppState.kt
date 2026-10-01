@@ -3,6 +3,7 @@ package com.linroid.ketch.app.state
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -48,6 +49,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -56,8 +58,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -105,6 +109,8 @@ val InstanceEntry.deviceId: String
  * meant to be used from the main thread.
  *
  * @param scope runs the commands; it should use a `SupervisorJob` and the main dispatcher.
+ * @param speedMode speed mode of the embedded device, owned by the host, such as the service whose
+ *   notification switches it; `null` when the host keeps none.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppState(
@@ -114,6 +120,7 @@ class AppState(
   val aiSettings: AiSettingsController = AiSettingsController(),
   private val incoming: IncomingDownloads = IncomingDownloads(),
   val messages: MessageCenter = MessageCenter(),
+  val speedMode: SpeedModeController? = null,
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()
@@ -147,26 +154,8 @@ class AppState(
 
   /** Tasks of the active device, without the ones a pending operation hides. */
   val tasks: StateFlow<List<DownloadTask>> =
-    combine(
-      activeApi.flatMapLatest { it.tasks },
-      activeInstance,
-      pendingOps.hidden,
-    ) { tasks, instance, hidden ->
-      val deviceId = instance?.deviceId ?: LOCAL_DEVICE_ID
-      if (hidden.isEmpty()) tasks else tasks.filter { TaskKey(deviceId, it.taskId) !in hidden }
-    }.stateIn(
-      scope,
-      SharingStarted.WhileSubscribed(5000),
-      emptyList()
-    )
-
-  val sortedTasks: StateFlow<List<DownloadTask>> =
-    tasks.map { it.sortedByDescending { t -> t.createdAt } }
-      .stateIn(
-        scope,
-        SharingStarted.WhileSubscribed(5000),
-        emptyList()
-      )
+    activeInstance.flatMapLatest { entry -> entry?.let(::visibleTasksOf) ?: flowOf(emptyList()) }
+      .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
   private val pendingCounts = mutableMapOf<Pair<TaskKey, String>, Int>()
   private val pendingState = MutableStateFlow<Set<Pair<TaskKey, String>>>(emptySet())
@@ -175,14 +164,49 @@ class AppState(
   val pending: StateFlow<Set<Pair<TaskKey, String>>> = pendingState.asStateFlow()
 
   // UI state
-  var statusFilter by mutableStateOf(StatusFilter.All)
+  private val filterState = FlowState(StatusFilter.All)
+  private val searchState = FlowState("")
+  private val arrangementState = FlowState(DEFAULT_ARRANGEMENT)
+  private val frozenState = FlowState(false)
+
+  /** Status tab of the Downloads list. */
+  var statusFilter: StatusFilter
+    get() = filterState.value
+    set(value) {
+      filterState.value = value
+    }
+
+  /** What is typed in the Downloads search field. */
+  var searchQuery: String
+    get() = searchState.value
+    set(value) {
+      searchState.value = value
+    }
+
+  /** Sort order and grouping of the Downloads list; newest first and ungrouped until changed. */
+  var listArrangement: ListArrangement
+    get() = arrangementState.value
+    set(value) {
+      arrangementState.value = value
+    }
+
+  /**
+   * Whether the pointer is over the Downloads list, a row has focus or a menu is open, which
+   * holds the list's order still.
+   */
+  var listFrozen: Boolean
+    get() = frozenState.value
+    set(value) {
+      frozenState.value = value
+    }
+
   var showAddDialog by mutableStateOf(false)
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
 
   private var latestError by mutableStateOf<AppMessage?>(null)
 
-  /** The newest error on screen, for the error banner until toasts replace it. */
+  /** The newest error on screen, as the error banner showed it before toasts replaced it. */
   @Deprecated("Read the Error messages of messages instead.")
   val errorMessage: String?
     get() = latestError?.let { listOfNotNull(it.title, it.detail).joinToString(": ") }
@@ -193,6 +217,9 @@ class AppState(
   /** The opened file the add dialog shows, or null when the user types a URL. */
   var openedDownload by mutableStateOf<IncomingDownload.Ready?>(null)
     private set
+
+  /** Links handed to the app that the add dialog shows, or `null`. */
+  private var openedLinks: IncomingDownload.Links? = null
 
   /** What the add sheet was opened with, or `null` while it is closed. */
   var intakeRequest by mutableStateOf<IntakeRequest?>(null)
@@ -222,6 +249,11 @@ class AppState(
   /** Emits when the search field should take focus, such as on ⌘F. */
   val focusSearchRequests: SharedFlow<Unit> = focusSearch.asSharedFlow()
 
+  private val showDownloadsRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+  /** Emits when the shell should show the Downloads list, such as after adding from Discover. */
+  val downloadsRequests: SharedFlow<Unit> = showDownloadsRequests.asSharedFlow()
+
   private val settingsCache = mutableMapOf<InstanceEntry, InstanceSettingsController>()
 
   /** Download, network and torrent settings of the active device. */
@@ -249,20 +281,65 @@ class AppState(
   /** The URL or file whose resolution [resolveState] reflects. */
   private var resolving: Any? = null
 
+  /** Speed mode of the embedded device; full speed when the host keeps no [speedMode]. */
+  private val localMode: StateFlow<SpeedMode> = speedMode?.mode ?: MutableStateFlow(SpeedMode.Full)
+
+  // Built on the main thread, which owns the settings cache; the models collect them elsewhere.
+  private val listSources: StateFlow<List<TaskListSource>> =
+    combine(activeInstance, snapshotFlow { aiSettings.available }) { entry, discover ->
+      listOfNotNull(entry?.let { listSourceOf(it, discover) })
+    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+  private val pulseSources: StateFlow<List<PulseSource>> =
+    activeInstance.map { entry -> listOfNotNull(entry?.let(::pulseSourceOf)) }
+      .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+  /** Rows of the active device's tasks, and the tab, search and order the Downloads list shows. */
+  val taskList: TaskListModel = TaskListModel(
+    sources = listSources,
+    scope = scope,
+    filter = filterState.flow,
+    query = searchState.flow,
+    arrangement = arrangementState.flow,
+    frozen = frozenState.flow,
+  )
+
+  /** Speed of each task once a second, for the inspector's Activity chart. */
+  val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.rows, scope)
+
+  /** Speed, counts, speed limit, free space and health of the active device. */
+  val pulse: PulseModel = PulseModel(
+    sources = pulseSources,
+    pulseScope = activeInstance.map { PulseScope.Device(it?.deviceId ?: LOCAL_DEVICE_ID) },
+    mode = combine(activeInstance, localMode) { entry, mode ->
+      if (entry is RemoteInstance) SpeedMode.Full else mode
+    },
+    scope = scope,
+  )
+
   init {
     scope.launch {
-      // Opened files show one at a time in the add dialog, like a dropped file, and wait for a
-      // backend if none is connected. Pending files survive a recreated UI and show again.
-      combine(incoming.pending, activeInstance) { pending, instance ->
-        pending.firstOrNull() to (instance != null)
-      }.collect { (next, connected) ->
+      // Opened files, then links handed to the app, show one at a time in the add dialog, and
+      // wait for a backend if none is connected. Pending ones survive a recreated UI and show
+      // again.
+      combine(incoming.pending, incoming.pendingLinks, activeInstance) { files, links, entry ->
+        Triple(files.firstOrNull(), links.firstOrNull(), entry != null)
+      }.collect { (file, links, connected) ->
+        // What the dialog showed leaves the queue once the dialog closes on it.
+        if (openedDownload != file) openedDownload = null
+        if (openedLinks != links) openedLinks = null
         when {
-          next == null -> openedDownload = null
+          file == null && links == null -> Unit
           !connected -> showAddRemoteDialog = true
-          next != openedDownload -> {
-            openedDownload = next
-            resolveDroppedFile(DroppedFile(next.label) { next.content })
+          openedDownload != null || openedLinks != null -> Unit
+          file != null -> {
+            openedDownload = file
+            resolveDroppedFile(DroppedFile(file.label) { file.content })
             openIntake(intakeRequest ?: IntakeRequest())
+          }
+          links != null -> {
+            openedLinks = links
+            openIntake(IntakeRequest(text = links.urls.joinToString("\n")))
           }
         }
       }
@@ -297,6 +374,12 @@ class AppState(
     }
     scope.launch {
       instances.collect { entries -> settingsCache.keys.retainAll(entries.toSet()) }
+    }
+    scope.launch {
+      // A speed mode changes the embedded device's limit; read it back for the speed readout.
+      localMode.drop(1).collect {
+        instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)?.loadDownload()
+      }
     }
   }
 
@@ -341,12 +424,13 @@ class AppState(
     openIntake()
   }
 
-  /** Closes the add dialog; the next opened download, if one is waiting, then shows. */
+  /** Closes the add dialog; the next opened download or links, if any are waiting, then show. */
   fun closeAddDialog() {
     resetResolveState()
     showAddDialog = false
     intakeRequest = null
     openedDownload?.let(incoming::complete)
+    openedLinks?.let(incoming::complete)
   }
 
   /** Opens Settings at [target]. */
@@ -384,6 +468,12 @@ class AppState(
   /** Asks the search field to take focus. */
   fun requestSearchFocus() {
     focusSearch.tryEmit(Unit)
+  }
+
+  /** Asks the shell to show the Downloads list on the [filter] tab. */
+  fun showDownloads(filter: StatusFilter = StatusFilter.All) {
+    statusFilter = filter
+    showDownloadsRequests.tryEmit(Unit)
   }
 
   fun resolveUrl(url: String) {
@@ -1001,7 +1091,7 @@ class AppState(
       is ActivityEvent.Failed -> messages.post(
         level = MessageLevel.Error,
         title = onDevice(event.taskKey.deviceId, "Download failed"),
-        detail = "${displayName(event.request, event.state)}: ${event.state.error.message}",
+        detail = displayName(event.request, event.state),
         taskKey = event.taskKey,
         deviceId = event.taskKey.deviceId,
         actions = listOf(MessageAction("Retry") { retry(event.taskKey) }),
@@ -1056,6 +1146,48 @@ class AppState(
   private fun visibleTasks(entry: InstanceEntry): List<DownloadTask> {
     val hidden = pendingOps.hidden.value
     return entry.instance.tasks.value.filter { TaskKey(entry.deviceId, it.taskId) !in hidden }
+  }
+
+  /** Tasks of [entry] as they change, without the ones a pending operation hides. */
+  private fun visibleTasksOf(entry: InstanceEntry): Flow<List<DownloadTask>> {
+    val deviceId = entry.deviceId
+    return combine(entry.instance.tasks, pendingOps.hidden) { tasks, hidden ->
+      if (hidden.isEmpty()) tasks else tasks.filter { TaskKey(deviceId, it.taskId) !in hidden }
+    }
+  }
+
+  private fun listSourceOf(entry: InstanceEntry, canDiscover: Boolean): TaskListSource {
+    val settings = settingsFor(entry)
+    val remote = entry is RemoteInstance
+    return TaskListSource(
+      deviceId = entry.deviceId,
+      device = DeviceInfo(
+        name = entry.label,
+        capabilities = if (remote) {
+          RowCapabilities.remote(canDiscover = canDiscover)
+        } else {
+          RowCapabilities.local(canDiscover = canDiscover)
+        },
+      ),
+      tasks = visibleTasksOf(entry),
+      config = snapshotFlow { settings.download },
+      slowLane = if (remote) flowOf(false) else localMode.map { it.isSlowLane },
+    )
+  }
+
+  private fun pulseSourceOf(entry: InstanceEntry): PulseSource {
+    val settings = settingsFor(entry)
+    return PulseSource(
+      deviceId = entry.deviceId,
+      name = entry.label,
+      tasks = visibleTasksOf(entry),
+      config = snapshotFlow { settings.download },
+      status = entry.instance::status,
+      health = when (entry) {
+        is RemoteInstance -> entry.connectionState.map { it.toDeviceHealth() }
+        else -> serverState.map { it.toDeviceHealth() }
+      },
+    )
   }
 
   private class PauseResult(
@@ -1207,7 +1339,7 @@ class AppState(
     messages.post(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
-      detail = failures.firstOrNull()?.let { (name, e) -> "$name: ${e.message}" },
+      detail = failures.firstOrNull()?.first,
       taskKey = single?.let { TaskKey(entry?.deviceId ?: LOCAL_DEVICE_ID, it.taskId) },
       deviceId = entry?.deviceId,
       actions = actions,
@@ -1341,7 +1473,29 @@ class AppState(
 
     /** How long a new download can be undone, together with its file. */
     val ADD_UNDO_WINDOW = 8.seconds
+
+    /** Order of the Downloads list until it is changed: newest first, ungrouped. */
+    val DEFAULT_ARRANGEMENT = ListArrangement(
+      sort = SortKey.Added,
+      descending = true,
+      group = GroupBy.None,
+    )
   }
+}
+
+/** Compose state that the models outside composition also read, through [flow]. */
+private class FlowState<T>(initial: T) {
+  private var state by mutableStateOf(initial)
+
+  /** The value as it changes. */
+  val flow = MutableStateFlow(initial)
+
+  var value: T
+    get() = state
+    set(value) {
+      state = value
+      flow.value = value
+    }
 }
 
 /**

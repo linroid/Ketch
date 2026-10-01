@@ -1,96 +1,74 @@
 package com.linroid.ketch.app.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
-import com.linroid.ketch.app.components.KetchButton
-import com.linroid.ketch.app.components.KetchCard
-import com.linroid.ketch.app.components.KetchButtonSize
-import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.icons.KetchIconImage
-import com.linroid.ketch.app.theme.KetchTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
-import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.SettingsCategory
-import com.linroid.ketch.app.state.StatusFilter
-import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
+import com.linroid.ketch.app.state.LocalAppState
+import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
 import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
-import com.linroid.ketch.app.util.matchesSearch
-import com.linroid.ketch.app.ui.list.DownloadList
-import com.linroid.ketch.app.ui.settings.SettingsDialog
-import com.linroid.ketch.app.ui.settings.SettingsCategoryContent
-import com.linroid.ketch.app.ui.settings.SettingsPage
+import com.linroid.ketch.app.ui.discover.DiscoverScreen
+import com.linroid.ketch.app.ui.downloads.DownloadsScreen
+import com.linroid.ketch.app.ui.downloads.KetchLayoutInfo
+import com.linroid.ketch.app.ui.feedback.ToastHost
+import com.linroid.ketch.app.ui.intake.IntakeHost
+import com.linroid.ketch.app.ui.settings.LocalFileLogger
+import com.linroid.ketch.app.ui.settings.SettingsHost
 import com.linroid.ketch.app.ui.sidebar.SidebarNavigation
 import com.linroid.ketch.app.ui.sidebar.SpeedStatusBar
-import com.linroid.ketch.app.ui.sidebar.filterIcon
-import com.linroid.ketch.app.ui.toolbar.BatchActionBar
-import com.linroid.ketch.app.ui.toolbar.KetchToolbar
-import com.linroid.ketch.app.ui.toolbar.countTasksByFilter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.launch
 
 /**
- * The app's window content: navigation, the download list, Settings and the dialogs, all driven
- * by [appState].
+ * The app's window content: navigation, the destinations, Settings, the dialogs and the toasts,
+ * all driven by [appState], which composables inside reach through [LocalAppState].
  *
  * @param openSettingsRequests emits when the platform asks to open Settings.
  * @param fileLogger the app's log files, offered on the About page; `null` when there are none.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppShell(
   appState: AppState,
   openSettingsRequests: Flow<Unit> = emptyFlow(),
   fileLogger: FileLogger? = null,
 ) {
-  val scope = rememberCoroutineScope()
-  val instanceManager = appState.instanceManager
-  val appSettings = appState.appSettings
-  val aiSettings = appState.aiSettings
-  // The error banner shows the newest error until toasts replace it.
-  @Suppress("DEPRECATION")
-  val errorMessage = appState.errorMessage
+  CompositionLocalProvider(
+    LocalAppState provides appState,
+    LocalFileLogger provides fileLogger,
+  ) {
+    ShellContent(appState, openSettingsRequests)
+  }
+}
 
+@Composable
+private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
   val instances by appState.instances.collectAsState()
   // Auto-show add-remote-server dialog when no instances
   // are configured (remote-only mode without auto-connect).
@@ -100,87 +78,18 @@ fun AppShell(
     }
   }
 
-  val sortedTasks by appState.sortedTasks.collectAsState()
   val activeInstance by appState.activeInstance.collectAsState()
   val connectionState by appState.connectionState.collectAsState()
   val serverState by appState.serverState.collectAsState()
-
-  // Collect all task states for filtering/counts
-  val taskStates = remember {
-    mutableStateMapOf<String, DownloadState>()
-  }
-  val currentTaskIds =
-    sortedTasks.map { it.taskId }.toSet()
-  taskStates.keys.removeAll { it !in currentTaskIds }
-  sortedTasks.forEach { task ->
-    val state by task.state.collectAsState()
-    taskStates[task.taskId] = state
-  }
-
-  var searchQuery by rememberSaveable { mutableStateOf("") }
-  val filteredTasks by remember(appState) {
-    derivedStateOf {
-      val query = searchQuery.trim()
-      sortedTasks.filter { task ->
-        val state = taskStates[task.taskId]
-        val matchesStatus = appState.statusFilter == StatusFilter.All ||
-          (state != null && appState.statusFilter.matches(state))
-        matchesStatus && task.request.matchesSearch(query)
-      }
-    }
-  }
-
-  val taskCounts by remember {
-    derivedStateOf {
-      StatusFilter.entries.associateWith { filter ->
-        countTasksByFilter(filter, taskStates)
-      }
-    }
-  }
-
-  val hasActive by remember {
-    derivedStateOf {
-      taskStates.values.any { it.isActive }
-    }
-  }
-  val hasPaused by remember {
-    derivedStateOf {
-      taskStates.values.any {
-        it is DownloadState.Paused
-      }
-    }
-  }
-  val hasCompleted by remember(taskStates) {
-    derivedStateOf {
-      taskStates.values.any {
-        it is DownloadState.Completed
-      }
-    }
-  }
-
-  val activeDownloadCount by remember(taskStates) {
-    derivedStateOf {
-      taskStates.values.count { it.isActive }
-    }
-  }
-  val totalSpeed by remember(taskStates) {
-    derivedStateOf {
-      taskStates.values.sumOf { state ->
-        if (state is DownloadState.Downloading) {
-          state.progress.bytesPerSecond
-        } else {
-          0L
-        }
-      }
-    }
-  }
+  val counts by appState.taskList.counts.collectAsState()
+  val pulse by appState.pulse.state.collectAsState()
 
   // Use the full sidebar when it fits; otherwise keep the destinations in
   // the bottom bar instead of a sparse rail that squeezes the content.
   var destinationName by rememberSaveable {
     mutableStateOf(AppDestination.Downloads.name)
   }
-  val destinations = AppDestination.visible(aiSettings.available)
+  val destinations = AppDestination.visible(appState.aiSettings.available)
   val destination = AppDestination.valueOf(destinationName)
     .takeIf { it in destinations && it != AppDestination.Settings }
     ?: AppDestination.Downloads
@@ -213,6 +122,12 @@ fun AppShell(
       appState.discoverRequestHandled()
     }
   }
+  LaunchedEffect(appState) {
+    appState.downloadsRequests.collect {
+      destinationName = AppDestination.Downloads.name
+      closeSettings()
+    }
+  }
   // The device may have changed its settings while the app was in the background.
   val windowInfo = LocalWindowInfo.current
   LaunchedEffect(windowInfo, appState) {
@@ -221,34 +136,11 @@ fun AppShell(
       .filter { it }
       .collect { appState.onWindowFocused() }
   }
-  val settingsCategories = SettingsCategory.visible(instanceManager.isLocalServerSupported)
-  // Download, network and torrent settings belong to the active instance.
-  val settingsInstance = activeInstance
-  val instanceSettings = appState.instanceSettings
-  val settingsContent: @Composable (SettingsCategory) -> Unit = { category ->
-    SettingsCategoryContent(
-      category = category,
-      appSettings = appSettings,
-      aiSettings = aiSettings,
-      instanceSettings = instanceSettings,
-      instanceLabel = settingsInstance?.label ?: "this device",
-      systemDeviceName = instances.firstOrNull { it is EmbeddedInstance }?.label,
-      serverState = serverState,
-      onTestAi = {
-        scope.launch { aiSettings.testConnection(aiSettings.settings) }
-      },
-      onStartServer = { instanceManager.startServer() },
-      onStopServer = { instanceManager.stopServer() },
-      fileLogger = fileLogger,
-    )
-  }
-  val aiDraft = appState.aiDiscover.draft
-  val adaptiveInfo = currentWindowAdaptiveInfo()
-  val isExpanded = adaptiveInfo.windowSizeClass
-    .isWidthAtLeastBreakpoint(
-      WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND,
-    )
-  val navLayoutType = if (isExpanded) {
+  val windowWidth = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
+  val layout = remember(windowWidth) { KetchLayoutInfo.of(windowWidth) }
+  val showSidebar = currentWindowAdaptiveInfoV2().windowSizeClass
+    .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+  val navLayoutType = if (showSidebar) {
     NavigationSuiteType.None
   } else {
     NavigationSuiteType.NavigationBar
@@ -284,9 +176,9 @@ fun AppShell(
             },
             icon = {
               KetchIconImage(
-                icon = entry.icon, size = 24.dp,
-                tint = if (selected) KetchTheme.colors.primary
-                  else KetchTheme.colors.onSurfaceVariant,
+                icon = entry.icon,
+                size = KetchTheme.density.navGlyph,
+                tint = if (selected) KetchTheme.colors.accent else KetchTheme.colors.textSecondary,
               )
             },
           )
@@ -294,226 +186,67 @@ fun AppShell(
       },
       layoutType = navLayoutType,
     ) {
-      Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-          // Expanded: sidebar + content side by side
-          Row(modifier = Modifier.weight(1f)) {
-            if (isExpanded) {
-              SidebarNavigation(
-                selectedFilter = appState.statusFilter,
-                destination = destination,
-                showDiscovery = AppDestination.Discover in destinations,
-                onDestinationSelect = { destinationName = it.name },
-                onOpenSettings = { appState.openSettings() },
-                taskCounts = taskCounts,
-                onFilterSelect = { selected ->
-                  destinationName = AppDestination.Downloads.name
-                  appState.statusFilter = selected
-                },
-                activeInstance = activeInstance,
-                connectionState = connectionState,
-                onInstanceClick = {
-                  appState.showInstanceSelector = true
-                },
-              )
-            }
-
-            // Content area
-            Column(modifier = Modifier.weight(1f)) {
-              if (settingsOpen && !isExpanded) {
-                SettingsPage(
-                  categories = settingsCategories,
-                  content = settingsContent,
-                  onClose = closeSettings,
-                )
-              } else if (destination == AppDestination.Discover) {
-                AiDiscoveryPage(
-                  state = appState.aiDiscoverState,
-                  draft = aiDraft,
-                  onCancelSearch = { appState.resetAiDiscover() },
-                  onDiscover = { query, sites -> appState.aiDiscover(query, sites) },
-                  onDownloadSelected = { candidates ->
-                    appState.aiDownloadSelected(candidates)
-                    aiDraft.selected = emptySet()
-                    destinationName = AppDestination.Downloads.name
-                    appState.statusFilter = StatusFilter.All
-                  },
-                )
-              } else {
-                if (isExpanded) {
-                  KetchToolbar(
-                    title = if (appState.statusFilter == StatusFilter.All) "Downloads" else appState.statusFilter.label,
-                    downloadCount = filteredTasks.size,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
-                    bandwidthBytesPerSec = totalSpeed,
-                    globalCapBytesPerSec = null,
-                    hasActiveDownloads = hasActive,
-                    hasPausedDownloads = hasPaused,
-                    hasCompletedDownloads = hasCompleted,
-                    onPauseAll = { appState.pauseAll() },
-                    onResumeAll = { appState.resumeAll() },
-                    onClearCompleted = { appState.clearCompleted() },
-                    onAddClick = { appState.requestAddDownload() },
-                  )
-                } else {
-                  TopAppBar(
-                    title = {
-                      Text(
-                        text = if (appState.statusFilter == StatusFilter.All) "Downloads" else appState.statusFilter.label,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                      )
-                    },
-                    actions = {
-                      com.linroid.ketch.app.components.KetchIconButton(
-                        icon = KetchIcon.Plus,
-                        contentDescription = "Add download",
-                        onClick = { appState.requestAddDownload() },
-                        tint = KetchTheme.colors.primary,
-                      )
-                      BatchActionBar(
-                        hasActiveDownloads = hasActive,
-                        hasPausedDownloads = hasPaused,
-                        hasCompletedDownloads = hasCompleted,
-                        onPauseAll = { appState.pauseAll() },
-                        onResumeAll = { appState.resumeAll() },
-                        onClearCompleted = {
-                          appState.clearCompleted()
-                        },
-                      )
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                      containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-                  )
-                }
-
-                if (!isExpanded) {
-                  com.linroid.ketch.app.components.KetchTextField(
-                    value = searchQuery, onValueChange = { searchQuery = it },
-                    placeholder = "Search downloads…", leadingIcon = KetchIcon.Search,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                  )
-                }
-
-                if (!isExpanded) {
-                  DownloadFilters(
-                    selected = appState.statusFilter,
-                    counts = taskCounts,
-                    onSelect = { appState.statusFilter = it },
-                  )
-                }
-
-                // Error banner
-                if (errorMessage != null) {
-                  KetchCard(
-                    modifier = Modifier
-                      .fillMaxWidth()
-                      .padding(horizontal = 16.dp),
-                    padding = 0.dp,
-                  ) {
-                    Row(
-                      modifier = Modifier.padding(16.dp),
-                      verticalAlignment =
-                        Alignment.CenterVertically,
-                      horizontalArrangement =
-                        Arrangement.spacedBy(12.dp),
-                    ) {
-                      Text(
-                        text = errorMessage,
-                        style = KetchTheme.typography.bodySmall,
-                        color = KetchTheme.colors.error,
-                        modifier = Modifier.weight(1f),
-                      )
-                      KetchButton(
-                        text = "Dismiss",
-                        onClick = { appState.dismissError() },
-                        variant =
-                          com.linroid.ketch.app.components
-                            .KetchButtonVariant.Ghost,
-                        size = KetchButtonSize.Small,
-                      )
-                    }
-                  }
-                }
-
-                // Download list
-                DownloadList(
-                  tasks = filteredTasks,
-                  onAddDownload = { appState.requestAddDownload() },
-                  isEmpty = sortedTasks.isEmpty() &&
-                    errorMessage == null,
-                  isFilterEmpty = filteredTasks.isEmpty() &&
-                    sortedTasks.isNotEmpty(),
-                  selectedFilter = appState.statusFilter,
-                  onShowAllDownloads = { appState.statusFilter = StatusFilter.All },
-                  onClearSearch = { searchQuery = "" },
-                  searchQuery = searchQuery,
-                  bottomPadding = 24.dp,
-                  scope = scope,
-                  modifier = Modifier.weight(1f),
-                )
-              }
-            }
+      Column(modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.weight(1f)) {
+          if (showSidebar) {
+            SidebarNavigation(
+              selectedFilter = appState.statusFilter,
+              destination = destination,
+              showDiscovery = AppDestination.Discover in destinations,
+              onDestinationSelect = { destinationName = it.name },
+              onOpenSettings = { appState.openSettings() },
+              taskCounts = counts,
+              onFilterSelect = { selected ->
+                destinationName = AppDestination.Downloads.name
+                appState.statusFilter = selected
+              },
+              activeInstance = activeInstance,
+              connectionState = connectionState,
+              onInstanceClick = {
+                appState.showInstanceSelector = true
+              },
+            )
           }
 
-          // Bottom speed status bar
-          SpeedStatusBar(
-            activeDownloads = activeDownloadCount,
-            totalSpeed = totalSpeed,
-            instanceLabel = activeInstance?.label,
-            connectionState = connectionState,
-            onInstanceClick = {
-              appState.showInstanceSelector = true
-            },
-          )
+          Box(modifier = Modifier.weight(1f)) {
+            when {
+              settingsOpen && !showSidebar ->
+                SettingsHost(appState, settingsRequest, onClose = closeSettings)
+              destination == AppDestination.Discover -> DiscoverScreen(appState)
+              else -> DownloadsScreen(appState, layout, Modifier.fillMaxSize())
+            }
+            ToastHost(
+              messages = appState.messages,
+              modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = KetchTheme.spacing.s4)
+                .padding(bottom = KetchTheme.spacing.s2),
+            )
+          }
         }
 
-
+        SpeedStatusBar(
+          activeDownloads = pulse.counts.downloading,
+          totalSpeed = pulse.totalSpeed,
+          instanceLabel = activeInstance?.label,
+          connectionState = connectionState,
+          onInstanceClick = {
+            appState.showInstanceSelector = true
+          },
+        )
       }
     }
   }
 
-  // Dialogs
-  if (settingsOpen && isExpanded) {
-    SettingsDialog(
-      categories = settingsCategories,
-      onDismiss = closeSettings,
-      content = settingsContent,
-    )
+  if (settingsOpen && showSidebar) {
+    SettingsHost(appState, settingsRequest, onClose = closeSettings)
   }
 
-  if (appState.showAddDialog) {
-    // Each opened file starts a fresh form.
-    key(appState.openedDownload) {
-      AddDownloadDialog(
-        resolveState = appState.resolveState,
-        onResolveUrl = { appState.resolveUrl(it) },
-        onResetResolve = { appState.resetResolveState() },
-        onDismiss = { appState.closeAddDialog() },
-        onDownload = { url, fileName, speedLimit,
-                       priority, schedule,
-                       resolvedUrl, selectedFileIds ->
-          appState.closeAddDialog()
-          appState.dismissError()
-          appState.startDownload(
-            url, fileName, speedLimit, priority,
-            schedule, resolvedUrl, selectedFileIds,
-          )
-        },
-        droppedFileName = appState.droppedFile?.name,
-        onRetryDroppedFile = {
-          appState.droppedFile?.let { appState.resolveDroppedFile(it) }
-        },
-        onDropFiles = { appState.addDroppedFiles(it) },
-      )
-    }
-  }
+  IntakeHost(appState)
 
   if (appState.showInstanceSelector) {
     InstanceSelectorSheet(
-      instanceManager = instanceManager,
+      instanceManager = appState.instanceManager,
       activeInstance = activeInstance,
       switchingInstance = appState.switchingInstance,
       serverState = serverState,
@@ -552,9 +285,7 @@ fun AppShell(
         appState.resetDiscovery()
         appState.showAddRemoteDialog = false
         if (unauthorized != null) {
-          appState.reconnectWithToken(
-            unauthorized, token ?: "",
-          )
+          appState.reconnectWithToken(unauthorized, token ?: "")
         } else {
           appState.addRemoteServer(host, port, token)
         }
