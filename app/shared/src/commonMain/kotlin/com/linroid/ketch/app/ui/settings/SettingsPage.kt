@@ -84,6 +84,7 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SettingsSection
 import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.state.clipboardMode
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.folderName
 import com.linroid.ketch.app.state.formatSpeedLimit
@@ -770,7 +771,7 @@ internal fun rememberSettingsSummaries(
     put(SettingsCategory.Notifications, notificationsSummary(appSettings.config.notifications))
     put(
       SettingsCategory.Integration,
-      integrationSummary(integration, desktop, clipboardModeOf(appSettings)),
+      integrationSummary(integration, desktop, appSettings.clipboardMode),
     )
     put(
       SettingsCategory.Discover,

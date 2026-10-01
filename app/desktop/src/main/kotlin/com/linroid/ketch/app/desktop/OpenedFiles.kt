@@ -2,6 +2,7 @@ package com.linroid.ketch.app.desktop
 
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
+import com.linroid.ketch.app.state.isPairingLink
 import java.awt.Desktop
 import java.io.File
 import java.io.IOException
@@ -14,7 +15,8 @@ internal const val BACKGROUND_FLAG = "--background"
  * What launch arguments ask the app to open.
  *
  * @property files `.torrent` files, made absolute so another process can open them.
- * @property links links for the add sheet, such as a `magnet:` link a browser opened.
+ * @property links links for the add sheet, such as a `magnet:` link a browser opened, and
+ *   `ketch://pair` links that pair this app with another device.
  */
 internal data class OpenedArguments(
   val files: List<File> = emptyList(),
@@ -27,8 +29,8 @@ internal data class OpenedArguments(
 /**
  * Sorts launch arguments into files and links. Files are plain paths from Windows file
  * associations or `file:` URIs from Linux desktop entries; `magnet:`, `http(s):` and `ftp(s):`
- * arguments, which the OS passes for links Ketch is registered to open, are links. Flags and
- * URIs of other schemes are left out.
+ * arguments, which the OS passes for links Ketch is registered to open, are links, and so are
+ * pairing links ([isPairingLink]). Flags and URIs of other schemes are left out.
  */
 internal fun fileArguments(args: List<String>): OpenedArguments {
   val files = ArrayList<File>()
@@ -36,7 +38,7 @@ internal fun fileArguments(args: List<String>): OpenedArguments {
   for (arg in args) {
     when {
       arg.isBlank() || arg.startsWith("-") -> continue
-      LINK_ARGUMENT.containsMatchIn(arg) -> links += arg
+      LINK_ARGUMENT.containsMatchIn(arg) || isPairingLink(arg) -> links += arg
       arg.startsWith("file:", ignoreCase = true) ->
         runCatching { File(URI(arg)) }.getOrNull()?.let { files += it.absoluteFile }
       // Two letters at least, so a Windows drive such as C: stays a path.

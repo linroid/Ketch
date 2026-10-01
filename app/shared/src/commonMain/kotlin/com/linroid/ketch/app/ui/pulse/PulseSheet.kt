@@ -42,6 +42,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.PulseState
+import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.theme.KetchTheme
@@ -60,7 +61,9 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
-  val text = pulseSubtitle(pulse, view.label)
+  // The bar is narrow, so plain full speed reads "Full", as the spec's subtitle has it.
+  val mode = if (view.mode == SpeedMode.Full && !view.limited) "Full" else view.label
+  val text = pulseSubtitle(pulse, mode)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
@@ -89,7 +92,7 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
   }
 }
 
-/** The phone subtitle: "↓ 4.2 MB/s · 2 active · Full speed", or "Idle · Full speed". */
+/** The phone subtitle: "↓ 4.2 MB/s · 2 active · Full", or "Idle · Slow lane · 1 MB/s". */
 internal fun pulseSubtitle(pulse: PulseState, modeLabel: String): String {
   val device = pulse.devices.firstOrNull()
   val parts = when {

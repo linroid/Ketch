@@ -538,14 +538,8 @@ class IntakeSession internal constructor(
   /** Every device downloads can be added to. */
   val instances: StateFlow<List<InstanceEntry>> get() = state.instances
 
-  /** What the sheet does with the clipboard: the setting, else fill on desktop, else suggest. */
-  val clipboardMode: ClipboardMode
-    get() = state.appSettings.ui.clipboardMode
-      ?: if (isMobilePlatform || KeyboardPlatform.current.isWeb) {
-        ClipboardMode.Suggest
-      } else {
-        ClipboardMode.Fill
-      }
+  /** What the sheet does with the clipboard; see [AppSettingsController.clipboardMode]. */
+  val clipboardMode: ClipboardMode get() = state.appSettings.clipboardMode
 
   /** The default directory of [target]. */
   val defaultFolder: String? get() = targetStatus?.system?.downloadDirectory
@@ -1811,3 +1805,14 @@ private const val TORRENT_SOURCE = "torrent"
 private const val MAX_RECENT_FOLDERS = 5
 private const val TINY_TEXT_BYTES = 1024L
 private const val HASH_RADIX = 36
+
+/**
+ * What to do with a link on the clipboard: the setting, else fill on desktop, else suggest, as
+ * the add sheet reads it.
+ */
+internal val AppSettingsController.clipboardMode: ClipboardMode
+  get() = ui.clipboardMode ?: if (isMobilePlatform || KeyboardPlatform.current.isWeb) {
+    ClipboardMode.Suggest
+  } else {
+    ClipboardMode.Fill
+  }

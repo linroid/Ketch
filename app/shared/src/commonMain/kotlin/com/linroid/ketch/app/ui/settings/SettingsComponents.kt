@@ -87,16 +87,6 @@ private const val COMMIT_DELAY_MS = 600L
 /** Least share of a row its title and description keep before the trailing control wraps. */
 private const val MIN_TEXT_SHARE = 0.55f
 
-/** Title and one-line explanation at the top of a settings category. */
-@Composable
-fun SettingsHeader(title: String, description: String) {
-  val colors = KetchTheme.colors
-  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {
-    Text(text = title, style = KetchTheme.typography.titleL, color = colors.textPrimary)
-    Text(text = description, style = KetchTheme.typography.bodyS, color = colors.textSecondary)
-  }
-}
-
 /**
  * Card of related rows, separated by dividers. The dividers are the card's fill showing between
  * the rows, so a row that is not a [SettingsRow] paints `KetchTheme.colors.surface` itself.
@@ -208,7 +198,8 @@ fun SettingsRow(
 
 /**
  * [leading], [text] and [trailing] in one line, or, when [trailing] would leave the text less
- * than [MIN_TEXT_SHARE] of the row as on phones, with [trailing] under the text.
+ * than [MIN_TEXT_SHARE] of the row as on phones, with [trailing] under the text. Text that fits
+ * on one line beside a [trailing] no wider than half the row keeps it there.
  */
 @Composable
 private fun TitleLine(
@@ -229,7 +220,11 @@ private fun TitleLine(
     val rest = if (bounded) (loose.maxWidth - startWidth).coerceAtLeast(0) else loose.maxWidth
     val end = trailingParts.firstOrNull()?.measure(loose.copy(maxWidth = rest))
     val endWidth = end?.let { it.width + gapPx } ?: 0
-    val inline = end == null || !bounded || rest - endWidth >= loose.maxWidth * MIN_TEXT_SHARE
+    val textRoom = rest - endWidth
+    // Short text beside a control that takes at most half the row stays beside it.
+    val fits = endWidth * 2 <= loose.maxWidth &&
+      textRoom >= textParts.single().maxIntrinsicWidth(loose.maxHeight)
+    val inline = end == null || !bounded || textRoom >= loose.maxWidth * MIN_TEXT_SHARE || fits
     val body = if (bounded) {
       val textWidth = (rest - if (inline) endWidth else 0).coerceAtLeast(0)
       textParts.single().measure(loose.copy(minWidth = textWidth, maxWidth = textWidth))
@@ -239,7 +234,7 @@ private fun TitleLine(
     }
     val width = if (bounded) constraints.maxWidth else startWidth + body.width + endWidth
     val top = maxOf(start?.height ?: 0, body.height, if (inline) end?.height ?: 0 else 0)
-    val height = if (inline || end == null) top else top + lineGap.roundToPx() + end.height
+    val height = if (end == null || inline) top else top + lineGap.roundToPx() + end.height
     layout(width, height) {
       start?.placeRelative(0, (top - start.height) / 2)
       body.placeRelative(startWidth, (top - body.height) / 2)

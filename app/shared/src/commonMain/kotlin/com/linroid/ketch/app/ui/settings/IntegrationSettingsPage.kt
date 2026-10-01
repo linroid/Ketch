@@ -24,6 +24,7 @@ import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.clipboardMode
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.IntegrationSettings
@@ -183,7 +184,7 @@ private fun DefaultAppRow(
 /** What Ketch does with a copied link, and with one pasted into the list. */
 @Composable
 private fun ClipboardGroup(appSettings: AppSettingsController) {
-  val mode = clipboardModeOf(appSettings)
+  val mode = appSettings.clipboardMode
   val quickAdd = appSettings.ui.quickAdd ?: !isMobilePlatform
   val paste = KetchCommands.PasteLinks.shortcutLabel(KeyboardPlatform.current)
   SettingsGroup(title = "Clipboard") {
@@ -222,18 +223,6 @@ private fun ClipboardGroup(appSettings: AppSettingsController) {
     )
   }
 }
-
-/**
- * What to do with a link on the clipboard: the setting, else fill on desktop, else suggest, as
- * the add sheet reads it.
- */
-internal fun clipboardModeOf(appSettings: AppSettingsController): ClipboardMode =
-  appSettings.ui.clipboardMode
-    ?: if (isMobilePlatform || KeyboardPlatform.current.isWeb) {
-      ClipboardMode.Suggest
-    } else {
-      ClipboardMode.Fill
-    }
 
 /** A check and [text] in the success color, for something already set up. */
 @Composable

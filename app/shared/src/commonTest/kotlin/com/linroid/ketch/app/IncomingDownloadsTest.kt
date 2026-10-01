@@ -1,6 +1,7 @@
 package com.linroid.ketch.app
 
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppState
@@ -146,7 +147,8 @@ class IncomingDownloadsTest {
       runCurrent()
 
       assertFalse(state.showAddDialog)
-      assertEquals("Couldn't open a.torrent: The file is empty", state.errorMessage)
+      val error = state.messages.active.value.single { it.level == MessageLevel.Error }
+      assertEquals("Couldn't open a.torrent" to "The file is empty", error.title to error.detail)
     }
   }
 

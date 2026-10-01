@@ -20,9 +20,12 @@ import kotlinx.coroutines.flow.filterNotNull
 /**
  * Shows the add sheet while [AppState.intakeRequest] is set: the request's links and seeds are
  * checked on its target device and added with the options chosen in the sheet.
+ *
+ * @param canFinishInBackground whether a torrent's file list may keep loading after the sheet
+ *   closes; a host that goes away with the sheet, such as Android's quick add, leaves it out.
  */
 @Composable
-fun IntakeHost(state: AppState) {
+fun IntakeHost(state: AppState, canFinishInBackground: Boolean = true) {
   val scope = rememberCoroutineScope()
   val controller = remember(state, scope) { IntakeController(state, scope) }
   val clipboard = rememberSystemClipboard()
@@ -49,7 +52,11 @@ fun IntakeHost(state: AppState) {
   IntakeSheet(
     session = session,
     onClose = { state.closeAddDialog() },
-    onFinishInBackground = { controller.finishInBackground(session) },
+    onFinishInBackground = if (canFinishInBackground) {
+      { controller.finishInBackground(session) }
+    } else {
+      null
+    },
   )
 }
 

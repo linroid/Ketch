@@ -458,6 +458,11 @@ private fun AdvancedGroup(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   var open by rememberSaveable { mutableStateOf(false) }
+  // A search result for one of the rows inside opens the section, so the jump finds it.
+  val asked = LocalSettingsJump.current?.requested.orEmpty()
+  LaunchedEffect(asked) {
+    if (asked.any { it in AdvancedRows }) open = true
+  }
   val lanOpen = !config.isLoopbackOnly
   val token = config.apiToken.orEmpty()
   SettingsGroup {
@@ -584,6 +589,16 @@ private fun AdvancedGroup(
 private fun newToken(): String = Uuid.random().toHexString()
 
 private const val COPIED_MILLIS = 2_000L
+
+/** Titles of the rows the Advanced section holds. */
+private val AdvancedRows = setOf(
+  "Reachable from other devices",
+  "Port",
+  "Access code",
+  "Discoverable on the local network",
+  "Websites allowed to connect",
+  "Start sharing when Ketch opens",
+)
 private val QrSize = 180.dp
 private val QrPlaceholderGlyph = 48.dp
 private val PortFieldWidth = 96.dp

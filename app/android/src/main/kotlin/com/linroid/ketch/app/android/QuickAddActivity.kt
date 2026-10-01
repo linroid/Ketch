@@ -115,7 +115,8 @@ private fun QuickAddSheet(controller: AppController, onClosed: () -> Unit) {
     reduceMotion = settings.ui.reduceMotion || rememberReduceMotion(),
   ) {
     CompositionLocalProvider(LocalAppState provides state) {
-      IntakeHost(state)
+      // The window and its sheet go together, so nothing is left to finish in the background.
+      IntakeHost(state, canFinishInBackground = false)
     }
   }
 }

@@ -222,10 +222,12 @@ class KetchService : Service() {
 
   /**
    * Tells the service whether the app is in front, as MainActivity is while it is resumed. Events
-   * then go to [activityEvents] instead of becoming notifications.
+   * then go to [activityEvents] instead of becoming notifications, and the remote devices not
+   * shown stay connected only while it is.
    */
   fun setInFront(inFront: Boolean) {
     this.inFront = inFront
+    instanceManager.setInForeground(inFront)
     if (!inFront) return
     val held = heldRecovery ?: return
     heldRecovery = null

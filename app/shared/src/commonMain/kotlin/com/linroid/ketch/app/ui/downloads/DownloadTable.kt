@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -76,6 +77,7 @@ import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.platform.HorizontalResizePointerIcon
 import com.linroid.ketch.app.state.ListArrangement
 import com.linroid.ketch.app.state.RowGroup
 import com.linroid.ketch.app.state.SortKey
@@ -97,6 +99,7 @@ import com.linroid.ketch.app.ui.list.TaskLazyList
 import com.linroid.ketch.app.ui.list.listEntries
 import com.linroid.ketch.app.ui.list.placement
 import com.linroid.ketch.app.ui.list.rememberRowCompletion
+import com.linroid.ketch.app.ui.list.rememberStalledLanes
 import com.linroid.ketch.app.ui.list.showsLanes
 import com.linroid.ketch.app.ui.list.withMissingFile
 import com.linroid.ketch.app.util.RowStatus
@@ -412,6 +415,7 @@ private fun ResizeHandle(
     modifier = modifier
       .width(ResizeHandleWidth)
       .fillMaxHeight()
+      .pointerHoverIcon(HorizontalResizePointerIcon)
       .hoverable(interactions)
       .draggable(
         state = rememberDraggableState { delta ->
@@ -591,6 +595,7 @@ private fun Cell(
           state = row.state,
           segments = row.segments,
           height = LaneStripDefaults.CellHeight,
+          stalled = rememberStalledLanes(row),
           onCompletionShown = onSheenShown,
           modifier = Modifier.weight(1f),
         )
