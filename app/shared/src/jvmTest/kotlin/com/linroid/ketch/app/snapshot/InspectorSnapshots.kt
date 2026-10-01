@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.snapshot
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -38,10 +41,13 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.rememberRowActionRunner
+import com.linroid.ketch.app.ui.inspector.ActionBar
 import com.linroid.ketch.app.ui.inspector.InspectorContent
 import com.linroid.ketch.app.ui.inspector.InspectorControls
 import com.linroid.ketch.app.ui.inspector.InspectorPlacement
+import com.linroid.ketch.app.ui.inspector.TaskHeader
 import com.linroid.ketch.app.ui.inspector.TaskInspector
+import com.linroid.ketch.app.ui.inspector.rememberDeviceLabel
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.flow.emptyFlow
@@ -186,6 +192,48 @@ class InspectorSnapshots {
               Column(Modifier.padding(KetchTheme.spacing.s4)) {
                 val runner = rememberRowActionRunner()
                 InspectorControls(state, listOf(remoteRow()), runner, emptySet())
+              }
+            }
+          }
+        }
+      } finally {
+        runBlocking(SnapshotHarness.ui) { environment.close() }
+      }
+    }
+  }
+
+  @Test
+  fun header_remoteCompleted_offersCopyPath() {
+    for (theme in SnapshotTheme.entries) {
+      val data = SampleData.downloads()
+      val environment = runBlocking(SnapshotHarness.ui) {
+        SampleEnvironment(data, theme, DensityMode.Compact)
+      }
+      try {
+        runBlocking(SnapshotHarness.ui) { withTimeout(START) { environment.start() } }
+        val state = environment.controller.state
+        snapshot("inspector-header-remote", Small, theme) {
+          CompositionLocalProvider(LocalAppState provides state) {
+            Pane(DockedWidth, InspectorPlacement.Docked) {
+              Column(
+                verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s4),
+                modifier = Modifier.padding(KetchTheme.spacing.s4),
+              ) {
+                val row = remoteCompletedRow()
+                val runner = rememberRowActionRunner()
+                val device = rememberDeviceLabel(state, row)
+                TaskHeader(
+                  row = row,
+                  device = device,
+                  reason = null,
+                  highlight = null,
+                  stalled = emptySet(),
+                  onReason = {},
+                  onCopyName = {},
+                  onClose = {},
+                )
+                val instances by state.instances.collectAsState()
+                ActionBar(state, row, runner, instances)
               }
             }
           }
@@ -350,6 +398,20 @@ private object InspectorClipboard : SystemClipboard {
 
   override suspend fun writeText(text: String) {}
 }
+
+/** A download that finished on a remote device, whose file is out of this one's reach. */
+private fun remoteCompletedRow() = ListFixtures.row(
+  id = "remote-done",
+  state = DownloadState.Completed(
+    outputPath = "/srv/downloads/debian-12.7.0-amd64-netinst.iso",
+    totalBytes = 661_651_456,
+    downloadTime = 94.seconds,
+  ),
+  request = DownloadRequest("https://cdimage.debian.org/debian-cd/debian-12.7.0-amd64-netinst.iso"),
+  deviceId = "nas.local:8642",
+  device = DeviceInfo("NAS-Basement", RowCapabilities.remote()),
+  now = SampleData.NOW,
+)
 
 /** A download on a remote device, which cannot be rescheduled. */
 private fun remoteRow() = ListFixtures.row(
