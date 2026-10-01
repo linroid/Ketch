@@ -140,7 +140,8 @@ internal fun AccessCodeField(
       enabled = !form.connecting,
       error = when {
         request?.rejected != true -> null
-        form.code.isBlank() -> "The code in the link no longer works. Enter the current one."
+        form.code.isBlank() -> "The code in the link no longer works. Enter the current one " +
+          "from Settings › Sharing on that device."
         else -> "That code didn't work. Check it, or copy a new pairing link."
       },
       visualTransformation = PasswordVisualTransformation(),

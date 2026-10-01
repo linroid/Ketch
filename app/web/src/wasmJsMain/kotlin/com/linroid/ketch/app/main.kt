@@ -98,9 +98,10 @@ fun main() {
 private val FONT_WAIT_LIMIT = 5.seconds
 
 /**
- * Connects to the [page]'s server when the address carried its access code, or when nothing is
- * saved and the server asks for it; otherwise shows the first saved device, unless the one shown
- * last time is shown again. With none of these, the page asks for a device.
+ * Connects to the server of the [page] when the address carried its access code, or when
+ * nothing is saved and the page was served by that server ([shouldAutoConnect]); otherwise
+ * shows the first saved device, unless the one shown last time is shown again. With none of
+ * these, the app shows its connect page.
  */
 private fun connectOnLoad(controller: AppController, page: PairingLink?) {
   val state = controller.state
