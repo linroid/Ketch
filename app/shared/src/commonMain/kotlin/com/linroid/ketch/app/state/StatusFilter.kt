@@ -29,4 +29,14 @@ enum class StatusFilter(val label: String) {
     Done -> state is DownloadState.Completed
     Failed -> state is DownloadState.Failed || state is DownloadState.Canceled
   }
+
+  /** Number of the tasks in [states] that belong on this tab. */
+  fun count(states: Collection<DownloadState>): Int =
+    if (this == All) states.size else states.count(::matches)
+
+  companion object {
+    /** Number of the tasks in [states] on each tab. */
+    fun counts(states: Collection<DownloadState>): Map<StatusFilter, Int> =
+      entries.associateWith { it.count(states) }
+  }
 }

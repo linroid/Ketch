@@ -12,7 +12,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -26,6 +25,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.DownloadFilters
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.toolbar.BatchActionBar
+import com.linroid.ketch.app.ui.toolbar.BulkActions
 import com.linroid.ketch.app.ui.toolbar.KetchToolbar
 
 /** Width tiers of the window, which set how the app lays itself out. */
@@ -76,7 +76,6 @@ data class KetchLayoutInfo(
  */
 @Composable
 fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier = Modifier) {
-  val scope = rememberCoroutineScope()
   val spacing = KetchTheme.spacing
   val tasks by state.tasks.collectAsState()
   val rows by state.taskList.rows.collectAsState()
@@ -86,20 +85,11 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
   val filter = state.statusFilter
   val query = state.searchQuery
   val title = if (filter == StatusFilter.All) "Downloads" else filter.label
-  val hasActive = (counts[StatusFilter.Downloading] ?: 0) > 0
-  val hasPaused = (counts[StatusFilter.Paused] ?: 0) > 0
-  val hasCompleted = (counts[StatusFilter.Done] ?: 0) > 0
-  val shown = remember(view) { view.rows.map { it.task } }
+  val bulk = remember(rows) { BulkActions.of(rows.map { it.state }) }
 
   Column(modifier) {
     if (layout.tier == LayoutTier.Compact) {
-      CompactHeader(
-        title = title,
-        hasActive = hasActive,
-        hasPaused = hasPaused,
-        hasCompleted = hasCompleted,
-        state = state,
-      )
+      CompactHeader(title = title, bulk = bulk, state = state)
       KetchTextField(
         value = query,
         onValueChange = { state.searchQuery = it },
@@ -116,11 +106,10 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
         onSearchQueryChange = { state.searchQuery = it },
         bandwidthBytesPerSec = pulse.totalSpeed,
         globalCapBytesPerSec = pulse.cap.takeUnless { it.isUnlimited }?.bytesPerSecond,
-        hasActiveDownloads = hasActive,
-        hasPausedDownloads = hasPaused,
-        hasCompletedDownloads = hasCompleted,
+        bulkActions = bulk,
         onPauseAll = { state.pauseAll() },
         onResumeAll = { state.resumeAll() },
+        onRetryFailed = { state.retryFailed() },
         onClearCompleted = { state.clearCompleted() },
         onAddClick = { state.requestAddDownload() },
       )
@@ -131,7 +120,7 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
       onSelect = { state.statusFilter = it },
     )
     DownloadList(
-      tasks = shown,
+      rows = view.rows,
       onAddDownload = { state.requestAddDownload() },
       // Rows arrive shortly after the tasks; until then the list stays blank rather than empty.
       isEmpty = tasks.isEmpty(),
@@ -141,7 +130,6 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
       onClearSearch = { state.searchQuery = "" },
       searchQuery = query,
       bottomPadding = spacing.s6,
-      scope = scope,
       modifier = Modifier.weight(1f),
     )
   }
@@ -149,13 +137,7 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CompactHeader(
-  title: String,
-  hasActive: Boolean,
-  hasPaused: Boolean,
-  hasCompleted: Boolean,
-  state: AppState,
-) {
+private fun CompactHeader(title: String, bulk: BulkActions, state: AppState) {
   val colors = KetchTheme.colors
   TopAppBar(
     title = {
@@ -173,11 +155,10 @@ private fun CompactHeader(
         tint = colors.accent,
       )
       BatchActionBar(
-        hasActiveDownloads = hasActive,
-        hasPausedDownloads = hasPaused,
-        hasCompletedDownloads = hasCompleted,
+        actions = bulk,
         onPauseAll = { state.pauseAll() },
         onResumeAll = { state.resumeAll() },
+        onRetryFailed = { state.retryFailed() },
         onClearCompleted = { state.clearCompleted() },
       )
     },
