@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,9 +34,11 @@ import com.linroid.ketch.app.ui.list.RowCommands
  * command runs on the row, its button shows a spinner.
  *
  * Pointer only; touch rows show their primary action and open the menu with a long-press or
- * their own "⋯".
+ * their own "⋯". The buttons stay while their menu is open, even once the pointer moved into it.
  *
  * @param visible whether the pointer is over the row, or the row holds the keyboard focus.
+ * @param menu the list's [RowMenuState], so "⋯" closes any other menu and the list holds still
+ *   while it is open; `null` keeps the menu to these buttons.
  */
 @Composable
 internal fun HoverActions(
@@ -43,26 +46,44 @@ internal fun HoverActions(
   visible: Boolean,
   runner: RowActionRunner,
   modifier: Modifier = Modifier,
+  menu: RowMenuState? = null,
 ) {
   val motion = KetchTheme.motion
-  LaunchedEffect(visible, row.key, row.state) { if (visible) runner.checkFile(row) }
+  var ownMenuOpen by remember { mutableStateOf(false) }
+  val request = menu?.request?.takeIf { it.anchor == row.key && it.position == null }
+  if (menu != null && request != null) {
+    DisposableEffect(menu, request) { onDispose { menu.closeIfCurrent(request) } }
+  }
+  val menuOpen = if (menu != null) request != null else ownMenuOpen
+  val setMenuOpen: (Boolean) -> Unit = { open ->
+    when {
+      menu == null -> ownMenuOpen = open
+      open -> menu.open(row.key, listOf(row))
+      else -> request?.let(menu::closeIfCurrent)
+    }
+  }
+  LaunchedEffect(visible, row.key, row.outputFile) { if (visible) runner.checkFile(row) }
   AnimatedVisibility(
-    visible = visible,
+    visible = visible || menuOpen,
     enter = fadeIn(tween(motion.micro, easing = motion.easeStandard)),
     exit = fadeOut(tween(motion.micro, easing = motion.easeStandard)),
     modifier = modifier,
   ) {
-    HoverButtons(row, runner)
+    HoverButtons(row, runner, menuOpen, setMenuOpen)
   }
 }
 
 @Composable
-private fun HoverButtons(row: TaskRow, runner: RowActionRunner) {
+private fun HoverButtons(
+  row: TaskRow,
+  runner: RowActionRunner,
+  menuOpen: Boolean,
+  setMenuOpen: (Boolean) -> Unit,
+) {
   val pending by runner.state.pending.collectAsState()
   val busy = RowCommands.isBusy(row, pending)
   val buttons = hoverButtons(runner.hover(row), runner.menu(row))
   val actions = buttons.actions
-  var menuOpen by remember { mutableStateOf(false) }
   val platform = KeyboardPlatform.current
   val revealLabel = runner.files?.revealLabel
   Row(
@@ -88,12 +109,12 @@ private fun HoverButtons(row: TaskRow, runner: RowActionRunner) {
         KetchIconButton(
           icon = KetchIcon.More,
           contentDescription = "More actions",
-          onClick = { menuOpen = true },
+          onClick = { setMenuOpen(true) },
           selected = menuOpen,
         )
         RowMenu(
           expanded = menuOpen,
-          onDismissRequest = { menuOpen = false },
+          onDismissRequest = { setMenuOpen(false) },
           rows = listOf(row),
           runner = runner,
         )

@@ -274,7 +274,8 @@ internal class RowActionRunner(
 
   /**
    * Removes [rows] from the list once the Undo window ends. With [withFiles] their files go too:
-   * to the Trash when [RemovalPlan.trash] allows it, otherwise deleted by the device.
+   * finished files to the Trash when [RemovalPlan.trash] allows it, every other file deleted by
+   * the device.
    */
   fun remove(rows: List<TaskRow>, withFiles: Boolean) {
     if (rows.isEmpty()) return
@@ -400,7 +401,8 @@ internal class RowActionRunner(
     }
   }
 
-  // Each completed file goes to the Trash after its row is removed; partial files never do.
+  // Each finished file goes to the Trash after its row is removed; the device that wrote a
+  // partial file deletes it, since only it knows where the file is.
   private fun removeToTrash(rows: List<TaskRow>) {
     val files = files ?: return
     val keys = rows.mapTo(mutableSetOf()) { it.key }
@@ -414,7 +416,7 @@ internal class RowActionRunner(
           rows.map { row ->
             async {
               row to catchingUnlessCancelled {
-                row.task.remove(deleteFiles = false)
+                row.task.remove(deleteFiles = row.state !is DownloadState.Completed)
                 row.outputFile?.let { files.moveToTrash(it) }
               }.exceptionOrNull()
             }
@@ -437,20 +439,22 @@ internal class RowActionRunner(
   private fun reportTrash(results: List<Pair<TaskRow, Throwable?>>) {
     val failed = results.mapNotNull { (row, e) -> e?.let { row to it } }
     failed.forEach { (row, e) ->
-      log.w { "Couldn't trash the file of taskId=${row.key.taskId}: ${e.describeCauses()}" }
+      log.w { "Couldn't remove taskId=${row.key.taskId} with its file: ${e.describeCauses()}" }
     }
-    val moved = results.size - failed.size
+    val moved = results.count { (row, e) -> e == null && row.outputFile != null }
     if (moved > 0) {
       val what = if (moved == 1) "1 file" else "$moved files"
       state.messages.post(MessageLevel.Success, "Moved $what to the Trash")
     }
     val (row, e) = failed.firstOrNull() ?: return
+    val trashing = failed.all { it.first.outputFile != null }
     state.messages.post(
       level = MessageLevel.Error,
-      title = if (failed.size == 1) {
-        "Couldn't move ${row.name} to the Trash"
-      } else {
-        "Couldn't move ${failed.size} files to the Trash"
+      title = when {
+        !trashing && failed.size == 1 -> "Couldn't remove ${row.name}"
+        !trashing -> "Couldn't remove ${downloads(failed.size)}"
+        failed.size == 1 -> "Couldn't move ${row.name} to the Trash"
+        else -> "Couldn't move ${failed.size} files to the Trash"
       },
       detail = e.message,
       deviceId = row.key.deviceId,
@@ -527,12 +531,13 @@ internal fun downloads(count: Int): String = if (count == 1) "1 download" else "
 internal fun skipNote(command: String, skipped: List<TaskRow>): String? {
   if (skipped.isEmpty()) return null
   val reasons = skipped.groupingBy { row ->
-    when {
-      row.state is DownloadState.Completed -> "already finished"
-      command == "pause" && row.state is DownloadState.Paused -> "already paused"
-      command == "resume" && (row.state is DownloadState.Downloading ||
-        row.state is DownloadState.Queued) -> "already running"
-      else -> "skipped"
+    when (row.state) {
+      is DownloadState.Completed -> "already finished"
+      is DownloadState.Downloading, DownloadState.Queued -> "already running"
+      is DownloadState.Paused -> if (command == "pause") "already paused" else "paused"
+      is DownloadState.Scheduled -> "scheduled"
+      is DownloadState.Failed -> "with an error"
+      DownloadState.Canceled -> "canceled"
     }
   }.eachCount()
   return reasons.entries.joinToString(" · ") { (reason, count) -> "$count $reason" }

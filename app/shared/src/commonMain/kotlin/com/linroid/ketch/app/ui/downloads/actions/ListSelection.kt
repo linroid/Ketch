@@ -188,10 +188,13 @@ private class RowPointerNode(
       if (down.isConsumed) return@awaitEachGesture
       val touch = down.type == PointerType.Touch
       if (touch) {
+        var cancelled = false
         val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-          waitForUpOrCancellation()
+          // Null once the finger scrolls, swipes or slides out of the row.
+          waitForUpOrCancellation().also { cancelled = it == null }
         }
-        if (held == null && currentEvent.changes.any { it.pressed && !it.isConsumed }) {
+        val pressed = currentEvent.changes.any { it.pressed && !it.isConsumed }
+        if (held == null && !cancelled && pressed) {
           onLongPress()
           // The finger lifts later; that release must not tap the row too.
           do {

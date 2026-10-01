@@ -3,6 +3,8 @@ package com.linroid.ketch.app.ui.dialog
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.app.state.ListFixtures
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -109,16 +111,57 @@ class RemoveTasksDialogTest {
   }
 
   @Test
+  fun removeDialogCopy_finishedAndPartialWithTrash_saysThePartialFileIsDeleted() {
+    val partial = RemovalItem("b.dmg", hasFile = true, bytes = 812 * mib, partial = true)
+
+    val copy = removeDialogCopy(
+      plan = RemovalPlan(listOf(file, partial), trash = true),
+      deviceName = "This Mac",
+      checked = true,
+      freeBytes = 48 * gib,
+    )
+
+    assertEquals("Also move the files to the Trash · 2.79 GB", copy.checkbox)
+    assertEquals("The partial file is deleted permanently · frees 812.0 MB", copy.note)
+    assertEquals("Remove and trash 2.79 GB", copy.confirm)
+  }
+
+  @Test
   fun removalPlanOf_partialFile_isNotTrashedEvenWhereThereIsATrash() {
     val request = DownloadRequest("https://example.com/a.iso")
     val done = ListFixtures.row("a", DownloadState.Completed("/d/a.iso", 100), request = request)
     val paused = ListFixtures.row("b", DownloadState.Paused(DownloadProgress(40, 100)))
 
     assertTrue(RemovalPlan.of(listOf(done), canTrash = true).trash)
+    assertFalse(RemovalPlan.of(listOf(paused), canTrash = true).trash)
     val mixed = RemovalPlan.of(listOf(done, paused), canTrash = true)
-    assertFalse(mixed.trash)
+    assertTrue(mixed.trash)
+    assertEquals(listOf(paused.name), mixed.deleted.map { it.name })
     assertEquals(140, mixed.bytes)
     assertFalse(RemovalPlan.of(listOf(done), canTrash = false).trash)
+  }
+
+  @Test
+  fun removalPlanOf_torrentWithoutSelection_countsEveryFileOfTheSource() {
+    val files = List(14) { SourceFile(id = "$it", name = "part$it.bin") }
+    val source = ResolvedSource(
+      url = "magnet:?xt=urn:btih:abc",
+      sourceType = "torrent",
+      totalBytes = 3 * gib,
+      supportsResume = true,
+      suggestedFileName = "archlinux",
+      maxSegments = 1,
+      files = files,
+    )
+    val request = DownloadRequest("magnet:?xt=urn:btih:abc", resolvedSource = source)
+    val done = DownloadState.Completed("/d/archlinux", 3 * gib)
+
+    val all = RemovalPlan.of(listOf(ListFixtures.row("a", done, request = request)), false)
+    val some = request.copy(selectedFileIds = setOf("1", "2"))
+    val picked = RemovalPlan.of(listOf(ListFixtures.row("b", done, request = some)), false)
+
+    assertEquals(14, all.items.single().fileCount)
+    assertEquals(2, picked.items.single().fileCount)
   }
 
   @Test

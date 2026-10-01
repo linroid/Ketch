@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.downloads.actions
 
+import androidx.compose.ui.geometry.Offset
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
@@ -23,6 +24,25 @@ import kotlin.test.assertTrue
 class RowMenuTest {
   private val downloading = DownloadState.Downloading(DownloadProgress(10, 100, 5))
   private val completed = DownloadState.Completed("/downloads/a.iso", totalBytes = 100)
+
+  @Test
+  fun closeIfCurrent_menuReplacedByAnother_keepsTheNewOne() = runTest {
+    val f = ActionsFixture(this)
+    val first = rowOf(f.add(downloading))
+    val second = rowOf(f.add(completed))
+    val menu = RowMenuState()
+
+    menu.open(first.key, listOf(first), Offset(4f, 8f))
+    val opened = checkNotNull(menu.request)
+    menu.open(second.key, listOf(second))
+    menu.closeIfCurrent(opened)
+
+    assertEquals(second.key, menu.request?.anchor)
+    assertEquals(null, menu.request?.position)
+    menu.closeIfCurrent(checkNotNull(menu.request))
+    assertFalse(menu.isOpen)
+    f.close()
+  }
 
   @Test
   fun rowMenuEntries_downloadingRow_listsControlsThenDestructiveAfterADivider() = runTest {

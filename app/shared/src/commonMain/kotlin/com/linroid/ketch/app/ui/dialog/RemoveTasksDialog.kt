@@ -47,8 +47,9 @@ data class RemovalItem(
  * What a [RemoveTasksDialog] removes and where the files go.
  *
  * @property items the downloads, in display order.
- * @property trash whether their files go to the Trash rather than being deleted: only when the
- *   device offers one and every file can go there.
+ * @property trash whether finished files go to the Trash rather than being deleted: only when
+ *   the device offers one and some file can go there. Partial files are deleted either way, since
+ *   only the device that wrote them knows where they are.
  */
 data class RemovalPlan(val items: List<RemovalItem>, val trash: Boolean) {
   /** Whether any of the downloads has a file to remove. */
@@ -57,12 +58,15 @@ data class RemovalPlan(val items: List<RemovalItem>, val trash: Boolean) {
   /** Bytes the files take, 0 when unknown. */
   val bytes: Long get() = items.filter { it.hasFile }.sumOf { it.bytes }
 
+  /** The files deleted for good: those that cannot go to the Trash, or all without one. */
+  val deleted: List<RemovalItem>
+    get() = items.filter { it.hasFile && !(trash && it.trashable) }
+
   companion object {
     /** The plan for removing [rows]; [canTrash] tells whether their device has a Trash. */
     fun of(rows: List<TaskRow>, canTrash: Boolean): RemovalPlan {
       val items = rows.map(::itemOf)
-      val withFiles = items.filter { it.hasFile }
-      return RemovalPlan(items, trash = canTrash && withFiles.all { it.trashable })
+      return RemovalPlan(items, trash = canTrash && items.any { it.hasFile && it.trashable })
     }
 
     private fun itemOf(row: TaskRow): RemovalItem {
@@ -72,7 +76,7 @@ data class RemovalPlan(val items: List<RemovalItem>, val trash: Boolean) {
           name = row.name,
           hasFile = state.outputPath.isNotBlank(),
           bytes = state.totalBytes ?: 0,
-          fileCount = row.request.selectedFileIds.size.coerceAtLeast(1),
+          fileCount = fileCount(row),
           trashable = state.outputPath.isNotBlank(),
         )
         is DownloadState.Downloading -> partial(row, state.progress)
@@ -92,6 +96,15 @@ data class RemovalPlan(val items: List<RemovalItem>, val trash: Boolean) {
       totalBytes = total.takeIf { it > 0 },
       partial = true,
     )
+
+    // No selection means every file of the source was downloaded.
+    private fun fileCount(row: TaskRow): Int {
+      val request = row.request
+      val count = request.selectedFileIds.size.takeIf { it > 0 }
+        ?: request.resolvedSource?.files?.size
+        ?: 1
+      return count.coerceAtLeast(1)
+    }
   }
 }
 
@@ -150,15 +163,7 @@ fun removeDialogCopy(
   }
   val box = if (plan.trash) "Also move $noun to the Trash" else "Also delete $noun permanently"
   val checkbox = listOfNotNull(box, size).joinToString(" · ")
-  // Files in the Trash still take their space until it is emptied.
-  val note = if (checked && !plan.trash && plan.bytes > 0) {
-    listOfNotNull(
-      "Frees ${formatBytes(plan.bytes)}",
-      freeBytes?.let { "${formatBytes(it)} free on $deviceName" },
-    ).joinToString(" · ")
-  } else {
-    null
-  }
+  val note = if (checked) deletionNote(plan, deviceName, freeBytes) else null
   val verb = if (plan.trash) "Remove and trash" else "Remove and delete"
   val confirm = when {
     !checked -> "Remove"
@@ -166,6 +171,28 @@ fun removeDialogCopy(
     else -> verb
   }
   return RemoveDialogCopy(title, subtitle, checkbox, note, confirm, danger = checked)
+}
+
+/**
+ * What deleting the files of [plan] for good means: which partial files skip the Trash, and the
+ * space that frees, with the space left on the device when every file is deleted. Files in the
+ * Trash keep their space until it is emptied, so they free none.
+ */
+private fun deletionNote(plan: RemovalPlan, deviceName: String, freeBytes: Long?): String? {
+  val deleted = plan.deleted
+  val freed = deleted.sumOf { it.bytes }
+  val parts = listOfNotNull(
+    when {
+      !plan.trash || deleted.isEmpty() -> null
+      deleted.size == 1 -> "the partial file is deleted permanently"
+      else -> "${deleted.size} partial files are deleted permanently"
+    },
+    "frees ${formatBytes(freed)}".takeIf { freed > 0 },
+    freeBytes?.takeIf { freed > 0 && !plan.trash }
+      ?.let { "${formatBytes(it)} free on $deviceName" },
+  )
+  if (parts.isEmpty()) return null
+  return parts.joinToString(" · ").replaceFirstChar { it.uppercaseChar() }
 }
 
 /**

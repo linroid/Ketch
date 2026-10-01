@@ -209,6 +209,24 @@ class RowActionRunnerTest {
   }
 
   @Test
+  fun remove_finishedAndPartialFilesWithTrash_trashesOneAndDeletesTheOther() = runTest {
+    val f = ActionsFixture(this, canTrash = true)
+    val done = f.add(completed)
+    val partial = f.add(DownloadState.Paused(DownloadProgress(40, 100)))
+    val canceled = f.add(DownloadState.Canceled)
+
+    f.runner.remove(listOf(done, partial, canceled).map { rowOf(it) }, withFiles = true)
+    advanceTimeBy(7.seconds)
+    runCurrent()
+
+    assertEquals(listOf("remove deleteFiles=false"), done.calls)
+    assertEquals(listOf("remove deleteFiles=true"), partial.calls)
+    assertEquals(listOf("trash /downloads/a.iso"), f.files.calls)
+    assertEquals("Moved 1 file to the Trash", f.messages().last().title)
+    f.close()
+  }
+
+  @Test
   fun remove_partialFileWithFiles_letsTheDeviceDeleteIt() = runTest {
     val f = ActionsFixture(this, canTrash = true)
     val task = f.add(DownloadState.Paused(DownloadProgress(40, 100)))
