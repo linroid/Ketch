@@ -11,6 +11,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.config.KetchConfig
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -20,6 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.seconds
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class PulseBarTest {
 
   @Test
