@@ -122,7 +122,12 @@ internal fun SettingsContent(
   val summaries = rememberSettingsSummaries(state, device)
   val features = buildSet {
     if (inWindow) add(SettingsFeature.Desktop)
-    if (isMobilePlatform) add(SettingsFeature.Mobile) else add(SettingsFeature.SetupChecklist)
+    if (isMobilePlatform) {
+      add(SettingsFeature.Mobile)
+    } else {
+      add(SettingsFeature.SetupChecklist)
+      add(SettingsFeature.Keyboard)
+    }
     if (permission != null) add(SettingsFeature.BrowserNotifications)
     if (fileLogger != null) add(SettingsFeature.Logs)
   }

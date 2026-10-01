@@ -510,10 +510,8 @@ internal class DesktopCommands(
       KetchCommands.SlowLane -> if (speedMode != null) state.toggleSlowLane()
       KetchCommands.ToggleInspector -> state.updateInspectorOpen(!state.inspectorOpen)
       KetchCommands.Undo -> state.pendingOps.undoLast()
-      KetchCommands.Settings -> {
-        actions.showWindow()
-        state.openSettings()
-      }
+      // Settings opens in a window of its own, so the main window can stay hidden.
+      KetchCommands.Settings -> state.openSettings()
       KetchCommands.CloseWindow -> actions.closeWindow()
       KetchCommands.Minimize -> minimizeWindow()
       KetchCommands.Quit -> actions.quit()

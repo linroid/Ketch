@@ -33,6 +33,7 @@ import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.platform.rememberSystemClipboard
@@ -281,11 +282,20 @@ private fun RestoreListState(appState: AppState) {
 @Composable
 private fun ShellRequests(appState: AppState, shell: ShellState, openSettingsRequests: Flow<Unit>) {
   val settingsRequest = appState.settingsRequest
-  LaunchedEffect(settingsRequest) {
-    if (settingsRequest != null) shell.openSettings()
+  // Desktop shows Settings in a window of its own, which takes the requests.
+  val settingsInWindow = LocalDesktopHooks.current.isSupported
+  LaunchedEffect(settingsRequest, settingsInWindow) {
+    if (settingsRequest != null && !settingsInWindow) shell.openSettings()
   }
   LaunchedEffect(openSettingsRequests) {
     openSettingsRequests.collect { appState.openSettings() }
+  }
+  val shortcutsRequested = appState.shortcutsRequested
+  LaunchedEffect(shortcutsRequested) {
+    if (shortcutsRequested) {
+      shell.shortcutsOpen = true
+      appState.shortcutsShown()
+    }
   }
   val discoverRequest = appState.discoverRequest
   LaunchedEffect(discoverRequest) {

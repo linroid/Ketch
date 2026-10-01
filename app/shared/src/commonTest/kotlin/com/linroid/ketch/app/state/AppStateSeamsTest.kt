@@ -178,6 +178,30 @@ class AppStateSeamsTest {
   }
 
   @Test
+  fun openSettings_samePageAgain_countsAnotherRequest() = runTest {
+    val state = appState()
+    val speed = SettingsTarget(SettingsTarget.Page.Speed)
+
+    state.openSettings(speed)
+    state.openSettings(speed)
+
+    assertEquals(speed, state.settingsRequest)
+    assertEquals(2, state.settingsRequests)
+  }
+
+  @Test
+  fun showShortcuts_untilShown_staysRequested() = runTest {
+    val state = appState()
+
+    state.showShortcuts()
+    val requested = state.shortcutsRequested
+    state.shortcutsShown()
+
+    assertTrue(requested)
+    assertFalse(state.shortcutsRequested)
+  }
+
+  @Test
   fun report_failedDownload_toastNamesTheFileAndTheProblem() = runTest {
     val state = appState()
     val request = DownloadRequest(url = "https://example.com/files/q3-report.pdf")
