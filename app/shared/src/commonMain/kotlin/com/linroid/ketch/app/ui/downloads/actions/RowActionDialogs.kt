@@ -23,6 +23,7 @@ import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.StartTimeDialog
 import com.linroid.ketch.app.components.parseSpeedInput
 import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.formatSpeedLimit
@@ -175,6 +176,41 @@ internal fun CustomSpeedDialog(
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
       keyboardActions = KeyboardActions(onDone = { apply() }),
       modifier = Modifier.fillMaxWidth().focusRequester(focus),
+    )
+  }
+}
+
+/**
+ * Asks before a Send to whose downloads carry cookies or a sign-in, which the other device keeps
+ * with them; see [AppState.sendTo]. Place it once next to the list.
+ */
+@Composable
+internal fun SendConfirmationDialog(state: AppState) {
+  val pending = state.sendConfirmation ?: return
+  val count = pending.tasks.size
+  val verb = if (pending.move) "Move" else "Send"
+  val what = if (count == 1) "this download" else downloads(count)
+  AdaptiveModal(
+    onDismissRequest = state::dismissSendConfirmation,
+    title = { Text("$verb $what to ${pending.target.label}?") },
+    dismissButton = {
+      KetchButton(
+        text = "Cancel",
+        variant = KetchButtonVariant.Secondary,
+        onClick = state::dismissSendConfirmation,
+      )
+    },
+    confirmButton = { KetchButton(text = verb, onClick = state::confirmSend) },
+  ) {
+    Text(
+      text = pending.warning,
+      style = KetchTheme.typography.body,
+      color = KetchTheme.colors.textSecondary,
+    )
+    Text(
+      text = "They are saved with the download there, where anyone who controls it can see them.",
+      style = KetchTheme.typography.bodyS,
+      color = KetchTheme.colors.textTertiary,
     )
   }
 }

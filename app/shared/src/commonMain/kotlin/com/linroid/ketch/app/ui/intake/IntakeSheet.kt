@@ -415,31 +415,39 @@ private fun IntakeHeader(actions: IntakeActions, phone: Boolean, modifier: Modif
   val session = actions.session
   val spacing = KetchTheme.spacing
   val instances by session.instances.collectAsState()
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(spacing.s3),
+  val target = instances.size >= 2 && session.mode == IntakeMode.Add
+  // A phone has no room for the target chip beside the title; it goes under it.
+  Column(
+    verticalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = modifier.fillMaxWidth(),
   ) {
-    Text(
-      text = when (session.mode) {
-        IntakeMode.Add -> "Add downloads"
-        IntakeMode.Retry -> "Retry with options"
-        IntakeMode.Edit -> "Download options"
-      },
-      style = KetchTheme.typography.titleL,
-      color = KetchTheme.colors.textPrimary,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.weight(1f),
-    )
-    if (instances.size >= 2 && session.mode == IntakeMode.Add) TargetChip(session, instances)
-    if (phone) {
-      KetchIconButton(
-        icon = KetchIcon.Close,
-        contentDescription = "Close",
-        onClick = actions::close,
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s3),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Text(
+        text = when (session.mode) {
+          IntakeMode.Add -> "Add downloads"
+          IntakeMode.Retry -> "Retry with options"
+          IntakeMode.Edit -> "Download options"
+        },
+        style = KetchTheme.typography.titleL,
+        color = KetchTheme.colors.textPrimary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(1f),
       )
+      if (target && !phone) TargetChip(session, instances)
+      if (phone) {
+        KetchIconButton(
+          icon = KetchIcon.Close,
+          contentDescription = "Close",
+          onClick = actions::close,
+        )
+      }
     }
+    if (target && phone) TargetChip(session, instances)
   }
 }
 

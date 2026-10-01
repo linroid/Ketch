@@ -34,7 +34,6 @@ import com.linroid.ketch.app.state.taskActions
 import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.util.priorityLabel
-import com.linroid.ketch.app.util.toCopy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -265,9 +264,12 @@ internal class RowActionRunner(
     }
   }
 
-  /** Adds [rows] to [target], where they start over. */
-  fun sendTo(rows: List<TaskRow>, target: InstanceEntry) {
-    state.sendTo(rows.map { it.task }, target)
+  /**
+   * Adds [rows] to [target], where they start over; with [move] they leave this list once sent.
+   * Rows whose cookies would go along ask first; see [AppState.sendTo].
+   */
+  fun sendTo(rows: List<TaskRow>, target: InstanceEntry, move: Boolean = false) {
+    state.sendTo(rows.map { it.task }, target, move)
   }
 
   /**
@@ -314,9 +316,14 @@ internal class RowActionRunner(
       RowAction.Resume -> launchBatch(applies, "resume", { "Resumed ${downloads(it)}" }, rows) {
         resume()
       }
-      RowAction.Retry -> retry(applies, rows)
-      RowAction.StartNow -> applies.forEach { state.startNow(it.task) }
-      RowAction.DownloadAgain -> applies.forEach { state.redownload(it.task) }
+      RowAction.Retry -> {
+        val app = state
+        launchBatch(applies, "retry", { n -> "Retrying ${downloads(n)}" }, rows) {
+          app.retryInBatch(this)
+        }
+      }
+      RowAction.StartNow -> state.startNow(applies.map { it.task })
+      RowAction.DownloadAgain -> state.redownload(applies.map { it.task })
       RowAction.StopAndDiscard -> dialog = RowDialog.Discard(applies)
       RowAction.RemoveAndTrash, RowAction.RemoveAndDelete -> {
         dialog = RowDialog.Remove(applies, withFiles = true)
@@ -325,21 +332,6 @@ internal class RowActionRunner(
       RowAction.CopyLink -> copy(applies.map { it.request.url }, "link")
       RowAction.CopyPath -> copy(applies.mapNotNull { it.outputFile }, "file path")
       else -> applies.forEach { commands.run(action, it) }
-    }
-  }
-
-  // Failed rows whose progress can be reused resume together; the others start over.
-  private fun retry(rows: List<TaskRow>, targets: List<TaskRow>) {
-    val (resumable, restarts) = rows.partition { row ->
-      val failed = row.state as? DownloadState.Failed
-      failed != null && failed.error.toCopy().primary != RowAction.DownloadAgain
-    }
-    restarts.forEach { state.redownload(it.task) }
-    if (resumable.isNotEmpty()) {
-      val others = targets - restarts.toSet()
-      launchBatch(resumable, "retry", { n -> "Retrying ${downloads(n)}" }, others) {
-        resume()
-      }
     }
   }
 

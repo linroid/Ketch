@@ -10,8 +10,6 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeMode
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.catchingUnlessCancelled
-import com.linroid.ketch.app.util.LinkParser
-import com.linroid.ketch.app.util.links
 import com.linroid.ketch.config.ClipboardMode
 import kotlinx.coroutines.flow.filterNotNull
 
@@ -56,9 +54,3 @@ fun IntakeHost(state: AppState, canFinishInBackground: Boolean = true) {
     },
   )
 }
-
-/** Link the add sheet starts with: the first seed of [request], else its text's first link. */
-internal fun initialUrl(request: IntakeRequest): String =
-  request.seeds.firstOrNull()?.url
-    ?: LinkParser.parseIntake(request.text).links().firstOrNull()?.url
-    ?: ""

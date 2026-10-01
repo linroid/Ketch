@@ -59,8 +59,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.app.components.DevicePennant
-import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchMenu
@@ -117,6 +115,8 @@ import kotlin.math.roundToInt
  *
  * @param layout the tab's columns.
  * @param onLayoutChange saves a change to the columns, such as a width dragged or a column shown.
+ * @param autoColumns columns shown whatever [layout] says, such as Device while every device
+ *   shows; when one has no room, rows put the device's pennant before their name instead.
  * @param onSort sorts by a column's key; see [nextArrangement].
  * @param onAddToken adds a token to the search.
  * @param rowHeight height of a row, from the row density.
@@ -134,13 +134,17 @@ internal fun DownloadTable(
   onAddToken: (SearchToken) -> Unit,
   rowHeight: Dp,
   modifier: Modifier = Modifier,
+  autoColumns: Set<TableColumn> = emptySet(),
   groupAction: @Composable RowScope.(RowGroup) -> Unit = {},
 ) {
   val spacing = KetchTheme.spacing
   // A width being dragged shows at once and is saved when the drag ends.
   var dragged by remember(layout) { mutableStateOf(layout) }
   BoxWithConstraints(modifier) {
-    val columns = dragged.fit(maxWidth, TablePadding)
+    val shown = autoColumns.fold(dragged) { shown, column -> shown.withVisible(column, true) }
+    val columns = shown.fit(maxWidth, TablePadding)
+    val namePennant = TableColumn.Device in autoColumns &&
+      columns.none { it.column == TableColumn.Device }
     val groups = view.groups
     val entries = listEntries(groups, collapse)
     Column(Modifier.fillMaxSize()) {
@@ -149,6 +153,7 @@ internal fun DownloadTable(
         actions = actions,
         columns = columns,
         layout = dragged,
+        autoColumns = autoColumns,
         onResize = { column, width -> dragged = dragged.withWidth(column, width) },
         onResizeEnd = { onLayoutChange(dragged) },
         onLayoutChange = onLayoutChange,
@@ -177,6 +182,7 @@ internal fun DownloadTable(
             columns = columns,
             height = rowHeight,
             onAddToken = onAddToken,
+            pennant = namePennant,
             modifier = placement(),
           )
         },
@@ -201,6 +207,7 @@ private fun TableHeader(
   actions: ListActions,
   columns: List<ColumnSetting>,
   layout: TableLayout,
+  autoColumns: Set<TableColumn>,
   onResize: (TableColumn, Dp) -> Unit,
   onResizeEnd: () -> Unit,
   onLayoutChange: (TableLayout) -> Unit,
@@ -271,7 +278,7 @@ private fun TableHeader(
           onDismissRequest = { chooserAt = null },
           offset = DpOffset(0.dp, -spacing.s1),
         ) {
-          columnChooser(layout, onLayoutChange)
+          columnChooser(layout, autoColumns, onLayoutChange)
         }
       }
     }
@@ -280,17 +287,22 @@ private fun TableHeader(
 
 /**
  * The column chooser: every column that can hide, checked when shown, and Reset columns.
- * Opened by right-clicking the table header and from "⋯ › Columns".
+ * Opened by right-clicking the table header and from "⋯ › Columns". [autoColumns] show
+ * whatever the layout says, so they are checked and cannot be picked.
  */
 internal fun KetchMenuScope.columnChooser(
   layout: TableLayout,
+  autoColumns: Set<TableColumn> = emptySet(),
   onLayoutChange: (TableLayout) -> Unit,
 ) {
   header("Columns")
   for (setting in layout.columns.filterNot { it.column.fixed }) {
+    val auto = setting.column in autoColumns
     item(
       label = setting.column.title,
-      checked = setting.visible,
+      caption = if (auto) "Shown for All devices" else null,
+      checked = setting.visible || auto,
+      enabled = !auto,
       keepOpen = true,
       onClick = { onLayoutChange(layout.withVisible(setting.column, !setting.visible)) },
     )
@@ -446,6 +458,7 @@ private fun TableRow(
   columns: List<ColumnSetting>,
   height: Dp,
   onAddToken: (SearchToken) -> Unit,
+  pennant: Boolean,
   modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
@@ -482,7 +495,7 @@ private fun TableRow(
           StatusDot(row.content.status, size = StatusDotDefaults.TableSize)
         }
       }
-      NameCell(row, completion.showsCheck, onAddToken, Modifier.weight(1f))
+      NameCell(row, completion.showsCheck, pennant, onAddToken, Modifier.weight(1f))
       var index = 0
       while (index < columns.size) {
         val setting = columns[index]
@@ -508,7 +521,7 @@ private fun TableRow(
         index++
       }
     }
-    HoverOverlay(row, actions, frame)
+    HoverOverlay(row, actions, frame, wideFade = true)
   }
 }
 
@@ -533,6 +546,7 @@ private fun spansReason(row: TaskRow, lanes: Boolean): Boolean = when (row.state
 private fun NameCell(
   row: TaskRow,
   showCheck: Boolean,
+  pennant: Boolean,
   onAddToken: (SearchToken) -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -542,6 +556,14 @@ private fun NameCell(
     verticalAlignment = Alignment.CenterVertically,
     modifier = modifier.padding(horizontal = CellPadding),
   ) {
+    if (pennant) {
+      RowPennant(
+        row = row,
+        modifier = Modifier
+          .padding(end = spacing.s2)
+          .altClick { onAddToken(SearchToken.Device(row.device.name)) },
+      )
+    }
     KetchFileTypeChip(
       fileName = row.name,
       sourceUrl = row.request.url,
@@ -697,11 +719,7 @@ private fun Cell(
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       modifier = cell.altClick { onAddToken(SearchToken.Device(row.device.name)) },
     ) {
-      DevicePennant(
-        deviceId = row.key.deviceId,
-        name = row.device.name,
-        size = DevicePennantDefaults.XSmall,
-      )
+      RowPennant(row)
       Text(
         text = row.device.name,
         style = KetchTheme.typography.cell,

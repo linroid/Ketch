@@ -193,12 +193,10 @@ internal class ListKeyboard(
   }
 
   // The connections Auto gives the row: one per segment once it has some, else the default of
-  // the settings of its device when that is the active one.
+  // the settings of its device.
   private fun autoConnections(row: TaskRow): Int? {
     row.segments.size.takeIf { it > 0 }?.let { return it }
-    val state = runner.state
-    if (state.activeInstance.value?.deviceId != row.key.deviceId) return null
-    return state.instanceSettings.download?.maxConnectionsPerDownload
+    return runner.state.settingsOf(row.key.deviceId)?.download?.maxConnectionsPerDownload
   }
 
   /** Moves the focus into the list. */

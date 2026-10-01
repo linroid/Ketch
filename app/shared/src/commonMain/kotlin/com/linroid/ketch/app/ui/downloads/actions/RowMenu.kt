@@ -2,6 +2,7 @@ package com.linroid.ketch.app.ui.downloads.actions
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
@@ -11,8 +12,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import com.linroid.ketch.api.DownloadPriority
@@ -28,6 +32,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -40,7 +45,9 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.toDeviceHealth
+import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.intake.targetSummary
 import com.linroid.ketch.app.util.priorityLabel
 import kotlin.math.roundToInt
 import kotlin.time.Clock
@@ -138,12 +145,14 @@ internal fun RowMenu(
   val single = rows.singleOrNull()
   LaunchedEffect(single?.key) { single?.let(runner::checkFile) }
   val instances by runner.state.instances.collectAsState()
+  val presence by runner.state.instanceManager.presence.collectAsState()
   val context = RowMenuContext(
     revealLabel = runner.files?.revealLabel,
-    devices = sendTargets(instances, rows),
+    devices = sendTargets(instances, rows, presence),
     now = LocalClock.current.now(),
     zone = TimeZone.currentSystemDefault(),
     urgentVictim = urgentVictim(rows, runner),
+    send = rememberSendMode(),
   )
   val title = single?.name ?: downloads(rows.size)
   KetchMenu(
@@ -173,6 +182,7 @@ internal data class SendTarget(val entry: InstanceEntry, val option: DeviceOptio
  * @property now the current time, for Start later.
  * @property zone the local time zone, for Start later.
  * @property urgentVictim name of the download Urgent would pause to make room, if any.
+ * @property send whether Send to moves the rows, and whether it says how to.
  */
 internal data class RowMenuContext(
   val revealLabel: String? = null,
@@ -180,7 +190,30 @@ internal data class RowMenuContext(
   val now: Instant = Clock.System.now(),
   val zone: TimeZone = TimeZone.currentSystemDefault(),
   val urgentVictim: String? = null,
+  val send: SendMode = SendMode(),
 )
+
+/**
+ * How Send to entries read: copies by default; while ⌥ (Alt) is held they move the rows
+ * instead, which a pointer menu says in a hint at its end.
+ *
+ * @property move whether ⌥ is held, so picking a device moves the rows.
+ * @property hint the hint, such as "Hold ⌥ to move", or `null` on touch.
+ */
+internal data class SendMode(val move: Boolean = false, val hint: String? = null)
+
+/** The [SendMode] of a menu open now, which follows ⌥ (Alt) as it is pressed and released. */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+internal fun rememberSendMode(): SendMode {
+  if (KetchTheme.density == KetchDensity.Comfortable) return SendMode()
+  val move = LocalWindowInfo.current.keyboardModifiers.isAltPressed
+  val key = if (KeyboardPlatform.current.isApple) "⌥" else "Alt"
+  return SendMode(
+    move = move,
+    hint = if (move) "Removes them here once sent" else "Hold $key to move instead",
+  )
+}
 
 /** Adds the entries of the menu of [rows]; see [RowMenu]. */
 internal fun KetchMenuScope.rowMenuEntries(
@@ -224,7 +257,9 @@ internal fun KetchMenuScope.rowMenuEntries(
         startLaterEntries(targets, runner, context)
       }
       RowAction.SendTo -> if (context.devices.isNotEmpty()) {
-        submenu(label, action.icon) { sendEntries(targets, runner, context.devices) }
+        submenu(label, action.icon) {
+          sendEntries(targets, runner, context.devices, context.send)
+        }
       }
       else -> item(
         label = label,
@@ -324,7 +359,7 @@ internal fun KetchMenuScope.priorityEntries(
   item(
     label = priorityLabel(DownloadPriority.URGENT),
     onClick = {
-      waiting.forEach { runner.state.startNow(it.task) }
+      if (waiting.isNotEmpty()) runner.state.startNow(waiting.map { it.task })
       val running = rows - waiting.toSet()
       if (running.isNotEmpty()) runner.setPriority(running, DownloadPriority.URGENT)
     },
@@ -363,24 +398,46 @@ internal fun KetchMenuScope.startLaterEntries(
   }
 }
 
-/** Adds the [devices] [rows] can be sent to; offline ones are listed but disabled. */
+/**
+ * Adds the [devices] [rows] can be sent to, or moved to while [mode] says so; offline ones are
+ * listed but disabled.
+ */
 internal fun KetchMenuScope.sendEntries(
   rows: List<TaskRow>,
   runner: RowActionRunner,
   devices: List<SendTarget>,
+  mode: SendMode = SendMode(),
 ) {
   for (device in devices) {
     item(
-      label = device.option.name,
-      onClick = { runner.sendTo(rows, device.entry) },
+      label = if (mode.move) "Move to ${device.option.name}" else device.option.name,
+      onClick = { runner.sendTo(rows, device.entry, move = mode.move) },
       caption = deviceOptionCaption(device.option),
       enabled = device.option.health.isOnline,
     )
   }
+  mode.hint?.let { hint ->
+    divider()
+    custom {
+      Text(
+        text = hint,
+        style = KetchTheme.typography.caption,
+        color = KetchTheme.colors.textTertiary,
+        maxLines = 1,
+      )
+    }
+  }
 }
 
-/** The devices other than those of [rows], with their health. */
-internal fun sendTargets(instances: List<InstanceEntry>, rows: List<TaskRow>): List<SendTarget> {
+/**
+ * The devices other than those of [rows], with their health and, from [presence], what each
+ * is doing, such as "1.8 TB free · 2 active".
+ */
+internal fun sendTargets(
+  instances: List<InstanceEntry>,
+  rows: List<TaskRow>,
+  presence: List<DevicePresence> = emptyList(),
+): List<SendTarget> {
   val here = rows.mapTo(mutableSetOf()) { it.key.deviceId }
   return instances.filter { it.deviceId !in here }.map { entry ->
     val health = when (entry) {
@@ -388,7 +445,8 @@ internal fun sendTargets(instances: List<InstanceEntry>, rows: List<TaskRow>): L
       else -> DeviceHealth.Local()
     }
     val name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label
-    SendTarget(entry, DeviceOption(entry.deviceId, name, health))
+    val summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId })
+    SendTarget(entry, DeviceOption(entry.deviceId, name, health, summary = summary))
   }
 }
 
@@ -403,7 +461,7 @@ internal fun urgentVictim(rows: List<TaskRow>, runner: RowActionRunner): String?
   val running = runner.state.taskList.rows.value.filter {
     it.key.deviceId == deviceId && it.state is DownloadState.Downloading
   }
-  val slots = runner.state.instanceSettings.download?.maxConcurrentDownloads
+  val slots = runner.state.settingsOf(deviceId)?.download?.maxConcurrentDownloads
   if (slots != null && running.size < slots) return null
   return running.filter { it.key !in keys && it.request.priority < DownloadPriority.URGENT }
     .minByOrNull { it.request.priority.ordinal }?.name

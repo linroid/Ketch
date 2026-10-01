@@ -61,6 +61,7 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.feedback.ActivityPopover
 
@@ -256,7 +257,6 @@ private fun SpeedReadout(
   val type = KetchTheme.typography
   val downloading = pulse.counts.downloading > 0
   val speed = speedText(pulse.totalSpeed)
-  val history = pulse.history
   val description = when {
     !online -> "Speed unknown while offline"
     downloading -> "Downloading at $speed, show the last 5 minutes"
@@ -279,11 +279,11 @@ private fun SpeedReadout(
       )
       else -> Text("Idle", style = type.caption, color = colors.textSecondary, maxLines = 1)
     }
-    val sparkline = remember(history) { sparklineSamples(history) }
-    if (showSparkline && online && sparkline != null) {
+    val bands = remember(pulse, colors) { sparklineBands(pulse, colors) }
+    if (showSparkline && online && bands != null) {
       Spacer(Modifier.width(KetchTheme.spacing.s2))
       KetchSpeedChart(
-        bands = listOf(SpeedBand(sparkline, colors.accent)),
+        bands = bands,
         showAxis = false,
         modifier = Modifier.size(SparklineWidth, SparklineHeight).clearAndSetSemantics {},
       )
@@ -452,6 +452,25 @@ private fun FittingRow(modifier: Modifier = Modifier, content: @Composable () ->
         x += placeable.width
       }
     }
+  }
+}
+
+/**
+ * The sparkline's bands: the scope's total speed in the accent color, or under All devices one
+ * band per device in its pennant hue, stacked and scaled together; `null` when there is nothing
+ * to draw.
+ */
+internal fun sparklineBands(pulse: PulseState, colors: KetchColors): List<SpeedBand>? {
+  val total = sparklineSamples(pulse.history) ?: return null
+  val moving = pulse.devices.filter { device -> device.history.any { it > 0 } }
+  if (!pulse.allDevices || moving.size < 2) return listOf(SpeedBand(total, colors.accent))
+  val peak = pulse.history.max()
+  return moving.map { device ->
+    val hue = colors.deviceHue(device.deviceId)
+    SpeedBand(
+      samples = device.history.map { it * SPARKLINE_TOP / peak },
+      color = if (colors.isDark) hue.dark else hue.light,
+    )
   }
 }
 
