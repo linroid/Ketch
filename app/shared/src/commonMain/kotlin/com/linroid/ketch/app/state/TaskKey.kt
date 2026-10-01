@@ -6,6 +6,9 @@ const val LOCAL_DEVICE_ID: String = "local"
 /**
  * Identifies a task across devices; a task id is only unique on the device that runs it.
  *
+ * Android saves lazy list item keys in a `Bundle`, which cannot hold this class, so lists key
+ * their items by [encode].
+ *
  * @property deviceId id of the device that runs the task, [LOCAL_DEVICE_ID] for the embedded one.
  * @property taskId id of the task on that device.
  */

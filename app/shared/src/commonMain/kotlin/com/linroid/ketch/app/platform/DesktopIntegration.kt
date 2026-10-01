@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.platform
 
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.linroid.ketch.config.CloseAction
@@ -23,22 +24,26 @@ data class DetectedBrowser(
  * @property browsers browsers found on this computer.
  * @property extensionConnected whether the browser extension has connected from any browser.
  * @property magnetHandler whether Ketch opens `magnet:` links.
+ * @property torrentFileHandler whether Ketch opens `.torrent` files.
  */
 data class IntegrationStatus(
   val browsers: List<DetectedBrowser> = emptyList(),
   val extensionConnected: Boolean = false,
   val magnetHandler: Boolean = false,
+  val torrentFileHandler: Boolean = false,
 )
 
 /** Live [IntegrationStatus], provided by the desktop app. */
-val LocalIntegrationStatus = compositionLocalOf { IntegrationStatus() }
+val LocalIntegrationStatus: ProvidableCompositionLocal<IntegrationStatus> =
+  compositionLocalOf { IntegrationStatus() }
 
 /**
  * Desktop behaviors that shared settings, menus and pages can trigger. The desktop app provides
  * an implementation through [LocalDesktopHooks]; every hook does nothing by default.
  *
  * Callers save the matching `[desktop]` or `[integration]` setting themselves; a hook only makes
- * the operating system follow it.
+ * the operating system follow it. The suspending hooks touch files, the registry or other
+ * processes, and throw when the operating system refuses.
  */
 interface DesktopHooks {
   /** Whether these hooks do anything here, so settings can hide desktop-only rows. */
@@ -48,19 +53,22 @@ interface DesktopHooks {
   fun setCloseAction(action: CloseAction) {}
 
   /** Adds or removes the login item that opens Ketch at login. */
-  fun setOpenAtLogin(enabled: Boolean) {}
+  suspend fun setOpenAtLogin(enabled: Boolean) {}
 
   /** Makes a launch at login start hidden in the menu bar or notification area. */
-  fun setStartHidden(enabled: Boolean) {}
+  suspend fun setStartHidden(enabled: Boolean) {}
 
   /** Makes the Dock or taskbar badge follow [mode]. */
   fun setDockBadgeMode(mode: DockBadgeMode) {}
 
   /** Registers Ketch to open `magnet:` links; returns whether it now does. */
-  fun registerMagnetHandler(): Boolean = false
+  suspend fun registerMagnetHandler(): Boolean = false
+
+  /** Registers Ketch to open `.torrent` files; returns whether it now does. */
+  suspend fun registerTorrentFileHandler(): Boolean = false
 
   /** Opens the folder that holds the log files. */
-  fun openLogsFolder() {}
+  suspend fun openLogsFolder() {}
 
   companion object {
     /** Hooks that do nothing, for platforms other than desktop. */
@@ -69,4 +77,5 @@ interface DesktopHooks {
 }
 
 /** [DesktopHooks] of the running app, [DesktopHooks.None] unless the desktop app provides them. */
-val LocalDesktopHooks = staticCompositionLocalOf { DesktopHooks.None }
+val LocalDesktopHooks: ProvidableCompositionLocal<DesktopHooks> =
+  staticCompositionLocalOf { DesktopHooks.None }

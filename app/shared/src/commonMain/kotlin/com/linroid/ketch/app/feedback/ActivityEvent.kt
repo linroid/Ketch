@@ -91,8 +91,9 @@ data class NotificationCopy(
 /**
  * Posts system notifications, one implementation per platform.
  *
- * The host that owns the activity monitor calls it only while the app is in the background and
- * the notification settings allow the event; in front, events show as toasts instead.
+ * The host that owns the activity monitor calls it when the notification settings allow the
+ * event. With `onlyInBackground` on, the default, that is only while the app is in the
+ * background; in front, events show as toasts instead.
  */
 fun interface SystemNotifier {
   /** Posts [copy] for [event]. */
