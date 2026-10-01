@@ -40,6 +40,7 @@ import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.IntakePreferences
+import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -401,8 +402,16 @@ class AppState(
         local = appSettings.takeIf { entry is EmbeddedInstance },
         scope = scope,
         applyTorrent = instanceManager::applyTorrentSettings,
+        savedSpeedLimit = { config -> standingCap(config.speedLimit) },
       )
     }
+
+  // The embedded device's cap when the slow lane lets go: its live limit at full speed, else
+  // the one the speed mode keeps for then.
+  private fun standingCap(live: SpeedLimit): SpeedLimit {
+    val settings = speedMode?.settings?.value ?: return live
+    return if (settings.mode == SpeedLimitMode.Full) live else settings.standard
+  }
 
   private fun settingsForActive(): InstanceSettingsController =
     activeInstance.value?.let(::settingsFor)

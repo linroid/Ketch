@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.config.TorrentSettings
@@ -35,12 +36,16 @@ import kotlinx.coroutines.sync.withLock
  * @param scope scope that runs the calls to [api].
  * @param applyTorrent hands saved torrent settings to the embedded
  *   instance, so they take effect without a restart.
+ * @param savedSpeedLimit the speed limit saved with download settings the
+ *   instance accepted: its standing cap, which a slow lane holding the
+ *   instance back for now must not replace.
  */
 class InstanceSettingsController(
   private val api: KetchApi,
   private val local: AppSettingsController?,
   private val scope: CoroutineScope,
   private val applyTorrent: suspend (TorrentSettings) -> Unit = {},
+  private val savedSpeedLimit: (DownloadConfig) -> SpeedLimit = { it.speedLimit },
 ) {
   /** Download settings, or `null` while a remote's are loading. */
   var download by mutableStateOf(local?.config?.download)
@@ -143,7 +148,7 @@ class InstanceSettingsController(
         attempt(onError = { downloadError = it }) {
           api.updateConfig(latest)
           appliedDownload = latest
-          local?.saveDownload(latest)
+          local?.saveDownload(latest.copy(speedLimit = savedSpeedLimit(latest)))
         }
         if (appliedDownload == latest) {
           attempt(onError = {}) { readDownload() }
