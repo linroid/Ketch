@@ -1,46 +1,57 @@
 package com.linroid.ketch.app.ui.intake
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.IntakeController
+import com.linroid.ketch.app.state.IntakeMode
 import com.linroid.ketch.app.state.IntakeRequest
-import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
+import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
+import com.linroid.ketch.config.ClipboardMode
+import kotlinx.coroutines.flow.filterNotNull
 
 /**
- * Shows the add dialog while [AppState.intakeRequest] is set, prefilled with the first link of
- * the request, and adds the download to the active device.
+ * Shows the add sheet while [AppState.intakeRequest] is set: the request's links and seeds are
+ * checked on its target device and added with the options chosen in the sheet.
  */
 @Composable
 fun IntakeHost(state: AppState) {
-  val request = state.intakeRequest
+  val scope = rememberCoroutineScope()
+  val controller = remember(state, scope) { IntakeController(state, scope) }
+  val clipboard = rememberSystemClipboard()
   if (!state.showAddDialog) return
-  // Each opened file or request starts a fresh form.
-  key(state.openedDownload, request) {
-    AddDownloadDialog(
-      resolveState = state.resolveState,
-      onResolveUrl = { state.resolveUrl(it) },
-      onResetResolve = { state.resetResolveState() },
-      onDismiss = { state.closeAddDialog() },
-      onDownload = { url, fileName, speedLimit, priority, schedule, resolved, selectedFileIds ->
-        state.closeAddDialog()
-        state.startDownload(
-          url, fileName, speedLimit, priority,
-          schedule, resolved, selectedFileIds
-        )
-      },
-      droppedFileName = state.droppedFile?.name,
-      onRetryDroppedFile = {
-        state.droppedFile?.let { state.resolveDroppedFile(it) }
-      },
-      onDropFiles = { state.addDroppedFiles(it) },
-      initialUrl = request?.let(::initialUrl).orEmpty(),
-    )
+  val request = state.intakeRequest ?: IntakeRequest()
+  val session = remember(controller, request) { controller.start(request) }
+  DisposableEffect(session) {
+    onDispose { controller.release(session) }
   }
+  LaunchedEffect(session) {
+    // A .torrent file dropped on the window or opened from the system joins the sheet.
+    snapshotFlow { state.droppedFile }.filterNotNull().collect(session::addFile)
+  }
+  LaunchedEffect(session) {
+    val empty = request.text.isBlank() && request.seeds.isEmpty()
+    if (!empty || session.mode != IntakeMode.Add || session.clipboardMode != ClipboardMode.Fill) {
+      return@LaunchedEffect
+    }
+    // Opening the sheet is the user action that lets the clipboard be read.
+    catchingUnlessCancelled { clipboard.readText() }.getOrNull()?.let(session::offerClipboard)
+  }
+  IntakeSheet(
+    session = session,
+    onClose = { state.closeAddDialog() },
+    onFinishInBackground = { controller.finishInBackground(session) },
+  )
 }
 
-/** Link the add dialog starts with: the first seed of [request], else its text's first link. */
+/** Link the add sheet starts with: the first seed of [request], else its text's first link. */
 internal fun initialUrl(request: IntakeRequest): String =
   request.seeds.firstOrNull()?.url
     ?: LinkParser.parseIntake(request.text).links().firstOrNull()?.url
