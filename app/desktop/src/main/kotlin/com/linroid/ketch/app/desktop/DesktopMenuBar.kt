@@ -14,6 +14,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
@@ -39,6 +40,7 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
@@ -564,11 +566,17 @@ internal class DesktopCommands(
     }
     val device = (1..MAX_DEVICE_ITEMS).firstOrNull { KetchCommands.device(it) == command }
     if (device != null) {
-      state.instances.value.getOrNull(device - 1)?.let(state::switchInstance)
+      state.instances.value.getOrNull(device - 1)?.let {
+        actions.showWindow()
+        state.switchInstance(it)
+      }
       return
     }
     when (command) {
-      KetchCommands.AllDevices -> controller.instanceManager.showAllDevices()
+      KetchCommands.AllDevices -> {
+        actions.showWindow()
+        controller.instanceManager.showAllDevices()
+      }
       KetchCommands.Add -> {
         actions.showWindow()
         state.openIntake()
@@ -657,14 +665,15 @@ internal class DesktopCommands(
   }
 
   // This computer is the one device with a speed mode, which the tray switches also while
-  // another device shows; the active one's change offers Undo.
-  private fun switchSpeedMode(mode: SpeedLimitMode) {
+  // another device shows, naming it then. Either way the change offers Undo when [undoable].
+  private fun switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true) {
     if (state.activeSpeedMode != null) {
-      state.switchSpeedMode(mode)
+      state.switchSpeedMode(mode, undoable)
       return
     }
     val speedMode = controller.speedMode ?: return
-    if (speedMode.settings.value.mode == mode) return
+    val previous = speedMode.settings.value.mode
+    if (previous == mode) return
     val device = localDeviceNoun()
     controller.scope.launch {
       try {
@@ -676,16 +685,24 @@ internal class DesktopCommands(
         state.messages.post(
           level = MessageLevel.Error,
           title = "Couldn't switch $device to ${speedModeName(mode)}",
+          actions = listOf(MessageAction("Try again") { switchSpeedMode(mode, undoable) }),
           cause = e,
         )
         return@launch
       }
       val title = when (mode) {
-        SpeedLimitMode.SlowLane -> "Slow lane on for $device"
+        SpeedLimitMode.SlowLane -> {
+          "Slow lane on for $device · ${formatSpeedLimit(speedMode.slowLaneSpeed)}"
+        }
         SpeedLimitMode.Full -> "Slow lane off for $device"
         SpeedLimitMode.Auto -> "Speed on $device follows your rules"
       }
-      state.messages.post(MessageLevel.Success, title)
+      val undo = MessageAction("Undo") { switchSpeedMode(previous, undoable = false) }
+      state.messages.post(
+        level = MessageLevel.Success,
+        title = title,
+        actions = if (undoable) listOf(undo) else emptyList(),
+      )
     }
   }
 
