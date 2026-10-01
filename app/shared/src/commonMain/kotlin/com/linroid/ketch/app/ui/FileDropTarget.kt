@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -9,17 +10,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,36 +26,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.platform.DragExitEffect
 import com.linroid.ketch.app.platform.DroppedFile
+import com.linroid.ketch.app.platform.droppedLinkList
 import com.linroid.ketch.app.platform.rememberFileDropReader
 import com.linroid.ketch.app.theme.KetchTheme
+import kotlinx.coroutines.launch
 
 /**
- * Accepts files dragged in from other applications anywhere over [content],
- * showing a drop hint while a drag hovers. A [compact] hint fits small areas
- * such as a dialog body.
+ * Accepts files and text dragged in from other applications anywhere over [content], showing a
+ * [DropOverlay] while a drag hovers. A [compact] overlay fits small areas such as a dialog body.
+ *
+ * @param onDrop receives dropped files, such as `.torrent` files and `.txt` lists of links.
+ * @param onDropText receives dropped text, such as a link dragged from a browser or selected
+ *   text; by default it reaches [onDrop] as a `.txt` list of links.
  */
 @Composable
 internal fun FileDropTarget(
   onDrop: (List<DroppedFile>) -> Unit,
   modifier: Modifier = Modifier,
   compact: Boolean = false,
+  onDropText: (String) -> Unit = { onDrop(listOf(droppedLinkList(it))) },
   content: @Composable BoxScope.() -> Unit,
 ) {
   val reader = rememberFileDropReader()
+  val scope = rememberCoroutineScope()
   val currentOnDrop by rememberUpdatedState(onDrop)
+  val currentOnDropText by rememberUpdatedState(onDropText)
   var hovering by remember { mutableStateOf(false) }
-  val target = remember(reader) {
+  val target = remember(reader, scope) {
     object : DragAndDropTarget {
       override fun onEntered(event: DragAndDropEvent) {
         hovering = true
@@ -73,83 +83,106 @@ internal fun FileDropTarget(
       override fun onDrop(event: DragAndDropEvent): Boolean {
         hovering = false
         val files = reader.files(event)
-        if (files.isEmpty()) return false
-        currentOnDrop(files)
+        if (files.isNotEmpty()) {
+          currentOnDrop(files)
+          return true
+        }
+        val text = reader.text(event) ?: return false
+        scope.launch {
+          val dropped = text()
+          if (dropped.isNotBlank()) currentOnDropText(dropped)
+        }
         return true
       }
     }
   }
   DragExitEffect { hovering = false }
+  val fade = tween<Float>(KetchTheme.motion.short)
   Box(
     modifier = modifier.dragAndDropTarget(
-      shouldStartDragAndDrop = { reader.hasFiles(it) },
+      shouldStartDragAndDrop = { reader.accepts(it) },
       target = target,
     ),
   ) {
     content()
     AnimatedVisibility(
       visible = hovering,
-      enter = fadeIn(),
-      exit = fadeOut(),
+      enter = fadeIn(fade),
+      exit = fadeOut(fade),
       modifier = Modifier.matchParentSize(),
     ) {
-      FileDropHint(compact)
+      DropOverlay(compact)
     }
   }
 }
 
+/**
+ * What a drag over the app shows: one berth to drop links, magnets, `.torrent` files and lists of
+ * links on. A [compact] berth fits small areas such as a dialog body.
+ */
 @Composable
-private fun FileDropHint(compact: Boolean) {
+internal fun DropOverlay(compact: Boolean, modifier: Modifier = Modifier) {
   val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val shape = KetchTheme.shapes.lg
+  val tile = if (compact) spacing.s8 else spacing.s12
   Box(
-    modifier = Modifier
+    modifier = modifier
       .fillMaxSize()
-      .background(colors.background.copy(alpha = 0.96f))
-      .padding(if (compact) 4.dp else 16.dp)
-      .drawBehind {
-        val stroke = 2.dp.toPx()
-        val dash = 8.dp.toPx()
-        drawRoundRect(
-          color = colors.primary,
-          cornerRadius = CornerRadius(16.dp.toPx()),
-          style = Stroke(
-            width = stroke,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash)),
-          ),
-        )
-      },
-    contentAlignment = Alignment.Center,
+      .background(colors.surfaceRaised.copy(alpha = OVERLAY_ALPHA))
+      .padding(if (compact) spacing.s1 else spacing.s4),
   ) {
     Column(
-      modifier = Modifier.padding(if (compact) 12.dp else 24.dp),
+      modifier = Modifier
+        .fillMaxSize()
+        .clip(shape)
+        .background(colors.accentSoft)
+        .dashedOutline(colors.accent, shape)
+        .padding(horizontal = spacing.s6, vertical = spacing.s4),
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.CenterVertically),
     ) {
-      val iconSize = if (compact) 40.dp else 64.dp
       Box(
-        modifier = Modifier
-          .size(iconSize)
-          .clip(CircleShape)
-          .background(colors.primaryContainer),
         contentAlignment = Alignment.Center,
+        modifier = Modifier
+          .padding(bottom = if (compact) spacing.s1 else spacing.s2)
+          .size(tile)
+          .background(colors.accent, KetchTheme.shapes.full),
       ) {
-        KetchIconImage(icon = KetchIcon.Active, size = iconSize / 2, tint = colors.primary)
+        KetchIconImage(KetchIcon.Drop, size = tile / 2, tint = colors.onAccent)
       }
-      if (!compact) Spacer(Modifier.height(4.dp))
       Text(
-        text = "Drop a .torrent file",
-        style = KetchTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-        color = colors.onBackground,
+        text = "Drop to download",
+        style = if (compact) KetchTheme.typography.bodyStrong else KetchTheme.typography.titleM,
+        color = colors.textPrimary,
         textAlign = TextAlign.Center,
       )
       if (!compact) {
         Text(
-          text = "Choose files and options before the download starts.",
-          style = KetchTheme.typography.bodyMedium,
-          color = colors.onSurfaceVariant,
+          text = "Links, magnets, .torrent files and lists of links",
+          style = KetchTheme.typography.bodyS,
+          color = colors.textSecondary,
           textAlign = TextAlign.Center,
         )
       }
     }
   }
 }
+
+/** A dashed [color] line just inside the edge of [shape]. */
+private fun Modifier.dashedOutline(color: Color, shape: Shape): Modifier = drawWithCache {
+  val width = OutlineWidth.toPx()
+  val dash = OutlineDash.toPx()
+  val dashes = PathEffect.dashPathEffect(floatArrayOf(dash, dash))
+  val stroke = Stroke(width = width, pathEffect = dashes)
+  val inset = Size(size.width - width, size.height - width)
+  val outline = shape.createOutline(inset, layoutDirection, this)
+  onDrawBehind {
+    translate(width / 2, width / 2) { drawOutline(outline, color, style = stroke) }
+  }
+}
+
+/** The overlay lets the app show through faintly, so the drop stays in context. */
+private const val OVERLAY_ALPHA = 0.96f
+private val OutlineWidth = 1.5.dp
+private val OutlineDash = 6.dp
