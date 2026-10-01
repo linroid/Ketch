@@ -123,7 +123,9 @@ class InspectorModelTest {
   fun metricParts_pausedBelowAUnitOfTheSize_writesBothUnits() {
     val state = DownloadState.Paused(DownloadProgress(497_025_024, 1_342_177_280))
 
-    assertEquals(listOf("37%", "474 MB of 1.3 GB"), metricParts(row("p", state), start, TimeZone.UTC))
+    val parts = metricParts(row("p", state), start, TimeZone.UTC)
+
+    assertEquals(listOf("37%", "474 MB of 1.3 GB"), parts)
   }
 
   @Test
