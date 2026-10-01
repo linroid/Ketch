@@ -444,7 +444,7 @@ private fun AddBody(
 ) {
   val session = actions.session
   if (session.mode == IntakeMode.Retry) RetryProblem(session)
-  val stage = session.torrentStage
+  val stage = session.activeStage
   if (stage != null) {
     TorrentStage(actions, stage, onBack = { session.torrentStage = null })
   } else {
@@ -470,7 +470,9 @@ private fun IntakeInput(actions: IntakeActions, matcher: ShortcutMatcher, phone:
   val spacing = KetchTheme.spacing
   val focus = remember { FocusRequester() }
   LaunchedEffect(session) {
-    if (session.mode == IntakeMode.Add) catchingUnlessCancelled { focus.requestFocus() }
+    // On phones a prefilled sheet keeps the keyboard down, so its rows stay in view.
+    val focusInput = session.mode == IntakeMode.Add && (!phone || session.text.text.isEmpty())
+    if (focusInput) catchingUnlessCancelled { focus.requestFocus() }
   }
   val suggest = session.clipboardMode == ClipboardMode.Suggest
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
@@ -599,7 +601,11 @@ private fun DiscoverOffer(actions: IntakeActions, query: String) {
 
 @Composable
 private fun RetryProblem(session: IntakeSession) {
-  val task = session.task ?: return
+  val task = session.task
+  if (task == null) {
+    NoticeLine("This download is no longer in the list.", KetchIcon.Warning, warning = true)
+    return
+  }
   val failed = task.state.value as? DownloadState.Failed ?: return
   val copy = failed.error.toCopy()
   ProblemCard(title = copy.title, detail = copy.hint)
@@ -625,7 +631,7 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
     ConfirmClose(actions, modifier)
     return
   }
-  val stage = session.torrentStage
+  val stage = session.activeStage
   val batchStage = stage != null && session.entries.size > 1
   val stageEntry = stage?.takeIf { !batchStage }
   Row(
@@ -634,7 +640,7 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
     modifier = modifier.fillMaxWidth(),
   ) {
     if (!phone) {
-      KeyHints(session, Modifier.weight(1f))
+      KeyHints(session, inStage = stage != null, modifier = Modifier.weight(1f))
     }
     val secondary: Pair<String, () -> Unit>? = when {
       batchStage -> null
@@ -672,11 +678,12 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
 }
 
 @Composable
-private fun KeyHints(session: IntakeSession, modifier: Modifier) {
+private fun KeyHints(session: IntakeSession, inStage: Boolean, modifier: Modifier) {
   val hints = buildList {
     if (session.mode == IntakeMode.Edit) return@buildList
     hint(KetchCommands.IntakeAdd, if (session.mode == IntakeMode.Retry) "Retry" else "Add")
-    if (session.mode == IntakeMode.Add) {
+    // The file picker has no input to type in or send to Discover.
+    if (session.mode == IntakeMode.Add && !inStage) {
       hint(KetchCommands.IntakeNewLine, "New line")
       if (session.canDiscover) hint(KetchCommands.IntakeDiscover, "Discover")
       hint(KetchCommands.IntakeOpenTorrent, ".torrent")
@@ -763,7 +770,12 @@ private fun handleInputKey(
   actions: IntakeActions,
 ): Boolean {
   val session = actions.session
-  val context = ShortcutContext(overlay = CommandScope.Intake, textFieldFocused = true)
+  val context = ShortcutContext(
+    overlay = CommandScope.Intake,
+    textFieldFocused = true,
+    // ↩ that confirms an input method's composition must not add.
+    composing = session.text.composition != null,
+  )
   return when (matcher.match(event, context)) {
     KetchCommands.IntakeAdd -> {
       session.flush()

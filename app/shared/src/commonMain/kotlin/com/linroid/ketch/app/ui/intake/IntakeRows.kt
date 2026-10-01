@@ -207,7 +207,8 @@ private fun LanesPreview(actions: IntakeActions, entry: IntakeEntry) {
   val resolved = entry.resolved ?: return
   if (entry.isTorrent || resolved.totalBytes <= 0 || resolved.maxSegments <= 1) return
   val chosen = session.connections.takeIf { it > 0 } ?: session.autoConnections ?: return
-  val connections = chosen.coerceIn(1, resolved.maxSegments)
+  val most = minOf(resolved.maxSegments.toLong(), resolved.totalBytes).toInt()
+  val connections = chosen.coerceIn(1, most)
   val segments = remember(resolved.totalBytes, connections) {
     evenSegments(resolved.totalBytes, connections)
   }
@@ -396,11 +397,13 @@ private fun EntryName(entry: IntakeEntry, style: TextStyle) {
   var editing by remember(entry) { mutableStateOf(false) }
   val renamable = entry.source is IntakeSource.Link && !entry.isTorrent
   if (editing) {
-    var draft by remember(entry) { mutableStateOf(entry.name) }
+    val original = remember(entry) { entry.name }
+    var draft by remember(entry) { mutableStateOf(original) }
     val focus = remember { FocusRequester() }
     val commit = {
       editing = false
-      entry.fileName = draft.trim().takeIf { it != entry.resolved?.suggestedFileName }.orEmpty()
+      // An unchanged name keeps following the source; a cleared one goes back to it.
+      if (draft.trim() != original) entry.fileName = draft.trim()
     }
     LaunchedEffect(Unit) { focus.requestFocus() }
     KetchTextField(
