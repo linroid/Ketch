@@ -37,12 +37,10 @@ import com.linroid.ketch.app.util.priorityLabel
 import com.linroid.ketch.app.util.toCopy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.withContext
 
 /**
  * A dialog a row action asks for before it runs.
@@ -91,8 +89,8 @@ internal data class BatchAction(val action: RowAction, val rows: List<TaskRow>) 
  *
  * @param files opens, reveals and trashes downloaded files; `null` where they are out of reach.
  * @param clipboard receives copied links and paths; `null` where there is none.
- * @param scope runs batches and clipboard writes. A batch finishes even when the scope is
- *   cancelled halfway, so leaving the screen never stops it with half the rows done.
+ * @param scope runs clipboard writes and file checks. Batches run in the app's scope instead,
+ *   so leaving the screen never stops one with half the rows done, and Try again still works.
  */
 @Stable
 internal class RowActionRunner(
@@ -356,49 +354,47 @@ internal class RowActionRunner(
     done: (Int) -> String,
     targets: List<TaskRow> = rows,
     block: suspend DownloadTask.() -> Unit,
-  ): Job = scope.launch {
-    withContext(NonCancellable) {
-      val results = supervisorScope {
-        rows.map { row ->
-          async { row to catchingUnlessCancelled { row.task.block() }.exceptionOrNull() }
-        }.awaitAll()
-      }
-      val failed = results.mapNotNull { (row, error) -> error?.let { row to it } }
-      failed.forEach { (row, e) ->
-        log.w { "Couldn't $command taskId=${row.key.taskId}: ${e.describeCauses()}" }
-      }
-      val retry = MessageAction("Try again") {
-        launchBatch(failed.map { it.first }, command, done, block = block)
-      }
-      val worked = rows.size - failed.size
-      if (worked == 0) {
-        val (row, e) = failed.firstOrNull() ?: return@withContext
-        val what = if (failed.size == 1) row.name else downloads(failed.size)
-        state.messages.post(
-          level = MessageLevel.Error,
-          title = "Couldn't $command $what on ${row.device.name}",
-          detail = e.message,
-          taskKey = row.key.takeIf { failed.size == 1 },
-          deviceId = row.key.deviceId,
-          actions = listOf(retry),
-          cause = e,
-        )
-        return@withContext
-      }
-      val skipped = skipNote(command, targets.filter { it !in rows })
-      val title = listOfNotNull(
-        done(worked),
-        skipped,
-        "${failed.size} failed".takeIf { failed.isNotEmpty() },
-      ).joinToString(" · ")
-      state.messages.post(
-        level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
-        title = title,
-        detail = failed.firstOrNull()?.second?.message,
-        actions = if (failed.isEmpty()) emptyList() else listOf(retry),
-        cause = failed.firstOrNull()?.second,
-      )
+  ): Job = state.launchCommand {
+    val results = supervisorScope {
+      rows.map { row ->
+        async { row to catchingUnlessCancelled { row.task.block() }.exceptionOrNull() }
+      }.awaitAll()
     }
+    val failed = results.mapNotNull { (row, error) -> error?.let { row to it } }
+    failed.forEach { (row, e) ->
+      log.w { "Couldn't $command taskId=${row.key.taskId}: ${e.describeCauses()}" }
+    }
+    val retry = MessageAction("Try again") {
+      launchBatch(failed.map { it.first }, command, done, block = block)
+    }
+    val worked = rows.size - failed.size
+    if (worked == 0) {
+      val (row, e) = failed.firstOrNull() ?: return@launchCommand
+      val what = if (failed.size == 1) row.name else downloads(failed.size)
+      state.messages.post(
+        level = MessageLevel.Error,
+        title = "Couldn't $command $what on ${row.device.name}",
+        detail = e.message,
+        taskKey = row.key.takeIf { failed.size == 1 },
+        deviceId = row.key.deviceId,
+        actions = listOf(retry),
+        cause = e,
+      )
+      return@launchCommand
+    }
+    val skipped = skipNote(command, targets.filter { it !in rows })
+    val title = listOfNotNull(
+      done(worked),
+      skipped,
+      "${failed.size} failed".takeIf { failed.isNotEmpty() },
+    ).joinToString(" · ")
+    state.messages.post(
+      level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
+      title = title,
+      detail = failed.firstOrNull()?.second?.message,
+      actions = if (failed.isEmpty()) emptyList() else listOf(retry),
+      cause = failed.firstOrNull()?.second,
+    )
   }
 
   // Each finished file goes to the Trash after its row is removed; the device that wrote a
