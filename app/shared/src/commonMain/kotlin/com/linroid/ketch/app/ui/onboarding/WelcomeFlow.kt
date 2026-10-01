@@ -51,8 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
-import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchBadge
 import com.linroid.ketch.app.components.KetchBadgeTone
 import com.linroid.ketch.app.components.KetchButton
@@ -73,14 +71,11 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.state.folderName
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.shell.canvasWash
 import kotlinx.coroutines.launch
-
-private val log = KetchLogger("WelcomeFlow")
 
 /**
  * The phone and tablet apps' first screens, full screen over the canvas wash: where downloads go,
@@ -177,7 +172,6 @@ private fun TopRow(welcome: WelcomeState, onSkip: () -> Unit, modifier: Modifier
         text = "Skip",
         onClick = onSkip,
         variant = KetchButtonVariant.Ghost,
-        size = KetchButtonSize.Small,
         modifier = Modifier.align(Alignment.CenterEnd),
       )
     }
@@ -318,21 +312,11 @@ private fun FolderStep(
   val scope = rememberCoroutineScope()
   val chosen = welcome.folder
   val choose: () -> Unit = {
-    welcome.choosingFolder = true
-    welcome.folderError = null
     scope.launch {
-      try {
-        catchingUnlessCancelled {
-          val folder = picker.pickFolder(DOWNLOAD_TREE) ?: return@catchingUnlessCancelled
-          useFolder(state, folder)
-          welcome.folder = folder
-        }.onFailure { error ->
-          log.w { "Couldn't use the chosen folder: ${error.describeCauses()}" }
-          welcome.folderError = error.message ?: "Something went wrong. Try again."
-        }
-      } finally {
-        welcome.choosingFolder = false
-      }
+      welcome.chooseFolder(
+        pick = { picker.pickFolder(DOWNLOAD_TREE) },
+        apply = { folder -> useFolder(state, folder) },
+      )
     }
   }
   StepScaffold(
@@ -376,18 +360,24 @@ private fun FolderStep(
     },
   ) {
     val error = welcome.folderError
-    when {
-      error != null -> Note(
-        icon = KetchIcon.Warning,
-        text = "Couldn't use that folder · $error",
-        color = KetchTheme.colors.status.failed.color,
-      )
-      chosen != null -> FolderPath(
-        icon = KetchIcon.CheckCircle,
-        text = "Saving to ${folderName(chosen)}",
-        tint = KetchTheme.colors.status.completed.color,
-      )
-      else -> Note(icon = KetchIcon.Info, text = "Torrents stay in Ketch's folder.")
+    Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s4),
+    ) {
+      when {
+        error != null -> Note(
+          icon = KetchIcon.Warning,
+          text = error,
+          color = KetchTheme.colors.status.failed.color,
+        )
+        chosen != null -> FolderPath(
+          icon = KetchIcon.CheckCircle,
+          text = "Saving to ${folderName(chosen)}",
+          tint = KetchTheme.colors.status.completed.color,
+        )
+      }
+      // The folder only takes HTTP and FTP downloads; torrents can't write to it.
+      Note(icon = KetchIcon.Info, text = "Torrents stay in Ketch's folder.")
     }
   }
 }
@@ -411,7 +401,7 @@ private fun UseStep(
         hue = FileTypeHue.Sky,
         title = "Download on ${deviceNoun.replaceFirstChar { it.lowercase() }}",
         detail = if (ios) {
-          "Downloads pause when Ketch is in the background."
+          "Downloads can pause while Ketch is in the background."
         } else {
           "Downloads keep going while you use other apps."
         },

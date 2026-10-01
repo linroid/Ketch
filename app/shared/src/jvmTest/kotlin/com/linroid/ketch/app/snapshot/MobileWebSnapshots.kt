@@ -65,7 +65,9 @@ class MobileWebSnapshots {
   @Test
   fun welcome_folderFailed_saysWhy() {
     welcome("welcome-android-folder-error", Phone, SnapshotTheme.Light, WelcomePlatform.Android) {
-      WelcomeState().apply { folderError = "The folder can't be written to." }
+      WelcomeState().apply {
+        runBlocking { chooseFolder(pick = { DOWNLOAD_TREE }, apply = { error("No grant") }) }
+      }
     }
   }
 
