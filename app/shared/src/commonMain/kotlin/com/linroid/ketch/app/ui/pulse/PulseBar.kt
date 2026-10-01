@@ -1,0 +1,448 @@
+package com.linroid.ketch.app.ui.pulse
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.KetchSpeedChart
+import com.linroid.ketch.app.components.KetchTooltip
+import com.linroid.ketch.app.components.SpeedBand
+import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.healthColor
+import com.linroid.ketch.app.components.rememberFocusVisibility
+import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.input.KetchCommands
+import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.PulseState
+import com.linroid.ketch.app.state.SettingsTarget
+import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.feedback.ActivityPopover
+
+/**
+ * Which of the Pulse bar's popovers are open, hoisted so a shortcut can open one: `⌘J` calls
+ * [toggleActivity].
+ */
+@Stable
+class PulseBarState {
+  /** Whether the Activity popover is open. */
+  var activityOpen: Boolean by mutableStateOf(false)
+
+  /** Whether the speed history popover is open. */
+  var speedOpen: Boolean by mutableStateOf(false)
+
+  /** Opens the Activity popover, or closes it when it is open. */
+  fun toggleActivity() {
+    activityOpen = !activityOpen
+  }
+}
+
+/** Remembers a [PulseBarState] with every popover closed. */
+@Composable
+fun rememberPulseBarState(): PulseBarState = remember { PulseBarState() }
+
+/**
+ * The Pulse bar, 32 dp at the bottom of the content card and the one place for global status:
+ * the speed mode pill, the active device's speed with its last minute as a sparkline, the
+ * downloading, waiting and failed counts (each opens its tab), free space, the device's
+ * connection and the Activity bell with its unread count.
+ *
+ * While rows are selected, the connection gives way to a summary of the selection. As the card
+ * narrows, free space goes below 720 dp and the counts below 600 dp. Metrics of a device that is
+ * not online are dimmed.
+ *
+ * @param barState which popovers are open; hoist it to open Activity from a shortcut.
+ */
+@Composable
+fun PulseBar(
+  state: AppState,
+  modifier: Modifier = Modifier,
+  barState: PulseBarState = rememberPulseBarState(),
+) {
+  val pulse by state.pulse.state.collectAsState()
+  val unread by state.messages.unreadCount.collectAsState()
+  val selected = state.selectedKeys
+  // Rows change several times a second; they are only read while something is selected.
+  val selection = if (selected.isEmpty()) {
+    null
+  } else {
+    val rows by state.taskList.rows.collectAsState()
+    remember(rows, selected) { selectionSummary(rows, selected) }
+  }
+  val local = pulse.devices.firstOrNull()?.health is DeviceHealth.Local
+  PulseBarContent(
+    pulse = pulse,
+    unread = unread,
+    selection = selection,
+    onShowTab = { state.showDownloads(it) },
+    onSpeedClick = { barState.speedOpen = !barState.speedOpen },
+    onHealthClick = {
+      if (local) {
+        state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing))
+      } else {
+        state.showInstanceSelector = true
+      }
+    },
+    onActivityClick = { barState.toggleActivity() },
+    modifier = modifier,
+    pill = { SpeedModePill(state) },
+    speedPopover = {
+      SpeedHistoryPopover(
+        state = state,
+        expanded = barState.speedOpen,
+        onDismissRequest = { barState.speedOpen = false },
+      )
+    },
+    activityPopover = {
+      ActivityPopover(
+        state = state,
+        expanded = barState.activityOpen,
+        onDismissRequest = { barState.activityOpen = false },
+      )
+    },
+  )
+}
+
+/**
+ * The Pulse bar drawn from [pulse], without the state it reads; see [PulseBar].
+ *
+ * @param selection summary of the selected rows, shown in place of the connection; `null` when
+ *   nothing is selected.
+ * @param pill the speed mode pill.
+ * @param speedPopover popover anchored to the speed, such as the speed history.
+ * @param activityPopover popover anchored to the bell.
+ */
+@Composable
+internal fun PulseBarContent(
+  pulse: PulseState,
+  unread: Int,
+  selection: String?,
+  onShowTab: (StatusFilter) -> Unit,
+  onSpeedClick: () -> Unit,
+  onHealthClick: () -> Unit,
+  onActivityClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  pill: @Composable () -> Unit,
+  speedPopover: @Composable () -> Unit = {},
+  activityPopover: @Composable () -> Unit = {},
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val device = pulse.devices.firstOrNull()
+  val online = device?.health?.isOnline ?: true
+  BoxWithConstraints(
+    modifier = modifier
+      .fillMaxWidth()
+      .height(spacing.pulseBarHeight)
+      .background(colors.surfaceSunken),
+  ) {
+    val showDisk = maxWidth >= DiskMinWidth
+    val showCounts = maxWidth >= CountsMinWidth
+    val showSparkline = maxWidth >= SparklineMinWidth
+    val showHealthLabel = maxWidth >= HealthLabelMinWidth
+    Spacer(Modifier.fillMaxWidth().height(1.dp).background(colors.hairline))
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.fillMaxSize().padding(horizontal = spacing.s2),
+    ) {
+      pill()
+      Spacer(Modifier.width(spacing.s2))
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.weight(1f).alpha(if (online) 1f else OFFLINE_ALPHA),
+      ) {
+        Box {
+          SpeedReadout(pulse, online, showSparkline, onSpeedClick)
+          speedPopover()
+        }
+        if (showCounts) {
+          countParts(pulse.counts, pulse.failures).forEach { part ->
+            Separator()
+            BarLink(
+              text = part.text,
+              description = "${part.description}, show the ${part.filter.label} tab",
+              color = if (part.alert) colors.status.failed.color else colors.textSecondary,
+              onClick = { onShowTab(part.filter) },
+            )
+          }
+        }
+        val disk = pulse.diskDevice
+        if (showDisk && disk?.disk != null) {
+          Separator()
+          DiskReadout(
+            label = diskLabel(disk.disk),
+            used = diskUsed(disk.disk),
+            short = pulse.isDiskShort,
+            tooltip = "${diskLabel(disk.disk)} on ${disk.name} · ${disk.disk.directory}",
+          )
+        }
+      }
+      if (selection != null) {
+        Text(
+          text = selection,
+          style = KetchTheme.typography.caption,
+          color = colors.textPrimary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          modifier = Modifier.padding(horizontal = spacing.s2),
+        )
+      } else if (device != null) {
+        HealthBadge(device.health, device.name, showHealthLabel, onHealthClick)
+      }
+      Spacer(Modifier.width(spacing.s1))
+      Box {
+        ActivityBell(unread, onActivityClick)
+        activityPopover()
+      }
+    }
+  }
+}
+
+@Composable
+private fun SpeedReadout(
+  pulse: PulseState,
+  online: Boolean,
+  showSparkline: Boolean,
+  onClick: () -> Unit,
+) {
+  val colors = KetchTheme.colors
+  val type = KetchTheme.typography
+  val downloading = pulse.counts.downloading > 0
+  val speed = speedText(pulse.totalSpeed)
+  val history = pulse.history
+  val description = when {
+    !online -> "Speed unknown while offline"
+    downloading -> "Downloading at $speed, show the last 5 minutes"
+    else -> "Idle, show the last 5 minutes"
+  }
+  BarButton(onClick = onClick, description = description) {
+    when {
+      !online -> Text("↓ —", style = type.numeral, color = colors.textSecondary)
+      downloading -> Text(
+        text = buildAnnotatedString {
+          append("↓ ${speed.amount}")
+          withStyle(type.caption.toSpanStyle().copy(color = colors.textTertiary)) {
+            append(" ${speed.unit}")
+          }
+        },
+        style = type.numeral,
+        color = colors.textPrimary,
+        maxLines = 1,
+        softWrap = false,
+      )
+      else -> Text("Idle", style = type.caption, color = colors.textSecondary, maxLines = 1)
+    }
+    val sparkline = remember(history) { sparklineSamples(history) }
+    if (showSparkline && online && sparkline != null) {
+      Spacer(Modifier.width(KetchTheme.spacing.s2))
+      KetchSpeedChart(
+        bands = listOf(SpeedBand(sparkline, colors.accent)),
+        showAxis = false,
+        modifier = Modifier.size(SparklineWidth, SparklineHeight).clearAndSetSemantics {},
+      )
+    }
+  }
+}
+
+@Composable
+private fun DiskReadout(label: String, used: Float, short: Boolean, tooltip: String) {
+  val colors = KetchTheme.colors
+  val ink = if (short) colors.status.paused.color else colors.textSecondary
+  KetchTooltip(text = if (short) "$tooltip · not enough for the waiting downloads" else tooltip) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+      modifier = Modifier.padding(horizontal = KetchTheme.spacing.s1),
+    ) {
+      Text(label, style = KetchTheme.typography.caption, color = ink, maxLines = 1)
+      Box(
+        Modifier
+          .size(DiskBarWidth, DiskBarHeight)
+          .clip(KetchTheme.shapes.full)
+          .background(colors.borderStrong)
+      ) {
+        Box(
+          Modifier
+            .fillMaxHeight()
+            .fillMaxWidth(used)
+            .background(if (short) colors.status.paused.color else colors.textTertiary)
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun HealthBadge(
+  health: DeviceHealth,
+  name: String,
+  showLabel: Boolean,
+  onClick: () -> Unit,
+) {
+  val colors = KetchTheme.colors
+  val label = healthLabel(health)
+  val hollow = health is DeviceHealth.Local && health.sharingPort == null
+  BarButton(onClick = onClick, description = "$name: $label") {
+    if (hollow) {
+      Spacer(
+        Modifier
+          .size(DotSize)
+          .border(RingStroke, colors.textTertiary, KetchTheme.shapes.full)
+      )
+    } else {
+      KetchDot(
+        color = colors.healthColor(health),
+        size = DotSize,
+        pulse = health == DeviceHealth.Connecting,
+      )
+    }
+    if (showLabel) {
+      Spacer(Modifier.width(KetchTheme.spacing.s1))
+      Text(
+        text = label,
+        style = KetchTheme.typography.caption,
+        color = if (health.isOnline) colors.textSecondary else colors.healthColor(health),
+        maxLines = 1,
+      )
+    }
+  }
+}
+
+@Composable
+private fun ActivityBell(unread: Int, onClick: () -> Unit) {
+  val colors = KetchTheme.colors
+  val description = if (unread > 0) "Activity, $unread unread" else "Activity"
+  KetchTooltip(command = KetchCommands.Activity) {
+    BarButton(onClick = onClick, description = description) {
+      KetchIconImage(
+        icon = KetchIcon.Bell,
+        size = BellSize,
+        tint = if (unread > 0) colors.accentText else colors.textSecondary,
+      )
+      if (unread > 0) {
+        Spacer(Modifier.width(KetchTheme.spacing.s1))
+        Text(
+          text = if (unread > MAX_UNREAD) "$MAX_UNREAD+" else unread.toString(),
+          style = KetchTheme.typography.numeralS,
+          color = colors.accentText,
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun Separator() {
+  Text(
+    text = "·",
+    style = KetchTheme.typography.caption,
+    color = KetchTheme.colors.textTertiary,
+    modifier = Modifier.padding(horizontal = KetchTheme.spacing.s0_5),
+  )
+}
+
+@Composable
+private fun BarLink(text: String, description: String, color: Color, onClick: () -> Unit) {
+  BarButton(onClick = onClick, description = description) {
+    Text(text = text, style = KetchTheme.typography.caption, color = color, maxLines = 1)
+  }
+}
+
+/** A clickable stretch of the bar, 24 dp tall, with the hover overlay and focus ring. */
+@Composable
+private fun BarButton(
+  onClick: () -> Unit,
+  description: String,
+  modifier: Modifier = Modifier,
+  content: @Composable RowScope.() -> Unit,
+) {
+  val colors = KetchTheme.colors
+  val shape = KetchTheme.shapes.full
+  val interactions = remember { MutableInteractionSource() }
+  val overlay = rememberInteractionOverlay(interactions)
+  val focus = rememberFocusVisibility()
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    modifier = modifier
+      .height(ButtonHeight)
+      .focusRing(focus.visible, shape, colors.focusRing)
+      .clip(shape)
+      .background(overlay)
+      .semantics(mergeDescendants = true) { contentDescription = description }
+      .trackFocusVisibility(focus)
+      .clickable(
+        interactionSource = interactions,
+        indication = null,
+        role = Role.Button,
+        onClick = onClick,
+      )
+      .padding(horizontal = KetchTheme.spacing.s1),
+    content = content,
+  )
+}
+
+/**
+ * [history] scaled so its peak reaches about four fifths of the sparkline, whose chart rounds
+ * its top up from there; `null` while there are fewer than two samples or all are zero.
+ */
+internal fun sparklineSamples(history: List<Long>): List<Long>? {
+  val peak = history.maxOrNull() ?: return null
+  if (history.size < 2 || peak <= 0) return null
+  return history.map { it * SPARKLINE_TOP / peak }
+}
+
+private const val OFFLINE_ALPHA = 0.5f
+private const val SPARKLINE_TOP = 800L * 1024
+private const val MAX_UNREAD = 99
+private val DiskMinWidth = 720.dp
+private val CountsMinWidth = 600.dp
+private val SparklineMinWidth = 480.dp
+private val HealthLabelMinWidth = 420.dp
+private val SparklineWidth = 64.dp
+private val SparklineHeight = 14.dp
+private val DiskBarWidth = 24.dp
+private val DiskBarHeight = 3.dp
+private val ButtonHeight = 24.dp
+private val BellSize = 16.dp
+private val DotSize: Dp = 8.dp
+private val RingStroke = 1.5.dp

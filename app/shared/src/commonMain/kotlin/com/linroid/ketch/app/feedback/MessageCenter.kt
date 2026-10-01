@@ -75,10 +75,11 @@ data class AppMessage(
 )
 
 /**
- * Collects the messages the app shows as toasts and banners, and keeps the most recent ones for
- * the Activity history.
+ * Collects the messages the app shows as toasts and banners, and keeps the most recent toasts
+ * for the Activity history.
  *
- * Any component can [post] without touching the shell; the toast host renders [active].
+ * Any component can [post] without touching the shell; the toast and banner hosts render
+ * [active].
  *
  * @param clock time source for [AppMessage.at].
  * @param historyLimit how many messages [history] keeps.
@@ -92,7 +93,10 @@ class MessageCenter(
   private val activeState = MutableStateFlow<List<AppMessage>>(emptyList())
   private val unreadState = MutableStateFlow(0)
 
-  /** Recent messages, newest first, at most `historyLimit`. */
+  /**
+   * Recent messages, newest first, at most `historyLimit`. Banners are left out: they show a
+   * condition for as long as it lasts rather than report an event.
+   */
   val history: StateFlow<List<AppMessage>> = historyState.asStateFlow()
 
   /**
@@ -135,8 +139,11 @@ class MessageCenter(
       placement = placement,
       cause = cause,
     )
-    historyState.update { (listOf(message) + it).take(historyLimit) }
-    unreadState.update { minOf(it + 1, historyLimit) }
+    // A banner is a condition shown while it lasts, not an event for the history.
+    if (placement == MessagePlacement.Toast) {
+      historyState.update { (listOf(message) + it).take(historyLimit) }
+      unreadState.update { minOf(it + 1, historyLimit) }
+    }
     if (toast != ToastMode.Silent) activeState.update { (it + message).takeLast(historyLimit) }
     return message
   }

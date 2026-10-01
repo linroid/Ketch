@@ -361,18 +361,6 @@ class AppState(
       }
     }
     scope.launch {
-      connectionState.collect { state ->
-        if (state is ConnectionState.Unauthorized) {
-          val instance =
-            activeInstance.value as? RemoteInstance
-          if (instance != null) {
-            unauthorizedInstance = instance
-            showAddRemoteDialog = true
-          }
-        }
-      }
-    }
-    scope.launch {
       messages.active.collect { active ->
         latestError = active.lastOrNull { it.level == MessageLevel.Error }
       }
