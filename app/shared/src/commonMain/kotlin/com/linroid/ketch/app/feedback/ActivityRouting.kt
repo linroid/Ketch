@@ -11,8 +11,8 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.formatBytes
-import com.linroid.ketch.app.util.formatDuration
 import com.linroid.ketch.app.util.toCopy
+import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.NotificationMode
 import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.remote.ConnectionState
@@ -73,7 +73,7 @@ object ActivityRouting {
     return when (event) {
       is ActivityEvent.Completed -> NotificationCopy(
         title = on("Download complete"),
-        body = listOfNotNull(displayName(event.request, event.state), sizeAndTime(event.state))
+        body = (listOf(displayName(event.request, event.state)) + transferSummary(event.state))
           .joinToString(" · "),
         actions = COMPLETED_ACTIONS,
       )
@@ -163,18 +163,6 @@ object ActivityRouting {
         if (settings.deviceOffline) NotificationMode.InApp else NotificationMode.Off
       is ActivityEvent.Added, is ActivityEvent.Recovered -> NotificationMode.InApp
     }
-
-  // "5.70 GB in 3m 12s", or whichever half is known.
-  private fun sizeAndTime(state: DownloadState.Completed): String? {
-    val size = state.totalBytes?.let(::formatBytes)
-    val time = state.downloadTime?.let(::formatDuration)
-    return when {
-      size != null && time != null -> "$size in $time"
-      size != null -> size
-      time != null -> "took $time"
-      else -> null
-    }
-  }
 
   private fun sourceOf(entry: InstanceEntry): ActivitySource = ActivitySource(
     deviceId = entry.deviceId,

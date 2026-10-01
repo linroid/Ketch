@@ -142,13 +142,13 @@ class ActivityRoutingTest {
   }
 
   @Test
-  fun copyOf_completed_namesFileSizeAndTime() {
+  fun copyOf_completed_namesFileAndTransferSummary() {
     val copy = ActivityRouting.copyOf(completed)
 
     assertEquals(
       NotificationCopy(
         title = "Download complete",
-        body = "ubuntu.iso · 5.70 GB in 3m 12s",
+        body = "ubuntu.iso · 5.70 GB · took 3m 12s · avg 30.4 MB/s",
         actions = listOf(
           NotificationAction.Open,
           NotificationAction.Reveal,
