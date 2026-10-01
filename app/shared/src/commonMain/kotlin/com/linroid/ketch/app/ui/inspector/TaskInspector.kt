@@ -2,6 +2,7 @@ package com.linroid.ketch.app.ui.inspector
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -99,9 +100,11 @@ internal fun InspectorContent(
   val row = remember(rows, taskKey) { taskKey?.let { key -> rows.firstOrNull { it.key == key } } }
   val spacing = KetchTheme.spacing
   val padding = if (placement == InspectorPlacement.Sheet) {
-    KetchTheme.density.pagePadding
+    // The sheet's drag handle already leaves room above.
+    val page = KetchTheme.density.pagePadding
+    PaddingValues(start = page, top = spacing.s1, end = page, bottom = page)
   } else {
-    spacing.s4
+    PaddingValues(spacing.s4)
   }
   // The tab stays as other downloads are inspected; the scroll position starts over.
   var tab by rememberSaveable { mutableStateOf(InspectorTab.Overview) }

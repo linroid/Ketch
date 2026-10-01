@@ -62,12 +62,10 @@ internal fun SelectionSummary(
           horizontalArrangement = Arrangement.spacedBy(spacing.s2),
           modifier = Modifier.fillMaxWidth(),
         ) {
-          Text(
+          MiddleText(
             text = row.name,
             style = type.caption,
             color = colors.textSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(NAME_SHARE),
           )
           key(row.key) {

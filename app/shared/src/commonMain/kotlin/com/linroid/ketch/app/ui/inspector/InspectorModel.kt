@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.startTimeLabel
+import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.ui.inspector.tabs.clockTime
@@ -18,9 +19,9 @@ import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.formatDuration
 import com.linroid.ketch.app.util.priorityLabel
-import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.app.util.urlHost
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
@@ -112,8 +113,7 @@ private fun limitReason(own: SpeedLimit, slowLane: Boolean, global: SpeedLimit):
 /**
  * The parts of the inspector's metric line for [row] at [now], joined with " · ":
  * "42%", "2.4 of 5.7 GB", "6.4 MB/s", "2m 10s left" and "done ≈ 14:32" while downloading; the
- * share and bytes while paused or failed; the known size while waiting; and the size, time taken
- * and average speed once completed.
+ * share and bytes while paused or failed; the known size while waiting; nothing once it ended.
  */
 internal fun metricParts(row: TaskRow, now: Instant, zone: TimeZone): List<String> {
   val state = row.state
@@ -139,8 +139,8 @@ internal fun metricParts(row: TaskRow, now: Instant, zone: TimeZone): List<Strin
       if (done > 0 && total != null) progressParts(done, total) else knownSize(row)
     }
     is DownloadState.Queued, is DownloadState.Scheduled -> knownSize(row)
-    is DownloadState.Completed -> transferSummary(state)
-    is DownloadState.Canceled -> emptyList()
+    // The subline shows the size, and the Details right below the time taken and speed.
+    is DownloadState.Completed, is DownloadState.Canceled -> emptyList()
   }
 }
 
@@ -160,6 +160,16 @@ private fun progressParts(downloaded: Long?, total: Long?): List<String> {
 }
 
 private fun knownSize(row: TaskRow): List<String> = listOfNotNull(row.sizeBytes?.let(::formatSize))
+
+/**
+ * When [row] was added, for the Added detail: the row's own "Today 11:42", or an earlier day
+ * with its time, such as "Yesterday 18:05" or "Sep 28 09:12".
+ */
+internal fun addedDetail(row: TaskRow, now: Instant, zone: TimeZone): String {
+  val today = now.toLocalDateTime(zone).date
+  if (row.createdAt.toLocalDateTime(zone).date == today) return row.content.added
+  return "${row.content.added} ${clockTime(row.createdAt, zone)}"
+}
 
 /**
  * Where [request] downloads from, for the Source detail: "HTTPS · releases.ubuntu.com",
@@ -279,13 +289,18 @@ internal fun speedPresets(reference: Long?): List<SpeedLimit> {
 }
 
 /**
- * The download that starting another one now would pause on a device that runs [slots] at once:
- * like the engine's queue, the first of [running] with the lowest priority below Urgent, when
- * every slot is taken; `null` when a slot is free.
+ * The download that starting the [starting] ones now would pause on a device that runs [slots]
+ * at once: like the engine's queue, the first of [running], all the downloads running there,
+ * with the lowest priority below Urgent, when every slot is taken; `null` when a slot is free.
+ * A running download among [starting] keeps its slot and is never the one paused.
  */
-internal fun preemptionVictim(running: List<TaskRow>, slots: Int?): TaskRow? {
+internal fun preemptionVictim(
+  running: List<TaskRow>,
+  slots: Int?,
+  starting: Set<TaskKey> = emptySet(),
+): TaskRow? {
   if (slots == null || running.size < slots) return null
-  return running.filter { it.request.priority < DownloadPriority.URGENT }
+  return running.filter { it.key !in starting && it.request.priority < DownloadPriority.URGENT }
     .minByOrNull { it.request.priority.ordinal }
 }
 
@@ -308,6 +323,13 @@ internal fun rescheduleNote(schedule: DownloadSchedule, now: Instant, zone: Time
 }
 
 /**
+ * When [this] row starts: the time a scheduled one waits for, else now. The request keeps the
+ * schedule it was added with, which says nothing once that time has passed.
+ */
+internal val TaskRow.startSchedule: DownloadSchedule
+  get() = (state as? DownloadState.Scheduled)?.schedule ?: DownloadSchedule.Immediate
+
+/**
  * What the Speed, Connections, Priority and Start controls show for [rows]: each value when every
  * row shares it, else `null`, drawn as "—".
  */
@@ -323,7 +345,7 @@ internal data class SharedSettings(
       speedLimit = rows.map { it.request.speedLimit }.distinct().singleOrNull(),
       connections = rows.map { it.request.connections }.distinct().singleOrNull(),
       priority = rows.map { it.request.priority }.distinct().singleOrNull(),
-      schedule = rows.map { it.request.schedule }.distinct().singleOrNull(),
+      schedule = rows.map { it.startSchedule }.distinct().singleOrNull(),
     )
   }
 }
@@ -345,7 +367,8 @@ internal val DownloadState.hasControls: Boolean
  *
  * @property running downloads running now.
  * @property slots how many may run at once; `null` while the config is unknown.
- * @property connections connections in flight across the running HTTP and FTP downloads.
+ * @property connections connections in flight across the [transfers].
+ * @property transfers running HTTP and FTP downloads, whose connections are counted.
  * @property hosts sites with running downloads and how many each may run, busiest first; empty
  *   without a per-site limit.
  * @property upNext the first waiting downloads, in the order they would start.
@@ -355,6 +378,7 @@ internal data class ScopeSummary(
   val running: Int,
   val slots: Int?,
   val connections: Int,
+  val transfers: Int,
   val hosts: List<HostLoad>,
   val upNext: List<TaskRow>,
 )
@@ -384,11 +408,12 @@ internal fun scopeSummary(rows: List<TaskRow>, config: DownloadConfig?): ScopeSu
     .sortedWith(compareBy({ -it.request.priority.ordinal }, { it.createdAt }))
   val scheduled = rows.filter { it.state is DownloadState.Scheduled }
     .sortedBy { (it.state as DownloadState.Scheduled).startsAt() }
+  val transfers = running.filter { !it.isTorrent }
   return ScopeSummary(
     running = running.size,
     slots = config?.maxConcurrentDownloads?.takeIf { it > 0 },
-    connections = running.filter { !it.isTorrent }
-      .sumOf { row -> row.segments.count { !it.isComplete } },
+    connections = transfers.sumOf { row -> row.segments.count { !it.isComplete } },
+    transfers = transfers.size,
     hosts = hosts,
     upNext = (queued + scheduled).take(UP_NEXT),
   )

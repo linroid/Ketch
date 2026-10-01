@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.inspector
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -23,10 +24,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Constraints
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
@@ -37,8 +42,12 @@ import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
+import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.LaneStrip
 import com.linroid.ketch.app.components.LaneStripDefaults
+import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.rememberFocusVisibility
+import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -59,6 +68,7 @@ import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.downloads.actions.sendEntries
 import com.linroid.ketch.app.ui.inspector.tabs.formatSize
+import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
@@ -114,9 +124,7 @@ internal fun TaskHeader(
   onCopyName: () -> Unit,
   onClose: () -> Unit,
 ) {
-  val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  val type = KetchTheme.typography
   val completed = row.state is DownloadState.Completed
   // A download that completes while shown plays its strip's finish, then trades it for a check.
   var finished by remember(row.key) { mutableStateOf(completed) }
@@ -139,16 +147,7 @@ internal fun TaskHeader(
         verticalArrangement = Arrangement.spacedBy(spacing.s0_5),
         modifier = Modifier.weight(1f).padding(top = spacing.s0_5),
       ) {
-        Text(
-          text = row.name,
-          style = type.titleM,
-          color = colors.textPrimary,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-          modifier = Modifier
-            .clip(KetchTheme.shapes.xs)
-            .clickable(onClickLabel = "Copy name", role = Role.Button, onClick = onCopyName),
-        )
+        TaskName(row.name, onCopyName)
         Subline(row, device)
       }
       KetchIconButton(
@@ -176,6 +175,52 @@ internal fun TaskHeader(
     val parts = metricParts(row, Clock.System.now(), remember { TimeZone.currentSystemDefault() })
     if (parts.isNotEmpty()) MetricLine(parts)
     if (reason != null) ReasonLine(row, reason, onReason)
+  }
+}
+
+/**
+ * The download's [name] on at most two lines. It may break after any "-" or "_", which file
+ * names use instead of spaces, so the first line stays full, but not at a dot, which keeps
+ * versions and the extension whole. A name that still does not fit gives up characters from its
+ * middle, so its extension stays in view, and shows whole in a tooltip. A click copies it.
+ */
+@Composable
+private fun TaskName(name: String, onCopy: () -> Unit) {
+  val colors = KetchTheme.colors
+  val style = KetchTheme.typography.titleM
+  val shape = KetchTheme.shapes.xs
+  val focus = rememberFocusVisibility()
+  BoxWithConstraints {
+    val measurer = rememberTextMeasurer()
+    val width = constraints.maxWidth
+    val breakable = remember(name) { name.replace(NameSeparator) { it.value + ZERO_WIDTH_SPACE } }
+    val shown = remember(breakable, width, style) {
+      middleEllipsis(breakable) { candidate ->
+        val fit = measurer.measure(
+          text = candidate,
+          style = style,
+          maxLines = NAME_LINES,
+          constraints = Constraints(maxWidth = width),
+        )
+        !fit.hasVisualOverflow
+      }
+    }
+    val elided = shown != breakable
+    KetchTooltip(text = name, enabled = elided) {
+      Text(
+        text = shown,
+        style = style,
+        color = colors.textPrimary,
+        maxLines = NAME_LINES,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+          .focusRing(focus.visible, shape, colors.focusRing)
+          .clip(shape)
+          .trackFocusVisibility(focus)
+          .clickable(onClickLabel = "Copy name", role = Role.Button, onClick = onCopy)
+          .semantics { contentDescription = name },
+      )
+    }
   }
 }
 
@@ -240,18 +285,13 @@ private fun MetricLine(parts: List<String>) {
   val text = buildAnnotatedString {
     parts.forEachIndexed { index, part ->
       if (index > 0) append(" · ")
-      val strong = part.endsWith("%") || part.endsWith("/s") && !part.startsWith("avg")
+      val strong = part.endsWith("%") || part.endsWith("/s")
       withStyle(SpanStyle(color = if (strong) colors.textPrimary else colors.textSecondary)) {
         append(keepPartsTogether(part))
       }
     }
   }
-  Text(
-    text = text,
-    style = KetchTheme.typography.numeral,
-    color = colors.textTertiary,
-    maxLines = 2,
-  )
+  Text(text = text, style = KetchTheme.typography.numeral, color = colors.textTertiary)
 }
 
 /** The reason line, with its chip at the end. */
@@ -467,6 +507,9 @@ private val TaskRow.hasLanes: Boolean
 internal fun keepPartsTogether(text: String): String =
   text.split(SEPARATOR).joinToString(SEPARATOR) { it.replace(' ', NO_BREAK) }
 
+private const val NAME_LINES = 2
+private const val ZERO_WIDTH_SPACE = "\u200B"
+private val NameSeparator = Regex("[-_]")
 private const val SEPARATOR = " · "
 private const val NO_BREAK = '\u00A0'
 private val CHECK_SHOWN = 1.2.seconds
