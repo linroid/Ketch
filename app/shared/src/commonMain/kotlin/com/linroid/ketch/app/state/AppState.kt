@@ -115,6 +115,8 @@ val InstanceEntry.deviceId: String
  * @param scope runs the commands; it should use a `SupervisorJob` and the main dispatcher.
  * @param speedMode speed mode of the embedded device, owned by the host, such as the service whose
  *   notification switches it; `null` when the host keeps none.
+ * @property incoming downloads and pairing links opened from outside the app; the shell asks
+ *   before it connects to a device a pairing link names.
  * @property clock current time of the task list, the speed history and the time labels.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -123,7 +125,7 @@ class AppState(
   private val scope: CoroutineScope,
   val appSettings: AppSettingsController = AppSettingsController(),
   val aiSettings: AiSettingsController = AiSettingsController(),
-  private val incoming: IncomingDownloads = IncomingDownloads(),
+  val incoming: IncomingDownloads = IncomingDownloads(),
   val messages: MessageCenter = MessageCenter(),
   val speedMode: SpeedModeController? = null,
   val clock: Clock = Clock.System,
