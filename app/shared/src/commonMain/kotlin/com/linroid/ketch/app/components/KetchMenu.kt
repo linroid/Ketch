@@ -153,7 +153,12 @@ class KetchMenuScope internal constructor() {
     entries += MenuEntry.Header(text)
   }
 
-  /** Adds custom [content], such as a picker; it receives a function that closes the menu. */
+  /**
+   * Adds custom [content], such as a picker; it receives a function that closes the menu. The
+   * menu sizes itself to its widest entry, so the content must report intrinsic sizes: no lazy
+   * lists or `BoxWithConstraints`. While a field in it has the focus, the menu leaves every key
+   * but Esc to it.
+   */
   fun custom(content: @Composable (dismiss: () -> Unit) -> Unit) {
     entries += MenuEntry.Custom(content)
   }
