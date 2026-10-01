@@ -99,15 +99,12 @@ fun AddDeviceSheet(state: AppState, onDismiss: () -> Unit, device: RemoteInstanc
     onSubmit = submit,
     onPick = { server ->
       val known = added["${server.host}:${server.port}"]
-      when {
-        known != null -> {
-          state.switchInstance(known)
-          onDismiss()
-        }
-        else -> {
-          form.pick(server)
-          if (!server.tokenRequired) submit(true)
-        }
+      if (known != null) {
+        state.switchInstance(known)
+        onDismiss()
+      } else {
+        form.pick(server)
+        if (!server.tokenRequired) submit(true)
       }
     },
     onFind = { access.request { nearby?.search() } },

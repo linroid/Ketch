@@ -45,7 +45,7 @@ class ConnectSnapshots {
 
   @Test
   fun landing_noDevice_showsTheConnectPage() {
-    for (size in Sizes) {
+    for (size in ConnectSizes) {
       for (theme in SnapshotTheme.entries) webSnapshot("connect-landing", size, theme)
     }
   }
@@ -54,7 +54,7 @@ class ConnectSnapshots {
   fun landing_savedDevicesNoneShown_listsThemWithTheirState() {
     for (size in listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
       for (theme in SnapshotTheme.entries) {
-        webSnapshot("connect-landing-devices", size, theme, SavedDevices)
+        webSnapshot("connect-landing-devices", size, theme, LandingDevices)
       }
     }
   }
@@ -85,9 +85,9 @@ class ConnectSnapshots {
 
   @Test
   fun addDevice_devicesOnTheNetwork_listsThem() {
-    for (size in Sizes) {
+    for (size in ConnectSizes) {
       for (theme in SnapshotTheme.entries) {
-        snapshot("add-device", size, theme) { AddDevice(remember { ConnectForm() }) }
+        snapshot("add-device", size, theme) { AddDeviceSample(remember { ConnectForm() }) }
       }
     }
   }
@@ -95,7 +95,7 @@ class ConnectSnapshots {
   @Test
   fun addDevice_pairingLinkPastedWhileSearching_confirmsTheLink() {
     snapshot("add-device-link", SnapshotSize.Desktop, SnapshotTheme.Light) {
-      AddDevice(remember { ConnectForm(PAIRING_LINK) }, searching = true)
+      AddDeviceSample(remember { ConnectForm(PAIRING_LINK) }, searching = true)
     }
   }
 
@@ -110,7 +110,7 @@ class ConnectSnapshots {
         val form = remember {
           formAfter("192.168.1.7:8642", ConnectionState.Unauthorized).apply { toggleManual() }
         }
-        AddDevice(form)
+        AddDeviceSample(form)
       }
     }
   }
@@ -119,14 +119,14 @@ class ConnectSnapshots {
   fun addDevice_nothingAnswers_offersToAddItAnyway() {
     for (theme in SnapshotTheme.entries) {
       snapshot("add-device-unreachable", SnapshotSize.Desktop, theme) {
-        AddDevice(remember { formAfter("192.168.1.99", ConnectionState.Disconnected()) })
+        AddDeviceSample(remember { formAfter("192.168.1.99", ConnectionState.Disconnected()) })
       }
     }
   }
 
   @Test
   fun addDevice_codeRejected_asksForANewOne() {
-    val device = remote(RemoteConfig("nas.local", name = "NAS-Basement"))
+    val device = sampleRemote(RemoteConfig("nas.local", name = "NAS-Basement"))
     for ((size, theme) in listOf(
       SnapshotSize.Desktop to SnapshotTheme.Light,
       SnapshotSize.Phone to SnapshotTheme.Dark,
@@ -149,16 +149,16 @@ class ConnectSnapshots {
   @Test
   fun addDevice_beforeASearch_offersFindOnNetwork() {
     snapshot("add-device-find", SnapshotSize.Phone, SnapshotTheme.Light) {
-      AddDevice(remember { ConnectForm() }, search = false)
+      AddDeviceSample(remember { ConnectForm() }, search = false)
     }
     snapshot("add-device-none-found", SnapshotSize.Desktop, SnapshotTheme.Dark) {
-      AddDevice(remember { ConnectForm() }, servers = emptyList())
+      AddDeviceSample(remember { ConnectForm() }, servers = emptyList())
     }
   }
 
   @Test
   fun pairing_scannedCode_asksBeforeConnecting() {
-    for (size in Sizes) {
+    for (size in ConnectSizes) {
       for (theme in SnapshotTheme.entries) {
         appSnapshot("pairing-confirm", size, theme) {
           state.incoming.offerLink(PAIRING_LINK, LinkSource.OpenUrl)
@@ -189,15 +189,15 @@ class ConnectSnapshots {
 private const val PAIRING_LINK =
   "ketch://pair?host=192.168.1.20&port=8642&name=Lins-MacBook-Pro#token=0b5e7c1d9a2f4e86"
 
-private val Sizes = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
+private val ConnectSizes = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
 
-private val Nearby = listOf(
+private val NearbyDevices = listOf(
   DiscoveredServer("NAS-Basement", "192.168.1.10", 8642, tokenRequired = false),
   DiscoveredServer("Den-PC", "192.168.1.7", 8642, tokenRequired = true),
   DiscoveredServer("Ketch", "192.168.1.31", 8642, tokenRequired = false),
 )
 
-private val SavedDevices = listOf(
+private val LandingDevices = listOf(
   RemoteConfig("nas.local", name = "NAS-Basement") to ConnectionState.Connected,
   RemoteConfig("192.168.1.7", name = "Den-PC") to ConnectionState.Disconnected(),
   RemoteConfig("studio.local", name = "Studio-Mac") to ConnectionState.Unauthorized,
@@ -209,16 +209,16 @@ private val SavedDevices = listOf(
  * [searching] the search goes on, and without [search] none has run.
  */
 @Composable
-private fun AddDevice(
+private fun AddDeviceSample(
   form: ConnectForm,
-  servers: List<DiscoveredServer> = Nearby,
+  servers: List<DiscoveredServer> = NearbyDevices,
   searching: Boolean = false,
   search: Boolean = true,
 ) {
   val scope = rememberCoroutineScope()
   val nearby = remember {
     NearbySearch(
-      discoverer = RoundsDiscoverer(servers, searching),
+      discoverer = SampleNearbyDiscoverer(servers, searching),
       scope = scope,
       rounds = listOf(Duration.ZERO, Duration.ZERO),
       dispatcher = Dispatchers.Unconfined,
@@ -238,7 +238,7 @@ private fun AddDevice(
 }
 
 /** Finds [servers] in its first round, then finds them again or, while [searching], waits. */
-private class RoundsDiscoverer(
+private class SampleNearbyDiscoverer(
   private val servers: List<DiscoveredServer>,
   private val searching: Boolean,
 ) : MdnsDiscoverer {
@@ -266,7 +266,10 @@ private fun formAfter(link: String, answer: ConnectionState): ConnectForm {
   return form
 }
 
-private fun remote(config: RemoteConfig, state: ConnectionState = ConnectionState.Connected) =
+private fun sampleRemote(
+  config: RemoteConfig,
+  state: ConnectionState = ConnectionState.Connected,
+): RemoteInstance =
   RemoteInstance(SampleKetchApi(SampleData.empty()), config, MutableStateFlow(state))
 
 /**
@@ -289,7 +292,7 @@ private fun webSnapshot(
   val (manager, controller) = runBlocking(SnapshotHarness.ui) {
     val manager = InstanceManager(
       factory = InstanceFactory(
-        remoteFactory = { config -> remote(config, states.getValue(config.host)) },
+        remoteFactory = { config -> sampleRemote(config, states.getValue(config.host)) },
       ),
       initialRemotes = data.remotes,
       configStore = RecordingConfigStore(data.config(theme, density)),
