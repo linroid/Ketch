@@ -154,7 +154,7 @@ internal fun ScopeOverview(state: AppState, onClose: () -> Unit) {
       if (slots != null) Stat("Slots", "${summary.running} of $slots in use")
       for (host in summary.hosts) Stat(host.host, "${host.running} of ${host.limit}")
       val disk = device?.disk
-      if (disk != null) Stat("Free space", "${formatSize(disk.usableBytes)} free")
+      if (disk != null) Stat("Free space", formatSize(disk.usableBytes))
     }
 
     val networks = settings.networks
@@ -195,8 +195,8 @@ internal fun ScopeOverview(state: AppState, onClose: () -> Unit) {
 }
 
 private fun connectionsText(summary: ScopeSummary): String {
-  if (summary.running == 0) return "None"
-  return "${summary.connections} across ${plural(summary.running, "download")}"
+  if (summary.transfers == 0) return "None"
+  return "${summary.connections} across ${plural(summary.transfers, "download")}"
 }
 
 @Composable
@@ -235,13 +235,7 @@ private fun UpNextRow(state: AppState, row: TaskRow) {
       size = KetchFileTypeChipDefaults.ListSize,
     )
     Column(modifier = Modifier.weight(1f)) {
-      Text(
-        text = row.name,
-        style = KetchTheme.typography.bodyS,
-        color = colors.textPrimary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
+      MiddleText(row.name, KetchTheme.typography.bodyS, colors.textPrimary)
       Text(
         text = row.content.detail,
         style = KetchTheme.typography.caption,

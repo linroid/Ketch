@@ -129,17 +129,24 @@ class InspectorModelTest {
   }
 
   @Test
-  fun metricParts_completed_usesTheTransferSummary() {
+  fun metricParts_completed_leavesTheSummaryToTheSublineAndDetails() {
     val state = DownloadState.Completed("/tmp/a.bin", 100 * MB, downloadTime = 10.seconds)
 
-    val parts = metricParts(row("a", state), start, TimeZone.UTC)
-
-    assertEquals(listOf("100.0 MB", "took 10s", "avg 10.0 MB/s"), parts)
+    assertEquals(emptyList(), metricParts(row("a", state), start, TimeZone.UTC))
   }
 
   @Test
   fun metricParts_queuedWithoutKnownSize_isEmpty() {
     assertEquals(emptyList(), metricParts(row("q", DownloadState.Queued), start, TimeZone.UTC))
+  }
+
+  @Test
+  fun addedDetail_earlierDay_addsTheTime() {
+    val today = row("t", DownloadState.Queued, createdAt = start - 2.hours)
+    val yesterday = row("y", DownloadState.Queued, createdAt = start - 18.hours)
+
+    assertEquals("Today 10:00", addedDetail(today, start, TimeZone.UTC))
+    assertEquals("Yesterday 18:00", addedDetail(yesterday, start, TimeZone.UTC))
   }
 
   @Test
@@ -237,6 +244,18 @@ class InspectorModelTest {
   }
 
   @Test
+  fun preemptionVictim_selectedRowRunning_takesASlotButIsNeverPaused() {
+    val selected = running("mine", DownloadPriority.LOW)
+    val other = running("other", DownloadPriority.NORMAL)
+
+    val starting = setOf(selected.key)
+
+    val victim = preemptionVictim(listOf(selected, other), slots = 2, starting = starting)
+
+    assertEquals("other.bin", victim?.name)
+  }
+
+  @Test
   fun preemptionVictim_slotsTaken_firstWithTheLowestPriority() {
     val running = listOf(
       running("a", DownloadPriority.HIGH),
@@ -281,6 +300,20 @@ class InspectorModelTest {
   }
 
   @Test
+  fun sharedSettings_scheduledRow_showsTheTimeItWaitsFor() {
+    val at = DownloadSchedule.AtTime(start + 9.hours)
+    val scheduled = row("s", DownloadState.Scheduled(at))
+    val started = row(
+      id = "r",
+      state = DownloadState.Downloading(DownloadProgress(1, 10, 1)),
+      request = DownloadRequest("https://e.com/r", schedule = DownloadSchedule.AtTime(start)),
+    )
+
+    assertEquals(at, SharedSettings.of(listOf(scheduled)).schedule)
+    assertEquals(DownloadSchedule.Immediate, SharedSettings.of(listOf(started)).schedule)
+  }
+
+  @Test
   fun scopeSummary_busyDevice_countsSlotsSitesConnectionsAndUpNext() {
     val config = DownloadConfig(maxConcurrentDownloads = 3, maxConnectionsPerHost = 2)
     val rows = listOf(
@@ -303,6 +336,7 @@ class InspectorModelTest {
     assertEquals(3, summary.running)
     assertEquals(3, summary.slots)
     assertEquals(7, summary.connections)
+    assertEquals(3, summary.transfers)
     val hosts = listOf(HostLoad("one.example", 2, 2), HostLoad("two.example", 1, 2))
     assertEquals(hosts, summary.hosts)
     assertEquals(listOf("high", "late", "soon", "night"), summary.upNext.map { it.key.taskId })

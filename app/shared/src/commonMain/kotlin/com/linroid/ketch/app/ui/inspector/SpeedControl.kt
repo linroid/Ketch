@@ -48,7 +48,6 @@ import com.linroid.ketch.app.components.DebouncedCommit
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.components.focusRing
-import com.linroid.ketch.app.components.winningLimitCaption
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchTheme
@@ -220,7 +219,7 @@ private fun SpeedOption.label(): String = when {
   else -> formatSpeedLimit(limit)
 }
 
-/** The slider over the [SpeedLimitPicker], with the limit that wins named under it. */
+/** The slider, with the device's limit marked, over the [SpeedLimitPicker]. */
 @Composable
 private fun SpeedPopoverContent(
   value: SpeedLimit,
@@ -287,10 +286,11 @@ private fun SpeedPopoverContent(
         }
       }
     }
+    // The slider covers the round speeds; the picker adds no limit and a typed one.
     SpeedLimitPicker(
       value = value,
       onCommit = onCommit,
-      caption = winningLimitCaption(value, globalCap, globalName),
+      presets = PopoverPresets,
       pending = pending,
     )
   }
@@ -434,5 +434,6 @@ internal fun LogSpeedSlider(
   )
 }
 
+private val PopoverPresets = listOf(SpeedLimit.Unlimited)
 private const val DOT_SHARE = 0.75f
 private val KEY_COMMIT_DELAY = 400.milliseconds

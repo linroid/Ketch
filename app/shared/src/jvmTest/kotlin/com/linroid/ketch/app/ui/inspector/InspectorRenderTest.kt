@@ -17,9 +17,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
@@ -98,7 +101,69 @@ class InspectorRenderTest {
   }
 
   @Test
+  fun speedControl_typedLimit_commitsOnceAfterThePause() {
+    val commits = mutableListOf<SpeedLimit>()
+    runScene(height = POPOVER_SCENE_HEIGHT, content = { SpeedControlUnderTest(commits) }) { scene ->
+      scene.openCustomField()
+      for (text in listOf("7", "75", "750", "750k")) {
+        scene.typeIntoField(text)
+        frames(scene, 100.milliseconds)
+      }
+      assertEquals(emptyList(), commits)
+      frames(scene, 1.seconds)
+    }
+
+    assertEquals(listOf(SpeedLimit.kbps(750)), commits)
+  }
+
+  @Test
+  fun speedControl_closedWhileTyping_commitsTheTypedLimitOnce() {
+    val commits = mutableListOf<SpeedLimit>()
+    runScene(height = POPOVER_SCENE_HEIGHT, content = { SpeedControlUnderTest(commits) }) { scene ->
+      scene.openCustomField()
+      scene.typeIntoField("3m")
+      frames(scene, 100.milliseconds)
+      scene.key(Key.Escape)
+      frames(scene, 1.seconds)
+      assertTrue(scene.texts().none { it == "Custom…" }, "The popover closed: ${scene.texts()}")
+    }
+
+    assertEquals(listOf(SpeedLimit.mbps(3)), commits)
+  }
+
+  @Test
   fun inspector_urgentWithEverySlotTaken_asksBeforeStarting() {
+    inspectSample(QUEUED) { state, key, scene ->
+      val starting = "start $QUEUED now"
+      scene.press(scene.centerOf("Urgent"))
+      scene.release(scene.centerOf("Urgent"))
+      frames(scene, 300.milliseconds)
+      assertTrue(scene.texts().any { it.startsWith("Starts now; may pause") }, "${scene.texts()}")
+      assertTrue(state.pendingLabels(key).none { it == starting })
+
+      val confirm = scene.centersOf("Start now").last()
+      scene.press(confirm)
+      scene.release(confirm)
+      frames(scene, 100.milliseconds)
+      assertTrue(starting in state.pendingLabels(key), "${state.pending.value}")
+    }
+  }
+
+  @Test
+  fun inspector_scheduledTask_startShowsTheTimeItWaitsFor() {
+    inspectSample(SCHEDULED) { _, _, scene ->
+      val texts = scene.texts()
+      // The reason line and the Start control both name the time.
+      assertEquals(2, texts.count { it.startsWith("Starts ") }, "$texts")
+      assertTrue("Now" !in texts, "$texts")
+    }
+  }
+
+  /** Renders the docked inspector of the sample download [name] and runs [test] on it. */
+  private fun inspectSample(
+    name: String,
+    test: suspend (AppState, TaskKey, ImageComposeScene) -> Unit,
+  ) {
     val data = SampleData.downloads()
     val environment = runBlocking(SnapshotHarness.ui) {
       SampleEnvironment(data, SnapshotTheme.Light, DensityMode.Compact)
@@ -106,8 +171,7 @@ class InspectorRenderTest {
     try {
       runBlocking(SnapshotHarness.ui) { withTimeout(5.seconds) { environment.start() } }
       val state = environment.controller.state
-      val key = data.keyOf(QUEUED)
-      val starting = "start $QUEUED now"
+      val key = data.keyOf(name)
       runScene(
         width = INSPECTOR_WIDTH,
         height = INSPECTOR_HEIGHT,
@@ -116,22 +180,44 @@ class InspectorRenderTest {
             TaskInspector(state, key, InspectorPlacement.Docked, onClose = {})
           }
         },
-      ) { scene ->
-        scene.press(scene.centerOf("Urgent"))
-        scene.release(scene.centerOf("Urgent"))
-        frames(scene, 300.milliseconds)
-        assertTrue(scene.texts().any { it.startsWith("Starts now; may pause") }, "${scene.texts()}")
-        assertTrue(state.pendingLabels(key).none { it == starting })
-
-        val confirm = scene.centersOf("Start now").last()
-        scene.press(confirm)
-        scene.release(confirm)
-        frames(scene, 100.milliseconds)
-        assertTrue(starting in state.pendingLabels(key), "${state.pending.value}")
-      }
+      ) { scene -> test(state, key, scene) }
     } finally {
       runBlocking(SnapshotHarness.ui) { environment.close() }
     }
+  }
+
+  @Composable
+  private fun SpeedControlUnderTest(commits: MutableList<SpeedLimit>) {
+    SpeedControl(
+      value = SpeedLimit.Unlimited,
+      presets = listOf(SpeedLimit.mbps(5), SpeedLimit.mbps(2), SpeedLimit.mbps(1)),
+      onCommit = { commits += it },
+      globalCap = SpeedLimit.Unlimited,
+      globalName = "Global limit",
+      pending = false,
+    )
+  }
+
+  /** Opens the Speed control's popover from its last segment, then its Custom… field. */
+  private suspend fun ImageComposeScene.openCustomField() {
+    nodes().last { it.config.getOrNull(SemanticsProperties.Role) == Role.Tab }.click()
+    frames(this, 300.milliseconds)
+    nodes().first { it.text() == "Custom…" }.click()
+    frames(this, 300.milliseconds)
+  }
+
+  private fun ImageComposeScene.typeIntoField(text: String) {
+    val field = nodes().first { SemanticsActions.SetText in it.config }
+    field.config[SemanticsActions.SetText].action?.invoke(AnnotatedString(text))
+  }
+
+  /** Clicks [this] node, or the closest clickable one around it. */
+  private fun SemanticsNode.click() {
+    var node: SemanticsNode? = this
+    while (node != null && SemanticsActions.OnClick !in node.config) node = node.parent
+    val action = node?.config?.get(SemanticsActions.OnClick)?.action
+    assertTrue(action != null, "Nothing to click around $this")
+    action()
   }
 
   private fun AppState.pendingLabels(key: TaskKey): List<String> =
@@ -213,7 +299,9 @@ class InspectorRenderTest {
     const val SLIDER_HEIGHT = 28
     const val INSPECTOR_WIDTH = 320
     const val INSPECTOR_HEIGHT = 1400
+    const val POPOVER_SCENE_HEIGHT = 480
     const val QUEUED = "blender-4.2-macos-arm64.dmg"
+    const val SCHEDULED = "llama-3.1-8b-instruct-q4_k_m.gguf"
     val FRAME = 16.milliseconds
     val PRIMARY = PointerButtons(isPrimaryPressed = true)
   }

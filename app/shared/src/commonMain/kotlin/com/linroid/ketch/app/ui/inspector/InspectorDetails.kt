@@ -34,7 +34,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -68,6 +67,8 @@ import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.formatDuration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlin.time.Clock
 
 /** Copies text to the clipboard, posting an error when the system refuses. */
 @Stable
@@ -144,10 +145,11 @@ internal fun TaskDetails(
         } else {
           null
         },
-      ) { MiddleText(path, KetchTheme.typography.monoS) }
+      ) { MiddleText(path, KetchTheme.typography.monoS, KetchTheme.colors.textPrimary) }
     }
     row.sizeBytes?.let { DetailRow("Size", copier, formatBytes(it)) }
-    DetailRow("Added", copier, row.content.added)
+    val zone = remember { TimeZone.currentSystemDefault() }
+    DetailRow("Added", copier, addedDetail(row, Clock.System.now(), zone))
     val time = completed?.downloadTime
     if (completed != null && time != null) {
       DetailRow("Time spent", copier, formatDuration(time))
@@ -206,21 +208,7 @@ private fun LinkText(parts: LinkParts) {
         measurer.measure(text(candidate), style, maxLines = 1).size.width <= width
       }
     }
-    Text(text = text(shown), style = style, maxLines = 1, overflow = TextOverflow.Clip)
-  }
-}
-
-/** [text] on one line, shortened in the middle when it does not fit. */
-@Composable
-private fun MiddleText(text: String, style: TextStyle) {
-  val styled = style.copy(color = KetchTheme.colors.textPrimary)
-  BoxWithConstraints(Modifier.fillMaxWidth()) {
-    val measurer = rememberTextMeasurer()
-    val width = with(LocalDensity.current) { maxWidth.roundToPx() }
-    val shown = remember(text, width, styled) {
-      middleEllipsis(text) { measurer.measure(it, styled, maxLines = 1).size.width <= width }
-    }
-    Text(text = shown, style = styled, maxLines = 1, overflow = TextOverflow.Clip)
+    Text(text = text(shown), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
   }
 }
 

@@ -100,7 +100,7 @@ internal fun InspectorControls(
               pending = isPending(RowCommands::speedLimitLabel),
             )
             val caption = if (shared.speedLimit == null) {
-              "$MIXED the downloads have different limits"
+              "These downloads have different limits"
             } else {
               winningLimitCaption(shared.speedLimit, cap, globalName)
             }
@@ -126,11 +126,17 @@ private fun ConnectionsRow(
   pending: Boolean,
 ) {
   val torrent = rows.all { it.isTorrent }
-  val value = shared.connections
+  // A torrent's count is its peer limit, so a mixed selection sets the HTTP and FTP ones only.
+  val targets = if (torrent) rows else rows.filter { !it.isTorrent }
+  val value = if (targets.size == rows.size) {
+    shared.connections
+  } else {
+    targets.map { it.request.connections }.distinct().singleOrNull()
+  }
   ControlRow(if (torrent) "Peer limit" else "Connections", inline) {
     when {
       value == null -> MixedChip(title = "Connections") {
-        connectionEntries(rows, runner, peers = torrent)
+        connectionEntries(targets, runner, peers = torrent)
       }
       torrent -> ConnectionStepper(
         value = value,
@@ -147,7 +153,7 @@ private fun ConnectionsRow(
           ?: single?.segments?.size?.takeIf { it > 0 }
         ConnectionStepper(
           value = value,
-          onCommit = { runner.setConnections(rows, it) },
+          onCommit = { runner.setConnections(targets, it) },
           autoValue = auto,
           enabled = !limited,
           pending = pending,
@@ -223,7 +229,7 @@ private fun PriorityRow(
           },
         )
       }
-      if (shared.priority == null) Caption("$MIXED the downloads have different priorities")
+      if (shared.priority == null) Caption("These downloads have different priorities")
     }
   }
   val victim = asking
@@ -243,11 +249,11 @@ private fun PriorityRow(
  */
 private fun victimFor(state: AppState, rows: List<TaskRow>): TaskRow? {
   val deviceId = rows.first().key.deviceId
-  val keys = rows.mapTo(HashSet()) { it.key }
   val running = state.taskList.rows.value.filter {
-    it.key.deviceId == deviceId && it.key !in keys && it.state is DownloadState.Downloading
+    it.key.deviceId == deviceId && it.state is DownloadState.Downloading
   }
-  return preemptionVictim(running, state.instanceSettings.download?.maxConcurrentDownloads)
+  val slots = state.instanceSettings.download?.maxConcurrentDownloads
+  return preemptionVictim(running, slots, starting = rows.mapTo(HashSet()) { it.key })
 }
 
 @Composable
@@ -271,10 +277,16 @@ private fun StartRow(
   var asking by remember(rows.map { it.key }) { mutableStateOf<DownloadSchedule?>(null) }
   val running = rows.any { it.state is DownloadState.Downloading }
   val select: (DownloadSchedule) -> Unit = { schedule ->
-    if (running && schedule is DownloadSchedule.AtTime) {
-      asking = schedule
+    // Rescheduling a running download to now would only pause it and queue it again.
+    val targets = if (schedule == DownloadSchedule.Immediate) {
+      rows.filter { it.state !is DownloadState.Downloading }
     } else {
-      runner.reschedule(rows, schedule)
+      rows
+    }
+    when {
+      targets.isEmpty() || schedule == shared.schedule -> Unit
+      running && schedule is DownloadSchedule.AtTime -> asking = schedule
+      else -> runner.reschedule(targets, schedule)
     }
   }
   ControlRow("Start", inline) {
