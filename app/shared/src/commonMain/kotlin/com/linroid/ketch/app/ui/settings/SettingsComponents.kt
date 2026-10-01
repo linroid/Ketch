@@ -115,7 +115,10 @@ fun SettingsGroup(
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
+  Column(
+    modifier = modifier.settingsAnchor(title.orEmpty()).fillMaxWidth(),
+    verticalArrangement = Arrangement.spacedBy(spacing.s2),
+  ) {
     if (title != null || action != null) {
       Row(
         modifier = Modifier.fillMaxWidth()
@@ -177,7 +180,7 @@ fun SettingsRow(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   Column(
-    modifier = modifier.fillMaxWidth()
+    modifier = modifier.settingsAnchor(title).fillMaxWidth()
       .background(colors.surface)
       .heightIn(min = KetchTheme.density.iconButtonTarget + spacing.s4)
       .padding(horizontal = spacing.s4, vertical = spacing.s3),

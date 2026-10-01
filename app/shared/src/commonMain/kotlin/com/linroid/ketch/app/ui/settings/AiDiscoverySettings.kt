@@ -5,18 +5,26 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.state.AiConnectionTest
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.SearchProvider
+import kotlin.time.Duration
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * Provider, credentials and web search for AI discovery. Every change
@@ -49,7 +57,7 @@ fun AiDiscoverySettings(
   val tokenFromEnvironment = llm.apiKey.isBlank() && effective.llm.apiKey.isNotBlank()
   val testing = connectionTest is AiConnectionTest.Running
 
-  Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
     SettingsGroup {
       val (status, statusColor) = discoveryStatus(settings, effective, supported)
       SettingsSwitchRow(
@@ -63,21 +71,35 @@ fun AiDiscoverySettings(
     }
 
     SettingsGroup(title = "Model") {
-      SettingsSelectRow(
+      SettingsRow(
         title = "Provider",
         description = providerHint(llm.provider),
-        value = llm.provider,
-        options = LlmProvider.entries,
-        label = { it.label },
         enabled = supported,
-        // Model and endpoint are provider-specific, so switching falls
-        // back to the new provider's defaults. The token is kept —
-        // clearing a secret on a stray tap is worse than a token the
-        // connection test will reject.
-        onSelect = { provider ->
-          onChange(settings.copy(llm = llm.copy(provider = provider, model = "", baseUrl = "")))
-        },
-      )
+      ) {
+        FlowRow(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+          verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+        ) {
+          LlmProvider.entries.forEach { provider ->
+            KetchChip(
+              label = provider.buttonLabel,
+              selected = provider == llm.provider,
+              enabled = supported,
+              // Model and endpoint are provider-specific, so switching falls back to the new
+              // provider's defaults. The token is kept: clearing a secret on a stray tap is
+              // worse than a token the connection test will reject.
+              onClick = {
+                if (provider != llm.provider) {
+                  onChange(
+                    settings.copy(llm = llm.copy(provider = provider, model = "", baseUrl = "")),
+                  )
+                }
+              },
+            )
+          }
+        }
+      }
       if (llm.provider.requiresApiKey) {
         SettingsRow(
           title = "API key",
@@ -118,8 +140,8 @@ fun AiDiscoverySettings(
         if (suggestions.isNotEmpty()) {
           FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+            verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
           ) {
             suggestions.forEach { suggestion ->
               KetchButton(
@@ -154,7 +176,17 @@ fun AiDiscoverySettings(
           enabled = supported,
         )
       }
-      val (testMessage, testColor) = testStatus(connectionTest)
+      // How long the last test took, measured from the click.
+      var testStarted by remember { mutableStateOf<TimeMark?>(null) }
+      var testTook by remember { mutableStateOf<Duration?>(null) }
+      LaunchedEffect(connectionTest) {
+        if (connectionTest is AiConnectionTest.Success) {
+          testTook = testStarted?.elapsedNow()
+          testStarted = null
+        }
+      }
+      val model = effective.llm.effectiveModel
+      val (testMessage, testColor) = testStatus(connectionTest, model, testTook)
       SettingsRow(
         title = "Test connection",
         description = testMessage,
@@ -166,6 +198,8 @@ fun AiDiscoverySettings(
             onClick = {
               // Leaving the field saves what was just typed.
               focusManager.clearFocus()
+              testStarted = TimeSource.Monotonic.markNow()
+              testTook = null
               onTest()
             },
             variant = KetchButtonVariant.Secondary,
@@ -233,29 +267,57 @@ private fun discoveryStatus(
 ): Pair<String, Color> {
   val colors = KetchTheme.colors
   return when {
-    !supported -> "Runs in the desktop and Android apps." to colors.onSurfaceDim
+    !supported -> "Runs in the desktop and Android apps." to colors.textTertiary
     !effective.llm.isComplete ->
-      "Choose a provider and add its key below to use discovery." to colors.warning
-    !effective.search.isComplete -> "Add the missing web search credentials." to colors.warning
-    !settings.enabled -> "Off. The Discover tab appears when this is on." to
-      colors.onSurfaceVariant
-    else -> "Ready — ${effective.llm.provider.label} · ${effective.llm.effectiveModel}" to
-      colors.success
+      "Choose a provider and add its key below to use discovery." to colors.status.paused.color
+    !effective.search.isComplete ->
+      "Add the missing web search credentials." to colors.status.paused.color
+    !settings.enabled -> "Off. Discover finds downloads for you once this is on." to
+      colors.textSecondary
+    else -> "Ready · ${effective.llm.provider.label} · ${effective.llm.effectiveModel}" to
+      colors.status.completed.color
   }
 }
 
+/**
+ * @param model the model the test called.
+ * @param took how long a successful test took, or `null` when it was not timed.
+ */
 @Composable
-private fun testStatus(test: AiConnectionTest): Pair<String, Color> {
+private fun testStatus(
+  test: AiConnectionTest,
+  model: String,
+  took: Duration?,
+): Pair<String, Color> {
   val colors = KetchTheme.colors
   return when (test) {
     AiConnectionTest.Idle -> "Sends a short prompt to check the key and model." to
-      colors.onSurfaceVariant
-    AiConnectionTest.Running -> "Waiting for the model…" to colors.onSurfaceVariant
-    is AiConnectionTest.Success -> "It works. The model replied: ${test.reply.take(80)}" to
-      colors.success
-    is AiConnectionTest.Failure -> "Failed: ${test.message}" to colors.error
+      colors.textSecondary
+    AiConnectionTest.Running -> "Waiting for the model…" to colors.textSecondary
+    is AiConnectionTest.Success -> connectedCopy(model, took) to colors.status.completed.color
+    is AiConnectionTest.Failure -> "Failed: ${test.message}" to colors.status.failed.color
   }
 }
+
+/** "Connected · claude-sonnet-5 responded in 1.2 s", or without the time when it is unknown. */
+internal fun connectedCopy(model: String, took: Duration?): String {
+  val who = model.ifBlank { "the model" }
+  if (took == null) return "Connected · $who responded"
+  val tenths = took.inWholeMilliseconds / MILLIS_PER_TENTH
+  return "Connected · $who responded in ${tenths / 10}.${tenths % 10} s"
+}
+
+private const val MILLIS_PER_TENTH = 100
+
+/** How a provider reads on its button. */
+private val LlmProvider.buttonLabel: String
+  get() = when (this) {
+    LlmProvider.OpenAi -> "OpenAI"
+    LlmProvider.Anthropic -> "Anthropic"
+    LlmProvider.Google -> "Gemini"
+    LlmProvider.Ollama -> "Ollama · runs locally, no key"
+    LlmProvider.OpenAiCompatible -> "Custom (OpenAI-compatible)"
+  }
 
 private fun tokenPlaceholder(provider: LlmProvider): String =
   when (provider) {
