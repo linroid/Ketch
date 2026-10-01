@@ -51,8 +51,9 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.connect.ConnectHost
+import com.linroid.ketch.app.ui.connect.ConnectLanding
 import com.linroid.ketch.app.ui.devices.DevicesScreen
-import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
 import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.ketch.app.ui.discover.DiscoverScreen
 import com.linroid.ketch.app.ui.downloads.DownloadsScreen
@@ -117,11 +118,6 @@ fun AppShell(
 
 @Composable
 private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
-  val instances by appState.instances.collectAsState()
-  // Without any device (the web before one is added), ask for one.
-  LaunchedEffect(instances) {
-    if (instances.isEmpty()) appState.showAddRemoteDialog = true
-  }
   val activeInstance by appState.activeInstance.collectAsState()
   val serverState by appState.serverState.collectAsState()
   RestoreListState(appState)
@@ -205,7 +201,10 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
           layout.navigation == ShellNavigation.Phone
         },
       ) {
-        if (layout.navigation == ShellNavigation.Phone) {
+        if (activeInstance == null) {
+          // No device to show yet, as in the web app before one is connected.
+          ConnectLanding(appState)
+        } else if (layout.navigation == ShellNavigation.Phone) {
           PhoneShell(shell, commands, destinations)
         } else {
           WideShell(shell, commands, destinations, layout)
@@ -243,31 +242,7 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
       onDismiss = { appState.showInstanceSelector = false },
     )
   }
-  if (appState.showAddRemoteDialog) {
-    val unauthorized = appState.unauthorizedInstance
-    AddRemoteServerDialog(
-      onDismiss = {
-        appState.resetDiscovery()
-        appState.showAddRemoteDialog = false
-        appState.unauthorizedInstance = null
-      },
-      discoveryState = appState.discoveryState,
-      onDiscover = { port -> appState.discoverRemoteServers(port) },
-      onStopDiscovery = { appState.stopDiscovery() },
-      onAdd = { host, port, token ->
-        appState.resetDiscovery()
-        appState.showAddRemoteDialog = false
-        if (unauthorized != null) {
-          appState.reconnectWithToken(unauthorized, token ?: "")
-        } else {
-          appState.addRemoteServer(host, port, token)
-        }
-      },
-      initialHost = unauthorized?.host ?: "",
-      initialPort = unauthorized?.port?.toString() ?: "8642",
-      authRequired = unauthorized != null,
-    )
-  }
+  ConnectHost(appState)
 }
 
 /** Keeps the Downloads tab and search across an Android activity recreation. */
