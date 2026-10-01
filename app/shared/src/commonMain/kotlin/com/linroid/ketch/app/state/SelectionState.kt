@@ -5,7 +5,8 @@ package com.linroid.ketch.app.state
  *
  * Operations that span rows take the visible keys in display order: after filtering, sorting
  * and grouping, with the rows of collapsed groups included. The selection survives filter
- * changes; [prune] drops tasks that were removed.
+ * changes; [prune] drops tasks that were removed. Pointer, keyboard and rubber band input map
+ * onto [click], [contextClick], [moveFocus] and [band].
  *
  * @property selected the selected tasks.
  * @property anchor where a Shift range starts: the row last clicked or toggled.
@@ -49,6 +50,52 @@ data class SelectionState(
     val chosen = if (additive) selected + range else range.toSet()
     return copy(selected = chosen, focused = key)
   }
+
+  /**
+   * A primary click on [key]: with [range] (⇧) it selects from the anchor, with [toggle] (⌘ on
+   * Apple keyboards, Ctrl elsewhere) it toggles the row, and with both it adds the range.
+   * A plain click selects only [key].
+   */
+  fun click(
+    key: TaskKey,
+    visible: List<TaskKey>,
+    toggle: Boolean = false,
+    range: Boolean = false,
+  ): SelectionState = when {
+    range -> selectRange(key, visible, additive = toggle)
+    toggle -> toggle(key)
+    else -> select(key)
+  }
+
+  /**
+   * A right-click or a menu key on [key]: inside the selection it keeps the selection, so the
+   * menu acts on every selected row; outside it selects only [key].
+   */
+  fun contextClick(key: TaskKey): SelectionState =
+    if (key in selected) copy(focused = key) else select(key)
+
+  /**
+   * The rows an action started from [key] acts on, in [visible] order: the visible selected
+   * rows when [key] is one of them, otherwise [key] alone. Selected rows that a filter hides
+   * are left out.
+   */
+  fun targets(key: TaskKey, visible: List<TaskKey>): List<TaskKey> =
+    if (key in selected) visible.filter { it in selected } else listOf(key)
+
+  /** The selected rows among [visible], in their order. */
+  fun visibleSelection(visible: List<TaskKey>): List<TaskKey> = visible.filter { it in selected }
+
+  /**
+   * A rubber band over [covered], in display order: selects those rows, after the rows in
+   * [base], which a ⌘-drag keeps. The first covered row becomes the anchor and the last the
+   * focus. With nothing covered only [base] stays selected.
+   */
+  fun band(covered: List<TaskKey>, base: Set<TaskKey> = emptySet()): SelectionState =
+    SelectionState(
+      selected = base + covered,
+      anchor = covered.firstOrNull() ?: anchor,
+      focused = covered.lastOrNull() ?: focused,
+    )
 
   /** `⌘A`: selects every [visible] row, keeping the anchor when it is one of them. */
   fun selectAllVisible(visible: List<TaskKey>): SelectionState {
