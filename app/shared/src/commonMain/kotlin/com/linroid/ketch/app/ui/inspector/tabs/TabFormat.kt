@@ -66,19 +66,31 @@ internal fun clockTime(at: Instant, zone: TimeZone, seconds: Boolean = false): S
 internal fun plural(count: Int, one: String, many: String = "${one}s"): String =
   if (count == 1) "1 $one" else "$count $many"
 
-/** The largest unit [bytes] has at least one of, as its name and size. */
-private fun unitOf(bytes: Long): Pair<String, Long> =
-  ByteUnits.lastOrNull { bytes >= it.second } ?: ByteUnits.first()
+/**
+ * The largest unit [bytes] has at least one of, as its name and size; an amount that would round
+ * to 1024 of it, such as 1023.6 KB, takes the next unit instead.
+ */
+private fun unitOf(bytes: Long): Pair<String, Long> {
+  val index = ByteUnits.indexOfLast { bytes >= it.second }.coerceAtLeast(0)
+  val next = ByteUnits.getOrNull(index + 1)
+  val rounded = (bytes.toDouble() / ByteUnits[index].second).roundToLong()
+  return if (next != null && rounded >= next.second / ByteUnits[index].second) {
+    next
+  } else {
+    ByteUnits[index]
+  }
+}
 
 private fun amount(bytes: Long, unit: Long): String {
   if (bytes == 0L || unit == 1L) return bytes.toString()
   val value = bytes.toDouble() / unit
-  if (value >= WHOLE_FROM) return value.roundToLong().toString()
   val tenths = (value * 10).roundToLong()
+  // 99.96 rounds to 100.0, which reads as a whole number like any other amount above 100.
+  if (tenths >= WHOLE_FROM_TENTHS) return value.roundToLong().toString()
   return "${tenths / 10}.${tenths % 10}"
 }
 
-private const val WHOLE_FROM = 100.0
+private const val WHOLE_FROM_TENTHS = 1000L
 
 private fun Int.twoDigits(): String = toString().padStart(2, '0')
 

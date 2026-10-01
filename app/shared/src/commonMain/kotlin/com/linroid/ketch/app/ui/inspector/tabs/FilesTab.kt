@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -196,18 +195,12 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
       modifier = Modifier
         .fillMaxWidth()
         .height(metrics.rowHeight)
-        .semantics(mergeDescendants = true) {
+        .clearAndSetSemantics {
           contentDescription = listOfNotNull(file.name, size, percent?.let { "$it percent" })
             .joinToString(", ")
         },
     ) {
-      if (chip) {
-        KetchFileTypeChip(
-          fileName = file.name,
-          size = KetchFileTypeChipDefaults.TableSize,
-          modifier = Modifier.clearAndSetSemantics {},
-        )
-      }
+      if (chip) KetchFileTypeChip(fileName = file.name, size = KetchFileTypeChipDefaults.TableSize)
       FileName(file.name, Modifier.weight(1f))
       Text(
         text = size,
@@ -230,6 +223,7 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
             progress = null,
             height = LaneStripDefaults.RowHeight,
             heads = false,
+            // The row describes itself; a strip would read as a download's connections.
             modifier = Modifier.width(metrics.barWidth).clearAndSetSemantics {},
           )
         }
@@ -355,6 +349,14 @@ internal fun torrentFiles(row: TaskRow): List<TorrentFile> {
       downloaded = if (completed && file.size >= 0) file.size else 0,
     ).also { offset += file.size.coerceAtLeast(0) }
   }
+}
+
+/** How many files [torrentFiles] lists for [row], without building them. */
+internal fun torrentFileCount(row: TaskRow): Int {
+  if (row.segments.isNotEmpty()) return row.segments.size
+  val files = row.request.resolvedSource?.files.orEmpty()
+  val selected = row.request.selectedFileIds
+  return if (selected.isEmpty()) files.size else files.count { it.id in selected }
 }
 
 /**

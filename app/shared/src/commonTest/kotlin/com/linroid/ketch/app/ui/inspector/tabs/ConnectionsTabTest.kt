@@ -145,11 +145,11 @@ class ConnectionsTabTest {
       connectionsCaption(1, serverLimited = true, editable = true, downloading = true)
     )
     assertEquals(
-      "Changing connections re-splits the remaining bytes live.",
+      "A new count re-splits the remaining bytes live.",
       connectionsCaption(4, serverLimited = false, editable = true, downloading = true)
     )
     assertEquals(
-      "A new number of connections applies when the download resumes.",
+      "A new count applies when the download resumes.",
       connectionsCaption(4, serverLimited = false, editable = true, downloading = false)
     )
     assertNull(connectionsCaption(4, serverLimited = false, editable = false, downloading = false))

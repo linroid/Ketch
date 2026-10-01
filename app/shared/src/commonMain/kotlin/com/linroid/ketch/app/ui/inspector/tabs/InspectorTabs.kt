@@ -37,7 +37,7 @@ fun inspectorTabs(
 ): List<InspectorTab> = buildList {
   add(InspectorTab.Overview)
   if (row.isTorrent) {
-    if (torrentFiles(row).isNotEmpty()) add(InspectorTab.Files)
+    if (torrentFileCount(row) > 0) add(InspectorTab.Files)
   } else if (connectionsCount(row) > 0) {
     add(InspectorTab.Connections)
   }
@@ -50,7 +50,7 @@ fun inspectorTabs(
  */
 fun InspectorTab.count(row: TaskRow): Int? = when (this) {
   InspectorTab.Connections -> connectionsCount(row)
-  InspectorTab.Files -> torrentFiles(row).size
+  InspectorTab.Files -> torrentFileCount(row)
   InspectorTab.Overview, InspectorTab.Activity -> null
 }
 
