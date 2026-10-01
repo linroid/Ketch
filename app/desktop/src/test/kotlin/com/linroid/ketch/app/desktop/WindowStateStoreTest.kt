@@ -120,6 +120,14 @@ class WindowStateStoreTest {
   }
 
   @Test
+  fun initialWindowState_savedSmallerThanTheMinimum_growsToTheMinimum() {
+    val saved = WindowBounds(x = 100, y = 120, width = 500, height = 300, maximized = false)
+    val state = initialWindowState(saved, screens = listOf(primary))
+    assertEquals(MIN_WINDOW_WIDTH.dp, state.size.width)
+    assertEquals(MIN_WINDOW_HEIGHT.dp, state.size.height)
+  }
+
+  @Test
   fun initialWindowState_savedMaximized_restoresMaximized() {
     val saved = WindowBounds(x = 100, y = 120, width = 900, height = 650, maximized = true)
     val state = initialWindowState(saved, screens = listOf(primary))

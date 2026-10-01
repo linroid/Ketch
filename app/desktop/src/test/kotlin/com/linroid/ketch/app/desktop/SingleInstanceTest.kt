@@ -101,7 +101,8 @@ class SingleInstanceTest {
 
   @Test
   fun fileArguments_acceptsPathsAndFileUris() {
-    val files = fileArguments(listOf("-psn_0_12345", "", "file:///tmp/a%20b.torrent", "c.torrent"))
+    val args = listOf("-psn_0_12345", "", "file:///tmp/a%20b.torrent", "c.torrent")
+    val files = fileArguments(args).files
     assertEquals(listOf(File("/tmp/a b.torrent"), File("c.torrent").absoluteFile), files)
   }
 }

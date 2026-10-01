@@ -50,6 +50,7 @@ class PendingOps(
   ) {
     var timer: Job? = null
     var committing = false
+    var commitJob: Job? = null
   }
 
   private val log = KetchLogger("PendingOps")
@@ -123,9 +124,19 @@ class PendingOps(
   /**
    * Commits every pending operation now. The commits start before this returns and finish even
    * when [scope] is cancelled right after, as it is when the app closes.
+   *
+   * @return completes once every commit, including ones already running, has finished, so a host
+   *   can wait for them before it closes the engine.
    */
-  fun flush() {
+  fun flush(): Job {
     entries.filter { !it.committing }.forEach { commit(it, CoroutineStart.UNDISPATCHED) }
+    val running = entries.mapNotNull { it.commitJob }
+    val done = Job()
+    if (running.isEmpty()) done.complete()
+    for (job in running) {
+      job.invokeOnCompletion { if (running.all { it.isCompleted }) done.complete() }
+    }
+    return done
   }
 
   private fun commit(entry: Entry, start: CoroutineStart) {
@@ -133,7 +144,7 @@ class PendingOps(
     entry.committing = true
     entry.timer?.cancel()
     publish()
-    scope.launch(start = start) {
+    entry.commitJob = scope.launch(start = start) {
       withContext(NonCancellable) {
         try {
           entry.commit()
