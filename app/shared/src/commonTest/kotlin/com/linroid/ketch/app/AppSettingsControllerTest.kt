@@ -171,7 +171,7 @@ class AppDestinationTest {
   @Test
   fun `discover is hidden until discovery works`() {
     assertEquals(
-      listOf(AppDestination.Downloads, AppDestination.Settings),
+      listOf(AppDestination.Downloads, AppDestination.Devices),
       AppDestination.visible(aiAvailable = false),
     )
   }

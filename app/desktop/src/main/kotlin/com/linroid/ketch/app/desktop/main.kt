@@ -37,6 +37,7 @@ import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.SystemNotifier
+import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
@@ -58,10 +59,13 @@ import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.ObservedPeak
+import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.PulseModel
 import com.linroid.ketch.app.state.SpeedModeController
+import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.LocalWindowChrome
+import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.FileConfigStore
@@ -406,10 +410,14 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       SideEffect { windowFocused = focused }
       MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.isDarkTheme())
       KetchMenuBar(controller, status, actions, speedMode)
+      val shellSkips = remember(speedMode) {
+        hostShortcuts(DesktopOs.current, slowLane = speedMode != null)
+      }
       CompositionLocalProvider(
         LocalDesktopHooks provides providedHooks,
         LocalIntegrationStatus provides launch.integration.status,
         LocalWindowChrome provides windowChrome(fullWindowContent, windowState.placement),
+        LocalHostShortcuts provides shellSkips,
       ) {
         val app = @Composable {
           App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
@@ -552,13 +560,41 @@ private fun installPreferencesHandler(onOpen: () -> Unit): () -> Unit {
 
 // The window's own shortcuts: Settings everywhere, and on Windows and Linux, which have no menu
 // bar to own them, closing the window and quitting.
-private val windowShortcuts = ShortcutMatcher(
-  commands = if (DesktopOs.current == DesktopOs.MAC) {
-    listOf(KetchCommands.Settings)
-  } else {
-    listOf(KetchCommands.Settings, KetchCommands.CloseWindow, KetchCommands.Quit)
-  },
-)
+private val windowShortcuts = ShortcutMatcher(commands = windowCommands(DesktopOs.current))
+
+private fun windowCommands(os: DesktopOs): List<KetchCommand> = if (os == DesktopOs.MAC) {
+  listOf(KetchCommands.Settings)
+} else {
+  listOf(KetchCommands.Settings, KetchCommands.CloseWindow, KetchCommands.Quit)
+}
+
+/**
+ * Commands whose keys the window or, on macOS, the menu bar runs before the app's content sees
+ * them, so the shell's shortcuts leave them alone and each runs once. [slowLane] says whether
+ * the menu bar lists Slow lane.
+ */
+internal fun hostShortcuts(os: DesktopOs, slowLane: Boolean): Set<KetchCommand> {
+  val window = windowCommands(os).toSet()
+  if (os != DesktopOs.MAC) return window
+  val menus = menuBar(
+    MenuBarContext(
+      counts = PulseCounts(),
+      failures = 0,
+      filter = StatusFilter.All,
+      devices = emptyList(),
+      activeDevice = null,
+      selection = emptyList(),
+      undoLabel = null,
+      inspectorOpen = false,
+      slowLane = if (slowLane) false else null,
+    ),
+  )
+  val owned = menus.flatMap { it.entries }
+    .filterIsInstance<MenuEntry.Item>()
+    .filter { it.shortcut != null }
+    .mapNotNull { (it.action as? MenuAction.Run)?.command }
+  return window + owned
+}
 
 /**
  * An error the window could not handle becomes an error message instead of closing it. A failure
