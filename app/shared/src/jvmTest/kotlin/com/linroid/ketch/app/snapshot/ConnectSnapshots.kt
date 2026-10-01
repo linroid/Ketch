@@ -84,6 +84,18 @@ class ConnectSnapshots {
   }
 
   @Test
+  fun landing_savedDeviceNeedsCode_asksForItsCurrentCode() {
+    val device = sampleRemote(
+      RemoteConfig("studio.local", name = "Studio-Mac"),
+      ConnectionState.Unauthorized,
+    )
+    snapshot("connect-landing-renew", SnapshotSize.Medium, SnapshotTheme.Dark) {
+      val form = remember { ConnectForm().apply { askForCode(device) } }
+      ConnectLandingContent(form, emptyList(), onSubmit = {}, onPick = {})
+    }
+  }
+
+  @Test
   fun addDevice_devicesOnTheNetwork_listsThem() {
     for (size in ConnectSizes) {
       for (theme in SnapshotTheme.entries) {

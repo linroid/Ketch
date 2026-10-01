@@ -144,6 +144,34 @@ class DeviceConnectorTest {
   }
 
   @Test
+  fun connect_addressOfADeviceAddedWithItsCode_triesThatCode() = runTest {
+    val saved = RemoteConfig(host = "192.168.1.20", apiToken = "saved", name = "Office")
+    val manager = manager(remotes = listOf(saved))
+    val probe = Probe()
+
+    val outcome = connector(manager, probe).connect(PairingLink("192.168.1.20"))
+
+    val device = manager.remotes().single()
+    assertEquals(ConnectOutcome.Connected(device), outcome)
+    assertEquals("saved", probe.checked.single().apiToken)
+    assertEquals("saved", device.remoteConfig.apiToken)
+    assertEquals(device, shown.single())
+    manager.close()
+  }
+
+  @Test
+  fun connect_savedCodeTurnedDown_asksForACodeWithoutBlamingALink() = runTest {
+    val saved = RemoteConfig(host = "192.168.1.20", apiToken = "stale")
+    val manager = manager(remotes = listOf(saved))
+    val probe = Probe(ProbeResult(ConnectionState.Unauthorized))
+
+    val outcome = connector(manager, probe).connect(PairingLink("192.168.1.20"))
+
+    assertEquals(ConnectOutcome.NeedsCode(rejected = false), outcome)
+    manager.close()
+  }
+
+  @Test
   fun connect_unnamedDeviceAddedAlready_takesTheNameOfTheLink() = runTest {
     val saved = RemoteConfig(host = "192.168.1.20", apiToken = "secret", watch = false)
     val manager = manager(remotes = listOf(saved))

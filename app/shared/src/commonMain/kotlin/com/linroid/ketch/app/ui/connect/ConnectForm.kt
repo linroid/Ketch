@@ -10,6 +10,7 @@ import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.deviceNameOrNull
 import com.linroid.ketch.app.util.PairingLink
+import com.linroid.ketch.app.util.toCopy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -55,6 +56,9 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
   private var codeState by mutableStateOf("")
   private var nameState by mutableStateOf<String?>(null)
 
+  // Whether the details were typed by hand, rather than filled from the link.
+  private var detailsTyped by mutableStateOf(false)
+
   /** The pairing link or address, as typed or pasted. */
   var link: String
     get() = linkState
@@ -69,6 +73,7 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
     get() = hostState
     set(value) {
       hostState = value
+      detailsTyped = true
       edited(addressChanged = true)
     }
 
@@ -77,6 +82,7 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
     get() = portState
     set(value) {
       portState = value.filter { it.isDigit() }.take(PORT_DIGITS)
+      detailsTyped = true
       edited(addressChanged = true)
     }
 
@@ -85,6 +91,7 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
     get() = secureState
     set(value) {
       secureState = value
+      detailsTyped = true
       edited(addressChanged = true)
     }
 
@@ -117,7 +124,7 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
 
   /** Whether anything differs from how the form started, which typed input would lose. */
   val isEdited: Boolean
-    get() = linkState != initialLink || hostState.isNotBlank() || codeState.isNotBlank()
+    get() = linkState != initialLink || detailsTyped || codeState.isNotBlank()
 
   /** What [link] reads as, or `null` when it is no pairing link or address. */
   val parsed: PairingLink?
@@ -195,7 +202,10 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
    * it needs one.
    */
   fun pick(server: DiscoveredServer) {
-    linkState = PairingLink(server.host, server.port).address
+    val address = PairingLink(server.host, server.port).address
+    // A code typed for another device is no code of this one.
+    if (address != linkState) codeState = ""
+    linkState = address
     nameState = deviceNameOrNull(server.name)
     manual = false
     if (server.tokenRequired) {
@@ -204,6 +214,21 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
     } else {
       problem = null
     }
+  }
+
+  /**
+   * Fills the form with [device], added before, whose access code no longer works, and asks
+   * for the current one.
+   */
+  fun askForCode(device: RemoteInstance) {
+    linkState = device.addressText()
+    nameState = device.remoteConfig.name
+    codeState = ""
+    manual = false
+    attempted = false
+    codeShown = true
+    val address = PairingLink(device.host, device.port).address
+    problem = ConnectProblem.NeedsCode(address, rejected = false)
   }
 
   /**
@@ -236,7 +261,8 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
         throw e
       } catch (e: Exception) {
         log.w { "Couldn't add ${target.address}: ${e.describeCauses()}" }
-        problem = ConnectProblem.Failed(e.message ?: "Something went wrong")
+        val copy = e.toCopy()
+        problem = ConnectProblem.Failed(listOfNotNull(copy.title, copy.hint).joinToString(". "))
       } finally {
         connecting = false
       }
@@ -272,9 +298,11 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
 }
 
 /** A [ConnectForm] to give [device], which rejected its access code, a new one. */
-internal fun codeForm(device: RemoteInstance): ConnectForm {
-  val link = PairingLink(device.host, device.port, secure = device.remoteConfig.secure)
-  // An HTTPS address keeps its scheme, which a plain one would lose.
-  val text = if (link.secure) link.webAppUrl().removeSuffix("/") else link.address
-  return ConnectForm(text, askForCode = true)
+internal fun codeForm(device: RemoteInstance): ConnectForm =
+  ConnectForm(device.addressText(), askForCode = true)
+
+// The device's address as the link field takes it; an HTTPS one keeps its scheme.
+private fun RemoteInstance.addressText(): String {
+  val link = PairingLink(host, port, secure = remoteConfig.secure)
+  return if (link.secure) link.webAppUrl().removeSuffix("/") else link.address
 }

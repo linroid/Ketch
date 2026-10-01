@@ -92,8 +92,9 @@ internal class DeviceConnector(
   private val log = KetchLogger("DeviceConnector")
 
   /**
-   * Connects to [link]. With [check] off the device is added without trying it first, such as
-   * one that is switched off now, and by default not shown, since there is nothing to show yet.
+   * Connects to [link]. A device added before is tried with the code it has unless [link]
+   * brings one. With [check] off the device is added without trying it first, such as one that
+   * is switched off now, and by default not shown, since there is nothing to show yet.
    *
    * @param show whether to show the device once it is added.
    */
@@ -104,7 +105,8 @@ internal class DeviceConnector(
   ): ConnectOutcome {
     var name = deviceNameOrNull(link.name)
     if (check) {
-      val result = probe.check(link.toRemoteConfig())
+      val saved = remoteAt(link)?.remoteConfig?.apiToken
+      val result = probe.check(link.copy(token = link.token ?: saved).toRemoteConfig())
       log.d { "${link.address} answered ${result.state}" }
       when (result.state) {
         ConnectionState.Connected -> name = name ?: deviceNameOrNull(result.name)

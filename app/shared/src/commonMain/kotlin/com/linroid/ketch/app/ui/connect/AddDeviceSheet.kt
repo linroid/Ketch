@@ -66,9 +66,16 @@ import com.linroid.ketch.app.util.PairingLink
  * search, so the web hides it.
  *
  * @param device a device that rejected its access code; the sheet then asks for a new one.
+ * @param searchNow searches the network as the sheet opens on phones too, for a "Find on
+ *   network" tapped before it opened.
  */
 @Composable
-fun AddDeviceSheet(state: AppState, onDismiss: () -> Unit, device: RemoteInstance? = null) {
+fun AddDeviceSheet(
+  state: AppState,
+  onDismiss: () -> Unit,
+  device: RemoteInstance? = null,
+  searchNow: Boolean = false,
+) {
   val form = remember(device) { device?.let(::codeForm) ?: ConnectForm() }
   val connector = rememberDeviceConnector(state)
   val scope = rememberCoroutineScope()
@@ -77,8 +84,8 @@ fun AddDeviceSheet(state: AppState, onDismiss: () -> Unit, device: RemoteInstanc
   val instances by state.instances.collectAsState()
   val serverState by state.serverState.collectAsState()
   LaunchedEffect(nearby) {
-    // Asking for a permission is up to the user, so phones wait for the button.
-    if (nearby != null && !isMobilePlatform) nearby.search()
+    // Asking for a permission is up to the user, so phones wait for a tap.
+    if (nearby != null && (searchNow || !isMobilePlatform)) access.request { nearby.search() }
   }
   val submit = { check: Boolean ->
     form.connect(scope, connector, check) { connected ->

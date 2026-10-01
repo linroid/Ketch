@@ -17,7 +17,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration
@@ -41,7 +40,6 @@ internal class NearbySearch(
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
   private val log = KetchLogger("NearbySearch")
-  private var job: Job? = null
 
   /** Whether this platform can search the network; "Find on network" hides without. */
   val supported: Boolean get() = discoverer.supported
@@ -67,7 +65,7 @@ internal class NearbySearch(
     if (searching || !supported) return
     searching = true
     error = null
-    job = scope.launch {
+    scope.launch {
       try {
         for (round in rounds) {
           val found = withContext(dispatcher) {
@@ -85,11 +83,6 @@ internal class NearbySearch(
         searched = true
       }
     }
-  }
-
-  /** Stops the search under way. */
-  fun stop() {
-    job?.cancel()
   }
 
   // What a round found replaces what an earlier one did; new devices go to the end.

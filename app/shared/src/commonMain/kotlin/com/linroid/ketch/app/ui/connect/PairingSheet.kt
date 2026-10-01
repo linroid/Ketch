@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
@@ -23,6 +26,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.deviceNameOrNull
+import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IncomingDownload
@@ -91,7 +95,15 @@ internal fun PairingDialog(
     contentSpacing = spacing.s4,
     title = { Text("Connect to $name?") },
     confirmButton = {
-      KetchButton(text = "Connect", onClick = { onSubmit(true) }, loading = form.connecting)
+      val focus = remember { FocusRequester() }
+      // Return connects on desktop, as in a system dialog.
+      LaunchedEffect(Unit) { if (!isMobilePlatform) focus.requestFocus() }
+      KetchButton(
+        text = "Connect",
+        onClick = { onSubmit(true) },
+        loading = form.connecting,
+        modifier = Modifier.focusRequester(focus),
+      )
     },
     dismissButton = {
       KetchButton(text = "Not now", onClick = onDismiss, variant = KetchButtonVariant.Secondary)
@@ -124,10 +136,10 @@ internal fun PairingDialog(
       }
     }
     Text(
-      text = if (known != null) {
-        "You've added $name already. Connecting shows it and gives it the code from this link."
-      } else {
-        "You'll see its downloads here and can add new ones to it from $noun."
+      text = when {
+        known == null -> "You'll see its downloads here and can add new ones to it from $noun."
+        link.token == null -> "You've added $name already. Connecting shows it."
+        else -> "You've added $name already. Connecting shows it and gives it this link's code."
       },
       style = type.bodyS,
       color = colors.textSecondary,
