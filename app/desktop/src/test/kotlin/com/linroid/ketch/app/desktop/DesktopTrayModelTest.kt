@@ -94,6 +94,19 @@ class DesktopTrayModelTest {
   }
 
   @Test
+  fun trayMenu_anyContext_hasNoShortcuts() {
+    // AWT tray menus throw on a shortcut.
+    val speed = TraySpeed(SpeedLimitMode.Full, SpeedLimit.mbps(1), hasRules = true)
+    val recent = listOf(RecentDownload("ubuntu.iso", "/Downloads/ubuntu.iso"))
+    val counts = PulseCounts(downloading = 1, paused = 1)
+
+    val menu = trayMenu(TrayContext(pulse(counts), speed, recent))
+    val items = menu.flatMap { if (it is MenuEntry.Submenu) it.entries else listOf(it) }
+
+    assertTrue(items.filterIsInstance<MenuEntry.Item>().all { it.shortcut == null })
+  }
+
+  @Test
   fun trayTooltip_downloading_showsSpeedAndActiveCount() {
     val pulse = pulse(PulseCounts(downloading = 3, waiting = 2), speed = 4_404_019)
 
@@ -271,40 +284,81 @@ class DesktopTrayModelTest {
   fun failureWatch_firstCount_isUnseenButNotNew() {
     val watch = FailureWatch()
 
-    assertEquals(0, watch.update(failures = 2, viewing = false))
+    assertEquals(0, watch.update(failing(tasks = 3, failures = 2), viewing = false))
     assertEquals(2, watch.unseen)
   }
 
   @Test
   fun failureWatch_newFailure_isUnseenUntilViewed() {
     val watch = FailureWatch()
-    watch.update(failures = 0, viewing = false)
+    watch.update(failing(tasks = 2, failures = 0), viewing = false)
 
-    assertEquals(1, watch.update(failures = 1, viewing = false))
+    assertEquals(1, watch.update(failing(tasks = 2, failures = 1), viewing = false))
     assertEquals(1, watch.unseen)
-    assertEquals(0, watch.update(failures = 1, viewing = true))
+    assertEquals(0, watch.update(failing(tasks = 2, failures = 1), viewing = true))
     assertEquals(0, watch.unseen)
   }
 
   @Test
   fun failureWatch_retriedThenFailedAgain_countsAgain() {
     val watch = FailureWatch()
-    watch.update(failures = 1, viewing = true)
-    watch.update(failures = 0, viewing = false)
+    watch.update(failing(tasks = 1, failures = 1), viewing = true)
+    watch.update(failing(tasks = 1, failures = 0), viewing = false)
 
-    assertEquals(1, watch.update(failures = 1, viewing = false))
+    assertEquals(1, watch.update(failing(tasks = 1, failures = 1), viewing = false))
     assertEquals(1, watch.unseen)
   }
 
   @Test
   fun failureWatch_failureRemoved_forgetsIt() {
     val watch = FailureWatch()
-    watch.update(failures = 0, viewing = false)
-    watch.update(failures = 2, viewing = false)
+    watch.update(failing(tasks = 2, failures = 0), viewing = false)
+    watch.update(failing(tasks = 2, failures = 2), viewing = false)
 
-    watch.update(failures = 1, viewing = false)
+    watch.update(failing(tasks = 1, failures = 1), viewing = false)
 
     assertEquals(1, watch.unseen)
+  }
+
+  @Test
+  fun failureWatch_deviceConnecting_takesItsBaselineOnceOnline() {
+    val watch = FailureWatch()
+    watch.update(failing(tasks = 0, failures = 0, health = DeviceHealth.Connecting), false)
+
+    assertEquals(0, watch.update(failing(tasks = 4, failures = 2), viewing = false))
+    assertEquals(2, watch.unseen)
+  }
+
+  @Test
+  fun failureWatch_failedTasksArrivingWithTheList_areUnseenButNotNew() {
+    val watch = FailureWatch()
+    watch.update(failing(tasks = 0, failures = 0), viewing = false)
+
+    assertEquals(0, watch.update(failing(tasks = 5, failures = 2), viewing = false))
+    assertEquals(2, watch.unseen)
+  }
+
+  @Test
+  fun failureWatch_deviceOffline_keepsItsCount() {
+    val watch = FailureWatch()
+    watch.update(failing(tasks = 2, failures = 1), viewing = false)
+    watch.update(failing(tasks = 0, failures = 0, health = DeviceHealth.Offline()), false)
+
+    assertEquals(1, watch.unseen)
+    assertEquals(0, watch.update(failing(tasks = 2, failures = 1), viewing = false))
+  }
+
+  @Test
+  fun failureWatch_switchingDevices_keepsWhatEachDeviceHasSeen() {
+    val watch = FailureWatch()
+    val mac = failing(tasks = 3, failures = 2)
+    val nas = failing(tasks = 1, failures = 1, deviceId = "nas:8642")
+    watch.update(mac, viewing = true)
+
+    assertEquals(0, watch.update(nas, viewing = false))
+    assertEquals(1, watch.unseen)
+    assertEquals(0, watch.update(mac, viewing = false))
+    assertEquals(0, watch.unseen)
   }
 
   @Test
@@ -314,6 +368,18 @@ class DesktopTrayModelTest {
     status.update(pulse(PulseCounts(failed = 1), failures = 1), viewingFailures = false)
 
     assertEquals(1, status.unseenFailures)
+  }
+
+  @Test
+  fun taskbarModelWindowProgress_pausedOrFailedWithoutProgress_fillsTheBar() {
+    val paused = taskbarModel(pulse(PulseCounts(paused = 2)), 0, DockBadgeMode.ActiveCount)
+    val failed = taskbarModel(pulse(PulseCounts(failed = 1), failures = 1), 1, DockBadgeMode.Off)
+    val downloading = pulse(PulseCounts(downloading = 1), downloaded = 45, size = 100)
+
+    assertEquals(100, paused.windowProgress)
+    assertEquals(100, failed.windowProgress)
+    assertEquals(45, taskbarModel(downloading, 0, DockBadgeMode.Off).windowProgress)
+    assertEquals(-1, TaskbarModel.Idle.windowProgress)
   }
 
   @Test
@@ -347,23 +413,42 @@ class DesktopTrayModelTest {
     downloaded: Long = 0,
     size: Long = 0,
   ): PulseState = PulseState(
-    devices = listOf(
-      DevicePulse(
-        deviceId = "local",
-        name = "This Mac",
-        health = DeviceHealth.Local(),
-        counts = counts,
-        failures = failures,
-        speed = speed,
-        cap = SpeedLimit.Unlimited,
-        downloadedBytes = downloaded,
-        sizeBytes = size,
-        sizesKnown = size > 0,
-        pendingBytes = 0,
-        disk = null,
-        history = emptyList(),
-      ),
-    ),
+    devices = listOf(device(counts, failures, speed = speed, downloaded = downloaded, size = size)),
+  )
+
+  // One device with [tasks] tasks, [failures] of them failed.
+  private fun failing(
+    tasks: Int,
+    failures: Int,
+    health: DeviceHealth = DeviceHealth.Local(),
+    deviceId: String = "local",
+  ): List<DevicePulse> {
+    val counts = PulseCounts(done = tasks - failures, failed = failures)
+    return listOf(device(counts, failures, health, deviceId))
+  }
+
+  private fun device(
+    counts: PulseCounts,
+    failures: Int,
+    health: DeviceHealth = DeviceHealth.Local(),
+    deviceId: String = "local",
+    speed: Long = 0,
+    downloaded: Long = 0,
+    size: Long = 0,
+  ): DevicePulse = DevicePulse(
+    deviceId = deviceId,
+    name = "This Mac",
+    health = health,
+    counts = counts,
+    failures = failures,
+    speed = speed,
+    cap = SpeedLimit.Unlimited,
+    downloadedBytes = downloaded,
+    sizeBytes = size,
+    sizesKnown = size > 0,
+    pendingBytes = 0,
+    disk = null,
+    history = emptyList(),
   )
 
   private fun context(

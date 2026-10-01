@@ -9,7 +9,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.toArgb
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.PulseState
+import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.lightKetchColors
 import com.linroid.ketch.config.DockBadgeMode
 import java.awt.Color
@@ -74,6 +76,16 @@ internal data class TaskbarModel(
   val progress: Int,
   val state: TaskbarProgress,
 ) {
+  /**
+   * Progress of the Windows taskbar button. Windows tints the bar's value for [state], so a
+   * paused or failed state with no progress to show fills the bar instead of leaving it empty.
+   */
+  val windowProgress: Int
+    get() {
+      val blocked = state == TaskbarProgress.Paused || state == TaskbarProgress.Error
+      return if (blocked && progress < 0) FULL_PROGRESS else progress
+    }
+
   companion object {
     /** Nothing shown. */
     val Idle: TaskbarModel = TaskbarModel(badge = null, progress = -1, state = TaskbarProgress.Off)
@@ -96,7 +108,7 @@ internal fun taskbarModel(
     else -> null
   }
   val progress = pulse.progress?.takeIf { counts.downloading > 0 }
-    ?.let { (it * 100).roundToInt().coerceIn(0, 100) }
+    ?.let { (it * FULL_PROGRESS).roundToInt().coerceIn(0, FULL_PROGRESS) }
     ?: -1
   val state = when {
     failed -> TaskbarProgress.Error
@@ -108,29 +120,49 @@ internal fun taskbarModel(
 }
 
 /**
- * Counts failures the user has not seen. The first count is a baseline: the failures in it are
- * unseen but not new. A count that drops forgets the failures that went away.
+ * Counts the failures the user has not seen, device by device.
+ *
+ * A device's first count while it is online is its baseline: those failures are unseen but not
+ * new. Failed tasks that arrive along with new tasks, as when the engine restores its tasks or a
+ * remote device's list loads after it connects, are unseen but not new either; only tasks that
+ * turn failed are. An offline device keeps its last count, and a count that drops forgets the
+ * failures that went away.
  */
 internal class FailureWatch {
-  private var known: Int? = null
+  private val known = HashMap<String, DeviceFailures>()
 
-  /** Failures not seen yet. */
+  /** Failures not seen yet on the devices of the last update. */
   var unseen: Int = 0
     private set
 
   /**
-   * Takes [failures] as the current count; while [viewing], every failure counts as seen.
+   * Takes the failures of [devices]; while [viewing], those of [devices] count as seen.
    *
-   * @return how many failures are new since the last count.
+   * @return how many tasks turned failed since the last update.
    */
-  fun update(failures: Int, viewing: Boolean): Int {
-    val previous = known
-    val new = if (previous == null) 0 else (failures - previous).coerceAtLeast(0)
-    if (previous == null) unseen = failures
-    known = failures
-    unseen = if (viewing) 0 else minOf(unseen + new, failures)
+  fun update(devices: List<DevicePulse>, viewing: Boolean): Int {
+    var new = 0
+    for (device in devices) {
+      val previous = known[device.deviceId]
+      val tasks = device.counts.count(StatusFilter.All)
+      val failures = device.failures
+      val next = when {
+        !device.health.isOnline -> previous ?: continue
+        previous == null -> DeviceFailures(tasks, failures, unseen = failures)
+        else -> {
+          val more = (failures - previous.failures).coerceAtLeast(0)
+          val arrived = (tasks - previous.tasks).coerceAtLeast(0)
+          new += (more - arrived).coerceAtLeast(0)
+          DeviceFailures(tasks, failures, minOf(previous.unseen + more, failures))
+        }
+      }
+      known[device.deviceId] = if (viewing) next.copy(unseen = 0) else next
+    }
+    unseen = devices.sumOf { known[it.deviceId]?.unseen ?: 0 }
     return new
   }
+
+  private data class DeviceFailures(val tasks: Int, val failures: Int, val unseen: Int)
 }
 
 private class TaskbarApplier(private val taskbar: Taskbar) {
@@ -144,7 +176,7 @@ private class TaskbarApplier(private val taskbar: Taskbar) {
     attempt(Taskbar.Feature.PROGRESS_VALUE) { taskbar.setProgressValue(model.progress) }
     if (window == null) return
     attempt(Taskbar.Feature.PROGRESS_VALUE_WINDOW) {
-      taskbar.setWindowProgressValue(window, model.progress)
+      taskbar.setWindowProgressValue(window, model.windowProgress)
     }
     attempt(Taskbar.Feature.PROGRESS_STATE_WINDOW) {
       taskbar.setWindowProgressState(window, model.state.awt)
@@ -204,6 +236,7 @@ private fun badgeImage(text: String): BufferedImage {
   return image
 }
 
+private const val FULL_PROGRESS = 100
 private const val BADGE_SIZE = 16
 private const val BADGE_FONT = 11
 private const val BADGE_FONT_SMALL = 8

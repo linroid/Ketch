@@ -32,6 +32,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.PulseCounts
+import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
@@ -41,6 +42,7 @@ import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.links
+import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.config.SpeedLimitMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,6 +59,7 @@ import java.io.File
 import java.io.FilenameFilter
 
 private val isMac = System.getProperty("os.name").startsWith("Mac")
+private val isWindows = System.getProperty("os.name").startsWith("Windows")
 
 /**
  * What the tray and the menu bar ask of the host, which owns the main window and the app's
@@ -580,11 +583,14 @@ internal class DesktopCommands(
       isMultipleMode = true
       filenameFilter = FilenameFilter { _, name -> name.endsWith(".torrent", ignoreCase = true) }
       // Windows ignores the filter but matches the name pattern.
-      if (!isMac) file = "*.torrent"
+      if (isWindows) file = "*.torrent"
     }
-    dialog.isVisible = true
-    val picked = dialog.files.toList()
-    dialog.dispose()
+    val picked = try {
+      dialog.isVisible = true
+      dialog.files.filter { it.isFile }
+    } finally {
+      dialog.dispose()
+    }
     if (picked.isNotEmpty()) actions.openFiles(picked)
   }
 
@@ -636,21 +642,23 @@ internal class DesktopCommands(
       running.forEach { state.runTaskCommand(it, "pause") { pause() } }
       return
     }
-    for (task in tasks) {
-      when (TaskPhase.of(task.state.value)) {
-        TaskPhase.Paused, TaskPhase.Failed -> state.runTaskCommand(task, "resume") { resume() }
-        TaskPhase.Canceled -> state.redownload(task)
-        TaskPhase.Running, TaskPhase.Completed -> {}
-      }
-    }
+    for (task in tasks) retry(task, label = "resume")
   }
 
   private fun retrySelected() {
-    for (task in selectedTasks()) {
-      when (TaskPhase.of(task.state.value)) {
-        TaskPhase.Paused, TaskPhase.Failed -> state.runTaskCommand(task, "retry") { resume() }
-        TaskPhase.Canceled -> state.redownload(task)
-        TaskPhase.Running, TaskPhase.Completed -> {}
+    for (task in selectedTasks()) retry(task, label = "retry")
+  }
+
+  // Resumes a paused or failed task. A failure only a fresh start can fix, and a canceled task,
+  // start over, as Retry all failed does.
+  private fun retry(task: DownloadTask, label: String) {
+    val current = task.state.value
+    val freshStart = current is DownloadState.Failed &&
+      current.error.toCopy().primary == RowAction.DownloadAgain
+    when {
+      current is DownloadState.Canceled || freshStart -> state.redownload(task)
+      current is DownloadState.Paused || current is DownloadState.Failed -> {
+        state.runTaskCommand(task, label) { resume() }
       }
     }
   }

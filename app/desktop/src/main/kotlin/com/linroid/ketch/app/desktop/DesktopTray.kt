@@ -95,14 +95,10 @@ class DesktopStatus internal constructor() {
   /** Emits when tasks fail, for the Dock's request for attention. */
   internal val newFailures: SharedFlow<Unit> = failures.asSharedFlow()
 
-  /**
-   * Takes [pulse] as the current status. While [viewingFailures], failures count as seen. A
-   * Pulse without devices is not loaded yet and leaves the failures alone.
-   */
+  /** Takes [pulse] as the current status. While [viewingFailures], its failures count as seen. */
   internal fun update(pulse: PulseState, viewingFailures: Boolean) {
     this.pulse = pulse
-    if (pulse.devices.isEmpty()) return
-    if (watch.update(pulse.failures, viewingFailures) > 0) failures.tryEmit(Unit)
+    if (watch.update(pulse.devices, viewingFailures) > 0) failures.tryEmit(Unit)
     unseenFailures = watch.unseen
   }
 }
