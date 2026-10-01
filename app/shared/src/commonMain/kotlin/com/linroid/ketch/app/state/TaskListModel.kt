@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.util.FileKind
 import com.linroid.ketch.app.util.FileType
 import com.linroid.ketch.app.util.RowContent
@@ -189,8 +190,11 @@ data class TaskListView(
 }
 
 /**
- * The tasks of every device in [sources] as immutable [TaskRow]s, plus the tab, search, sort
- * order and grouping the Downloads list shows them in.
+ * The tasks of every device in [sources] as immutable [TaskRow]s, plus the devices, tab, search,
+ * sort order and grouping the Downloads list shows them in.
+ *
+ * Rows are kept for every device, shown or not, so a device's speed samples and histories
+ * survive while another one shows; [rows], [counts] and [view] hold only the [shown] ones.
  *
  * Task changes are sampled every [UPDATE_INTERVAL] and turned into rows on [dispatcher], so a
  * thousand tasks with many of them downloading cost the UI at most four updates a second. While
@@ -206,6 +210,7 @@ data class TaskListView(
  * @param arrangement sort order and grouping of the tab.
  * @param frozen whether the pointer is over the list, a row has focus or a menu is open, which
  *   holds the order still (see [StableArrangement]).
+ * @param shown the devices whose rows the list shows.
  * @param clock current time, for stalls, countdowns and dates.
  * @param timeZone zone of dates and times.
  * @param dispatcher where rows are built and arranged.
@@ -218,6 +223,7 @@ class TaskListModel(
   query: Flow<String> = flowOf(""),
   arrangement: Flow<ListArrangement> = flowOf(ListArrangement()),
   frozen: Flow<Boolean> = flowOf(false),
+  shown: Flow<DeviceScope> = flowOf(DeviceScope.All),
   private val clock: Clock = Clock.System,
   private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
   dispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -227,7 +233,7 @@ class TaskListModel(
   private val moved = HashMap<TaskKey, Moved>()
   private val rings = HashMap<TaskKey, SpeedRing>()
   private val contexts = HashMap<String, RowContext>()
-  private var lastRows: List<TaskRow> = emptyList()
+  private var lastShown: List<TaskRow> = emptyList()
   private val downloading = MutableStateFlow(false)
   private var ticks = 0L
   private var sampledTick = 0L
@@ -237,13 +243,22 @@ class TaskListModel(
   private val resortPending = MutableStateFlow(false)
   private val resorts = MutableStateFlow(0)
 
-  /** Every task of every device, in device order, unfiltered. */
-  val rows: StateFlow<List<TaskRow>> =
-    combine(sources.flatMapLatest(::devices), ticks()) { devices, tick -> Frame(devices, tick) }
+  private val frames: StateFlow<Rows> =
+    combine(sources.flatMapLatest(::devices), ticks(), shown) { devices, tick, devicesShown ->
+      Frame(devices, tick, devicesShown)
+    }
       .sample(UPDATE_INTERVAL)
       .map(::build)
       .flowOn(dispatcher)
-      .stateIn(scope, SharingStarted.Eagerly, emptyList())
+      .stateIn(scope, SharingStarted.Eagerly, Rows())
+
+  /** Every task of every device, shown or not, in device order, unfiltered. */
+  val allRows: StateFlow<List<TaskRow>> =
+    frames.map { it.all }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+  /** Every task of the shown devices, in device order, unfiltered. */
+  val rows: StateFlow<List<TaskRow>> =
+    frames.map { it.shown }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
   /** Number of tasks on each status tab. */
   val counts: StateFlow<Map<StatusFilter, Int>> =
@@ -278,8 +293,8 @@ class TaskListModel(
       .flowOn(dispatcher)
       .stateIn(scope, SharingStarted.Eagerly, TaskListView())
 
-  /** The row of the task [key], if it is listed. */
-  fun row(key: TaskKey): TaskRow? = rows.value.firstOrNull { it.key == key }
+  /** The row of the task [key], if its device lists it, shown or not. */
+  fun row(key: TaskKey): TaskRow? = allRows.value.firstOrNull { it.key == key }
 
   private fun devices(sources: List<TaskListSource>): Flow<List<DeviceSnapshot>> {
     if (sources.isEmpty()) return flowOf(emptyList())
@@ -327,7 +342,7 @@ class TaskListModel(
     return (MINUTE_MILLIS - millis.mod(MINUTE_MILLIS)).milliseconds
   }
 
-  private fun build(frame: Frame): List<TaskRow> {
+  private fun build(frame: Frame): Rows {
     val now = clock.now()
     val zone = timeZone()
     val millis = now.toEpochMilliseconds()
@@ -349,10 +364,14 @@ class TaskListModel(
     rings.keys.retainAll(seen)
     contexts.keys.retainAll(frame.devices.mapTo(HashSet()) { it.source.deviceId })
     downloading.value = rows.any { it.state is DownloadState.Downloading }
+    val devicesShown = frame.shown
+    val shownRows = if (devicesShown == DeviceScope.All) rows else {
+      rows.filter { devicesShown.includes(it.key.deviceId) }
+    }
     // Unchanged rows never reach the view, so wake it to re-sort the order it holds.
-    if (resortPending.value && rows == lastRows) resorts.value += 1
-    lastRows = rows
-    return rows
+    if (resortPending.value && shownRows == lastShown) resorts.value += 1
+    lastShown = shownRows
+    return Rows(rows, shownRows)
   }
 
   /** The device's row context, the same instance while nothing in it changes. */
@@ -445,7 +464,9 @@ class TaskListModel(
     val slowLane: Boolean,
   )
 
-  private class Frame(val devices: List<DeviceSnapshot>, val tick: Long)
+  private class Frame(val devices: List<DeviceSnapshot>, val tick: Long, val shown: DeviceScope)
+
+  private class Rows(val all: List<TaskRow> = emptyList(), val shown: List<TaskRow> = emptyList())
 
   private class Moved(val bytes: Long, val at: Instant)
 

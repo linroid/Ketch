@@ -29,6 +29,7 @@ import com.linroid.ketch.app.components.startTimeLabel
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -407,6 +408,30 @@ class IntakeHeaders {
   }
 }
 
+/**
+ * What an add holds, which picks the device it goes to by default: each kind goes where the
+ * last add of that kind went this session, such as magnets to a NAS.
+ */
+enum class IntakeKind {
+  /** Links to files, over HTTP(S) or FTP(S). */
+  Links,
+
+  /** Magnets and torrents only. */
+  Torrents;
+
+  companion object {
+    /** [Torrents] when every one of [urls] and [files] is a torrent, else [Links]. */
+    fun of(urls: List<String>, files: Int = 0): IntakeKind {
+      if (urls.isEmpty() && files == 0) return Links
+      val torrents = urls.all { url ->
+        val kind = LinkKind.of(url)
+        kind == LinkKind.Magnet || kind == LinkKind.TorrentFile
+      }
+      return if (torrents) Torrents else Links
+    }
+  }
+}
+
 /** What the add sheet does on submit. */
 enum class IntakeMode {
   /** Adds new downloads. */
@@ -473,6 +498,16 @@ class IntakeSession internal constructor(
   var target: InstanceEntry? by mutableStateOf(null)
     private set
 
+  // Whether the user or the request chose the target, so the kind of the rows no longer does.
+  private var targetChosen = request.targetDeviceId != null
+
+  /** What the rows hold, which picks the target until one is chosen. */
+  val kind: IntakeKind
+    get() {
+      val (files, links) = entries.partition { it.source is IntakeSource.File }
+      return IntakeKind.of(urls = links.mapNotNull { it.url }, files = files.size)
+    }
+
   /** Status of [target], for its folders, free space and queue; `null` until it answers. */
   var targetStatus: KetchStatus? by mutableStateOf(null)
     private set
@@ -537,6 +572,9 @@ class IntakeSession internal constructor(
 
   /** Every device downloads can be added to. */
   val instances: StateFlow<List<InstanceEntry>> get() = state.instances
+
+  /** What each device is doing, which the target menu sums up. */
+  val presence: StateFlow<List<DevicePresence>> get() = state.instanceManager.presence
 
   /** What the sheet does with the clipboard; see [AppSettingsController.clipboardMode]. */
   val clipboardMode: ClipboardMode get() = state.appSettings.clipboardMode
@@ -614,13 +652,7 @@ class IntakeSession internal constructor(
   val cookieWarning: String?
     get() {
       val remote = target as? RemoteInstance ?: return null
-      val secret = entries.any { entry ->
-        effectiveHeaders(entry).keys.any { name ->
-          name.equals("Cookie", ignoreCase = true) ||
-            name.equals("Authorization", ignoreCase = true)
-        }
-      }
-      return if (secret) "Cookies from your browser will be sent to ${remote.label}." else null
+      return credentialWarning(entries.map(::effectiveHeaders), remote.label)
     }
 
   /** What happens once the rows are added, such as "Starts now · 1 of 2 slots free". */
@@ -684,13 +716,17 @@ class IntakeSession internal constructor(
   /** Starts the session: picks the target, prefills the input and starts the checks. */
   internal fun start() {
     val devices = state.instances.value
+    val seeds = request.seeds
+    val prefill = (seeds.map { it.url } + request.text.ifBlank { null }).filterNotNull()
+    val prefillKind = IntakeKind.of(
+      LinkParser.parseIntake(prefill.joinToString("\n")).links().map { it.url },
+    )
     val target = request.targetDeviceId?.let { id -> devices.firstOrNull { it.deviceId == id } }
+      ?: state.lastTarget(prefillKind)
       ?: state.activeInstance.value
     this.target = target
     if (target != null) loadDefaults(target)
-    val seeds = request.seeds
     seeds.forEach { seedsByUrl[it.url] = it }
-    val prefill = (seeds.map { it.url } + request.text.ifBlank { null }).filterNotNull()
     if (mode != IntakeMode.Add) bindTask()
     if (prefill.isNotEmpty()) text = TextFieldValue(prefill.joinToString("\n"))
     this.target?.let(::watch)
@@ -889,12 +925,23 @@ class IntakeSession internal constructor(
     if (fileEntries.any { (it.source as IntakeSource.File).file === file }) return
     val entry = IntakeEntry(IntakeSource.File(file, "file:${fileCount++}:${file.name}"))
     fileEntries = fileEntries + entry
+    followKind()
     request(entry)
   }
 
-  /** Sends downloads to [entry] instead, checking every row again there. */
+  /**
+   * Sends downloads to [entry] instead, checking every row again there; the next adds of the
+   * same [kind] go there too this session.
+   */
   fun selectTarget(entry: InstanceEntry) {
-    if (entry == target || mode != IntakeMode.Add) return
+    if (mode != IntakeMode.Add) return
+    targetChosen = true
+    state.rememberTarget(kind, entry)
+    retarget(entry)
+  }
+
+  private fun retarget(entry: InstanceEntry) {
+    if (entry == target) return
     target = entry
     targetStatus = null
     targetTasks = emptyList()
@@ -1009,6 +1056,7 @@ class IntakeSession internal constructor(
         }
       }
       saveDefaults(target)
+      if (results.any { it.third.isSuccess }) state.rememberTarget(kind, target)
       submitting = false
       onDone()
       reportAdded(target, results, skipped)
@@ -1299,8 +1347,16 @@ class IntakeSession internal constructor(
     val nextSet = next.toSet()
     previous.values.filter { it !in nextSet }.forEach { it.job?.cancel() }
     textEntries = next
+    followKind()
     refreshDuplicates()
     next.take(EAGER_RESOLVES).forEach(::request)
+  }
+
+  // Until a target is chosen, the rows go where the last add of their kind went.
+  private fun followKind() {
+    if (targetChosen || mode != IntakeMode.Add || entries.isEmpty()) return
+    val wanted = state.lastTarget(kind) ?: return
+    retarget(wanted)
   }
 
   private fun linkSource(item: IntakeItem.Link): IntakeSource.Link {

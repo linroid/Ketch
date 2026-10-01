@@ -52,6 +52,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.RowActionDialogs
 import com.linroid.ketch.app.ui.downloads.actions.SelectionBar
+import com.linroid.ketch.app.ui.downloads.actions.SendConfirmationDialog
 import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.list.DownloadList
@@ -105,9 +106,10 @@ data class KetchLayoutInfo(
 
 /**
  * The Downloads page: the header with search and the view toggles, the status tabs (or the
- * selection bar), the search's facets, and the tasks of the active device from
- * [AppState.taskList], as a table where a pointer has room for it and as two-line rows
- * elsewhere. Before the first download it shows the launchpad.
+ * selection bar), the search's facets, and the tasks of the shown device, or of every device
+ * with their Device column and pennants, from [AppState.taskList], as a table where a pointer
+ * has room for it and as two-line rows elsewhere. Before the first download it shows the
+ * launchpad.
  *
  * The inspector docks beside the table on cards from [KetchLayout.DockedInspectorWidth], floats
  * over the list on narrower ones and opens in a bottom sheet on phones. On phones the status
@@ -120,14 +122,17 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
     val actions = rememberListActions(view.rows, state)
     val page = remember(state, actions) { DownloadsPage(state, actions) }
     PageEffects(page, view)
-    BoxWithConstraints(modifier) {
-      if (layout.tier == LayoutTier.Compact) {
-        PhoneDownloads(page, view)
-      } else {
-        WideDownloads(page, view, layout, cardWidth = maxWidth)
+    CompositionLocalProvider(LocalShownDevices provides rememberShownDevices(state)) {
+      BoxWithConstraints(modifier) {
+        if (layout.tier == LayoutTier.Compact) {
+          PhoneDownloads(page, view)
+        } else {
+          WideDownloads(page, view, layout, cardWidth = maxWidth)
+        }
       }
     }
     RowActionDialogs(actions.runner)
+    SendConfirmationDialog(state)
   }
 }
 
@@ -271,6 +276,9 @@ private enum class PageContent {
   /** A remote device that cannot be reached and has sent no downloads yet. */
   Offline,
 
+  /** Every device shows, and none has downloads. */
+  FleetEmpty,
+
   /** A tab or search that matches nothing. */
   Empty,
 
@@ -279,7 +287,7 @@ private enum class PageContent {
 
   /** Whether the device has no downloads to show at all, so the tabs and inspector stay away. */
   val isBare: Boolean
-    get() = this == Launchpad || this == RemoteEmpty || this == Offline
+    get() = this == Launchpad || this == RemoteEmpty || this == Offline || this == FleetEmpty
 }
 
 @Composable
@@ -288,9 +296,11 @@ private fun pageContent(state: AppState, view: TaskListView): PageContent {
   val tasks by state.tasks.collectAsState()
   val active by state.activeInstance.collectAsState()
   val connection by state.connectionState.collectAsState()
+  val shown = LocalShownDevices.current
   val remote = active is RemoteInstance
   return when {
     tasks.isEmpty() && rows.isEmpty() -> when {
+      shown.several -> PageContent.FleetEmpty
       !remote -> PageContent.Launchpad
       connection == ConnectionState.Connecting -> PageContent.Loading
       connection is ConnectionState.Disconnected ||
@@ -463,6 +473,7 @@ private fun PageBody(
       },
     )
     PageContent.Launchpad -> Launchpad(state, phone)
+    PageContent.FleetEmpty -> EmptyMessage(fleetEmptyCopy(deviceName), onAction)
     PageContent.RemoteEmpty -> EmptyMessage(remoteEmptyCopy(deviceName), onAction)
     PageContent.Offline -> {
       val connection by state.connectionState.collectAsState()
@@ -474,12 +485,14 @@ private fun PageBody(
         filter = view.filter,
         query = state.searchQuery,
         deviceName = deviceName,
-        slots = state.instanceSettings.download?.maxConcurrentDownloads,
+        slots = state.instanceSettings.download?.maxConcurrentDownloads
+          .takeUnless { LocalShownDevices.current.several },
       ),
       onAction = onAction,
     )
     PageContent.Rows -> if (showsTable) {
       val filter = view.filter
+      val devices = LocalShownDevices.current
       DownloadTable(
         view = view,
         actions = page.actions,
@@ -487,6 +500,7 @@ private fun PageBody(
         listState = page.listState,
         layout = page.tableLayout(filter),
         onLayoutChange = { page.saveTableLayout(filter, it) },
+        autoColumns = if (devices.several) setOf(TableColumn.Device) else emptySet(),
         onSort = { key -> page.arrange(nextArrangement(view.arrangement, key)) },
         onAddToken = { token ->
           state.searchQuery = (SearchQuery.parse(state.searchQuery) + token).format()

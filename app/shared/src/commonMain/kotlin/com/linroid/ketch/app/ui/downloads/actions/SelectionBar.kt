@@ -177,7 +177,8 @@ internal fun SelectionBar(
   compact: Boolean = false,
 ) {
   val instances by runner.state.instances.collectAsState()
-  val devices = remember(instances, rows) { sendTargets(instances, rows) }
+  val presence by runner.state.instanceManager.presence.collectAsState()
+  val devices = remember(instances, rows, presence) { sendTargets(instances, rows, presence) }
   val batch = remember(rows) { runner.batch(rows) }
   val (bar, more) = barVerbs(batch, devices.isNotEmpty(), runner.files?.revealLabel)
   val context = RowMenuContext(
@@ -186,6 +187,7 @@ internal fun SelectionBar(
     now = LocalClock.current.now(),
     zone = TimeZone.currentSystemDefault(),
     urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
+    send = rememberSendMode(),
   )
   if (compact) {
     CompactSelectionBar(rows, bar + more, runner, context, onClear, onSelectAll, modifier)
@@ -406,7 +408,7 @@ private fun KetchMenuScope.verbChoices(
   when (verb.kind) {
     BarVerbKind.Priority -> priorityEntries(verb.rows, runner, context.urgentVictim)
     BarVerbKind.Speed -> speedEntries(verb.rows, runner)
-    BarVerbKind.SendTo -> sendEntries(verb.rows, runner, context.devices)
+    BarVerbKind.SendTo -> sendEntries(verb.rows, runner, context.devices, context.send)
     BarVerbKind.Connections -> {
       connectionEntries(verb.rows, runner, peers = verb.rows.all { it.isTorrent })
     }

@@ -134,7 +134,7 @@ class InspectorRenderTest {
   @Test
   fun inspector_urgentWithEverySlotTaken_asksBeforeStarting() {
     inspectSample(QUEUED) { state, key, scene ->
-      val starting = "start $QUEUED now"
+      val starting = "start now"
       scene.press(scene.centerOf("Urgent"))
       scene.release(scene.centerOf("Urgent"))
       frames(scene, 300.milliseconds)

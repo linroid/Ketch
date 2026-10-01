@@ -60,6 +60,8 @@ import com.linroid.ketch.app.components.startTimeLabel
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.input.KetchCommands
+import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -73,12 +75,13 @@ import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.UserAgentChoice
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.folderLabel
+import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.priorityLabel
 import kotlinx.datetime.TimeZone
 
@@ -426,18 +429,22 @@ private fun AdvancedToggle(session: IntakeSession) {
   )
 }
 
-/** The pill that picks the device downloads go to; shown with two devices or more. */
+/**
+ * The pill that picks the device downloads go to; shown with two devices or more. Each device
+ * in its menu says what it is doing, such as "1.8 TB free · 2 active · Slow lane", and the
+ * chord that picks it while the sheet is open.
+ */
 @Composable
 internal fun TargetChip(session: IntakeSession, instances: List<InstanceEntry>) {
-  val options = instances.map { entry ->
+  val presence by session.presence.collectAsState()
+  val options = instances.mapIndexed { index, entry ->
     key(entry.deviceId) {
       val health = when (entry) {
         is RemoteInstance -> entry.connectionState.collectAsState().value.toDeviceHealth()
         else -> DeviceHealth.Local()
       }
-      val summary = if (entry == session.target) {
+      val free = if (entry == session.target) {
         session.targetStatus?.system?.usableSpace?.takeIf { it > 0 }
-          ?.let { "${freeSpace(it)} free" }
       } else {
         null
       }
@@ -446,7 +453,9 @@ internal fun TargetChip(session: IntakeSession, instances: List<InstanceEntry>) 
         name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label,
         health = health,
         pennantName = entry.label,
-        summary = summary,
+        summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId }, free),
+        shortcut = (index + 1).takeIf { it <= MAX_TARGET_SHORTCUTS }
+          ?.let { KetchCommands.intakeTarget(it).shortcutLabel() },
       )
     }
   }
@@ -653,9 +662,25 @@ private fun ExtraHeader(row: HeaderRow, onChange: () -> Unit, onRemove: () -> Un
   }
 }
 
-/** Free space in whole gigabytes once there are ten or more, such as "412 GB". */
-internal fun freeSpace(bytes: Long): String =
-  if (bytes >= 10 * GIB) "${bytes / GIB} GB" else formatBytes(bytes)
+/**
+ * What a device in the target menu is doing: "1.8 TB free · 2 active · Slow lane", from its
+ * [presence], with [free] bytes when the sheet read them more recently; `null` when nothing is
+ * known yet.
+ */
+internal fun targetSummary(presence: DevicePresence?, free: Long? = null): String? {
+  val usable = free ?: presence?.disk?.usableBytes?.takeIf { it > 0 }
+  val active = presence?.counts?.downloading ?: 0
+  return listOfNotNull(
+    usable?.let { "${freeSpace(it)} free" },
+    "$active active".takeIf { active > 0 },
+    "Slow lane".takeIf { presence?.speedMode?.isSlowLane == true },
+  ).joinToString(" · ").ifEmpty { null }
+}
+
+private const val MAX_TARGET_SHORTCUTS = 9
+
+/** Free space as the Pulse bar says it, such as "412 GB", "3.1 GB" or "1.6 TB". */
+internal fun freeSpace(bytes: Long): String = formatSpace(bytes)
 
 private fun priorityCaption(priority: DownloadPriority): String = when (priority) {
   DownloadPriority.LOW -> "Runs when nothing else is waiting"
@@ -671,6 +696,5 @@ private val PRIORITIES = listOf(
   DownloadPriority.URGENT,
 )
 
-private const val GIB = 1L shl 30
 private const val SECRET_LINES = 3
 private const val HEADER_NAME_WEIGHT = 0.4f

@@ -48,7 +48,9 @@ import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchPillGroup
 import com.linroid.ketch.app.components.KetchPillItem
+import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.KetchTextField
+import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
@@ -124,8 +126,13 @@ internal fun DownloadsHeader(
       return@Row
     }
     Title(page)
-    Box(Modifier.weight(1f)) {
-      if (showDevice) DeviceChip(state)
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+      modifier = Modifier.weight(1f),
+    ) {
+      if (showDevice) DeviceChip(state, Modifier.weight(1f, fill = false))
+      ResolvingChip(state)
     }
     if (collapsed) {
       KetchIconButton(
@@ -226,12 +233,16 @@ private fun Title(page: DownloadsPage) {
   }
 }
 
-/** The active device as a chip that opens the device switcher. */
+/**
+ * The shown device as a chip that opens the device switcher: the active one, or "All devices"
+ * with their pennants stacked while every device shows.
+ */
 @Composable
-private fun DeviceChip(state: AppState) {
+private fun DeviceChip(state: AppState, modifier: Modifier = Modifier) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val active by state.activeInstance.collectAsState()
+  val devices = LocalShownDevices.current
   val entry = active ?: return
   val shape = KetchTheme.shapes.full
   val interactions = remember { MutableInteractionSource() }
@@ -240,7 +251,7 @@ private fun DeviceChip(state: AppState) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s1),
-    modifier = Modifier
+    modifier = modifier
       .focusRing(focus.visible, shape, colors.focusRing)
       .height(KetchTheme.density.chip)
       .widthIn(max = DeviceChipMaxWidth)
@@ -258,13 +269,17 @@ private fun DeviceChip(state: AppState) {
       )
       .padding(start = spacing.s1, end = spacing.s2),
   ) {
-    DevicePennant(
-      deviceId = entry.deviceId,
-      name = entry.label,
-      size = DevicePennantDefaults.Small,
-    )
+    if (devices.several) {
+      StackedPennants(devices.ids.map { it to devices.pennantName(it, it) })
+    } else {
+      DevicePennant(
+        deviceId = entry.deviceId,
+        name = entry.label,
+        size = DevicePennantDefaults.Small,
+      )
+    }
     Text(
-      text = entry.displayName,
+      text = if (devices.several) "All devices" else entry.displayName,
       style = KetchTheme.typography.labelS,
       color = colors.textPrimary,
       maxLines = 1,
@@ -358,6 +373,7 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
   val rows by state.taskList.rows.collectAsState()
   var open by remember { mutableStateOf(false) }
   val visible = actions.rows
+  val auto = if (LocalShownDevices.current.several) setOf(TableColumn.Device) else emptySet()
   Box {
     KetchIconButton(
       icon = KetchIcon.More,
@@ -402,9 +418,9 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
       )
       divider()
       submenu(label = "Columns", icon = KetchIcon.Columns, enabled = showsTable) {
-        columnChooser(page.tableLayout(state.statusFilter)) {
+        columnChooser(page.tableLayout(state.statusFilter), autoColumns = auto, onLayoutChange = {
           page.saveTableLayout(state.statusFilter, it)
-        }
+        })
       }
       submenu(label = "Row density", icon = KetchIcon.Lanes, enabled = showsTable) {
         for (density in RowDensity.entries) {
@@ -415,6 +431,52 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
           )
         }
       }
+    }
+  }
+}
+
+/**
+ * "Resolving 1" while torrents left to finish in the background still fetch their file lists;
+ * clicking it opens their add sheet again.
+ */
+@Composable
+private fun ResolvingChip(state: AppState) {
+  val session = state.intake.background ?: return
+  val count = session.entries.count { it.isTorrent && it.waitsForFiles }
+  if (count == 0) return
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val shape = KetchTheme.shapes.full
+  val interactions = remember { MutableInteractionSource() }
+  val overlay = rememberInteractionOverlay(interactions)
+  val focus = rememberFocusVisibility()
+  KetchTooltip(text = "Fetching file lists from peers · click to choose files") {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s1),
+      modifier = Modifier
+        .focusRing(focus.visible, shape, colors.focusRing)
+        .height(KetchTheme.density.chip)
+        .clip(shape)
+        .background(colors.accentSoft)
+        .background(overlay)
+        .trackFocusVisibility(focus)
+        .clickable(
+          interactionSource = interactions,
+          indication = null,
+          role = Role.Button,
+          onClickLabel = "Show the add sheet",
+          onClick = { state.intake.resume(session) },
+        )
+        .padding(horizontal = spacing.s2),
+    ) {
+      KetchSpinner(size = spacing.s3, color = colors.accentText)
+      Text(
+        text = "Resolving $count",
+        style = KetchTheme.typography.labelS,
+        color = colors.accentText,
+        maxLines = 1,
+      )
     }
   }
 }
