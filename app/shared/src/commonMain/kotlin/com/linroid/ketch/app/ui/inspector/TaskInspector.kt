@@ -34,7 +34,6 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionDialogs
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.rememberRowActionRunner
-import com.linroid.ketch.app.ui.downloads.actions.sendTargets
 import com.linroid.ketch.app.ui.inspector.tabs.ActivityTab
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.FilesTab
@@ -153,7 +152,6 @@ private fun TaskView(
   val stalled = remember(rates, row.key) {
     rates[row.key].orEmpty().filter { it.stalledFor != null }.mapTo(HashSet()) { it.start }
   }
-  val targets = remember(instances, row.key) { sendTargets(instances, listOf(row)) }
   var highlight by remember { mutableStateOf<Long?>(null) }
   LaunchedEffect(row.state is DownloadState.Completed) { runner.checkFile(row) }
 
@@ -169,7 +167,7 @@ private fun TaskView(
     },
     onClose = onClose,
   )
-  ActionBar(state, row, runner, targets)
+  ActionBar(state, row, runner, instances)
   val tabs = rememberInspectorTabs(state, row)
   val shown = if (tab in tabs) tab else InspectorTab.Overview
   if (tabs.size > 1) {
