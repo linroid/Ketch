@@ -85,17 +85,23 @@ internal fun fitMiddle(
   return best
 }
 
-/** [text] cut to [kept] characters around an ellipsis, keeping its extension when it can. */
+/**
+ * [text] cut to [kept] characters around an ellipsis, keeping its extension when it can.
+ * Separators next to the ellipsis are dropped, so "2024.2.1.…" reads "2024.2.1…".
+ */
 internal fun middleEllipsis(text: String, kept: Int): String {
   if (kept >= text.length) return text
   val dot = text.lastIndexOf('.')
   val extension = if (dot > 0 && text.length - dot <= MAX_EXTENSION) text.length - dot else 0
   val tail = minOf(kept, maxOf(kept / 3, extension + TAIL_CONTEXT))
-  val head = kept - tail
-  return text.take(head) + ELLIPSIS + text.takeLast(tail)
+  val head = text.take(kept - tail).trimEnd { it in SEPARATORS }
+  // A leading dot may be the extension's own, so the tail keeps it.
+  val end = text.takeLast(tail).trimStart { it != '.' && it in SEPARATORS }
+  return head + ELLIPSIS + end
 }
 
 private const val ELLIPSIS = "…"
+private const val SEPARATORS = ".-_ "
 private const val MAX_EXTENSION = 8
 private const val TAIL_CONTEXT = 4
 private const val MEASURE_CACHE = 16

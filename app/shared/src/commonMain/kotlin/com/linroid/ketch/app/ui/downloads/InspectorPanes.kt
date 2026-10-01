@@ -79,7 +79,7 @@ internal fun DockedInspector(
   val dragged by interactions.collectIsDraggedAsState()
   val line = if (hovered || dragged) colors.borderStrong else colors.hairline
   Row(modifier.fillMaxHeight()) {
-    Box(Modifier.width(1.dp).fillMaxHeight().drawBehind { drawRect(line) })
+    Box(Modifier.width(HairlineWidth).fillMaxHeight().drawBehind { drawRect(line) })
     Box(Modifier.width(width).fillMaxHeight().background(colors.surface)) {
       TaskInspector(state, taskKey, InspectorPlacement.Docked, onClose)
       ResizeHandle(

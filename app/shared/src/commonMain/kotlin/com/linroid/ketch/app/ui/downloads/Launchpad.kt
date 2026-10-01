@@ -276,7 +276,7 @@ private fun LaunchTile(
     .clip(shape)
     .background(colors.surface)
     .background(overlay)
-    .border(1.dp, colors.hairline, shape)
+    .border(HairlineWidth, colors.hairline, shape)
     .trackFocusVisibility(focus)
     .clickable(
       interactionSource = interactions,
@@ -441,7 +441,7 @@ private fun SetupChecklist(state: AppState, hooks: DesktopHooks, modifier: Modif
         .fillMaxWidth()
         .padding(top = spacing.s1)
         .background(colors.surface, KetchTheme.shapes.lg)
-        .border(1.dp, colors.hairline, KetchTheme.shapes.lg)
+        .border(HairlineWidth, colors.hairline, KetchTheme.shapes.lg)
         .padding(vertical = spacing.s1),
     ) {
       items.forEach { ChecklistRow(it) }

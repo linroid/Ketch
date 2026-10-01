@@ -43,6 +43,7 @@ import com.linroid.ketch.app.state.ListArrangement
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.RowGroup
+import com.linroid.ketch.app.state.SelectionState
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskListView
 import com.linroid.ketch.app.state.TaskRow
@@ -51,6 +52,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.RowActionDialogs
 import com.linroid.ketch.app.ui.downloads.actions.SelectionBar
+import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.list.GroupCollapse
@@ -231,6 +233,17 @@ private fun PageEffects(page: DownloadsPage, view: TaskListView) {
       selected = now
     }
   }
+  val pointer = KetchTheme.density == KetchDensity.Compact
+  LaunchedEffect(state, pointer) {
+    if (!pointer) return@LaunchedEffect
+    // A row shown from elsewhere, such as the Activity popover or the menu bar, is selected too,
+    // so it stands out and scrolls into view as a clicked row does.
+    snapshotFlow { state.inspectedTask }.collect { key ->
+      if (key != null && actions.selection.count == 0 && key in actions.visibleKeys) {
+        actions.selection.update(SelectionState().select(key))
+      }
+    }
+  }
   LaunchedEffect(page) {
     snapshotFlow {
       val keyboard = actions.keyboard
@@ -254,11 +267,18 @@ private enum class PageContent {
   /** A remote device without downloads. */
   RemoteEmpty,
 
+  /** A remote device that cannot be reached and has sent no downloads yet. */
+  Offline,
+
   /** A tab or search that matches nothing. */
   Empty,
 
   /** The table or the list. */
-  Rows,
+  Rows;
+
+  /** Whether the device has no downloads to show at all, so the tabs and inspector stay away. */
+  val isBare: Boolean
+    get() = this == Launchpad || this == RemoteEmpty || this == Offline
 }
 
 @Composable
@@ -270,9 +290,11 @@ private fun pageContent(state: AppState, view: TaskListView): PageContent {
   val remote = active is RemoteInstance
   return when {
     tasks.isEmpty() && rows.isEmpty() -> when {
-      remote && connection == ConnectionState.Connecting -> PageContent.Loading
-      remote -> PageContent.RemoteEmpty
-      else -> PageContent.Launchpad
+      !remote -> PageContent.Launchpad
+      connection == ConnectionState.Connecting -> PageContent.Loading
+      connection is ConnectionState.Disconnected ||
+        connection == ConnectionState.Unauthorized -> PageContent.Offline
+      else -> PageContent.RemoteEmpty
     }
     rows.isEmpty() -> PageContent.Blank
     view.rows.isNotEmpty() -> PageContent.Rows
@@ -294,13 +316,13 @@ private fun WideDownloads(
   val ui = state.appSettings.ui
   val instances by state.instances.collectAsState()
   val content = pageContent(state, view)
-  val firstRun = content == PageContent.Launchpad || content == PageContent.RemoteEmpty
+  val firstRun = content.isBare
   val docked = cardWidth >= DockedInspectorWidth
   var draggedWidth by remember { mutableStateOf<Dp?>(null) }
   val inspectorWidth = (draggedWidth ?: ui.inspectorWidth.dp)
     .coerceIn(spacing.inspectorMinWidth, spacing.inspectorMaxWidth)
   val dockedOpen = docked && state.inspectorOpen && !firstRun
-  val tableWidth = if (dockedOpen) cardWidth - inspectorWidth - 1.dp else cardWidth
+  val tableWidth = if (dockedOpen) cardWidth - inspectorWidth - HairlineWidth else cardWidth
   val pointer = KetchTheme.density == KetchDensity.Compact
   val tableFits = pointer && tableWidth >= TableColumn.TableMinWidth
   val showsTable = tableFits && page.viewMode != DownloadsLayout.List
@@ -317,9 +339,10 @@ private fun WideDownloads(
       showDevice = showDevice,
       tableFits = tableFits,
       showsTable = showsTable,
+      hasRows = !firstRun,
     )
     if (!firstRun) TabArea(page, view, showsTable)
-    if (!view.query.isEmpty) {
+    if (!firstRun && !view.query.isEmpty) {
       val onTab = rowsOnTab(state, view.filter)
       FacetRow(
         query = view.query,
@@ -418,6 +441,18 @@ private fun PageBody(
   val active by state.activeInstance.collectAsState()
   val deviceName = active?.displayName ?: localDeviceNoun()
   val bottom = if (phone) FabClearance else spacing.s4
+  val onAction: (EmptyAction) -> Unit = { action ->
+    when (action) {
+      EmptyAction.ClearSearch -> state.searchQuery = ""
+      EmptyAction.ShowAll -> state.statusFilter = StatusFilter.All
+      EmptyAction.Add -> state.openIntake()
+      EmptyAction.AddLinks -> {
+        val text = state.searchQuery
+        state.searchQuery = ""
+        state.openIntake(IntakeRequest(text = text))
+      }
+    }
+  }
   when (content) {
     PageContent.Blank -> Box(Modifier.fillMaxSize())
     PageContent.Loading -> SkeletonRows(
@@ -427,7 +462,12 @@ private fun PageBody(
       },
     )
     PageContent.Launchpad -> Launchpad(state, phone)
-    PageContent.RemoteEmpty -> RemoteEmpty(deviceName, onAdd = { state.openIntake() })
+    PageContent.RemoteEmpty -> EmptyMessage(remoteEmptyCopy(deviceName), onAction)
+    PageContent.Offline -> {
+      val connection by state.connectionState.collectAsState()
+      val unauthorized = connection == ConnectionState.Unauthorized
+      EmptyMessage(offlineCopy(deviceName, unauthorized), onAction)
+    }
     PageContent.Empty -> EmptyMessage(
       copy = emptyCopy(
         filter = view.filter,
@@ -435,17 +475,7 @@ private fun PageBody(
         deviceName = deviceName,
         slots = state.instanceSettings.download?.maxConcurrentDownloads,
       ),
-      onAction = { action ->
-        when (action) {
-          EmptyAction.ClearSearch -> state.searchQuery = ""
-          EmptyAction.ShowAll -> state.statusFilter = StatusFilter.All
-          EmptyAction.AddLinks -> {
-            val text = state.searchQuery
-            state.searchQuery = ""
-            state.openIntake(IntakeRequest(text = text))
-          }
-        }
-      },
+      onAction = onAction,
     )
     PageContent.Rows -> if (showsTable) {
       val filter = view.filter
@@ -512,9 +542,12 @@ private fun PhoneDownloads(page: DownloadsPage, view: TaskListView) {
   val content = pageContent(state, view)
   val chips = remember { CollapsingChips() }
   val selected = actions.selectedRows
+  // With a pointer, as in a narrow browser window, a click selects the row it shows.
+  val pointer = KetchTheme.density == KetchDensity.Compact
+  val selecting = isSelectionMode(actions.selection.count, pointer)
   Box(Modifier.fillMaxSize().nestedScroll(chips.connection)) {
     Column(Modifier.fillMaxSize()) {
-      if (content != PageContent.Launchpad && content != PageContent.RemoteEmpty) {
+      if (!content.isBare) {
         chips.Bar {
           StatusChips(
             selected = view.filter,
@@ -536,7 +569,7 @@ private fun PhoneDownloads(page: DownloadsPage, view: TaskListView) {
       Box(Modifier.weight(1f).fillMaxWidth()) {
         PageBody(page, view, content, showsTable = false, phone = true)
       }
-      if (selected.isNotEmpty()) {
+      if (selecting && selected.isNotEmpty()) {
         SelectionBar(
           rows = selected,
           runner = actions.runner,
@@ -548,7 +581,7 @@ private fun PhoneDownloads(page: DownloadsPage, view: TaskListView) {
     }
   }
   val inspected = state.inspectedTask
-  if (inspected != null && actions.selection.count == 0) {
+  if (inspected != null && !selecting) {
     SheetInspector(state, inspected, onClose = { state.inspect(null) })
   }
 }
@@ -558,3 +591,6 @@ internal val DockedInspectorWidth: Dp = 1040.dp
 
 /** Room a phone list leaves under its last row for the floating Add button. */
 internal val FabClearance: Dp = 88.dp
+
+/** Width of the 1 dp lines that frame the page's parts. */
+internal val HairlineWidth: Dp = 1.dp

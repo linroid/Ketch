@@ -80,6 +80,8 @@ import com.linroid.ketch.config.DownloadsLayout
  * @param showDevice whether to show the device chip.
  * @param tableFits whether the table has room, so the view can be picked.
  * @param showsTable whether the page shows the table rather than list rows.
+ * @param hasRows whether the device has downloads to show; without any, the view and inspector
+ *   toggles stay away.
  */
 @Composable
 internal fun DownloadsHeader(
@@ -89,6 +91,7 @@ internal fun DownloadsHeader(
   tableFits: Boolean,
   showsTable: Boolean,
   modifier: Modifier = Modifier,
+  hasRows: Boolean = true,
 ) {
   val state = page.state
   val spacing = KetchTheme.spacing
@@ -133,35 +136,7 @@ internal fun DownloadsHeader(
     } else {
       SearchField(page, fill = false)
     }
-    if (tableFits) {
-      KetchPillGroup(
-        listOf(
-          KetchPillItem(
-            icon = KetchIcon.All,
-            label = "List",
-            onClick = { page.saveViewMode(DownloadsLayout.List) },
-            selected = !showsTable,
-          ),
-          KetchPillItem(
-            icon = KetchIcon.Columns,
-            label = "Table",
-            onClick = { page.saveViewMode(DownloadsLayout.Table) },
-            selected = showsTable,
-          ),
-          KetchPillItem(
-            command = KetchCommands.ToggleInspector,
-            onClick = { state.updateInspectorOpen(!state.inspectorOpen) },
-            selected = state.inspectorOpen,
-          )
-        )
-      )
-    } else {
-      KetchIconButton(
-        command = KetchCommands.ToggleInspector,
-        onClick = { state.updateInspectorOpen(!state.inspectorOpen) },
-        selected = state.inspectorOpen,
-      )
-    }
+    if (hasRows) ViewToggles(page, tableFits, showsTable)
     OverflowMenu(page, showsTable)
     KetchButton(
       text = "Add",
@@ -169,6 +144,44 @@ internal fun DownloadsHeader(
       leadingIcon = KetchIcon.Plus,
       tooltip = KetchCommands.Add.label,
       shortcut = KetchCommands.Add.shortcutLabel(),
+    )
+  }
+}
+
+/**
+ * The List and Table toggles with the inspector's, where the table fits; elsewhere only the
+ * inspector's.
+ */
+@Composable
+private fun ViewToggles(page: DownloadsPage, tableFits: Boolean, showsTable: Boolean) {
+  val state = page.state
+  if (tableFits) {
+    KetchPillGroup(
+      listOf(
+        KetchPillItem(
+          icon = KetchIcon.All,
+          label = "List",
+          onClick = { page.saveViewMode(DownloadsLayout.List) },
+          selected = !showsTable,
+        ),
+        KetchPillItem(
+          icon = KetchIcon.Columns,
+          label = "Table",
+          onClick = { page.saveViewMode(DownloadsLayout.Table) },
+          selected = showsTable,
+        ),
+        KetchPillItem(
+          command = KetchCommands.ToggleInspector,
+          onClick = { state.updateInspectorOpen(!state.inspectorOpen) },
+          selected = state.inspectorOpen,
+        )
+      )
+    )
+  } else {
+    KetchIconButton(
+      command = KetchCommands.ToggleInspector,
+      onClick = { state.updateInspectorOpen(!state.inspectorOpen) },
+      selected = state.inspectorOpen,
     )
   }
 }
@@ -234,7 +247,7 @@ private fun DeviceChip(state: AppState) {
       .clip(shape)
       .background(colors.surface)
       .background(overlay)
-      .border(1.dp, colors.borderStrong, shape)
+      .border(HairlineWidth, colors.borderStrong, shape)
       .trackFocusVisibility(focus)
       .clickable(
         interactionSource = interactions,

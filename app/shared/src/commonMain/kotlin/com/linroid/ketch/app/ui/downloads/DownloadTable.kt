@@ -240,7 +240,7 @@ private fun TableHeader(
         onSort = onSort,
         modifier = Modifier.weight(1f),
       )
-      for ((index, setting) in columns.withIndex()) {
+      for (setting in columns) {
         val column = setting.column
         Box(Modifier.width(setting.width).fillMaxHeight()) {
           HeaderCell(
@@ -255,8 +255,7 @@ private fun TableHeader(
             width = setting.width,
             onResize = { onResize(column, it) },
             onResizeEnd = onResizeEnd,
-            showLine = index < columns.lastIndex,
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier.align(Alignment.CenterStart),
           )
         }
       }
@@ -390,15 +389,15 @@ private fun SortChevron(descending: Boolean, tint: Color) {
 }
 
 /**
- * The 6 dp handle at a header cell's end that drags the column's width, drawn as a short
- * separator unless it is the last column's.
+ * The 6 dp handle on the boundary before a column, drawn as a short separator. The columns after
+ * Name keep to the table's end, so dragging the boundary toward Name widens the column and the
+ * boundary follows the pointer.
  */
 @Composable
 private fun ResizeHandle(
   width: Dp,
   onResize: (Dp) -> Unit,
   onResizeEnd: () -> Unit,
-  showLine: Boolean,
   modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
@@ -408,11 +407,7 @@ private fun ResizeHandle(
   var start by remember { mutableStateOf(width) }
   var moved by remember { mutableStateOf(0f) }
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  val line = when {
-    hovered -> colors.borderStrong
-    showLine -> colors.hairline
-    else -> Color.Transparent
-  }
+  val line = if (hovered) colors.borderStrong else colors.hairline
   Box(
     modifier = modifier
       .width(ResizeHandleWidth)
@@ -420,7 +415,7 @@ private fun ResizeHandle(
       .hoverable(interactions)
       .draggable(
         state = rememberDraggableState { delta ->
-          moved += if (rtl) -delta else delta
+          moved += if (rtl) delta else -delta
           onResize(start + with(pixels) { moved.toDp() })
         },
         orientation = Orientation.Horizontal,
@@ -431,7 +426,9 @@ private fun ResizeHandle(
         onDragStopped = { onResizeEnd() },
       )
       .drawBehind {
-        val x = size.width / 2
+        // On the boundary itself, as far from the labels on either side.
+        val half = density / 2
+        val x = if (layoutDirection == LayoutDirection.Ltr) half else size.width - half
         val inset = size.height / 4
         drawLine(line, Offset(x, inset), Offset(x, size.height - inset), strokeWidth = density)
       },
@@ -537,9 +534,16 @@ private fun NameCell(
     )
     PriorityGlyph(row.request.priority, Modifier.padding(start = spacing.s1))
     val limit = row.request.speedLimit
-    if (!limit.isUnlimited) CapPill(formatSpeedLimit(limit), Modifier.padding(start = spacing.s1))
+    if (!limit.isUnlimited && row.state.isLive) {
+      CapPill(formatSpeedLimit(limit), Modifier.padding(start = spacing.s1))
+    }
   }
 }
+
+/** Whether a task in this state can still download, so a speed cap still applies to it. */
+private val DownloadState.isLive: Boolean
+  get() = this is DownloadState.Downloading || this is DownloadState.Paused ||
+    this is DownloadState.Queued || this is DownloadState.Scheduled
 
 /** A per-task speed cap after the name, such as "2 MB/s". */
 @Composable
