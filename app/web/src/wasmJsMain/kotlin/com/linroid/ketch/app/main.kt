@@ -44,11 +44,11 @@ fun main() {
   // The server that serves this page. A pairing link to it (`http://host:port/#token=…`) holds
   // the access code in the fragment, which leaves the address before anything can show or keep
   // it.
-  val page = PairingLink.parse(window.location.href)
+  val launchUrl = window.location.href
+  val page = PairingLink.parse(launchUrl)
   clearPairingCode()
   // Links the page was opened with, from the magnet protocol handler or the share target. They
   // leave the address at once, so a reload does not add them again.
-  val launchUrl = window.location.href
   incoming.offerLaunchLinks(launchUrl)
   clearLaunchLinks()
   var loadLaunch: String? = launchUrl
