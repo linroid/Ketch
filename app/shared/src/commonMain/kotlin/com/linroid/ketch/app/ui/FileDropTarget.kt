@@ -117,8 +117,9 @@ internal fun FileDropTarget(
 }
 
 /**
- * What a drag over the app shows: one berth to drop links, magnets, `.torrent` files and lists of
- * links on. A [compact] berth fits small areas such as a dialog body.
+ * What a drag over the app shows: the app fades behind the overlay, and one berth in the middle
+ * names what can be dropped (links, magnets, `.torrent` files and lists of links), which is taken
+ * wherever it lands. A [compact] berth fills small areas such as a dialog body.
  */
 @Composable
 internal fun DropOverlay(compact: Boolean, modifier: Modifier = Modifier) {
@@ -127,6 +128,7 @@ internal fun DropOverlay(compact: Boolean, modifier: Modifier = Modifier) {
   val shape = KetchTheme.shapes.lg
   val tile = if (compact) spacing.s8 else spacing.s12
   Box(
+    contentAlignment = Alignment.Center,
     modifier = modifier
       .fillMaxSize()
       .background(colors.surfaceRaised.copy(alpha = OVERLAY_ALPHA))
@@ -134,11 +136,14 @@ internal fun DropOverlay(compact: Boolean, modifier: Modifier = Modifier) {
   ) {
     Column(
       modifier = Modifier
-        .fillMaxSize()
+        .then(if (compact) Modifier.fillMaxSize() else Modifier)
         .clip(shape)
         .background(colors.accentSoft)
         .dashedOutline(colors.accent, shape)
-        .padding(horizontal = spacing.s6, vertical = spacing.s4),
+        .padding(
+          horizontal = if (compact) spacing.s6 else spacing.s8,
+          vertical = if (compact) spacing.s4 else spacing.s10,
+        ),
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.CenterVertically),
     ) {
@@ -182,7 +187,7 @@ private fun Modifier.dashedOutline(color: Color, shape: Shape): Modifier = drawW
   }
 }
 
-/** The overlay lets the app show through faintly, so the drop stays in context. */
+/** The overlay lets the app show through faintly around the berth, so the drop keeps context. */
 private const val OVERLAY_ALPHA = 0.96f
 private val OutlineWidth = 1.5.dp
 private val OutlineDash = 6.dp

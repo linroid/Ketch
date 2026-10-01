@@ -124,6 +124,20 @@ class FileDropJvmTest {
     assertFalse(FakeTransferable(mapOf(DataFlavor.imageFlavor to Any())).isDroppable())
   }
 
+  @Test
+  fun isDroppable_rowsDraggedOutOfTheList_isFalse() {
+    val keys = DataFlavor("application/x-ketch-tasks;class=java.lang.String")
+    val rows = FakeTransferable(
+      mapOf(
+        uriList to "https://a.org/u.iso\r\n",
+        DataFlavor.stringFlavor to "https://a.org/u.iso",
+        keys to "ketch-task://local/1",
+      ),
+    )
+
+    assertFalse(rows.isDroppable())
+  }
+
   private fun fileList(vararg files: File) =
     FakeTransferable(mapOf(DataFlavor.javaFileListFlavor to files.toList()))
 

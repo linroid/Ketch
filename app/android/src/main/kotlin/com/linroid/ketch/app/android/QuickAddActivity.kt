@@ -2,6 +2,7 @@ package com.linroid.ketch.app.android
 
 import android.app.Application
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.res.Configuration
@@ -17,7 +18,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -53,18 +53,6 @@ import kotlin.time.Duration.Companion.seconds
 class QuickAddActivity : ComponentActivity() {
 
   private val model: QuickAddModel by viewModels()
-  private var service: KetchService? by mutableStateOf(null)
-  private var bound = false
-
-  private val connection = object : ServiceConnection {
-    override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-      service = (binder as KetchService.LocalBinder).service
-    }
-
-    override fun onServiceDisconnected(name: ComponentName) {
-      service = null
-    }
-  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -86,17 +74,11 @@ class QuickAddActivity : ComponentActivity() {
         return
       }
     }
-    bound = bindService(Intent(this, KetchService::class.java), connection, BIND_AUTO_CREATE)
+    model.connect()
     setContent {
-      val svc = service ?: return@setContent
-      val controller = remember(svc) { model.controllerFor(svc) }
+      val controller = model.controller ?: return@setContent
       QuickAddSheet(controller, onClosed = ::finish)
     }
-  }
-
-  override fun onDestroy() {
-    super.onDestroy()
-    if (bound) unbindService(connection)
   }
 
   /** The text of a share, or the selection sent with "Download with Ketch". */
@@ -139,11 +121,13 @@ private fun QuickAddSheet(controller: AppController, onClosed: () -> Unit) {
 }
 
 /**
- * What a [QuickAddActivity] keeps while it is recreated, such as on rotation: the shared links
- * and the controller that adds them.
+ * What a [QuickAddActivity] keeps while it is recreated, such as on rotation: the shared links,
+ * the service binding and the controller that adds them.
  *
- * The controller outlives the window by [ADD_GRACE], so an add the sheet sent as it closed can
- * finish. Meanwhile its toasts show as system toasts, since no window shows them.
+ * The controller and the binding outlive the window by [ADD_GRACE]. An add sent as the sheet
+ * closes can finish, and the service, which is destroyed once nothing binds it unless it runs
+ * downloads in the foreground, stays until it has noticed the new downloads. Meanwhile the
+ * controller's toasts show as system toasts, since no window shows them.
  */
 internal class QuickAddModel(application: Application) : AndroidViewModel(application) {
   /** The links shared with the window, for its controller's add sheet. */
@@ -152,26 +136,49 @@ internal class QuickAddModel(application: Application) : AndroidViewModel(applic
   /** Whether the window's intent has been offered to [incoming]. */
   var offered = false
 
-  private var controller: AppController? = null
+  /** The controller of the service's devices, once [connect] has bound the service. */
+  var controller: AppController? by mutableStateOf(null)
+    private set
 
-  /** The controller for [service]'s devices, built once and kept across recreation. */
-  fun controllerFor(service: KetchService): AppController {
-    val current = controller
-    if (current?.instanceManager === service.instanceManager) return current
-    current?.let(::retire)
-    return AppController(
-      instanceManager = service.instanceManager,
-      incoming = incoming,
-      speedMode = service.speedMode,
-    ).also {
-      controller = it
-      relayToasts(it)
+  private var bound = false
+
+  private val connection = object : ServiceConnection {
+    override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+      if (controller != null) return
+      val service = (binder as KetchService.LocalBinder).service
+      controller = AppController(
+        instanceManager = service.instanceManager,
+        incoming = incoming,
+        speedMode = service.speedMode,
+      ).also(::relayToasts)
     }
+
+    override fun onServiceDisconnected(name: ComponentName) = Unit
+  }
+
+  /** Binds the service once; a recreated window reuses the binding. */
+  fun connect() {
+    if (bound) return
+    val app = getApplication<Application>()
+    val intent = Intent(app, KetchService::class.java)
+    bound = app.bindService(intent, connection, Context.BIND_AUTO_CREATE)
   }
 
   override fun onCleared() {
-    controller?.let(::retire)
-    controller = null
+    if (!bound) return
+    bound = false
+    val app = getApplication<Application>()
+    val retiring = controller
+    if (retiring == null) {
+      app.unbindService(connection)
+      return
+    }
+    lingering.launch {
+      delay(ADD_GRACE)
+      // The service closes its devices once unbound, so the controller goes first.
+      retiring.close()
+      app.unbindService(connection)
+    }
   }
 
   private fun relayToasts(controller: AppController) {
@@ -186,13 +193,6 @@ internal class QuickAddModel(application: Application) : AndroidViewModel(applic
     }
   }
 
-  private fun retire(controller: AppController) {
-    lingering.launch {
-      delay(ADD_GRACE)
-      controller.close()
-    }
-  }
-
   private fun AppMessage.toastText(): String =
     if (level == MessageLevel.Error) listOfNotNull(title, detail).joinToString("\n") else title
 
@@ -200,10 +200,10 @@ internal class QuickAddModel(application: Application) : AndroidViewModel(applic
     if (level == MessageLevel.Error) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
 
   private companion object {
-    /** How long a closed window's controller keeps running for the adds it sent. */
+    /** How long a closed window's controller and binding last, for the adds it sent. */
     val ADD_GRACE = 30.seconds
 
-    /** Runs the closing of controllers whose window is gone. */
+    /** Runs the release of controllers and bindings whose window is gone. */
     val lingering = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   }
 }

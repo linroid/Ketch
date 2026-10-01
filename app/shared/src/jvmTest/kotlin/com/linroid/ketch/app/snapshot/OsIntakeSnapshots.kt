@@ -49,10 +49,12 @@ class OsIntakeSnapshots {
 
   @Test
   fun droppedLink_onTheWindow_opensTheAddSheet() {
-    val link = "https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso"
+    // A link the sample has no task for, so the sheet shows a fresh add.
+    val link = "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/" +
+      "debian-13.1.0-amd64-netinst.iso"
     appSnapshots("drop-link", listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
-      // What a link dragged from a browser reaches the app as.
-      state.addDroppedFiles(listOf(droppedLinkList("Ubuntu 24.04\n$link")))
+      // What a link dragged from a browser reaches the app as: the address in its URI list.
+      state.addDroppedFiles(listOf(droppedLinkList(link)))
     }
   }
 

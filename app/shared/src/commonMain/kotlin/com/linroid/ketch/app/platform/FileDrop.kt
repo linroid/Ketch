@@ -23,8 +23,9 @@ class DroppedFile(
 /** Extracts files and text from platform drag-and-drop events. */
 internal interface FileDropReader {
   /**
-   * Whether a drag may carry files or text. Called when the drag starts, before the platform
-   * exposes file names or content.
+   * Whether a drag may carry files or text from another app. Called when the drag starts, before
+   * the platform exposes file names or content. A drag that starts inside Ketch, such as rows
+   * dragged out of the list, is not accepted, so it never reads as new downloads.
    */
   fun accepts(event: DragAndDropEvent): Boolean
 
