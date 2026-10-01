@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
@@ -43,7 +44,14 @@ class KetchApplication : Application() {
 
   override fun onCreate() {
     super.onCreate()
-    startForegroundService(Intent(this, KetchService::class.java))
+    try {
+      startForegroundService(Intent(this, KetchService::class.java))
+    } catch (e: IllegalStateException) {
+      // Android 12+ throws ForegroundServiceStartNotAllowedException when the process starts in
+      // the background, such as for another app opening a shared download. The activity
+      // creates the service when it opens.
+      fileLogger.w("[KetchApplication] Couldn't start the service: ${e.describeCauses()}")
+    }
   }
 
   /** Reads a `.torrent` file opened with Ketch from a file manager or another app. */
