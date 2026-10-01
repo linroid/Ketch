@@ -10,17 +10,27 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
+import com.linroid.ketch.app.feedback.OngoingDownloads
 import com.linroid.ketch.app.feedback.ToastMode
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.PendingOps
+import com.linroid.ketch.app.util.displayName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -35,6 +45,7 @@ import platform.UIKit.UIApplicationDidEnterBackgroundNotification
 import platform.UIKit.UIApplicationState
 import platform.UIKit.UIApplicationWillEnterForegroundNotification
 import platform.UIKit.UIBackgroundTaskInvalid
+import kotlin.time.Duration.Companion.ZERO
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -47,11 +58,33 @@ import kotlin.time.Duration.Companion.seconds
  * which it does without notice; operations still waiting for their Undo window are committed
  * for the same reason. While downloads run, a banner tells the user that they pause in the
  * background.
+ *
+ * Where iOS can keep them running instead (iOS 26 and later), the app sets
+ * [continuedProcessing]: downloads started while Ketch is in front then go on in the background,
+ * with their progress in the system's UI, and pause only once iOS stops that work.
  */
 object KetchBackground {
   private val log = KetchLogger("KetchBackground")
   private val scope = MainScope()
   private var pauser: BackgroundPauser? = null
+  private var continued: ContinuedDownloads? = null
+
+  /**
+   * Keeps downloads running in the background where iOS allows it; set by the app before its
+   * UI starts, on iOS 26 and later. `null` pauses them as Ketch leaves the screen.
+   */
+  var continuedProcessing: ContinuedProcessing? = null
+
+  /**
+   * Tells Ketch that iOS stopped the work [continuedProcessing] began before the downloads
+   * finished. Ketch pauses them if it is in the background, as it would without that work.
+   */
+  fun continuedProcessingExpired() {
+    val continued = continued ?: return
+    continued.expire()
+    log.i { "iOS stopped the downloads running in the background" }
+    if (!isInFront()) pauser?.enterBackground()?.let(::holdBackgroundTime)
+  }
 
   /**
    * Pauses this device's queued and downloading tasks and waits until their progress is saved.
@@ -81,28 +114,40 @@ object KetchBackground {
       onResumed = IosNotifier::clearPaused,
     )
     this.pauser = pauser
+    val continued = continuedProcessing?.let { ContinuedDownloads(it, ::isInFront) }
+    this.continued = continued
     val center = NSNotificationCenter.defaultCenter
     val queue = NSOperationQueue.mainQueue
     val observers = listOf(
       center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, queue) {
-        pauser.enterBackground()?.let(::holdBackgroundTime)
+        // Downloads iOS keeps running need no pausing.
+        if (continued?.running?.value != true) {
+          pauser.enterBackground()?.let(::holdBackgroundTime)
+        }
       },
       center.addObserverForName(UIApplicationWillEnterForegroundNotification, null, queue) {
         pauser.enterForeground()
       },
     )
     // Resumes the tasks paused before iOS ended Ketch, if any.
-    val app = UIApplication.sharedApplication
-    if (app.applicationState != UIApplicationState.UIApplicationStateBackground) {
-      pauser.enterForeground()
-    }
-    val banner = scope.launch { showBanner(api, messages, onUseComputer) }
+    if (isInFront()) pauser.enterForeground()
+    val progress = continued?.let { scope.launch { it.follow(api) } }
+    val banner = scope.launch { showBanner(api, messages, continued?.running, onUseComputer) }
     return DisposableHandle {
       observers.forEach { center.removeObserver(it) }
       banner.cancel()
+      progress?.cancel()
+      continued?.close()
       pauser.close()
       if (this.pauser === pauser) this.pauser = null
+      if (this.continued === continued) this.continued = null
     }
+  }
+
+  // Whether Ketch is on the screen; iOS suspends it soon after it leaves.
+  private fun isInFront(): Boolean {
+    val state = UIApplication.sharedApplication.applicationState
+    return state != UIApplicationState.UIApplicationStateBackground
   }
 
   // Keeps Ketch running in the background until [work] completes or iOS runs out of time.
@@ -123,10 +168,13 @@ object KetchBackground {
     work.invokeOnCompletion { end() }
   }
 
-  // Shown while this device downloads, until the user closes it.
+  // Shown while this device downloads and iOS would not keep it running in the background
+  // ([continuing]; `null` where it never does), until the user closes it.
+  @OptIn(FlowPreview::class)
   private suspend fun showBanner(
     api: KetchApi,
     messages: MessageCenter,
+    continuing: Flow<Boolean>?,
     onUseComputer: () -> Unit,
   ) {
     var shown: Long? = null
@@ -142,12 +190,15 @@ object KetchBackground {
             }
           }
         }
-        ForegroundPolicy.observe(api.tasks, flowOf(ServerState.Stopped))
+        val downloading = ForegroundPolicy.observe(api.tasks, flowOf(ServerState.Stopped))
           .map { it.downloading > 0 }
+        combine(downloading, continuing ?: flowOf(false)) { active, kept -> active && !kept }
           .distinctUntilChanged()
-          .collect { downloading ->
+          // iOS takes a moment to take on the downloads as they start.
+          .debounce { pausing -> if (pausing && continuing != null) ACCEPT_WAIT else ZERO }
+          .collect { pausing ->
             val id = shown
-            if (downloading && id == null && !closed) {
+            if (pausing && id == null && !closed) {
               shown = messages.post(
                 level = MessageLevel.Info,
                 title = "Downloads pause when Ketch is in the background",
@@ -156,7 +207,7 @@ object KetchBackground {
                 toast = ToastMode.Sticky,
                 placement = MessagePlacement.Banner,
               ).id
-            } else if (!downloading && id != null) {
+            } else if (!pausing && id != null) {
               shown = null
               messages.dismiss(id)
             }
@@ -168,6 +219,131 @@ object KetchBackground {
   }
 
   private const val BACKGROUND_TASK = "ketch.downloads"
+  private val ACCEPT_WAIT = 2.seconds
+}
+
+/**
+ * What the system's progress UI shows for this device's downloads while they run in the
+ * background.
+ *
+ * @property title "Downloading ubuntu-24.04.iso", "Downloading 3 files", or "Waiting to download
+ *   2 files" while every task waits.
+ * @property subtitle "1.2 GB of 3.4 GB · about 6 min left", only the bytes so far while a size
+ *   is unknown, or empty while every task waits.
+ * @property permille overall progress out of 1000, or -1 while a size is unknown or every task
+ *   waits.
+ */
+data class BackgroundProgress(
+  val title: String,
+  val subtitle: String,
+  val permille: Int,
+)
+
+/**
+ * Asks iOS to keep Ketch running in the background while downloads run, showing their progress;
+ * on iOS 26 and later, the app implements it with a continued processing task. Ketch calls it on
+ * the main thread.
+ */
+interface ContinuedProcessing {
+  /**
+   * Asks iOS to let the downloads go on in the background, showing [progress]. Ketch asks only
+   * while it is in front, as downloads start.
+   *
+   * @return whether iOS accepted the request.
+   */
+  fun begin(progress: BackgroundProgress): Boolean
+
+  /** Shows the downloads' latest [progress]. */
+  fun update(progress: BackgroundProgress)
+
+  /**
+   * Ends the work begun, as nothing downloads or waits any more ([success]), or as Ketch stops
+   * following the downloads.
+   */
+  fun end(success: Boolean)
+}
+
+/**
+ * Follows this device's downloads for [processing]: begins its work when downloads start while
+ * Ketch is in front, which is when iOS accepts it, updates their progress once a second, and ends
+ * it once nothing downloads or waits.
+ *
+ * @param inFront whether Ketch is on the screen.
+ */
+internal class ContinuedDownloads(
+  private val processing: ContinuedProcessing,
+  private val inFront: () -> Boolean,
+) {
+  private val _running = MutableStateFlow(false)
+
+  // Set once iOS refused or stopped the work, so it is not asked again every second until the
+  // downloads stop.
+  private var declined = false
+
+  /** Whether iOS keeps the downloads running in the background now. */
+  val running: StateFlow<Boolean> = _running.asStateFlow()
+
+  /** Reports the progress of [api]'s downloads once a second until cancelled. */
+  suspend fun follow(api: KetchApi) {
+    while (true) {
+      update(backgroundProgress(api.tasks.value))
+      delay(UPDATE_PERIOD)
+    }
+  }
+
+  /** Reports the downloads' [progress], `null` when nothing downloads or waits. */
+  fun update(progress: BackgroundProgress?) {
+    when {
+      progress == null -> {
+        declined = false
+        if (_running.value) {
+          _running.value = false
+          processing.end(success = true)
+        }
+      }
+      _running.value -> processing.update(progress)
+      !declined && inFront() -> {
+        val accepted = processing.begin(progress)
+        _running.value = accepted
+        declined = !accepted
+      }
+    }
+  }
+
+  /** Records that iOS stopped the work before the downloads finished. */
+  fun expire() {
+    _running.value = false
+    declined = true
+  }
+
+  /** Ends the work begun, as Ketch stops following the downloads. */
+  fun close() {
+    if (!_running.value) return
+    _running.value = false
+    processing.end(success = false)
+  }
+
+  private companion object {
+    val UPDATE_PERIOD = 1.seconds
+  }
+}
+
+/** What the system shows for [tasks] in the background; `null` when none downloads or waits. */
+internal fun backgroundProgress(tasks: List<DownloadTask>): BackgroundProgress? {
+  val ongoing = OngoingDownloads.of(tasks) ?: return null
+  val downloading = tasks.filter { it.state.value is DownloadState.Downloading }
+  val title = when (downloading.size) {
+    0 -> ongoing.title
+    1 -> downloading.single().let {
+      "Downloading ${displayName(it.requestState.value, it.state.value)}"
+    }
+    else -> "Downloading ${downloading.size} files"
+  }
+  return BackgroundProgress(
+    title = title,
+    subtitle = ongoing.text.orEmpty(),
+    permille = ongoing.permille ?: -1,
+  )
 }
 
 /** Ids of the tasks paused for the background, downloading ones first. */
