@@ -1,5 +1,11 @@
 package com.linroid.ketch.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -426,6 +432,11 @@ private fun PhoneShell(
   val fabExpanded by remember(shell, clearance) {
     derivedStateOf { shell.chrome.contentOffset < clearance }
   }
+  // The button leaves with the top bar while the list scrolls down, so it never sits over the
+  // actions of the rows passing under it, and comes back as soon as the list scrolls up.
+  val fabShown by remember(shell) {
+    derivedStateOf { shell.chrome.collapsedFraction < FAB_HIDE_FRACTION }
+  }
   PhoneScaffold(
     chrome = shell.chrome,
     topBar = {
@@ -463,12 +474,19 @@ private fun PhoneShell(
             },
           ),
       )
-      if (downloads && !selecting) {
+      val motion = KetchTheme.motion
+      AnimatedVisibility(
+        visible = downloads && !selecting && fabShown,
+        enter = slideInVertically(tween(motion.short, easing = motion.easeDecelerate)) { it } +
+          fadeIn(tween(motion.short)),
+        exit = slideOutVertically(tween(motion.short, easing = motion.easeAccelerate)) { it } +
+          fadeOut(tween(motion.short)),
+        modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.s4),
+      ) {
         AddFab(
           expanded = fabExpanded,
           onClick = { appState.openIntake() },
           onLongClick = { commands.run(KetchCommands.AddClipboardLink) },
-          modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.s4),
         )
       }
     },
@@ -496,3 +514,6 @@ private fun KetchCommand.isWindowCommand(): Boolean =
 
 private val WindowCommands =
   setOf(KetchCommands.CloseWindow, KetchCommands.Minimize, KetchCommands.Quit)
+
+// How far the top bar collapses before the phone's Add button leaves with it.
+private const val FAB_HIDE_FRACTION = 0.5f
