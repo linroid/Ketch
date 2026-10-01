@@ -93,7 +93,6 @@ import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.displayName
-import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppDestination
@@ -421,7 +420,7 @@ private fun rememberRowCommands(state: AppState): RowCommands {
 }
 
 /** What a device is doing, after its name: "2 active · 6.4 MB/s", "Idle", "Offline"… */
-internal fun deviceLine(device: DevicePresence): String = when {
+private fun deviceLine(device: DevicePresence): String = when {
   device.health == DeviceHealth.Unauthorized -> "Needs a token"
   !device.connected -> "Not connected"
   device.health is DeviceHealth.Offline -> "Offline"
@@ -778,7 +777,7 @@ private fun KeyHints(discover: Boolean) {
   val hints = buildList {
     val move = listOfNotNull(
       KetchCommands.PaletteUp.shortcutLabel(),
-      KetchCommands.PaletteDown.shortcutLabel(),
+      KetchCommands.PaletteDown.shortcutLabel()
     ).joinToString("")
     add(move to "move")
     KetchCommands.PaletteRun.shortcutLabel()?.let { add(it to "run") }

@@ -151,7 +151,7 @@ class PaletteSnapshots {
       "command.retryFailed",
       "settings.Speed",
       "task.local/ubuntu",
-      "device.nas.local:8642",
+      "device.nas.local:8642"
     )
   }
 }
@@ -173,7 +173,7 @@ private fun PaletteOverlay(
   val commands = remember(state) { ShellCommands(ShellState(state), scope, clipboard, files) }
   CompositionLocalProvider(
     LocalAppState provides state,
-    LocalClock provides SampleData.CLOCK,
+    LocalClock provides SampleData.CLOCK
   ) {
     KetchTheme(
       darkTheme = theme == SnapshotTheme.Dark,

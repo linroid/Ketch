@@ -66,7 +66,7 @@ class PaletteRankingTest {
   fun paletteResults_equalMatches_keepProviderOrder() {
     val items = listOf(
       item("Paused files", provider = PaletteProvider.Downloads),
-      item("Pause all", provider = PaletteProvider.Commands),
+      item("Pause all", provider = PaletteProvider.Commands)
     )
 
     assertEquals(listOf("Pause all", "Paused files"), titles("pause", items))
@@ -120,7 +120,7 @@ class PaletteRankingTest {
       item("Pause all"),
       item("Undo"),
       item("Downloads", provider = PaletteProvider.Navigation),
-      item("ubuntu.iso", provider = PaletteProvider.Downloads, searchOnly = true),
+      item("ubuntu.iso", provider = PaletteProvider.Downloads, searchOnly = true)
     )
 
     val results = paletteResults("", items, recent = listOf("ubuntu.iso"))
@@ -133,9 +133,9 @@ class PaletteRankingTest {
         PaletteEntry.Row(items[0], 1),
         PaletteEntry.Row(items[1], 2),
         PaletteEntry.Header("Go to"),
-        PaletteEntry.Row(items[2], 3),
+        PaletteEntry.Row(items[2], 3)
       ),
-      results.entries,
+      results.entries
     )
     assertEquals(3, results.entryIndex(1))
   }
@@ -173,7 +173,7 @@ class PaletteRankingTest {
       query = "pause nas",
       devices = listOf(
         PaletteDevice(LOCAL_DEVICE_ID, "This Mac", 1, active = true, "Idle"),
-        PaletteDevice(NAS_ID, "NAS-Basement", 2, active = false, "2 active · 4.0 MB/s"),
+        PaletteDevice(NAS_ID, "NAS-Basement", 2, active = false, "2 active · 4.0 MB/s")
       ),
       commands = KetchCommands.all.filter { it.scope == KetchCommands.PauseAll.scope },
       settings = SettingsCategory.entries,
