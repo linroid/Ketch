@@ -59,6 +59,7 @@ import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.common.PriorityIcon
 import com.linroid.ketch.app.ui.common.PriorityPanel
 import com.linroid.ketch.app.ui.common.ScheduleIcon
@@ -98,9 +99,14 @@ internal fun DownloadListItem(
   var expanded by remember { mutableStateOf(false) }
   var panel by remember { mutableStateOf(ExpandedPanel.None) }
   var confirmingDelete by remember { mutableStateOf(false) }
+  var confirmingDiscard by remember { mutableStateOf(false) }
   val terminal = row.state.isTerminal
   LaunchedEffect(terminal) {
-    if (terminal) panel = ExpandedPanel.None
+    if (terminal) {
+      panel = ExpandedPanel.None
+      // A task that finished or failed meanwhile has no progress left to discard.
+      confirmingDiscard = false
+    }
   }
 
   val colors = KetchTheme.colors
@@ -138,6 +144,7 @@ internal fun DownloadListItem(
           panel = panel,
           onPanelChange = { panel = it },
           onDelete = { confirmingDelete = true },
+          onDiscard = { confirmingDiscard = true },
         )
         AnimatedContent(
           targetState = panel,
@@ -159,6 +166,41 @@ internal fun DownloadListItem(
       totalBytes = row.sizeBytes,
       onDismiss = { confirmingDelete = false },
       onConfirm = { deleteFiles -> commands.remove(row, deleteFiles) },
+    )
+  }
+  if (confirmingDiscard) {
+    DiscardProgressDialog(
+      fileName = row.name,
+      onDismiss = { confirmingDiscard = false },
+      onConfirm = { commands.run(RowAction.StopAndDiscard, row) },
+    )
+  }
+}
+
+/** Asks before discarding a task's progress, which cannot be resumed afterwards. */
+@Composable
+private fun DiscardProgressDialog(fileName: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+  AdaptiveModal(
+    onDismissRequest = onDismiss,
+    title = { Text("Stop and discard progress?") },
+    dismissButton = {
+      KetchButton(text = "Keep", variant = KetchButtonVariant.Secondary, onClick = onDismiss)
+    },
+    confirmButton = {
+      KetchButton(
+        text = "Discard progress",
+        variant = KetchButtonVariant.Danger,
+        onClick = {
+          onConfirm()
+          onDismiss()
+        },
+      )
+    },
+  ) {
+    Text(
+      text = "$fileName can't be resumed after this.",
+      style = KetchTheme.typography.body,
+      color = KetchTheme.colors.textSecondary,
     )
   }
 }
@@ -352,6 +394,7 @@ private fun ActionsRow(
   panel: ExpandedPanel,
   onPanelChange: (ExpandedPanel) -> Unit,
   onDelete: () -> Unit,
+  onDiscard: () -> Unit,
 ) {
   val spacing = KetchTheme.spacing
   val request = row.request
@@ -430,10 +473,10 @@ private fun ActionsRow(
       MoreMenu(
         actions = more,
         onAction = { action ->
-          if (action == RowAction.RemoveAndDelete || action == RowAction.RemoveAndTrash) {
-            onDelete()
-          } else {
-            commands.run(action, row)
+          when (action) {
+            RowAction.RemoveAndDelete, RowAction.RemoveAndTrash -> onDelete()
+            RowAction.StopAndDiscard -> onDiscard()
+            else -> commands.run(action, row)
           }
         },
       )

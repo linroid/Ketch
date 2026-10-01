@@ -5,6 +5,9 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.components.DebouncedCommit
+import com.linroid.ketch.app.components.parseSpeedInput
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -19,6 +22,7 @@ import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RecordingTask
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.RowCapabilities
+import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.util.RowContext
@@ -39,6 +43,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -60,7 +65,10 @@ class RowCommandsTest {
       controller.messages.history.value.filter { it.level == MessageLevel.Error }
   }
 
-  private fun TestScope.fixture(revealLabel: String? = "Show in Finder"): Fixture {
+  private fun TestScope.fixture(
+    revealLabel: String? = "Show in Finder",
+    openUri: (String) -> Unit = {},
+  ): Fixture {
     val api = RecordingKetchApi()
     val controller = AppController(
       instanceManager = InstanceManager(
@@ -70,7 +78,7 @@ class RowCommandsTest {
     )
     val files = RecordingFileActions(revealLabel)
     val clipboard = RecordingClipboard()
-    val commands = RowCommands(controller.state, files, clipboard, backgroundScope) {}
+    val commands = RowCommands(controller.state, files, clipboard, backgroundScope, openUri)
     return Fixture(api, controller, files, clipboard, commands)
   }
 
@@ -238,6 +246,64 @@ class RowCommandsTest {
   }
 
   @Test
+  fun run_openSourcePage_opensTheReferer() = runTest {
+    val opened = mutableListOf<String>()
+    val f = fixture(openUri = { opened += it })
+    val task = f.api.add(DownloadState.Failed(KetchError.Http(403)), capturedOn(PAGE))
+
+    f.commands.run(RowAction.OpenSourcePage, rowOf(task))
+
+    assertEquals(listOf(PAGE), opened)
+    f.controller.close()
+  }
+
+  @Test
+  fun run_openSourcePageThrows_postsAnErrorInsteadOfCrashing() = runTest {
+    val f = fixture(openUri = { throw IllegalArgumentException("No browser") })
+    val task = f.api.add(DownloadState.Failed(KetchError.Http(403)), capturedOn(PAGE))
+
+    f.commands.run(RowAction.OpenSourcePage, rowOf(task))
+
+    assertEquals("Couldn't open the source page", f.errors().single().title)
+    f.controller.close()
+  }
+
+  @Test
+  fun canRun_refererOfAnotherScheme_refusesToOpenIt() = runTest {
+    val f = fixture()
+    val task = f.api.add(
+      DownloadState.Failed(KetchError.Http(403)),
+      capturedOn("android-app://com.example.app"),
+    )
+
+    assertFalse(f.commands.canRun(RowAction.OpenSourcePage, rowOf(task)))
+    assertFalse(RowAction.OpenSourcePage in f.commands.menu(rowOf(task)))
+    f.controller.close()
+  }
+
+  @Test
+  fun setSpeedLimit_valueTypedKeyByKey_sendsOneSetSpeedLimit() = runTest {
+    val f = fixture()
+    val task = f.api.add(downloading)
+    val row = rowOf(task)
+    // The list's speed field debounces what is typed the way SpeedLimitPicker does.
+    val field = DebouncedCommit<SpeedLimit>(backgroundScope, 600.milliseconds) {
+      f.commands.setSpeedLimit(row, it)
+    }
+
+    listOf("5", "50", "500").forEach { text ->
+      field.update(assertNotNull(parseSpeedInput(text, SpeedUnit.KB)))
+      advanceTimeBy(200.milliseconds)
+    }
+    advanceTimeBy(1.seconds)
+    runCurrent()
+
+    assertEquals(listOf("speed"), task.calls)
+    assertEquals(SpeedLimit.kbps(500), task.request.speedLimit)
+    f.controller.close()
+  }
+
+  @Test
   fun canRun_withoutAClipboard_refusesCopies() = runTest {
     val f = fixture()
     val commands = RowCommands(f.controller.state, f.files, null, backgroundScope) {}
@@ -262,8 +328,14 @@ class RowCommandsTest {
     assertFalse(RowCommands.isBusy(row, setOf(row.key to RowCommands.speedLimitLabel(row))))
   }
 
+  private fun capturedOn(page: String): DownloadRequest = DownloadRequest(
+    url = "https://cdn.example.com/a.iso",
+    headers = mapOf("Referer" to page),
+  )
+
   private companion object {
     val NOW: Instant = Instant.parse("2026-10-01T12:00:00Z")
+    const val PAGE = "https://example.com/releases"
   }
 }
 

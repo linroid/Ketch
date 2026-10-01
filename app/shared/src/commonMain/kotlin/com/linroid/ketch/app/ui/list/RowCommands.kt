@@ -71,7 +71,7 @@ internal class RowCommands(
     RowAction.ShowInFolder -> files?.revealLabel != null && folderPath(row) != null
     RowAction.CopyPath -> clipboard != null && outputPath(row) != null
     RowAction.CopyLink, RowAction.CopyError, RowAction.CopyDetails -> clipboard != null
-    RowAction.OpenSourcePage -> row.request.referer != null
+    RowAction.OpenSourcePage -> sourcePage(row) != null
     RowAction.FindAnotherSource -> row.device.capabilities.canDiscover
     else -> true
   }
@@ -79,7 +79,7 @@ internal class RowCommands(
   /**
    * Runs [action] on [row]. Actions that open a panel, a menu or a dialog, such as
    * [RowAction.SpeedLimit] or [RowAction.RemoveAndDelete], belong to the caller and do nothing
-   * here.
+   * here. [RowAction.StopAndDiscard] discards at once, so the caller confirms it first.
    */
   fun run(action: RowAction, row: TaskRow) {
     val task = row.task
@@ -120,7 +120,7 @@ internal class RowCommands(
       RowAction.RetryWithOptions,
       RowAction.EnterCredentials -> state.openIntake(retryRequest(row))
       RowAction.FindAnotherSource -> state.openDiscover(DiscoverRequest(query = name))
-      RowAction.OpenSourcePage -> row.request.referer?.let(openUri)
+      RowAction.OpenSourcePage -> sourcePage(row)?.let(::openPage)
       RowAction.Remove -> state.remove(listOf(task))
       RowAction.StopAndDiscard -> state.cancel(listOf(task))
       RowAction.SpeedLimit,
@@ -163,6 +163,13 @@ internal class RowCommands(
         .onFailure { e ->
           state.messages.post(MessageLevel.Error, "Couldn't copy the $what", cause = e)
         }
+    }
+  }
+
+  private fun openPage(url: String) {
+    // A link the platform cannot parse, or a device without a browser, throws.
+    runCatching { openUri(url) }.onFailure { e ->
+      state.messages.post(MessageLevel.Error, "Couldn't open the source page", cause = e)
     }
   }
 
@@ -227,6 +234,13 @@ internal fun rememberRowCommands(): RowCommands {
 /** Path of the file a completed row saved. */
 private fun outputPath(row: TaskRow): String? =
   (row.state as? DownloadState.Completed)?.outputPath?.ifBlank { null }
+
+/** The web page [row]'s link was captured from; a `Referer` of another scheme is not opened. */
+private fun sourcePage(row: TaskRow): String? = row.request.referer?.takeIf { referer ->
+  WEB_SCHEMES.any { referer.startsWith(it, ignoreCase = true) }
+}
+
+private val WEB_SCHEMES = listOf("https://", "http://")
 
 /** Where [row]'s file is or goes: its output, else a destination that names a path. */
 private fun folderPath(row: TaskRow): String? =

@@ -54,9 +54,7 @@ internal fun DownloadExpandedPanel(row: TaskRow, modifier: Modifier = Modifier) 
     val segments = row.segments
     val segmentContent: @Composable () -> Unit = {
       Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-        SectionEyebrow(
-          if (segments.isEmpty()) "Segments" else "Segments · ${segments.size} connections",
-        )
+        SectionEyebrow(segmentsTitle(row))
         if (segments.isEmpty()) {
           PanelNote("No segment data available.")
         } else {
@@ -100,6 +98,20 @@ internal fun DownloadExpandedPanel(row: TaskRow, modifier: Modifier = Modifier) 
   }
 }
 
+/**
+ * "Segments · 5 connections", counting the segments still downloading as the row does; a
+ * torrent's segments are its files.
+ */
+private fun segmentsTitle(row: TaskRow): String {
+  val count = if (row.isTorrent) row.segments.size else row.connections ?: 0
+  val noun = if (row.isTorrent) "file" else "connection"
+  return when (count) {
+    0 -> "Segments"
+    1 -> "Segments · 1 $noun"
+    else -> "Segments · $count ${noun}s"
+  }
+}
+
 @Composable
 private fun SectionEyebrow(text: String) {
   Text(
@@ -123,7 +135,7 @@ private fun MetadataGrid(row: TaskRow) {
       MetaRow("File", row.name)
       MetaRow("URL", row.request.url)
       MetaRow("Priority", priorityLabel(row.request.priority))
-      val savedTo = completed?.outputPath ?: row.request.destination?.value
+      val savedTo = row.outputPath
       if (!savedTo.isNullOrBlank()) MetaRow("Saved to", savedTo)
       row.sizeBytes?.let { MetaRow("Size", formatBytes(it)) }
       val downloadTime = completed?.downloadTime
