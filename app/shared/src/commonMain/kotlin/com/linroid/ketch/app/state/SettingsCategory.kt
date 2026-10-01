@@ -14,10 +14,11 @@ enum class SettingsCategory(
   val icon: KetchIcon,
 ) {
   General("General", "Device name, theme and accent colour", KetchIcon.Settings),
-  Downloads("Downloads", "Location, queue, speed and retries", KetchIcon.Active),
+  Downloads("Downloads", "Folder, queue and retries", KetchIcon.Active),
+  Speed("Speed", "Speed modes, Slow lane and Auto rules", KetchIcon.Speed),
   Network("Network", "Network interfaces used for downloads", KetchIcon.Network),
   BitTorrent("BitTorrent", "Extra trackers for public torrents", KetchIcon.FileTorrent),
-  RemoteAccess("Remote access", "Control this device from other devices", KetchIcon.Server),
+  RemoteAccess("Sharing", "Pair a phone or browser to control this device", KetchIcon.Server),
   Ai("AI discovery", "Model provider and web search", KetchIcon.Ai),
   About("About", "Version and project links", KetchIcon.Info);
 
