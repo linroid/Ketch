@@ -79,10 +79,13 @@ data class IntakePreferences(
  *   by the table.
  * @property sort sort order per tab, encoded by the list.
  * @property sidebarCollapsed whether the sidebar is collapsed to the rail.
+ * @property lastDeviceId device that was active when the app last ran; `null`
+ *   until the user switches devices.
  * @property inspectorWidth width of the docked inspector, in dp.
  * @property inspectorOpen whether the docked inspector is shown.
  * @property intake what the add sheet remembers per device: the options of the
  *   last add (folder, priority and connections) and the pinned folders.
+ * @property intakeAdvancedOpen whether the add sheet's Advanced section is open.
  * @property clipboardMode what to do with a link on the clipboard; `null` uses
  *   the platform default (fill on desktop, suggest on phones and the web).
  * @property quickAdd whether pasting one link adds it at once; `null` uses the
@@ -94,24 +97,33 @@ data class IntakePreferences(
  * @property observedPeakAt when [observedPeak] was seen, in epoch milliseconds.
  * @property onboardingVersion version of the welcome flow the user finished;
  *   `0` when it has not been shown.
+ * @property setupChecklistShownAt when the launchpad's setup checklist was first
+ *   shown, in epoch milliseconds; `0` until then. It hides itself 7 days later.
+ * @property setupChecklistDismissed whether the user closed the setup checklist.
  * @property density how dense the UI is.
  * @property reduceMotion whether to reduce motion; `false` follows the system.
  */
 @Serializable
 data class UiPreferences(
   val layout: DownloadsLayout = DownloadsLayout.Auto,
+  // ktoml keeps the quotes of keys such as "nas.local" in maps of plain values, so only maps of
+  // tables, like intake, can be keyed by device id.
   val table: Map<String, String> = emptyMap(),
   val sort: Map<String, String> = emptyMap(),
   val sidebarCollapsed: Boolean = false,
+  val lastDeviceId: String? = null,
   val inspectorWidth: Int = DEFAULT_INSPECTOR_WIDTH,
   val inspectorOpen: Boolean = true,
   val intake: Map<String, IntakePreferences> = emptyMap(),
+  val intakeAdvancedOpen: Boolean = false,
   val clipboardMode: ClipboardMode? = null,
   val quickAdd: Boolean? = null,
   val lastClipHash: String? = null,
   val observedPeak: Long = 0,
   val observedPeakAt: Long = 0,
   val onboardingVersion: Int = 0,
+  val setupChecklistShownAt: Long = 0,
+  val setupChecklistDismissed: Boolean = false,
   val density: DensityMode = DensityMode.Auto,
   val reduceMotion: Boolean = false,
 ) {
