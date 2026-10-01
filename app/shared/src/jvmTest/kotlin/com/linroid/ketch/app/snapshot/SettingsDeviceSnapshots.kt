@@ -104,20 +104,20 @@ class SettingsDeviceSnapshots {
   fun sharing_offAndOn_showsThePairCard() {
     pageSnapshots(
       name = "settings-sharing-off",
-      category = SettingsCategory.RemoteAccess,
+      category = SettingsCategory.Sharing,
       setup = DeviceSetup(sharing = false),
     )
-    pageSnapshots("settings-sharing-on", SettingsCategory.RemoteAccess)
+    pageSnapshots("settings-sharing-on", SettingsCategory.Sharing)
     pageSnapshots(
       name = "settings-sharing-nocode",
-      category = SettingsCategory.RemoteAccess,
+      category = SettingsCategory.Sharing,
       sizes = listOf(Pane),
       themes = listOf(SnapshotTheme.Light),
       setup = DeviceSetup(token = null),
     )
     pageSnapshots(
       name = "settings-sharing-restart",
-      category = SettingsCategory.RemoteAccess,
+      category = SettingsCategory.Sharing,
       sizes = listOf(Pane),
       setup = DeviceSetup(pendingPort = 9000),
       interact = {
@@ -138,7 +138,7 @@ class SettingsDeviceSnapshots {
         setup = remote,
       )
     }
-    for (category in listOf(SettingsCategory.BitTorrent, SettingsCategory.RemoteAccess)) {
+    for (category in listOf(SettingsCategory.BitTorrent, SettingsCategory.Sharing)) {
       pageSnapshots(
         name = "settings-remote-${category.name.lowercase()}",
         category = category,

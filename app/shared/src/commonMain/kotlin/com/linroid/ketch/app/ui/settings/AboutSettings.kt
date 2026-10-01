@@ -3,13 +3,14 @@ package com.linroid.ketch.app.ui.settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,17 +18,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchLogoTile
+import com.linroid.ketch.app.components.KetchLogoTileDefaults
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.log.LogFilesAction
 import com.linroid.ketch.app.log.rememberLogFilesAction
+import com.linroid.ketch.app.platform.isMobilePlatform
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.common.AdaptiveModal
 import ketch.app.shared.generated.resources.Res
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -35,48 +45,118 @@ import kotlinx.coroutines.launch
 private const val PROJECT_URL = "https://github.com/linroid/Ketch"
 
 /**
- * Version information, project links and the app's log files.
+ * Who made Ketch and which version this is, the licenses it ships under, its log files, and
+ * ways to see the setup steps again.
  *
  * @param fileLogger the app's log files, or `null` when it keeps none.
  */
 @Composable
-fun AboutSettings(fileLogger: FileLogger? = null) {
+fun AboutSettings(state: AppState, fileLogger: FileLogger? = null) {
   var showLicenses by remember { mutableStateOf(false) }
   val logFiles = fileLogger?.let { rememberLogFilesAction(it) }
-  Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-    SettingsGroup {
-      SettingsRow(title = "Version", trailing = { MonoValue(KetchApi.VERSION) })
-      SettingsRow(title = "Build", trailing = { MonoValue(KetchApi.REVISION) })
-    }
-    SettingsGroup(title = "Project") {
-      LinkRow(
-        title = "Source code",
-        description = "github.com/linroid/Ketch",
-        url = PROJECT_URL,
-      )
-      LinkRow(
-        title = "Report a problem",
-        description = "Open an issue on GitHub",
-        url = "$PROJECT_URL/issues",
-      )
+  val appSettings = state.appSettings
+  BrandHeader()
+  if (!state.aiSettings.supported) {
+    SettingsNotice(text = "Discover runs in the desktop and Android apps.", tone = NoticeTone.Info)
+  }
+  SettingsGroup {
+    SettingsRow(title = "Version", trailing = { MonoValue(KetchApi.VERSION) })
+    SettingsRow(title = "Build", trailing = { MonoValue(KetchApi.REVISION) })
+  }
+  SettingsGroup(title = "Project") {
+    LinkRow(
+      title = "Source code",
+      description = "github.com/linroid/Ketch",
+      url = PROJECT_URL,
+    )
+    LinkRow(
+      title = "Report a problem",
+      description = "Open an issue on GitHub",
+      url = "$PROJECT_URL/issues",
+    )
+    SettingsRow(
+      title = "Open-source licenses",
+      description = "Ketch, its libraries and its fonts",
+      modifier = Modifier.clickable(role = Role.Button) { showLicenses = true },
+      trailing = { Chevron() },
+    )
+  }
+  SettingsGroup(title = "Getting started") {
+    var checklistShown by remember { mutableStateOf(false) }
+    SettingsRow(
+      title = "Show setup checklist",
+      description = if (checklistShown) {
+        "Done. It shows on the Downloads page while the list is empty."
+      } else {
+        "The setup steps on an empty Downloads page."
+      },
+      modifier = Modifier.clickable(role = Role.Button) {
+        appSettings.saveUi { it.copy(setupChecklistDismissed = false, setupChecklistShownAt = 0) }
+        checklistShown = true
+      },
+      trailing = { Chevron() },
+    )
+    if (isMobilePlatform) {
+      var welcomeShown by remember { mutableStateOf(false) }
       SettingsRow(
-        title = "Open-source licenses",
-        description = "Ketch and third-party notices",
-        modifier = Modifier.clickable(role = Role.Button) { showLicenses = true },
+        title = "Show welcome again",
+        description = if (welcomeShown) {
+          "Done. The welcome screens show next time you open Ketch."
+        } else {
+          "Where downloads go, and how you use Ketch on this device."
+        },
+        modifier = Modifier.clickable(role = Role.Button) {
+          appSettings.saveUi { it.copy(onboardingVersion = 0) }
+          welcomeShown = true
+        },
+        trailing = { Chevron() },
       )
     }
-    if (logFiles != null) {
-      SettingsGroup(
-        title = "Troubleshooting",
-        footer = "Logs include the names and addresses of your downloads, with passwords " +
-          "masked. Check them before posting them publicly.",
-      ) {
-        LogFilesRow(logFiles)
-      }
+  }
+  if (logFiles != null) {
+    SettingsGroup(
+      title = "Troubleshooting",
+      footer = "Logs include the names and addresses of your downloads, with passwords " +
+        "masked. Check them before posting them publicly.",
+    ) {
+      LogFilesRow(logFiles)
     }
   }
   if (showLicenses) {
     LicenseDialog(onDismiss = { showLicenses = false })
+  }
+}
+
+/** The app's tile, name and version over the one line about the name. */
+@Composable
+private fun BrandHeader() {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  Column(
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.spacedBy(spacing.s2),
+    modifier = Modifier.fillMaxWidth().padding(vertical = spacing.s2),
+  ) {
+    KetchLogoTile(size = KetchLogoTileDefaults.About)
+    Text(
+      text = "Ketch",
+      style = KetchTheme.typography.pageTitle,
+      color = colors.textPrimary,
+      modifier = Modifier.padding(top = spacing.s2),
+    )
+    Text(
+      text = "Version ${KetchApi.VERSION}",
+      style = KetchTheme.typography.mono,
+      color = colors.textSecondary,
+    )
+    Text(
+      text = "A ketch is a two-masted sailboat. Ketch splits every download into lanes, like " +
+        "its sails.",
+      style = KetchTheme.typography.bodyS,
+      color = colors.textSecondary,
+      textAlign = TextAlign.Center,
+      modifier = Modifier.widthIn(max = BrandLineWidth),
+    )
   }
 }
 
@@ -88,21 +168,22 @@ private fun LicenseDialog(onDismiss: () -> Unit) {
       Res.readBytes("files/licenses/$it").decodeToString()
     }.joinToString("\n\n")
   }
-  AlertDialog(
+  AdaptiveModal(
     onDismissRequest = onDismiss,
     title = { Text("Open-source licenses") },
-    text = {
-      SelectionContainer {
-        Text(
-          text = licenseText,
-          modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
-        )
-      }
-    },
     confirmButton = {
-      TextButton(onClick = onDismiss) { Text("Close") }
+      KetchButton(text = "Close", onClick = onDismiss, variant = KetchButtonVariant.Secondary)
     },
-  )
+  ) {
+    SelectionContainer {
+      Text(
+        text = licenseText,
+        style = KetchTheme.typography.mono,
+        color = KetchTheme.colors.textSecondary,
+        modifier = Modifier.heightIn(max = LicenseMaxHeight).verticalScroll(rememberScrollState()),
+      )
+    }
+  }
 }
 
 /** Opens or shares the log files; a failure replaces the description until the next try. */
@@ -115,9 +196,9 @@ private fun LogFilesRow(action: LogFilesAction) {
     title = action.title,
     description = failure ?: action.description,
     descriptionColor = if (failure != null) {
-      KetchTheme.colors.error
+      KetchTheme.colors.status.failed.color
     } else {
-      KetchTheme.colors.onSurfaceVariant
+      KetchTheme.colors.textSecondary
     },
     modifier = Modifier.clickable(enabled = !running, role = Role.Button) {
       running = true
@@ -134,18 +215,21 @@ private fun LogFilesRow(action: LogFilesAction) {
         }
       }
     },
-    trailing = {
-      KetchIconImage(KetchIcon.Chevron, size = 14.dp, tint = KetchTheme.colors.onSurfaceDim)
-    },
+    trailing = { Chevron() },
   )
 }
 
 @Composable
 private fun MonoValue(text: String) {
-  Text(
-    text = text,
-    style = KetchTheme.typography.monoSmall,
-    color = KetchTheme.colors.onSurfaceVariant,
+  Text(text = text, style = KetchTheme.typography.mono, color = KetchTheme.colors.textSecondary)
+}
+
+@Composable
+private fun Chevron() {
+  KetchIconImage(
+    icon = KetchIcon.Chevron,
+    size = KetchTheme.density.controlGlyph,
+    tint = KetchTheme.colors.textTertiary,
   )
 }
 
@@ -159,7 +243,14 @@ private fun LinkRow(title: String, description: String, url: String) {
       runCatching { uriHandler.openUri(url) }
     },
     trailing = {
-      KetchIconImage(KetchIcon.Chevron, size = 14.dp, tint = KetchTheme.colors.onSurfaceDim)
+      KetchIconImage(
+        icon = KetchIcon.Open,
+        size = KetchTheme.density.controlGlyph,
+        tint = KetchTheme.colors.textTertiary,
+      )
     },
   )
 }
+
+private val BrandLineWidth = 360.dp
+private val LicenseMaxHeight = 480.dp

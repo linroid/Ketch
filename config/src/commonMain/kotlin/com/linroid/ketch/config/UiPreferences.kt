@@ -102,6 +102,8 @@ data class IntakePreferences(
  * @property setupChecklistDismissed whether the user closed the setup checklist.
  * @property density how dense the UI is.
  * @property reduceMotion whether to reduce motion; `false` follows the system.
+ * @property settingsPage name of the Settings page shown last, which Settings reopens on;
+ *   `null` until Settings has been opened.
  */
 @Serializable
 data class UiPreferences(
@@ -126,6 +128,7 @@ data class UiPreferences(
   val setupChecklistDismissed: Boolean = false,
   val density: DensityMode = DensityMode.Auto,
   val reduceMotion: Boolean = false,
+  val settingsPage: String? = null,
 ) {
   companion object {
     /** Docked inspector width until the user resizes it, in dp. */

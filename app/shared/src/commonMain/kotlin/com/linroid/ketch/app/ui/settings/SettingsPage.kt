@@ -1,60 +1,106 @@
 package com.linroid.ketch.app.ui.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.navigationevent.NavigationEventInfo
-import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.rememberNavigationEventState
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.NetworkInterfaceInfo
+import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.components.DevicePennant
+import com.linroid.ketch.app.components.DevicePennantDefaults
+import com.linroid.ketch.app.components.KetchHueTile
+import com.linroid.ketch.app.components.KetchHueTileDefaults
 import com.linroid.ketch.app.components.KetchIconButton
-import com.linroid.ketch.app.components.KetchSidebarItem
+import com.linroid.ketch.app.components.KetchMenu
+import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.rememberFocusVisibility
+import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.instance.detail
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.IntegrationStatus
+import com.linroid.ketch.app.platform.LocalDesktopHooks
+import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.SettingsCategory
+import com.linroid.ketch.app.state.SettingsSection
+import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.state.folderName
+import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.isDocumentTree
+import com.linroid.ketch.app.state.toDeviceHealth
+import com.linroid.ketch.app.theme.FileTypeHue
+import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.KetchTheme
-
-/** Below this width the categories and their page are shown one at a time. */
-private val TWO_PANE_MIN_WIDTH = 760.dp
+import com.linroid.ketch.app.theme.eyebrowText
+import com.linroid.ketch.app.util.pairingAddresses
+import com.linroid.ketch.config.AiSettings
+import com.linroid.ketch.config.ClipboardMode
+import com.linroid.ketch.config.NotificationMode
+import com.linroid.ketch.config.NotificationSettings
+import com.linroid.ketch.config.SearchProvider
+import com.linroid.ketch.config.SpeedSettings
+import com.linroid.ketch.config.ThemeMode
 
 /**
- * The settings of one [category]. [SettingsPage] and [SettingsDialog]
- * both show categories through this.
+ * The settings of one [category]. Every layout of Settings shows its pages through this.
  *
  * Changes are applied as they are made, so there is nothing to save.
  *
@@ -63,11 +109,10 @@ private val TWO_PANE_MIN_WIDTH = 760.dp
  *   `null` while none is connected.
  * @param appSettings this app's own config sections.
  * @param aiSettings AI discovery settings and provider.
- * @param systemDeviceName name this device goes by when none is set, or
- *   `null` when the app has no local instance (the web app).
- * @param onTestAi call the AI provider with the saved settings.
- * @param fileLogger the app's log files, offered under About; `null`
- *   when the app keeps none.
+ * @param systemDeviceName name this device goes by when none is set, or `null` when the app has
+ *   no device of its own (the web app).
+ * @param onTestAi calls the AI provider with the saved settings.
+ * @param fileLogger the app's log files, offered under About; `null` when the app keeps none.
  */
 @Composable
 fun SettingsCategoryContent(
@@ -81,13 +126,10 @@ fun SettingsCategoryContent(
   fileLogger: FileLogger? = null,
 ) {
   when (category) {
-    SettingsCategory.General -> GeneralSettings(appSettings, systemDeviceName)
-    SettingsCategory.Downloads -> device?.let { DownloadSettings(state, it) } ?: NoDeviceNotice()
-    SettingsCategory.Speed -> device?.let { SpeedSettingsPage(state, it) } ?: NoDeviceNotice()
-    SettingsCategory.Network -> device?.let { NetworkSettings(state, it) } ?: NoDeviceNotice()
-    SettingsCategory.BitTorrent -> device?.let { BitTorrentSettings(state, it) } ?: NoDeviceNotice()
-    SettingsCategory.RemoteAccess -> device?.let { SharingSettings(state, it) } ?: NoDeviceNotice()
-    SettingsCategory.Ai -> AiDiscoverySettings(
+    SettingsCategory.General -> GeneralSettings(state, appSettings, systemDeviceName)
+    SettingsCategory.Notifications -> NotificationSettingsPage(state)
+    SettingsCategory.Integration -> IntegrationSettingsPage(state)
+    SettingsCategory.Discover -> AiDiscoverySettings(
       settings = aiSettings.settings,
       supported = aiSettings.supported,
       resolveCredentials = aiSettings::withPlatformCredentials,
@@ -95,176 +137,23 @@ fun SettingsCategoryContent(
       onChange = { aiSettings.save(it) },
       onTest = onTestAi,
     )
-    SettingsCategory.About -> AboutSettings(fileLogger)
+    SettingsCategory.About -> AboutSettings(state, fileLogger)
+    SettingsCategory.Downloads -> device?.let { DownloadSettings(state, it) } ?: NoDeviceNotice()
+    SettingsCategory.Speed -> device?.let { SpeedSettingsPage(state, it) } ?: NoDeviceNotice()
+    SettingsCategory.Network -> device?.let { NetworkSettings(state, it) } ?: NoDeviceNotice()
+    SettingsCategory.BitTorrent -> device?.let { BitTorrentSettings(state, it) } ?: NoDeviceNotice()
+    SettingsCategory.Sharing -> device?.let { SharingSettings(state, it) } ?: NoDeviceNotice()
   }
 }
 
 /**
- * Settings as a full page, for windows too narrow for [SettingsDialog].
- * Medium widths show the categories beside the selected page; phones
- * show the list first and open a category on tap.
+ * One page of Settings: its title, with [actions] such as the device chip at the end, over its
+ * scrolling content, which ends with a note that changes apply as they are made.
  *
- * @param categories categories to list, in order.
- * @param content renders one category; see [SettingsCategoryContent].
- * @param onClose leaves Settings when back is pressed on the category
- *   list; `null` leaves back handling to the platform.
- * @param initialCategory category to open first; on phones `null` starts
- *   at the category list.
- */
-@Composable
-fun SettingsPage(
-  categories: List<SettingsCategory>,
-  content: @Composable (SettingsCategory) -> Unit,
-  onClose: (() -> Unit)? = null,
-  initialCategory: SettingsCategory? = null,
-) {
-  var openName by rememberSaveable { mutableStateOf(initialCategory?.name) }
-  val open = categories.firstOrNull { it.name == openName }
-
-  BoxWithConstraints(Modifier.fillMaxSize()) {
-    val inset = if (maxWidth < 600.dp) 16.dp else 32.dp
-    val twoPane = maxWidth >= TWO_PANE_MIN_WIDTH
-    // Back steps out of a category first, then out of Settings.
-    val onBack = if (open != null && !twoPane) {
-      { openName = null }
-    } else {
-      onClose
-    }
-    if (onBack != null) {
-      NavigationBackHandler(
-        state = rememberNavigationEventState(NavigationEventInfo.None),
-        onBackCompleted = onBack,
-      )
-    }
-    when {
-      twoPane -> Row(Modifier.fillMaxSize()) {
-        val selected = open ?: categories.first()
-        SettingsCategoryNav(
-          categories = categories,
-          selected = selected,
-          onSelect = { openName = it.name },
-        )
-        VerticalDivider(color = KetchTheme.colors.outlineVariant)
-        SettingsCategoryPage(
-          category = selected,
-          inset = inset,
-          onBack = null,
-          content = content,
-          modifier = Modifier.weight(1f),
-        )
-      }
-      open == null -> CategoryList(
-        categories = categories,
-        inset = inset,
-        onOpen = { openName = it.name },
-      )
-      else -> SettingsCategoryPage(
-        category = open,
-        inset = inset,
-        onBack = { openName = null },
-        content = content,
-      )
-    }
-  }
-}
-
-/**
- * Category list beside a settings page.
- *
- * @param background fill behind the list, e.g. to set it apart in a
- *   dialog.
- * @param footer optional content pinned under the list.
- */
-@Composable
-internal fun SettingsCategoryNav(
-  categories: List<SettingsCategory>,
-  selected: SettingsCategory,
-  onSelect: (SettingsCategory) -> Unit,
-  background: Color = Color.Transparent,
-  footer: (@Composable () -> Unit)? = null,
-) {
-  Column(
-    modifier = Modifier.width(232.dp)
-      .fillMaxHeight()
-      .background(background)
-      .padding(vertical = 24.dp),
-  ) {
-    Text(
-      text = "Settings",
-      style = KetchTheme.typography.displaySmall,
-      color = KetchTheme.colors.onBackground,
-      modifier = Modifier.padding(start = 22.dp, end = 16.dp, bottom = 16.dp),
-    )
-    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-      categories.forEach { category ->
-        KetchSidebarItem(
-          label = category.title,
-          icon = category.icon,
-          selected = category == selected,
-          onClick = { onSelect(category) },
-        )
-      }
-    }
-    footer?.invoke()
-  }
-}
-
-@Composable
-private fun CategoryList(
-  categories: List<SettingsCategory>,
-  inset: Dp,
-  onOpen: (SettingsCategory) -> Unit,
-) {
-  Column(
-    modifier = Modifier.fillMaxSize()
-      .verticalScroll(rememberScrollState())
-      .padding(inset),
-    verticalArrangement = Arrangement.spacedBy(20.dp),
-  ) {
-    Text(
-      text = "Settings",
-      style = KetchTheme.typography.displaySmall,
-      color = KetchTheme.colors.onBackground,
-    )
-    SettingsGroup {
-      categories.forEach { category ->
-        SettingsRow(
-          title = category.title,
-          description = category.summary,
-          modifier = Modifier.clickable(role = Role.Button) { onOpen(category) },
-          leading = { CategoryIcon(category.icon) },
-          trailing = {
-            KetchIconImage(
-              icon = KetchIcon.Chevron,
-              size = 14.dp,
-              tint = KetchTheme.colors.onSurfaceDim,
-            )
-          },
-        )
-      }
-    }
-  }
-}
-
-@Composable
-private fun CategoryIcon(icon: KetchIcon) {
-  val colors = KetchTheme.colors
-  Box(
-    contentAlignment = Alignment.Center,
-    modifier = Modifier.size(32.dp)
-      .clip(RoundedCornerShape(8.dp))
-      .background(colors.primaryContainer),
-  ) {
-    KetchIconImage(icon = icon, size = 17.dp, tint = colors.primary)
-  }
-}
-
-/**
- * One category's page, centred and width-capped so rows stay readable
- * on wide windows.
- *
- * @param onBack returns to the category list; `null` when the list is
- *   already on screen.
+ * @param inset space at the sides of the page.
+ * @param onBack returns to the list of pages; `null` when the list is on screen beside it.
+ * @param jump scrolls to a row and flashes it, as a search result asks.
+ * @param actions controls at the end of the title line.
  */
 @Composable
 internal fun SettingsCategoryPage(
@@ -273,35 +162,759 @@ internal fun SettingsCategoryPage(
   onBack: (() -> Unit)?,
   content: @Composable (SettingsCategory) -> Unit,
   modifier: Modifier = Modifier,
+  jump: SettingsJumpRequest? = null,
+  actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
-  // A fresh scroll position for every category.
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  // A fresh scroll position for every page.
   key(category) {
-    Column(
-      modifier = modifier.fillMaxSize()
-        .verticalScroll(rememberScrollState())
-        .padding(horizontal = inset, vertical = 24.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-      Column(
-        modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+    val scroll = rememberScrollState()
+    val highlight = colors.accent.copy(alpha = HIGHLIGHT_ALPHA)
+    val cardShape = KetchTheme.shapes.card
+    val settingsJump = remember(highlight, cardShape) { SettingsJump(highlight, cardShape) }
+    val scrolled = remember { CoordinatesHolder() }
+    Column(modifier.fillMaxSize()) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+        modifier = Modifier.fillMaxWidth()
+          .heightIn(min = KetchTheme.density.iconButtonTarget)
+          .padding(
+            start = if (onBack != null) inset - spacing.s2 else inset,
+            end = inset,
+            top = spacing.s4,
+            bottom = spacing.s3,
+          ),
       ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(4.dp),
+        if (onBack != null) {
+          KetchIconButton(
+            icon = KetchIcon.ChevronLeft,
+            onClick = onBack,
+            contentDescription = "Back to settings",
+          )
+        }
+        Text(
+          text = category.title,
+          style = KetchTheme.typography.titleL,
+          color = colors.textPrimary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          modifier = Modifier.weight(1f),
+        )
+        actions?.invoke(this)
+      }
+      CompositionLocalProvider(LocalSettingsJump provides settingsJump) {
+        Column(
+          modifier = Modifier.weight(1f)
+            .fillMaxWidth()
+            .verticalScroll(scroll)
+            .onGloballyPositioned { scrolled.value = it }
+            .padding(start = inset, end = inset, top = spacing.s1, bottom = spacing.s4),
         ) {
-          if (onBack != null) {
-            KetchIconButton(
-              icon = KetchIcon.ChevronLeft,
-              contentDescription = "Back to settings",
-              onClick = onBack,
+          Column(
+            modifier = Modifier.widthIn(max = PageMaxWidth).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(spacing.sectionGap),
+          ) {
+            content(category)
+            Text(
+              text = "Changes apply as you make them.",
+              style = KetchTheme.typography.caption,
+              color = colors.textTertiary,
+              textAlign = TextAlign.Center,
+              modifier = Modifier.fillMaxWidth(),
             )
           }
-          SettingsHeader(title = category.title, description = category.summary)
         }
-        content(category)
-        Spacer(Modifier.height(24.dp))
+      }
+    }
+    val margin = with(LocalDensity.current) { spacing.s4.toPx() }
+    SettingsJumpEffect(
+      jump = settingsJump,
+      request = jump,
+      scroll = scroll,
+      content = { scrolled.value },
+      margin = margin,
+      animate = !KetchTheme.reduceMotion,
+    )
+  }
+}
+
+private class CoordinatesHolder {
+  var value: LayoutCoordinates? = null
+}
+
+/**
+ * The column of pages beside the open one, in two groups, with search at the top. While a query
+ * is typed it lists what matches instead.
+ *
+ * @param summaries the live one-line state of each page.
+ * @param deviceChip the chip that picks the device the device pages edit; `null` hides it.
+ * @param search the search field.
+ * @param results the search results, shown in place of the pages while a query is typed.
+ */
+@Composable
+internal fun SettingsNav(
+  categories: List<SettingsCategory>,
+  selected: SettingsCategory,
+  summaries: Map<SettingsCategory, String>,
+  onOpen: (SettingsCategory) -> Unit,
+  deviceChip: (@Composable () -> Unit)?,
+  search: @Composable () -> Unit,
+  results: (@Composable () -> Unit)?,
+  modifier: Modifier = Modifier,
+) {
+  val spacing = KetchTheme.spacing
+  Column(modifier.fillMaxHeight()) {
+    Box(Modifier.padding(start = spacing.s3, end = spacing.s3, top = spacing.s3)) { search() }
+    Column(
+      modifier = Modifier.weight(1f)
+        .fillMaxWidth()
+        .verticalScroll(rememberScrollState())
+        .padding(horizontal = spacing.s1, vertical = spacing.s3),
+    ) {
+      if (results != null) {
+        results()
+        return@Column
+      }
+      for (section in SettingsSection.entries) {
+        val pages = categories.filter { it.section == section }
+        if (pages.isEmpty()) continue
+        SectionHeader(
+          title = section.title,
+          trailing = deviceChip.takeIf { section == SettingsSection.Device },
+          modifier = Modifier.padding(
+            top = if (section == SettingsSection.App) 0.dp else spacing.s4,
+          ),
+        )
+        pages.forEach { category ->
+          SettingsNavItem(
+            category = category,
+            summary = summaries[category],
+            selected = category == selected,
+            onClick = { onOpen(category) },
+          )
+        }
       }
     }
   }
 }
+
+/** The eyebrow over a group of pages, with an optional control at its end. */
+@Composable
+private fun SectionHeader(
+  title: String,
+  trailing: (@Composable () -> Unit)?,
+  modifier: Modifier = Modifier,
+) {
+  val spacing = KetchTheme.spacing
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+    modifier = modifier.fillMaxWidth()
+      .heightIn(min = KetchTheme.density.chip + spacing.s1)
+      .padding(start = spacing.s3, end = spacing.s2, bottom = spacing.s1),
+  ) {
+    Text(
+      text = eyebrowText(title),
+      style = KetchTheme.typography.eyebrow,
+      color = KetchTheme.colors.textSecondary,
+      maxLines = 1,
+    )
+    if (trailing != null) {
+      Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { trailing() }
+    }
+  }
+}
+
+/** One page in [SettingsNav]: its hue tile, its name and its live summary. */
+@Composable
+private fun SettingsNavItem(
+  category: SettingsCategory,
+  summary: String?,
+  selected: Boolean,
+  onClick: () -> Unit,
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val shape = KetchTheme.shapes.sidebarItem
+  val interactions = remember { MutableInteractionSource() }
+  val hovered by interactions.collectIsHoveredAsState()
+  val focus = rememberFocusVisibility()
+  val fill by animateColorAsState(
+    targetValue = when {
+      selected -> colors.sidebarItemSelected
+      hovered -> colors.sidebarItemHover
+      else -> Color.Transparent
+    },
+    animationSpec = tween(KetchTheme.motion.micro),
+  )
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(spacing.iconLabelGap),
+    modifier = Modifier.fillMaxWidth()
+      .padding(horizontal = spacing.s2, vertical = spacing.s0_5)
+      .focusRing(focus.visible, shape, colors.focusRing)
+      .heightIn(min = KetchHueTileDefaults.Small + spacing.s2)
+      .background(fill, shape)
+      .trackFocusVisibility(focus)
+      .selectable(
+        selected = selected,
+        interactionSource = interactions,
+        indication = null,
+        role = Role.Tab,
+        onClick = onClick,
+      )
+      .padding(horizontal = spacing.s1, vertical = spacing.s1),
+  ) {
+    KetchHueTile(icon = category.icon, hue = category.hue, size = KetchHueTileDefaults.Small)
+    Column(Modifier.weight(1f)) {
+      Text(
+        text = category.title,
+        style = KetchTheme.typography.label,
+        fontWeight = if (selected) FontWeight.SemiBold else null,
+        color = colors.textPrimary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+      if (!summary.isNullOrEmpty()) {
+        Text(
+          text = summary,
+          style = KetchTheme.typography.caption,
+          color = colors.textTertiary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+    }
+  }
+}
+
+/**
+ * The phone's Settings: the pages in two groups, each with its summary, and search above them.
+ *
+ * @param onClose leaves Settings; `null` leaves that to the platform's back.
+ */
+@Composable
+internal fun SettingsList(
+  categories: List<SettingsCategory>,
+  summaries: Map<SettingsCategory, String>,
+  inset: Dp,
+  onOpen: (SettingsCategory) -> Unit,
+  onClose: (() -> Unit)?,
+  deviceChip: (@Composable () -> Unit)?,
+  search: @Composable () -> Unit,
+  results: (@Composable () -> Unit)?,
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  Column(
+    modifier = Modifier.fillMaxSize()
+      .verticalScroll(rememberScrollState())
+      .padding(horizontal = inset, vertical = spacing.s4),
+    verticalArrangement = Arrangement.spacedBy(spacing.s4),
+  ) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+      modifier = Modifier.padding(start = if (onClose != null) 0.dp else spacing.s1),
+    ) {
+      if (onClose != null) {
+        KetchIconButton(
+          icon = KetchIcon.ChevronLeft,
+          onClick = onClose,
+          contentDescription = "Close settings",
+        )
+      }
+      Text(text = "Settings", style = KetchTheme.typography.pageTitle, color = colors.textPrimary)
+    }
+    search()
+    if (results != null) {
+      results()
+      return@Column
+    }
+    for (section in SettingsSection.entries) {
+      val pages = categories.filter { it.section == section }
+      if (pages.isEmpty()) continue
+      SettingsGroup(
+        title = section.title,
+        action = deviceChip.takeIf { section == SettingsSection.Device },
+      ) {
+        pages.forEach { category ->
+          SettingsRow(
+            title = category.title,
+            description = summaries[category] ?: category.description,
+            modifier = Modifier.clickable(role = Role.Button) { onOpen(category) },
+            leading = {
+              KetchHueTile(
+                icon = category.icon,
+                hue = category.hue,
+                size = KetchHueTileDefaults.Small,
+              )
+            },
+            trailing = {
+              KetchIconImage(
+                icon = KetchIcon.Chevron,
+                size = KetchTheme.density.controlGlyph,
+                tint = colors.textTertiary,
+              )
+            },
+          )
+        }
+      }
+    }
+    Text(
+      text = "Changes apply as you make them.",
+      style = KetchTheme.typography.caption,
+      color = colors.textTertiary,
+      textAlign = TextAlign.Center,
+      modifier = Modifier.fillMaxWidth(),
+    )
+  }
+}
+
+/**
+ * Search results: each setting with the matching words highlighted and the page it is on. The
+ * [selected] one is what Enter opens.
+ *
+ * @param inGroup draws the results as the rows of a group, as on phones, rather than as
+ *   navigation items.
+ */
+@Composable
+internal fun SettingsSearchResults(
+  query: String,
+  hits: List<SettingsHit>,
+  selected: Int,
+  onOpen: (SettingsHit) -> Unit,
+  inGroup: Boolean,
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  if (hits.isEmpty()) {
+    Text(
+      text = "No settings match “${query.trim()}”.",
+      style = KetchTheme.typography.bodyS,
+      color = colors.textSecondary,
+      modifier = Modifier.padding(horizontal = spacing.s3, vertical = spacing.s2),
+    )
+    return
+  }
+  val match = SpanStyle(
+    color = colors.accentText,
+    fontWeight = FontWeight.SemiBold,
+    background = colors.accentSoft,
+  )
+  val items = @Composable {
+    hits.forEachIndexed { index, hit ->
+      SearchResult(
+        hit = hit,
+        match = match,
+        selected = index == selected,
+        onClick = { onOpen(hit) },
+        filled = inGroup,
+      )
+    }
+  }
+  if (inGroup) {
+    val count = if (hits.size == 1) "1 setting" else "${hits.size} settings"
+    SettingsGroup(title = count) { items() }
+  } else {
+    items()
+  }
+}
+
+@Composable
+private fun SearchResult(
+  hit: SettingsHit,
+  match: SpanStyle,
+  selected: Boolean,
+  onClick: () -> Unit,
+  filled: Boolean,
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val entry = hit.entry
+  val shape = KetchTheme.shapes.sidebarItem
+  val interactions = remember { MutableInteractionSource() }
+  val hovered by interactions.collectIsHoveredAsState()
+  val focus = rememberFocusVisibility()
+  val fill = when {
+    selected -> colors.sidebarItemSelected
+    hovered -> colors.sidebarItemHover
+    filled -> colors.surface
+    else -> Color.Transparent
+  }
+  val outer = if (filled) {
+    Modifier.fillMaxWidth().background(colors.surface)
+  } else {
+    Modifier.fillMaxWidth().padding(horizontal = spacing.s2, vertical = spacing.s0_5)
+  }
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(spacing.iconLabelGap),
+    modifier = outer
+      .focusRing(focus.visible, shape, colors.focusRing)
+      .background(fill, if (filled) RectangleShape else shape)
+      .trackFocusVisibility(focus)
+      .clickable(
+        interactionSource = interactions,
+        indication = null,
+        role = Role.Button,
+        onClick = onClick,
+      )
+      .padding(
+        horizontal = if (filled) spacing.s4 else spacing.s2,
+        vertical = if (filled) spacing.s3 else spacing.s1,
+      ),
+  ) {
+    KetchHueTile(
+      icon = entry.category.icon,
+      hue = entry.category.hue,
+      size = KetchHueTileDefaults.Small,
+    )
+    Column(Modifier.weight(1f)) {
+      Text(
+        text = highlighted(entry.title, hit.titleMatches, match),
+        style = KetchTheme.typography.label,
+        color = colors.textPrimary,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+      )
+      val where = if (entry.title == entry.category.title) {
+        entry.description
+      } else {
+        entry.category.title
+      }
+      if (where.isNotEmpty()) {
+        Text(
+          text = where,
+          style = KetchTheme.typography.caption,
+          color = colors.textTertiary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+    }
+  }
+}
+
+/**
+ * The pill naming the device the device pages edit, such as "(LM) This Mac ▾"; with two
+ * devices or more it opens a menu of them. Devices that are not connected are listed but cannot
+ * be picked.
+ *
+ * @param label word before the device, such as "On"; `null` for none.
+ */
+@Composable
+internal fun SettingsDeviceChip(
+  devices: List<InstanceEntry>,
+  selected: InstanceEntry,
+  onSelect: (InstanceEntry) -> Unit,
+  modifier: Modifier = Modifier,
+  label: String? = null,
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val shape = KetchTheme.shapes.full
+  val choosable = devices.size > 1
+  val interactions = remember { MutableInteractionSource() }
+  val overlay = rememberInteractionOverlay(interactions, choosable)
+  val focus = rememberFocusVisibility()
+  var expanded by remember { mutableStateOf(false) }
+  val health = devices.associate { key(it.deviceId) { it.deviceId to rememberHealth(it) } }
+  Box(modifier) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s1),
+      modifier = Modifier
+        .focusRing(focus.visible, shape, colors.focusRing)
+        .height(KetchTheme.density.chip)
+        .clip(shape)
+        .background(colors.surface)
+        .background(overlay)
+        .border(HairlineWidth, colors.borderStrong, shape)
+        .trackFocusVisibility(focus)
+        .clickable(
+          interactionSource = interactions,
+          indication = null,
+          enabled = choosable,
+          role = Role.DropdownList,
+          onClickLabel = "Choose device",
+          onClick = { expanded = true },
+        )
+        .padding(horizontal = spacing.s2),
+    ) {
+      if (label != null) {
+        Text(
+          text = label,
+          style = KetchTheme.typography.labelS,
+          color = colors.textTertiary,
+          maxLines = 1,
+        )
+      }
+      DevicePennant(
+        deviceId = selected.deviceId,
+        name = selected.label,
+        size = DevicePennantDefaults.XSmall,
+      )
+      Text(
+        text = selected.displayName,
+        style = KetchTheme.typography.labelS,
+        fontWeight = FontWeight.SemiBold,
+        color = colors.textPrimary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(1f, fill = false).widthIn(max = ChipNameMaxWidth),
+      )
+      if (choosable) {
+        KetchIconImage(
+          icon = KetchIcon.ChevronDown,
+          size = KetchTheme.density.controlGlyph,
+          tint = colors.textSecondary,
+        )
+      }
+    }
+    KetchMenu(
+      expanded = expanded,
+      onDismissRequest = { expanded = false },
+      title = "Settings for",
+    ) {
+      for (device in devices) {
+        val state = health[device.deviceId] ?: DeviceHealth.Local()
+        item(
+          label = device.displayName,
+          onClick = { onSelect(device) },
+          caption = when (state) {
+            DeviceHealth.Connecting -> "Connecting…"
+            is DeviceHealth.Offline -> "Offline"
+            DeviceHealth.Unauthorized -> "Needs a new access code"
+            is DeviceHealth.Local, DeviceHealth.Live -> device.detail
+          },
+          enabled = state.isOnline,
+          checked = device.deviceId == selected.deviceId,
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun rememberHealth(device: InstanceEntry): DeviceHealth = when (device) {
+  is RemoteInstance -> device.connectionState.collectAsState().value.toDeviceHealth()
+  else -> DeviceHealth.Local()
+}
+
+/** Hue of a page's tile. */
+internal val SettingsCategory.hue: FileTypeHue
+  get() = when (this) {
+    SettingsCategory.General, SettingsCategory.About -> FileTypeHue.Slate
+    SettingsCategory.Notifications -> FileTypeHue.Amber
+    SettingsCategory.Integration -> FileTypeHue.Indigo
+    SettingsCategory.Discover -> FileTypeHue.Violet
+    SettingsCategory.Downloads -> FileTypeHue.Blue
+    SettingsCategory.Speed -> FileTypeHue.Orange
+    SettingsCategory.Network -> FileTypeHue.Teal
+    SettingsCategory.BitTorrent -> FileTypeHue.Jade
+    SettingsCategory.Sharing -> FileTypeHue.Sky
+  }
+
+/**
+ * The live one-line state of each page, as the list of pages shows it, such as "Light · Signal"
+ * for General or "~/Downloads · 3 at a time" for Downloads. Pages whose state is still loading
+ * have none.
+ *
+ * @param device device the device pages edit.
+ */
+@Composable
+internal fun rememberSettingsSummaries(
+  state: AppState,
+  device: InstanceEntry?,
+): Map<SettingsCategory, String> {
+  val appSettings = state.appSettings
+  val aiSettings = state.aiSettings
+  val integration = LocalIntegrationStatus.current
+  val desktop = LocalDesktopHooks.current.isSupported
+  val serverState by state.serverState.collectAsState()
+  val controller = device?.let(state::settingsFor)
+  val speedMode = state.speedMode.takeIf { device is EmbeddedInstance }
+  val speedSettings = speedMode?.settings?.collectAsState()?.value
+  val mode = speedMode?.mode?.collectAsState()?.value
+  val download = controller?.download
+  val networks = controller?.networks
+  return buildMap {
+    put(SettingsCategory.General, generalSummary(appSettings.themeMode, appSettings.accent))
+    put(SettingsCategory.Notifications, notificationsSummary(appSettings.config.notifications))
+    put(
+      SettingsCategory.Integration,
+      integrationSummary(integration, desktop, clipboardModeOf(appSettings)),
+    )
+    put(
+      SettingsCategory.Discover,
+      discoverSummary(aiSettings.settings, aiSettings.withPlatformCredentials(aiSettings.settings)),
+    )
+    put(SettingsCategory.About, "Version ${KetchApi.VERSION}")
+    if (download != null) put(SettingsCategory.Downloads, downloadsSummary(download))
+    val speed = when {
+      speedMode != null && speedSettings != null && mode != null ->
+        speedSummary(mode, speedSettings, speedSettings.slowLane ?: speedMode.suggestedSlowLane)
+      download != null -> remoteSpeedSummary(download.speedLimit)
+      else -> null
+    }
+    speed?.let { put(SettingsCategory.Speed, it) }
+    networkSummary(networks)?.let { put(SettingsCategory.Network, it) }
+    controller?.torrent?.let { put(SettingsCategory.BitTorrent, trackersSummary(it.trackers.size)) }
+    put(SettingsCategory.Sharing, sharingSummary(serverState, networks?.available))
+  }
+}
+
+/** "Light · Signal": the theme and the accent. */
+internal fun generalSummary(theme: ThemeMode, accent: KetchAccent): String =
+  "${theme.label} · ${accent.displayName}"
+
+/** "4 on": how many kinds of event are reported at all, or "Off" when none is. */
+internal fun notificationsSummary(settings: NotificationSettings): String {
+  val on = listOf(
+    settings.finished != NotificationMode.Off,
+    settings.failed != NotificationMode.Off,
+    settings.queueDrained,
+    settings.deviceOffline,
+  ).count { it }
+  return if (on == 0) "Off" else "$on on"
+}
+
+/**
+ * "Chrome ✓" when the browser extension connected from Chrome; on desktop without it "Extension
+ * not set up"; elsewhere what happens to copied links.
+ */
+internal fun integrationSummary(
+  status: IntegrationStatus,
+  desktop: Boolean,
+  clipboard: ClipboardMode,
+): String {
+  val connected = status.browsers.filter { it.extensionConnected }.map { it.name }
+  return when {
+    connected.size == 1 -> "${connected.single()} ✓"
+    connected.size > 1 -> "${connected.first()} + ${connected.size - 1} ✓"
+    status.extensionConnected -> "Extension ✓"
+    desktop -> "Extension not set up"
+    else -> clipboard.summary
+  }
+}
+
+/**
+ * "Anthropic · Brave search" once discovery is on and set up; "Off" or "Not set up" otherwise.
+ *
+ * @param effective [settings] with the credentials the platform supplies.
+ */
+internal fun discoverSummary(settings: AiSettings, effective: AiSettings): String = when {
+  !effective.llm.isComplete || !effective.search.isComplete -> "Not set up"
+  !settings.enabled -> "Off"
+  effective.search.provider == SearchProvider.None -> effective.llm.provider.label
+  else -> "${effective.llm.provider.label} · ${effective.search.provider.label} search"
+}
+
+/** "~/Downloads · 3 at a time": where downloads go and how many run together. */
+internal fun downloadsSummary(config: DownloadConfig): String {
+  val folder = config.defaultDirectory?.let(::shortFolder) ?: "Downloads folder"
+  val count = config.maxConcurrentDownloads
+  return if (count == 0) "$folder · no queue" else "$folder · $count at a time"
+}
+
+/**
+ * [path] for a one-line summary: "~/Downloads" for a folder right in the home folder on macOS or
+ * Linux, otherwise its name.
+ */
+internal fun shortFolder(path: String): String {
+  if (isDocumentTree(path)) return folderName(path)
+  val home = HomeFolder.find(path)
+  if (home != null) {
+    val rest = path.substring(home.value.length).trim('/')
+    if (rest.isNotEmpty() && '/' !in rest) return "~/$rest"
+  }
+  return folderName(path)
+}
+
+/** "Slow lane · 1 MB/s": the mode of a device with speed modes, and the limit it applies. */
+internal fun speedSummary(mode: SpeedMode, settings: SpeedSettings, slowLane: SpeedLimit): String =
+  when (mode) {
+    SpeedMode.Full -> if (settings.standard.isUnlimited) {
+      "Full speed"
+    } else {
+      "Full speed · ${formatSpeedLimit(settings.standard)}"
+    }
+    SpeedMode.SlowLane -> "Slow lane · ${formatSpeedLimit(slowLane)}"
+    is SpeedMode.Auto -> if (mode.slowLane) {
+      "Auto · Slow lane ${formatSpeedLimit(slowLane)}"
+    } else {
+      "Auto · Full speed"
+    }
+  }
+
+/** "Limit 5 MB/s" for a device without speed modes, or "No limit". */
+internal fun remoteSpeedSummary(limit: SpeedLimit): String =
+  if (limit.isUnlimited) "No limit" else "Limit ${formatSpeedLimit(limit)}"
+
+/** "en0 + en7": the networks downloads are spread across, or the system's default. */
+internal fun networkSummary(networks: NetworkInterfaces?): String? {
+  if (networks == null) return null
+  val selected = networks.config.interfaceIds
+  if (!networks.supported || selected.isEmpty()) return "System default"
+  val names = networks.available.associate { it.id to it.name }
+  return selected.joinToString(" + ") { names[it] ?: it }
+}
+
+/** "3 trackers", or "No extra trackers". */
+internal fun trackersSummary(count: Int): String = when (count) {
+  0 -> "No extra trackers"
+  1 -> "1 tracker"
+  else -> "$count trackers"
+}
+
+/**
+ * "On · 192.168.1.20:8642" while other devices can connect, "This device only" while only apps
+ * here can, and "Off".
+ *
+ * @param interfaces the device's networks, for its address; `null` while they load.
+ */
+internal fun sharingSummary(
+  server: ServerState,
+  interfaces: List<NetworkInterfaceInfo>?,
+): String = when {
+  server !is ServerState.Running -> "Off"
+  server.config.isLoopbackOnly -> "This device only"
+  else -> {
+    val address = interfaces?.let(::pairingAddresses)?.firstOrNull()
+    if (address != null) "On · $address:${server.port}" else "On · port ${server.port}"
+  }
+}
+
+/** What happens to copied links, as the clipboard setting reads in summaries. */
+internal val ClipboardMode.summary: String
+  get() = when (this) {
+    ClipboardMode.Fill -> "Fills copied links"
+    ClipboardMode.Suggest -> "Suggests copied links"
+    ClipboardMode.Off -> "Clipboard off"
+  }
+
+/** How the theme reads in Settings. */
+internal val ThemeMode.label: String
+  get() = when (this) {
+    ThemeMode.System -> "System"
+    ThemeMode.Light -> "Light"
+    ThemeMode.Dark -> "Dark"
+  }
+
+/** Home folders of macOS and Linux, which summaries shorten to "~". */
+private object HomeFolder {
+  private val pattern = Regex("^/(Users|home)/[^/]+")
+
+  fun find(path: String): MatchResult? = pattern.find(path)
+}
+
+/** Widest the main pane of Settings lets its rows grow. */
+private val PageMaxWidth = 640.dp
+
+/** Widest a device name grows in the device chip before it is cut short. */
+private val ChipNameMaxWidth = 160.dp
+
+private const val HIGHLIGHT_ALPHA = 0.16f

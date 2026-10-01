@@ -6,7 +6,10 @@ import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.config.AccentColor
 import com.linroid.ketch.config.ConfigStore
+import com.linroid.ketch.config.DesktopSettings
+import com.linroid.ketch.config.IntegrationSettings
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.TorrentSettings
@@ -77,6 +80,29 @@ class AppSettingsController(
    */
   fun saveUi(transform: (UiPreferences) -> UiPreferences) {
     update { it.copy(ui = transform(it.ui)) }
+  }
+
+  /** Persists a change to the desktop app's window and startup behavior. */
+  fun saveDesktop(transform: (DesktopSettings) -> DesktopSettings) {
+    update { it.copy(desktop = transform(it.desktop)) }
+  }
+
+  /** Persists a change to which activity the apps report, and how. */
+  fun saveNotifications(transform: (NotificationSettings) -> NotificationSettings) {
+    update { it.copy(notifications = transform(it.notifications)) }
+  }
+
+  /** Persists a change to how the desktop app hooks into the operating system. */
+  fun saveIntegration(transform: (IntegrationSettings) -> IntegrationSettings) {
+    update { it.copy(integration = transform(it.integration)) }
+  }
+
+  /**
+   * Reads the store again, for sections the host saves on its own, such as the desktop app's
+   * close action after "Don't ask again".
+   */
+  fun reload() {
+    configStore?.load()?.let { config = it }
   }
 
   private fun update(block: (KetchConfig) -> KetchConfig) {
