@@ -12,11 +12,16 @@ import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -72,6 +77,36 @@ class ShortcutHostTest {
     window.press(KetchCommands.Discover)
 
     assertEquals(listOf(KetchCommands.Discover, KetchCommands.Discover), window.close())
+  }
+
+  @Test
+  fun shortcutHost_focusablePopupOpen_leavesItTheKeys() {
+    val window = ShortcutWindow(runs = true)
+    val popupKeys = mutableListOf<Key>()
+
+    window.show {
+      ShortcutHost(onCommand = window::run) {
+        Box(Modifier.size(Side))
+        Popup(properties = PopupProperties(focusable = true)) {
+          val focus = remember { FocusRequester() }
+          Box(
+            Modifier
+              .size(Side)
+              .focusRequester(focus)
+              .onKeyEvent {
+                if (it.type == KeyEventType.KeyDown) popupKeys += it.key
+                true
+              }
+              .focusable(),
+          )
+          LaunchedEffect(focus) { focus.requestFocus() }
+        }
+      }
+    }
+    window.press(KetchCommands.Add)
+
+    assertEquals(listOf(Key.N), popupKeys)
+    assertEquals(emptyList(), window.close())
   }
 
   /** A focused box that keeps every key, as a focused text field keeps ⌘V. */

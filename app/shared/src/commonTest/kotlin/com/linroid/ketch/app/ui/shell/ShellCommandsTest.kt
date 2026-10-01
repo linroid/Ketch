@@ -19,6 +19,7 @@ import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -218,6 +219,30 @@ class ShellCommandsTest {
 
     assertTrue(fixture.commands.run(KetchCommands.ToggleSidebar))
     assertTrue(fixture.controller.appSettings.ui.sidebarCollapsed)
+    fixture.controller.close()
+  }
+
+  @Test
+  fun run_search_asksForTheSearchField() = runTest {
+    val fixture = fixture()
+    val requests = mutableListOf<Unit>()
+    backgroundScope.launch { fixture.controller.state.focusSearchRequests.collect(requests::add) }
+    runCurrent()
+
+    assertTrue(fixture.commands.run(KetchCommands.Search))
+    runCurrent()
+
+    assertEquals(1, requests.size)
+    fixture.controller.close()
+  }
+
+  @Test
+  fun run_searchWhileSettingsShows_leavesTheKeyToSettings() = runTest {
+    val fixture = fixture()
+    fixture.shell.openSettings()
+
+    assertFalse(fixture.commands.run(KetchCommands.Search))
+    assertTrue(fixture.shell.settingsOpen)
     fixture.controller.close()
   }
 
