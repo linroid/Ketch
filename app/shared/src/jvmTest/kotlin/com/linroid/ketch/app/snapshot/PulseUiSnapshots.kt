@@ -122,13 +122,29 @@ class PulseUiSnapshots {
 
   @Test
   fun pulseBar_narrowCards_collapseFromTheRight() {
-    val size = SnapshotSize(720.dp, 300.dp, KetchDensity.Compact)
+    val size = SnapshotSize(720.dp, 420.dp, KetchDensity.Compact)
     SnapshotTheme.entries.forEach { theme ->
       snapshot("pulse-bar-widths", size, theme) {
         Column(
           verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s3),
           modifier = Modifier.padding(KetchTheme.spacing.s4),
         ) {
+          // The medium tier's narrowest card, with the longest pill: what does not fit goes.
+          BarSample(
+            label = "640 dp, Auto rule",
+            pulse = PulseSamples.busy,
+            mode = PulseSamples.auto,
+            unread = 2,
+            width = 640.dp,
+          )
+          BarSample(
+            label = "640 dp, Auto rule, selection",
+            pulse = PulseSamples.busy,
+            mode = PulseSamples.auto,
+            unread = 2,
+            selection = "3 selected · 19.94 GB · 23.7 MB/s",
+            width = 640.dp,
+          )
           listOf(680.dp, 560.dp, 440.dp, 360.dp).forEach { width ->
             BarSample(
               label = "${width.value.toInt()} dp",
@@ -217,7 +233,7 @@ class PulseUiSnapshots {
                 Panel(280.dp) { SpeedModeOptions(state, onOpenSettings = {}) }
                 Panel(320.dp) {
                   val histories = state.speedHistory.histories.value
-                  val chart = totalHistory(histories.values)
+                  val chart = totalHistory(histories.values, SampleData.NOW)
                   SpeedHistoryContent(
                     samples = chart.samples,
                     end = chart.end,
@@ -243,7 +259,24 @@ class PulseUiSnapshots {
         theme = SnapshotTheme.Dark,
         interact = {
           // The chevron of "Slow lane · 3 MB/s", at the start of the bar.
-          click(x = 162.dp, y = 776.dp)
+          click(x = 166.dp, y = 776.dp)
+        },
+      ) {
+        PulseCard(state, SnapshotSize.Desktop.width)
+      }
+    }
+  }
+
+  @Test
+  fun popover_chevronClickedTwice_closesAgain() {
+    withPulseApp(SnapshotTheme.Light, SnapshotSize.Desktop, slowLane = true) { state ->
+      snapshot(
+        name = "pulse-card-popover-closed",
+        size = SnapshotSize.Desktop,
+        theme = SnapshotTheme.Light,
+        interact = {
+          click(x = 166.dp, y = 776.dp)
+          click(x = 166.dp, y = 776.dp)
         },
       ) {
         PulseCard(state, SnapshotSize.Desktop.width)
@@ -649,6 +682,7 @@ private object BannerSamples {
       name = "NAS-Basement",
       connectingLong = true,
       localName = null,
+      onRetry = {},
       onSwitchToLocal = {},
       onEnterToken = {},
     ),
@@ -657,6 +691,7 @@ private object BannerSamples {
       name = "NAS-Basement",
       connectingLong = false,
       localName = "This Mac",
+      onRetry = {},
       onSwitchToLocal = {},
       onEnterToken = {},
     )?.copy(id = "offline"),
@@ -665,6 +700,7 @@ private object BannerSamples {
       name = "NAS-Basement",
       connectingLong = false,
       localName = null,
+      onRetry = {},
       onSwitchToLocal = {},
       onEnterToken = {},
     )?.copy(id = "token"),

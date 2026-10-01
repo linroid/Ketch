@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -66,7 +67,7 @@ class SpeedModeActionsTest {
   fun toggleSlowLane_fullSpeed_turnsItOnWithUndo() = runTest {
     val f = fixture()
 
-    f.state.toggleSlowLane(backgroundScope)
+    f.state.toggleSlowLane()
     runCurrent()
 
     assertEquals(SpeedMode.SlowLane, f.speed?.mode?.value)
@@ -79,7 +80,7 @@ class SpeedModeActionsTest {
   @Test
   fun toggleSlowLane_undo_restoresFullSpeed() = runTest {
     val f = fixture()
-    f.state.toggleSlowLane(backgroundScope)
+    f.state.toggleSlowLane()
     runCurrent()
 
     f.state.messages.history.value.first().actions.single().onClick()
@@ -96,7 +97,7 @@ class SpeedModeActionsTest {
   fun toggleSlowLane_withoutSpeedMode_doesNothing() = runTest {
     val f = fixture(withSpeedMode = false)
 
-    assertNull(f.state.toggleSlowLane(backgroundScope))
+    assertNull(f.state.toggleSlowLane())
     assertTrue(f.state.messages.history.value.isEmpty())
   }
 
@@ -105,7 +106,7 @@ class SpeedModeActionsTest {
     val f = fixture()
     f.engine.rejects = true
 
-    f.state.toggleSlowLane(backgroundScope)
+    f.state.toggleSlowLane()
     runCurrent()
 
     assertEquals(SpeedMode.Full, f.speed?.mode?.value)
@@ -124,7 +125,7 @@ class SpeedModeActionsTest {
   fun setSpeedLimit_asSlowLaneAtFullSpeed_setsItsSpeedAndTurnsItOn() = runTest {
     val f = fixture()
 
-    f.state.setSpeedLimit(SpeedLimit.mbps(2), asSlowLane = true, scope = backgroundScope)
+    f.state.setSpeedLimit(SpeedLimit.mbps(2), asSlowLane = true)
     runCurrent()
 
     assertEquals(SpeedMode.SlowLane, f.speed?.mode?.value)
@@ -136,7 +137,7 @@ class SpeedModeActionsTest {
   fun setSpeedLimit_capAtFullSpeed_becomesTheDownloadLimit() = runTest {
     val f = fixture()
 
-    f.state.setSpeedLimit(SpeedLimit.mbps(5), asSlowLane = false, scope = backgroundScope)
+    f.state.setSpeedLimit(SpeedLimit.mbps(5), asSlowLane = false)
     runCurrent()
 
     assertEquals(SpeedMode.Full, f.speed?.mode?.value)
@@ -145,16 +146,25 @@ class SpeedModeActionsTest {
   }
 
   @Test
+  fun limitGoesToSettings_capAtFullSpeedOrNoSpeedMode_isTrue() = runTest {
+    val f = fixture()
+
+    assertTrue(f.state.limitGoesToSettings(asSlowLane = false))
+    assertFalse(f.state.limitGoesToSettings(asSlowLane = true))
+    assertTrue(fixture(withSpeedMode = false).state.limitGoesToSettings(asSlowLane = true))
+  }
+
+  @Test
   fun setSpeedLimit_capInSlowLane_waitsForFullSpeed() = runTest {
     val f = fixture()
-    f.state.toggleSlowLane(backgroundScope)
+    f.state.toggleSlowLane()
     runCurrent()
 
-    f.state.setSpeedLimit(SpeedLimit.mbps(20), asSlowLane = false, scope = backgroundScope)
+    f.state.setSpeedLimit(SpeedLimit.mbps(20), asSlowLane = false)
     runCurrent()
 
     assertEquals(SpeedLimit.mbps(1), f.engine.config.speedLimit)
-    f.state.toggleSlowLane(backgroundScope)
+    f.state.toggleSlowLane()
     runCurrent()
     assertEquals(SpeedLimit.mbps(20), f.engine.config.speedLimit)
   }

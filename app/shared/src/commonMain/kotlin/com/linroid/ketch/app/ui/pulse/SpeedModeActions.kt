@@ -13,9 +13,7 @@ import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.config.SpeedLimitMode
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 private val log = KetchLogger("SpeedMode")
 
@@ -31,13 +29,15 @@ val AppState.activeSpeedMode: SpeedModeController?
  * on otherwise, then posts "Slow lane on · 1 MB/s" or "Slow lane off" with Undo. This is the
  * Pulse bar pill's click and `⇧⌘L`.
  *
- * @param scope runs the change; a failure is posted as an error with Try again.
+ * Like every speed mode change it runs in the app scope, so closing the control that started it
+ * cancels neither the change nor its Undo; a failure is posted as an error with Try again.
+ *
  * @return the change, or `null` when the active device has no speed mode.
  */
-fun AppState.toggleSlowLane(scope: CoroutineScope): Job? {
+fun AppState.toggleSlowLane(): Job? {
   val controller = activeSpeedMode ?: return null
   val next = if (controller.mode.value.isSlowLane) SpeedLimitMode.Full else SpeedLimitMode.SlowLane
-  return switchSpeedMode(next, scope)
+  return switchSpeedMode(next)
 }
 
 /**
@@ -45,25 +45,21 @@ fun AppState.toggleSlowLane(scope: CoroutineScope): Job? {
  *
  * @return the change, or `null` when the device has no speed mode or is already in [mode].
  */
-fun AppState.switchSpeedMode(
-  mode: SpeedLimitMode,
-  scope: CoroutineScope,
-  undoable: Boolean = true,
-): Job? {
+fun AppState.switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true): Job? {
   val controller = activeSpeedMode ?: return null
   val previous = controller.settings.value.mode
   if (mode == previous) return null
-  return scope.launch {
-    val applied = speedModeCommand("switch to ${speedModeName(mode)}", scope) {
+  return launchCommand {
+    val applied = speedModeCommand("switch to ${speedModeName(mode)}") {
       controller.setMode(mode)
     }
-    if (!applied) return@launch
+    if (!applied) return@launchCommand
     val title = when (mode) {
       SpeedLimitMode.SlowLane -> "Slow lane on · ${formatSpeedLimit(controller.slowLaneLimit)}"
       SpeedLimitMode.Full -> "Slow lane off"
       SpeedLimitMode.Auto -> "Speed follows your rules"
     }
-    val undo = MessageAction("Undo") { switchSpeedMode(previous, scope, undoable = false) }
+    val undo = MessageAction("Undo") { switchSpeedMode(previous, undoable = false) }
     messages.post(
       level = MessageLevel.Success,
       title = title,
@@ -79,17 +75,20 @@ fun AppState.switchSpeedMode(
  * lane on when the device runs at full speed. Otherwise it is the standing cap: at full speed,
  * or on a device without a speed mode, it becomes the device's download speed limit; while the
  * slow lane or Auto rules hold the limit, the speed mode keeps it for when they let go.
+ *
+ * @return the change, or `null` when it went to the device's download settings, which keep
+ *   their own error.
  */
-fun AppState.setSpeedLimit(limit: SpeedLimit, asSlowLane: Boolean, scope: CoroutineScope): Job? {
+fun AppState.setSpeedLimit(limit: SpeedLimit, asSlowLane: Boolean): Job? {
   val controller = activeSpeedMode
-  if (controller == null || !asSlowLane && controller.settings.value.mode == SpeedLimitMode.Full) {
+  if (controller == null || limitGoesToSettings(asSlowLane)) {
     val settings = instanceSettings
     val download = settings.download ?: return null
     settings.updateDownload(download.copy(speedLimit = limit))
     return null
   }
-  return scope.launch {
-    speedModeCommand("set the speed limit", scope) {
+  return launchCommand {
+    speedModeCommand("set the speed limit") {
       if (asSlowLane) {
         controller.setSlowLane(limit)
         if (controller.settings.value.mode == SpeedLimitMode.Full) {
@@ -100,6 +99,15 @@ fun AppState.setSpeedLimit(limit: SpeedLimit, asSlowLane: Boolean, scope: Corout
       }
     }
   }
+}
+
+/**
+ * Whether [setSpeedLimit] hands the limit to the active device's download settings, which keep
+ * their own error, rather than to its speed mode.
+ */
+internal fun AppState.limitGoesToSettings(asSlowLane: Boolean): Boolean {
+  val controller = activeSpeedMode ?: return true
+  return !asSlowLane && controller.settings.value.mode == SpeedLimitMode.Full
 }
 
 /** Limit the slow lane runs at: its speed, held to the standing cap. */
@@ -113,11 +121,7 @@ internal val SpeedModeController.slowLaneLimit: SpeedLimit
 
 // Runs a speed mode change, reads the device's limit back for the Pulse bar and posts a failure
 // with Try again. Returns whether the change applied.
-private suspend fun AppState.speedModeCommand(
-  label: String,
-  scope: CoroutineScope,
-  block: suspend () -> Unit,
-): Boolean {
+private suspend fun AppState.speedModeCommand(label: String, block: suspend () -> Unit): Boolean {
   try {
     block()
   } catch (e: CancellationException) {
@@ -129,7 +133,7 @@ private suspend fun AppState.speedModeCommand(
       title = "Couldn't $label",
       actions = listOf(
         MessageAction("Try again") {
-          scope.launch { speedModeCommand(label, scope, block) }
+          launchCommand { speedModeCommand(label, block) }
         }
       ),
       cause = e,

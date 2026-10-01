@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -35,7 +36,10 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.icons.KetchIcon
@@ -64,10 +68,11 @@ import kotlin.time.Instant
  * grouped Today and Earlier, with "Mark all read" and "Clear". It opens 380 dp wide above its
  * anchor, lined up with its end, or as a bottom sheet on touch.
  *
- * Entries since the history was last read are marked; closing it marks them all read. An entry
- * names its device when that is not the active one, and clicking an entry about a task on the
- * active device shows that task. Its buttons stay while it is still on screen as a toast; after
- * that only failures and warnings keep theirs, since an Undo can expire.
+ * Entries since the history was last read are marked; closing it, however it closes, marks them
+ * all read. An entry names its device when that is not the active one, and clicking an entry
+ * about a task on the active device shows that task. Its buttons stay while it is still on
+ * screen as a toast, and using one takes the toast away; after that only failures and warnings
+ * keep theirs, since an Undo can expire.
  */
 @Composable
 fun ActivityPopover(
@@ -76,17 +81,17 @@ fun ActivityPopover(
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val close = {
-    state.messages.markAllRead()
-    onDismissRequest()
-  }
   PulsePopover(
     expanded = expanded,
-    onDismissRequest = close,
+    onDismissRequest = onDismissRequest,
     width = PopoverWidth,
     modifier = modifier,
     alignment = PopoverAlignment.End,
   ) {
+    // Also covers ⌘J and the bell closing it, which do not go through onDismissRequest.
+    DisposableEffect(state.messages) {
+      onDispose { state.messages.markAllRead() }
+    }
     val history by state.messages.history.collectAsState()
     val active by state.messages.active.collectAsState()
     val unread by state.messages.unreadCount.collectAsState()
@@ -104,8 +109,9 @@ fun ActivityPopover(
       onShowTask = { key ->
         state.showDownloads()
         state.inspect(key)
-        close()
+        onDismissRequest()
       },
+      onActionUsed = state.messages::dismiss,
     )
   }
 }
@@ -115,6 +121,8 @@ fun ActivityPopover(
  *
  * @param pennantName what a device's pennant monogram is made from: the host name of the
  *   embedded device rather than "This Mac".
+ * @param onActionUsed called with the id of an entry whose button was used, to take its toast
+ *   away as the toast's own button does.
  */
 @Composable
 internal fun ActivityContent(
@@ -127,6 +135,7 @@ internal fun ActivityContent(
   onClear: () -> Unit,
   onShowTask: (TaskKey) -> Unit,
   pennantName: (String) -> String = deviceName,
+  onActionUsed: (Long) -> Unit = {},
   now: Instant = Clock.System.now(),
   timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
@@ -190,6 +199,7 @@ internal fun ActivityContent(
             ?.let { EntryDevice(it, deviceName(it), pennantName(it)) },
           showActions = showsActions(message, message.id in activeIds),
           onClick = taskKey?.let { key -> { onShowTask(key) } },
+          onActionUsed = { onActionUsed(message.id) },
         )
       }
     }
@@ -204,18 +214,23 @@ private fun ActivityEntry(
   device: EntryDevice?,
   showActions: Boolean,
   onClick: (() -> Unit)?,
+  onActionUsed: () -> Unit,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
+  val shape = KetchTheme.shapes.sm
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions, enabled = onClick != null)
+  val focus = rememberFocusVisibility()
   val clickable = if (onClick != null) {
-    Modifier.clickable(
-      interactionSource = interactions,
-      indication = null,
-      role = Role.Button,
-      onClick = onClick,
-    )
+    Modifier
+      .trackFocusVisibility(focus)
+      .clickable(
+        interactionSource = interactions,
+        indication = null,
+        role = Role.Button,
+        onClick = onClick,
+      )
   } else {
     Modifier
   }
@@ -223,7 +238,9 @@ private fun ActivityEntry(
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = Modifier
       .fillMaxWidth()
-      .clip(KetchTheme.shapes.sm)
+      // Drawn inside the entry, since the list clips anything outside it.
+      .focusRing(focus.visible, shape, colors.focusRing, gap = -spacing.s0_5)
+      .clip(shape)
       .background(overlay)
       .then(clickable)
       .padding(horizontal = spacing.s2, vertical = spacing.s2),
@@ -305,7 +322,10 @@ private fun ActivityEntry(
           message.actions.forEach { action ->
             KetchButton(
               text = action.label,
-              onClick = action.onClick,
+              onClick = {
+                action.onClick()
+                onActionUsed()
+              },
               variant = KetchButtonVariant.Secondary,
               size = KetchButtonSize.Small,
             )

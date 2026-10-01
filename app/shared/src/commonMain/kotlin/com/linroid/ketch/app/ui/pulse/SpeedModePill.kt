@@ -18,11 +18,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,6 +102,26 @@ internal fun rememberSpeedModeView(state: AppState): SpeedModeView {
   return SpeedModeView(mode, limit, label, controller)
 }
 
+/** The command a control shows a spinner for, until it ends. */
+@Stable
+internal class PendingJob {
+  private var job by mutableStateOf<Job?>(null)
+
+  /** Whether the tracked command still runs. */
+  val pending: Boolean get() = job != null
+
+  /** Tracks [next] in place of the last command; `null`, for no command, changes nothing. */
+  fun track(next: Job?) {
+    next ?: return
+    job = next
+    next.invokeOnCompletion { if (job === next) job = null }
+  }
+}
+
+/** Remembers a [PendingJob] that tracks nothing yet. */
+@Composable
+internal fun rememberPendingJob(): PendingJob = remember { PendingJob() }
+
 /**
  * The speed mode pill of the Pulse bar: "Full speed", "Capped · 20 MB/s", "Slow lane · 1 MB/s"
  * or "Auto · Slow lane until 18:00", amber whenever a limit holds downloads back.
@@ -113,18 +133,17 @@ internal fun rememberSpeedModeView(state: AppState): SpeedModeView {
 @Composable
 fun SpeedModePill(state: AppState, modifier: Modifier = Modifier) {
   val view = rememberSpeedModeView(state)
-  val scope = rememberCoroutineScope()
   var popoverOpen by remember { mutableStateOf(false) }
-  var switching by remember { mutableStateOf<Job?>(null) }
+  val switching = rememberPendingJob()
   Box(modifier) {
     SpeedModePillContent(
       view = view,
-      pending = switching?.isActive == true,
+      pending = switching.pending,
       onToggle = {
         if (view.controller == null) {
           popoverOpen = true
         } else {
-          switching = state.toggleSlowLane(scope)
+          switching.track(state.toggleSlowLane())
         }
       },
       onOptions = { popoverOpen = !popoverOpen },

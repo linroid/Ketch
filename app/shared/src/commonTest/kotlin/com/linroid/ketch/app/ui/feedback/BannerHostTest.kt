@@ -13,6 +13,7 @@ import kotlin.time.Instant
 
 class BannerHostTest {
 
+  private var retried = 0
   private var switched = 0
   private var tokenAsked = 0
 
@@ -25,6 +26,7 @@ class BannerHostTest {
     name = "NAS-Basement",
     connectingLong = connectingLong,
     localName = localName,
+    onRetry = { retried++ },
     onSwitchToLocal = { switched++ },
     onEnterToken = { tokenAsked++ },
   )
@@ -44,24 +46,23 @@ class BannerHostTest {
   }
 
   @Test
-  fun deviceBanner_offline_offersTheLocalDevice() {
+  fun deviceBanner_offline_offersRetryAndTheLocalDevice() {
     val banner = banner(DeviceHealth.Offline("Connection refused"))
 
     assertEquals("NAS-Basement is offline · retrying · Connection refused", banner?.text)
     assertEquals(BannerTone.Danger, banner?.tone)
-    banner?.actions?.single()?.let {
-      assertEquals("Switch to This Mac", it.label)
-      it.onClick()
-    }
+    assertEquals(listOf("Retry now", "Switch to This Mac"), banner?.actions?.map { it.label })
+    banner?.actions?.forEach { it.onClick() }
+    assertEquals(1, retried)
     assertEquals(1, switched)
   }
 
   @Test
-  fun deviceBanner_offlineWithoutLocalDevice_hasNoActions() {
+  fun deviceBanner_offlineWithoutLocalDevice_offersOnlyRetry() {
     val banner = banner(DeviceHealth.Offline(), localName = null)
 
     assertEquals("NAS-Basement is offline · retrying", banner?.text)
-    assertEquals(emptyList(), banner?.actions)
+    assertEquals(listOf("Retry now"), banner?.actions?.map { it.label })
   }
 
   @Test

@@ -740,6 +740,13 @@ class AppState(
   }
 
   /**
+   * Runs [block] in the app scope, so closing the control that started it cancels neither the
+   * command nor the Undo it offers.
+   */
+  internal fun launchCommand(block: suspend CoroutineScope.() -> Unit): Job =
+    scope.launch(block = block)
+
+  /**
    * Runs [block] on [task] in the app scope, so leaving the screen never cancels it.
    *
    * While it runs, [pending] holds the task with [label]. A failure is logged and posted as one
