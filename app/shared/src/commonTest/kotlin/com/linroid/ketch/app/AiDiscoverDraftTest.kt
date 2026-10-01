@@ -34,4 +34,22 @@ class AiDiscoverDraftTest {
     assertTrue(draft.selectedCandidates(AiDiscoverState.Loading).isEmpty())
     assertTrue(draft.selectedCandidates(AiDiscoverState.Results(emptyList())).isEmpty())
   }
+
+  @Test
+  fun siteList_commasAndSpaces_splitsIntoWebsites() {
+    val draft = AiDiscoverDraft()
+    draft.sites = " ubuntu.com,  blender.org kernel.org ,"
+    assertEquals(listOf("ubuntu.com", "blender.org", "kernel.org"), draft.siteList())
+  }
+
+  @Test
+  fun toggle_twice_leavesTheSelectionAsItWas() {
+    val candidate = AiCandidate("https://example.com/file.zip", "A file",
+      confidence = 0.9f, description = "")
+    val draft = AiDiscoverDraft()
+    draft.toggle(candidate)
+    assertEquals(setOf(candidate.url), draft.selected)
+    draft.toggle(candidate)
+    assertTrue(draft.selected.isEmpty())
+  }
 }

@@ -29,6 +29,7 @@ import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AiDiscoverRequest
 import com.linroid.ketch.app.state.AiDiscoverResponse
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsTarget
@@ -338,7 +339,7 @@ private val DesktopHooksShown = object : DesktopHooks {
 /** Discovery that can run but is never asked, so the Discover page shows. */
 private object IdleDiscovery : AiDiscoveryProviderFactory {
   override fun create(settings: AiSettings): AiDiscoveryProvider = object : AiDiscoveryProvider {
-    override suspend fun discover(request: AiDiscoverRequest) =
+    override suspend fun discover(request: AiDiscoverRequest, onStep: (DiscoveryStep) -> Unit) =
       AiDiscoverResponse(request.query, emptyList())
 
     override suspend fun verify(): String = "OK"

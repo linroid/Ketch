@@ -1,6 +1,8 @@
 package com.linroid.ketch.app
 
+import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
+import com.linroid.ketch.app.state.StepRelay
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
@@ -9,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Wiring check for the desktop/Android factory: settings in, a live
@@ -89,5 +92,28 @@ class EmbeddedAiDiscoveryProviderFactoryTest {
     val provider = factory.create(settings)
     assertNotNull(provider)
     provider.close()
+  }
+
+  @Test
+  fun stepRelay_searchRunning_handsItTheTrimmedSteps() {
+    val relay = StepRelay()
+    val steps = mutableListOf<DiscoveryStep>()
+    relay.target = { steps += it }
+
+    relay.onStep(" Plan ", "Search blender.org first\n")
+
+    assertEquals(listOf(DiscoveryStep("Plan", "Search blender.org first")), steps)
+  }
+
+  @Test
+  fun stepRelay_noSearchRunning_dropsTheStep() {
+    val relay = StepRelay()
+    val steps = mutableListOf<DiscoveryStep>()
+    relay.target = { steps += it }
+    relay.target = null
+
+    relay.onStep("Plan", "")
+
+    assertTrue(steps.isEmpty())
   }
 }
