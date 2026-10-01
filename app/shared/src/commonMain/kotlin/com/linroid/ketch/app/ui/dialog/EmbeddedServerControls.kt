@@ -14,9 +14,9 @@ import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.theme.KetchTheme
 
 /**
- * Sharing of the embedded device in the device picker: "Sharing on :8642" with a button that
- * stops it, or a button that starts it with the saved settings. Pairing lives in Settings ›
- * Sharing.
+ * Sharing of the embedded device in the device picker: "Sharing on :8642" (or, while only apps
+ * on this device may connect, "Apps on this device · :8642") with a button that stops it, or a
+ * button that starts it with the saved settings. Pairing lives in Settings › Sharing.
  */
 @Composable
 fun EmbeddedServerControls(
@@ -31,7 +31,11 @@ fun EmbeddedServerControls(
         horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
       ) {
         Text(
-          text = "Sharing on :${serverState.port}",
+          text = if (serverState.config.isLoopbackOnly) {
+            "Apps on this device · :${serverState.port}"
+          } else {
+            "Sharing on :${serverState.port}"
+          },
           style = KetchTheme.typography.caption,
           color = KetchTheme.colors.status.completed.color,
         )

@@ -98,7 +98,8 @@ fun SettingsHeader(title: String, description: String) {
 }
 
 /**
- * Card of related rows, separated by dividers.
+ * Card of related rows, separated by dividers. The dividers are the card's fill showing between
+ * the rows, so a row that is not a [SettingsRow] paints `KetchTheme.colors.surface` itself.
  *
  * @param title short label above the card, set as an eyebrow.
  * @param footer note under the card that applies to all of its rows.
@@ -217,18 +218,23 @@ private fun TitleLine(
   Layout(
     contents = listOf(leading ?: {}, text, trailing ?: {}),
   ) { (leadingParts, textParts, trailingParts), constraints ->
-    val width = constraints.maxWidth
+    val bounded = constraints.hasBoundedWidth
     val gapPx = gap.roundToPx()
     val loose = constraints.copy(minWidth = 0, minHeight = 0)
     val start = leadingParts.firstOrNull()?.measure(loose)
     val startWidth = start?.let { it.width + gapPx } ?: 0
-    val end = trailingParts.firstOrNull()
-      ?.measure(loose.copy(maxWidth = (width - startWidth).coerceAtLeast(0)))
+    val rest = if (bounded) (loose.maxWidth - startWidth).coerceAtLeast(0) else loose.maxWidth
+    val end = trailingParts.firstOrNull()?.measure(loose.copy(maxWidth = rest))
     val endWidth = end?.let { it.width + gapPx } ?: 0
-    val inline = end == null || !constraints.hasBoundedWidth ||
-      width - startWidth - endWidth >= width * MIN_TEXT_SHARE
-    val textWidth = (width - startWidth - if (inline) endWidth else 0).coerceAtLeast(0)
-    val body = textParts.single().measure(loose.copy(minWidth = textWidth, maxWidth = textWidth))
+    val inline = end == null || !bounded || rest - endWidth >= loose.maxWidth * MIN_TEXT_SHARE
+    val body = if (bounded) {
+      val textWidth = (rest - if (inline) endWidth else 0).coerceAtLeast(0)
+      textParts.single().measure(loose.copy(minWidth = textWidth, maxWidth = textWidth))
+    } else {
+      // Unbounded, as when measured for intrinsics: the text takes its own width.
+      textParts.single().measure(loose)
+    }
+    val width = if (bounded) constraints.maxWidth else startWidth + body.width + endWidth
     val top = maxOf(start?.height ?: 0, body.height, if (inline) end?.height ?: 0 else 0)
     val height = if (inline || end == null) top else top + lineGap.roundToPx() + end.height
     layout(width, height) {

@@ -28,13 +28,15 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
   val controller = state.settingsFor(device)
   LaunchedEffect(controller) { controller.loadNetworks() }
   val networks = controller.networks
+  val error = controller.networkError
   val spacing = KetchTheme.spacing
   Column(verticalArrangement = Arrangement.spacedBy(spacing.sectionGap)) {
-    controller.networkError?.let {
-      SettingsNotice(text = it, tone = NoticeTone.Error)
-    }
+    // A device that could not be asked has nothing to show besides the error.
+    val unread = error != null && networks?.supported != true
+    DeviceSettingsError(error, loaded = !unread) { controller.loadNetworks() }
     when {
       networks == null -> SettingsLoading("Looking for networks on ${device.label}…")
+      unread -> Unit
       !networks.supported -> SettingsNotice(
         text = "${device.label} can't choose networks, so downloads use the connection its " +
           "system picks.",

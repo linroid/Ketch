@@ -162,6 +162,35 @@ class SpeedSettingsModelTest {
   }
 
   @Test
+  fun setRules_atFullSpeedAfterSettingTheCap_keepsTheCap() = runTest {
+    val fixture = fixture(SpeedLimitMode.Full)
+    fixture.model.setFullSpeedCap(SpeedLimit.mbps(10))
+    settle()
+
+    fixture.model.setRules(listOf(SpeedRule(start = "14:00", end = "15:00")))
+    settle()
+
+    assertEquals(SpeedLimit.mbps(10), fixture.engine.config.speedLimit)
+    assertEquals(SpeedLimit.mbps(10), fixture.speedMode.settings.value.standard)
+  }
+
+  @Test
+  fun setSlowLane_atFullSpeedWithACapSetElsewhere_keepsTheCap() = runTest {
+    val fixture = fixture(SpeedLimitMode.Full)
+    fixture.engine.config = fixture.engine.config.copy(speedLimit = SpeedLimit.mbps(5))
+
+    fixture.model.setSlowLane(SpeedLimit.mbps(2))
+    settle()
+
+    assertEquals(SpeedLimit.mbps(5), fixture.engine.config.speedLimit)
+    assertEquals(SpeedLimit.mbps(2), fixture.speedMode.settings.value.slowLane)
+    fixture.model.setMode(SpeedLimitMode.SlowLane)
+    fixture.model.setMode(SpeedLimitMode.Full)
+    settle()
+    assertEquals(SpeedLimit.mbps(5), fixture.engine.config.speedLimit)
+  }
+
+  @Test
   fun setRules_inAuto_appliesTheSlowLaneOfTheRule() = runTest {
     val fixture = fixture(SpeedLimitMode.Auto)
 

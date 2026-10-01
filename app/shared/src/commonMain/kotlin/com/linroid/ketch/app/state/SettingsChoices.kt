@@ -234,6 +234,10 @@ private fun parentFolder(path: String): String? {
   return if (end > 0) path.substring(0, end) else null
 }
 
+/** Whether [path] and [other] name the same folder, ignoring a trailing separator. */
+fun isSameFolder(path: String, other: String?): Boolean =
+  other != null && folderKey(path) == folderKey(other)
+
 private fun folderKey(path: String): String = path.trimEnd('/', '\\').ifEmpty { path }
 
 /**

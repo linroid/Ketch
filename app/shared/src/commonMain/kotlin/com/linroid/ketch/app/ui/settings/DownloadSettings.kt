@@ -44,6 +44,7 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.folderName
 import com.linroid.ketch.app.state.isAppPrivateFolder
 import com.linroid.ketch.app.state.isDocumentTree
+import com.linroid.ketch.app.state.isSameFolder
 import com.linroid.ketch.app.state.recentDownloadFolders
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.formatBytes
@@ -100,6 +101,8 @@ private fun FolderGroup(
     value = readSystem(device)
   }
   val folder = config.defaultDirectory ?: system?.downloadDirectory
+  // A folder chosen by path can be the Downloads folder itself.
+  val chosen = config.defaultDirectory?.takeUnless { isSameFolder(it, system?.downloadDirectory) }
   val canPick = local && picker.canPickFolder
   val revealLabel = files?.revealLabel.takeIf { local && folder != null && !isDocumentTree(folder) }
   var typing by rememberSaveable(device.deviceId) { mutableStateOf(!canPick) }
@@ -115,7 +118,7 @@ private fun FolderGroup(
       title = "Save downloads to",
       description = when {
         failure != null -> failure
-        config.defaultDirectory == null -> "The Downloads folder of ${device.label}."
+        chosen == null -> "The Downloads folder of ${device.label}."
         local -> "A folder you chose on this device."
         else -> "A folder on ${device.label}."
       },
@@ -125,7 +128,23 @@ private fun FolderGroup(
         KetchTheme.colors.textSecondary
       },
     ) {
-      FolderPill(path = folder, freeBytes = system?.usableSpace)
+      val free = system?.usableSpace?.takeIf { it > 0 }?.let { "${formatFreeSpace(it)} free" }
+      // Typing replaces the pill, so the folder shows once.
+      if (typing) {
+        SettingsTextInput(
+          value = config.defaultDirectory.orEmpty(),
+          onCommit = { onChange(config.copy(defaultDirectory = it.ifBlank { null })) },
+          placeholder = system?.downloadDirectory ?: "Path of a folder on ${device.label}",
+          mono = true,
+          actions = if (free != null) {
+            { FreeSpace(free, Modifier.padding(end = spacing.s2)) }
+          } else {
+            null
+          },
+        )
+      } else {
+        FolderPill(path = folder, free = free)
+      }
       if (local && folder != null && isAppPrivateFolder(folder)) {
         SettingsNotice(
           text = "Only Ketch can see this folder. Choose a folder such as Download so other " +
@@ -152,6 +171,7 @@ private fun FolderGroup(
           tone = NoticeTone.Info,
         )
       }
+      if (!canPick && revealLabel == null && chosen == null) return@SettingsRow
       FlowRow(
         horizontalArrangement = Arrangement.spacedBy(spacing.s2),
         verticalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -192,7 +212,7 @@ private fun FolderGroup(
             size = KetchButtonSize.Small,
           )
         }
-        if (config.defaultDirectory != null) {
+        if (chosen != null) {
           KetchButton(
             text = "Use the Downloads folder",
             onClick = { onChange(config.copy(defaultDirectory = null)) },
@@ -201,21 +221,13 @@ private fun FolderGroup(
           )
         }
       }
-      if (typing) {
-        SettingsTextInput(
-          value = config.defaultDirectory.orEmpty(),
-          onCommit = { onChange(config.copy(defaultDirectory = it.ifBlank { null })) },
-          placeholder = system?.downloadDirectory ?: "Path of a folder on ${device.label}",
-          mono = true,
-        )
-      }
     }
   }
 }
 
-/** The folder as a sunken pill, middle-ellipsized, with the free space at its end. */
+/** The folder as a sunken pill, middle-ellipsized, with the [free] space at its end. */
 @Composable
-private fun FolderPill(path: String?, freeBytes: Long?) {
+private fun FolderPill(path: String?, free: String?) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   Row(
@@ -237,15 +249,20 @@ private fun FolderPill(path: String?, freeBytes: Long?) {
       color = colors.textPrimary,
       modifier = Modifier.weight(1f),
     )
-    if (freeBytes != null && freeBytes > 0) {
-      Text(
-        text = "${formatFreeSpace(freeBytes)} free",
-        style = KetchTheme.typography.caption,
-        color = colors.textSecondary,
-        maxLines = 1,
-      )
-    }
+    if (free != null) FreeSpace(free)
   }
+}
+
+/** "384 GB free" at the end of the folder. */
+@Composable
+private fun FreeSpace(text: String, modifier: Modifier = Modifier) {
+  Text(
+    text = text,
+    style = KetchTheme.typography.caption,
+    color = KetchTheme.colors.textSecondary,
+    maxLines = 1,
+    modifier = modifier,
+  )
 }
 
 /**
