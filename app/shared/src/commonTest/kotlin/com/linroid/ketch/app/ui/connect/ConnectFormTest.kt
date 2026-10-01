@@ -11,6 +11,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import okio.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -203,6 +204,61 @@ class ConnectFormTest {
     form.link = "nas"
 
     assertTrue(form.isEdited)
+  }
+
+  @Test
+  fun isEdited_detailsFilledFromTheLink_staysFalseUntilTyped() {
+    val form = ConnectForm("nas.local:9000")
+
+    form.toggleManual()
+
+    assertFalse(form.isEdited)
+    form.port = "9001"
+    assertTrue(form.isEdited)
+  }
+
+  @Test
+  fun pick_anotherDevice_dropsTheCodeTypedForTheLast() {
+    val form = ConnectForm()
+    form.pick(DiscoveredServer("Den-PC", "192.168.1.7", 8642, tokenRequired = true))
+    form.code = "den-code"
+
+    form.pick(DiscoveredServer("NAS", "192.168.1.10", 8642, tokenRequired = true))
+
+    assertEquals("", form.code)
+    assertNull(form.target?.token)
+  }
+
+  @Test
+  fun askForCode_deviceAddedBefore_showsTheCodeFieldForItsAddress() {
+    val device = FakeInstanceFactory().factory.createRemote(
+      RemoteConfig(host = "studio.local", apiToken = "old", name = "Studio-Mac"),
+    )
+    val form = ConnectForm("typed")
+
+    form.askForCode(device)
+
+    assertTrue(form.codeShown)
+    assertEquals(PairingLink("studio.local", name = "Studio-Mac"), form.target)
+    assertEquals(ConnectProblem.NeedsCode("studio.local:8642", rejected = false), form.problem)
+  }
+
+  @Test
+  fun connect_addingFails_explainsWhyInPlainWords() = runTest {
+    val manager = InstanceManager(
+      factory = FakeInstanceFactory().factory,
+      context = backgroundScope.coroutineContext,
+    )
+    val form = ConnectForm("nas.local")
+
+    form.connect(this, DeviceConnector(manager, {}, { throw IOException("reset") })) {}
+    runCurrent()
+
+    assertEquals(
+      ConnectProblem.Failed("Connection lost. Check the connection and try again."),
+      form.problem,
+    )
+    assertFalse(form.connecting)
   }
 
   @Test

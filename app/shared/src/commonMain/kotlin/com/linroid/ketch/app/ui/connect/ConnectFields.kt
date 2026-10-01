@@ -59,7 +59,7 @@ internal fun PairingLinkField(
   form: ConnectForm,
   onSubmit: () -> Unit,
   modifier: Modifier = Modifier,
-  placeholder: String = "ketch://pair… or nas.local:8642",
+  placeholder: String = DefaultPlaceholder,
   autoFocus: Boolean = false,
 ) {
   val colors = KetchTheme.colors
@@ -159,7 +159,7 @@ internal fun AccessCodeField(
     )
     if (request != null && !request.rejected && name != null) {
       Text(
-        text = "$name asks for its access code. Find it in Settings › Sharing on that device.",
+        text = "$name asks for its access code. It's in Settings › Sharing there.",
         style = KetchTheme.typography.caption,
         color = KetchTheme.colors.textSecondary,
       )
@@ -307,6 +307,9 @@ private val PortKeyboard = KeyboardOptions(
   keyboardType = KeyboardType.Number,
   imeAction = ImeAction.Go,
 )
+
+/** Hint of the "Pairing link or address" field. */
+internal const val DefaultPlaceholder = "ketch://pair… or nas.local:8642"
 
 private val SummaryGlyph = 12.dp
 private val PortWidth = 96.dp

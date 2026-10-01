@@ -9,6 +9,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.DiscoveryState
 import com.linroid.ketch.app.util.PairingLink
 
 private val log = KetchLogger("ConnectHost")
@@ -18,7 +19,8 @@ private val log = KetchLogger("ConnectHost")
  * opened from outside the app ([com.linroid.ketch.app.state.IncomingDownloads.pendingPairings]),
  * such as a code scanned with the camera, one at a time; then the [AddDeviceSheet] while
  * [AppState.showAddRemoteDialog] asks for it, for [AppState.unauthorizedInstance] when that is
- * set.
+ * set. A search of the network started with it ([AppState.discoverRemoteServers]) runs in the
+ * sheet instead.
  *
  * While no device is shown the shell shows [ConnectLanding], which takes the sheet's place.
  */
@@ -51,9 +53,13 @@ fun ConnectHost(state: AppState) {
     return
   }
   if (asked) {
+    // "Find on network" elsewhere starts the app's own search; the sheet's search takes over.
+    val searchNow = remember { state.discoveryState is DiscoveryState.Discovering }
+    LaunchedEffect(Unit) { if (searchNow) state.resetDiscovery() }
     AddDeviceSheet(
       state = state,
       device = state.unauthorizedInstance,
+      searchNow = searchNow,
       onDismiss = {
         state.showAddRemoteDialog = false
         state.unauthorizedInstance = null

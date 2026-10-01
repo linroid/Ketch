@@ -66,8 +66,8 @@ import com.linroid.ketch.app.ui.shell.canvasWash
 /**
  * The page shown in place of the app while no device is shown, as in the web app before one is
  * connected: a pairing link or address connects in one step, the access code field appears
- * once a device asks for one, and devices added before are a click away. It never opens a
- * dialog by itself.
+ * once a device asks for one, and devices added before are a click away; one whose code no
+ * longer works asks for the current one here. It never opens a dialog by itself.
  */
 @Composable
 fun ConnectLanding(state: AppState, modifier: Modifier = Modifier) {
@@ -80,9 +80,20 @@ fun ConnectLanding(state: AppState, modifier: Modifier = Modifier) {
       form = form,
       devices = devices,
       onSubmit = { check ->
-        form.connect(scope, connector, check) { device -> state.reportConnected(device, check) }
+        form.connect(scope, connector, check) { device ->
+          state.reportConnected(device, check)
+          // Added untried, it waits under Your devices, and the field is free for the next.
+          if (!check) form.link = ""
+        }
       },
-      onPick = { state.switchInstance(it.entry) },
+      onPick = { device ->
+        val remote = device.entry as? RemoteInstance
+        if (remote != null && device.needsCode) {
+          form.askForCode(remote)
+        } else {
+          state.switchInstance(device.entry)
+        }
+      },
     )
     ToastHost(
       messages = state.messages,
@@ -163,6 +174,8 @@ internal fun ConnectLandingContent(
         PairingLinkField(
           form = form,
           onSubmit = submit,
+          // The whole hint does not fit a phone's card.
+          placeholder = if (narrow) NarrowPlaceholder else DefaultPlaceholder,
           autoFocus = true,
         )
         AccessCodeField(form, onSubmit = submit)
@@ -247,7 +260,7 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
         interactionSource = interactions,
         indication = null,
         role = Role.Button,
-        onClickLabel = "Show",
+        onClickLabel = if (device.needsCode) "Enter its access code" else "Show",
         onClick = onClick,
       )
       .padding(horizontal = spacing.s2),
@@ -287,11 +300,15 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
 /** What a device row says about how [device] is reached, and in which color. */
 private fun landingStatus(device: DevicePresence, colors: KetchColors) = when {
   !device.connected -> "Not connected" to colors.textTertiary
-  device.health == DeviceHealth.Unauthorized -> "Needs a code" to colors.status.failed.color
+  device.needsCode -> "Needs a code" to colors.status.failed.color
   device.health is DeviceHealth.Offline -> "Offline" to colors.status.failed.color
   device.health == DeviceHealth.Connecting -> "Connecting…" to colors.textSecondary
   else -> "Online" to colors.healthColor(device.health)
 }
+
+// Whether the device turned down the access code it was given.
+private val DevicePresence.needsCode: Boolean
+  get() = connected && health == DeviceHealth.Unauthorized
 
 /** Widens this element by [horizontal] on each side, past its parent's padding. */
 private fun Modifier.bleed(horizontal: Dp): Modifier = layout { measurable, constraints ->
@@ -307,6 +324,7 @@ private fun Modifier.bleed(horizontal: Dp): Modifier = layout { measurable, cons
   }
 }
 
+private const val NarrowPlaceholder = "nas.local:8642"
 private val CardWidth = 480.dp
 private val HairlineWidth = 1.dp
 
