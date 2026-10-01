@@ -73,6 +73,33 @@ class BrowserExtensionServerTest {
   }
 
   @Test
+  fun connect_eachTimeTheExtensionConnects_reportsIt() {
+    var connections = 0
+    val server = BrowserExtensionServer(onConnect = { connections++ }) { _, token ->
+      BrowserExtensionServer.Started(port = 5123, token = token, stop = { })
+    }
+    server.attach(api)
+
+    server.connect()
+    server.connect()
+
+    assertEquals(2, connections)
+  }
+
+  @Test
+  fun connect_whenTheServerFails_reportsNoConnection() {
+    var connections = 0
+    val server = BrowserExtensionServer(onConnect = { connections++ }) { _, _ ->
+      throw IllegalStateException("port in use")
+    }
+    server.attach(api)
+
+    server.connect()
+
+    assertEquals(0, connections)
+  }
+
+  @Test
   fun close_stopsTheServer() {
     var stopped = false
     val server = BrowserExtensionServer { _, token ->
