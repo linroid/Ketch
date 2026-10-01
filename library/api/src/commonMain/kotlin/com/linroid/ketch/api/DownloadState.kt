@@ -2,6 +2,7 @@ package com.linroid.ketch.api
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration
 
 /**
  * Represents the lifecycle state of a download task.
@@ -41,10 +42,22 @@ sealed class DownloadState {
   @SerialName("paused")
   data class Paused(val progress: DownloadProgress) : DownloadState()
 
-  /** Download finished successfully. [outputPath] is the resolved output location. */
+  /**
+   * Download finished successfully.
+   *
+   * @property outputPath the resolved output location
+   * @property totalBytes size of the downloaded content in bytes, or `null` if unknown
+   * @property downloadTime time spent downloading, summed over every run of the task and
+   *   excluding time it was scheduled, queued or paused; `null` if unknown, such as for a
+   *   task started by a version of Ketch that did not track it
+   */
   @Serializable
   @SerialName("completed")
-  data class Completed(val outputPath: String) : DownloadState()
+  data class Completed(
+    val outputPath: String,
+    val totalBytes: Long? = null,
+    val downloadTime: Duration? = null,
+  ) : DownloadState()
 
   /** Download failed with [error]. May be retried if the error is retryable. */
   @Serializable

@@ -52,6 +52,7 @@ import okio.Path.Companion.toPath
  * @param config snapshot of the global configuration taken when this
  *   execution was created; later [com.linroid.ketch.api.KetchApi.updateConfig]
  *   calls apply to the next start or resume
+ * @param timeSource measures download speed and the time added to [TaskRecord.downloadTime]
  */
 internal class DownloadExecution(
   private val handle: TaskHandle,
@@ -60,6 +61,7 @@ internal class DownloadExecution(
   private val config: DownloadConfig,
   private val globalLimiter: SpeedLimiter,
   private val dispatchers: KetchDispatchers,
+  private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) {
   private val log = KetchLogger("Execution")
 
@@ -259,6 +261,11 @@ internal class DownloadExecution(
     }
     fileAccessor = fa
 
+    // Added to the time saved by earlier runs; a record that never tracked it stays unknown.
+    val previousTime = handle.record.value.downloadTime
+    val runMark = timeSource.markNow()
+    fun downloadTime() = previousTime?.plus(runMark.elapsedNow())
+
     var completed = false
     try {
       val ctx = buildContext(fa, total, preResolved, outputPath)
@@ -275,6 +282,7 @@ internal class DownloadExecution(
                 segments = snapshot,
                 sourceResumeState = updatedResume
                   ?: it.sourceResumeState,
+                downloadTime = downloadTime(),
                 updatedAt = Clock.System.now(),
               )
             }
@@ -290,6 +298,7 @@ internal class DownloadExecution(
             handle.record.update {
               it.copy(segments = snapshot,
                 sourceResumeState = updatedResume ?: it.sourceResumeState,
+                downloadTime = downloadTime(),
                 updatedAt = Clock.System.now())
             }
             if (snapshot.isNotEmpty()) {
@@ -315,17 +324,23 @@ internal class DownloadExecution(
         }
       }
 
+      val finalTime = downloadTime()
       handle.record.update {
         it.copy(
           state = TaskState.COMPLETED,
           segments = null,
+          downloadTime = finalTime,
           updatedAt = Clock.System.now(),
         )
       }
 
       completed = true
       log.i { "Download completed for taskId=$taskId" }
-      handle.mutableState.value = DownloadState.Completed(outputPath)
+      handle.mutableState.value = DownloadState.Completed(
+        outputPath = outputPath,
+        totalBytes = total.takeIf { it >= 0 },
+        downloadTime = finalTime,
+      )
     } finally {
       if (!selfManagedIo) {
         cleanupAfterExecution(fa, completed)
@@ -363,7 +378,11 @@ internal class DownloadExecution(
         updatedAt = Clock.System.now(),
       )
     }
-    handle.mutableState.value = DownloadState.Completed(outputPath)
+    handle.mutableState.value = DownloadState.Completed(
+      outputPath = outputPath,
+      totalBytes = 0,
+      downloadTime = handle.record.value.downloadTime,
+    )
   }
 
   private suspend fun cleanupAfterExecution(
@@ -471,7 +490,7 @@ internal class DownloadExecution(
     outputPath: String,
   ): DownloadContext {
     var lastBytes = 0L
-    var lastMark = TimeSource.Monotonic.markNow()
+    var lastMark = timeSource.markNow()
     var speed = 0L
     val reportedSpeed = MutableStateFlow<Long?>(null)
     return DownloadContext(
@@ -481,7 +500,7 @@ internal class DownloadExecution(
       fileAccessor = fileAccessor,
       segments = handle.mutableSegments,
       onProgress = { downloaded, total ->
-        val now = TimeSource.Monotonic.markNow()
+        val now = timeSource.markNow()
         val elapsed = (now - lastMark).inWholeMilliseconds
         if (elapsed >= 500) {
           val delta = downloaded - lastBytes

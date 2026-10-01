@@ -140,6 +140,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Servers without Range support use a single connection; resuming them restarts from zero
 - Pause / Resume with server identity validation (ETag, Last-Modified)
 - File integrity check on resume (validates local file size vs. claimed progress)
+- `DownloadState.Completed` reports the size and the download time, summed over every run and
+  excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records)
 - Retry with exponential backoff for transient errors
 - Persistent task metadata via `TaskStore` interface
 - Duplicate download guards in `DownloadCoordinator.start()` and `resume()`

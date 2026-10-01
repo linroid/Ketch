@@ -280,6 +280,8 @@ class KetchToolSet(
         }
         is DownloadState.Completed -> {
           put("outputPath", state.outputPath)
+          state.totalBytes?.let { put("totalBytes", it) }
+          state.downloadTime?.let { put("downloadTimeMs", it.inWholeMilliseconds) }
         }
         is DownloadState.Failed -> {
           put("error", state.error.message ?: "Unknown error")

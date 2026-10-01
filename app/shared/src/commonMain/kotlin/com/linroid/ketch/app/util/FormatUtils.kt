@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.DownloadPriority
+import kotlin.time.Duration
 
 fun extractFilename(url: String): String {
   val path = url.trim()
@@ -55,4 +56,15 @@ fun formatEta(seconds: Long): String {
     m > 0 -> "${m}m ${s}s"
     else -> "${s}s"
   }
+}
+
+/** Formats [duration] like [formatEta], showing anything shorter than a second as "<1s". */
+fun formatDuration(duration: Duration): String {
+  return formatEta(duration.inWholeSeconds).ifEmpty { "<1s" }
+}
+
+/** Bytes per second over [duration], or `null` when it is too short to measure. */
+fun averageSpeed(bytes: Long, duration: Duration): Long? {
+  val millis = duration.inWholeMilliseconds
+  return if (millis > 0) bytes * 1000 / millis else null
 }

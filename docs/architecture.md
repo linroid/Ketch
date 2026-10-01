@@ -145,7 +145,8 @@ DownloadRequest
   |           (saveIntervalMs) for crash recovery.
   |
   v
-[7. Complete]  All segments finished -> Completed state with file path.
+[7. Complete]  All segments finished -> Completed state with file path, size and
+               download time (summed over runs, excluding queued and paused time).
                On a retryable error -> retry with exponential backoff, keeping
                segment progress (from byte zero without range support).
                Otherwise, or after retryCount retries -> Failed state.

@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 /**
@@ -60,6 +61,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         source_resume_state_json = resumeStateJson,
         segments_json = segmentsJson,
         error_json = errorJson,
+        download_time_ms = record.downloadTime?.inWholeMilliseconds,
       )
       queries.update(
         task_id = record.taskId,
@@ -71,6 +73,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         source_resume_state_json = resumeStateJson,
         segments_json = segmentsJson,
         error_json = errorJson,
+        download_time_ms = record.downloadTime?.inWholeMilliseconds,
       )
     }
   }
@@ -137,6 +140,7 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
           null
         }
       },
+      downloadTime = download_time_ms?.milliseconds,
       createdAt = Instant.fromEpochMilliseconds(created_at),
       updatedAt = Instant.fromEpochMilliseconds(updated_at),
     )

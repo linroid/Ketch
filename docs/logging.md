@@ -106,7 +106,7 @@ An HTTP download that survives one dropped connection:
 14:03:12.530 [INFO] [Ketch] Task state: taskId=3f2a, Queued -> Downloading
 14:03:17.001 [WARN] [Execution] Retry 1/3 for taskId=3f2a in 1000ms: Network: Network error occurred <- IOException: Connection reset by peer
 14:03:25.870 [INFO] [Execution] Download completed for taskId=3f2a
-14:03:25.871 [INFO] [Ketch] Task state: taskId=3f2a, Downloading -> Completed(/Users/me/Downloads/file.zip)
+14:03:25.871 [INFO] [Ketch] Task state: taskId=3f2a, Downloading -> Completed(/Users/me/Downloads/file.zip, totalBytes=10485760, downloadTime=13.348s)
 ```
 
 A magnet download (dates omitted, task IDs shortened):
