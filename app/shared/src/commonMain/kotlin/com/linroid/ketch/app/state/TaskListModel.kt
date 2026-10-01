@@ -247,9 +247,7 @@ class TaskListModel(
 
   /** Number of tasks on each status tab. */
   val counts: StateFlow<Map<StatusFilter, Int>> =
-    rows.map { list ->
-      StatusFilter.entries.associateWith { filter -> list.count { filter.matches(it.state) } }
-    }
+    rows.map { list -> StatusFilter.counts(list.map { it.state }) }
       .flowOn(dispatcher)
       .stateIn(scope, SharingStarted.Eagerly, StatusFilter.entries.associateWith { 0 })
 

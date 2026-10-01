@@ -42,7 +42,7 @@ class RowContentTest {
 
     assertEquals(RowStatus.Downloading, content.status)
     assertEquals("2 connections · releases.example.com", content.detail)
-    assertEquals("1.0 KB / 4.0 KB", content.size)
+    assertEquals("1.00/4.00 KB", content.size)
     assertEquals("1.0 KB/s", content.speed)
     assertEquals("3s", content.time)
     assertEquals(0.25f, content.progress)
@@ -273,5 +273,23 @@ class RowContentTest {
 
   private companion object {
     val UTC = TimeZone.UTC
+  }
+
+  @Test
+  fun formatSizeOf_sharedUnit_usesTheTotalsUnit() {
+    assertEquals("0.49/1.20 GB", formatSizeOf(526_385_152, 1_288_490_188))
+    assertEquals("3.51/13.0 GB", formatSizeOf(3_768_000_000, 13L shl 30))
+    assertEquals("138/512 MB", formatSizeOf(145_012_736, 512L shl 20))
+    assertEquals("512/1000 B", formatSizeOf(512, 1000))
+  }
+
+  @Test
+  fun formatSizeOf_ofSeparator_readsAsProse() {
+    assertEquals("1.00 of 4.00 GB", formatSizeOf(1L shl 30, 4L shl 30, separator = " of "))
+  }
+
+  @Test
+  fun formatSizeOf_downloadedBeyondTheTotal_capsAtTheTotal() {
+    assertEquals("1.00/1.00 KB", formatSizeOf(2048, 1024))
   }
 }

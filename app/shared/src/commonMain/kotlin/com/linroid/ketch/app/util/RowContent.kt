@@ -266,8 +266,56 @@ private fun downloadingDetail(
 private fun connectionsText(count: Int): String =
   if (count == 1) "1 connection" else "$count connections"
 
-private fun runningSize(state: DownloadState): String =
-  transferSummary(state).firstOrNull() ?: UNKNOWN
+private fun runningSize(state: DownloadState): String {
+  val progress = when (state) {
+    is DownloadState.Downloading -> state.progress
+    is DownloadState.Paused -> state.progress
+    else -> return UNKNOWN
+  }
+  return when {
+    progress.totalBytes > 0 -> formatSizeOf(progress.downloadedBytes, progress.totalBytes)
+    progress.downloadedBytes > 0 -> formatBytes(progress.downloadedBytes)
+    else -> UNKNOWN
+  }
+}
+
+/**
+ * [downloaded] of [total] bytes in the unit of [total], to three significant digits, as the
+ * table's Size column shows it: "2.41/5.69 GB", "0.49/1.20 GB", "138/512 MB". With [separator]
+ * " of " it reads as list rows show it: "2.41 of 5.69 GB".
+ */
+fun formatSizeOf(downloaded: Long, total: Long, separator: String = "/"): String {
+  val unit = SIZE_UNITS.lastOrNull { total >= it.second } ?: SIZE_UNITS.first()
+  fun number(bytes: Long): String {
+    val value = bytes.coerceAtLeast(0).toDouble() / unit.second
+    if (unit.second == 1L) return bytes.coerceAtLeast(0).toString()
+    val decimals = when {
+      value < 10 -> 2
+      value < 100 -> 1
+      else -> 0
+    }
+    return formatDecimal(value, decimals)
+  }
+  return "${number(downloaded.coerceAtMost(total))}$separator${number(total)} ${unit.first}"
+}
+
+private val SIZE_UNITS = listOf(
+  "B" to 1L,
+  "KB" to (1L shl 10),
+  "MB" to (1L shl 20),
+  "GB" to (1L shl 30),
+  "TB" to (1L shl 40)
+)
+
+/** [value] rounded half up to [decimals] places, with a dot. */
+private fun formatDecimal(value: Double, decimals: Int): String {
+  var scale = 1L
+  repeat(decimals) { scale *= 10 }
+  val scaled = (value * scale + 0.5).toLong()
+  if (decimals == 0) return scaled.toString()
+  val fraction = (scaled % scale).toString().padStart(decimals, '0')
+  return "${scaled / scale}.$fraction"
+}
 
 private fun knownSize(request: DownloadRequest): String =
   request.resolvedSource?.totalBytes?.takeIf { it > 0 }?.let(::formatBytes) ?: UNKNOWN
