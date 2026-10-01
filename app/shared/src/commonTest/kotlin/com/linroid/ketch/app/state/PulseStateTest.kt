@@ -322,6 +322,36 @@ class PulseStateTest {
   }
 
   @Test
+  fun disk_unreadableDisk_leftUnknown() = runTest {
+    val resolved = ResolvedSource(
+      url = "https://example.com/big.iso",
+      sourceType = "http",
+      totalBytes = gb,
+      supportsResume = true,
+      suggestedFileName = "big.iso",
+      maxSegments = 4,
+    )
+    val request = DownloadRequest(url = resolved.url, resolvedSource = resolved)
+    val local = FakeDevice("local", listOf(FakeTask("a", DownloadState.Queued, request)))
+    val model = model(local)
+
+    assertEquals(1, local.statusCalls)
+    assertNull(model.state.value.devices.single().disk)
+    assertFalse(model.state.value.isDiskShort)
+    assertEquals("All quiet", model.state.value.sentence(now, TimeZone.UTC))
+  }
+
+  @Test
+  fun devices_deviceScope_listsEveryDevice() = runTest {
+    val local = FakeDevice("local", listOf(FakeTask("a", downloading(0, 1000, 100))))
+    val nas = FakeDevice("nas", listOf(FakeTask("b", downloading(0, 1000, 200))))
+    val model = model(local, nas, scope = PulseScope.Device("nas"))
+
+    assertEquals(listOf("local", "nas"), model.devices.value.map { it.deviceId })
+    assertEquals(listOf(100L, 200L), model.devices.value.map { it.speed })
+  }
+
+  @Test
   fun state_waitingTasksLargerThanDisk_diskShort() = runTest {
     val resolved = ResolvedSource(
       url = "https://example.com/big.iso",
@@ -510,6 +540,26 @@ class PulseStateTest {
     )
 
     assertEquals("3 downloading · 45%", state.shortSentence())
+  }
+
+  @Test
+  fun shortSentence_offlineDeviceDownloading_ignoresItsProgress() {
+    val state = PulseState(
+      devices = listOf(
+        device(counts = PulseCounts(downloading = 1), downloadedBytes = 45, sizeBytes = 100),
+        device(
+          name = "NAS-Basement",
+          health = DeviceHealth.Offline(),
+          counts = PulseCounts(downloading = 2),
+          downloadedBytes = 0,
+          sizeBytes = 900,
+        )
+      ),
+      allDevices = true,
+    )
+
+    assertEquals("1 downloading · 45%", state.shortSentence())
+    assertEquals(0.45f, state.progress)
   }
 
   @Test

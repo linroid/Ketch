@@ -6,6 +6,7 @@ import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.SpeedSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -19,9 +20,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -32,8 +35,10 @@ class SpeedModeControllerTest {
   private class Device(var config: DownloadConfig = DownloadConfig()) {
     val applied = mutableListOf<SpeedLimit>()
     var failure: Exception? = null
+    var latency = Duration.ZERO
 
     suspend fun apply(config: DownloadConfig) {
+      delay(latency)
       failure?.let { throw it }
       applied += config.speedLimit
       this.config = config
@@ -104,11 +109,51 @@ class SpeedModeControllerTest {
   fun setSlowLane_belowMinimum_raisedToMinimum() = runTest {
     val device = Device()
     val controller = controller(device, settings = SpeedSettings(mode = SpeedLimitMode.SlowLane))
+    runCurrent()
 
     controller.setSlowLane(SpeedLimit.kbps(64))
 
     assertEquals(SpeedModeController.MIN_SLOW_LANE, controller.settings.value.slowLane)
-    assertEquals(listOf(SpeedModeController.MIN_SLOW_LANE), device.applied)
+    assertEquals(SpeedModeController.MIN_SLOW_LANE, device.applied.last())
+  }
+
+  @Test
+  fun init_savedSlowLaneMode_appliesSlowLane() = runTest {
+    val device = Device()
+    val settings = SpeedSettings(mode = SpeedLimitMode.SlowLane, slowLane = SpeedLimit.mbps(2))
+
+    val controller = controller(device, settings = settings)
+    runCurrent()
+
+    assertEquals(listOf(SpeedLimit.mbps(2)), device.applied)
+    assertEquals(SpeedMode.SlowLane, controller.mode.value)
+  }
+
+  @Test
+  fun slowLane_deviceLosesLimit_appliedAgainWithinMinute() = runTest {
+    val device = Device()
+    val controller = controller(device)
+    controller.setMode(SpeedLimitMode.SlowLane)
+    runCurrent()
+
+    device.config = DownloadConfig()
+    advanceTimeBy(1.minutes)
+    runCurrent()
+
+    assertEquals(listOf(SpeedLimit.mbps(1), SpeedLimit.mbps(1)), device.applied)
+  }
+
+  @Test
+  fun init_savedFullSpeed_keepsDeviceLimit() = runTest {
+    val cap = SpeedLimit.mbps(5)
+    val device = Device(DownloadConfig(speedLimit = cap))
+
+    controller(device)
+    advanceTimeBy(2.minutes)
+    runCurrent()
+
+    assertEquals(emptyList(), device.applied)
+    assertEquals(cap, device.config.speedLimit)
   }
 
   @Test
@@ -158,13 +203,20 @@ class SpeedModeControllerTest {
 
   @Test
   fun setMode_applyFails_keepsPreviousMode() = runTest {
-    val device = Device().apply { failure = IllegalStateException("Connection lost") }
+    val device = Device(DownloadConfig(speedLimit = SpeedLimit.mbps(5))).apply {
+      failure = IllegalStateException("Connection lost")
+      latency = 1.seconds
+    }
     val controller = controller(device)
 
     assertFailsWith<IllegalStateException> { controller.setMode(SpeedLimitMode.SlowLane) }
+    device.failure = null
+    advanceTimeBy(2.minutes)
+    runCurrent()
 
     assertEquals(SpeedLimitMode.Full, controller.settings.value.mode)
     assertEquals(SpeedMode.Full, controller.mode.value)
+    assertEquals(emptyList(), device.applied)
   }
 
   @Test

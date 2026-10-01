@@ -68,15 +68,17 @@ data class ObservedPeak(
  * Switches one device between full speed, the slow lane and Auto speed rules.
  *
  * A change applies at once: the controller replaces the speed limit of the device's current
- * [DownloadConfig] and hands the result to [apply]. While the mode is Auto, the rules are
- * evaluated again whenever one starts or ends, and at least every minute. Leaving full speed
- * remembers the device's current limit as the standing cap, so switching back restores it.
+ * [DownloadConfig] and hands the result to [apply]. Outside full speed, including a slow lane
+ * or Auto mode restored from [settings], the controller keeps the device at the limit of the
+ * mode: it checks again whenever an Auto rule starts or ends, and at least every minute, so a
+ * device that comes back online or lost its limit gets it again. Leaving full speed remembers
+ * the device's current limit as the standing cap, so switching back restores it.
  *
  * The owner saves [settings] and [observedPeak] when they change.
  *
  * @param config reads the device's current download config.
  * @param apply applies a download config to the device.
- * @param scope runs the Auto rules and records the observed peak.
+ * @param scope keeps the limit of the mode applied and records the observed peak.
  * @param deviceId device whose speed this controls; used in log messages.
  * @param settings settings to start from, such as the saved `[speed]` section.
  * @param observedPeak observed peak to start from, such as the one saved under `[ui]`.
@@ -123,7 +125,7 @@ class SpeedModeController(
   init {
     refreshMode(_settings.value)
     scope.launch { speed.collect(::recordSpeed) }
-    scope.launch { runRules() }
+    scope.launch { keepLimit() }
   }
 
   /**
@@ -178,9 +180,9 @@ class SpeedModeController(
   private suspend fun update(transform: (SpeedSettings) -> SpeedSettings) {
     lock.withLock {
       val previous = _settings.value
-      val current = config()
       var next = normalize(transform(previous))
       if (next == previous) return
+      val current = config()
       if (previous.mode == SpeedLimitMode.Full && next.mode != SpeedLimitMode.Full) {
         next = next.copy(standard = current.speedLimit)
       }
@@ -199,17 +201,20 @@ class SpeedModeController(
     }
   }
 
-  // Keeps the Auto rules applied: evaluates them, applies the result and sleeps until the next
-  // rule starts or ends. Sleeps are capped so a clock change or a suspended machine is noticed.
-  private suspend fun runRules() {
-    _settings.map { if (it.mode == SpeedLimitMode.Auto) it.rules else null }
+  // Outside full speed, keeps the limit of the mode applied: evaluates the rules, applies the
+  // result and sleeps until the next rule starts or ends. Sleeps are capped so a clock change, a
+  // suspended machine or a device that lost its limit is noticed.
+  private suspend fun keepLimit() {
+    _settings.map { if (it.mode == SpeedLimitMode.Full) null else it.mode to it.rules }
       .distinctUntilChanged()
-      .collectLatest { rules ->
-        if (rules == null) return@collectLatest
+      .collectLatest { key ->
+        if (key == null) return@collectLatest
         var failing = false
         while (true) {
           val evaluated = lock.withLock {
             val settings = _settings.value
+            // A change that the device rejected can have restored full speed meanwhile.
+            if (settings.mode == SpeedLimitMode.Full) return@collectLatest
             refreshMode(settings)
             try {
               applyLimit(settings, config())
@@ -218,7 +223,7 @@ class SpeedModeController(
               throw e
             } catch (e: Exception) {
               // An offline device fails every minute; only the first failure is a warning.
-              val message = "Could not apply speed rules on deviceId=$deviceId"
+              val message = "Could not apply the speed mode on deviceId=$deviceId"
               if (failing) {
                 log.d { "$message: ${e.describeCauses()}" }
               } else {

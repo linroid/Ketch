@@ -248,11 +248,15 @@ data class PulseState(
   /** Whether a scoped device lacks the space its tasks still need. */
   val isDiskShort: Boolean get() = devices.any { it.isDiskShort }
 
-  /** Share of the downloading tasks of known size received so far, or `null` when none. */
+  /**
+   * Share of the downloading tasks of known size on online devices received so far, or `null`
+   * when none.
+   */
   val progress: Float?
     get() {
-      val size = devices.sumOf { it.sizeBytes }
-      return if (size > 0) devices.sumOf { it.downloadedBytes }.toFloat() / size else null
+      val online = devices.filter { it.health.isOnline }
+      val size = online.sumOf { it.sizeBytes }
+      return if (size > 0) online.sumOf { it.downloadedBytes }.toFloat() / size else null
     }
 
   /**
@@ -289,11 +293,12 @@ data class PulseState(
 
   /** Short form for a window title, such as "3 downloading · 45%"; `null` when idle. */
   fun shortSentence(): String? {
-    val downloading = devices.filter { it.health.isOnline }.sumOf { it.counts.downloading }
+    val online = devices.filter { it.health.isOnline }
+    val downloading = online.sumOf { it.counts.downloading }
     if (downloading == 0) return null
-    val size = devices.sumOf { it.sizeBytes }
+    val size = online.sumOf { it.sizeBytes }
     if (size <= 0) return "$downloading downloading"
-    return "$downloading downloading · ${devices.sumOf { it.downloadedBytes } * 100 / size}%"
+    return "$downloading downloading · ${online.sumOf { it.downloadedBytes } * 100 / size}%"
   }
 
   private fun activeSentence(
@@ -370,13 +375,14 @@ class PulseSource(
 /**
  * Computes [PulseState] from the devices it is given.
  *
- * Each device's tasks, health and config are summed up at most every [UPDATE_INTERVAL]. Its
- * total speed is sampled once a second while anything downloads, keeping [HISTORY_SIZE]
- * samples, and its free space is read every [DISK_POLL_INTERVAL] while it is online and after
- * each completion. Devices out of [PulseState]'s scope are still watched, so switching scope
- * keeps their history.
+ * Each device's task states are summed up at most every [UPDATE_INTERVAL]; health and config
+ * changes show at once. Its total speed is sampled once a second while anything downloads,
+ * keeping [HISTORY_SIZE] samples, and its free space is read every [DISK_POLL_INTERVAL] while it
+ * is online and after each completion. Devices out of [PulseState]'s scope are still watched
+ * and listed in [devices], so switching scope keeps their history.
  *
- * @param sources devices to watch.
+ * @param sources devices to watch. Each source's flows must emit a first value promptly, since
+ *   the state waits for every device.
  * @param pulseScope devices the state sums up.
  * @param mode speed mode in effect for the scope.
  * @param scope runs the model until it is cancelled.
@@ -398,15 +404,23 @@ class PulseModel(
     }
     .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
+  /**
+   * Every device the model watches, whatever the scope, in the order it was given them; for
+   * example to feed a device's speed to its [SpeedModeController].
+   */
+  val devices: StateFlow<List<DevicePulse>> =
+    combine(live, disks, history) { devices, disks, history ->
+      devices.map { it.toPulse(disks[it.deviceId], history[it.deviceId].orEmpty()) }
+    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
   /** Status of the devices in scope. */
   val state: StateFlow<PulseState> =
-    combine(live, disks, history, pulseScope, mode) { devices, disks, history, focus, speedMode ->
-      val scoped = when (focus) {
-        PulseScope.AllDevices -> devices
-        is PulseScope.Device -> devices.filter { it.deviceId == focus.deviceId }
-      }
+    combine(devices, pulseScope, mode) { devices, focus, speedMode ->
       PulseState(
-        devices = scoped.map { it.toPulse(disks[it.deviceId], history[it.deviceId].orEmpty()) },
+        devices = when (focus) {
+          PulseScope.AllDevices -> devices
+          is PulseScope.Device -> devices.filter { it.deviceId == focus.deviceId }
+        },
         allDevices = focus == PulseScope.AllDevices,
         mode = speedMode,
       )
@@ -480,7 +494,8 @@ class PulseModel(
   }
 
   // Reads the free space when the device comes online, after each completion, and every
-  // DISK_POLL_INTERVAL; a failed read keeps the last known value.
+  // DISK_POLL_INTERVAL; a failed read keeps the last known value. A disk of size 0 means the
+  // platform could not read it, for example because the download folder does not exist.
   private suspend fun pollDisk(source: PulseSource) {
     val completions = live
       .mapNotNull { devices -> devices.find { it.deviceId == source.deviceId } }
@@ -491,8 +506,12 @@ class PulseModel(
       merge(completions.map {}, ticks(DISK_POLL_INTERVAL)).conflate().collect {
         try {
           val system = source.status().system
-          val disk = DiskSpace(system.usableSpace, system.totalSpace, system.downloadDirectory)
-          disks.update { it + (source.deviceId to disk) }
+          if (system.totalSpace > 0) {
+            val disk = DiskSpace(system.usableSpace, system.totalSpace, system.downloadDirectory)
+            disks.update { it + (source.deviceId to disk) }
+          } else {
+            disks.update { it - source.deviceId }
+          }
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
