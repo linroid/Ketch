@@ -20,7 +20,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -67,10 +66,7 @@ import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.Weekday
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
 
@@ -84,11 +80,7 @@ import kotlin.time.Clock
 @Composable
 fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
   val controller = state.settingsFor(device)
-  // Changes run past the page, so closing Settings right after a click never undoes them.
-  val pageScope = rememberCoroutineScope()
-  val model = remember(state, device, pageScope) {
-    SpeedSettingsModel(state, device, CoroutineScope(pageScope.coroutineContext + SupervisorJob()))
-  }
+  val model = remember(state, device) { SpeedSettingsModel(state, device) }
   LaunchedEffect(controller) { controller.loadDownload() }
   val config = controller.download
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
@@ -403,12 +395,12 @@ private val TimeFieldWidth = 72.dp
  * first hands it the limit the device uses, which may have been set elsewhere, such as in the
  * Pulse bar or the config file.
  *
- * @param scope runs the changes; failures are posted to [AppState.messages].
+ * Changes run in the app scope, so closing Settings right after a click never undoes them, and
+ * failures are posted to [AppState.messages].
  */
 internal class SpeedSettingsModel(
   private val state: AppState,
   private val device: InstanceEntry,
-  private val scope: CoroutineScope,
 ) {
   private val log = KetchLogger("SpeedSettings")
   private val settings = state.settingsFor(device)
@@ -459,7 +451,7 @@ internal class SpeedSettingsModel(
     block: suspend (SpeedModeController) -> Unit,
   ): Job? {
     val modes = speedMode ?: return null
-    return scope.launch {
+    return state.launchCommand {
       try {
         if (syncCap && modes.settings.value.mode == SpeedLimitMode.Full) {
           val limit = device.instance.status().config.speedLimit

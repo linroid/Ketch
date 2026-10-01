@@ -112,7 +112,7 @@ class SpeedSettingsModelTest {
       speedMode = speedMode,
     )
     runCurrent()
-    val model = SpeedSettingsModel(state, state.instances.value.single(), backgroundScope)
+    val model = SpeedSettingsModel(state, state.instances.value.single())
     return Fixture(engine, state, speedMode, model)
   }
 
