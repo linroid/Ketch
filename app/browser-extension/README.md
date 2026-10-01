@@ -194,7 +194,7 @@ including a final release after its release candidates, which the stores require
 | `src/lib/ketch-client.js` | Client for the Ketch REST API |
 | `src/lib/connection.js` | Reaches the Ketch app through native messaging |
 | `src/lib/handoff.js` | Creates the task with cookies, or resolves a fetched `.torrent` file first |
-| `src/lib/request.js` | Builds the download request and headers; recognizes torrents |
+| `src/lib/request.js` | Builds the download request and headers, tagged `ketch.origin: browser`; recognizes torrents |
 | `src/lib/intercept.js` | Which browser downloads are captured |
 | `src/lib/format.js` | Text for tasks, sizes and connection problems |
 | `src/lib/ext.js` | The `browser` or `chrome` API namespace |

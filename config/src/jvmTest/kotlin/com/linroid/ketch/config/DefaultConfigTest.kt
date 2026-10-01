@@ -32,7 +32,8 @@ class DefaultConfigTest {
       // Ktor's CORS allowHost rejects a scheme in the host, failing server startup
       assertEquals(listOf("localhost:3000"), config.server.corsAllowedHosts)
       assertEquals("My Ketch", config.name)
-      assertEquals(1, config.remotes.size)
+      val remote = RemoteConfig("192.168.1.100", apiToken = "token", name = "NAS")
+      assertEquals(listOf(remote), config.remotes)
       assertEquals(1, config.torrent.trackers.size)
     } finally {
       dir.deleteRecursively()
