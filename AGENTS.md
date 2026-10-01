@@ -306,7 +306,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### MCP Server (`library:mcp`)
 - `KetchMcpServer` exposes any `KetchApi` over stdio or SSE through Koog's MCP server bridge
 - `KetchToolSet` provides 12 tools: list/get/start/pause/resume/cancel/remove downloads,
-  `resolveUrl`, `getStatus`, `setSpeedLimit`, `setPriority`, `updateConfig`
+  `resolveUrl`, `getStatus`, `setSpeedLimit`, `setPriority`, `updateConfig`; downloads it starts
+  carry `DownloadRequest.properties["ketch.origin"] = "agent"`
 - Register Koog tool sets with `asDeclaredTools()` (`library:mcp` and `ai:discover` each have a
   copy), not `tools(toolSet)`: Koog 1.2.0 describes every parameter of a `@Tool` method as
   required and JSON-encodes a `String` result again. The adapter makes parameters with default
@@ -340,6 +341,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   script sends trusted magnet link clicks
 - Forwards cookies, referrer and user agent as `DownloadRequest.headers`; `.torrent` downloads
   whose URL Ketch would not recognize are fetched and resolved via `resolveContent`
+- Tags every request with `DownloadRequest.properties["ketch.origin"] = "browser"`. The apps
+  read this origin (`browser`, `discover`, `agent`, `app` or `cli`, set by whoever adds the
+  download) for the Origin search facet; it never goes to `resolve()`, whose properties are headers
 - Unit tests run with `node --test` in `app/browser-extension`; see its README
 
 ### Logging System
