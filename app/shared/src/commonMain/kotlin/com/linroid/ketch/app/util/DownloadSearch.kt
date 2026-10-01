@@ -1,9 +1,518 @@
 package com.linroid.ketch.app.util
 
+import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.state.StatusFilter
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
-internal fun DownloadRequest.matchesSearch(query: String): Boolean {
-  val term = query.trim()
-  return term.isEmpty() || url.contains(term, ignoreCase = true) ||
-    destination?.value?.contains(term, ignoreCase = true) == true
+/**
+ * Where a task was added from, recorded in its request property [TaskOrigin.PROPERTY].
+ *
+ * @property id value of the property and of the `origin:` search token.
+ * @property label name shown in the Origin column.
+ */
+enum class TaskOrigin(val id: String, val label: String) {
+  Browser("browser", "Browser"),
+  Discover("discover", "Discover"),
+  Agent("agent", "Agent"),
+  App("app", "App"),
+  Cli("cli", "CLI");
+
+  companion object {
+    /**
+     * Request property naming where a task was added from: `browser`, `discover`, `agent`,
+     * `app` or `cli`. Tasks without it have no origin.
+     */
+    const val PROPERTY: String = "ketch.origin"
+
+    /** Origin of the task downloading [request], or `null` when it is unknown. */
+    fun of(request: DownloadRequest): TaskOrigin? = fromId(request.properties[PROPERTY])
+
+    /** The origin whose [id] is [value], ignoring case. */
+    fun fromId(value: String?): TaskOrigin? {
+      val id = value?.trim() ?: return null
+      return entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
+    }
+  }
 }
+
+/**
+ * Broad file types of the `type:` search token and of grouping by type, each folding several
+ * [FileKind]s.
+ *
+ * @property id value of the `type:` search token.
+ * @property label group title.
+ */
+enum class FileType(val id: String, val label: String) {
+  Video("video", "Video"),
+  Audio("audio", "Audio"),
+  Image("image", "Images"),
+  Doc("doc", "Documents"),
+  Archive("archive", "Archives"),
+  App("app", "Apps"),
+  Torrent("torrent", "Torrents"),
+  Other("other", "Other");
+
+  companion object {
+    /** The type [kind] belongs to. */
+    fun of(kind: FileKind): FileType = when (kind) {
+      FileKind.Video, FileKind.Subtitle -> Video
+      FileKind.Audio -> Audio
+      FileKind.Image, FileKind.Design -> Image
+      FileKind.Document, FileKind.Pdf, FileKind.Ebook, FileKind.Spreadsheet,
+      FileKind.Presentation, FileKind.Text, FileKind.Email -> Doc
+      FileKind.Archive, FileKind.DiskImage -> Archive
+      FileKind.App -> App
+      FileKind.Torrent -> Torrent
+      FileKind.Code, FileKind.Data, FileKind.Database, FileKind.Web, FileKind.Model3d,
+      FileKind.Font, FileKind.Key, FileKind.Unknown -> Other
+    }
+
+    /** The type whose [id] is [value], ignoring case. */
+    fun fromId(value: String): FileType? =
+      entries.firstOrNull { it.id.equals(value, ignoreCase = true) }
+  }
+}
+
+/**
+ * What a search looks at in a task. Free text matches the decoded [name], [host],
+ * [refererHost], [outputPath] and [errorTitle]; tokens match the other fields.
+ */
+interface SearchTarget {
+  /** Display name of the task, from [displayName]. */
+  val name: String
+
+  /** Host of the task's URL, or `null` for magnets and other host-less links. */
+  val host: String?
+
+  /** Host of the page the link was found on, from its `Referer` header. */
+  val refererHost: String?
+
+  /** Where the file is or will be saved, decoded; `null` when not known yet. */
+  val outputPath: String?
+
+  /** Title of the error of a failed task. */
+  val errorTitle: String?
+
+  /** Current state of the task. */
+  val state: DownloadState
+
+  /** Queue priority of the task. */
+  val priority: DownloadPriority
+
+  /** Whether the task downloads but has received no data for a while. */
+  val isStalled: Boolean
+
+  /** Whether a per-task limit, the global limit or Slow lane caps the task. */
+  val isLimited: Boolean
+
+  /** Broad type of the file. */
+  val fileType: FileType
+
+  /** Whether the task downloads a torrent. */
+  val isTorrent: Boolean
+
+  /** Where the task was added from, if known. */
+  val origin: TaskOrigin?
+
+  /** Name of the device that runs the task. */
+  val deviceName: String
+
+  /** Size of the file in bytes, or `null` while unknown. */
+  val sizeBytes: Long?
+
+  /** When the task was added. */
+  val createdAt: Instant
+}
+
+/** Values of the `is:` search token. */
+enum class SearchStatus(val id: String) {
+  Downloading("downloading"),
+  Waiting("waiting"),
+  Paused("paused"),
+  Done("done"),
+  Failed("failed"),
+  Scheduled("scheduled"),
+  Urgent("urgent"),
+  Stalled("stalled"),
+  Limited("limited");
+
+  /** Whether [target] has this status. Status words use the [StatusFilter] definitions. */
+  fun matches(target: SearchTarget): Boolean = when (this) {
+    Downloading -> StatusFilter.Downloading.matches(target.state)
+    Waiting -> StatusFilter.Waiting.matches(target.state)
+    Paused -> StatusFilter.Paused.matches(target.state)
+    Done -> StatusFilter.Done.matches(target.state)
+    Failed -> StatusFilter.Failed.matches(target.state)
+    Scheduled -> target.state is DownloadState.Scheduled
+    Urgent -> target.priority == DownloadPriority.URGENT
+    Stalled -> target.isStalled
+    Limited -> target.isLimited
+  }
+
+  /** Whether this word names a state; a task is in one state but may have every flag. */
+  internal val isState: Boolean
+    get() = ordinal <= Scheduled.ordinal
+}
+
+/** How a `size:` token compares, written before the size: `>`, `>=`, `<` or `<=`. */
+enum class SizeComparison(val symbol: String) {
+  Greater(">"),
+  AtLeast(">="),
+  Less("<"),
+  AtMost("<=");
+
+  internal fun test(size: Long, bound: Long): Boolean = when (this) {
+    Greater -> size > bound
+    AtLeast -> size >= bound
+    Less -> size < bound
+    AtMost -> size <= bound
+  }
+}
+
+/** The span of an `added:` token. */
+sealed class AddedSpan {
+  /** Added on the current local day. */
+  data object Today : AddedSpan()
+
+  /** Added on the previous local day. */
+  data object Yesterday : AddedSpan()
+
+  /** Added at most [duration] ago, as in `added:<7d`. */
+  data class Within(val duration: Duration) : AddedSpan()
+
+  /** Added more than [duration] ago, as in `added:>7d`. */
+  data class OlderThan(val duration: Duration) : AddedSpan()
+}
+
+/**
+ * A `key:value` filter of a search, shown as a removable chip.
+ *
+ * Tokens of the same facet widen a search: `type:video type:audio` finds either. Size and date
+ * bounds and the `urgent`, `stalled` and `limited` flags narrow it: every one must hold.
+ */
+sealed class SearchToken {
+  /** The key before the colon, such as `is`. */
+  abstract val key: String
+
+  /** The value after the colon, as typed. */
+  abstract val value: String
+
+  /** The token as typed, quoting a value with spaces: `device:"This Mac"`. */
+  val label: String
+    get() = "$key:${quoteIfNeeded(value)}"
+
+  /** Tokens with the same non-null facet widen the search instead of narrowing it. */
+  internal abstract val facet: String?
+
+  /** Whether [target] passes this token at [now] in [timeZone]. */
+  abstract fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean
+
+  /** `is:` with a state or a flag. */
+  data class Is(val status: SearchStatus) : SearchToken() {
+    override val key: String get() = IS
+    override val value: String get() = status.id
+    override val facet: String? get() = if (status.isState) IS else null
+
+    override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
+      status.matches(target)
+  }
+
+  /** `type:`, such as `type:video`. A torrent also matches `type:torrent`. */
+  data class Type(val type: FileType) : SearchToken() {
+    override val key: String get() = TYPE
+    override val value: String get() = type.id
+    override val facet: String get() = TYPE
+
+    override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
+      target.fileType == type || (type == FileType.Torrent && target.isTorrent)
+  }
+
+  /** `host:`, matching the link's host or the page it came from, subdomains included. */
+  data class Host(val host: String) : SearchToken() {
+    override val key: String get() = HOST
+    override val value: String get() = host
+    override val facet: String get() = HOST
+
+    override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
+      hostMatches(target.host) || hostMatches(target.refererHost)
+
+    private fun hostMatches(candidate: String?): Boolean =
+      candidate != null && (candidate == host || candidate.endsWith(".$host"))
+  }
+
+  /** `origin:`, such as `origin:browser`. Tasks of unknown origin never match. */
+  data class Origin(val origin: TaskOrigin) : SearchToken() {
+    override val key: String get() = ORIGIN
+    override val value: String get() = origin.id
+    override val facet: String get() = ORIGIN
+
+    override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
+      target.origin == origin
+  }
+
+  /** `device:`, matching device names that contain [name], ignoring case. */
+  data class Device(val name: String) : SearchToken() {
+    override val key: String get() = DEVICE
+    override val value: String get() = name
+    override val facet: String get() = DEVICE
+
+    override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
+      target.deviceName.contains(name, ignoreCase = true)
+  }
+
+  /**
+   * `size:`, such as `size:>1gb`. Without a comparison it finds files of at least that size.
+   * Units are powers of 1024, like the sizes shown. Tasks of unknown size never match.
+   */
+  data class Size(
+    val comparison: SizeComparison,
+    val bytes: Long,
+    override val value: String,
+  ) : SearchToken() {
+    override val key: String get() = SIZE
+    override val facet: String? get() = null
+
+    override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean {
+      val size = target.sizeBytes ?: return false
+      return comparison.test(size, bytes)
+    }
+  }
+
+  /** `added:`, such as `added:today` or `added:<7d`; a bare span means "within". */
+  data class Added(val span: AddedSpan, override val value: String) : SearchToken() {
+    override val key: String get() = ADDED
+    override val facet: String? get() = null
+
+    override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean {
+      val age = now - target.createdAt
+      return when (span) {
+        AddedSpan.Today -> localDate(target.createdAt, timeZone) == localDate(now, timeZone)
+        AddedSpan.Yesterday -> localDate(target.createdAt, timeZone) ==
+          localDate(now, timeZone).minus(1, DateTimeUnit.DAY)
+        is AddedSpan.Within -> age <= span.duration
+        is AddedSpan.OlderThan -> age > span.duration
+      }
+    }
+  }
+
+  companion object {
+    /** The keys tokens may have. */
+    val KEYS: List<String> = listOf(IS, TYPE, HOST, ORIGIN, DEVICE, SIZE, ADDED)
+
+    /** Reads `key:value`, or returns `null` when the key or value is not recognized. */
+    fun parse(key: String, value: String): SearchToken? {
+      val text = value.trim()
+      if (text.isEmpty()) return null
+      return when (key.lowercase()) {
+        IS -> SearchStatus.entries.firstOrNull { it.id.equals(text, ignoreCase = true) }
+          ?.let(::Is)
+        TYPE -> FileType.fromId(text)?.let(::Type)
+        HOST -> parseHost(text)?.let(::Host)
+        ORIGIN -> TaskOrigin.fromId(text)?.let(::Origin)
+        DEVICE -> Device(text)
+        SIZE -> parseSize(text)
+        ADDED -> parseAdded(text)?.let { Added(it, text.lowercase()) }
+        else -> null
+      }
+    }
+
+    private fun parseHost(value: String): String? {
+      val host = if ("://" in value) urlHost(value) else value.substringBefore('/')
+      return host?.lowercase()?.trimEnd('.')?.ifEmpty { null }
+    }
+
+    private fun parseSize(value: String): Size? {
+      val match = SIZE_PATTERN.matchEntire(value.lowercase()) ?: return null
+      val (symbol, number, unit) = match.destructured
+      val comparison = SizeComparison.entries.firstOrNull { it.symbol == symbol }
+        ?: SizeComparison.AtLeast
+      val multiplier = when (unit.firstOrNull()) {
+        'k' -> 1L shl 10
+        'm' -> 1L shl 20
+        'g' -> 1L shl 30
+        't' -> 1L shl 40
+        else -> 1L
+      }
+      val bytes = number.toDoubleOrNull()?.times(multiplier) ?: return null
+      if (bytes >= Long.MAX_VALUE.toDouble()) return null
+      return Size(comparison, bytes.toLong(), value.lowercase())
+    }
+
+    private fun parseAdded(value: String): AddedSpan? {
+      when (value.lowercase()) {
+        "today" -> return AddedSpan.Today
+        "yesterday" -> return AddedSpan.Yesterday
+      }
+      val match = ADDED_PATTERN.matchEntire(value.lowercase()) ?: return null
+      val (symbol, number, unit) = match.destructured
+      val count = number.toIntOrNull() ?: return null
+      val duration = when (unit) {
+        "h" -> count.hours
+        "d" -> count.days
+        else -> (count * 7).days
+      }
+      return if (symbol == ">") AddedSpan.OlderThan(duration) else AddedSpan.Within(duration)
+    }
+
+    private const val IS = "is"
+    private const val TYPE = "type"
+    private const val HOST = "host"
+    private const val ORIGIN = "origin"
+    private const val DEVICE = "device"
+    private const val SIZE = "size"
+    private const val ADDED = "added"
+    private val SIZE_PATTERN = Regex("""(>=|<=|>|<)?(\d+(?:\.\d+)?)(b|[kmgt]i?b?)?""")
+    private val ADDED_PATTERN = Regex("""([<>])?(\d{1,5})([hdw])""")
+  }
+}
+
+/**
+ * A parsed search: free text plus [SearchToken]s.
+ *
+ * Every word of free text must appear, ignoring case, in one of the decoded fields of
+ * [SearchTarget]; double quotes keep a phrase together. A word such as `is:paused` whose key and
+ * value are recognized becomes a token; any other word is free text.
+ *
+ * @property terms words and quoted phrases of free text.
+ * @property tokens the filters, in the order typed.
+ */
+data class SearchQuery(
+  val terms: List<String> = emptyList(),
+  val tokens: List<SearchToken> = emptyList(),
+) {
+  /** Whether the query matches every task. */
+  val isEmpty: Boolean
+    get() = terms.isEmpty() && tokens.isEmpty()
+
+  /** The free text, for the search field next to the token chips. */
+  val text: String
+    get() = terms.joinToString(" ") { quoteIfNeeded(it) }
+
+  /** Whether [target] matches at [now] in [timeZone]. */
+  fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean {
+    if (terms.isNotEmpty()) {
+      val fields = listOfNotNull(
+        target.name,
+        target.host,
+        target.refererHost,
+        target.outputPath,
+        target.errorTitle
+      )
+      if (!terms.all { term -> fields.any { it.contains(term, ignoreCase = true) } }) {
+        return false
+      }
+    }
+    return tokens.groupBy { it.facet }.all { (facet, group) ->
+      if (facet == null) {
+        group.all { it.matches(target, now, timeZone) }
+      } else {
+        group.any { it.matches(target, now, timeZone) }
+      }
+    }
+  }
+
+  /** This query with [token] added, as when `⌥`-clicking a host; a duplicate is ignored. */
+  operator fun plus(token: SearchToken): SearchQuery =
+    if (token in tokens) this else copy(tokens = tokens + token)
+
+  /** This query without [token], as when its chip is removed. */
+  operator fun minus(token: SearchToken): SearchQuery = copy(tokens = tokens - token)
+
+  /** The query as it would be typed: tokens first, then the free text. */
+  fun format(): String = (tokens.map { it.label } + terms.map(::quoteIfNeeded)).joinToString(" ")
+
+  companion object {
+    /** Matches every task. */
+    val Empty: SearchQuery = SearchQuery()
+
+    /** Parses what was typed in the search field. */
+    fun parse(input: String): SearchQuery {
+      val terms = mutableListOf<String>()
+      val tokens = mutableListOf<SearchToken>()
+      for (word in words(input)) {
+        val colon = word.text.indexOf(':')
+        val token = if (colon > 0 && !word.isPhrase) {
+          SearchToken.parse(word.text.substring(0, colon), word.text.substring(colon + 1))
+        } else {
+          null
+        }
+        when {
+          token == null -> terms += word.text
+          token !in tokens -> tokens += token
+        }
+      }
+      return SearchQuery(terms, tokens)
+    }
+  }
+}
+
+/**
+ * Whether the task downloading this request matches the free text of [query], searching its
+ * decoded display name, host, referer host and destination. Tokens are ignored, since the
+ * request alone has no state.
+ */
+internal fun DownloadRequest.matchesSearch(query: String): Boolean {
+  val terms = SearchQuery.parse(query).terms
+  if (terms.isEmpty()) return true
+  val fields = listOfNotNull(
+    displayName(this),
+    urlHost(url),
+    referer?.let(::urlHost),
+    destination?.value?.let(::decodePath)
+  )
+  return terms.all { term -> fields.any { it.contains(term, ignoreCase = true) } }
+}
+
+/** [path] with the escapes of an Android `content://` URI decoded; other paths are kept. */
+internal fun decodePath(path: String): String =
+  if (path.startsWith("content://", ignoreCase = true)) percentDecode(path) else path
+
+private class Word(val text: String, val isPhrase: Boolean)
+
+/**
+ * Splits [input] at whitespace outside double quotes and drops the quotes. A word that starts
+ * with a quote is a phrase, never a token, even when it contains a colon.
+ */
+private fun words(input: String): List<Word> {
+  val words = mutableListOf<Word>()
+  val current = StringBuilder()
+  var quoted = false
+  var startsQuoted = false
+  var started = false
+  fun flush() {
+    if (started && current.isNotBlank()) words += Word(current.toString().trim(), startsQuoted)
+    current.clear()
+    started = false
+    startsQuoted = false
+  }
+  for (char in input) {
+    when {
+      char == '"' -> {
+        if (!started) startsQuoted = true
+        started = true
+        quoted = !quoted
+      }
+      char.isWhitespace() && !quoted -> flush()
+      else -> {
+        started = true
+        current.append(char)
+      }
+    }
+  }
+  flush()
+  return words
+}
+
+private fun quoteIfNeeded(value: String): String =
+  if (value.any { it.isWhitespace() || it == ':' }) "\"$value\"" else value
+
+private fun localDate(instant: Instant, timeZone: TimeZone) = instant.toLocalDateTime(timeZone).date
