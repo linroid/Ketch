@@ -148,7 +148,15 @@ private fun progressParts(downloaded: Long?, total: Long?): List<String> {
   if (downloaded == null) return emptyList()
   if (total == null || total <= 0) return listOf(formatSize(downloaded))
   val percent = (downloaded.coerceIn(0, total) * 100 / total).toInt()
-  return listOf("$percent%", formatBytesOf(downloaded, total))
+  val done = formatSize(downloaded)
+  val size = formatSize(total)
+  // "2.4 of 5.7 GB" in one unit, but "474 MB of 1.3 GB" rather than "0.5 of 1.3 GB".
+  val bytes = if (done.substringAfter(' ') == size.substringAfter(' ')) {
+    formatBytesOf(downloaded, total)
+  } else {
+    "$done of $size"
+  }
+  return listOf("$percent%", bytes)
 }
 
 private fun knownSize(row: TaskRow): List<String> = listOfNotNull(row.sizeBytes?.let(::formatSize))

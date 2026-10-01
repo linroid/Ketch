@@ -18,6 +18,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -140,6 +142,7 @@ private fun ProblemLinks(row: TaskRow, runner: RowActionRunner) {
       TextLink(if (logs.title.startsWith("Open")) "Open logs" else logs.title) {
         scope.launch {
           catchingUnlessCancelled { logs.run() }.onFailure { e ->
+            log.w { "Couldn't open the logs: ${e.describeCauses()}" }
             state.messages.post(MessageLevel.Error, "Couldn't open the logs", cause = e)
           }
         }
@@ -147,6 +150,8 @@ private fun ProblemLinks(row: TaskRow, runner: RowActionRunner) {
     }
   }
 }
+
+private val log = KetchLogger("Inspector")
 
 private const val MAX_FIXES = 2
 private const val BORDER_ALPHA = 0.3f

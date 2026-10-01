@@ -120,6 +120,13 @@ class InspectorModelTest {
   }
 
   @Test
+  fun metricParts_pausedBelowAUnitOfTheSize_writesBothUnits() {
+    val state = DownloadState.Paused(DownloadProgress(497_025_024, 1_342_177_280))
+
+    assertEquals(listOf("37%", "474 MB of 1.3 GB"), metricParts(row("p", state), start, TimeZone.UTC))
+  }
+
+  @Test
   fun metricParts_completed_usesTheTransferSummary() {
     val state = DownloadState.Completed("/tmp/a.bin", 100 * MB, downloadTime = 10.seconds)
 
