@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
@@ -141,7 +143,7 @@ private fun RowBody(
         verticalArrangement = Arrangement.spacedBy(spacing.s0_5),
         modifier = Modifier.weight(1f).padding(start = spacing.s3),
       ) {
-        FirstLine(row, metric = !touch)
+        FirstLine(row, metric = !touch, hovered = frame.hovered)
         Text(
           text = secondLine(row, touch, colors),
           style = KetchTheme.typography.caption,
@@ -164,9 +166,12 @@ private fun RowBody(
   }
 }
 
-/** The name, its priority and, with a pointer, the metric at the end. */
+/**
+ * The name, its priority and, with a pointer, the metric at the end, which gives way to the
+ * hover actions while [hovered].
+ */
 @Composable
-private fun FirstLine(row: TaskRow, metric: Boolean) {
+private fun FirstLine(row: TaskRow, metric: Boolean, hovered: Boolean) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   Row(verticalAlignment = Alignment.CenterVertically) {
@@ -180,7 +185,7 @@ private fun FirstLine(row: TaskRow, metric: Boolean) {
       PriorityGlyph(row.request.priority, Modifier.padding(start = spacing.s1))
     }
     if (metric) {
-      Box(Modifier.padding(start = spacing.s3)) { Metric(row) }
+      Box(Modifier.padding(start = spacing.s3).alpha(if (hovered) 0f else 1f)) { Metric(row) }
     }
   }
 }
@@ -288,10 +293,22 @@ internal fun BoxScope.HoverOverlay(row: TaskRow, actions: ListActions, frame: Ro
   val spacing = KetchTheme.spacing
   val fill = rowFill(colors, frame, actions.keyboard.hasFocus)
   val fade = spacing.s6
+  Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+    HoverButtons(row, actions, frame, fill, fade)
+  }
+}
+
+@Composable
+private fun HoverButtons(
+  row: TaskRow,
+  actions: ListActions,
+  frame: RowFrameState,
+  fill: Color,
+  fade: Dp,
+) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier
-      .align(Alignment.CenterEnd)
       .fillMaxHeight()
       .then(
         if (frame.hovered) {
@@ -303,7 +320,7 @@ internal fun BoxScope.HoverOverlay(row: TaskRow, actions: ListActions, frame: Ro
           Modifier
         }
       )
-      .padding(start = fade, end = spacing.s2),
+      .padding(start = fade, end = KetchTheme.spacing.s2),
   ) {
     HoverActions(row, frame.hovered, actions.runner, menu = actions.menu)
   }

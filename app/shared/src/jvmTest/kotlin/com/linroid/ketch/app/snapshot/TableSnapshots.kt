@@ -1,6 +1,8 @@
 package com.linroid.ketch.app.snapshot
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
@@ -24,6 +26,7 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.downloads.ClipboardChipRow
 import com.linroid.ketch.app.ui.downloads.Launchpad
 import com.linroid.ketch.app.ui.downloads.RowDensity
 import com.linroid.ketch.app.ui.downloads.TableColumn
@@ -69,6 +72,7 @@ class TableSnapshots {
     appSnapshots("list-inspected", listOf(SnapshotSize.Medium, SnapshotSize.Phone)) {
       inspect(UBUNTU)
     }
+    appSnapshots("list-hover", listOf(SnapshotSize.Medium)) { scene.hover(420.dp, 145.dp) }
     appSnapshots("list-picked", listOf(SnapshotSize.Desktop)) {
       state.updateInspectorOpen(false)
       state.appSettings.saveUi { it.copy(layout = DownloadsLayout.List) }
@@ -148,6 +152,23 @@ class TableSnapshots {
       snapshot("table-columns", size, theme) {
         KetchMenuPanel(Modifier.padding(KetchTheme.spacing.s2)) {
           columnChooser(TableLayout().withVisible(TableColumn.Source, true)) {}
+        }
+      }
+    }
+  }
+
+  @Test
+  fun clipboardChip_phone_offersTheCopiedLink() {
+    val size = SnapshotSize(390.dp, 120.dp, KetchDensity.Comfortable)
+    for (theme in SnapshotTheme.entries) {
+      snapshot("clipboard-chip", size, theme) {
+        Column(Modifier.background(KetchTheme.colors.surface)) {
+          ClipboardChipRow(
+            label = "ubuntu-24.04-desktop-amd64.iso · releases.ubuntu.com",
+            onClick = {},
+            onDismiss = {},
+          )
+          ClipboardChipRow(label = null, onClick = {}, onDismiss = {})
         }
       }
     }
