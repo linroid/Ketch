@@ -15,6 +15,11 @@ import kotlinx.serialization.Serializable
  * @property ai AI resource discovery settings.
  * @property appearance app look and feel settings.
  * @property torrent BitTorrent engine settings.
+ * @property speed speed modes and rules for the embedded device.
+ * @property ui app UI state remembered between launches.
+ * @property desktop desktop app window and startup behavior.
+ * @property notifications which activity the apps report.
+ * @property integration operating system integration of the desktop app.
  */
 @Serializable
 data class KetchConfig(
@@ -25,4 +30,9 @@ data class KetchConfig(
   val ai: AiSettings = AiSettings(),
   val appearance: AppearanceConfig = AppearanceConfig(),
   val torrent: TorrentSettings = TorrentSettings(),
+  val speed: SpeedSettings = SpeedSettings(),
+  val ui: UiPreferences = UiPreferences(),
+  val desktop: DesktopSettings = DesktopSettings(),
+  val notifications: NotificationSettings = NotificationSettings(),
+  val integration: IntegrationSettings = IntegrationSettings(),
 )
