@@ -3,6 +3,9 @@ package com.linroid.ketch.app.state
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageCenter
@@ -20,7 +23,7 @@ import kotlin.time.Clock
  * the Settings window can share it, and commands survive the screen that started them.
  *
  * The host that creates it closes it with [close]; [rememberAppController] does that for apps
- * that keep it in a composition.
+ * that keep it in a composition, once the screen that holds it is gone for good.
  *
  * @param instanceManager the devices; the host owns it and closes it after this controller.
  * @param aiProviderFactory builds the AI discovery engine; `null` where it cannot run.
@@ -100,10 +103,14 @@ class AppController(
 }
 
 /**
- * Creates an [AppController] that lives as long as this composition and is closed with it.
+ * Creates an [AppController] that lives as long as the screen showing this composition, such as
+ * an Android activity across rotations, so adds and commands in flight survive the screen being
+ * recreated. It is closed once the screen is gone for good, or when it is asked for with another
+ * [instanceManager], [aiProviderFactory], [incoming] or [speedMode].
  *
- * The instance manager and [speedMode] can outlive the composition (Android keeps them in the
- * service across activity recreation), so the controller is released here rather than with them.
+ * The instance manager and [speedMode] can outlive the screen (Android keeps them in the
+ * service), so the controller is released here rather than with them. Without a
+ * `ViewModelStoreOwner` the controller lives as long as this composition.
  */
 @Composable
 fun rememberAppController(
@@ -112,16 +119,51 @@ fun rememberAppController(
   incoming: IncomingDownloads? = null,
   speedMode: SpeedModeController? = null,
 ): AppController {
-  val controller = remember(instanceManager, aiProviderFactory, incoming, speedMode) {
-    AppController(
-      instanceManager = instanceManager,
-      aiProviderFactory = aiProviderFactory,
-      incoming = incoming ?: IncomingDownloads(),
-      speedMode = speedMode,
-    )
+  val key = AppControllerKey(instanceManager, aiProviderFactory, incoming, speedMode)
+  val owner = LocalViewModelStoreOwner.current
+  if (owner != null) {
+    val holder = viewModel(viewModelStoreOwner = owner) { AppControllerHolder() }
+    return remember(holder, key) { holder.controllerFor(key) }
   }
+  val controller = remember(key) { key.create() }
   DisposableEffect(controller) {
     onDispose { controller.close() }
   }
   return controller
+}
+
+/** What an [AppController] made by [rememberAppController] is built from. */
+private data class AppControllerKey(
+  val instanceManager: InstanceManager,
+  val aiProviderFactory: AiDiscoveryProviderFactory?,
+  val incoming: IncomingDownloads?,
+  val speedMode: SpeedModeController?,
+) {
+  fun create(): AppController = AppController(
+    instanceManager = instanceManager,
+    aiProviderFactory = aiProviderFactory,
+    incoming = incoming ?: IncomingDownloads(),
+    speedMode = speedMode,
+  )
+}
+
+/** Keeps the [AppController] of a screen while the screen is recreated, and closes it after. */
+private class AppControllerHolder : ViewModel() {
+  private var key: AppControllerKey? = null
+  private var controller: AppController? = null
+
+  /** The controller built from [key]; one built from another key is closed first. */
+  fun controllerFor(key: AppControllerKey): AppController {
+    controller?.takeIf { this.key == key }?.let { return it }
+    controller?.close()
+    return key.create().also {
+      this.key = key
+      controller = it
+    }
+  }
+
+  override fun onCleared() {
+    controller?.close()
+    controller = null
+  }
 }
