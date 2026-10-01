@@ -9,7 +9,9 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -83,6 +85,21 @@ class RowActionRunnerTest {
     runCurrent()
     assertEquals(listOf("pause"), good.calls)
     assertEquals(listOf("pause", "pause"), bad.calls)
+    f.close()
+  }
+
+  @Test
+  fun run_pauseAfterTheScreenLeft_stillPausesEveryRow() = runTest {
+    val f = ActionsFixture(this)
+    val tasks = List(2) { f.add(downloading) }
+    val left = CoroutineScope(Job().apply { cancel() })
+    val runner = RowActionRunner(f.state, f.runner.commands, f.files, f.clipboard, left)
+
+    runner.run(RowAction.Pause, tasks.map { rowOf(it) })
+    runCurrent()
+
+    tasks.forEach { assertEquals(listOf("pause"), it.calls) }
+    assertEquals("Paused 2 downloads", f.messages().last().title)
     f.close()
   }
 
