@@ -52,7 +52,9 @@ object IosNotifier : SystemNotifier {
   private val taps = Channel<NotificationTap>(Channel.UNLIMITED)
   private var installed = false
   private var authorizationRequested = false
-  private var badge = 0
+
+  // Unknown until the first count, so a badge left from an earlier launch is replaced.
+  private var badge: Int? = null
 
   private val center: UNUserNotificationCenter
     get() = UNUserNotificationCenter.currentNotificationCenter()
@@ -152,7 +154,8 @@ object IosNotifier : SystemNotifier {
   }
 
   private fun applyBadge() {
-    center.setBadgeCount(badge.toLong()) { error ->
+    val count = badge ?: return
+    center.setBadgeCount(count.toLong()) { error ->
       if (error != null) log.d { "Could not set the badge: ${error.describe()}" }
     }
   }
