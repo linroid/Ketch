@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -79,19 +80,22 @@ fun SailLanesIllustration(
           startX = topLeft.x,
           endX = topLeft.x + topSize.width,
         )
+        val accentCenter = Offset(ACCENT_GLOW_X * unit, ACCENT_GLOW_Y * unit)
+        val emberCenter = Offset(EMBER_GLOW_X * unit, EMBER_GLOW_Y * unit)
         val accentGlow = Brush.radialGradient(
           colors = listOf(colors.accent.copy(alpha = GLOW_ALPHA), Color.Transparent),
-          center = Offset(ACCENT_GLOW_X * unit, ACCENT_GLOW_Y * unit),
+          center = accentCenter,
           radius = ACCENT_GLOW_RADIUS * unit,
         )
         val emberGlow = Brush.radialGradient(
           colors = listOf(colors.brandEmber.last().copy(alpha = GLOW_ALPHA), Color.Transparent),
-          center = Offset(EMBER_GLOW_X * unit, EMBER_GLOW_Y * unit),
+          center = emberCenter,
           radius = EMBER_GLOW_RADIUS * unit,
         )
         onDrawBehind {
-          drawRect(accentGlow)
-          drawRect(emberGlow)
+          // The glows fade out past the canvas, so they are drawn whole rather than cut square.
+          drawGlow(accentGlow, accentCenter, ACCENT_GLOW_RADIUS * unit)
+          drawGlow(emberGlow, emberCenter, EMBER_GLOW_RADIUS * unit)
           val now = time?.value
           val alpha = if (now == null) 1f else sailFillAlpha(now)
           lanes.forEachIndexed { i, (laneTopLeft, laneSize) ->
@@ -115,6 +119,11 @@ fun SailLanesIllustration(
         }
       }
   )
+}
+
+/** Fills the square around [center] that holds the whole of a radial [glow] of [radius]. */
+private fun DrawScope.drawGlow(glow: Brush, center: Offset, radius: Float) {
+  drawRect(glow, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2))
 }
 
 /**

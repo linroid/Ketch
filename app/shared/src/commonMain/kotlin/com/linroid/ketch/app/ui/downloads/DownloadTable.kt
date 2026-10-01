@@ -243,7 +243,7 @@ private fun TableHeader(
         onSort = onSort,
         modifier = Modifier.weight(1f),
       )
-      for (setting in columns) {
+      columns.forEachIndexed { index, setting ->
         val column = setting.column
         Box(Modifier.width(setting.width).fillMaxHeight()) {
           HeaderCell(
@@ -252,7 +252,7 @@ private fun TableHeader(
             arrangement = view.arrangement,
             numeric = column.numeric,
             onSort = onSort,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().then(columnLead(columns, index)),
           )
           ResizeHandle(
             width = setting.width,
@@ -487,20 +487,39 @@ private fun TableRow(
       while (index < columns.size) {
         val setting = columns[index]
         if (setting.column.inReasonSpan && spansReason(row, lanes)) {
+          val start = index
           var width = 0.dp
           while (index < columns.size && columns[index].column.inReasonSpan) {
             width += columns[index].width
             index++
           }
-          ReasonCell(row, Modifier.width(width))
+          ReasonCell(row, Modifier.width(width).then(columnLead(columns, start)))
           continue
         }
-        Cell(row, setting, lanes, completion::onSheenShown, onAddToken, frame)
+        Cell(
+          row = row,
+          setting = setting,
+          lanes = lanes,
+          onSheenShown = completion::onSheenShown,
+          onAddToken = onAddToken,
+          frame = frame,
+          modifier = columnLead(columns, index),
+        )
         index++
       }
     }
     HoverOverlay(row, actions, frame)
   }
+}
+
+/**
+ * Extra space before a left-aligned column that follows a right-aligned one, such as Progress
+ * after Size, so a number and the text after it don't read as one.
+ */
+@Composable
+private fun columnLead(columns: List<ColumnSetting>, index: Int): Modifier {
+  val follows = index > 0 && columns[index - 1].column.numeric && !columns[index].column.numeric
+  return if (follows) Modifier.padding(start = KetchTheme.spacing.s2) else Modifier
 }
 
 /** Whether [row] shows its reason across Progress, Speed and Left instead of numbers. */
@@ -577,11 +596,12 @@ private fun Cell(
   onSheenShown: () -> Unit,
   onAddToken: (SearchToken) -> Unit,
   frame: RowFrameState,
+  modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val content = row.content
-  val cell = Modifier.width(setting.width).padding(horizontal = CellPadding)
+  val cell = Modifier.width(setting.width).then(modifier).padding(horizontal = CellPadding)
   val muted = if (frame.selected) colors.textSecondary else colors.textTertiary
   when (setting.column) {
     TableColumn.Size -> NumberCell(content.size, cell, color = colors.textSecondary)
@@ -790,7 +810,7 @@ private fun Modifier.altClick(onAltClick: () -> Unit): Modifier {
 }
 
 /** Space between the table's edge and its first and last cells. */
-internal val TablePadding: Dp = 4.dp
+internal val TablePadding: Dp = 8.dp
 
 /** Horizontal padding inside each cell, so neighbouring cells are 8 dp apart. */
 private val CellPadding: Dp = 4.dp

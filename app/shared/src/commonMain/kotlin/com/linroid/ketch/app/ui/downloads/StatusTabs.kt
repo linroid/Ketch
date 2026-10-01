@@ -290,7 +290,7 @@ internal fun ArrangementMenu(
 
 /** A quiet "Label: value ▾" button that opens a menu. */
 @Composable
-private fun MenuLabel(label: String, value: String, open: Boolean, onClick: () -> Unit) {
+internal fun MenuLabel(label: String, value: String, open: Boolean, onClick: () -> Unit) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val shape = KetchTheme.shapes.sm

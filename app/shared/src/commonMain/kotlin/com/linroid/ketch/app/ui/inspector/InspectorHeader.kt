@@ -23,10 +23,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -254,7 +256,12 @@ private fun Subline(row: TaskRow, device: DeviceLabel) {
 
 /** The device's pennant with its health ring, and its name. */
 @Composable
-internal fun DeviceName(device: DeviceLabel, modifier: Modifier = Modifier) {
+internal fun DeviceName(
+  device: DeviceLabel,
+  modifier: Modifier = Modifier,
+  style: TextStyle = KetchTheme.typography.caption,
+  color: Color = KetchTheme.colors.textSecondary,
+) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
@@ -268,8 +275,8 @@ internal fun DeviceName(device: DeviceLabel, modifier: Modifier = Modifier) {
     )
     Text(
       text = device.name,
-      style = KetchTheme.typography.caption,
-      color = KetchTheme.colors.textSecondary,
+      style = style,
+      color = color,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )

@@ -110,8 +110,9 @@ internal fun PhoneScaffold(
   val colors = KetchTheme.colors
   val safe = WindowInsets.safeDrawing
   val topInsets = safe.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
-  Column(modifier.fillMaxSize().phoneWash(colors, PhoneWashHeight)) {
-    Box(Modifier.windowInsetsPadding(topInsets)) {
+  Column(modifier.fillMaxSize().background(colors.surface)) {
+    // The wash fades out by the bar's bottom edge, so the list below meets it without a seam.
+    Box(Modifier.phoneWash(colors).windowInsetsPadding(topInsets)) {
       CollapsingBar(chrome) { topBar() }
     }
     banners()
@@ -168,22 +169,15 @@ internal fun Modifier.canvasWash(colors: KetchColors, emberRadius: Dp): Modifier
     }
   }
 
-/** The phone's surface, with the wash's first stop fading out over the top [height]. */
-private fun Modifier.phoneWash(colors: KetchColors, height: Dp): Modifier = drawWithCache {
-  val fade = Brush.verticalGradient(
-    colors = listOf(colors.wash.start, colors.surface),
-    endY = height.toPx(),
-  )
-  onDrawBehind {
-    drawRect(colors.surface)
-    drawRect(fade)
-  }
+/** The wash's first stop fading out into the phone's surface down this element's height. */
+private fun Modifier.phoneWash(colors: KetchColors): Modifier = drawWithCache {
+  val fade = Brush.verticalGradient(colors = listOf(colors.wash.start, colors.surface))
+  onDrawBehind { drawRect(fade) }
 }
 
 private const val WASH_ANGLE_DEGREES = 160.0
 
 private val HairlineWidth = 1.dp
 
-// Radius of the wash's ember glow, and how far down the phone's wash fades out.
+// Radius of the wash's ember glow.
 private val EmberRadius = 520.dp
-private val PhoneWashHeight = 200.dp
