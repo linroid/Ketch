@@ -4,6 +4,7 @@ import com.linroid.ketch.config.ServerConfig
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class FakeMdnsDiscoverer(
@@ -28,6 +29,16 @@ class FakeMdnsDiscoverer(
 }
 
 class LanServerDiscoveryTest {
+
+  @Test
+  fun supported_discovererThatCanBrowse_isTrue() {
+    assertTrue(LanServerDiscovery(FakeMdnsDiscoverer()).supported)
+  }
+
+  @Test
+  fun supported_noOpDiscoverer_isFalse() {
+    assertFalse(LanServerDiscovery(NoOpMdnsDiscoverer).supported)
+  }
 
   @Test
   fun `empty discovery returns empty list`() = runTest {
