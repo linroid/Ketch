@@ -142,7 +142,8 @@ private fun ShortcutLineView(line: ShortcutLine, modifier: Modifier) {
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = modifier
-      .heightIn(min = KetchTheme.density.menuItem)
+      // Lines are read, not tapped, so they keep their height on touch screens too.
+      .heightIn(min = KeyCapHeight + spacing.s2)
       .clearAndSetSemantics { contentDescription = "${line.label}, ${line.keys.joinToString()}" },
   ) {
     Text(

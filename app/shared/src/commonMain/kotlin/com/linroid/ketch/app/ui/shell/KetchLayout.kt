@@ -10,7 +10,7 @@ import com.linroid.ketch.app.ui.downloads.KetchLayoutInfo
 import com.linroid.ketch.app.ui.downloads.LayoutTier
 
 /** How the shell offers its destinations. */
-enum class ShellNavigation {
+internal enum class ShellNavigation {
   /** The 220 dp sidebar beside the content card, on wide windows. */
   Sidebar,
 
@@ -31,7 +31,7 @@ enum class ShellNavigation {
  * @property cardWidth width of the content card.
  */
 @Immutable
-data class KetchLayout(
+internal data class KetchLayout(
   val windowWidth: Dp,
   val tier: LayoutTier,
   val navigation: ShellNavigation,
@@ -98,4 +98,4 @@ data class KetchLayout(
 }
 
 /** Layout of the shell around the screen below, provided by the app shell. */
-val LocalKetchLayout = compositionLocalOf { KetchLayout.of(KetchLayoutInfo.ExpandedWidth) }
+internal val LocalKetchLayout = compositionLocalOf { KetchLayout.of(KetchLayoutInfo.ExpandedWidth) }

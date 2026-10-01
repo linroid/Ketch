@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,7 +73,6 @@ import com.linroid.ketch.app.ui.shell.ShortcutHost
 import com.linroid.ketch.app.ui.shell.ShortcutSheet
 import com.linroid.ketch.app.ui.shell.shortcutGroups
 import com.linroid.ketch.app.ui.sidebar.Sidebar
-import com.linroid.ketch.app.ui.sidebar.rememberDevices
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emptyFlow
@@ -144,6 +144,14 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     if (shell.destination !in destinations) shell.show(AppDestination.Downloads)
   }
   ShellRequests(appState, shell, openSettingsRequests)
+  val backLeadsHome = isMobilePlatform || layout.navigation == ShellNavigation.Phone
+  if (backLeadsHome && shell.destination != AppDestination.Downloads && !shell.settingsOpen) {
+    // Back leads home to Downloads; Settings and the phone's search handle it first.
+    NavigationBackHandler(
+      state = rememberNavigationEventState(NavigationEventInfo.None),
+      onBackCompleted = { shell.show(AppDestination.Downloads) },
+    )
+  }
   LaunchedEffect(windowInfo, appState) {
     // The device may have changed its settings while the app was in the background.
     snapshotFlow { windowInfo.isWindowFocused }
@@ -287,6 +295,14 @@ private fun ShellRequests(appState: AppState, shell: ShellState, openSettingsReq
     appState.downloadsRequests.collect { shell.show(AppDestination.Downloads) }
   }
   LaunchedEffect(appState) {
+    var last: String? = null
+    appState.activeInstance.collect { entry ->
+      val id = entry?.deviceId
+      if (last != null && last != id) shell.previousDeviceId = last
+      last = id
+    }
+  }
+  LaunchedEffect(appState) {
     appState.focusSearchRequests.collect { shell.focusSearch() }
   }
   val searchFocus = shell.searchFocusRequests
@@ -378,25 +394,20 @@ private fun PhoneShell(
     }
     return
   }
-  if (shell.destination != AppDestination.Downloads) {
-    NavigationBackHandler(
-      state = rememberNavigationEventState(NavigationEventInfo.None),
-      onBackCompleted = { shell.show(AppDestination.Downloads) },
-    )
-  }
-  val active by appState.activeInstance.collectAsState()
-  val devices = rememberDevices(appState)
-  var previousId by remember { mutableStateOf<String?>(null) }
-  LaunchedEffect(appState) {
-    var last: String? = null
-    appState.activeInstance.collect { entry ->
-      val id = entry?.deviceId
-      if (last != null && last != id) previousId = last
-      last = id
-    }
+  LaunchedEffect(shell) {
+    // A search typed on a wider window, restored after Android recreated the activity, or set
+    // from elsewhere shows in the search field, so it never filters the list out of sight.
+    snapshotFlow {
+      appState.searchQuery.isNotEmpty() && shell.destination == AppDestination.Downloads
+    }.collect { searching -> if (searching) shell.searchOpen = true }
   }
   val showsBottomBar = destinations.size >= BOTTOM_BAR_MIN_DESTINATIONS
   val downloads = shell.destination == AppDestination.Downloads
+  val clearance = with(LocalDensity.current) { KetchLayout.FabClearance.toPx() }
+  // Read through a derived state, so scrolling recomposes only when the button changes shape.
+  val fabExpanded by remember(shell, clearance) {
+    derivedStateOf { shell.chrome.contentOffset < clearance }
+  }
   PhoneScaffold(
     chrome = shell.chrome,
     topBar = {
@@ -406,8 +417,6 @@ private fun PhoneShell(
         showsBottomBar = showsBottomBar,
         onShow = { shell.show(it) },
         onOpenSettings = { appState.openSettings() },
-        previousDevice = devices.firstOrNull { it.deviceId == previousId },
-        device = devices.firstOrNull { it.deviceId == active?.deviceId },
       )
     },
     banners = { BannerHost(appState) },
@@ -432,9 +441,7 @@ private fun PhoneShell(
       )
       if (downloads) {
         AddFab(
-          expanded = shell.chrome.contentOffset < with(LocalDensity.current) {
-            KetchLayout.FabClearance.toPx()
-          },
+          expanded = fabExpanded,
           onClick = { appState.openIntake() },
           onLongClick = { commands.run(KetchCommands.AddClipboardLink) },
           modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.s4),

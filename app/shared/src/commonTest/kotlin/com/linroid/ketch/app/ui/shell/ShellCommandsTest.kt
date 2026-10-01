@@ -168,6 +168,19 @@ class ShellCommandsTest {
   }
 
   @Test
+  fun paste_addSheetOpen_addsNothingBehindIt() = runTest {
+    val fixture = fixture(platform = KeyboardPlatform.WebMac)
+    fixture.controller.state.openIntake()
+
+    fixture.commands.paste("https://example.com/ubuntu.iso")
+    runCurrent()
+
+    assertTrue(fixture.api.requests.isEmpty())
+    assertTrue(fixture.controller.state.showAddDialog)
+    fixture.controller.close()
+  }
+
+  @Test
   fun run_addClipboardLinkWithEmptyClipboard_saysSo() = runTest {
     val fixture = fixture(clipboard = null)
 

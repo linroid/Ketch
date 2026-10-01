@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -90,33 +89,36 @@ internal fun Sidebar(
         )
       }
     }
-    Text(
-      text = eyebrowText("Devices"),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textSecondary,
-      modifier = Modifier.padding(
-        start = spacing.s4,
-        top = spacing.s6,
-        bottom = spacing.s1,
-      ),
-    )
-    Column(
-      Modifier
-        .heightIn(max = (KetchTheme.density.deviceRow + spacing.s1) * VISIBLE_DEVICE_ROWS)
-        .verticalScroll(rememberScrollState()),
-    ) {
-      for (device in devices) {
-        key(device.deviceId) {
-          SidebarDeviceRow(
-            device = device,
-            active = device.deviceId == active?.deviceId,
-            onClick = { state.switchInstance(device.entry) },
-          )
+    // The devices take the room left above Settings, and scroll in a short window.
+    Column(Modifier.weight(1f)) {
+      Text(
+        text = eyebrowText("Devices"),
+        style = KetchTheme.typography.eyebrow,
+        color = KetchTheme.colors.textSecondary,
+        modifier = Modifier.padding(
+          start = spacing.s4,
+          top = spacing.s6,
+          bottom = spacing.s1,
+        ),
+      )
+      Column(
+        Modifier
+          .weight(1f, fill = false)
+          .heightIn(max = (KetchTheme.density.deviceRow + spacing.s1) * VISIBLE_DEVICE_ROWS)
+          .verticalScroll(rememberScrollState()),
+      ) {
+        for (device in devices) {
+          key(device.deviceId) {
+            SidebarDeviceRow(
+              device = device,
+              active = device.deviceId == active?.deviceId,
+              onClick = { state.switchInstance(device.entry) },
+            )
+          }
         }
       }
+      AddDeviceRow(onClick = { state.showAddRemoteDialog = true })
     }
-    AddDeviceRow(onClick = { state.showAddRemoteDialog = true })
-    Spacer(Modifier.weight(1f))
     KetchTooltip(text = "Settings", shortcut = KetchCommands.Settings.shortcutLabel()) {
       KetchSidebarItem(
         label = "Settings",

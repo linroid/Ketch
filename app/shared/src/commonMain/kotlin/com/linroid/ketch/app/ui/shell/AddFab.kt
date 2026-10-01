@@ -138,9 +138,11 @@ internal fun AddFab(
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
   val scale = rememberPressScale(interactions)
+  val focus = rememberFocusVisibility()
   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = modifier
+      .focusRing(focus.visible, shape, colors.focusRing)
       .graphicsLayer {
         scaleX = scale
         scaleY = scale
@@ -149,6 +151,7 @@ internal fun AddFab(
       .widthIn(min = FabSize)
       .ketchSurface(KetchElevationLevel.E3, shape, colors.accent)
       .background(overlay, shape)
+      .trackFocusVisibility(focus)
       .combinedClickable(
         interactionSource = interactions,
         indication = null,

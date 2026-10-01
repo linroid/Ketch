@@ -40,7 +40,8 @@ import kotlin.math.sin
  * under it. [overlay] floats over the content, such as the toasts.
  *
  * The card floats with an 8 dp inset, rounded corners and a hairline, except on windows of a
- * [full-bleed][KetchLayout.fullBleed] layout, where it fills its area beside a hairline.
+ * [full-bleed][KetchLayout.fullBleed] layout, where it fills its area beside a hairline. On
+ * tablets the wash runs under the system bars and the rest stays clear of them.
  */
 @Composable
 internal fun ShellScaffold(
@@ -54,7 +55,12 @@ internal fun ShellScaffold(
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  Row(modifier.fillMaxSize().canvasWash(colors, EmberRadius)) {
+  Row(
+    modifier
+      .fillMaxSize()
+      .canvasWash(colors, EmberRadius)
+      .windowInsetsPadding(WindowInsets.safeDrawing),
+  ) {
     navigation()
     val card = if (layout.fullBleed) {
       Modifier.background(colors.surface)

@@ -139,6 +139,8 @@ internal class ShellCommands(
 
   /** Adds what the browser's paste event brought, as [KetchCommands.PasteLinks] does. */
   fun paste(text: String) {
+    // A paste outside the add sheet's fields while it is open adds nothing behind it.
+    if (state.showAddDialog) return
     apply(pasteAction(text, quickAdd), warnEmpty = false)
   }
 

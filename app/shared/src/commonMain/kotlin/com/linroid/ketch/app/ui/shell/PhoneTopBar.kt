@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -37,9 +39,11 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -54,16 +58,17 @@ import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
-import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.IntakeRequest
+import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.feedback.ActivityPopover
 import com.linroid.ketch.app.ui.pulse.PulseSubtitle
 import com.linroid.ketch.app.ui.sidebar.pennantHealth
 import com.linroid.ketch.app.ui.sidebar.pennantName
+import com.linroid.ketch.app.ui.sidebar.rememberDevices
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.links
@@ -75,21 +80,20 @@ import kotlin.math.roundToInt
  * through [nestedScrollConnection]; the Downloads chips can follow [collapsedFraction].
  */
 @Stable
-class PhoneChromeState {
+internal class PhoneChromeState {
   /** How far the bar has moved up, from 0 down to [heightOffsetLimit], in pixels. */
   var heightOffset: Float by mutableFloatStateOf(0f)
     private set
 
   /** How far the bar can move up: minus its height, in pixels. */
   var heightOffsetLimit: Float by mutableFloatStateOf(0f)
-    internal set
 
   /** How far the content has scrolled down since it was last at its top, in pixels. */
   var contentOffset: Float by mutableFloatStateOf(0f)
     private set
 
   /** Whether the bar may collapse; the search field keeps it in place. */
-  internal var collapsible: Boolean by mutableStateOf(true)
+  var collapsible: Boolean by mutableStateOf(true)
 
   /** How collapsed the bar is, from 0 (shown) to 1 (gone). */
   val collapsedFraction: Float
@@ -124,7 +128,7 @@ class PhoneChromeState {
 }
 
 /** The phone's top bar of the shell around the screen below, or `null` on wider windows. */
-val LocalPhoneChrome = staticCompositionLocalOf<PhoneChromeState?> { null }
+internal val LocalPhoneChrome = staticCompositionLocalOf<PhoneChromeState?> { null }
 
 /** Lays [content] out under the window's top, moved up by [chrome]'s offset and clipped. */
 @Composable
@@ -158,8 +162,6 @@ internal fun PhoneTopBar(
   showsBottomBar: Boolean,
   onShow: (AppDestination) -> Unit,
   onOpenSettings: () -> Unit,
-  previousDevice: DevicePresence?,
-  device: DevicePresence?,
 ) {
   val state = shell.app
   if (shell.searchOpen) {
@@ -169,16 +171,13 @@ internal fun PhoneTopBar(
   val spacing = KetchTheme.spacing
   Row(
     verticalAlignment = Alignment.CenterVertically,
+    // The pennant's ring lines up with the content's 16 dp edge, the ⋮ glyph with the other.
     modifier = Modifier
       .fillMaxWidth()
       .height(BarHeight)
-      .padding(horizontal = spacing.s1),
+      .padding(start = spacing.s3, end = spacing.s1),
   ) {
-    DeviceButton(
-      device = device,
-      onClick = { state.showInstanceSelector = true },
-      onLongClick = { previousDevice?.let { state.switchInstance(it.entry) } },
-    )
+    DeviceButton(shell)
     Column(Modifier.weight(1f).padding(start = spacing.s1)) {
       Text(
         text = title,
@@ -198,22 +197,33 @@ internal fun PhoneTopBar(
   }
 }
 
-/** The pennant of [device] in its health ring, with its unseen failures. */
+/**
+ * The active device's pennant in its health ring, with its unseen failures: a tap opens the
+ * devices, and a long press goes back to the device that was active before.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DeviceButton(device: DevicePresence?, onClick: () -> Unit, onLongClick: () -> Unit) {
-  val shape = KetchTheme.shapes.full
+private fun DeviceButton(shell: ShellState) {
+  val state = shell.app
+  // Read here, so the device's live numbers recompose the button and not the whole bar.
+  val devices = rememberDevices(state)
+  val active by state.activeInstance.collectAsState()
+  val device = devices.firstOrNull { it.deviceId == active?.deviceId }
+  val target = KetchTheme.density.iconButtonTarget
   Box(
     contentAlignment = Alignment.Center,
     modifier = Modifier
-      .size(KetchTheme.density.iconButtonTarget)
-      .clip(shape)
+      .sizeIn(minWidth = target, minHeight = target)
+      .clip(KetchTheme.shapes.full)
       .semantics { contentDescription = device?.name?.let { "$it, switch device" } ?: "Devices" }
       .combinedClickable(
         role = Role.Button,
         onLongClickLabel = "Back to the previous device",
-        onLongClick = onLongClick,
-        onClick = onClick,
+        onLongClick = {
+          devices.firstOrNull { it.deviceId == shell.previousDeviceId }
+            ?.let { state.switchInstance(it.entry) }
+        },
+        onClick = { state.showInstanceSelector = true },
       ),
   ) {
     if (device == null) {
@@ -303,15 +313,15 @@ private fun SearchBar(shell: ShellState) {
   val focus = remember { FocusRequester() }
   val active by state.activeInstance.collectAsState()
   val query = state.searchQuery
-  val close = {
-    state.searchQuery = ""
-    shell.searchOpen = false
-  }
+  val close = shell::closeSearch
   NavigationBackHandler(
     state = rememberNavigationEventState(NavigationEventInfo.None),
     onBackCompleted = close,
   )
-  LaunchedEffect(focus) { runCatching { focus.requestFocus() } }
+  LaunchedEffect(focus) {
+    // A search kept from a wider window or an earlier activity opens without the keyboard.
+    if (query.isEmpty()) runCatching { focus.requestFocus() }
+  }
   DisposableEffect(shell.chrome) {
     // The field stays in place while the results scroll under it.
     shell.chrome.expand()
@@ -320,6 +330,18 @@ private fun SearchBar(shell: ShellState) {
   }
   val suggestion = remember(query, shell.destinations) {
     searchSuggestion(query, discover = AppDestination.Discover in shell.destinations)
+  }
+  val focusManager = LocalFocusManager.current
+  val run = { chosen: SearchSuggestion ->
+    close()
+    when (chosen) {
+      is SearchSuggestion.Download -> if (chosen.withOptions) {
+        state.openIntake(IntakeRequest(text = query))
+      } else {
+        state.quickAdd(chosen.urls)
+      }
+      is SearchSuggestion.Discover -> state.openDiscover(DiscoverRequest(chosen.query))
+    }
   }
   Column(Modifier.fillMaxWidth()) {
     Row(
@@ -340,6 +362,14 @@ private fun SearchBar(shell: ShellState) {
         onValueChange = { state.searchQuery = it },
         placeholder = "Search or paste a link",
         leadingIcon = KetchIcon.Search,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(
+          onSearch = {
+            // A link downloads as its suggestion offers; other text only filters the list.
+            val download = suggestion as? SearchSuggestion.Download
+            if (download != null) run(download) else focusManager.clearFocus()
+          },
+        ),
         modifier = Modifier.weight(1f).focusRequester(focus),
       )
     }
@@ -349,17 +379,7 @@ private fun SearchBar(shell: ShellState) {
         icon = suggestion.icon,
         text = suggestion.label(deviceName),
         detail = suggestion.detail,
-        onClick = {
-          close()
-          when (suggestion) {
-            is SearchSuggestion.Download -> if (suggestion.withOptions) {
-              state.openIntake(IntakeRequest(text = query))
-            } else {
-              state.quickAdd(suggestion.urls)
-            }
-            is SearchSuggestion.Discover -> state.openDiscover(DiscoverRequest(suggestion.query))
-          }
-        },
+        onClick = { run(suggestion) },
       )
     }
   }
