@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.instance
 
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
@@ -13,15 +14,19 @@ import com.linroid.ketch.app.state.PulseSource
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.toDeviceHealth
+import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -37,7 +42,8 @@ import kotlin.time.Instant
  * @property entry the device; [api] reaches it.
  * @property name name to show, such as "This Mac" or "NAS-Basement" (see [displayName]).
  * @property detail secondary text: the embedded device's host name, else `host:port`.
- * @property health how well the app is connected to it.
+ * @property health how well the app is connected to it; [DeviceHealth.Offline] also while it is
+ *   not [connected] on purpose, which callers tell apart to show "Not connected".
  * @property connected whether the app keeps a connection to it now; `false` for a remote device
  *   it does not watch, or whose connection it closed in the background. Always `true` for the
  *   embedded device.
@@ -49,7 +55,8 @@ import kotlin.time.Instant
  * @property lastSeen when it was last online, while it is not; `null` while it is online, and
  *   when it has not been online since the app started.
  * @property speed total download speed in bytes per second; `0` while it is not online.
- * @property counts its tasks per status tab.
+ * @property counts its tasks per status tab; while a remote device is not connected, as of when
+ *   it last was.
  * @property failures its failed tasks, not counting canceled ones.
  * @property unseenFailures failures that arrived while it was not shown, or that it had when the
  *   app first reached it; they count as seen once it shows with the app in front.
@@ -100,13 +107,15 @@ data class DevicePresence(
  * Keeps a [DevicePresence] for each of [devices]: their task totals, speed history and free
  * space come from a [PulseModel] over every device, which reads each online device's status
  * every [PulseModel.DISK_POLL_INTERVAL] and after each completion; the rest of the status is
- * kept from those reads.
+ * kept from those reads. A remote device that is not connected keeps the tasks it listed when
+ * it last was, since a fresh client lists none until it connects.
  *
  * @param connected ids of the remote devices whose client is connected or connecting.
  * @param serverState state of the embedded device's server, for its health.
  * @param shown devices the app shows; their failures count as seen while [inForeground].
  * @param localMode speed mode of the embedded device.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 internal class DevicePresenceModel(
   devices: StateFlow<List<InstanceEntry>>,
   connected: Flow<Set<String>>,
@@ -120,6 +129,7 @@ internal class DevicePresenceModel(
   private val statuses = MutableStateFlow<Map<String, StatusReading>>(emptyMap())
   private val unseen = MutableStateFlow<Map<String, Int>>(emptyMap())
   private val lastSeen = MutableStateFlow<Map<String, Instant>>(emptyMap())
+  private val lastTasks = MutableStateFlow<Map<String, List<DownloadTask>>>(emptyMap())
 
   private val pulse = PulseModel(
     sources = devices.map { entries -> entries.map(::sourceOf) },
@@ -146,6 +156,7 @@ internal class DevicePresenceModel(
       devices.collect { entries ->
         val ids = entries.map { it.deviceId }.toSet()
         statuses.update { it.filterKeys(ids::contains) }
+        lastTasks.update { it.filterKeys(ids::contains) }
       }
     }
     scope.launch { trackUnseen(shown, inForeground) }
@@ -157,7 +168,7 @@ internal class DevicePresenceModel(
     return PulseSource(
       deviceId = deviceId,
       name = entry.displayName,
-      tasks = entry.instance.tasks,
+      tasks = tasksOf(entry),
       config = statuses.map { it[deviceId]?.status?.config }.distinctUntilChanged(),
       status = {
         entry.instance.status().also { status ->
@@ -169,6 +180,23 @@ internal class DevicePresenceModel(
         else -> serverState.map { it.toDeviceHealth() }
       },
     )
+  }
+
+  // Otherwise the fresh client of a device that connects again would list no tasks until it
+  // loads them, and the failures among them would look new.
+  private fun tasksOf(entry: InstanceEntry): Flow<List<DownloadTask>> {
+    if (entry !is RemoteInstance) return entry.instance.tasks
+    val deviceId = entry.deviceId
+    return entry.connectionState
+      .map { it == ConnectionState.Connected }
+      .distinctUntilChanged()
+      .flatMapLatest { connected ->
+        if (connected) {
+          entry.instance.tasks.onEach { tasks -> lastTasks.update { it + (deviceId to tasks) } }
+        } else {
+          flowOf(lastTasks.value[deviceId] ?: entry.instance.tasks.value)
+        }
+      }
   }
 
   private fun presenceOf(

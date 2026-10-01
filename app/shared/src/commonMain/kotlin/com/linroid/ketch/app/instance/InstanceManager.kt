@@ -61,7 +61,8 @@ import kotlin.time.Clock
  * that was active when the app last ran is active again at launch.
  *
  * @param keepAlive which remote devices stay connected besides the active one.
- * @param context dispatcher of the coroutines that connect devices and follow them.
+ * @param context dispatcher of the coroutines that connect devices and follow them; a [Job] in
+ *   it becomes the parent of those coroutines, and cancelling it stops them like [close].
  * @param clock current time of [presence].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -74,7 +75,7 @@ class InstanceManager(
   private val clock: Clock = Clock.System,
 ) {
   private val log = KetchLogger("InstanceManager")
-  private val scope = CoroutineScope(SupervisorJob() + context)
+  private val scope = CoroutineScope(context + SupervisorJob(context[Job]))
 
   /**
    * Single embedded instance, alive for the whole app.
@@ -107,6 +108,8 @@ class InstanceManager(
     MutableStateFlow(
       embeddedInstance?.instance ?: DisconnectedApi,
     )
+
+  /** The [activeInstance]'s engine or client; a placeholder that adds nothing without one. */
   val activeApi: StateFlow<KetchApi> = _activeApi.asStateFlow()
 
   private val _deviceScope =
@@ -115,6 +118,7 @@ class InstanceManager(
   /** Whether the app shows the active device or every device; see [showAllDevices]. */
   val deviceScope: StateFlow<DeviceScope> = _deviceScope.asStateFlow()
 
+  /** Whether the embedded device can be shared over the network; see [startServer]. */
   val isLocalServerSupported: Boolean =
     factory.isLocalServerSupported
 
@@ -192,7 +196,7 @@ class InstanceManager(
    * The local server (if running) is not affected by switching.
    */
   suspend fun switchTo(instance: InstanceEntry) {
-    val target = connectionLock.withLock {
+    connectionLock.withLock {
       val deviceId = instance.deviceId
       val target = requireNotNull(entryOf(deviceId)) {
         "Instance not found: ${instance.label}"
@@ -202,9 +206,7 @@ class InstanceManager(
       _activeInstance.value = target
       _activeApi.value = target.instance
       reconcile()
-      target
     }
-    if (target !is RemoteInstance) target.instance.start()
   }
 
   /**
@@ -359,7 +361,8 @@ class InstanceManager(
       removed.instance.close()
       reconcile()
     }
-    if (_instances.value.size < DeviceScope.MIN_DEVICES) {
+    val shown = _deviceScope.value
+    if (_instances.value.size < DeviceScope.MIN_DEVICES || shown == DeviceScope.Single(deviceId)) {
       _deviceScope.value = DeviceScope.Single(_activeInstance.value?.deviceId ?: LOCAL_DEVICE_ID)
     }
     persistRemotes()
@@ -476,11 +479,20 @@ class InstanceManager(
       return
     }
     val name = deviceNameOrNull(status.name) ?: return
-    val unnamed = entryOf(entry.deviceId) as? RemoteInstance
-    if (unnamed?.instance !== entry.instance || unnamed.remoteConfig.name != null) return
-    log.i { "Naming ${entry.deviceId} after the name it announces" }
-    updateRemote(entry.deviceId) { it.copy(remoteConfig = it.remoteConfig.copy(name = name)) }
-    persistRemotes()
+    connectionLock.withLock {
+      val unnamed = entryOf(entry.deviceId) as? RemoteInstance
+      if (unnamed?.instance !== entry.instance || unnamed.remoteConfig.name != null) return
+      log.i { "Naming ${entry.deviceId} after the name it announces" }
+      // A rename on another thread may land meanwhile; it wins.
+      updateRemote(entry.deviceId) { remote ->
+        if (remote.remoteConfig.name != null) {
+          remote
+        } else {
+          remote.copy(remoteConfig = remote.remoteConfig.copy(name = name))
+        }
+      }
+      persistRemotes()
+    }
   }
 
   private fun forget(deviceId: String) {

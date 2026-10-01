@@ -56,17 +56,6 @@ class InstanceFactory(
   /** Create a remote instance with a new, unconnected client from a [RemoteConfig]. */
   fun createRemote(config: RemoteConfig): RemoteInstance = remoteFactory(config)
 
-  /** Create a remote instance for the given host/port/token. */
-  fun createRemote(
-    host: String,
-    port: Int = 8642,
-    token: String? = null,
-  ): RemoteInstance {
-    return createRemote(
-      RemoteConfig(host = host, port = port, apiToken = token),
-    )
-  }
-
   /**
    * Start a local HTTP server exposing [api].
    * Does not change the active instance.

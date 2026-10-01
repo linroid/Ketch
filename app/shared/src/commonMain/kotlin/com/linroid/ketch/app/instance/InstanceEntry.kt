@@ -45,7 +45,10 @@ data class RemoteInstance(
   constructor(client: RemoteKetch, remoteConfig: RemoteConfig) :
     this(client, remoteConfig, client.connectionState)
 
+  /** Host name or address of the device. */
   val host: String get() = remoteConfig.host
+
+  /** Port of the device's server. */
   val port: Int get() = remoteConfig.port
 
   /** [RemoteConfig.name], or `host:port` while the device has none. */
