@@ -62,12 +62,12 @@ import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.shell.KetchLayout
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlinx.coroutines.launch
 
@@ -382,7 +382,8 @@ private fun SetupChecklist(state: AppState, hooks: DesktopHooks, modifier: Modif
   val active by state.activeInstance.collectAsState()
   val local = active is EmbeddedInstance
   val folder = state.instanceSettings.download?.defaultDirectory
-  val now = remember { Clock.System.now().toEpochMilliseconds() }
+  val clock = LocalClock.current
+  val now = remember { clock.now().toEpochMilliseconds() }
   val shownAt = ui.setupChecklistShownAt
   val items = buildList {
     add(

@@ -58,6 +58,7 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
@@ -74,7 +75,6 @@ import com.linroid.ketch.app.ui.inspector.tabs.formatSize
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -175,7 +175,7 @@ internal fun TaskHeader(
         )
       }
     }
-    val parts = metricParts(row, Clock.System.now(), remember { TimeZone.currentSystemDefault() })
+    val parts = metricParts(row, LocalClock.current.now(), remember { TimeZone.currentSystemDefault() })
     if (parts.isNotEmpty()) MetricLine(parts)
     if (reason != null) ReasonLine(row, reason, onReason)
   }

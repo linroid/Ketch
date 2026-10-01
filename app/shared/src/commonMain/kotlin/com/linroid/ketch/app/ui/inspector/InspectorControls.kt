@@ -39,6 +39,7 @@ import com.linroid.ketch.app.components.winningLimitCaption
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.isSlowLane
@@ -50,7 +51,6 @@ import com.linroid.ketch.app.util.SegmentRateTracker
 import com.linroid.ketch.app.util.priorityLabel
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
-import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -270,7 +270,7 @@ private fun StartRow(
   val local = rows.first().key.deviceId == LOCAL_DEVICE_ID
   val speedSettings = state.speedMode?.settings?.collectAsState()?.value
   val offPeak = if (local && speedSettings != null) {
-    offPeakStart(speedSettings.rules, Clock.System.now())
+    offPeakStart(speedSettings.rules, LocalClock.current.now())
   } else {
     null
   }
@@ -307,7 +307,7 @@ private fun StartRow(
   val schedule = asking
   if (schedule != null) {
     ConfirmNote(
-      text = rescheduleNote(schedule, Clock.System.now(), zone),
+      text = rescheduleNote(schedule, LocalClock.current.now(), zone),
       confirm = "Reschedule",
       onConfirm = {
         asking = null

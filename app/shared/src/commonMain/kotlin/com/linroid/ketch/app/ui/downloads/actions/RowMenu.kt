@@ -33,6 +33,7 @@ import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
@@ -140,7 +141,7 @@ internal fun RowMenu(
   val context = RowMenuContext(
     revealLabel = runner.files?.revealLabel,
     devices = sendTargets(instances, rows),
-    now = Clock.System.now(),
+    now = LocalClock.current.now(),
     zone = TimeZone.currentSystemDefault(),
     urgentVictim = urgentVictim(rows, runner),
   )

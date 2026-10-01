@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.formatEta
@@ -36,7 +37,6 @@ import kotlinx.datetime.atTime
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
@@ -152,7 +152,7 @@ fun StartTimePicker(
   disabledReason: String? = null,
 ) {
   var expanded by remember { mutableStateOf(false) }
-  val label = startTimeLabel(value, Clock.System.now(), TimeZone.currentSystemDefault())
+  val label = startTimeLabel(value, LocalClock.current.now(), TimeZone.currentSystemDefault())
   val chip = @Composable { chipModifier: Modifier ->
     Box(chipModifier) {
       Row(verticalAlignment = Alignment.CenterVertically) {
@@ -194,7 +194,7 @@ fun StartTimeMenu(
   offPeak: Instant? = null,
 ) {
   var picking by remember { mutableStateOf(false) }
-  val now = Clock.System.now()
+  val now = LocalClock.current.now()
   val zone = TimeZone.currentSystemDefault()
   KetchMenu(expanded = expanded, onDismissRequest = onDismissRequest, title = "Start") {
     startTimeOptions(now, zone, offPeak).forEach { option ->
@@ -238,7 +238,8 @@ fun StartTimeDialog(
 ) {
   val colors = KetchTheme.colors
   val shape = KetchTheme.shapes.dialog
-  val now = remember { Clock.System.now() }
+  val clock = LocalClock.current
+  val now = remember { clock.now() }
   val today = remember(zone) { now.toLocalDateTime(zone).date }
   var date by remember { mutableStateOf<LocalDate?>(null) }
   val picked = date
@@ -278,7 +279,7 @@ fun StartTimeDialog(
     val next = now.toLocalDateTime(zone)
     val state = rememberTimePickerState(initialHour = (next.hour + 1) % 24, initialMinute = 0)
     val at = LocalDateTime(picked, LocalTime(state.hour, state.minute)).toInstant(zone)
-    val passed = at <= Clock.System.now()
+    val passed = at <= clock.now()
     TimePickerDialog(
       onDismissRequest = onCancel,
       shape = shape,
@@ -289,7 +290,7 @@ fun StartTimeDialog(
           text = "Schedule",
           enabled = !passed,
           tooltip = if (passed) "That time has already passed" else null,
-          onClick = { if (at > Clock.System.now()) onPicked(at) },
+          onClick = { if (at > clock.now()) onPicked(at) },
         )
       },
       dismissButton = {

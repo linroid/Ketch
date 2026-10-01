@@ -55,6 +55,7 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.catchingUnlessCancelled
@@ -68,7 +69,6 @@ import com.linroid.ketch.app.util.formatDuration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
-import kotlin.time.Clock
 
 /** Copies text to the clipboard, posting an error when the system refuses. */
 @Stable
@@ -149,7 +149,7 @@ internal fun TaskDetails(
     }
     row.sizeBytes?.let { DetailRow("Size", copier, formatBytes(it)) }
     val zone = remember { TimeZone.currentSystemDefault() }
-    DetailRow("Added", copier, addedDetail(row, Clock.System.now(), zone))
+    DetailRow("Added", copier, addedDetail(row, LocalClock.current.now(), zone))
     val time = completed?.downloadTime
     if (completed != null && time != null) {
       DetailRow("Time spent", copier, formatDuration(time))

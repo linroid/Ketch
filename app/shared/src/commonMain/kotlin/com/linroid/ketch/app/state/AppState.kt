@@ -115,7 +115,7 @@ val InstanceEntry.deviceId: String
  * @param scope runs the commands; it should use a `SupervisorJob` and the main dispatcher.
  * @param speedMode speed mode of the embedded device, owned by the host, such as the service whose
  *   notification switches it; `null` when the host keeps none.
- * @param clock current time of the task list and the speed history.
+ * @property clock current time of the task list, the speed history and the time labels.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppState(
@@ -126,7 +126,7 @@ class AppState(
   private val incoming: IncomingDownloads = IncomingDownloads(),
   val messages: MessageCenter = MessageCenter(),
   val speedMode: SpeedModeController? = null,
-  clock: Clock = Clock.System,
+  val clock: Clock = Clock.System,
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()

@@ -69,6 +69,7 @@ import com.linroid.ketch.app.state.HeaderRow
 import com.linroid.ketch.app.state.IntakeMode
 import com.linroid.ketch.app.state.IntakeSession
 import com.linroid.ketch.app.state.IntakeSource
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.UserAgentChoice
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.folderLabel
@@ -80,7 +81,6 @@ import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.priorityLabel
 import kotlinx.datetime.TimeZone
-import kotlin.time.Clock
 
 /** The option pills under the rows: Save to, Speed, Priority, Start and Connections. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -338,7 +338,7 @@ private fun StartPill(session: IntakeSession) {
     OptionPill(
       label = if (scheduled) null else "Start",
       value = if (scheduled) {
-        startTimeLabel(schedule, Clock.System.now(), TimeZone.currentSystemDefault())
+        startTimeLabel(schedule, LocalClock.current.now(), TimeZone.currentSystemDefault())
       } else {
         "Now"
       },

@@ -36,6 +36,7 @@ import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
@@ -195,6 +196,7 @@ internal fun SettingsWindow(
     val systemReducesMotion = rememberReduceMotion()
     CompositionLocalProvider(
       LocalAppState provides controller.state,
+      LocalClock provides controller.state.clock,
       LocalFileLogger provides fileLogger,
       LocalDesktopHooks provides hooks,
       LocalIntegrationStatus provides integration.status,
