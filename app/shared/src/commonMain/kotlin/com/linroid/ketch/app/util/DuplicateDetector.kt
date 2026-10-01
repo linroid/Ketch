@@ -91,7 +91,7 @@ private fun linkKeys(url: String): Set<String> {
 private fun magnetKeys(magnet: String): Set<String> = buildSet {
   for (param in magnet.substringAfter('?', "").split('&')) {
     if (!param.startsWith("xt=", ignoreCase = true)) continue
-    val topic = percentDecode(param.substring(3))
+    val topic = decodePercentEscapes(param.substring(3))
     when {
       topic.startsWith("urn:btih:", ignoreCase = true) ->
         infoHashKey(topic.substring("urn:btih:".length))?.let(::add)
@@ -188,7 +188,7 @@ private fun normalizePercent(value: String): String = buildString {
 }
 
 /** Decodes every `%XX` escape as UTF-8; a `%` that starts no escape stays as it is. */
-private fun percentDecode(value: String): String {
+private fun decodePercentEscapes(value: String): String {
   if ('%' !in value) return value
   val bytes = ArrayList<Byte>(value.length)
   var i = 0

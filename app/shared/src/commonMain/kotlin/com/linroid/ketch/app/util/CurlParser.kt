@@ -288,7 +288,7 @@ private fun readAnsiC(command: String, start: Int, words: WordBuilder): Int? {
         if (end == i) {
           words.append("\\$escape")
         } else {
-          words.appendCodePoint(command.substring(i, end).toInt(16))
+          words.appendCodePoint(command.substring(i, end).toLong(16))
           i = end
         }
       }
@@ -389,13 +389,16 @@ private class WordBuilder {
     started = true
   }
 
-  fun appendCodePoint(codePoint: Int) {
-    if (codePoint < 0x10000) {
-      append(codePoint.toChar())
-    } else {
-      val offset = codePoint - 0x10000
-      append((0xD800 + (offset shr 10)).toChar())
-      append((0xDC00 + (offset and 0x3FF)).toChar())
+  // A code point beyond Unicode, such as \UFFFFFFFF, becomes U+FFFD.
+  fun appendCodePoint(codePoint: Long) {
+    when {
+      codePoint > 0x10FFFF -> append('\uFFFD')
+      codePoint < 0x10000 -> append(codePoint.toInt().toChar())
+      else -> {
+        val offset = codePoint.toInt() - 0x10000
+        append((0xD800 + (offset shr 10)).toChar())
+        append((0xDC00 + (offset and 0x3FF)).toChar())
+      }
     }
   }
 

@@ -129,7 +129,8 @@ object LinkParser {
         csv -> csvCells(line).forEach(collector::addLinksIn)
         CurlParser.isCurl(line) -> {
           var command = line
-          while (CurlParser.isIncomplete(command) && i + 1 < lines.size) {
+          val last = minOf(lines.lastIndex, i + MAX_CURL_LINES - 1)
+          while (i < last && CurlParser.isIncomplete(command)) {
             i++
             command += "\n" + lines[i]
           }
@@ -150,14 +151,14 @@ object LinkParser {
     fileName.endsWith(".txt", ignoreCase = true) || fileName.endsWith(".csv", ignoreCase = true)
 
   /**
-   * The link to add at once, without the add sheet: [items] hold exactly one HTTP(S) or FTP(S)
-   * link that brings no headers and is not a `.torrent` file. Several links, a range, a magnet,
-   * a `.torrent`, a cURL command with headers or plain text return `null`, so the sheet opens.
+   * The link to add at once, without the add sheet, when [text] holds exactly one HTTP(S) or
+   * FTP(S) link that is not a `.torrent` file. Several links, a range, a magnet, a `.torrent`, a
+   * cURL command or text without a link return `null`, so the sheet opens.
    */
-  fun quickAddLink(items: List<IntakeItem>): IntakeItem.Link? {
-    val link = items.singleOrNull() as? IntakeItem.Link ?: return null
-    val plain = link.kind == LinkKind.Http || link.kind == LinkKind.Ftp
-    return link.takeIf { plain && it.headers.isEmpty() }
+  fun quickAddLink(text: String): IntakeItem.Link? {
+    if (text.lines().any(CurlParser::isCurl)) return null
+    val link = parseIntake(text).singleOrNull() as? IntakeItem.Link ?: return null
+    return link.takeIf { it.kind == LinkKind.Http || it.kind == LinkKind.Ftp }
   }
 
   /**
@@ -199,6 +200,9 @@ object LinkParser {
   }
 }
 
+// Most lines one curl command may span, so a quote left open does not swallow a long list.
+private const val MAX_CURL_LINES = 200
+
 private val WHITESPACE = Regex("\\s+")
 private val TOKEN = Regex("\\S+")
 private val SCHEME_URL = Regex(
@@ -216,6 +220,7 @@ private val SCHEMELESS_LINK = Regex("^$HOST/\\S*$", RegexOption.IGNORE_CASE)
 private val SCHEMELESS_HOST = Regex("^$HOST(?:/\\S*)?$", RegexOption.IGNORE_CASE)
 
 private val LINK_STARTS = listOf("http://", "https://", "ftp://", "ftps://", "magnet:?")
+private val AUTHORITY_ENDS = charArrayOf('/', '?', '#')
 
 // HTML escapes that cannot be part of a link, so one ends the link before it.
 private val HTML_STOPS = listOf("&quot;", "&#34;", "&lt;", "&gt;", "&#39;", "&apos;")
@@ -223,7 +228,7 @@ private val HTML_AMPERSANDS = listOf("&amp;", "&#38;", "&#x26;")
 
 // Ends of sentences, Markdown emphasis and CJK punctuation are never the last character of a
 // link that someone typed.
-private const val TRAILING_PUNCTUATION = ".,;:!?*\"'>。，、；：！？）」』】"
+private const val TRAILING_PUNCTUATION = ".,;:!?*\"'>…。，、；：！？）」』】"
 private const val LEADING_WRAPPERS = "\"'(<[{*（「『【"
 
 /** Links in [segment], in the order they appear. */
@@ -231,6 +236,8 @@ private fun findLinks(segment: String): List<String> {
   val found = mutableListOf<Pair<Int, String>>()
   val taken = mutableListOf<IntRange>()
   for (match in SCHEME_URL.findAll(segment)) {
+    // The ftp:// of sftp:// belongs to another scheme.
+    if (segment.getOrNull(match.range.first - 1)?.isSchemeChar() == true) continue
     taken += match.range
     for ((offset, part) in splitJoined(cutAtHtmlEscape(match.value))) {
       val link = trimTrailing(decodeHtmlAmpersands(part))
@@ -255,16 +262,22 @@ private fun findLinks(segment: String): List<String> {
   return found.sortedBy { it.first }.map { it.second }
 }
 
-/** Splits links joined by a comma or semicolon, with each part's offset in [value]. */
+/**
+ * Splits links joined by a comma or semicolon, or by the `](` of a Markdown link whose text is
+ * a link too, with each part's offset in [value].
+ */
 private fun splitJoined(value: String): List<Pair<Int, String>> {
   val parts = mutableListOf<Pair<Int, String>>()
   var start = 0
   for (i in 1 until value.length) {
-    val joined = (value[i] == ',' || value[i] == ';') &&
-      LINK_STARTS.any { value.startsWith(it, startIndex = i + 1, ignoreCase = true) }
-    if (joined) {
+    val next = when {
+      value[i] == ',' || value[i] == ';' -> i + 1
+      value.startsWith("](", startIndex = i) -> i + 2
+      else -> continue
+    }
+    if (LINK_STARTS.any { value.startsWith(it, startIndex = next, ignoreCase = true) }) {
       parts += start to value.substring(start, i)
-      start = i + 1
+      start = next
     }
   }
   parts += start to value.substring(start)
@@ -318,10 +331,12 @@ internal class Authority(val start: Int, val hostStart: Int, val end: Int)
 /** The authority of [url], or `null` when it has no `scheme://`. */
 internal fun authorityOf(url: String): Authority? {
   val start = url.indexOf("://").takeIf { it > 0 }?.plus(3) ?: return null
-  // Like FtpUrl, only a slash ends the user info: an unencoded password may hold ? or #.
-  val slash = url.indexOf('/', start).let { if (it < 0) url.length else it }
-  val hostStart = url.lastIndexOf('@', slash - 1).let { if (it < start) start else it + 1 }
-  val end = url.indexOfAny(charArrayOf('/', '?', '#'), hostStart)
+  // Like FtpUrl, only a slash ends an FTP link's user info: an unencoded password may hold ? or
+  // #. Elsewhere they end the authority, so an @ in a query is not taken for user info.
+  val ends = if (url.startsWith("ftp", ignoreCase = true)) charArrayOf('/') else AUTHORITY_ENDS
+  val userInfoEnd = url.indexOfAny(ends, start).let { if (it < 0) url.length else it }
+  val hostStart = url.lastIndexOf('@', userInfoEnd - 1).let { if (it < start) start else it + 1 }
+  val end = url.indexOfAny(AUTHORITY_ENDS, hostStart)
   return Authority(start, hostStart, if (end < 0) url.length else end)
 }
 
@@ -436,3 +451,6 @@ private fun parseGlob(open: Char, body: String): Glob? {
 }
 
 private fun Char.isAsciiDigit(): Boolean = this in '0'..'9'
+
+private fun Char.isSchemeChar(): Boolean =
+  this in 'a'..'z' || this in 'A'..'Z' || isAsciiDigit() || this == '+' || this == '-'

@@ -76,6 +76,17 @@ class CurlParserTest {
   }
 
   @Test
+  fun parse_ansiCCodePointBeyondUnicode_becomesAReplacementCharacter() {
+    listOf("\\UFFFFFFFF", "\\U80000000", "\\U00110000").forEach { escape ->
+      assertEquals(
+        listOf("https://example.com/a\uFFFD"),
+        CurlParser.parse("curl \$'https://example.com/a$escape'")?.urls,
+        escape,
+      )
+    }
+  }
+
+  @Test
   fun parse_doubleQuotesAndBackslashes_followShellRules() {
     val command = "curl \"https://example.com/\\\$x\\q\" -H \"X-Note: say \\\"hi\\\"\" " +
       "https://example.com/two\\ words"

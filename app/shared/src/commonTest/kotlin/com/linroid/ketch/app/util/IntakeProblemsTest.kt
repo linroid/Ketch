@@ -72,6 +72,7 @@ class IntakeProblemsTest {
     val cases = mapOf(
       "ftp://ftp.example.org/pub/a.iso" to "Can't reach ftp.example.org",
       "http://[fd00::20]:8642/a" to "Can't reach [fd00::20]",
+      "https://user@example.com?mail=me@x.org" to "Can't reach example.com",
       "magnet:?xt=urn:btih:abc" to "Can't reach any peers",
       "not a url" to "Can't reach the server",
     )

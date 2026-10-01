@@ -44,10 +44,13 @@ class LinkParserTest {
         "https://en.wikipedia.org/wiki/Foo_(bar)",
       "**https://example.com/a.zip**" to "https://example.com/a.zip",
       "[docs](https://example.com/a.pdf)" to "https://example.com/a.pdf",
+      "[https://example.com/a.pdf](https://example.com/a.pdf)" to "https://example.com/a.pdf",
       "<https://example.com/a.zip>" to "https://example.com/a.zip",
       "\"https://example.com/a.zip\"" to "https://example.com/a.zip",
       "下载：https://example.com/a.zip。" to "https://example.com/a.zip",
       "Is it https://example.com/a.zip?" to "https://example.com/a.zip",
+      "Mirrors: https://example.com/a.zip…" to "https://example.com/a.zip",
+      "下载地址https://example.com/a.zip" to "https://example.com/a.zip",
       "x HTTPS://Example.com/A.zip" to "HTTPS://Example.com/A.zip",
     )
     cases.forEach { (text, url) -> assertEquals(listOf(url), urls(text), text) }
@@ -245,6 +248,18 @@ class LinkParserTest {
   }
 
   @Test
+  fun parseIntake_schemeEndingInASupportedOne_keepsItsOwnScheme() {
+    val link = "sftp://host.example.org/file.iso"
+
+    assertEquals(listOf(Link(link)), parse(link))
+    assertIs<Discover>(parse("get $link now").single())
+    assertEquals(
+      listOf("https://example.com/a.zip"),
+      urls("git+https://example.com/repo.git or https://example.com/a.zip"),
+    )
+  }
+
+  @Test
   fun parseIntake_textWithoutLinks_becomesADiscoverSearch() {
     assertEquals(
       listOf(Discover("ubuntu 24.04 desktop iso")),
@@ -337,6 +352,20 @@ class LinkParserTest {
   }
 
   @Test
+  fun parseIntake_curlQuoteNeverClosed_readsLaterCommandsOnTheirOwn() {
+    val notes = List(300) { "note $it" }.joinToString("\n")
+    val text = "curl 'https://example.com/a.zip\n$notes\ncurl https://example.com/b.zip -b a=b"
+
+    assertEquals(
+      listOf(
+        Link("https://example.com/a.zip"),
+        Link("https://example.com/b.zip", mapOf("Cookie" to "a=b")),
+      ),
+      parse(text),
+    )
+  }
+
+  @Test
   fun isLinkList_textAndCsvFiles_areLists() {
     assertTrue(LinkParser.isLinkList("links.txt"))
     assertTrue(LinkParser.isLinkList("EXPORT.CSV"))
@@ -347,7 +376,8 @@ class LinkParserTest {
   @Test
   fun quickAddLink_onePlainLink_returnsIt() {
     listOf("https://example.com/a.iso", "http://example.com/a", "ftp://example.com/a.bin")
-      .forEach { assertEquals(Link(it), LinkParser.quickAddLink(parse(it)), it) }
+      .forEach { assertEquals(Link(it), LinkParser.quickAddLink(" $it\n"), it) }
+    assertEquals(Link("https://example.com/a.iso"), LinkParser.quickAddLink("example.com/a.iso"))
   }
 
   @Test
@@ -357,11 +387,13 @@ class LinkParserTest {
       "magnet:?xt=urn:btih:$HEX_HASH",
       "https://example.com/a.torrent?dl=1",
       "curl -H 'Cookie: a=b' https://example.com/a.zip",
+      "curl https://example.com/a.zip",
+      "curl https://example.com/a.zip -H",
       "https://x.org/p[1-2].rar",
       "ubuntu iso",
       "ed2k://|file|a|1|0123|/",
       "",
-    ).forEach { assertNull(LinkParser.quickAddLink(parse(it)), it) }
+    ).forEach { assertNull(LinkParser.quickAddLink(it), it) }
   }
 
   @Test

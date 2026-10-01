@@ -49,6 +49,8 @@ class DuplicateDetectorTest {
       "https://x.org/a" to "https://x.org/a/",
       "https://x.org/A" to "https://x.org/a",
       "https://x.org:8443/a" to "https://x.org/a",
+      "https://a.org?to=me@x.org" to "https://b.org?to=me@x.org",
+      "https://a.org#me@x.org" to "https://b.org#me@x.org",
     ).forEach { (a, b) -> assertNotEquals(normalizeUrl(b), normalizeUrl(a), "$a vs $b") }
   }
 
