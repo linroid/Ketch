@@ -3,6 +3,7 @@ package com.linroid.ketch.app.icons
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -25,10 +26,11 @@ fun KetchIconImage(
   size: Dp = 20.dp,
   tint: Color = KetchTheme.colors.onBackground,
 ) {
+  val colorFilter = remember(tint) { ColorFilter.tint(tint) }
   Image(
     painter = rememberVectorPainter(icon.imageVector),
     contentDescription = null,
     modifier = modifier.size(size),
-    colorFilter = ColorFilter.tint(tint),
+    colorFilter = colorFilter,
   )
 }

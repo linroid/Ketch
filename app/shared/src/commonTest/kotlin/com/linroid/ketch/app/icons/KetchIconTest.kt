@@ -1,12 +1,15 @@
 package com.linroid.ketch.app.icons
 
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.PathNode
 import androidx.compose.ui.graphics.vector.VectorPath
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -26,7 +29,7 @@ class KetchIconTest {
   }
 
   @Test
-  fun imageVector_everyIcon_usesTheIconStroke() {
+  fun imageVector_everyIcon_drawsBlackWithTheIconStroke() {
     for (icon in KetchIcon.entries) {
       val vector = icon.imageVector
       assertEquals(ICON_VIEWPORT, vector.viewportWidth)
@@ -36,14 +39,14 @@ class KetchIconTest {
       val fills = paths.drop(strokes.size).take(icon.data.fills.size)
       val softFills = paths.drop(strokes.size + fills.size)
       for (path in strokes) {
-        assertNotNull(path.stroke, icon.name)
+        assertBlack(path.stroke, icon.name)
         assertNull(path.fill, icon.name)
         assertEquals(ICON_STROKE_WIDTH, path.strokeLineWidth, icon.name)
         assertEquals(StrokeCap.Round, path.strokeLineCap, icon.name)
         assertEquals(StrokeJoin.Round, path.strokeLineJoin, icon.name)
       }
       for (path in fills + softFills) {
-        assertNotNull(path.fill, icon.name)
+        assertBlack(path.fill, icon.name)
         assertNull(path.stroke, icon.name)
       }
       fills.forEach { assertEquals(1f, it.fillAlpha, icon.name) }
@@ -56,6 +59,11 @@ class KetchIconTest {
     for (icon in KetchIcon.entries) {
       assertSame(icon.imageVector, icon.imageVector, icon.name)
     }
+  }
+
+  /** Tinting relies on every path being solid black, which also suits template tray icons. */
+  private fun assertBlack(brush: Brush?, message: String) {
+    assertEquals(Color.Black, assertIs<SolidColor>(brush, message).value, message)
   }
 
   /**
@@ -82,7 +90,7 @@ class KetchIconTest {
     val numberPattern = Regex("""[-+]?(?:\d+\.?\d*|\.\d+)""")
     val commandArity = mapOf(
       'M' to 2, 'L' to 2, 'T' to 2, 'H' to 1, 'V' to 1,
-      'C' to 6, 'S' to 4, 'Q' to 4, 'A' to 7, 'Z' to 0,
+      'C' to 6, 'S' to 4, 'Q' to 4, 'A' to 7, 'Z' to 0
     )
   }
 }
