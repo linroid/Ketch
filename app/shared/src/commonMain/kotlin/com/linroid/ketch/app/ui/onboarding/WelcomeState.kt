@@ -8,7 +8,12 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.config.UiPreferences
+
+private val log = KetchLogger("WelcomeFlow")
 
 /** Version of the [WelcomeFlow]; `UiPreferences.onboardingVersion` below it shows the flow. */
 internal const val WELCOME_VERSION: Int = 1
@@ -57,7 +62,7 @@ internal class WelcomeState(
   /** The download folder chosen on [WelcomeStep.Folder]; `null` until one is. */
   var folder: String? by mutableStateOf(folder)
 
-  /** Why the folder could not be used; `null` unless choosing it failed. */
+  /** What to tell the user when the chosen folder could not be used; `null` otherwise. */
   var folderError: String? by mutableStateOf(null)
 
   /** Whether the folder picker is open or the folder is being applied. */
@@ -95,6 +100,27 @@ internal class WelcomeState(
     WelcomeUse.Control -> false
   }
 
+  /**
+   * Picks a folder with [pick] and downloads to it with [apply]: [folder] becomes the folder, or
+   * [folderError] says it could not be used. Closing the picker without a folder changes nothing.
+   */
+  suspend fun chooseFolder(pick: suspend () -> String?, apply: suspend (String) -> Unit) {
+    choosingFolder = true
+    folderError = null
+    try {
+      catchingUnlessCancelled {
+        val chosen = pick() ?: return@catchingUnlessCancelled
+        apply(chosen)
+        folder = chosen
+      }.onFailure { error ->
+        log.w { "Couldn't use the chosen folder: ${error.describeCauses()}" }
+        folderError = FOLDER_ERROR
+      }
+    } finally {
+      choosingFolder = false
+    }
+  }
+
   companion object {
     /** Keeps the step and the chosen folder, as across Android's activity recreation. */
     val Saver: Saver<WelcomeState, Any> = listSaver(
@@ -105,6 +131,9 @@ internal class WelcomeState(
     )
   }
 }
+
+// Why a folder could not be used: the picker's grant was refused, or the device would not take it.
+private const val FOLDER_ERROR = "Couldn't use that folder. Try another one."
 
 /** A [WelcomeState] on the first step that survives the activity being recreated. */
 @Composable

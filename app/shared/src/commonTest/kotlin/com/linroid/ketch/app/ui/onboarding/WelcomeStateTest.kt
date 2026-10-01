@@ -1,11 +1,19 @@
 package com.linroid.ketch.app.ui.onboarding
 
 import com.linroid.ketch.config.UiPreferences
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class WelcomeStateTest {
 
   @Test
@@ -73,6 +81,56 @@ class WelcomeStateTest {
     assertFalse(welcome.choose(WelcomeUse.Control))
 
     assertEquals(WelcomeStep.Use, welcome.step)
+  }
+
+  @Test
+  fun chooseFolder_applied_keepsTheFolder() = runTest {
+    val welcome = WelcomeState()
+    val applied = mutableListOf<String>()
+
+    welcome.chooseFolder(pick = { DOWNLOAD }, apply = { applied += it })
+
+    assertEquals(listOf(DOWNLOAD), applied)
+    assertEquals(DOWNLOAD, welcome.folder)
+    assertNull(welcome.folderError)
+    assertFalse(welcome.choosingFolder)
+  }
+
+  @Test
+  fun chooseFolder_pickerClosed_changesNothing() = runTest {
+    val welcome = WelcomeState(folder = DOWNLOAD)
+
+    welcome.chooseFolder(pick = { null }, apply = { error("Not applied") })
+
+    assertEquals(DOWNLOAD, welcome.folder)
+    assertNull(welcome.folderError)
+    assertFalse(welcome.choosingFolder)
+  }
+
+  @Test
+  fun chooseFolder_applyFails_saysSoWithoutTheFolder() = runTest {
+    val welcome = WelcomeState()
+
+    welcome.chooseFolder(pick = { DOWNLOAD }, apply = { throw IllegalStateException("No grant") })
+
+    assertNull(welcome.folder)
+    assertNotNull(welcome.folderError)
+    assertFalse(welcome.folderError.orEmpty().contains("No grant"))
+    assertFalse(welcome.choosingFolder)
+  }
+
+  @Test
+  fun chooseFolder_whilePicking_showsItIsBusy() = runTest {
+    val welcome = WelcomeState()
+    val picked = CompletableDeferred<String?>()
+
+    val choosing = launch { welcome.chooseFolder(pick = { picked.await() }, apply = {}) }
+    runCurrent()
+
+    assertTrue(welcome.choosingFolder)
+    picked.complete(null)
+    choosing.join()
+    assertFalse(welcome.choosingFolder)
   }
 
   private companion object {
