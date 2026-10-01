@@ -48,6 +48,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.autoModeSummary
@@ -68,7 +69,6 @@ import com.linroid.ketch.config.Weekday
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.datetime.TimeZone
-import kotlin.time.Clock
 
 /**
  * Speed settings of [device]: the speed mode with its Slow lane and Auto rules, the full speed
@@ -148,7 +148,7 @@ private fun ModeGroup(
     is SpeedMode.Auto -> if (settings.rules.isEmpty()) {
       "Add a rule below to turn the Slow lane on by itself."
     } else {
-      "${autoModeSummary(mode, Clock.System.now(), TimeZone.currentSystemDefault())}."
+      "${autoModeSummary(mode, LocalClock.current.now(), TimeZone.currentSystemDefault())}."
     }
   }
   SettingsGroup(title = "Mode") {

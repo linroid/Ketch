@@ -48,6 +48,7 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchColors
@@ -60,7 +61,6 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -136,7 +136,7 @@ internal fun ActivityContent(
   onShowTask: (TaskKey) -> Unit,
   pennantName: (String) -> String = deviceName,
   onActionUsed: (Long) -> Unit = {},
-  now: Instant = Clock.System.now(),
+  now: Instant = LocalClock.current.now(),
   timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
   val colors = KetchTheme.colors

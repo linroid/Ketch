@@ -22,6 +22,7 @@ import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DevicePulse
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.SpeedHistoryStore
 import com.linroid.ketch.app.state.deviceId
@@ -31,7 +32,6 @@ import com.linroid.ketch.app.theme.eyebrowText
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
-import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -54,7 +54,8 @@ internal fun SpeedHistoryPopover(
     val instances by state.instances.collectAsState()
     val histories by state.speedHistory.histories.collectAsState()
     val view = rememberSpeedModeView(state)
-    val chart = remember(histories) { totalHistory(histories.values, Clock.System.now()) }
+    val clock = LocalClock.current
+    val chart = remember(histories) { totalHistory(histories.values, clock.now()) }
     SpeedHistoryContent(
       samples = chart.samples,
       end = chart.end,

@@ -27,6 +27,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.deviceId
@@ -35,8 +36,8 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.config.SpeedLimitMode
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
-import kotlin.time.Clock
 
 /**
  * The speed mode popover of the Pulse bar, 280 dp wide above the [SpeedModePill], or a bottom
@@ -104,7 +105,7 @@ internal fun ColumnScope.SpeedModeOptions(
     )
     Spacer(Modifier.height(spacing.s2))
     Text(
-      text = modeCaption(view.mode, view.limit, settings.rules.isEmpty()),
+      text = modeCaption(view.mode, view.limit, settings.rules.isEmpty(), LocalClock.current.now()),
       style = KetchTheme.typography.caption,
       color = colors.textSecondary,
     )
@@ -160,8 +161,12 @@ private fun Eyebrow(text: String) {
 }
 
 /** What the mode does now, under the mode control. */
-internal fun modeCaption(mode: SpeedMode, limit: SpeedLimit, noRules: Boolean): String {
-  val now = Clock.System.now()
+internal fun modeCaption(
+  mode: SpeedMode,
+  limit: SpeedLimit,
+  noRules: Boolean,
+  now: Instant,
+): String {
   val zone = TimeZone.currentSystemDefault()
   return when (mode) {
     SpeedMode.Full -> if (limit.isUnlimited) {

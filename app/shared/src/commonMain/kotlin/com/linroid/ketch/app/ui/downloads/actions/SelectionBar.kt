@@ -45,11 +45,11 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.formatBytes
-import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 
 /** What a [BarVerb] does when clicked. */
@@ -183,7 +183,7 @@ internal fun SelectionBar(
   val context = RowMenuContext(
     revealLabel = runner.files?.revealLabel,
     devices = devices,
-    now = Clock.System.now(),
+    now = LocalClock.current.now(),
     zone = TimeZone.currentSystemDefault(),
     urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
   )

@@ -47,13 +47,13 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
 import kotlinx.coroutines.Job
 import kotlinx.datetime.TimeZone
-import kotlin.time.Clock
 
 /**
  * What the speed mode pill and popover show for the active device.
@@ -98,7 +98,7 @@ internal fun rememberSpeedModeView(state: AppState): SpeedModeView {
   } else {
     effectiveCap(mode, pulse.cap, controller.slowLaneSpeed, settings.standard)
   }
-  val label = speedModeLabel(mode, limit, Clock.System.now(), TimeZone.currentSystemDefault())
+  val label = speedModeLabel(mode, limit, LocalClock.current.now(), TimeZone.currentSystemDefault())
   return SpeedModeView(mode, limit, label, controller)
 }
 

@@ -65,6 +65,7 @@ import com.linroid.ketch.app.state.IntakeEntry
 import com.linroid.ketch.app.state.IntakeMode
 import com.linroid.ketch.app.state.IntakeSource
 import com.linroid.ketch.app.state.IntakeStatus
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
@@ -73,7 +74,6 @@ import com.linroid.ketch.app.util.IntakeAction
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.formatBytes
 import kotlinx.coroutines.delay
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -609,14 +609,16 @@ private fun SignInFields(onSignIn: (user: String, password: String) -> Unit) {
 
 /** The current time, ticking every second while [ticking], for "0:14" waits. */
 @Composable
-internal fun rememberNow(ticking: Boolean): State<Instant> =
-  produceState(Clock.System.now(), ticking) {
-    value = Clock.System.now()
+internal fun rememberNow(ticking: Boolean): State<Instant> {
+  val clock = LocalClock.current
+  return produceState(clock.now(), ticking) {
+    value = clock.now()
     while (ticking) {
       delay(1.seconds)
-      value = Clock.System.now()
+      value = clock.now()
     }
   }
+}
 
 /** [totalBytes] split into [count] equal segments with nothing downloaded. */
 internal fun evenSegments(totalBytes: Long, count: Int): List<Segment> {

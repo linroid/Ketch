@@ -34,6 +34,7 @@ import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
@@ -91,7 +92,7 @@ internal fun ScopeOverview(state: AppState, onClose: () -> Unit) {
           overflow = TextOverflow.Ellipsis,
         )
         Text(
-          text = keepPartsTogether(pulse.sentence()),
+          text = keepPartsTogether(pulse.sentence(now = LocalClock.current.now())),
           style = type.caption,
           color = colors.textSecondary,
           maxLines = 2,
