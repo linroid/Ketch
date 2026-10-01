@@ -122,7 +122,11 @@ internal fun TaskDetails(
   val request = row.request
   val completed = row.state as? DownloadState.Completed
   InspectorSection("Details", modifier) {
-    DetailRow("Source", copier, sourceLabel(request, row.isTorrent))
+    // One line like its neighbours; the Link below shows the host whole.
+    val source = sourceLabel(request, row.isTorrent)
+    DetailRow("Source", copier, copy = source) {
+      MiddleText(source, KetchTheme.typography.bodyS, KetchTheme.colors.textPrimary)
+    }
     LinkRow(request.url, copier)
     val path = row.outputPath
     if (path != null) {
