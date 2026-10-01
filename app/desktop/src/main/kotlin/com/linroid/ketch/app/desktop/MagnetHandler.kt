@@ -24,7 +24,7 @@ internal fun installOpenUriHandler(onUri: (String) -> Unit) {
  * from Settings. The packaged apps already declare both, so the system offers Ketch for them;
  * this makes Ketch the default.
  *
- * - macOS: Launch Services, through `osascript`, for the bundle [LoginItem.LABEL].
+ * - macOS: Launch Services, through `osascript`, for the bundle [MAC_BUNDLE_ID].
  * - Windows: `HKCU\Software\Classes` entries, imported from a `.reg` file.
  * - Linux: a hidden desktop entry, `ketch-handler.desktop`, that opens the links and files,
  *   made the default with `xdg-mime`.
@@ -107,14 +107,14 @@ internal class MagnetHandler(
   /** The script that makes the bundle the default app for `magnet:` links. */
   internal fun macMagnetScript(): String =
     "ObjC.import('CoreServices');\n" +
-      "\$.LSSetDefaultHandlerForURLScheme(\$('magnet'), \$('${LoginItem.LABEL}'))"
+      "\$.LSSetDefaultHandlerForURLScheme(\$('magnet'), \$('$MAC_BUNDLE_ID'))"
 
   /** The script that makes the bundle the default app for `.torrent` files. */
   internal fun macTorrentScript(): String =
     "ObjC.import('CoreServices');\n" +
       "var type = \$.UTTypeCreatePreferredIdentifierForTag(" +
       "\$.kUTTagClassFilenameExtension, \$('torrent'), null);\n" +
-      "\$.LSSetDefaultRoleHandlerForContentType(type, \$.kLSRolesAll, \$('${LoginItem.LABEL}'))"
+      "\$.LSSetDefaultRoleHandlerForContentType(type, \$.kLSRolesAll, \$('$MAC_BUNDLE_ID'))"
 
   // The Windows command line that opens the link or file in %1 with Ketch.
   private fun openCommand(): String = windowsCommandLine(appCommand.command) + " \"%1\""
@@ -139,11 +139,13 @@ internal class MagnetHandler(
     if (exit != 0) throw IOException("xdg-mime exited with $exit")
   }
 
-  private companion object {
-    const val MAGNET_MIME_TYPE = "x-scheme-handler/magnet"
-    const val TORRENT_MIME_TYPE = "application/x-bittorrent"
-    const val TORRENT_PROG_ID = "Ketch.torrent"
-    const val LINUX_ENTRY = "ketch-handler.desktop"
+  internal companion object {
+    /** The packaged app's bundle identifier (`bundleID` in `app/desktop/build.gradle.kts`). */
+    const val MAC_BUNDLE_ID = "com.linroid.ketch.app.desktop"
+    private const val MAGNET_MIME_TYPE = "x-scheme-handler/magnet"
+    private const val TORRENT_MIME_TYPE = "application/x-bittorrent"
+    private const val TORRENT_PROG_ID = "Ketch.torrent"
+    private const val LINUX_ENTRY = "ketch-handler.desktop"
   }
 }
 

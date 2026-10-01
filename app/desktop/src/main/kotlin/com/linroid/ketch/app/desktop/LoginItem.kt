@@ -93,7 +93,7 @@ internal class LoginItem(
     if (hidden) listOf(BACKGROUND_FLAG) else emptyList()
 
   companion object {
-    /** Label of the macOS launch agent, also the app's bundle identifier. */
+    /** Label of the macOS launch agent. */
     const val LABEL = "com.linroid.ketch"
 
     private const val PLIST_HEADER = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +

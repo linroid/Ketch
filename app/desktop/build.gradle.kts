@@ -132,8 +132,9 @@ compose.desktop {
 
       macOS {
         iconFile.set(rootProject.file("art/icon.icns"))
-        // Also the label of the login item's launch agent (LoginItem.kt).
-        bundleID = "com.linroid.ketch"
+        // The identifier earlier releases shipped with, so an update keeps its notification
+        // permission and other per-app macOS state.
+        bundleID = "com.linroid.ketch.app.desktop"
         // Lists Ketch as an app for magnet: links, and for ketch: pairing links; macOS delivers
         // them through Desktop.setOpenURIHandler (MagnetHandler.kt).
         infoPlist {

@@ -126,7 +126,7 @@ class MagnetHandlerTest {
 
     handler.registerMagnet()
 
-    val call = "LSSetDefaultHandlerForURLScheme(\$('magnet'), \$('com.linroid.ketch'))"
+    val call = "LSSetDefaultHandlerForURLScheme(\$('magnet'), \$('com.linroid.ketch.app.desktop'))"
     assertTrue(call in scripts.single())
   }
 
