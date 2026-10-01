@@ -34,6 +34,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -110,7 +112,7 @@ internal fun DiscoverResults(
       is AiDiscoverState.Error -> item(key = "error") {
         ProblemCard(
           message = discover.message,
-          onRetry = { controller.search() },
+          onRetry = { controller.retry() },
           onSettings = { state.openSettings(SettingsTarget(SettingsTarget.Page.Discover)) },
           modifier = content,
         )
@@ -124,7 +126,7 @@ internal fun DiscoverResults(
               onSearchEverywhere = {
                 draft.sites = ""
                 draft.showSites = false
-                controller.search()
+                controller.retry()
               },
               modifier = content,
             )
@@ -162,15 +164,17 @@ private fun ResultsHeader(
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
     modifier = modifier.fillMaxWidth().heightIn(min = KetchTheme.density.tableRow),
   ) {
+    val everything = selected == candidates.size
     KetchTriStateCheckbox(
-      modifier = Modifier.checkboxSlot(),
+      modifier = Modifier.checkboxSlot().semantics {
+        contentDescription = if (everything) "Clear selection" else "Select all"
+      },
       state = when (selected) {
         0 -> ToggleableState.Off
         candidates.size -> ToggleableState.On
         else -> ToggleableState.Indeterminate
       },
       onClick = {
-        val everything = selected == candidates.size
         draft.selected = if (everything) draft.selected - all else draft.selected + all
       },
     )

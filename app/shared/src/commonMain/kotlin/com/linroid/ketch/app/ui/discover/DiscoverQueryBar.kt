@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -45,8 +46,16 @@ internal fun DiscoverQueryBar(
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
+  val focusManager = LocalFocusManager.current
   val canSearch = draft.query.isNotBlank()
   val submit = { if (canSearch) onSearch() }
+  // The keyboard's Search key also puts the keyboard away, so the results have the screen.
+  val keyboardSearch = KeyboardActions(
+    onSearch = {
+      submit()
+      focusManager.clearFocus()
+    },
+  )
   Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
     KetchTextField(
       value = draft.query,
@@ -55,7 +64,7 @@ internal fun DiscoverQueryBar(
       leadingIcon = KetchIcon.Discover,
       textStyle = KetchTheme.typography.body,
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-      keyboardActions = KeyboardActions(onSearch = { submit() }),
+      keyboardActions = keyboardSearch,
       trailing = if (wide) {
         {
           Row(
@@ -74,15 +83,7 @@ internal fun DiscoverQueryBar(
       modifier = Modifier
         .fillMaxWidth()
         .focusRequester(focusRequester)
-        .onPreviewKeyEvent { event ->
-          val enter = event.key == Key.Enter || event.key == Key.NumPadEnter
-          if (event.type == KeyEventType.KeyDown && enter) {
-            submit()
-            true
-          } else {
-            false
-          }
-        },
+        .submitOnEnter(submit),
     )
     if (!wide) {
       Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -92,7 +93,7 @@ internal fun DiscoverQueryBar(
       }
     }
     AnimatedVisibility(draft.showSites) {
-      SitesField(draft, submit)
+      SitesField(draft, submit, keyboardSearch)
     }
   }
 }
@@ -134,7 +135,11 @@ private fun SitesChip(draft: AiDiscoverDraft) {
 }
 
 @Composable
-private fun SitesField(draft: AiDiscoverDraft, onSearch: () -> Unit) {
+private fun SitesField(
+  draft: AiDiscoverDraft,
+  onSearch: () -> Unit,
+  keyboardActions: KeyboardActions,
+) {
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {
     KetchTextField(
       value = draft.sites,
@@ -142,21 +147,24 @@ private fun SitesField(draft: AiDiscoverDraft, onSearch: () -> Unit) {
       placeholder = "ubuntu.com, blender.org",
       leadingIcon = KetchIcon.Link,
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-      keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-      modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
-        val enter = event.key == Key.Enter || event.key == Key.NumPadEnter
-        if (event.type == KeyEventType.KeyDown && enter) {
-          onSearch()
-          true
-        } else {
-          false
-        }
-      },
+      keyboardActions = keyboardActions,
+      modifier = Modifier.fillMaxWidth().submitOnEnter(onSearch),
     )
     Text(
       text = "Searches only these websites and their subdomains. Separate them with commas.",
       style = KetchTheme.typography.caption,
       color = KetchTheme.colors.textTertiary,
     )
+  }
+}
+
+/** Runs [onSubmit] on Enter from a hardware keyboard, instead of the field taking it. */
+private fun Modifier.submitOnEnter(onSubmit: () -> Unit): Modifier = onPreviewKeyEvent { event ->
+  val enter = event.key == Key.Enter || event.key == Key.NumPadEnter
+  if (event.type == KeyEventType.KeyDown && enter) {
+    onSubmit()
+    true
+  } else {
+    false
   }
 }

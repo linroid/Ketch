@@ -96,7 +96,7 @@ internal fun DiscoverFooter(
         KetchButton(
           text = reviewLabel(selected.size),
           onClick = review,
-          enabled = selected.isNotEmpty(),
+          enabled = selected.isNotEmpty() && !busy,
         )
       }
     }
@@ -113,7 +113,7 @@ internal fun DiscoverFooter(
         KetchButton(
           text = reviewLabel(selected.size),
           onClick = review,
-          enabled = selected.isNotEmpty(),
+          enabled = selected.isNotEmpty() && !busy,
           modifier = Modifier.weight(1f),
         )
       }

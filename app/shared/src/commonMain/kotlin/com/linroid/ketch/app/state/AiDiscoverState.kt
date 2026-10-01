@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 
 /** Where the current Discover search is. */
 sealed interface AiDiscoverState {
-  /** No search has run since the last reset. */
+  /** No search has run since the last reset, or the last one was stopped. */
   data object Idle : AiDiscoverState
 
   /** A search is running. */

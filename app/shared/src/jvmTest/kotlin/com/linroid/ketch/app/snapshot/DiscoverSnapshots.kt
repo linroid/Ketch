@@ -62,6 +62,16 @@ class DiscoverSnapshots {
   }
 
   @Test
+  fun setup_providerChosenWithoutAKey_saysToFinishIt() {
+    val cases = listOf(CardDesktop to SnapshotTheme.Light, CardPhone to SnapshotTheme.Dark)
+    for ((size, theme) in cases) {
+      setupSnapshot("discover-setup-chosen", size, theme) {
+        it.controller.state.aiSettings.chooseProvider(LlmProvider.Anthropic)
+      }
+    }
+  }
+
+  @Test
   fun search_beforeTheFirstSearch_showsExamples() {
     for (size in AppSizes) {
       for (theme in SnapshotTheme.entries) {
