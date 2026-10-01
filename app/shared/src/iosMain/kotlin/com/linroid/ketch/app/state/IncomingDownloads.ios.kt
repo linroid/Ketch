@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.app.util.LinkKind
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
@@ -12,6 +13,23 @@ import platform.Foundation.NSURL
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.dataWithContentsOfURL
 import platform.posix.memcpy
+
+/**
+ * Takes a URL that iOS opened Ketch with: a `.torrent` file ([offerFile]) or a link Ketch is
+ * registered to open, such as a `magnet:` link, which is offered as [IncomingDownload.Links].
+ *
+ * @return `false` when [url] is neither, such as a `ketch:` link, so the caller can route it.
+ */
+fun IncomingDownloads.offerUrl(url: NSURL): Boolean {
+  if (url.fileURL) {
+    offerFile(url)
+    return true
+  }
+  val link = url.absoluteString ?: return false
+  if (LinkKind.of(link) == LinkKind.Other) return false
+  offerLinks(listOf(link), LinkSource.OpenUrl)
+  return true
+}
 
 /**
  * Reads a `.torrent` file opened in Ketch from Files, AirDrop or another app. Files opened in
