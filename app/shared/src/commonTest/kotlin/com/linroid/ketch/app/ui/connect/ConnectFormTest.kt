@@ -47,6 +47,13 @@ class ConnectFormTest {
   }
 
   @Test
+  fun isComplete_onlyForAPairingLinkWithItsCode() {
+    assertTrue(ConnectForm(pairingLink).isComplete)
+    assertFalse(ConnectForm(pairingLink.substringBefore('#')).isComplete)
+    assertFalse(ConnectForm("nas.local:8642").isComplete)
+  }
+
+  @Test
   fun target_codeTyped_winsOverTheCodeOfTheLink() {
     val form = ConnectForm(pairingLink)
 

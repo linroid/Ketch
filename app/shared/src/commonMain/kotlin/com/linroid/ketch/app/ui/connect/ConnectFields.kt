@@ -48,7 +48,8 @@ private val log = KetchLogger("ConnectFields")
 
 /**
  * The "Pairing link or address" field of [form], with what it read from a pairing link under
- * it. Go on the keyboard runs [onSubmit].
+ * it. Go on the keyboard runs [onSubmit], and so does pasting a whole pairing link with its
+ * access code into the empty field, which leaves nothing else to fill in.
  *
  * @param autoFocus takes focus when it appears, except on phones, whose keyboard would cover
  *   the rest.
@@ -72,7 +73,11 @@ internal fun PairingLinkField(
   Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
     KetchTextField(
       value = form.link,
-      onValueChange = { form.link = it },
+      onValueChange = { text ->
+        val pasted = form.link.isEmpty() && text.length > 1
+        form.link = text
+        if (pasted && form.isComplete) onSubmit()
+      },
       label = "Pairing link or address",
       placeholder = placeholder,
       leadingIcon = KetchIcon.Link,
@@ -83,7 +88,10 @@ internal fun PairingLinkField(
         {
           scope.launch {
             try {
-              clipboard.readText()?.trim()?.let { form.link = it }
+              clipboard.readText()?.trim()?.let { text ->
+                form.link = text
+                if (form.isComplete) onSubmit()
+              }
             } catch (e: CancellationException) {
               throw e
             } catch (e: Exception) {

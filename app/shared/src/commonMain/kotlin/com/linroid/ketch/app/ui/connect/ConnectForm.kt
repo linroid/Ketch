@@ -123,6 +123,10 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
   val parsed: PairingLink?
     get() = PairingLink.parse(linkState)
 
+  /** Whether [link] is a pairing link with an access code, which is all a connection needs. */
+  val isComplete: Boolean
+    get() = parsed?.token != null && !usesManual
+
   /** The device the form would connect to, or `null` while what is typed names none. */
   val target: PairingLink?
     get() {
