@@ -62,7 +62,8 @@ fun InstanceSelectorSheet(
   val instances by instanceManager.instances.collectAsState()
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
-  val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+  val window = LocalWindowInfo.current.containerSize
+  val windowWidth = with(LocalDensity.current) { window.width.toDp() }
   val isCompact = windowWidth.value < WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
 
   val instanceList: @Composable () -> Unit = {
