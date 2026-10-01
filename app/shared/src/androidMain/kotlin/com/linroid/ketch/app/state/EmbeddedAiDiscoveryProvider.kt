@@ -3,20 +3,38 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.DiscoverQuery
+import com.linroid.ketch.ai.agent.DiscoveryStepListener
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.config.AiSettings
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * In-process AI discovery using the `ai:discover` module directly.
  * Available on Android where the AI module can run.
+ *
+ * Searches run one at a time, so the steps the module reports belong to the search that asked
+ * for them.
  */
-class EmbeddedAiDiscoveryProvider(
+class EmbeddedAiDiscoveryProvider internal constructor(
   private val module: AiModule,
+  private val steps: StepRelay,
 ) : AiDiscoveryProvider {
+  private val runs = Mutex()
 
   override suspend fun discover(
     request: AiDiscoverRequest,
-  ): AiDiscoverResponse {
+    onStep: (DiscoveryStep) -> Unit,
+  ): AiDiscoverResponse = runs.withLock {
+    steps.target = onStep
+    try {
+      search(request)
+    } finally {
+      steps.target = null
+    }
+  }
+
+  private suspend fun search(request: AiDiscoverRequest): AiDiscoverResponse {
     val result = module.discoveryService.discover(
       DiscoverQuery(
         query = request.query,
@@ -50,6 +68,16 @@ class EmbeddedAiDiscoveryProvider(
   }
 }
 
+/** Hands the steps the module reports to the search running now, if any. */
+internal class StepRelay : DiscoveryStepListener {
+  @Volatile
+  var target: ((DiscoveryStep) -> Unit)? = null
+
+  override fun onStep(title: String, details: String) {
+    target?.invoke(DiscoveryStep(title = title.trim(), detail = details.trim()))
+  }
+}
+
 /**
  * Builds [EmbeddedAiDiscoveryProvider] instances from saved settings,
  * filling blank credentials from the environment.
@@ -68,8 +96,10 @@ class EmbeddedAiDiscoveryProviderFactory(
     if (!settings.enabled) return null
     val resolved = withPlatformCredentials(settings)
     if (!resolved.isUsable) return null
+    val steps = StepRelay()
     return EmbeddedAiDiscoveryProvider(
-      AiModule.create(AiConfig(settings = resolved)),
+      module = AiModule.create(AiConfig(settings = resolved), stepListener = steps),
+      steps = steps,
     )
   }
 

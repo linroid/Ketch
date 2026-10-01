@@ -3,7 +3,16 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.config.AiSettings
 
 /**
- * A discovered resource candidate from AI discovery.
+ * A download AI discovery found.
+ *
+ * @property url link to download.
+ * @property title what the agent calls it.
+ * @property fileName name of the file, when the link names one.
+ * @property fileSize size in bytes, when the server reported it.
+ * @property mimeType content type, when the server reported it.
+ * @property sourceUrl page the link was found on; blank when unknown.
+ * @property confidence how sure the agent is that it matches the search, from 0 to 1.
+ * @property description what the agent says the file is.
  */
 data class AiCandidate(
   val url: String,
@@ -17,7 +26,12 @@ data class AiCandidate(
 )
 
 /**
- * Request for AI resource discovery.
+ * A search for AI discovery.
+ *
+ * @property query what to look for, in the user's words.
+ * @property sites websites to limit the search to; empty searches the whole web.
+ * @property maxResults most candidates to return.
+ * @property fileTypes file types to prefer, such as `iso`; empty prefers none.
  */
 data class AiDiscoverRequest(
   val query: String,
@@ -27,7 +41,10 @@ data class AiDiscoverRequest(
 )
 
 /**
- * Response from AI resource discovery.
+ * What an AI discovery search found.
+ *
+ * @property query the search, as the engine read it.
+ * @property candidates the downloads it found, best first.
  */
 data class AiDiscoverResponse(
   val query: String,
@@ -35,11 +52,31 @@ data class AiDiscoverResponse(
 )
 
 /**
+ * Something the discovery agent reported doing, such as "Plan" or "Searching".
+ *
+ * @property title short name of the step.
+ * @property detail what the agent said about it; may be blank.
+ */
+data class DiscoveryStep(
+  val title: String,
+  val detail: String = "",
+)
+
+/**
  * Abstraction for AI resource discovery, allowing platform-specific
  * implementations (e.g., embedded in-process on JVM/Android).
  */
 interface AiDiscoveryProvider {
-  suspend fun discover(request: AiDiscoverRequest): AiDiscoverResponse
+  /**
+   * Searches for downloads matching [request].
+   *
+   * @param onStep called with each step the agent reports while it works, possibly from another
+   *   thread.
+   */
+  suspend fun discover(
+    request: AiDiscoverRequest,
+    onStep: (DiscoveryStep) -> Unit = {},
+  ): AiDiscoverResponse
 
   /**
    * Sends a minimal prompt to the configured provider to check the

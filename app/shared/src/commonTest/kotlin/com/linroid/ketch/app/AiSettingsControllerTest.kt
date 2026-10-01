@@ -6,6 +6,7 @@ import com.linroid.ketch.app.state.AiDiscoverResponse
 import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AiSettingsController
+import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.KetchConfig
@@ -42,6 +43,7 @@ private class FakeAiProvider(
 
   override suspend fun discover(
     request: AiDiscoverRequest,
+    onStep: (DiscoveryStep) -> Unit,
   ): AiDiscoverResponse = AiDiscoverResponse(request.query, emptyList())
 
   override suspend fun verify(): String = failure?.let { throw it } ?: reply
@@ -277,5 +279,57 @@ class AiSettingsControllerTest {
     assertTrue(controller.connectionTest is AiConnectionTest.Success)
     controller.save(usableSettings(apiKey = "sk-other"))
     assertEquals(AiConnectionTest.Idle, controller.connectionTest)
+  }
+
+  @Test
+  fun chooseProvider_newProvider_switchesDiscoveryOnWithItsDefaults() {
+    val store = FakeConfigStore(
+      KetchConfig(
+        ai = AiSettings(
+          llm = LlmSettings(
+            provider = LlmProvider.OpenAi,
+            apiKey = "sk-test",
+            model = "gpt-custom",
+            baseUrl = "https://proxy.example.com",
+          ),
+        ),
+      ),
+    )
+    val controller = AiSettingsController(store, FakeFactory())
+
+    controller.chooseProvider(LlmProvider.Anthropic)
+
+    val saved = store.load().ai
+    assertTrue(saved.enabled)
+    assertEquals(LlmSettings(provider = LlmProvider.Anthropic, apiKey = "sk-test"), saved.llm)
+  }
+
+  @Test
+  fun chooseProvider_sameProvider_keepsModelAndEndpoint() {
+    val llm = LlmSettings(provider = LlmProvider.OpenAi, model = "gpt-custom")
+    val controller = AiSettingsController(
+      configStore = FakeConfigStore(KetchConfig(ai = AiSettings(llm = llm))),
+      factory = FakeFactory(),
+    )
+
+    controller.chooseProvider(LlmProvider.OpenAi)
+
+    assertEquals(AiSettings(enabled = true, llm = llm), controller.settings)
+  }
+
+  @Test
+  fun chooseProvider_providerWithoutAKey_makesDiscoveryAvailable() {
+    val controller = AiSettingsController(FakeConfigStore(), FakeFactory())
+    assertTrue(controller.needsSetup)
+
+    controller.chooseProvider(LlmProvider.Ollama)
+
+    assertTrue(controller.available)
+    assertFalse(controller.needsSetup)
+  }
+
+  @Test
+  fun needsSetup_withoutAFactory_isFalse() {
+    assertFalse(AiSettingsController(FakeConfigStore()).needsSetup)
   }
 }
