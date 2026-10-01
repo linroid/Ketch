@@ -11,6 +11,7 @@ import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.MenuScope
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageLevel
@@ -19,8 +20,10 @@ import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyChord
 import com.linroid.ketch.app.input.KeyboardPlatform
-import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.platform.localDeviceNoun
@@ -31,11 +34,13 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.PulseCounts
+import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
@@ -106,6 +111,7 @@ fun FrameWindowScope.KetchMenuBar(
   }
   val instances by state.instances.collectAsState()
   val active by state.activeInstance.collectAsState()
+  val shown by controller.instanceManager.deviceScope.collectAsState()
   val ops by state.pendingOps.ops.collectAsState()
   val mode = speedMode?.mode?.collectAsState()?.value
   val selectedKeys = state.selectedKeys
@@ -118,12 +124,13 @@ fun FrameWindowScope.KetchMenuBar(
       counts = status.pulse.counts,
       failures = status.pulse.failures,
       filter = state.statusFilter,
-      devices = instances.map { if (it is EmbeddedInstance) localDeviceNoun() else it.label },
+      devices = instances.map { it.displayName },
       activeDevice = instances.indexOf(active).takeIf { it >= 0 },
       selection = selection,
       undoLabel = ops.lastOrNull()?.label,
       inspectorOpen = state.inspectorOpen,
       slowLane = mode?.isSlowLane,
+      allDevices = shown == DeviceScope.All,
       revealLabel = files?.revealLabel,
       platform = platform,
     ),
@@ -170,14 +177,47 @@ internal sealed interface MenuAction {
   /** Runs [command]. */
   data class Run(val command: KetchCommand) : MenuAction
 
-  /** Switches the active device to [mode]. */
+  /** Switches this computer, the one device with a speed mode, to [mode]. */
   data class SetSpeedMode(val mode: SpeedLimitMode) : MenuAction
+
+  /** Sets the download speed limit of the device with [deviceId], one without a speed mode. */
+  data class SetSpeedLimit(val deviceId: String, val limit: SpeedLimit) : MenuAction
 
   /** Opens the downloaded file at [path], named [name] in messages. */
   data class OpenFile(val path: String, val name: String) : MenuAction
 
   /** Shows the main window. */
   data object ShowWindow : MenuAction
+
+  /** Shows the main window on the downloads of the device with [deviceId]. */
+  data class ShowDevice(val deviceId: String) : MenuAction
+
+  /** Pauses the downloading and queued tasks of the devices with [deviceIds]. */
+  data class PauseAll(val deviceIds: List<String>) : MenuAction
+
+  /** Resumes the paused tasks of the devices with [deviceIds]. */
+  data class ResumeAll(val deviceIds: List<String>) : MenuAction
+
+  /** Retries the failed tasks of the devices with [deviceIds]. */
+  data class RetryFailed(val deviceIds: List<String>) : MenuAction
+
+  /** Downloads the links on the clipboard on the device with [deviceId]. */
+  data class AddClipboardLink(val deviceId: String) : MenuAction
+
+  /** Connects to the offline device with [deviceId] now rather than at its next attempt. */
+  data class Reconnect(val deviceId: String) : MenuAction
+
+  /** Asks for a new access token for the device with [deviceId], which rejected its token. */
+  data class EnterToken(val deviceId: String) : MenuAction
+
+  /** Sets whether the app stays connected to the device with [deviceId] while another shows. */
+  data class StayConnected(val deviceId: String, val watch: Boolean) : MenuAction
+
+  /** Opens the sheet that connects to another device. */
+  data object AddDevice : MenuAction
+
+  /** Opens Settings at Sharing, where another device pairs with this one. */
+  data object PairDevice : MenuAction
 }
 
 /** A menu of the menu bar. */
@@ -224,6 +264,7 @@ internal data class SelectedTask(val phase: TaskPhase, val local: Boolean)
  * @property undoLabel label of the operation ⌘Z undoes, or `null` when there is none.
  * @property inspectorOpen whether the inspector is shown.
  * @property slowLane whether the slow lane is on; `null` when speed modes are unavailable.
+ * @property allDevices whether the window shows every device rather than the active one.
  * @property revealLabel label of Reveal, such as "Show in Finder"; `null` keeps the command's.
  */
 internal data class MenuBarContext(
@@ -236,6 +277,7 @@ internal data class MenuBarContext(
   val undoLabel: String?,
   val inspectorOpen: Boolean,
   val slowLane: Boolean?,
+  val allDevices: Boolean = false,
   val revealLabel: String? = null,
   val platform: KeyboardPlatform = KeyboardPlatform.Mac,
 )
@@ -265,13 +307,14 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
     else -> KetchCommands.TogglePause.label
   }
   val counts = context.counts
-  return listOfNotNull(
+  return listOf(
     MenuBarMenu(
       "File",
       listOf(
         item(KetchCommands.Add),
         item(KetchCommands.AddClipboardLink),
         item(KetchCommands.OpenTorrent),
+        MenuEntry.Item(MenuAction.AddDevice, ADD_DEVICE),
         MenuEntry.Separator,
         item(KetchCommands.CloseWindow),
       ),
@@ -321,18 +364,32 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
         context.slowLane?.let { item(KetchCommands.SlowLane, checked = it) },
       ),
     ),
-    context.devices.take(MAX_DEVICE_ITEMS).takeIf { it.isNotEmpty() }?.let { devices ->
-      MenuBarMenu(
-        "Device",
-        devices.mapIndexed { index, name ->
-          val command = KetchCommands.device(index + 1)
-          item(command, label = name, checked = index == context.activeDevice)
-        },
-      )
-    },
+    MenuBarMenu(
+      "Device",
+      buildList {
+        val devices = context.devices.take(MAX_DEVICE_ITEMS)
+        add(
+          item(
+            KetchCommands.AllDevices,
+            enabled = context.devices.size >= DeviceScope.MIN_DEVICES,
+            checked = context.allDevices,
+          ),
+        )
+        if (devices.isNotEmpty()) add(MenuEntry.Separator)
+        devices.forEachIndexed { index, name ->
+          val shown = !context.allDevices && index == context.activeDevice
+          add(item(KetchCommands.device(index + 1), label = name, checked = shown))
+        }
+        add(MenuEntry.Separator)
+        add(MenuEntry.Item(MenuAction.PairDevice, "Pair a device…"))
+      },
+    ),
     MenuBarMenu("Window", listOf(item(KetchCommands.Minimize))),
   )
 }
+
+/** Label of the item that connects to another device: in the File menu and the tray's Devices. */
+internal const val ADD_DEVICE = "Add device…"
 
 /**
  * An item that runs [command]. A chord the menu may own becomes its shortcut; any other chord is
@@ -473,9 +530,27 @@ internal class DesktopCommands(
   fun perform(action: MenuAction) {
     when (action) {
       is MenuAction.Run -> run(action.command)
-      is MenuAction.SetSpeedMode -> if (speedMode != null) state.switchSpeedMode(action.mode)
+      is MenuAction.SetSpeedMode -> switchSpeedMode(action.mode)
+      is MenuAction.SetSpeedLimit -> setSpeedLimit(action.deviceId, action.limit)
       is MenuAction.OpenFile -> openFile(action.path, action.name)
       MenuAction.ShowWindow -> actions.showWindow()
+      is MenuAction.ShowDevice -> showDevice(action.deviceId)
+      is MenuAction.PauseAll -> state.pauseAll(devices(action.deviceIds))
+      is MenuAction.ResumeAll -> state.resumeAll(devices(action.deviceIds))
+      is MenuAction.RetryFailed -> state.retryFailed(devices(action.deviceIds))
+      is MenuAction.AddClipboardLink -> device(action.deviceId)?.let(::addClipboardLinks)
+      is MenuAction.Reconnect -> reconnect(action.deviceId)
+      is MenuAction.EnterToken -> enterToken(action.deviceId)
+      is MenuAction.StayConnected -> (device(action.deviceId) as? RemoteInstance)?.let {
+        controller.instanceManager.setWatched(it, action.watch)
+      }
+      MenuAction.AddDevice -> {
+        actions.showWindow()
+        state.showAddRemoteDialog = true
+      }
+      MenuAction.PairDevice -> {
+        state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
+      }
     }
   }
 
@@ -493,6 +568,7 @@ internal class DesktopCommands(
       return
     }
     when (command) {
+      KetchCommands.AllDevices -> controller.instanceManager.showAllDevices()
       KetchCommands.Add -> {
         actions.showWindow()
         state.openIntake()
@@ -540,8 +616,9 @@ internal class DesktopCommands(
     }
   }
 
-  // ⇧⌘V: adds every link on the clipboard without the add sheet, even with the window hidden.
-  private fun addClipboardLinks() {
+  // ⇧⌘V: adds every link on the clipboard without the add sheet, even with the window hidden;
+  // to [target], or where links added without the sheet go.
+  private fun addClipboardLinks(target: InstanceEntry? = null) {
     controller.scope.launch {
       val text = clipboardText()
       val links = text?.let { LinkParser.parseIntake(it).links() }.orEmpty()
@@ -553,20 +630,124 @@ internal class DesktopCommands(
         links.isEmpty() || links.any { it.headers.isNotEmpty() } -> {
           // Text without a link, or a cURL command whose headers the add sheet keeps.
           actions.showWindow()
-          state.openIntake(IntakeRequest(text = text))
+          state.openIntake(IntakeRequest(text = text, targetDeviceId = target?.deviceId))
         }
-        else -> addNow(links.map { it.url }.distinct())
+        else -> addNow(links.map { it.url }.distinct(), target)
       }
     }
   }
 
-  private fun addNow(urls: List<String>) {
+  private fun addNow(urls: List<String>, target: InstanceEntry? = null) {
+    if (target != null) {
+      state.quickAdd(urls, target)
+      return
+    }
     // Without a device the app asks for one, which needs the window.
     if (state.activeInstance.value == null) actions.showWindow()
     state.quickAdd(urls)
   }
 
   private suspend fun clipboardText(): String? = clipboard.readText()?.trim()?.ifEmpty { null }
+
+  private fun showDevice(deviceId: String) {
+    val entry = device(deviceId) ?: return
+    actions.showWindow()
+    state.switchInstance(entry)
+    state.showDownloads(state.statusFilter)
+  }
+
+  // This computer is the one device with a speed mode, which the tray switches also while
+  // another device shows; the active one's change offers Undo.
+  private fun switchSpeedMode(mode: SpeedLimitMode) {
+    if (state.activeSpeedMode != null) {
+      state.switchSpeedMode(mode)
+      return
+    }
+    val speedMode = controller.speedMode ?: return
+    if (speedMode.settings.value.mode == mode) return
+    val device = localDeviceNoun()
+    controller.scope.launch {
+      try {
+        speedMode.setMode(mode)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w { "Couldn't switch $device to ${speedModeName(mode)}: ${e.describeCauses()}" }
+        state.messages.post(
+          level = MessageLevel.Error,
+          title = "Couldn't switch $device to ${speedModeName(mode)}",
+          cause = e,
+        )
+        return@launch
+      }
+      val title = when (mode) {
+        SpeedLimitMode.SlowLane -> "Slow lane on for $device"
+        SpeedLimitMode.Full -> "Slow lane off for $device"
+        SpeedLimitMode.Auto -> "Speed on $device follows your rules"
+      }
+      state.messages.post(MessageLevel.Success, title)
+    }
+  }
+
+  // As in the Pulse popover, a device without a speed mode takes the limit as its download
+  // setting; one whose settings were never read is read first.
+  private fun setSpeedLimit(deviceId: String, limit: SpeedLimit) {
+    val entry = device(deviceId) ?: return
+    val settings = state.settingsFor(entry)
+    val loaded = settings.download
+    if (loaded != null) {
+      settings.updateDownload(loaded.copy(speedLimit = limit))
+      return
+    }
+    controller.scope.launch {
+      val config = try {
+        entry.instance.status().config
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w { "Couldn't read the settings of $deviceId: ${e.describeCauses()}" }
+        state.messages.post(
+          level = MessageLevel.Error,
+          title = "Couldn't set the speed limit on ${entry.displayName}",
+          cause = e,
+        )
+        return@launch
+      }
+      settings.updateDownload(config.copy(speedLimit = limit))
+    }
+  }
+
+  private fun reconnect(deviceId: String) {
+    val remote = device(deviceId) as? RemoteInstance ?: return
+    controller.scope.launch {
+      try {
+        controller.instanceManager.reconnect(remote)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w { "Couldn't reconnect to $deviceId: ${e.describeCauses()}" }
+        state.messages.post(
+          level = MessageLevel.Error,
+          title = "Couldn't reconnect to ${remote.displayName}",
+          cause = e,
+        )
+      }
+    }
+  }
+
+  // The add device sheet takes the new token, as from the offline banner.
+  private fun enterToken(deviceId: String) {
+    val remote = device(deviceId) as? RemoteInstance ?: return
+    actions.showWindow()
+    state.unauthorizedInstance = remote
+    state.showAddRemoteDialog = true
+  }
+
+  private fun device(deviceId: String): InstanceEntry? =
+    state.instances.value.firstOrNull { it.deviceId == deviceId }
+
+  private fun devices(deviceIds: List<String>): List<InstanceEntry> =
+    state.instances.value.filter { it.deviceId in deviceIds }
 
   // Picked files go where files opened from the file manager go, so several open one by one.
   private fun openTorrentFiles() {
