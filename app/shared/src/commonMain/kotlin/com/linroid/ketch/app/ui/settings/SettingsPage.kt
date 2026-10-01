@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +43,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -252,6 +255,8 @@ private class CoordinatesHolder {
  * @param deviceChip the chip that picks the device the device pages edit; `null` hides it.
  * @param search the search field.
  * @param results the search results, shown in place of the pages while a query is typed.
+ * @param onSurface whether the column sits on a surface rather than on the canvas, which decides
+ *   how the open page is marked.
  */
 @Composable
 internal fun SettingsNav(
@@ -262,6 +267,7 @@ internal fun SettingsNav(
   deviceChip: (@Composable () -> Unit)?,
   search: @Composable () -> Unit,
   results: (@Composable () -> Unit)?,
+  onSurface: Boolean,
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
@@ -271,7 +277,8 @@ internal fun SettingsNav(
       modifier = Modifier.weight(1f)
         .fillMaxWidth()
         .verticalScroll(rememberScrollState())
-        .padding(horizontal = spacing.s1, vertical = spacing.s3),
+        .padding(horizontal = spacing.s1, vertical = spacing.s3)
+        .selectableGroup(),
     ) {
       if (results != null) {
         results()
@@ -292,6 +299,7 @@ internal fun SettingsNav(
             category = category,
             summary = summaries[category],
             selected = category == selected,
+            onSurface = onSurface,
             onClick = { onOpen(category) },
           )
         }
@@ -333,6 +341,7 @@ private fun SettingsNavItem(
   category: SettingsCategory,
   summary: String?,
   selected: Boolean,
+  onSurface: Boolean,
   onClick: () -> Unit,
 ) {
   val colors = KetchTheme.colors
@@ -342,11 +351,7 @@ private fun SettingsNavItem(
   val hovered by interactions.collectIsHoveredAsState()
   val focus = rememberFocusVisibility()
   val fill by animateColorAsState(
-    targetValue = when {
-      selected -> colors.sidebarItemSelected
-      hovered -> colors.sidebarItemHover
-      else -> Color.Transparent
-    },
+    targetValue = itemFill(selected, hovered, onSurface),
     animationSpec = tween(KetchTheme.motion.micro),
   )
   Row(
@@ -391,6 +396,20 @@ private fun SettingsNavItem(
 }
 
 /**
+ * Fill of a picked or hovered item in Settings' lists. The sidebar's translucent pills only show
+ * on the canvas, so on a [surface][onSurface] the surface's own hover and pressed tones mark them.
+ */
+@Composable
+private fun itemFill(selected: Boolean, hovered: Boolean, onSurface: Boolean): Color {
+  val colors = KetchTheme.colors
+  return when {
+    selected -> if (onSurface) colors.surfacePressed else colors.sidebarItemSelected
+    hovered -> if (onSurface) colors.surfaceHover else colors.sidebarItemHover
+    else -> Color.Transparent
+  }
+}
+
+/**
  * The phone's Settings: the pages in two groups, each with its summary, and search above them.
  *
  * @param onClose leaves Settings; `null` leaves that to the platform's back.
@@ -417,7 +436,12 @@ internal fun SettingsList(
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
-      modifier = Modifier.padding(start = if (onClose != null) 0.dp else spacing.s1),
+      // The back button lines up with the one on each page, its glyph at the page's edge.
+      modifier = if (onClose != null) {
+        Modifier.offset(x = -spacing.s2)
+      } else {
+        Modifier.padding(start = spacing.s1)
+      },
     ) {
       if (onClose != null) {
         KetchIconButton(
@@ -479,6 +503,7 @@ internal fun SettingsList(
  *
  * @param inGroup draws the results as the rows of a group, as on phones, rather than as
  *   navigation items.
+ * @param onSurface whether navigation items sit on a surface rather than on the canvas.
  */
 @Composable
 internal fun SettingsSearchResults(
@@ -487,6 +512,7 @@ internal fun SettingsSearchResults(
   selected: Int,
   onOpen: (SettingsHit) -> Unit,
   inGroup: Boolean,
+  onSurface: Boolean,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -512,6 +538,7 @@ internal fun SettingsSearchResults(
         selected = index == selected,
         onClick = { onOpen(hit) },
         filled = inGroup,
+        onSurface = inGroup || onSurface,
       )
     }
   }
@@ -530,6 +557,7 @@ private fun SearchResult(
   selected: Boolean,
   onClick: () -> Unit,
   filled: Boolean,
+  onSurface: Boolean,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -538,12 +566,7 @@ private fun SearchResult(
   val interactions = remember { MutableInteractionSource() }
   val hovered by interactions.collectIsHoveredAsState()
   val focus = rememberFocusVisibility()
-  val fill = when {
-    selected -> colors.sidebarItemSelected
-    hovered -> colors.sidebarItemHover
-    filled -> colors.surface
-    else -> Color.Transparent
-  }
+  val fill = itemFill(selected, hovered, onSurface)
   val outer = if (filled) {
     Modifier.fillMaxWidth().background(colors.surface)
   } else {
@@ -580,10 +603,11 @@ private fun SearchResult(
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
       )
+      // A page answers by its description, so that is where its matches show.
       val where = if (entry.title == entry.category.title) {
-        entry.description
+        highlighted(entry.description, hit.descriptionMatches, match)
       } else {
-        entry.category.title
+        AnnotatedString(entry.category.title)
       }
       if (where.isNotEmpty()) {
         Text(
@@ -771,12 +795,16 @@ internal fun rememberSettingsSummaries(
 internal fun generalSummary(theme: ThemeMode, accent: KetchAccent): String =
   "${theme.label} · ${accent.displayName}"
 
-/** "4 on": how many kinds of event are reported at all, or "Off" when none is. */
+/**
+ * "4 on": how many kinds of event are reported at all, or "Off" when none is. "All downloads
+ * finished" is reported the way finished downloads are, so it counts only while they are.
+ */
 internal fun notificationsSummary(settings: NotificationSettings): String {
+  val finished = settings.finished != NotificationMode.Off
   val on = listOf(
-    settings.finished != NotificationMode.Off,
+    finished,
     settings.failed != NotificationMode.Off,
-    settings.queueDrained,
+    finished && settings.queueDrained,
     settings.deviceOffline,
   ).count { it }
   return if (on == 0) "Off" else "$on on"
@@ -813,11 +841,14 @@ internal fun discoverSummary(settings: AiSettings, effective: AiSettings): Strin
   else -> "${effective.llm.provider.label} · ${effective.search.provider.label} search"
 }
 
-/** "~/Downloads · 3 at a time": where downloads go and how many run together. */
+/**
+ * "~/Downloads · 3 at a time": where downloads go and how many run together, "all at once"
+ * without a limit.
+ */
 internal fun downloadsSummary(config: DownloadConfig): String {
   val folder = config.defaultDirectory?.let(::shortFolder) ?: "Downloads folder"
   val count = config.maxConcurrentDownloads
-  return if (count == 0) "$folder · no queue" else "$folder · $count at a time"
+  return if (count == 0) "$folder · all at once" else "$folder · $count at a time"
 }
 
 /**

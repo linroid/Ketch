@@ -39,6 +39,9 @@ internal enum class SettingsFeature {
   /** A phone or tablet app, which has the welcome screens. */
   Mobile,
 
+  /** An app whose empty Downloads page shows the setup checklist: desktop and the web. */
+  SetupChecklist,
+
   /** The browser asks before the web app may notify. */
   BrowserNotifications,
 
@@ -210,17 +213,21 @@ internal class SettingsJump(val highlight: Color, val shape: Shape) {
       if (animate) scroll.animateScrollTo(y) else scroll.scrollTo(y)
     }
     highlighted = name
-    if (animate) {
-      flash.snapTo(0f)
-      flash.animateTo(1f, tween(FLASH_IN_MS))
-      delay(FLASH_HOLD_MS)
-      flash.animateTo(0f, tween(FLASH_OUT_MS))
-    } else {
-      flash.snapTo(1f)
-      delay(FLASH_IN_MS + FLASH_HOLD_MS + FLASH_OUT_MS)
-      flash.snapTo(0f)
+    // Cleared even when cancelled, such as by opening the page again, so no tint stays behind.
+    try {
+      if (animate) {
+        flash.snapTo(0f)
+        flash.animateTo(1f, tween(FLASH_IN_MS))
+        delay(FLASH_HOLD_MS)
+        flash.animateTo(0f, tween(FLASH_OUT_MS))
+      } else {
+        flash.snapTo(1f)
+        delay(FLASH_IN_MS + FLASH_HOLD_MS + FLASH_OUT_MS)
+        flash.snapTo(0f)
+      }
+    } finally {
+      highlighted = null
     }
-    highlighted = null
   }
 }
 
@@ -306,9 +313,9 @@ internal val SettingsIndex: List<SettingsEntry> = listOf(
   ),
   SettingsEntry(
     category = SettingsCategory.General,
-    title = "Accent colour",
+    title = "Accent color",
     description = "Signal, Harbor, Fathom or Beacon",
-    keywords = listOf("color", "appearance"),
+    keywords = listOf("colour", "appearance"),
   ),
   SettingsEntry(
     category = SettingsCategory.General,
@@ -493,6 +500,7 @@ internal val SettingsIndex: List<SettingsEntry> = listOf(
     category = SettingsCategory.About,
     title = "Show setup checklist",
     keywords = listOf("getting started", "onboarding", "setup"),
+    needs = SettingsFeature.SetupChecklist,
   ),
   SettingsEntry(
     category = SettingsCategory.About,

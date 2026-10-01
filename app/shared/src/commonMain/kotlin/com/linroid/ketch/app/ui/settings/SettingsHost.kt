@@ -122,7 +122,7 @@ internal fun SettingsContent(
   val summaries = rememberSettingsSummaries(state, device)
   val features = buildSet {
     if (inWindow) add(SettingsFeature.Desktop)
-    if (isMobilePlatform) add(SettingsFeature.Mobile)
+    if (isMobilePlatform) add(SettingsFeature.Mobile) else add(SettingsFeature.SetupChecklist)
     if (permission != null) add(SettingsFeature.BrowserNotifications)
     if (fileLogger != null) add(SettingsFeature.Logs)
   }
@@ -178,6 +178,7 @@ internal fun SettingsContent(
           selected = selectedHit,
           onOpen = openHit,
           inGroup = !twoPane,
+          onSurface = !inWindow,
         )
       }
     } else {
@@ -249,6 +250,7 @@ internal fun SettingsContent(
           deviceChip = chip,
           search = search,
           results = results,
+          onSurface = !inWindow,
           modifier = Modifier.width(KetchTheme.spacing.sidebarWidth + NavExtraWidth),
         )
         val pane = if (inWindow) {

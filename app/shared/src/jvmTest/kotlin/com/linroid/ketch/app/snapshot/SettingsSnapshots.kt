@@ -189,6 +189,13 @@ class SettingsSnapshots {
     }
   }
 
+  @Test
+  fun card_search_marksTheResultEnterOpens() {
+    for (theme in SnapshotTheme.entries) {
+      cardSnapshot("settings-card-search", theme, query = "speed")
+    }
+  }
+
   /** Renders [SettingsContent] in the Settings window's frame, as the desktop app shows it. */
   private fun windowSnapshot(
     name: String,
@@ -203,6 +210,17 @@ class SettingsSnapshots {
       SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, interact) {
         SettingsFrame(environment, theme, size.density, desktop = true) {
           SettingsContent(environment.controller.state, target, onClose = {}, initialQuery = query)
+        }
+      }
+    }
+  }
+
+  /** Renders [SettingsContent] on the card of a tablet or the web, beside nothing else. */
+  private fun cardSnapshot(name: String, theme: SnapshotTheme, query: String) {
+    withEnvironment(theme, CardSize.density, lastPage = null) { environment ->
+      SnapshotHarness.capture("$name-${theme.id}-${CardSize.id}", CardSize) {
+        SettingsFrame(environment, theme, CardSize.density, desktop = false) {
+          SettingsContent(environment.controller.state, null, onClose = {}, initialQuery = query)
         }
       }
     }
@@ -259,6 +277,9 @@ class SettingsSnapshots {
 
     /** The smallest the Settings window gets. */
     val MinWindowSize = SnapshotSize(640.dp, 480.dp, KetchDensity.Compact)
+
+    /** The card of a tablet or a web page, where Settings shows both panes on a surface. */
+    val CardSize = SnapshotSize(760.dp, 640.dp, KetchDensity.Compact)
 
     /** A phone tall enough for a whole page. */
     val PhoneTall = SnapshotSize(390.dp, 1100.dp, KetchDensity.Comfortable)

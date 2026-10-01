@@ -93,7 +93,7 @@ fun GeneralSettings(
       },
     )
     SettingsRow(
-      title = "Accent colour",
+      title = "Accent color",
       trailing = {
         AccentPicker(selected = appSettings.accent, onSelect = { appSettings.saveAccent(it) })
       },
@@ -145,17 +145,20 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
   val apple = KeyboardPlatform.current.isApple
   val trayName = if (apple) "menu bar" else "notification area"
   var failure by remember { mutableStateOf<String?>(null) }
-  // Runs a hook that asks the operating system for something, which it may refuse.
-  val apply = { what: String, block: suspend () -> Unit ->
+  // Saves a change, then asks the operating system to follow it; when it refuses, the saved
+  // setting goes back, so the switch keeps saying what the system does.
+  val apply = { what: String, change: (Boolean) -> Unit, on: Boolean, hook: suspend () -> Unit ->
     failure = null
+    change(on)
     state.launchCommand {
       try {
-        block()
+        hook()
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
         log.w { "Couldn't $what: ${e.describeCauses()}" }
         failure = "Couldn't $what: ${e.message ?: e::class.simpleName}"
+        change(!on)
       }
     }
   }
@@ -188,10 +191,9 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
       title = "Open Ketch at login",
       checked = desktop.openAtLogin,
       onCheckedChange = { on ->
-        appSettings.saveDesktop { it.copy(openAtLogin = on) }
-        apply(if (on) "add the login item" else "remove the login item") {
-          hooks.setOpenAtLogin(on)
-        }
+        val save = { value: Boolean -> appSettings.saveDesktop { it.copy(openAtLogin = value) } }
+        val what = if (on) "add the login item" else "remove the login item"
+        apply(what, save, on) { hooks.setOpenAtLogin(on) }
       },
     )
     SettingsSwitchRow(
@@ -200,8 +202,8 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
       checked = desktop.startHidden,
       enabled = desktop.openAtLogin,
       onCheckedChange = { on ->
-        appSettings.saveDesktop { it.copy(startHidden = on) }
-        apply("update the login item") { hooks.setStartHidden(on) }
+        val save = { value: Boolean -> appSettings.saveDesktop { it.copy(startHidden = value) } }
+        apply("update the login item", save, on) { hooks.setStartHidden(on) }
       },
     )
     SettingsSelectRow(
