@@ -1,8 +1,9 @@
 package com.linroid.ketch.app.ui.downloads.actions
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -48,20 +49,22 @@ import kotlinx.datetime.TimeZone
 /**
  * A context menu open on the Downloads list.
  *
- * @property anchor the row that was right-clicked; the menu opens over it.
+ * @property anchor the row the menu belongs to.
  * @property rows the rows the menu acts on: the selection, or the anchor alone.
- * @property position where the pointer was, from the anchor row's top-left corner.
+ * @property position where the pointer was, from the anchor row's top-left corner; `null` when
+ *   the row's "⋯" hover button opened it, under that button.
  */
 @Immutable
 internal data class RowMenuRequest(
   val anchor: TaskKey,
   val rows: List<TaskRow>,
-  val position: Offset,
+  val position: Offset?,
 )
 
 /**
- * Which row of the Downloads list has its context menu open, if any. The list holds one, each
- * row places a [RowMenuAnchor], and the list's order stays still while [isOpen].
+ * Which row of the Downloads list has its menu open, if any: one at a time, opened by a
+ * right-click ([RowMenuAnchor]) or by the row's "⋯" ([HoverActions]). The list's order stays
+ * still and its keys wait while [isOpen].
  */
 @Stable
 internal class RowMenuState {
@@ -72,8 +75,11 @@ internal class RowMenuState {
   /** Whether a menu is open. */
   val isOpen: Boolean get() = request != null
 
-  /** Opens the menu of [rows] at [position] in the row of [anchor]. */
-  fun open(anchor: TaskKey, rows: List<TaskRow>, position: Offset) {
+  /**
+   * Opens the menu of [rows] on the row of [anchor]: at [position] in that row, or under the
+   * row's "⋯" when `null`. Any other open menu closes.
+   */
+  fun open(anchor: TaskKey, rows: List<TaskRow>, position: Offset? = null) {
     if (rows.isNotEmpty()) request = RowMenuRequest(anchor, rows, position)
   }
 
@@ -81,17 +87,25 @@ internal class RowMenuState {
   fun close() {
     request = null
   }
+
+  /** Closes the menu of [opened] unless another one took its place. */
+  fun closeIfCurrent(opened: RowMenuRequest) {
+    if (request === opened) request = null
+  }
 }
 
 /**
- * The context menu of the row of [key] while [menu] is open on it, opening at the pointer. Place
- * it in a `Box` around the row's content.
+ * The context menu of the row of [key] while [menu] is open on it at the pointer. Place it in a
+ * `Box` around the row's content. A row that scrolls away or is removed closes its menu, so the
+ * list never stays frozen behind a menu nobody sees.
  */
 @Composable
 internal fun RowMenuAnchor(menu: RowMenuState, key: TaskKey, runner: RowActionRunner) {
   val request = menu.request?.takeIf { it.anchor == key } ?: return
-  val position = request.position
-  Box(Modifier.offset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }) {
+  val position = request.position ?: return
+  DisposableEffect(menu, request) { onDispose { menu.closeIfCurrent(request) } }
+  // Pointer positions do not mirror in right-to-left layouts, so neither does the anchor.
+  Box(Modifier.absoluteOffset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }) {
     // Cancels the menu's gap below its anchor, so its corner sits at the pointer.
     RowMenu(
       expanded = true,

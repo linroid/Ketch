@@ -75,7 +75,7 @@ internal fun bandRange(
  * Selects rows by dragging a band from empty space in the list, such as below its last row.
  * Every row the band crosses is selected; with ⌘ (Ctrl elsewhere) held they add to the
  * selection. Near the top or bottom edge the list scrolls on, faster the closer the pointer.
- * Pointer only: a finger scrolls.
+ * A click on empty space clears the selection. Pointer only: a finger scrolls.
  *
  * Put it on the `LazyColumn` of [listState].
  *
@@ -139,7 +139,11 @@ internal fun Modifier.rubberBand(
           while (true) {
             val event = awaitPointerEvent()
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-            if (!change.pressed) break
+            if (!change.pressed) {
+              // A click on empty space, as in file managers, deselects.
+              if (active == null && !additive && !change.isConsumed) selection.clear()
+              break
+            }
             var running = active
             if (running == null) {
               if ((change.position - down.position).getDistance() < viewConfiguration.touchSlop) {

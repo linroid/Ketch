@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyPress
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -275,6 +276,41 @@ class ListKeyboardTest {
     runCurrent()
 
     assertEquals(listOf("connections 7"), task.calls)
+    f.close()
+  }
+
+  @Test
+  fun apply_connectionsOnAutoRow_stepsFromTheConnectionsItOpened() = runTest {
+    val f = ActionsFixture(this)
+    val task = f.add(downloading, DownloadRequest("https://example.com/a.iso"))
+    task.segments.value = List(4) { Segment(it, it * 100L, it * 100L + 99) }
+    val rows = listOf(rowOf(task))
+    val selection = ListSelection(f.state)
+    selection.update(SelectionState().select(rows.single().key))
+    val keyboard = ListKeyboard(selection, f.runner, RowMenuState(), backgroundScope)
+
+    keyboard.apply(ListKey.Connections(1), rows)
+    advanceTimeBy(500.milliseconds)
+    runCurrent()
+
+    assertEquals(listOf("connections 5"), task.calls)
+    f.close()
+  }
+
+  @Test
+  fun apply_connectionsOnAutoTorrent_leavesThePeerLimitAlone() = runTest {
+    val f = ActionsFixture(this)
+    val task = f.add(downloading, DownloadRequest("magnet:?xt=urn:btih:abc"))
+    val rows = listOf(rowOf(task))
+    val selection = ListSelection(f.state)
+    selection.update(SelectionState().select(rows.single().key))
+    val keyboard = ListKeyboard(selection, f.runner, RowMenuState(), backgroundScope)
+
+    keyboard.apply(ListKey.Connections(1), rows)
+    advanceTimeBy(500.milliseconds)
+    runCurrent()
+
+    assertTrue(task.calls.isEmpty())
     f.close()
   }
 

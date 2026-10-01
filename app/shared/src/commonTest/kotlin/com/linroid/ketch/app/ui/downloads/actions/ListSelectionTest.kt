@@ -6,6 +6,7 @@ import com.linroid.ketch.app.state.SelectionState
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ListSelectionTest {
@@ -92,5 +93,34 @@ class ListSelectionTest {
 
     assertEquals(setOf(rows[0].key), f.state.selectedKeys)
     f.close()
+  }
+
+  @Test
+  fun showMenu_rowOutsideTheSelection_actsOnItAloneAndKeepsTheSelection() = runTest {
+    val f = ActionsFixture(this)
+    val rows = List(3) { rowOf(f.add(downloading)) }
+    val selection = ListSelection(f.state)
+    val menu = RowMenuState()
+    val keyboard = ListKeyboard(selection, f.runner, menu, backgroundScope)
+    val actions = ListActions(selection, f.runner, menu, keyboard)
+    actions.rows = rows
+    val selected = rows.take(2).map { it.key }
+    selection.update(SelectionState().selectAllVisible(selected))
+
+    actions.showMenu(rows[2])
+    assertEquals(listOf(rows[2]), menu.request?.rows)
+    actions.showMenu(rows[0])
+    assertEquals(rows.take(2), menu.request?.rows)
+
+    assertEquals(selected.toSet(), f.state.selectedKeys)
+    f.close()
+  }
+
+  @Test
+  fun isSelectionMode_pointerNeedsTwoRowsTouchOne() {
+    assertFalse(isSelectionMode(1, pointer = true))
+    assertTrue(isSelectionMode(2, pointer = true))
+    assertFalse(isSelectionMode(0, pointer = false))
+    assertTrue(isSelectionMode(1, pointer = false))
   }
 }

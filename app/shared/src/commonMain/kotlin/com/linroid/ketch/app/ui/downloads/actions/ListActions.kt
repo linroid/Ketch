@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.LayoutDirection
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.KetchCheckbox
 import com.linroid.ketch.app.components.focusRing
@@ -92,6 +93,16 @@ internal class ListActions(
     menu.open(row.key, keys.mapNotNull(byKey::get).ifEmpty { listOf(row) }, position)
   }
 
+  /**
+   * Opens the menu of [row] without changing the selection, as a touch row's "⋯" or a screen
+   * reader's long-press does: it acts on the selection when [row] is in it, else on [row] alone.
+   */
+  fun showMenu(row: TaskRow) {
+    val keys = selection.current.targets(row.key, visibleKeys)
+    val byKey = rows.associateBy { it.key }
+    menu.open(row.key, keys.mapNotNull(byKey::get).ifEmpty { listOf(row) }, Offset.Zero)
+  }
+
   /** A long-press on [row]: enters selection mode with it, or toggles it. */
   fun longPress(row: TaskRow) {
     selection.longPress(row.key)
@@ -136,9 +147,11 @@ internal fun rememberListActions(
 /**
  * How a row looks while it is used, for its content.
  *
- * @property hovered whether the pointer is over the row.
+ * @property hovered whether the pointer is over the row, or a menu of the row is open, which
+ *   keeps its hover actions in place while the pointer is in the menu.
  * @property selected whether the row is selected.
- * @property selecting whether any row is selected, so checkboxes take the place of status dots.
+ * @property selecting whether the list is in selection mode, so checkboxes take the place of
+ *   status dots; see [isSelectionMode].
  */
 @Immutable
 internal data class RowFrameState(
@@ -171,7 +184,8 @@ internal fun TaskRowFrame(
   val spacing = KetchTheme.spacing
   val motion = KetchTheme.motion
   val interactions = remember { MutableInteractionSource() }
-  val hovered by interactions.collectIsHoveredAsState()
+  val pointerOver by interactions.collectIsHoveredAsState()
+  val hovered = pointerOver || actions.menu.request?.anchor == row.key
   val selected = actions.isSelected(row.key)
   val keyboard = actions.keyboard
   val focused = keyboard.hasFocus && actions.selection.focusedKey == row.key
@@ -185,7 +199,7 @@ internal fun TaskRowFrame(
     animationSpec = tween(motion.micro),
   )
   val pointer = KetchTheme.density == KetchDensity.Compact
-  val state = RowFrameState(hovered, selected, actions.selection.count > 0)
+  val state = RowFrameState(hovered, selected, isSelectionMode(actions.selection.count, pointer))
   Box(
     modifier = modifier
       // Inside the row, so neighbors and the card edge never cut the ring off.
@@ -195,18 +209,20 @@ internal fun TaskRowFrame(
       .drawWithContent {
         drawContent()
         if (selected) {
-          drawRect(colors.accent, Offset.Zero, Size(spacing.s0_5.toPx(), size.height))
+          val bar = spacing.s0_5.toPx()
+          val start = if (layoutDirection == LayoutDirection.Ltr) 0f else size.width - bar
+          drawRect(colors.accent, Offset(start, 0f), Size(bar, size.height))
         }
       }
       .hoverable(interactions)
-      .semantics {
+      .semantics(mergeDescendants = true) {
         this.selected = selected
         onClick(label = "Select") {
           actions.click(row, RowClick())
           true
         }
         onLongClick(label = "Show actions") {
-          actions.contextClick(row, Offset.Zero)
+          if (pointer) actions.contextClick(row, Offset.Zero) else actions.showMenu(row)
           true
         }
       }
@@ -224,8 +240,16 @@ internal fun TaskRowFrame(
 }
 
 /**
- * The checkbox that takes the place of a row's status dot or file chip while rows are selected
- * or the pointer is over the row. Clicking it toggles the row and keeps the rest selected.
+ * Whether a list with [count] selected rows is in selection mode, where checkboxes take the place
+ * of status dots: with a [pointer] from two rows on, since a click selects the row it inspects,
+ * and on touch from the first row a long-press selects.
+ */
+internal fun isSelectionMode(count: Int, pointer: Boolean): Boolean =
+  count >= if (pointer) 2 else 1
+
+/**
+ * The checkbox that takes the place of a row's status dot or file chip in selection mode or
+ * while the pointer is over the row. Clicking it toggles the row and keeps the rest selected.
  */
 @Composable
 internal fun SelectionCheckbox(row: TaskRow, actions: ListActions, modifier: Modifier = Modifier) {

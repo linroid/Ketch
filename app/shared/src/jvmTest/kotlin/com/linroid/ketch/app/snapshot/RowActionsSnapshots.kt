@@ -121,6 +121,17 @@ class RowActionsSnapshots {
   }
 
   @Test
+  fun hoverActions_moreMenu_staysWhileThePointerIsInIt() {
+    for (theme in SnapshotTheme.entries) {
+      actionsSnapshot("row-actions-hover-menu", SnapshotSize.Desktop, theme) {
+        hoverRow(UBUNTU, x = 1200.dp)
+        clickRow(UBUNTU, x = 1200.dp)
+        scene.hover(1150.dp, 300.dp)
+      }
+    }
+  }
+
+  @Test
   fun rowMenu_downloadingRow_opensAtThePointerWithSubmenus() {
     for (theme in SnapshotTheme.entries) {
       actionsSnapshot("row-actions-menu", SnapshotSize.Desktop, theme, prepare = {
@@ -150,7 +161,7 @@ class RowActionsSnapshots {
   fun rowMenu_phone_opensAsASheet() {
     for (theme in SnapshotTheme.entries) {
       actionsSnapshot("row-actions-menu-phone", SnapshotSize.Phone, theme, prepare = {
-        openMenu(UBUNTU, x = 200.dp)
+        actions.showMenu(row(UBUNTU))
       })
     }
   }
@@ -180,6 +191,9 @@ class RowActionsSnapshots {
       })
       actionsSnapshot("row-actions-remove-partial", SnapshotSize.Desktop, theme, prepare = {
         remove(listOf(ANDROID), withFiles = true)
+      })
+      actionsSnapshot("row-actions-remove-mixed", SnapshotSize.Desktop, theme, prepare = {
+        remove(listOf(LINUX, PODCAST, ANDROID), withFiles = true)
       })
       actionsSnapshot(
         "row-actions-remove-delete",
@@ -320,9 +334,17 @@ private object SnapshotClipboard : SystemClipboard {
 /** The scene of an [actionsSnapshot] with the rows' positions, to hover them. */
 private class ActionsScene(val scene: SnapshotScene, private val controller: AppController) {
   suspend fun hoverRow(name: String, x: Dp = 600.dp) {
+    scene.hover(x, middleOf(name))
+  }
+
+  suspend fun clickRow(name: String, x: Dp) {
+    scene.click(x, middleOf(name))
+  }
+
+  private fun middleOf(name: String): Dp {
     val index = controller.state.taskList.view.value.rows.indexOfFirst { it.name == name }
     val top = CARD_INSET + HEADER + TABS + COLUMN_HEADER
-    scene.hover(x, top + ROW * index + ROW / 2)
+    return top + ROW * index + ROW / 2
   }
 
   suspend fun pressKey(key: Key, shift: Boolean = false) = scene.pressKey(key, shift)
@@ -566,7 +588,7 @@ private fun TableRow(row: TaskRow, actions: ListActions) {
             color = colors.textTertiary,
           )
         }
-        HoverActions(row, frame.hovered, actions.runner)
+        HoverActions(row, frame.hovered, actions.runner, menu = actions.menu)
       }
     }
   }

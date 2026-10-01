@@ -110,4 +110,17 @@ class SelectionBarTest {
     assertEquals(null, skipNote("pause", emptyList()))
     f.close()
   }
+
+  @Test
+  fun skipNote_resume_namesWhyEachRowWasLeftAlone() = runTest {
+    val f = ActionsFixture(this)
+    val rows = listOf(
+      f.add(downloading),
+      f.add(DownloadState.Failed(KetchError.Network())),
+      f.add(DownloadState.Canceled),
+    ).map { rowOf(it) }
+
+    assertEquals("1 already running · 1 with an error · 1 canceled", skipNote("resume", rows))
+    f.close()
+  }
 }
