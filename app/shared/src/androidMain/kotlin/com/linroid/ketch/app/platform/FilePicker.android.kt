@@ -109,7 +109,7 @@ private class PickRequest<T>(private val canceled: T) {
 }
 
 /** The document at [uri] as a [DroppedFile]; its name is queried now, its content on demand. */
-private fun contentFile(context: Context, uri: Uri): DroppedFile {
+internal fun contentFile(context: Context, uri: Uri): DroppedFile {
   val name = runCatching {
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
       ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }

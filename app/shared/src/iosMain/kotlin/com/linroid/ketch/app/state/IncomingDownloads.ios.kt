@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.state
 
-import com.linroid.ketch.app.util.LinkKind
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
@@ -15,10 +14,11 @@ import platform.Foundation.dataWithContentsOfURL
 import platform.posix.memcpy
 
 /**
- * Takes a URL that iOS opened Ketch with: a `.torrent` file ([offerFile]) or a link Ketch is
- * registered to open, such as a `magnet:` link, which is offered as [IncomingDownload.Links].
+ * Takes a URL that iOS opened Ketch with: a `.torrent` file ([offerFile]), a `magnet:` link,
+ * offered as [IncomingDownload.Links], or a `ketch://pair` link, offered as
+ * [IncomingDownload.Pairing] (see [IncomingDownloads.offerLink]).
  *
- * @return `false` when [url] is neither, such as a `ketch:` link, so the caller can route it.
+ * @return `false` when [url] is none of these, such as another `ketch:` link.
  */
 fun IncomingDownloads.offerUrl(url: NSURL): Boolean {
   if (url.fileURL) {
@@ -26,9 +26,7 @@ fun IncomingDownloads.offerUrl(url: NSURL): Boolean {
     return true
   }
   val link = url.absoluteString ?: return false
-  if (LinkKind.of(link) == LinkKind.Other) return false
-  offerLinks(listOf(link), LinkSource.OpenUrl)
-  return true
+  return offerLink(link, LinkSource.OpenUrl)
 }
 
 /**

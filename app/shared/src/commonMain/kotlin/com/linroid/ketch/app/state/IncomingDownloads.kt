@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
 import kotlinx.coroutines.channels.Channel
@@ -18,7 +19,7 @@ const val MAX_TORRENT_FILE_BYTES: Int = 4 * 1024 * 1024
 
 /**
  * A download handed to the app from outside, such as a file opened from the file manager or a
- * magnet link opened from a browser.
+ * magnet link opened from a browser, or a link that pairs another device.
  */
 sealed interface IncomingDownload {
   /** What the user opened, such as the file name. */
@@ -50,6 +51,23 @@ sealed interface IncomingDownload {
       get() = urls.singleOrNull() ?: "${urls.size} links"
   }
 
+  /**
+   * A link that pairs this app with another device, such as `ketch://pair?host=…#token=…` from a
+   * scanned code. Its token sits in the fragment, which [label] and [toString] leave out.
+   *
+   * @property link the link as it arrived, token included.
+   */
+  class Pairing(val link: String) : IncomingDownload {
+    override val label: String
+      get() = link.substringBefore('#')
+
+    override fun equals(other: Any?): Boolean = other is Pairing && link == other.link
+
+    override fun hashCode(): Int = link.hashCode()
+
+    override fun toString(): String = "Pairing($label)"
+  }
+
   /** The input could not be read; [message] explains why. */
   data class Failed(override val label: String, val message: String) : IncomingDownload
 }
@@ -70,14 +88,24 @@ enum class LinkSource {
 }
 
 /**
+ * Whether [link] pairs this app with another device: a `ketch://pair` link, whose query names
+ * the device and whose fragment holds its token.
+ */
+fun isPairingLink(link: String): Boolean = PAIRING_LINK.containsMatchIn(link.trim())
+
+private val PAIRING_LINK = Regex("^ketch://pair(?:[/?#]|$)", RegexOption.IGNORE_CASE)
+
+/**
  * Downloads opened from outside the app. Platform entry points offer them as they arrive, even
- * before the UI is ready. Each one stays [pending] (links in [pendingLinks]) until the UI
- * [completes][complete] it, so a UI recreated in between (e.g. an Android configuration change)
- * shows it again; keep this object for as long as that UI can be recreated.
+ * before the UI is ready. Each one stays [pending] (links in [pendingLinks], pairing links in
+ * [pendingPairings]) until the UI [completes][complete] it, so a UI recreated in between (e.g. an
+ * Android configuration change) shows it again; keep this object for as long as that UI can be
+ * recreated.
  */
 class IncomingDownloads {
   private val pendingState = MutableStateFlow<List<IncomingDownload.Ready>>(emptyList())
   private val linksState = MutableStateFlow<List<IncomingDownload.Links>>(emptyList())
+  private val pairingState = MutableStateFlow<List<IncomingDownload.Pairing>>(emptyList())
   private val failureChannel = Channel<IncomingDownload.Failed>(Channel.UNLIMITED)
 
   /** Opened downloads waiting for the user, oldest first. */
@@ -85,6 +113,9 @@ class IncomingDownloads {
 
   /** Links handed to the app waiting for the add sheet, oldest first. */
   val pendingLinks: StateFlow<List<IncomingDownload.Links>> = linksState.asStateFlow()
+
+  /** Pairing links waiting for the user to confirm them, oldest first. */
+  val pendingPairings: StateFlow<List<IncomingDownload.Pairing>> = pairingState.asStateFlow()
 
   /** Files that could not be read, each delivered once. Collect from one place only. */
   val failures: Flow<IncomingDownload.Failed> = failureChannel.receiveAsFlow()
@@ -94,6 +125,8 @@ class IncomingDownloads {
     when (download) {
       is IncomingDownload.Ready -> pendingState.update { if (download in it) it else it + download }
       is IncomingDownload.Links -> linksState.update { if (download in it) it else it + download }
+      is IncomingDownload.Pairing ->
+        pairingState.update { if (download in it) it else it + download }
       is IncomingDownload.Failed -> failureChannel.trySend(download)
     }
   }
@@ -108,6 +141,11 @@ class IncomingDownloads {
     linksState.update { it - links }
   }
 
+  /** Marks [pairing] as handled, whether the user connected or declined. */
+  fun complete(pairing: IncomingDownload.Pairing) {
+    pairingState.update { it - pairing }
+  }
+
   /** Offers [urls] that arrived through [source]; blank ones are dropped. */
   fun offerLinks(urls: List<String>, source: LinkSource) {
     val links = urls.map { it.trim() }.filter { it.isNotEmpty() }
@@ -115,15 +153,35 @@ class IncomingDownloads {
   }
 
   /**
+   * Offers one link the app was opened with, by its scheme: a pairing link ([isPairingLink]) as
+   * [IncomingDownload.Pairing], and a link Ketch downloads, such as a `magnet:` link, as
+   * [IncomingDownload.Links].
+   *
+   * @return whether [link] was offered; other links, such as other `ketch:` links, are not.
+   */
+  fun offerLink(link: String, source: LinkSource): Boolean {
+    val trimmed = link.trim()
+    when {
+      isPairingLink(trimmed) -> offer(IncomingDownload.Pairing(trimmed))
+      LinkKind.of(trimmed) == LinkKind.Other -> return false
+      else -> offerLinks(listOf(trimmed), source)
+    }
+    return true
+  }
+
+  /**
    * Offers every link in [text], such as text shared from another app, found as the add sheet
-   * finds them ([LinkParser.parseIntake], with ranges expanded).
+   * finds them ([LinkParser.parseIntake], with ranges expanded). Pairing links among them are
+   * offered as [IncomingDownload.Pairing].
    *
    * @return whether [text] holds a link; when it does not, nothing is offered.
    */
   fun offerText(text: String, source: LinkSource): Boolean {
-    val urls = LinkParser.parseIntake(text).links().map { it.url }
+    val (pairings, urls) = LinkParser.parseIntake(text).links().map { it.url }
+      .partition(::isPairingLink)
+    pairings.forEach { offer(IncomingDownload.Pairing(it)) }
     offerLinks(urls, source)
-    return urls.isNotEmpty()
+    return pairings.isNotEmpty() || urls.isNotEmpty()
   }
 
   /** Offers the contents of a `.torrent` file named [name]. */

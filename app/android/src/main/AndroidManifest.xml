@@ -56,6 +56,46 @@
         <data android:pathPattern=".*\\..*\\..*\\.torrent" />
         <data android:pathPattern=".*\\..*\\..*\\..*\\.torrent" />
       </intent-filter>
+      <!-- magnet: links opened from browsers and other apps. -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="magnet" />
+      </intent-filter>
+      <!-- Pairing codes scanned with the camera: ketch://pair?host=…&port=…#token=… -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data
+          android:host="pair"
+          android:scheme="ketch" />
+      </intent-filter>
+    </activity>
+    <!--
+      Links shared from other apps, or sent from a text selection with "Download with Ketch".
+      Translucent and outside the app's task, so only the add sheet shows over the app that
+      shared, and finishing returns there.
+    -->
+    <activity
+      android:name="com.linroid.ketch.app.android.QuickAddActivity"
+      android:excludeFromRecents="true"
+      android:exported="true"
+      android:label="@string/app_name"
+      android:taskAffinity=""
+      android:theme="@android:style/Theme.Translucent.NoTitleBar"
+      android:windowSoftInputMode="adjustResize">
+      <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+      </intent-filter>
+      <intent-filter android:label="Download with Ketch">
+        <action android:name="android.intent.action.PROCESS_TEXT" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+      </intent-filter>
     </activity>
     <service
       android:name="com.linroid.ketch.app.android.KetchService"
