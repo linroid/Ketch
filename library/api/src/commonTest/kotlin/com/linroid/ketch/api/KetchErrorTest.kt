@@ -44,6 +44,16 @@ class KetchErrorTest {
   }
 
   @Test
+  fun httpMessage_withoutStatusMessage_omitsNull() {
+    assertEquals("HTTP error 403", KetchError.Http(403).message)
+  }
+
+  @Test
+  fun httpMessage_withStatusMessage_appendsIt() {
+    assertEquals("HTTP error 404: Not Found", KetchError.Http(404, "Not Found").message)
+  }
+
+  @Test
   fun http404_isNotRetryable() {
     assertFalse(KetchError.Http(404).isRetryable)
   }
