@@ -83,8 +83,8 @@ internal fun paletteResults(
         { it.recent },
         { it.item.provider },
         { it.match.span },
-        { it.index },
-      ),
+        { it.index }
+      )
     )
     .take(MAX_RESULTS)
   return PaletteResults(ranked.mapIndexed { index, it -> PaletteEntry.Row(it.item, index) })

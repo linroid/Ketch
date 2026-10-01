@@ -149,7 +149,7 @@ private fun linkItems(
           shortcut = if (device.active) null else deviceChord(device, source.platform),
           verb = if (now) "Download" else "Review",
           direct = true,
-        ),
+        )
       )
     }
     add(
@@ -162,7 +162,7 @@ private fun linkItems(
         action = PaletteAction.AddWithOptions(query, source.activeDevice?.deviceId),
         shortcut = alternateKey,
         direct = true,
-      ),
+      )
     )
   }
 }
@@ -292,7 +292,7 @@ private fun downloadItem(
     content.error?.title ?: content.statusText,
     content.size,
     if (row.state is DownloadState.Downloading) content.speed else "",
-    if (manyDevices) row.device.name else "",
+    if (manyDevices) row.device.name else ""
   ).filter { it.isNotBlank() && it != NO_VALUE }.joinToString(" · ")
   return PaletteItem(
     id = "task.${row.key.deviceId}/${row.key.taskId}",
@@ -343,7 +343,7 @@ private fun navigationItems(source: PaletteSource): List<PaletteItem> = buildLis
         icon = PaletteIcon.Glyph(command.icon ?: KetchIcon.All),
         action = PaletteAction.Command(command),
         shortcut = command.shortcutLabel(source.platform),
-      ),
+      )
     )
   }
   for (destination in source.destinations) {
@@ -356,7 +356,7 @@ private fun navigationItems(source: PaletteSource): List<PaletteItem> = buildLis
         icon = PaletteIcon.Glyph(destination.icon),
         action = PaletteAction.Command(destination.command),
         shortcut = destination.command.shortcutLabel(source.platform),
-      ),
+      )
     )
   }
   for (category in source.settings) {
@@ -369,7 +369,7 @@ private fun navigationItems(source: PaletteSource): List<PaletteItem> = buildLis
         icon = PaletteIcon.Glyph(category.icon),
         action = PaletteAction.Settings(category.page),
         keywords = listOf("/${category.title.lowercase()}", category.title),
-      ),
+      )
     )
   }
 }
@@ -386,7 +386,7 @@ private fun deviceItems(source: PaletteSource): List<PaletteItem> {
           icon = PaletteIcon.Glyph(KetchIcon.Fleet),
           action = PaletteAction.Command(KetchCommands.AllDevices),
           shortcut = KetchCommands.AllDevices.shortcutLabel(source.platform),
-        ),
+        )
       )
     }
     for (device in source.devices.filterNot { it.active }) {
@@ -399,7 +399,7 @@ private fun deviceItems(source: PaletteSource): List<PaletteItem> {
           icon = PaletteIcon.Device(device.deviceId, device.name),
           action = PaletteAction.SwitchDevice(device.deviceId),
           shortcut = deviceChord(device, source.platform),
-        ),
+        )
       )
     }
     for (device in source.devices) {
@@ -413,7 +413,7 @@ private fun deviceItems(source: PaletteSource): List<PaletteItem> {
             icon = PaletteIcon.Glyph(verb.icon),
             action = PaletteAction.DeviceBatch(device.deviceId, verb),
             searchOnly = true,
-          ),
+          )
         )
       }
     }
@@ -434,7 +434,7 @@ private fun fallbackItems(source: PaletteSource, query: String): List<PaletteIte
           subtitle = if (matches == 1) "1 match" else "$matches matches",
           icon = PaletteIcon.Glyph(KetchIcon.Search),
           action = PaletteAction.Search(query),
-        ),
+        )
       )
     }
     // Search tokens such as is:failed and a typed speed mean nothing to Discover.
@@ -449,7 +449,7 @@ private fun fallbackItems(source: PaletteSource, query: String): List<PaletteIte
           icon = PaletteIcon.Glyph(KetchIcon.Discover),
           action = PaletteAction.Discover(query),
           shortcut = KetchCommands.PaletteDiscover.shortcutLabel(source.platform),
-        ),
+        )
       )
     }
   }
@@ -499,7 +499,7 @@ private val COMMAND_ORDER: List<KetchCommand> = listOf(
   KetchCommands.Activity,
   KetchCommands.SwitchDevice,
   KetchCommands.Settings,
-  KetchCommands.Shortcuts,
+  KetchCommands.Shortcuts
 )
 
 /** Commands Full speed follows: the last of these the window runs. */
@@ -507,7 +507,7 @@ private val SPEED_ANCHORS: Set<KetchCommand> = setOf(
   KetchCommands.PauseAll,
   KetchCommands.ResumeAll,
   KetchCommands.RetryFailed,
-  KetchCommands.SlowLane,
+  KetchCommands.SlowLane
 )
 
 /** Commands listed elsewhere, or that make no sense from the palette. */
@@ -515,7 +515,7 @@ private val NOT_COMMANDS: Set<KetchCommand> = setOf(
   KetchCommands.Palette,
   KetchCommands.Discover,
   KetchCommands.Devices,
-  KetchCommands.AllDevices,
+  KetchCommands.AllDevices
 )
 
 /** Kinds of link added without the add sheet, like a quick add. */

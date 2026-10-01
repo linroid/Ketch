@@ -28,7 +28,7 @@ class PaletteProvidersTest {
     ListFixtures.row("weights", DownloadState.Failed(KetchError.Http(500))),
     ListFixtures.row("blender", DownloadState.Failed(KetchError.Network())),
     ListFixtures.row("studio", DownloadState.Paused(DownloadProgress(10, 100))),
-    ListFixtures.row("report", DownloadState.Completed("/Users/alex/Downloads/report.bin")),
+    ListFixtures.row("report", DownloadState.Completed("/Users/alex/Downloads/report.bin"))
   )
 
   private fun source(
