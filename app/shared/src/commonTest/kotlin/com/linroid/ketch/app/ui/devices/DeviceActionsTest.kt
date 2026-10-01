@@ -1,0 +1,191 @@
+package com.linroid.ketch.app.ui.devices
+
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.FakeKetchApi
+import com.linroid.ketch.app.instance.DevicePresence
+import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.instance.InstanceFactory
+import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.IntakeRequest
+import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.PulseCounts
+import com.linroid.ketch.app.state.RecordingKetchApi
+import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.state.SpeedModeController
+import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.remote.ConnectionState
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class DeviceActionsTest {
+
+  /** The embedded engine: it keeps the config it is given. */
+  private class Engine : KetchApi by FakeKetchApi() {
+    var config = DownloadConfig()
+
+    override suspend fun updateConfig(config: DownloadConfig) {
+      this.config = config
+    }
+  }
+
+  private class Fixture(
+    val controller: AppController,
+    val nas: InstanceEntry,
+    val speed: SpeedModeController,
+  ) {
+    val state get() = controller.state
+  }
+
+  private fun TestScope.fixture(nasApi: KetchApi): Fixture {
+    val engine = Engine()
+    val speed = SpeedModeController(
+      config = { engine.config },
+      apply = { engine.updateConfig(it) },
+      scope = backgroundScope,
+    )
+    val manager = InstanceManager(
+      factory = InstanceFactory(
+        deviceName = "MacBook Pro",
+        embeddedFactory = { engine },
+        remoteFactory = { config ->
+          RemoteInstance(nasApi, config, MutableStateFlow(ConnectionState.Connected))
+        },
+      ),
+      initialRemotes = listOf(RemoteConfig(host = "nas.local", name = "NAS-Basement")),
+      context = backgroundScope.coroutineContext,
+    )
+    val controller = AppController(
+      instanceManager = manager,
+      context = StandardTestDispatcher(testScheduler),
+      speedMode = speed,
+    )
+    return Fixture(controller, manager.instances.value.first { it is RemoteInstance }, speed)
+  }
+
+  private fun presence(entry: InstanceEntry) = DevicePresence(
+    entry = entry,
+    name = "This Mac",
+    detail = "MacBook Pro",
+    health = DeviceHealth.Local(),
+    connected = true,
+    watched = true,
+    status = null,
+    statusAt = null,
+    lastSeen = null,
+    speed = 0,
+    counts = PulseCounts(),
+    failures = 0,
+    unseenFailures = 0,
+    cap = SpeedLimit.Unlimited,
+    disk = null,
+    speedMode = SpeedMode.Full,
+    history = emptyList(),
+  )
+
+  @Test
+  fun showDeviceTab_failedCountOfTheNas_switchesToItsFailedTab() = runTest {
+    val nas = RecordingKetchApi("NAS")
+    nas.add(DownloadState.Failed(KetchError.Network()))
+    val f = fixture(nas)
+    var shown = 0
+    backgroundScope.launch { f.state.downloadsRequests.collect { shown++ } }
+    runCurrent()
+
+    f.state.showDeviceTab(f.nas, StatusFilter.Failed)
+    runCurrent()
+
+    assertEquals(f.nas.deviceId, f.state.activeInstance.value?.deviceId)
+    assertEquals(StatusFilter.Failed, f.state.statusFilter)
+    assertEquals(1, shown)
+    f.controller.close()
+  }
+
+  @Test
+  fun runNextAction_retryFailedOnTheNas_retriesWithoutSwitching() = runTest {
+    val nas = RecordingKetchApi("NAS")
+    val failed = nas.add(DownloadState.Failed(KetchError.Network()))
+    val f = fixture(nas)
+
+    f.state.runNextAction(f.nas, NextAction.RetryFailed(1))
+    runCurrent()
+
+    assertEquals(listOf("resume"), failed.calls)
+    assertEquals(LOCAL_DEVICE_ID, f.state.activeInstance.value?.deviceId)
+    f.controller.close()
+  }
+
+  @Test
+  fun runNextAction_pauseAllOnTheNas_pausesOnlyThere() = runTest {
+    val nas = RecordingKetchApi("NAS")
+    val waiting = nas.add(DownloadState.Queued)
+    val f = fixture(nas)
+
+    f.state.runNextAction(f.nas, NextAction.PauseAll)
+    runCurrent()
+
+    assertEquals(listOf("pause"), waiting.calls)
+    assertEquals(LOCAL_DEVICE_ID, f.state.activeInstance.value?.deviceId)
+    f.controller.close()
+  }
+
+  @Test
+  fun toggleSlowLane_thisMacWhileTheNasShows_switchesItsModeWithUndo() = runTest {
+    val f = fixture(RecordingKetchApi("NAS"))
+    f.state.switchInstance(f.nas)
+    runCurrent()
+    val local = f.state.instances.value.first { it.deviceId == LOCAL_DEVICE_ID }
+
+    f.state.toggleSlowLane(presence(local))
+    runCurrent()
+
+    assertEquals(SpeedMode.SlowLane, f.speed.mode.value)
+    val message = f.state.messages.history.value.first()
+    assertEquals("Slow lane on · 1 MB/s", message.title)
+    message.actions.single { it.label == "Undo" }.onClick()
+    runCurrent()
+    assertEquals(SpeedMode.Full, f.speed.mode.value)
+    f.controller.close()
+  }
+
+  @Test
+  fun dropText_onTheNasCard_opensTheAddSheetForTheNas() = runTest {
+    val f = fixture(RecordingKetchApi("NAS"))
+
+    f.state.dropText(f.nas, "  https://example.com/ubuntu.iso\n")
+
+    assertTrue(f.state.showAddDialog)
+    assertEquals(
+      IntakeRequest(text = "https://example.com/ubuntu.iso", targetDeviceId = f.nas.deviceId),
+      f.state.intakeRequest
+    )
+    f.controller.close()
+  }
+
+  @Test
+  fun renameDevice_nas_renamesItAtOnce() = runTest {
+    val f = fixture(RecordingKetchApi("NAS"))
+
+    f.state.renameDevice(f.nas, "Basement")
+
+    assertEquals("Basement", f.state.instances.value.first { it is RemoteInstance }.label)
+    f.controller.close()
+  }
+}
