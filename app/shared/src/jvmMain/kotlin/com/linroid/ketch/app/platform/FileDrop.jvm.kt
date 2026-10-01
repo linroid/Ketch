@@ -30,9 +30,13 @@ private object AwtFileDropReader : FileDropReader {
     event.awtTransferable.droppedText()?.let { text -> { text } }
 }
 
-/** Whether a drag carries files or text, judged by its flavors alone. */
+/**
+ * Whether a drag carries files or text from another app, judged by its flavors alone. Rows
+ * dragged out of the list carry their keys as [IN_APP_DRAG_TYPE] beside their files and links.
+ */
 internal fun Transferable.isDroppable(): Boolean =
-  DROP_FLAVORS.any(::isDataFlavorSupported)
+  transferDataFlavors.orEmpty().none { it.isMimeTypeEqual(IN_APP_DRAG_TYPE) } &&
+    DROP_FLAVORS.any(::isDataFlavorSupported)
 
 /**
  * Regular files in a drop; directories are skipped. Some Linux file managers offer files only as
@@ -93,3 +97,6 @@ private val DROP_FLAVORS = listOf(
   URL_FLAVOR,
   DataFlavor.stringFlavor,
 )
+
+/** The type of the task keys that rows dragged out of the Downloads list carry. */
+private const val IN_APP_DRAG_TYPE = "application/x-ketch-tasks"

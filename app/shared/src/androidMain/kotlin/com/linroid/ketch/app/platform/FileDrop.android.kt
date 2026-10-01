@@ -29,7 +29,10 @@ internal actual fun DragExitEffect(onExit: () -> Unit) = Unit
  */
 private class AndroidFileDropReader(private val context: Context) : FileDropReader {
   override fun accepts(event: DragAndDropEvent): Boolean {
-    val description = event.toAndroidDragEvent().clipDescription ?: return false
+    val dragEvent = event.toAndroidDragEvent()
+    // Only drags that start in this app, such as rows dragged out of the list, carry local state.
+    if (dragEvent.localState != null) return false
+    val description = dragEvent.clipDescription ?: return false
     return (0 until description.mimeTypeCount).any {
       description.getMimeType(it) != ClipDescription.MIMETYPE_TEXT_INTENT
     }
