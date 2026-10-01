@@ -72,6 +72,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 sealed interface DiscoveryState {
@@ -113,6 +114,7 @@ val InstanceEntry.deviceId: String
  * @param scope runs the commands; it should use a `SupervisorJob` and the main dispatcher.
  * @param speedMode speed mode of the embedded device, owned by the host, such as the service whose
  *   notification switches it; `null` when the host keeps none.
+ * @param clock current time of the task list and the speed history.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppState(
@@ -123,6 +125,7 @@ class AppState(
   private val incoming: IncomingDownloads = IncomingDownloads(),
   val messages: MessageCenter = MessageCenter(),
   val speedMode: SpeedModeController? = null,
+  clock: Clock = Clock.System,
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()
@@ -309,10 +312,11 @@ class AppState(
     query = searchState.flow,
     arrangement = arrangementState.flow,
     frozen = frozenState.flow,
+    clock = clock,
   )
 
   /** Speed of each task once a second, for the inspector's Activity chart. */
-  val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.rows, scope)
+  val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.rows, scope, clock)
 
   /** Speed, counts, speed limit, free space and health of the active device. */
   val pulse: PulseModel = PulseModel(

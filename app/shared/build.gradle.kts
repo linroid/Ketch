@@ -121,6 +121,10 @@ kotlin {
     wasmJsMain.dependencies {
       implementation(libs.ktor.client.js)
     }
+    jvmTest.dependencies {
+      // Skia for this machine, which the snapshot harness renders with.
+      implementation(compose.desktop.currentOs)
+    }
   }
 }
 
@@ -137,4 +141,16 @@ tasks.named<Test>("jvmTest") {
   inputs.dir("src/commonMain/kotlin")
     .withPropertyName("tokenGuardSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // `-Psnapshots` renders the UI snapshot scenarios to build/snapshots; without it they skip.
+  val snapshots = providers.gradleProperty("snapshots").map { it != "false" }.getOrElse(false)
+  inputs.property("snapshots", snapshots)
+  if (snapshots) {
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+    systemProperty("ketch.snapshots", "true")
+    systemProperty("ketch.snapshots.dir", layout.buildDirectory.dir("snapshots").get().asFile.path)
+    // No window, no Dock icon and no reading the real clipboard.
+    systemProperty("java.awt.headless", "true")
+  }
 }
