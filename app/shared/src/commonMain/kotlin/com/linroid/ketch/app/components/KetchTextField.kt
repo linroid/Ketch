@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
@@ -53,6 +54,7 @@ import com.linroid.ketch.app.theme.KetchTheme
  * @param trailing extra content at the end of the field, such as a unit toggle.
  * @param textStyle overrides the text style picked by [mono].
  * @param onFocusChange runs when the field gains or loses focus, for commit-on-blur.
+ * @param visualTransformation changes how the text shows, such as masking a password.
  */
 @Composable
 fun KetchTextField(
@@ -74,6 +76,7 @@ fun KetchTextField(
   keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
   keyboardActions: KeyboardActions = KeyboardActions.Default,
   onFocusChange: (Boolean) -> Unit = {},
+  visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
   val interactions = remember { MutableInteractionSource() }
   val style = fieldTextStyle(mono, textStyle)
@@ -96,6 +99,7 @@ fun KetchTextField(
       cursorBrush = SolidColor(KetchTheme.colors.accent),
       keyboardOptions = keyboardOptions,
       keyboardActions = keyboardActions,
+      visualTransformation = visualTransformation,
       interactionSource = interactions,
       modifier = fieldModifier,
       decorationBox = { inner ->
@@ -143,6 +147,7 @@ fun KetchTextField(
   keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
   keyboardActions: KeyboardActions = KeyboardActions.Default,
   onFocusChange: (Boolean) -> Unit = {},
+  visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
   val interactions = remember { MutableInteractionSource() }
   val style = fieldTextStyle(mono, textStyle)
@@ -165,6 +170,7 @@ fun KetchTextField(
       cursorBrush = SolidColor(KetchTheme.colors.accent),
       keyboardOptions = keyboardOptions,
       keyboardActions = keyboardActions,
+      visualTransformation = visualTransformation,
       interactionSource = interactions,
       modifier = fieldModifier,
       decorationBox = { inner ->
