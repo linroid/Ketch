@@ -35,10 +35,11 @@ data class ShortcutContext(
  * modifier.
  *
  * The open overlay's chords come first, then the list's, then the global ones. Overlay chords
- * wait while an input method composes. List chords need the list to have focus, with no text
- * field, composition or menu active. Global chords always run, except chords a focused text
- * field keeps: those of commands that [KetchCommand.yieldsToTextField] and those that would type
- * a character, such as the web app's single keys.
+ * wait while an input method composes or a menu is open, and a global command never runs in
+ * their place. List chords need the list to have focus, with no text field, composition or menu
+ * active. Global chords always run, except chords a focused text field keeps: those of commands
+ * that [KetchCommand.yieldsToTextField] and those that would type a character, such as the web
+ * app's single keys.
  *
  * @param platform keyboard conventions to match with.
  * @param commands commands to match; a chord bound twice in one scope runs the first.
@@ -66,8 +67,10 @@ class ShortcutMatcher(
   /** The command [press] runs in [context], or `null` when it runs none. */
   fun match(press: KeyPress, context: ShortcutContext): KetchCommand? {
     val overlay = context.overlay
-    if (overlay != null && !context.composing) {
-      find(overlay, press)?.let { return it.command }
+    if (overlay != null) {
+      val binding = find(overlay, press)
+      val waits = context.composing || context.menuOpen
+      if (binding != null) return if (waits) null else binding.command
     }
     val listActive = overlay == null && context.listFocused && !context.textFieldFocused &&
       !context.composing && !context.menuOpen

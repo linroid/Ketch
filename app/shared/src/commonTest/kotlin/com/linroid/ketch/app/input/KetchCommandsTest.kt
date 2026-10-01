@@ -43,6 +43,15 @@ class KetchCommandsTest {
   }
 
   @Test
+  fun all_listChordsOnEachPlatform_neverHideGlobalChords() {
+    for (platform in KeyboardPlatform.entries) {
+      val hidden = presses(CommandScope.List, platform) intersect
+        presses(CommandScope.Global, platform)
+      assertTrue(hidden.isEmpty(), "$platform list chords hide global ones: $hidden")
+    }
+  }
+
+  @Test
   fun all_everyCommand_hasLabel() {
     KetchCommands.all.forEach { command ->
       assertTrue(command.label.isNotBlank(), "${command.id} has no label")
@@ -166,6 +175,11 @@ class KetchCommandsTest {
   fun byId_unknownId_returnsNull() {
     assertNull(KetchCommands.byId("nope"))
   }
+
+  private fun presses(scope: CommandScope, platform: KeyboardPlatform): Set<KeyPress> =
+    KetchCommands.all.filter { it.scope == scope }
+      .flatMap { command -> command.chords(platform).map { it.resolve(platform) } }
+      .toSet()
 
   private fun assertLabels(
     command: KetchCommand,

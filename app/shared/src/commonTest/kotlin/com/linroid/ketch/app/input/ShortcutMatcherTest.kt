@@ -87,6 +87,14 @@ class ShortcutMatcherTest {
   }
 
   @Test
+  fun match_webMacOptionDigitWhileTyping_returnsNull() {
+    val webMac = ShortcutMatcher(KeyboardPlatform.WebMac)
+    val press = KeyPress(Key.One, alt = true)
+    assertSame(KetchCommands.tab(StatusFilter.All), webMac.match(press, idle))
+    assertNull(webMac.match(press, typing))
+  }
+
+  @Test
   fun match_browserReservedChordOnWeb_returnsNull() {
     assertNull(webPc.match(KeyPress(Key.N, ctrl = true), idle))
     assertNull(webPc.match(KeyPress(Key.One, ctrl = true), idle))
@@ -111,6 +119,21 @@ class ShortcutMatcherTest {
   @Test
   fun match_overlayWhileComposing_returnsNull() {
     assertNull(mac.match(KeyPress(Key.Enter), intake.copy(composing = true)))
+  }
+
+  @Test
+  fun match_overlayChordWhileComposingOrInMenu_neverRunsGlobalCommand() {
+    val target = KeyPress(Key.Two, meta = true, alt = true)
+    assertNull(mac.match(target, intake.copy(composing = true)))
+    assertNull(mac.match(target, intake.copy(menuOpen = true)))
+    assertNull(mac.match(KeyPress(Key.O, meta = true), intake.copy(composing = true)))
+  }
+
+  @Test
+  fun match_overlayWithMenuOpen_leavesKeysToMenu() {
+    val menu = ShortcutContext(overlay = CommandScope.Palette, menuOpen = true)
+    assertNull(mac.match(KeyPress(Key.Escape), menu))
+    assertNull(mac.match(KeyPress(Key.Enter), intake.copy(menuOpen = true)))
   }
 
   @Test
