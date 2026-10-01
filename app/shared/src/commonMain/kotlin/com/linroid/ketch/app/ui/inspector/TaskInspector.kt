@@ -2,23 +2,46 @@ package com.linroid.ketch.app.ui.inspector
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
-import com.linroid.ketch.app.components.KetchIconButton
-import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.components.KetchSegmented
+import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.LocalAppState
+import com.linroid.ketch.app.state.RowAction
+import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.downloads.actions.RowActionDialogs
+import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
+import com.linroid.ketch.app.ui.downloads.actions.rememberRowActionRunner
+import com.linroid.ketch.app.ui.downloads.actions.sendTargets
+import com.linroid.ketch.app.ui.inspector.tabs.ActivityTab
+import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
+import com.linroid.ketch.app.ui.inspector.tabs.FilesTab
+import com.linroid.ketch.app.ui.inspector.tabs.InspectorTab
+import com.linroid.ketch.app.ui.inspector.tabs.count
+import com.linroid.ketch.app.ui.inspector.tabs.rememberInspectorTabs
+import com.linroid.ketch.app.ui.pulse.switchSpeedMode
+import com.linroid.ketch.config.SpeedLimitMode
 
 /** Where the task inspector shows. */
 enum class InspectorPlacement {
@@ -33,8 +56,13 @@ enum class InspectorPlacement {
 }
 
 /**
- * What the inspector shows about the task [taskKey]: its name, status and progress. The docked,
- * overlay and sheet containers belong to the Downloads page, which places this inside them.
+ * The inspector's content; the docked, overlay and sheet containers belong to the Downloads
+ * page, which places this inside them. It scrolls on its own.
+ *
+ * With two or more rows selected it sums them up and offers their shared Controls. Otherwise it
+ * shows the task of [taskKey]: its header with the lane strip, metric and reason lines, the
+ * action bar, and the tabs: Overview (problem card, Controls and Details), Connections or Files,
+ * and Activity. With neither, it gives an overview of the active device.
  *
  * @param placement the container this is shown in.
  * @param onClose closes the inspector.
@@ -45,49 +73,149 @@ fun TaskInspector(
   taskKey: TaskKey?,
   placement: InspectorPlacement,
   onClose: () -> Unit,
+  modifier: Modifier = Modifier,
 ) {
-  val rows by state.taskList.rows.collectAsState()
-  val row = remember(rows, taskKey) { taskKey?.let { key -> rows.firstOrNull { it.key == key } } }
-  val spacing = KetchTheme.spacing
-  val padding = if (placement == InspectorPlacement.Sheet) spacing.s4 else spacing.s3
-  Column(
-    modifier = Modifier.fillMaxWidth().padding(padding),
-    verticalArrangement = Arrangement.spacedBy(spacing.s2),
-  ) {
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
-    ) {
-      Text(
-        text = row?.name ?: "No download selected",
-        style = KetchTheme.typography.titleM,
-        color = KetchTheme.colors.textPrimary,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f),
-      )
-      KetchIconButton(icon = KetchIcon.Close, contentDescription = "Close", onClick = onClose)
-    }
-    if (row != null) Summary(row)
+  CompositionLocalProvider(LocalAppState provides state) {
+    InspectorContent(state, taskKey, placement, onClose, rememberRowActionRunner(), modifier)
   }
 }
 
+/** [TaskInspector] running its actions through [runner]. */
 @Composable
-private fun Summary(row: TaskRow) {
-  val content = row.content
-  val colors = KetchTheme.colors
-  val type = KetchTheme.typography
-  Text(text = content.statusText, style = type.bodyStrong, color = colors.textPrimary)
-  if (content.detail.isNotEmpty()) {
-    Text(text = content.detail, style = type.bodyS, color = colors.textSecondary)
+internal fun InspectorContent(
+  state: AppState,
+  taskKey: TaskKey?,
+  placement: InspectorPlacement,
+  onClose: () -> Unit,
+  runner: RowActionRunner,
+  modifier: Modifier = Modifier,
+) {
+  val rows by state.taskList.rows.collectAsState()
+  val pending by state.pending.collectAsState()
+  val selectedKeys = state.selectedKeys
+  val selection = remember(rows, selectedKeys) {
+    if (selectedKeys.size < 2) emptyList() else rows.filter { it.key in selectedKeys }
   }
-  val numbers = listOf(content.size, content.speed, content.time).filter { it.isNotEmpty() }
-  if (numbers.isNotEmpty()) {
-    Text(text = numbers.joinToString(" · "), style = type.caption, color = colors.textTertiary)
+  val row = remember(rows, taskKey) { taskKey?.let { key -> rows.firstOrNull { it.key == key } } }
+  val spacing = KetchTheme.spacing
+  val padding = if (placement == InspectorPlacement.Sheet) {
+    KetchTheme.density.pagePadding
+  } else {
+    spacing.s4
   }
-  Text(
-    text = "${row.device.name} · Added ${content.added}",
-    style = type.caption,
-    color = colors.textTertiary,
+  // The tab stays as other downloads are inspected; the scroll position starts over.
+  var tab by rememberSaveable { mutableStateOf(InspectorTab.Overview) }
+  val shows = when {
+    selection.size >= 2 -> "selection"
+    row != null -> row.key
+    else -> "overview"
+  }
+  key(shows) {
+    Column(
+      verticalArrangement = Arrangement.spacedBy(spacing.s4),
+      modifier = modifier
+        .fillMaxWidth()
+        .verticalScroll(rememberScrollState())
+        .padding(padding),
+    ) {
+      when {
+        selection.size >= 2 -> SelectionSummary(state, selection, runner, pending, onClose)
+        row != null -> TaskView(state, row, runner, pending, tab, { tab = it }, onClose)
+        else -> ScopeOverview(state, onClose)
+      }
+    }
+  }
+  RowActionDialogs(runner)
+}
+
+@Composable
+private fun TaskView(
+  state: AppState,
+  row: TaskRow,
+  runner: RowActionRunner,
+  pending: Set<Pair<TaskKey, String>>,
+  tab: InspectorTab,
+  onTab: (InspectorTab) -> Unit,
+  onClose: () -> Unit,
+) {
+  val pulse by state.pulse.state.collectAsState()
+  val rates by state.speedHistory.rates.collectAsState()
+  val instances by state.instances.collectAsState()
+  val device = rememberDeviceLabel(state, row)
+  val copier = rememberCopier(state)
+  val cap = pulse.devices.firstOrNull { it.deviceId == row.key.deviceId }?.cap
+    ?: SpeedLimit.Unlimited
+  val slowLane = row.key.deviceId == LOCAL_DEVICE_ID && pulse.mode.isSlowLane
+  val reason = inspectorReason(row, slowLane, cap, runner.isFileMissing(row))
+  val stalled = remember(rates, row.key) {
+    rates[row.key].orEmpty().filter { it.stalledFor != null }.mapTo(HashSet()) { it.start }
+  }
+  val targets = remember(instances, row.key) { sendTargets(instances, listOf(row)) }
+  var highlight by remember { mutableStateOf<Long?>(null) }
+  LaunchedEffect(row.state is DownloadState.Completed) { runner.checkFile(row) }
+
+  TaskHeader(
+    row = row,
+    device = device,
+    reason = reason,
+    highlight = highlight,
+    stalled = stalled,
+    onReason = { action -> runReason(state, row, runner, action) },
+    onCopyName = {
+      copier.copy(row.name, "name") { state.messages.post(MessageLevel.Success, "Copied the name") }
+    },
+    onClose = onClose,
   )
+  ActionBar(state, row, runner, targets)
+  val tabs = rememberInspectorTabs(state, row)
+  val shown = if (tab in tabs) tab else InspectorTab.Overview
+  if (tabs.size > 1) {
+    KetchSegmented(
+      options = tabs,
+      selected = shown,
+      onSelect = onTab,
+      label = { it.title },
+      count = { it.count(row) },
+    )
+  }
+  when (shown) {
+    InspectorTab.Overview -> Overview(state, row, device, runner, pending, copier)
+    InspectorTab.Connections -> ConnectionsTab(state, row, onHighlight = { highlight = it })
+    InspectorTab.Files -> FilesTab(row)
+    InspectorTab.Activity -> ActivityTab(state, row)
+  }
+}
+
+/** The Overview tab: the problem of a failed download, its Controls and its Details. */
+@Composable
+private fun Overview(
+  state: AppState,
+  row: TaskRow,
+  device: DeviceLabel,
+  runner: RowActionRunner,
+  pending: Set<Pair<TaskKey, String>>,
+  copier: Copier,
+) {
+  val error = row.content.error
+  if (row.state is DownloadState.Failed && error != null) {
+    ProblemCard(row, error, runner, inBar = setOfNotNull(runner.primary(row)))
+  }
+  if (row.state.hasControls) InspectorControls(state, listOf(row), runner, pending)
+  TaskDetails(state, row, device, runner, copier)
+}
+
+private fun runReason(
+  state: AppState,
+  row: TaskRow,
+  runner: RowActionRunner,
+  action: ReasonAction,
+) {
+  when (action) {
+    ReasonAction.Reconnect -> runner.run(RowAction.Reconnect, listOf(row))
+    ReasonAction.FullSpeed -> state.switchSpeedMode(SpeedLimitMode.Full)
+    ReasonAction.RemoveLimit -> runner.setSpeedLimit(listOf(row), SpeedLimit.Unlimited)
+    ReasonAction.SpeedSettings -> {
+      state.openSettings(SettingsTarget(SettingsTarget.Page.Speed, row.key.deviceId))
+    }
+  }
 }
