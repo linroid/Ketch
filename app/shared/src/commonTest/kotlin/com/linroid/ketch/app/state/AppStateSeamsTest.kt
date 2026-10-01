@@ -16,11 +16,13 @@ import com.linroid.ketch.app.ui.intake.initialUrl
 import com.linroid.ketch.config.KetchConfig
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -104,6 +106,50 @@ class AppStateSeamsTest {
       "https://example.com/ubuntu.iso",
       initialUrl(assertNotNull(state.intakeRequest))
     )
+  }
+
+  @Test
+  fun addDroppedText_whileTheDialogShowsAnotherLink_dropsItsResolution() = runTest {
+    val state = appState()
+    state.openIntake()
+    state.resolveUrl("https://example.com/a.iso")
+    runCurrent()
+    assertIs<ResolveState.Error>(state.resolveState)
+
+    state.addDroppedText("https://example.com/b.iso")
+
+    assertEquals(ResolveState.Idle, state.resolveState)
+    assertEquals("https://example.com/b.iso", initialUrl(assertNotNull(state.intakeRequest)))
+  }
+
+  @Test
+  fun incomingFile_whileTheDialogShowsALink_resolvesTheFile() = runTest {
+    val api = FakeKetchApi()
+    val incoming = IncomingDownloads()
+    val state = appState(api = api, incoming = incoming)
+    state.addDroppedText("https://example.com/a.iso")
+    runCurrent()
+
+    incoming.offer(IncomingDownload.Ready("b.torrent", byteArrayOf(1)))
+    runCurrent()
+
+    assertEquals("b.torrent", state.droppedFile?.name)
+    assertEquals("b.torrent", api.lastResolvedFileName)
+  }
+
+  @Test
+  fun pulse_removedTask_leavesTheCounts() = runTest {
+    val api = RecordingKetchApi()
+    val task = api.add(DownloadState.Downloading(RecordingTask.PROGRESS))
+    val state = appState(api = api)
+    runCurrent()
+    assertEquals(1, state.pulse.state.value.counts.downloading)
+
+    state.remove(listOf(task))
+    advanceTimeBy(PulseModel.UPDATE_INTERVAL)
+    runCurrent()
+
+    assertEquals(0, state.pulse.state.value.counts.downloading)
   }
 
   @Test

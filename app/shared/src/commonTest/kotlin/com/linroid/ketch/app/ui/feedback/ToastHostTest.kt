@@ -59,4 +59,24 @@ class ToastHostTest {
 
     assertEquals(listOf(3L, 4L, 5L), visibleToasts(active).map { it.id })
   }
+
+  @Test
+  fun overflowingToasts_pushedOffTheStack_dismissesTimedOnesAndKeepsErrors() {
+    val active = listOf(
+      message(id = 1, level = MessageLevel.Success),
+      message(id = 2, level = MessageLevel.Error),
+      message(id = 3, level = MessageLevel.Success),
+      message(id = 4, level = MessageLevel.Info),
+      message(id = 5, level = MessageLevel.Success),
+    )
+
+    assertEquals(listOf(1L), overflowingToasts(active).map { it.id })
+  }
+
+  @Test
+  fun overflowingToasts_threeOrFewer_isEmpty() {
+    val active = (1L..3L).map { message(id = it, level = MessageLevel.Success) }
+
+    assertEquals(emptyList(), overflowingToasts(active))
+  }
 }

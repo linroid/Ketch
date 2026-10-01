@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -29,6 +30,7 @@ import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
+import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
 import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
@@ -83,6 +85,19 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
   val serverState by appState.serverState.collectAsState()
   val counts by appState.taskList.counts.collectAsState()
   val pulse by appState.pulse.state.collectAsState()
+
+  // A recreated Android activity builds a new controller; the list's tab and search come back.
+  var savedFilter by rememberSaveable { mutableStateOf(appState.statusFilter.name) }
+  var savedQuery by rememberSaveable { mutableStateOf(appState.searchQuery) }
+  LaunchedEffect(appState) {
+    appState.statusFilter = StatusFilter.entries.firstOrNull { it.name == savedFilter }
+      ?: appState.statusFilter
+    appState.searchQuery = savedQuery
+    snapshotFlow { appState.statusFilter to appState.searchQuery }.collect { (filter, query) ->
+      savedFilter = filter.name
+      savedQuery = query
+    }
+  }
 
   // Use the full sidebar when it fits; otherwise keep the destinations in
   // the bottom bar instead of a sparse rail that squeezes the content.
@@ -208,7 +223,7 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
             )
           }
 
-          Box(modifier = Modifier.weight(1f)) {
+          Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
             when {
               settingsOpen && !showSidebar ->
                 SettingsHost(appState, settingsRequest, onClose = closeSettings)

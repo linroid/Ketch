@@ -334,8 +334,8 @@ class AppState(
           openedDownload != null || openedLinks != null -> Unit
           file != null -> {
             openedDownload = file
-            resolveDroppedFile(DroppedFile(file.label) { file.content })
             openIntake(intakeRequest ?: IntakeRequest())
+            resolveDroppedFile(DroppedFile(file.label) { file.content })
           }
           links != null -> {
             openedLinks = links
@@ -406,12 +406,16 @@ class AppState(
     instanceSettings.loadDownload()
   }
 
-  /** Opens the add sheet with [request]; asks for a device first when none is connected. */
+  /**
+   * Opens the add sheet with [request]; asks for a device first when none is connected. Another
+   * request starts a fresh form, without the link or file the last one resolved.
+   */
   fun openIntake(request: IntakeRequest = IntakeRequest()) {
     if (activeInstance.value == null) {
       showAddRemoteDialog = true
       return
     }
+    if (request != intakeRequest) resetResolveState()
     intakeRequest = request
     showAddDialog = true
   }

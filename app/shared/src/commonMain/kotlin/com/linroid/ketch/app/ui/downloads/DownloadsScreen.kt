@@ -90,8 +90,6 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
   val hasPaused = (counts[StatusFilter.Paused] ?: 0) > 0
   val hasCompleted = (counts[StatusFilter.Done] ?: 0) > 0
   val shown = remember(view) { view.rows.map { it.task } }
-  // Rows arrive shortly after the tasks; until then the list stays blank rather than empty.
-  val loading = rows.isEmpty() && tasks.isNotEmpty()
 
   Column(modifier) {
     if (layout.tier == LayoutTier.Compact) {
@@ -135,8 +133,9 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
     DownloadList(
       tasks = shown,
       onAddDownload = { state.requestAddDownload() },
+      // Rows arrive shortly after the tasks; until then the list stays blank rather than empty.
       isEmpty = tasks.isEmpty(),
-      isFilterEmpty = !loading && view.rows.isEmpty() && rows.isNotEmpty(),
+      isFilterEmpty = view.rows.isEmpty() && rows.isNotEmpty(),
       selectedFilter = filter,
       onShowAllDownloads = { state.statusFilter = StatusFilter.All },
       onClearSearch = { state.searchQuery = "" },

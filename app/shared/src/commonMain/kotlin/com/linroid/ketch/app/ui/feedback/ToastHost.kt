@@ -3,12 +3,14 @@ package com.linroid.ketch.app.ui.feedback
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.linroid.ketch.app.components.KetchToast
+import com.linroid.ketch.app.components.toastDuration
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.theme.KetchTheme
@@ -18,11 +20,16 @@ import com.linroid.ketch.app.util.toCopy
  * Shows the active messages of [messages] as toasts, at most [MAX_TOASTS] stacked with the newest
  * at the bottom. Place it at the bottom center of the content, above the status bar.
  *
+ * A timed toast that newer ones push off the stack is dismissed, so it never comes back later
+ * with an Undo that has expired; one that stays until dismissed, such as an error, waits for room.
  * Banners show here as toasts too, until the app has a place for them.
  */
 @Composable
 fun ToastHost(messages: MessageCenter, modifier: Modifier = Modifier) {
   val active by messages.active.collectAsState()
+  LaunchedEffect(active) {
+    overflowingToasts(active).forEach { messages.dismiss(it.id) }
+  }
   Column(
     modifier = modifier,
     verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
@@ -42,6 +49,10 @@ fun ToastHost(messages: MessageCenter, modifier: Modifier = Modifier) {
 
 /** The toasts on screen: the newest [MAX_TOASTS] of [active], oldest first. */
 internal fun visibleToasts(active: List<AppMessage>): List<AppMessage> = active.takeLast(MAX_TOASTS)
+
+/** Timed toasts of [active] that newer ones push off the stack. */
+internal fun overflowingToasts(active: List<AppMessage>): List<AppMessage> =
+  active.dropLast(MAX_TOASTS).filter { toastDuration(it) != null }
 
 /**
  * Second line of the toast for [message]. A failure reads as the error catalog explains it
