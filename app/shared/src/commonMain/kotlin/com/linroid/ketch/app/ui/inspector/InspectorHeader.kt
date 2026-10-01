@@ -51,6 +51,7 @@ import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
@@ -61,12 +62,12 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
-import com.linroid.ketch.app.ui.downloads.actions.SendTarget
 import com.linroid.ketch.app.ui.downloads.actions.command
 import com.linroid.ketch.app.ui.downloads.actions.icon
 import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.downloads.actions.sendEntries
+import com.linroid.ketch.app.ui.downloads.actions.sendTargets
 import com.linroid.ketch.app.ui.inspector.tabs.formatSize
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
 import kotlinx.coroutines.delay
@@ -340,7 +341,8 @@ private fun reasonIcon(row: TaskRow, reason: InspectorReason): KetchIcon = when 
  * The action bar: the one or two things to do now for [row]'s state, Send to while it
  * downloads, then "⋯" with the rest of its actions, leaving out those the Controls set.
  *
- * @param targets other devices it can be sent to.
+ * @param instances the devices; the others are offered in Send to, with their health when a menu
+ *   opens.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -348,7 +350,7 @@ internal fun ActionBar(
   state: AppState,
   row: TaskRow,
   runner: RowActionRunner,
-  targets: List<SendTarget>,
+  instances: List<InstanceEntry>,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -356,7 +358,8 @@ internal fun ActionBar(
   val missing = runner.isFileMissing(row)
   val remote = row.device.capabilities.isRemote
   val buttons = barActions(row, runner, missing)
-  val sendInBar = row.state is DownloadState.Downloading && targets.isNotEmpty()
+  val canSend = instances.any { it.deviceId != row.key.deviceId }
+  val sendInBar = row.state is DownloadState.Downloading && canSend
   FlowRow(
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     verticalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -394,9 +397,9 @@ internal fun ActionBar(
         leadingIcon = KetchIcon.Open,
       )
     }
-    if (sendInBar) SendToButton(row, runner, targets)
+    if (sendInBar) SendToButton(row, runner, instances)
     val inBar = if (sendInBar) buttons + RowAction.SendTo else buttons
-    MoreButton(row, runner, targets, exclude = inBar.toSet() + InControls)
+    MoreButton(row, runner, instances.takeIf { canSend }, exclude = inBar.toSet() + InControls)
   }
 }
 
@@ -431,7 +434,7 @@ private val InControls = setOf(
 )
 
 @Composable
-private fun SendToButton(row: TaskRow, runner: RowActionRunner, targets: List<SendTarget>) {
+private fun SendToButton(row: TaskRow, runner: RowActionRunner, instances: List<InstanceEntry>) {
   var open by remember { mutableStateOf(false) }
   Box {
     KetchButton(
@@ -441,17 +444,20 @@ private fun SendToButton(row: TaskRow, runner: RowActionRunner, targets: List<Se
       leadingIcon = KetchIcon.Devices,
     )
     KetchMenu(expanded = open, onDismissRequest = { open = false }, title = "Send to") {
-      sendEntries(listOf(row), runner, targets)
+      sendEntries(listOf(row), runner, sendTargets(instances, listOf(row)))
     }
   }
 }
 
-/** "⋯" with the actions of [row] that are not [exclude]d, destructive ones last. */
+/**
+ * "⋯" with the actions of [row] that are not [exclude]d, destructive ones last. Send to lists the
+ * other [instances]; it is left out when there are none (`null`).
+ */
 @Composable
 private fun MoreButton(
   row: TaskRow,
   runner: RowActionRunner,
-  targets: List<SendTarget>,
+  instances: List<InstanceEntry>?,
   exclude: Set<RowAction>,
 ) {
   var open by remember { mutableStateOf(false) }
@@ -478,8 +484,10 @@ private fun MoreButton(
           destructive = true
         }
         if (action == RowAction.SendTo) {
-          if (targets.isNotEmpty()) {
-            submenu(action.label, action.icon) { sendEntries(listOf(row), runner, targets) }
+          if (instances != null) {
+            submenu(action.label, action.icon) {
+              sendEntries(listOf(row), runner, sendTargets(instances, listOf(row)))
+            }
           }
           continue
         }
