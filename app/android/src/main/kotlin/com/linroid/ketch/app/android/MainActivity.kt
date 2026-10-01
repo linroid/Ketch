@@ -14,6 +14,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -97,35 +98,48 @@ class MainActivity : ComponentActivity() {
 
   override fun onDestroy() {
     super.onDestroy()
-    // Dismissed without an answer, the offer is made again after a later add.
+    // Dismissed without an answer, the offer shows again in the recreated activity.
     notificationRationale?.dismiss()
     unbindService(connection)
   }
 
   /**
    * Offers notifications once, when the first task is added to this device, instead of at
-   * launch. Tasks restored from the previous run do not count.
+   * launch. Tasks restored from the previous run do not count. The offer stays due until it is
+   * answered, so a rotation or a restart while it shows brings it back.
    */
   private fun offerNotificationsAfterFirstAdd(manager: InstanceManager) {
-    if (!shouldOfferNotifications()) return
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !shouldOfferNotifications()) {
+      return
+    }
     val tasks = manager.embedded?.tasks ?: return
     val since = Clock.System.now()
     notificationOffer?.cancel()
     notificationOffer = lifecycleScope.launch {
-      tasks.first { list -> list.any { it.createdAt >= since } }
+      if (!permissionPrefs.getBoolean(KEY_NOTIFICATIONS_DUE, false)) {
+        tasks.first { list -> list.any { it.createdAt >= since } }
+        permissionPrefs.edit { putBoolean(KEY_NOTIFICATIONS_DUE, true) }
+      }
       withStarted { showNotificationRationale() }
     }
   }
 
-  private fun shouldOfferNotifications(): Boolean =
-    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-      checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-      PackageManager.PERMISSION_GRANTED &&
+  @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+  private fun shouldOfferNotifications(): Boolean {
+    val permission = Manifest.permission.POST_NOTIFICATIONS
+    return checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED &&
       !permissionPrefs.getBoolean(KEY_NOTIFICATIONS_OFFERED, false)
+  }
 
+  @RequiresApi(Build.VERSION_CODES.TIRAMISU)
   private fun showNotificationRationale() {
     if (!shouldOfferNotifications()) return
-    val answered = { permissionPrefs.edit { putBoolean(KEY_NOTIFICATIONS_OFFERED, true) } }
+    val answered = {
+      permissionPrefs.edit {
+        putBoolean(KEY_NOTIFICATIONS_OFFERED, true)
+        remove(KEY_NOTIFICATIONS_DUE)
+      }
+    }
     notificationRationale = AlertDialog.Builder(this, dialogTheme())
       .setTitle("Get notified when downloads finish")
       .setMessage("Ketch can tell you when a download finishes or fails while you use other apps.")
@@ -161,5 +175,6 @@ class MainActivity : ComponentActivity() {
   private companion object {
     const val PERMISSION_PREFS = "permissions"
     const val KEY_NOTIFICATIONS_OFFERED = "notifications_offered"
+    const val KEY_NOTIFICATIONS_DUE = "notifications_due"
   }
 }

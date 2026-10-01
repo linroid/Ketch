@@ -33,9 +33,9 @@ import kotlin.time.Instant
 class ForegroundPolicyTest {
 
   private val downloading = DownloadState.Downloading(
-    DownloadProgress(downloadedBytes = 100, totalBytes = 1000, bytesPerSecond = 50),
+    DownloadProgress(downloadedBytes = 100, totalBytes = 1000, bytesPerSecond = 50)
   )
-  private val running = ServerState.Running(ServerConfig())
+  private val running = ServerState.Running(ServerConfig(port = 9000, apiToken = "secret"))
   private val stopped: ServerState = ServerState.Stopped
 
   @Test
@@ -51,14 +51,16 @@ class ForegroundPolicyTest {
       DownloadState.Paused(DownloadProgress(downloadedBytes = 100, totalBytes = 1000)),
       DownloadState.Completed("/downloads/file.iso", totalBytes = 1000),
       DownloadState.Failed(KetchError.Network()),
-      DownloadState.Canceled,
+      DownloadState.Canceled
     )
     assertFalse(ForegroundPolicy.evaluate(idle, stopped).isRequired)
   }
 
   @Test
-  fun evaluate_serverRunningWithoutTasks_isRequired() {
-    assertTrue(ForegroundPolicy.evaluate(emptyList(), running).isRequired)
+  fun evaluate_serverRunningWithoutTasks_isRequiredWithPortOnly() {
+    val status = ForegroundPolicy.evaluate(emptyList(), running)
+    assertTrue(status.isRequired)
+    assertEquals(ForegroundStatus(serverPort = 9000), status)
   }
 
   @Test
@@ -108,6 +110,20 @@ class ForegroundPolicyTest {
     advanceTimeBy(ForegroundPolicy.samplePeriod)
     runCurrent()
     assertEquals(ForegroundStatus(downloading = 1), emitted.last())
+  }
+
+  @Test
+  fun observe_lastTaskRemoved_releases() = runTest {
+    val tasks = MutableStateFlow<List<DownloadTask>>(listOf(FakeTask(downloading)))
+    val emitted = observe(tasks, MutableStateFlow(stopped))
+    advanceTimeBy(ForegroundPolicy.samplePeriod)
+    runCurrent()
+    assertTrue(emitted.last().isRequired)
+
+    tasks.value = emptyList()
+    advanceTimeBy(ForegroundPolicy.samplePeriod)
+    runCurrent()
+    assertEquals(ForegroundStatus(), emitted.last())
   }
 
   @Test

@@ -20,16 +20,17 @@ import kotlin.time.Duration.Companion.seconds
  *
  * @property downloading number of embedded tasks downloading.
  * @property queued number of embedded tasks waiting for a free download slot.
- * @property serverState state of the local server sharing the embedded device.
+ * @property serverPort port of the local server sharing the embedded device, or `null` when it
+ *   is not running. Only the port is kept, so the status never carries the server's API token.
  */
 data class ForegroundStatus(
   val downloading: Int = 0,
   val queued: Int = 0,
-  val serverState: ServerState = ServerState.Stopped,
+  val serverPort: Int? = null,
 ) {
   /** Whether the service must run in the foreground. */
   val isRequired: Boolean
-    get() = downloading > 0 || queued > 0 || serverState is ServerState.Running
+    get() = downloading > 0 || queued > 0 || serverPort != null
 }
 
 /**
@@ -48,7 +49,7 @@ object ForegroundPolicy {
     ForegroundStatus(
       downloading = states.count { it is DownloadState.Downloading },
       queued = states.count { it is DownloadState.Queued },
-      serverState = serverState,
+      serverPort = (serverState as? ServerState.Running)?.port,
     )
 
   /**
