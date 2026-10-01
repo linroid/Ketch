@@ -211,7 +211,7 @@ fun StartTimeMenu(
     }
   }
   if (picking) {
-    DateTimeDialogs(
+    StartTimeDialog(
       zone = zone,
       onPicked = {
         picking = false
@@ -222,10 +222,20 @@ fun StartTimeMenu(
   }
 }
 
-/** Asks for a date from today on, then a time, and reports the moment in [zone]. */
+/**
+ * "Pick date & time…": asks for a date from today on, then a time, and reports the moment in
+ * [zone]. A moment that has already passed cannot be chosen. Row menus open it from their Start
+ * later submenu.
+ *
+ * @param onPicked receives the chosen moment, which is in the future.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateTimeDialogs(zone: TimeZone, onPicked: (Instant) -> Unit, onCancel: () -> Unit) {
+fun StartTimeDialog(
+  onPicked: (Instant) -> Unit,
+  onCancel: () -> Unit,
+  zone: TimeZone = TimeZone.currentSystemDefault(),
+) {
   val colors = KetchTheme.colors
   val shape = KetchTheme.shapes.dialog
   val now = remember { Clock.System.now() }
@@ -243,10 +253,11 @@ private fun DateTimeDialogs(zone: TimeZone, onPicked: (Instant) -> Unit, onCance
         }
       },
     )
+    val pickerColors = DatePickerDefaults.colors(containerColor = colors.surfaceRaised)
     DatePickerDialog(
       onDismissRequest = onCancel,
       shape = shape,
-      colors = DatePickerDefaults.colors(containerColor = colors.surfaceRaised),
+      colors = pickerColors,
       confirmButton = {
         KetchButton(
           text = "Next",
@@ -261,11 +272,13 @@ private fun DateTimeDialogs(zone: TimeZone, onPicked: (Instant) -> Unit, onCance
         KetchButton(text = "Cancel", variant = KetchButtonVariant.Ghost, onClick = onCancel)
       },
     ) {
-      DatePicker(state = state)
+      DatePicker(state = state, colors = pickerColors)
     }
   } else {
     val next = now.toLocalDateTime(zone)
     val state = rememberTimePickerState(initialHour = (next.hour + 1) % 24, initialMinute = 0)
+    val at = LocalDateTime(picked, LocalTime(state.hour, state.minute)).toInstant(zone)
+    val passed = at <= Clock.System.now()
     TimePickerDialog(
       onDismissRequest = onCancel,
       shape = shape,
@@ -274,9 +287,9 @@ private fun DateTimeDialogs(zone: TimeZone, onPicked: (Instant) -> Unit, onCance
       confirmButton = {
         KetchButton(
           text = "Schedule",
-          onClick = {
-            onPicked(LocalDateTime(picked, LocalTime(state.hour, state.minute)).toInstant(zone))
-          },
+          enabled = !passed,
+          tooltip = if (passed) "That time has already passed" else null,
+          onClick = { if (at > Clock.System.now()) onPicked(at) },
         )
       },
       dismissButton = {

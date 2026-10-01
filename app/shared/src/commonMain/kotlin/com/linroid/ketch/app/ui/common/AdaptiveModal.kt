@@ -19,6 +19,9 @@ import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -90,11 +93,17 @@ fun AdaptiveModal(
   val width = with(density) { window.width.toDp() }
   val height = with(density) { window.height.toDp() }
   val form = modalForm(width, isMobilePlatform)
+  val currentDismissible by rememberUpdatedState(dismissible)
+  val currentOnDismiss by rememberUpdatedState(onDismissRequest)
   if (form == ModalForm.Sheet) {
+    // The sheet state is keyed on this lambda, so it must not change with [dismissible].
+    val confirmChange = remember {
+      { value: SheetValue -> currentDismissible || value != SheetValue.Hidden }
+    }
     val sheetState = rememberBottomSheetState(
       initialValue = SheetValue.Hidden,
-      enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-      confirmValueChange = { dismissible || it != SheetValue.Hidden },
+      enabledValues = SheetValues,
+      confirmValueChange = confirmChange,
     )
     ModalBottomSheet(
       onDismissRequest = onDismissRequest,
@@ -129,7 +138,15 @@ fun AdaptiveModal(
   )
   Dialog(onDismissRequest = onDismissRequest, properties = properties) {
     if (form == ModalForm.CenteredDialog) {
-      DialogPanel(title, confirmButton, modifier, dismissButton, contentSpacing, maxWidth, content)
+      DialogPanel(
+        title = title,
+        confirmButton = confirmButton,
+        dismissButton = dismissButton,
+        contentSpacing = contentSpacing,
+        maxWidth = maxWidth,
+        modifier = Modifier.padding(vertical = spacing.s6).then(modifier),
+        content = content,
+      )
       return@Dialog
     }
     // The content fills the window, so outside taps land here rather than on the scrim.
@@ -137,8 +154,8 @@ fun AdaptiveModal(
       contentAlignment = Alignment.TopCenter,
       modifier = Modifier
         .fillMaxSize()
-        .pointerInput(dismissible) {
-          detectTapGestures { if (dismissible) onDismissRequest() }
+        .pointerInput(Unit) {
+          detectTapGestures { if (currentDismissible) currentOnDismiss() }
         },
     ) {
       DialogPanel(
@@ -220,3 +237,6 @@ private fun ModalBody(
 }
 
 private const val TOUCH_ANCHOR_FRACTION = 0.15f
+
+@OptIn(ExperimentalMaterial3Api::class)
+private val SheetValues = setOf(SheetValue.Hidden, SheetValue.Expanded)

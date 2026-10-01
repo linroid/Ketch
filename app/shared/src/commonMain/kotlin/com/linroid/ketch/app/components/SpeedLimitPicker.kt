@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -81,9 +82,11 @@ fun winningLimitCaption(own: SpeedLimit, global: SpeedLimit, globalName: String)
  *
  * The chip that looks selected follows [value], the limit currently requested, so it never
  * drifts from the task. The custom field takes "500k", "2m" or "1.5" in the unit shown next to
- * it, and commits on ↩, when it loses focus, or 600 ms after the last keystroke, never once per
- * keystroke. While [pending] the control shows a spinner and keeps showing the limit just
- * chosen; once the command ends it follows [value] again, so a failure shows the old limit.
+ * it, and commits on ↩, when the focus leaves the picker, or 600 ms after the last keystroke,
+ * never once per keystroke. Clicking a chip or the unit, which takes the focus from the field,
+ * does not commit the typed value first. While [pending] the control shows a spinner and keeps
+ * showing the limit just chosen; once the command ends it follows [value] again, so a failure
+ * shows the old limit.
  *
  * @param onCommit applies a newly chosen limit.
  * @param caption names the limit that wins when another one is lower; see
@@ -147,7 +150,14 @@ fun SpeedLimitPicker(
     }
   }
 
-  Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
+  var pickerFocused by remember { mutableStateOf(false) }
+  Column(
+    verticalArrangement = Arrangement.spacedBy(spacing.s2),
+    modifier = modifier.onFocusChanged {
+      if (pickerFocused && !it.hasFocus) debounce.flush()
+      pickerFocused = it.hasFocus
+    },
+  ) {
     FlowRow(
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       verticalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -160,6 +170,7 @@ fun SpeedLimitPicker(
           enabled = enabled,
           onClick = {
             debounce.cancel()
+            customOpen = false
             commit(preset)
           },
         )
@@ -191,10 +202,7 @@ fun SpeedLimitPicker(
           imeAction = ImeAction.Done,
         ),
         keyboardActions = KeyboardActions(onDone = { debounce.flush() }),
-        onFocusChange = { focused ->
-          fieldFocused = focused
-          if (!focused) debounce.flush()
-        },
+        onFocusChange = { fieldFocused = it },
         trailing = {
           KetchButton(
             text = unit.label,

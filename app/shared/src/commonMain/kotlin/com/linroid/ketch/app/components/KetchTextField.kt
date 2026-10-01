@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,13 +20,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchTheme
-import kotlinx.coroutines.flow.drop
 
 /**
  * Text input on a sunken fill, 32 dp tall with a pointer and 48 dp on touch.
@@ -211,13 +210,11 @@ private fun FieldFrame(
   val type = KetchTheme.typography
   val shape = KetchTheme.shapes.textField
   val errorText = error
-  val focusState = interactions.collectIsFocusedAsState()
-  val focused by focusState
+  // Read from the focus system, not the interactions: a field focused in the frame it appears
+  // in would emit its focus before anyone collects it.
+  var focused by remember { mutableStateOf(false) }
   val hovered by interactions.collectIsHoveredAsState()
   val focusCallback by rememberUpdatedState(onFocusChange)
-  LaunchedEffect(interactions) {
-    snapshotFlow { focusState.value }.drop(1).collect { focusCallback(it) }
-  }
   val border by animateColorAsState(
     targetValue = when {
       error != null -> colors.status.failed.color
@@ -234,6 +231,12 @@ private fun FieldFrame(
     if (label != null) Text(label, style = type.labelS, color = colors.textSecondary)
     field(
       Modifier
+        .onFocusChanged {
+          if (it.isFocused != focused) {
+            focused = it.isFocused
+            focusCallback(it.isFocused)
+          }
+        }
         .focusRing(
           visible = focused,
           shape = shape,

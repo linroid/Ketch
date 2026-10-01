@@ -103,7 +103,8 @@ fun KetchTriStateCheckbox(
 }
 
 /**
- * An on/off switch, with its [label] to the left when given, as in settings rows.
+ * An on/off switch, with its [label] to the left when given, as in settings rows. In a row wider
+ * than both, the switch keeps to the end.
  *
  * @param onCheckedChange `null` makes it read-only.
  */
@@ -152,7 +153,7 @@ fun KetchSwitch(
   val shape = KetchTheme.shapes.full
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s3),
+    horizontalArrangement = Arrangement.SpaceBetween,
     modifier = modifier
       .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
       .heightIn(min = density.iconButtonTarget)
@@ -163,7 +164,7 @@ fun KetchSwitch(
         text = label,
         style = KetchTheme.typography.body,
         color = colors.textPrimary,
-        modifier = Modifier.weight(1f, fill = false),
+        modifier = Modifier.weight(1f, fill = false).padding(end = KetchTheme.spacing.s3),
       )
     }
     Box(

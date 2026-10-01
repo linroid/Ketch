@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -84,15 +85,18 @@ fun KetchToast(
   modifier: Modifier = Modifier,
   detail: String? = message.detail,
 ) {
-  KetchToast(
-    title = message.title,
-    onDismiss = onDismiss,
-    modifier = modifier,
-    level = message.level,
-    detail = detail,
-    actions = message.actions,
-    duration = toastDuration(message),
-  )
+  // A slot that shows another message starts its timer and swipe afresh.
+  key(message.id) {
+    KetchToast(
+      title = message.title,
+      onDismiss = onDismiss,
+      modifier = modifier,
+      level = message.level,
+      detail = detail,
+      actions = message.actions,
+      duration = toastDuration(message),
+    )
+  }
 }
 
 /**

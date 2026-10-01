@@ -29,6 +29,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -43,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -261,9 +263,16 @@ internal class MenuLevel {
 
   /**
    * Handles [key] in the deepest open submenu that has a highlighted entry, or in this level.
-   * Returns whether the key was used.
+   * Returns whether the key was used. While [editing], custom content such as a field has the
+   * focus and keeps every key but Esc.
    */
-  fun handle(key: MenuKey, entries: List<MenuEntry>, dismiss: () -> Unit): Boolean {
+  fun handle(
+    key: MenuKey,
+    entries: List<MenuEntry>,
+    dismiss: () -> Unit,
+    editing: Boolean = false,
+  ): Boolean {
+    if (editing && key != MenuKey.Escape) return false
     var parent: MenuLevel? = null
     var level = this
     var levelEntries = entries
@@ -315,6 +324,18 @@ internal class MenuLevel {
   }
 }
 
+/** The custom entries of a menu that hold the keyboard focus. */
+internal class MenuFocus {
+  private val focused = mutableSetOf<Any>()
+
+  /** Whether custom content, such as a field, has the focus. */
+  val editing: Boolean get() = focused.isNotEmpty()
+
+  fun update(entry: Any, hasFocus: Boolean) {
+    if (hasFocus) focused += entry else focused -= entry
+  }
+}
+
 /**
  * A menu of commands, anchored to the layout it is placed in, like a dropdown.
  *
@@ -349,7 +370,13 @@ internal fun KetchMenuPanel(
   modifier: Modifier = Modifier,
   content: KetchMenuScope.() -> Unit,
 ) {
-  MenuPanel(buildMenu(content), remember { MenuLevel() }, onDismiss = {}, modifier = modifier)
+  MenuPanel(
+    entries = buildMenu(content),
+    level = remember { MenuLevel() },
+    focus = remember { MenuFocus() },
+    onDismiss = {},
+    modifier = modifier,
+  )
 }
 
 @Composable
@@ -363,6 +390,7 @@ private fun MenuPopup(
   val shift = with(density) { IntOffset(offset.x.roundToPx(), offset.y.roundToPx()) }
   val gap = with(density) { MenuGap.roundToPx() }
   val root = remember { MenuLevel() }
+  val menuFocus = remember { MenuFocus() }
   val currentEntries by rememberUpdatedState(entries)
   Popup(
     popupPositionProvider = remember(shift, gap) { DropdownPositionProvider(shift, gap) },
@@ -379,6 +407,7 @@ private fun MenuPopup(
     MenuPanel(
       entries = entries,
       level = root,
+      focus = menuFocus,
       onDismiss = onDismiss,
       modifier = modifier
         .graphicsLayer {
@@ -390,7 +419,7 @@ private fun MenuPopup(
         .onPreviewKeyEvent { event ->
           if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
           val key = event.key.toMenuKey() ?: return@onPreviewKeyEvent false
-          root.handle(key, currentEntries, onDismiss)
+          root.handle(key, currentEntries, onDismiss, menuFocus.editing)
         }
         .focusRequester(focus)
         .focusable(),
@@ -412,6 +441,7 @@ private fun Key.toMenuKey(): MenuKey? = when (this) {
 private fun MenuPanel(
   entries: List<MenuEntry>,
   level: MenuLevel,
+  focus: MenuFocus,
   onDismiss: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -479,7 +509,9 @@ private fun MenuPanel(
             onClick = { if (level.openIndex != index) level.openSubmenu(index) },
           )
           val child = level.child
-          if (level.openIndex == index && child != null) SubmenuPopup(entry, child, onDismiss)
+          if (level.openIndex == index && child != null) {
+            SubmenuPopup(entry, child, focus, onDismiss)
+          }
         }
         MenuEntry.Divider -> Box(
           Modifier
@@ -499,20 +531,31 @@ private fun MenuPanel(
             bottom = spacing.s1,
           ),
         )
-        is MenuEntry.Custom -> Box(Modifier.padding(spacing.s2)) { entry.content(onDismiss) }
+        is MenuEntry.Custom -> {
+          val key = level to index
+          DisposableEffect(focus, key) { onDispose { focus.update(key, false) } }
+          Box(Modifier.padding(spacing.s2).onFocusChanged { focus.update(key, it.hasFocus) }) {
+            entry.content(onDismiss)
+          }
+        }
       }
     }
   }
 }
 
 @Composable
-private fun SubmenuPopup(entry: MenuEntry.Submenu, level: MenuLevel, onDismiss: () -> Unit) {
+private fun SubmenuPopup(
+  entry: MenuEntry.Submenu,
+  level: MenuLevel,
+  focus: MenuFocus,
+  onDismiss: () -> Unit,
+) {
   val inset = with(LocalDensity.current) { (MenuInset + 1.dp).roundToPx() }
   Popup(
     popupPositionProvider = remember(inset) { SubmenuPositionProvider(inset) },
     properties = PopupProperties(focusable = false),
   ) {
-    MenuPanel(entry.entries, level, onDismiss)
+    MenuPanel(entry.entries, level, focus, onDismiss)
   }
 }
 

@@ -118,6 +118,34 @@ class KetchMenuTest {
   }
 
   @Test
+  fun handle_whileCustomContentIsEditing_leavesEveryKeyButEscape() {
+    val root = MenuLevel()
+    root.press(MenuKey.Down)
+
+    for (key in listOf(MenuKey.Up, MenuKey.Down, MenuKey.Right, MenuKey.Enter)) {
+      assertFalse(root.handle(key, entries, dismiss = { dismissals++ }, editing = true))
+    }
+    assertEquals(1, root.highlighted)
+    assertEquals(emptyList(), clicks)
+
+    assertTrue(root.handle(MenuKey.Escape, entries, dismiss = { dismissals++ }, editing = true))
+    assertEquals(1, dismissals)
+  }
+
+  @Test
+  fun menuFocus_focusMovingBetweenCustomEntries_staysEditingUntilAllLoseIt() {
+    val focus = MenuFocus()
+
+    focus.update("speed", hasFocus = true)
+    focus.update("name", hasFocus = true)
+    focus.update("speed", hasFocus = false)
+    assertTrue(focus.editing)
+
+    focus.update("name", hasFocus = false)
+    assertFalse(focus.editing)
+  }
+
+  @Test
   fun handle_rightOnPlainItem_isNotUsed() {
     val root = MenuLevel()
     root.press(MenuKey.Down)
