@@ -8,7 +8,6 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.util.displayName
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -297,5 +296,5 @@ private fun AppState.open(tap: NotificationTap) {
   inspect(key)
   if (tap.action != NotificationAction.Retry) return
   val task = entry.instance.tasks.value.firstOrNull { it.taskId == key.taskId } ?: return
-  runTaskCommand(task, "retry ${displayName(task.request, task.state.value)}") { resume() }
+  retry(task)
 }

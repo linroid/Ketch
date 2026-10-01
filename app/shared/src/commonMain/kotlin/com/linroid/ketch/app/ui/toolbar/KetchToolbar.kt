@@ -17,10 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
@@ -128,7 +130,7 @@ private fun BandwidthReadout(
   val type = KetchTheme.typography
   val spacing = KetchTheme.spacing
   val shape = KetchTheme.shapes.sm
-  val capLabel = globalCapBytesPerSec?.let { "/ ${formatBytes(it)}/s" } ?: "/ ∞"
+  val capLabel = capLabel(globalCapBytesPerSec)
   val capFraction = if (globalCapBytesPerSec != null && globalCapBytesPerSec > 0) {
     (bandwidthBytesPerSec.toFloat() / globalCapBytesPerSec).coerceIn(0f, 1f)
   } else {
@@ -180,6 +182,14 @@ private fun BandwidthReadout(
     }
   }
 }
+
+/** The readout's cap, such as "/ 5 MB/s", or "/ ∞" without one. */
+internal fun capLabel(capBytesPerSec: Long?): String =
+  if (capBytesPerSec == null || capBytesPerSec <= 0) {
+    "/ ∞"
+  } else {
+    "/ ${formatSpeedLimit(SpeedLimit.of(capBytesPerSec))}"
+  }
 
 /** Share of the cap from which the readout turns amber. */
 private const val NEAR_CAP = 0.9f

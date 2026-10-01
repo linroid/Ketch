@@ -25,9 +25,7 @@ import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
@@ -44,11 +42,9 @@ import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
 import com.linroid.ketch.app.instance.EmbeddedInstance
-import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
-import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.LocalDesktopHooks
@@ -62,14 +58,8 @@ import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.PulseModel
-import com.linroid.ketch.app.state.PulseScope
-import com.linroid.ketch.app.state.PulseSource
-import com.linroid.ketch.app.state.PulseState
-import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
-import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
-import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.FileConfigStore
@@ -80,28 +70,23 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.ftp.FtpDownloadSource
-import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -244,18 +229,20 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   val configStore = remember {
     FileConfigStore(File(launch.configDir, "config.toml").path)
   }
+  val localSpeed = remember { LocalSpeedMode(configStore) }
   val controller = remember {
+    val manager = createInstanceManager(launch, configStore)
     AppController(
-      instanceManager = createInstanceManager(launch, configStore),
+      instanceManager = manager,
       aiProviderFactory = EmbeddedAiDiscoveryProviderFactory(),
       incoming = launch.incoming,
-    )
+      speedMode = localSpeed.attach(manager),
+    ).also { localSpeed.follow(it.pulse) }
   }
-  val resources = remember { AppResources(controller, launch) }
+  val resources = remember { AppResources(controller, localSpeed, launch) }
   DisposableEffect(resources) {
     onDispose { resources.close() }
   }
-  val models = remember { DesktopModels(controller, configStore) }
   val desktopSettings = remember { controller.appSettings.config.desktop }
   val trayState = rememberTrayState()
   val notifier = remember { TrayNotifier(trayState) }
@@ -304,7 +291,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   }
   val active by controller.state.activeInstance.collectAsState()
   // Speed modes only switch this computer for now.
-  val speedMode = models.speedMode.takeIf { active == null || active is EmbeddedInstance }
+  val speedMode = controller.speedMode.takeIf { active == null || active is EmbeddedInstance }
   val commands = remember(speedMode, files, clipboard) {
     DesktopCommands(controller, actions, speedMode, files, clipboard) {
       windowState.isMinimized = true
@@ -328,7 +315,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   var windowFocused by remember { mutableStateOf(false) }
   // A hidden window stops composing, so the focus it last reported only counts while it shows.
   fun inFront() = behavior.windowVisible && windowFocused && !windowState.isMinimized
-  val status = rememberDesktopStatus(controller, models.pulse, inFront())
+  val status = rememberDesktopStatus(controller, controller.pulse.state, inFront())
   val activityEvents = remember {
     reportDesktopActivity(controller, notifier, ::inFront)
   }
@@ -437,6 +424,7 @@ private fun createInstanceManager(
 /** What the app closes when it quits: the controller, then the engine; once. */
 private class AppResources(
   private val controller: AppController,
+  private val localSpeed: LocalSpeedMode,
   private val launch: LaunchContext,
 ) {
   private var closed = false
@@ -445,6 +433,7 @@ private class AppResources(
     if (closed) return
     closed = true
     controller.close()
+    localSpeed.close()
     launch.extensionServer.close()
     controller.instanceManager.close()
     launch.singleInstance.close()
@@ -646,63 +635,51 @@ internal fun addedCopy(added: List<ActivityEvent.Added>, deviceName: String?): N
 }
 
 /**
- * The Pulse of the active device and the speed mode of this computer, which the tray, the menu
- * bar and the Dock show. The speed settings and the observed peak are saved as they change.
+ * Speed mode of this computer, which the app, the tray and the menu bar switch. It is made before
+ * the controller that shows it, so it runs in a scope of its own on the main thread, and saves
+ * the speed settings and the observed peak as they change.
  */
-private class DesktopModels(controller: AppController, private val configStore: ConfigStore) {
-  /** Speed mode of this computer; `null` without an embedded engine. */
-  val speedMode: SpeedModeController?
+private class LocalSpeedMode(private val configStore: ConfigStore) {
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+  private val speed = MutableStateFlow(0L)
 
-  /** Pulse of the active device. */
-  val pulse: StateFlow<PulseState>
-
-  init {
-    val manager = controller.instanceManager
-    val scope = controller.scope
-    val config = controller.appSettings.config
-    val localSpeed = MutableStateFlow(0L)
-    speedMode = manager.embedded?.let { embedded ->
-      SpeedModeController(
-        config = { embedded.status().config },
-        apply = { embedded.updateConfig(it) },
-        scope = scope,
-        settings = config.speed,
-        observedPeak = ObservedPeak(config.ui.observedPeak, config.ui.observedPeakAt),
-        speed = localSpeed,
-      )
-    }
-    val localMode = speedMode?.mode ?: flowOf(SpeedMode.Full)
-    // This computer and the device the app shows, like the activity monitor.
-    val entries = combine(manager.instances, manager.activeInstance) { instances, active ->
-      instances.filter { it is EmbeddedInstance || it == active }
-    }.distinctUntilChanged()
-    val model = PulseModel(
-      sources = entries.map { list -> list.map { pulseSource(it, manager, localMode) } },
-      pulseScope = manager.activeInstance.map {
-        PulseScope.Device(it?.deviceId ?: LOCAL_DEVICE_ID)
-      },
-      mode = combine(manager.activeInstance, localMode) { active, mode ->
-        if (active == null || active is EmbeddedInstance) mode else SpeedMode.Full
-      },
+  /** Creates the speed mode of [manager]'s embedded engine; `null` without one. */
+  fun attach(manager: InstanceManager): SpeedModeController? {
+    val embedded = manager.embedded ?: return null
+    val config = configStore.load()
+    val speedMode = SpeedModeController(
+      config = { embedded.status().config },
+      apply = { embedded.updateConfig(it) },
       scope = scope,
+      settings = config.speed,
+      observedPeak = ObservedPeak(config.ui.observedPeak, config.ui.observedPeakAt),
+      speed = speed,
     )
-    pulse = model.state
+    save(speedMode)
+    return speedMode
+  }
+
+  /** Records this computer's speed from [pulse], which raises the observed peak. */
+  fun follow(pulse: PulseModel) {
     scope.launch {
-      model.devices.collect { devices ->
-        localSpeed.value = devices.firstOrNull { it.deviceId == LOCAL_DEVICE_ID }?.speed ?: 0
+      pulse.devices.collect { devices ->
+        speed.value = devices.firstOrNull { it.deviceId == LOCAL_DEVICE_ID }?.speed ?: 0
       }
     }
-    speedMode?.let { save(it, controller) }
+  }
+
+  fun close() {
+    scope.cancel()
   }
 
   @OptIn(FlowPreview::class)
-  private fun save(speedMode: SpeedModeController, controller: AppController) {
-    controller.scope.launch {
+  private fun save(speedMode: SpeedModeController) {
+    scope.launch {
       speedMode.settings.drop(1).collect { speed ->
         saveConfig(configStore) { it.copy(speed = speed) }
       }
     }
-    controller.scope.launch {
+    scope.launch {
       // The peak climbs in steps while a download speeds up.
       speedMode.observedPeak.drop(1).debounce(PEAK_SAVE_DELAY).collect { peak ->
         saveConfig(configStore) {
@@ -716,45 +693,6 @@ private class DesktopModels(controller: AppController, private val configStore: 
       }
     }
   }
-}
-
-private fun pulseSource(
-  entry: InstanceEntry,
-  manager: InstanceManager,
-  localMode: Flow<SpeedMode>,
-): PulseSource {
-  val api = entry.instance
-  return if (entry is RemoteInstance) {
-    PulseSource(
-      deviceId = entry.deviceId,
-      name = entry.label,
-      tasks = api.tasks,
-      config = entry.connectionState.map { it == ConnectionState.Connected }
-        .distinctUntilChanged()
-        .map { connected -> if (connected) readConfig(api) else null },
-      status = api::status,
-      health = entry.connectionState.map { it.toDeviceHealth() },
-    )
-  } else {
-    PulseSource(
-      deviceId = entry.deviceId,
-      name = localDeviceNoun(),
-      tasks = api.tasks,
-      // The speed mode changes the cap, so the config is read again when it switches.
-      config = localMode.map { readConfig(api) },
-      status = api::status,
-      health = manager.serverState.map { it.toDeviceHealth() },
-    )
-  }
-}
-
-private suspend fun readConfig(api: KetchApi): DownloadConfig? = try {
-  api.status().config
-} catch (e: CancellationException) {
-  throw e
-} catch (e: Exception) {
-  log.d { "Couldn't read the download config: ${e.describeCauses()}" }
-  null
 }
 
 // Runs on the main thread, like the app's settings, so loads and saves cannot interleave.

@@ -23,20 +23,15 @@ import androidx.core.content.edit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
-import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
-import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.rememberAppController
-import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.toCopy
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
@@ -94,9 +89,10 @@ class MainActivity : ComponentActivity() {
       val svc = service
       if (svc != null) {
         val controller = rememberAppController(
-          svc.instanceManager,
-          svc.aiProviderFactory,
-          ketchApplication.incoming
+          instanceManager = svc.instanceManager,
+          aiProviderFactory = svc.aiProviderFactory,
+          incoming = ketchApplication.incoming,
+          speedMode = svc.speedMode,
         )
         val link = notificationLink
         LaunchedEffect(controller, link) {
@@ -250,14 +246,4 @@ private suspend fun AppState.open(link: NotificationLink) {
   if (!statusFilter.matches(task.state.value)) statusFilter = StatusFilter.All
   inspect(key)
   if (link.retry) retry(task)
-}
-
-// A failure that resuming cannot fix starts over, as Retry does in the app.
-private fun AppState.retry(task: DownloadTask) {
-  val failed = task.state.value as? DownloadState.Failed ?: return
-  if (failed.error.toCopy().primary == RowAction.DownloadAgain) {
-    redownload(task)
-  } else {
-    runTaskCommand(task, "retry ${displayName(task.request, failed)}") { resume() }
-  }
 }

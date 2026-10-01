@@ -33,6 +33,7 @@ import com.linroid.ketch.app.instance.LanServerDiscovery
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.DroppedFile
+import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
@@ -58,6 +59,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -290,8 +292,13 @@ class AppState(
       listOfNotNull(entry?.let { listSourceOf(it, discover) })
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
+  // The embedded device is watched even while another one shows, so its speed mode keeps
+  // recording its speed.
   private val pulseSources: StateFlow<List<PulseSource>> =
-    activeInstance.map { entry -> listOfNotNull(entry?.let(::pulseSourceOf)) }
+    combine(instances, activeInstance) { entries, active ->
+      entries.filter { it is EmbeddedInstance && it != active } + listOfNotNull(active)
+    }.distinctUntilChanged()
+      .map { entries -> entries.map(::pulseSourceOf) }
       .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
   /** Rows of the active device's tasks, and the tab, search and order the Downloads list shows. */
@@ -923,6 +930,23 @@ class AppState(
   }
 
   /**
+   * Retries [task] as its Retry button promises: a paused or failed task resumes, and a failed
+   * task whose progress cannot be reused (see [retryFailed]) or a canceled one starts over with
+   * [redownload]. Other states are left alone.
+   */
+  fun retry(task: DownloadTask) {
+    val current = task.state.value
+    when {
+      current is DownloadState.Canceled -> redownload(task)
+      current is DownloadState.Failed && current.error.needsFreshStart() -> redownload(task)
+      current is DownloadState.Failed || current is DownloadState.Paused -> {
+        val verb = if (current is DownloadState.Failed) "retry" else "resume"
+        runTaskCommand(task, "$verb ${task.displayName()}") { resume() }
+      }
+    }
+  }
+
+  /**
    * Starts [task] at once: it becomes [DownloadPriority.URGENT], which may pause a running task
    * to make room. The toast names that task, and Undo restores the previous priority and state.
    */
@@ -1183,7 +1207,7 @@ class AppState(
     val settings = settingsFor(entry)
     return PulseSource(
       deviceId = entry.deviceId,
-      name = entry.label,
+      name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label,
       tasks = visibleTasksOf(entry),
       config = snapshotFlow { settings.download },
       status = entry.instance::status,
@@ -1243,9 +1267,15 @@ class AppState(
     return keys
   }
 
-  /** Removes [task] and adds its request again on [entry]. */
+  /**
+   * Removes [task] and adds its request again on [entry], to start at once. The old task and its
+   * partial file go first, since the new task writes to the same path.
+   */
   private suspend fun restart(entry: InstanceEntry, task: DownloadTask) {
-    val request = task.requestState.value.copy(resolvedSource = null)
+    val request = task.requestState.value.copy(
+      schedule = DownloadSchedule.Immediate,
+      resolvedSource = null,
+    )
     task.remove(deleteFiles = task.state.value !is DownloadState.Completed)
     entry.instance.download(request)
   }
@@ -1271,7 +1301,7 @@ class AppState(
   private fun retry(key: TaskKey) {
     val entry = instances.value.firstOrNull { it.deviceId == key.deviceId } ?: return
     val task = entry.instance.tasks.value.firstOrNull { it.taskId == key.taskId } ?: return
-    runTaskCommand(task, "retry ${task.displayName()}") { resume() }
+    retry(task)
   }
 
   /** Adds each of [requests] to [entry] on its own and reports the outcome. */

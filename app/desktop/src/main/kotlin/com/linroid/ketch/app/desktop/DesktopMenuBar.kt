@@ -32,7 +32,6 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.PulseCounts
-import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
@@ -42,7 +41,6 @@ import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.links
-import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.config.SpeedLimitMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -485,7 +483,8 @@ internal class DesktopCommands(
   fun run(command: KetchCommand) {
     val filter = StatusFilter.entries.firstOrNull { KetchCommands.tab(it) == command }
     if (filter != null) {
-      state.statusFilter = filter
+      actions.showWindow()
+      state.showDownloads(filter)
       return
     }
     val device = (1..MAX_DEVICE_ITEMS).firstOrNull { KetchCommands.device(it) == command }
@@ -518,12 +517,7 @@ internal class DesktopCommands(
       KetchCommands.CloseWindow -> actions.closeWindow()
       KetchCommands.Minimize -> minimizeWindow()
       KetchCommands.Quit -> actions.quit()
-      KetchCommands.SelectAll -> {
-        val filter = state.statusFilter
-        state.selectedKeys = state.tasks.value
-          .filter { filter.matches(it.state.value) }
-          .mapTo(LinkedHashSet()) { state.keyOf(it) }
-      }
+      KetchCommands.SelectAll -> state.selectedKeys = controller.taskList.view.value.keys.toSet()
       KetchCommands.TogglePause -> togglePause()
       KetchCommands.Open -> openSelected()
       KetchCommands.Reveal -> revealSelected()
@@ -639,28 +633,14 @@ internal class DesktopCommands(
     val tasks = selectedTasks()
     val running = tasks.filter { TaskPhase.of(it.state.value) == TaskPhase.Running }
     if (running.isNotEmpty()) {
-      running.forEach { state.runTaskCommand(it, "pause") { pause() } }
+      running.forEach { state.runTaskCommand(it, "pause ${nameOf(it)}") { pause() } }
       return
     }
-    for (task in tasks) retry(task, label = "resume")
+    for (task in tasks) state.retry(task)
   }
 
   private fun retrySelected() {
-    for (task in selectedTasks()) retry(task, label = "retry")
-  }
-
-  // Resumes a paused or failed task. A failure only a fresh start can fix, and a canceled task,
-  // start over, as Retry all failed does.
-  private fun retry(task: DownloadTask, label: String) {
-    val current = task.state.value
-    val freshStart = current is DownloadState.Failed &&
-      current.error.toCopy().primary == RowAction.DownloadAgain
-    when {
-      current is DownloadState.Canceled || freshStart -> state.redownload(task)
-      current is DownloadState.Paused || current is DownloadState.Failed -> {
-        state.runTaskCommand(task, label) { resume() }
-      }
-    }
+    for (task in selectedTasks()) state.retry(task)
   }
 
   // Opens the files of local completed tasks; any other task opens in the inspector.
