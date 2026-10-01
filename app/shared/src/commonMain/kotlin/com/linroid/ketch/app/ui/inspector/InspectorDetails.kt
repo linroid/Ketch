@@ -41,6 +41,8 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.connectionLabel
@@ -74,6 +76,8 @@ internal class Copier(
   private val scope: CoroutineScope,
   private val state: AppState,
 ) {
+  private val log = KetchLogger("Inspector")
+
   /** Whether there is a clipboard to copy to. */
   val enabled: Boolean get() = clipboard != null
 
@@ -84,6 +88,7 @@ internal class Copier(
       catchingUnlessCancelled { clipboard.writeText(text) }
         .onSuccess { onCopied() }
         .onFailure { e ->
+          log.w { "Couldn't copy the $what: ${e.describeCauses()}" }
           state.messages.post(MessageLevel.Error, "Couldn't copy the $what", cause = e)
         }
     }
