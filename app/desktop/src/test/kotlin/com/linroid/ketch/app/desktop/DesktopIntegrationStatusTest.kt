@@ -5,6 +5,8 @@ import com.linroid.ketch.app.platform.DetectedBrowser
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -132,6 +134,51 @@ class DesktopIntegrationStatusTest {
 
     assertTrue(windows.opensMagnetLinks())
     assertFalse(windows.opensTorrentFiles())
+  }
+
+  @Test
+  fun defaultHandlers_windowsUserChoiceOfAnotherApp_answersNo() {
+    val command = "    (Default)    REG_SZ    \"C:\\Program Files\\Ketch\\Ketch.exe\" \"%1\"\r\n"
+    val windows = DefaultHandlers(DesktopOs.WINDOWS, WindowsApp) { args ->
+      when {
+        args[2].endsWith("magnet\\shell\\open\\command") -> command
+        args[2].endsWith("magnet\\UserChoice") -> "    ProgId    REG_SZ    OtherApp.Url.magnet\r\n"
+        args[2].endsWith("Classes\\.torrent") -> "    (Default)    REG_SZ    Ketch.torrent\r\n"
+        args[2].endsWith(".torrent\\UserChoice") -> "    ProgId    REG_SZ    Ketch.torrent\r\n"
+        else -> null
+      }
+    }
+
+    assertFalse(windows.opensMagnetLinks())
+    assertTrue(windows.opensTorrentFiles())
+  }
+
+  @Test
+  fun refresh_whileAnEarlierRefreshIsAsking_keepsTheLaterAnswer() {
+    val asking = CountDownLatch(1)
+    val answer = CountDownLatch(1)
+    var first = true
+    val slow = DefaultHandlers(DesktopOs.LINUX, App) { command ->
+      // The first refresh read the magnet default before Ketch became it, then waits.
+      if (command.last() == "application/x-bittorrent" && first) {
+        first = false
+        asking.countDown()
+        answer.await()
+      }
+      outputs[command.last()]
+    }
+    val integration = DesktopIntegrationStatus(file, { installed }, slow)
+    val earlier = thread { integration.refresh() }
+    asking.await()
+    outputs["x-scheme-handler/magnet"] = "ketch-handler.desktop"
+
+    val later = thread { integration.refresh() }
+    while (later.isAlive && later.state != Thread.State.BLOCKED) Thread.onSpinWait()
+    answer.countDown()
+    earlier.join()
+    later.join()
+
+    assertTrue(integration.status.magnetHandler)
   }
 
   @Test

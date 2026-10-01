@@ -38,6 +38,8 @@ internal class DesktopIntegrationStatus(
   private val handlers: DefaultHandlers = DefaultHandlers(),
 ) {
   private val log = KetchLogger("IntegrationStatus")
+  // One refresh at a time, so one that started earlier cannot overwrite a later answer.
+  private val refreshing = Any()
   private val connected = load()
   private var detected = emptyList<String>()
   private var magnetHandler = false
@@ -49,14 +51,16 @@ internal class DesktopIntegrationStatus(
 
   /** Looks for browsers and asks the system for the default apps again. Blocks. */
   fun refresh() {
-    val browsers = browsers()
-    val magnet = handlers.opensMagnetLinks()
-    val torrent = handlers.opensTorrentFiles()
-    synchronized(this) {
-      detected = browsers
-      magnetHandler = magnet
-      torrentFileHandler = torrent
-      status = build()
+    synchronized(refreshing) {
+      val browsers = browsers()
+      val magnet = handlers.opensMagnetLinks()
+      val torrent = handlers.opensTorrentFiles()
+      synchronized(this) {
+        detected = browsers
+        magnetHandler = magnet
+        torrentFileHandler = torrent
+        status = build()
+      }
     }
   }
 
@@ -149,7 +153,8 @@ private class RefreshingHooks(
  * does; see [MagnetHandler] for how Ketch registers.
  *
  * - macOS: Launch Services, through `osascript`, for the bundle [MagnetHandler.MAC_BUNDLE_ID].
- * - Windows: the `HKCU\Software\Classes` entries Ketch writes.
+ * - Windows: the `HKCU\Software\Classes` entries Ketch writes, unless the user chose another app
+ *   in Windows Settings, which Windows records as a `UserChoice` that takes precedence.
  * - Linux: `xdg-mime`'s default for the type.
  *
  * Each check blocks, and answers `false` when the system can't be asked.
@@ -170,7 +175,9 @@ internal class DefaultHandlers(
     )
     DesktopOs.WINDOWS -> {
       val command = query("HKCU\\Software\\Classes\\magnet\\shell\\open\\command")
-      command != null && command.contains(appCommand.command.first(), ignoreCase = true)
+      val chosen = userChoice(MAGNET_USER_CHOICE)
+      (chosen == null || chosen.equals(MAGNET_PROG_ID, ignoreCase = true)) &&
+        command != null && command.contains(appCommand.command.first(), ignoreCase = true)
     }
     DesktopOs.LINUX -> isKetchEntry("x-scheme-handler/magnet")
   }
@@ -185,7 +192,9 @@ internal class DefaultHandlers(
         "app ? ObjC.unwrap(ObjC.castRefToObject(app)) : ''",
     )
     DesktopOs.WINDOWS -> {
-      query("HKCU\\Software\\Classes\\.torrent")?.contains("Ketch", ignoreCase = true) == true
+      val chosen = userChoice(TORRENT_USER_CHOICE)
+      (chosen == null || chosen.contains("Ketch", ignoreCase = true)) &&
+        query("HKCU\\Software\\Classes\\.torrent")?.contains("Ketch", ignoreCase = true) == true
     }
     DesktopOs.LINUX -> isKetchEntry("application/x-bittorrent")
   }
@@ -197,6 +206,15 @@ internal class DefaultHandlers(
 
   // The default value of a registry key, in `reg query` output.
   private fun query(key: String): String? = run(listOf("reg", "query", key, "/ve"))
+
+  // The ProgId of the app the user chose in Windows Settings, or null when they chose none.
+  private fun userChoice(key: String): String? =
+    run(listOf("reg", "query", key, "/v", "ProgId"))?.lineSequence()
+      ?.map { it.trim() }
+      ?.firstOrNull { it.startsWith("ProgId", ignoreCase = true) }
+      ?.substringAfter("REG_SZ", missingDelimiterValue = "")
+      ?.trim()
+      ?.ifEmpty { null }
 
   // Ketch's own entry, or the one its package installs.
   private fun isKetchEntry(mimeType: String): Boolean =
@@ -309,3 +327,12 @@ internal fun runForOutput(command: List<String>): String? {
 // The host, the shell a browser may start it through, and the browser.
 private const val MAX_HOST_ANCESTORS = 3
 private const val COMMAND_TIMEOUT_SECONDS = 5L
+
+// Where Windows records the app the user chose for magnet links and for .torrent files.
+private const val MAGNET_USER_CHOICE =
+  "HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\magnet\\UserChoice"
+private const val TORRENT_USER_CHOICE =
+  "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.torrent\\UserChoice"
+
+// The class Ketch registers magnet links under, HKCU\Software\Classes\magnet.
+private const val MAGNET_PROG_ID = "magnet"
