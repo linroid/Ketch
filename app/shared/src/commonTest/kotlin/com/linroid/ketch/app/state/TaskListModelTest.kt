@@ -87,7 +87,7 @@ class TaskListModelTest {
         StatusFilter.Waiting to 0,
         StatusFilter.Paused to 1,
         StatusFilter.Done to 2,
-        StatusFilter.Failed to 2,
+        StatusFilter.Failed to 2
       ),
       model.counts.value
     )
@@ -135,13 +135,52 @@ class TaskListModelTest {
   }
 
   @Test
+  fun view_heldOrderWithNothingElseChanging_resortsOnceTheIntervalPasses() = runTest {
+    val running = task("a", downloading(10))
+    val model = model(listOf(source(listOf(running, task("b", completed("b"))))))
+
+    advanceTimeBy(300)
+    running.state.value = completed("a")
+    advanceTimeBy(300)
+    val held = model.view.value
+    advanceTimeBy(3_000)
+    val resorted = model.view.value
+
+    assertEquals(listOf("Downloading", "Added today"), held.groups.map { it.title })
+    assertEquals(listOf("Added today"), resorted.groups.map { it.title })
+    assertEquals(listOf("a", "b"), resorted.keys.map { it.taskId })
+  }
+
+  @Test
+  fun view_frozen_holdsOrderUntilReleased() = runTest {
+    val running = task("a", downloading(10))
+    val frozen = MutableStateFlow(true)
+    val model = model(listOf(source(listOf(running, task("b", completed("b"))))), frozen = frozen)
+
+    advanceTimeBy(300)
+    running.state.value = completed("a")
+    advanceTimeBy(5_000)
+    val held = model.view.value
+    frozen.value = false
+    advanceTimeBy(1)
+    val released = model.view.value
+
+    assertEquals(listOf("Downloading", "Added today"), held.groups.map { it.title })
+    assertEquals(listOf("Added today"), released.groups.map { it.title })
+  }
+
+  @Test
   fun rows_thousandTasksWithThirtyTicking_emitAtMostEvery250msAndKeepUnchangedRows() = runTest {
     val active = (0 until 30).map { task("a$it", downloading(0, total = TOTAL)) }
     val idle = (0 until 970).map { task("i$it", DownloadState.Completed("/d/i$it", 10)) }
     val model = model(listOf(source(active + idle)))
     val emissions = mutableListOf<Pair<Long, List<TaskRow>>>()
+    val views = mutableListOf<Pair<Long, List<TaskRow>>>()
     backgroundScope.launch {
       model.rows.collect { if (it.isNotEmpty()) emissions += testScheduler.currentTime to it }
+    }
+    backgroundScope.launch {
+      model.view.collect { if (it.rows.isNotEmpty()) views += testScheduler.currentTime to it.rows }
     }
     backgroundScope.launch {
       var bytes = 0L
@@ -162,17 +201,25 @@ class TaskListModelTest {
       for (index in 30 until 1000) assertSame(previous.second[index], next.second[index])
       assertNotSame(previous.second[0], next.second[0])
     }
+    assertTrue(views.size > 200, "view emitted ${views.size} times")
+    for ((previous, next) in views.zipWithNext()) {
+      assertTrue(next.first - previous.first >= 250, "view emitted at ${next.first}")
+      // The idle rows follow the 30 downloading ones in the same order and as the same rows.
+      for (index in 30 until 1000) assertSame(previous.second[index], next.second[index])
+    }
   }
 
   private fun TestScope.model(
     sources: List<TaskListSource>,
     filter: Flow<StatusFilter> = flowOf(StatusFilter.All),
     query: Flow<String> = flowOf(""),
+    frozen: Flow<Boolean> = flowOf(false),
   ) = TaskListModel(
     sources = flowOf(sources),
     scope = backgroundScope,
     filter = filter,
     query = query,
+    frozen = frozen,
     clock = ListFixtures.clock(this),
     timeZone = { TimeZone.UTC },
     dispatcher = StandardTestDispatcher(testScheduler),
@@ -183,6 +230,8 @@ class TaskListModelTest {
 
   private fun task(id: String, state: DownloadState) =
     ListTestTask(id, state, DownloadRequest("https://example.com/$id.iso"))
+
+  private fun completed(id: String) = DownloadState.Completed("/d/$id.iso", 10)
 
   private companion object {
     const val TOTAL = 1_000_000_000L

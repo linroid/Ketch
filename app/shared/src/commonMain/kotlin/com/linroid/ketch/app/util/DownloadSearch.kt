@@ -133,7 +133,11 @@ interface SearchTarget {
   val createdAt: Instant
 }
 
-/** Values of the `is:` search token. */
+/**
+ * Values of the `is:` search token.
+ *
+ * @property id the value as typed after `is:`.
+ */
 enum class SearchStatus(val id: String) {
   Downloading("downloading"),
   Waiting("waiting"),
@@ -163,7 +167,11 @@ enum class SearchStatus(val id: String) {
     get() = ordinal <= Scheduled.ordinal
 }
 
-/** How a `size:` token compares, written before the size: `>`, `>=`, `<` or `<=`. */
+/**
+ * How a `size:` token compares, written before the size: `>`, `>=`, `<` or `<=`.
+ *
+ * @property symbol the operator as typed.
+ */
 enum class SizeComparison(val symbol: String) {
   Greater(">"),
   AtLeast(">="),
@@ -272,6 +280,9 @@ sealed class SearchToken {
   /**
    * `size:`, such as `size:>1gb`. Without a comparison it finds files of at least that size.
    * Units are powers of 1024, like the sizes shown. Tasks of unknown size never match.
+   *
+   * @property comparison how the size compares with [bytes].
+   * @property bytes the bound in bytes.
    */
   data class Size(
     val comparison: SizeComparison,

@@ -34,7 +34,7 @@ class SortAndGroupTest {
       row("canceled", DownloadState.Canceled),
       row("paused", DownloadState.Paused(DownloadProgress(5, 10))),
       row("queued", DownloadState.Queued),
-      row("running", downloading(10)),
+      row("running", downloading(10))
     )
 
     val groups = arrangeRows(rows, ListArrangement(), START, utc)
@@ -42,7 +42,7 @@ class SortAndGroupTest {
     assertEquals(
       listOf(
         "Downloading", "Waiting", "Paused", "Needs attention", "Added today", "Added yesterday",
-        "Added this week", "Added earlier",
+        "Added this week", "Added earlier"
       ),
       groups.map { it.title }
     )
@@ -54,7 +54,7 @@ class SortAndGroupTest {
     val rows = listOf(
       row("slow", downloading(100, total = 1000, speed = 100)),
       row("far", downloading(900, total = 1000, speed = 300)),
-      row("urgent", downloading(10, total = 1000, speed = 50), request = urgent("urgent")),
+      row("urgent", downloading(10, total = 1000, speed = 50), request = urgent("urgent"))
     )
 
     val group = arrangeRows(rows, ListArrangement(), START, utc).single()
@@ -81,7 +81,7 @@ class SortAndGroupTest {
       row("soon", scheduled(START + 1.hours)),
       row("queued-old", DownloadState.Queued, createdAt = START - 1.hours),
       row("high", DownloadState.Queued, request = urgent("high", DownloadPriority.HIGH)),
-      row("delayed", DownloadState.Scheduled(DownloadSchedule.AfterDelay(30.minutes))),
+      row("delayed", DownloadState.Scheduled(DownloadSchedule.AfterDelay(30.minutes)))
     )
 
     val group = arrangeRows(rows, ListArrangement(), START, utc).single()
@@ -116,7 +116,7 @@ class SortAndGroupTest {
     val rows = listOf(
       row("done", completed()),
       row("fast", downloading(10, speed = 900)),
-      row("slow", downloading(10, speed = 100)),
+      row("slow", downloading(10, speed = 100))
     )
     val bySpeed = ListArrangement(SortKey.Speed, descending = true, group = GroupBy.None)
 
@@ -131,7 +131,7 @@ class SortAndGroupTest {
   fun arrangeRows_speedSort_usesThreeSampleAverage() {
     val rows = listOf(
       row("spike", downloading(10, speed = 900), speedSamples = listOf(900, 0, 0, 900)),
-      row("steady", downloading(10, speed = 400), speedSamples = listOf(400, 400, 400)),
+      row("steady", downloading(10, speed = 400), speedSamples = listOf(400, 400, 400))
     )
     val bySpeed = ListArrangement(SortKey.Speed, descending = true, group = GroupBy.None)
 
@@ -145,7 +145,7 @@ class SortAndGroupTest {
     val rows = listOf(
       row("b", downloading(10), request = named("beta.iso")),
       row("a", downloading(10), request = named("Alpha.iso")),
-      row("c", DownloadState.Queued, request = named("aardvark.iso")),
+      row("c", DownloadState.Queued, request = named("aardvark.iso"))
     )
     val byName = ListArrangement(SortKey.Name, descending = false, group = GroupBy.Smart)
 
@@ -161,7 +161,7 @@ class SortAndGroupTest {
     val rows = listOf(
       row("magnet", DownloadState.Queued, request = DownloadRequest("magnet:?xt=urn:btih:abc")),
       row("z", DownloadState.Queued, request = DownloadRequest("https://zeta.org/z.iso")),
-      row("a", DownloadState.Queued, request = DownloadRequest("https://alpha.org/a.iso")),
+      row("a", DownloadState.Queued, request = DownloadRequest("https://alpha.org/a.iso"))
     )
 
     val groups = arrangeRows(rows, ListArrangement(group = GroupBy.Site), START, utc)
@@ -209,11 +209,61 @@ class SortAndGroupTest {
     val swapped = listOf(speedRow("a", 100), speedRow("b", 900))
 
     val held = stable.arrange(swapped, bySpeed, START + 1.seconds, utc)
+    val wasHeld = stable.isHeld
     val resorted = stable.arrange(swapped, bySpeed, START + 2.seconds, utc)
 
     assertEquals(listOf("a", "b"), held.ids())
+    assertTrue(wasHeld)
     assertEquals(listOf("b", "a"), resorted.ids())
+    assertFalse(stable.isHeld)
     assertEquals(900, held.single().rows[1].speed)
+  }
+
+  @Test
+  fun arrange_clockSetBack_resortsAtOnce() {
+    val stable = StableArrangement()
+    val bySpeed = ListArrangement(SortKey.Speed, descending = true, group = GroupBy.None)
+    stable.arrange(listOf(speedRow("a", 900), speedRow("b", 100)), bySpeed, START, utc)
+    val swapped = listOf(speedRow("a", 100), speedRow("b", 900))
+
+    val arranged = stable.arrange(swapped, bySpeed, START - 1.hours, utc)
+
+    assertEquals(listOf("b", "a"), arranged.ids())
+  }
+
+  @Test
+  fun arrange_noRowShownBefore_sortsWithoutHolding() {
+    val stable = StableArrangement()
+    val bySpeed = ListArrangement(SortKey.Speed, descending = true, group = GroupBy.None)
+    stable.arrange(emptyList(), bySpeed, START, utc)
+
+    val arranged = stable.arrange(
+      listOf(speedRow("a", 100), speedRow("b", 900)),
+      bySpeed,
+      START + 1.seconds,
+      utc,
+      frozen = true
+    )
+
+    assertEquals(listOf("b", "a"), arranged.ids())
+    assertFalse(stable.isHeld)
+  }
+
+  @Test
+  fun arrange_deviceRenamedWhileHeld_keepsOneGroup() {
+    val stable = StableArrangement()
+    val byDevice = ListArrangement(group = GroupBy.Device)
+    stable.arrange(listOf(row("a", DownloadState.Queued)), byDevice, START, utc)
+    val renamed = DeviceInfo("Studio Mac", RowCapabilities.local())
+    val rows = listOf(
+      row("a", DownloadState.Queued, device = renamed),
+      row("b", DownloadState.Queued, device = renamed)
+    )
+
+    val held = stable.arrange(rows, byDevice, START + 1.seconds, utc)
+
+    assertEquals(listOf("device:$LOCAL_DEVICE_ID"), held.map { it.id })
+    assertEquals(listOf("a", "b"), held.ids())
   }
 
   @Test

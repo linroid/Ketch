@@ -167,6 +167,13 @@ class StableArrangement(private val interval: Duration = RESORT_INTERVAL) {
   private var arrangedAt: Instant? = null
 
   /**
+   * Whether the last [arrange] kept an earlier order instead of sorting, so arranging the same
+   * rows again once the list may re-sort can move them.
+   */
+  var isHeld: Boolean = false
+    private set
+
+  /**
    * Arranges [rows] like [arrangeRows], keeping the previous order unless the list may re-sort.
    *
    * @param frozen whether the user is pointing at or working in the list.
@@ -182,33 +189,45 @@ class StableArrangement(private val interval: Duration = RESORT_INTERVAL) {
     view: Any? = arrangement,
   ): List<RowGroup> {
     val last = arrangedAt
-    val due = last == null || now - last >= interval
-    if (view != this.view || (due && !frozen)) {
+    // A clock set back counts as due, so the order is not held until the clock catches up.
+    val due = last == null || now < last || now - last >= interval
+    val held = if (view == this.view && (!due || frozen)) {
+      keep(rows, arrangement, now, timeZone)
+    } else {
+      null
+    }
+    if (held == null) {
       layout = sortedSlots(rows, arrangement, now, timeZone)
         .map { (slot, members) -> slot to members.map { it.key } }
       this.view = view
       arrangedAt = now
     } else {
-      layout = keep(rows, arrangement, now, timeZone)
+      layout = held
     }
+    isHeld = held != null
     val rowsByKey = rows.associateBy { it.key }
     return layout.map { (slot, keys) ->
       groupOf(slot, keys.map(rowsByKey::getValue), arrangement, now, timeZone)
     }
   }
 
+  /**
+   * The previous layout without the rows that left and with new rows placed among the others,
+   * or `null` when none of [rows] was shown before, since sorting them then moves nothing.
+   */
   private fun keep(
     rows: List<TaskRow>,
     arrangement: ListArrangement,
     now: Instant,
     timeZone: TimeZone,
-  ): List<Pair<Slot, List<TaskKey>>> {
+  ): List<Pair<Slot, List<TaskKey>>>? {
     val present = rows.mapTo(HashSet()) { it.key }
     val groups = LinkedHashMap<Slot, MutableList<TaskKey>>()
     for ((slot, keys) in layout) {
       val kept = keys.filterTo(ArrayList()) { it in present }
       if (kept.isNotEmpty()) groups[slot] = kept
     }
+    if (groups.isEmpty()) return null
     val placed = groups.values.flatMapTo(HashSet()) { it }
     val fresh = rows.filter { it.key !in placed }
     if (fresh.isNotEmpty()) {
@@ -232,17 +251,22 @@ class StableArrangement(private val interval: Duration = RESORT_INTERVAL) {
 private enum class SlotKind { Downloading, Waiting, Day, Plain }
 
 /**
- * Where a row goes under a [GroupBy]. Groups are ordered by [order], then by [name], then by
+ * Where a row goes under a [GroupBy], identified by [id] alone, so a device renamed while the
+ * order is held still has one group. Groups are ordered by [order], then by [name], then by
  * first appearance.
  */
-private data class Slot(
+private class Slot(
   val id: String,
   val title: String,
   val order: Int,
   val name: String = "",
   val kind: SlotKind = SlotKind.Plain,
   val collapsible: Boolean = false,
-)
+) {
+  override fun equals(other: Any?): Boolean = other is Slot && other.id == id
+
+  override fun hashCode(): Int = id.hashCode()
+}
 
 private val SLOT_ORDER: Comparator<Slot> = compareBy({ it.order }, { it.name })
 

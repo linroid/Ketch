@@ -196,7 +196,8 @@ data class TaskListView(
  * thousand tasks with many of them downloading cost the UI at most four updates a second. While
  * anything downloads the model also wakes once a second, to catch stalls and to sample each
  * downloading task's speed into [TaskRow.speedSamples]; otherwise once a minute, for countdowns
- * and dates.
+ * and dates. It also wakes once a second while [view] holds an order that a re-sort may change,
+ * so a held list re-sorts even when no task changes.
  *
  * @param sources the devices whose tasks to show.
  * @param scope runs the model until it is cancelled.
@@ -226,10 +227,15 @@ class TaskListModel(
   private val moved = HashMap<TaskKey, Moved>()
   private val rings = HashMap<TaskKey, SpeedRing>()
   private val contexts = HashMap<String, RowContext>()
+  private var lastRows: List<TaskRow> = emptyList()
   private val downloading = MutableStateFlow(false)
   private var ticks = 0L
   private var sampledTick = 0L
+
+  // Only the view pipeline touches the arranger; it asks for wake-ups through resortPending.
   private val arranger = StableArrangement()
+  private val resortPending = MutableStateFlow(false)
+  private val resorts = MutableStateFlow(0)
 
   /** Every task of every device, in device order, unfiltered. */
   val rows: StateFlow<List<TaskRow>> =
@@ -250,7 +256,7 @@ class TaskListModel(
   /** The rows of the current tab that match the search, grouped and sorted. */
   val view: StateFlow<TaskListView> =
     combine(
-      rows,
+      combine(rows, resorts) { list, _ -> list },
       filter,
       query.map(SearchQuery::parse).distinctUntilChanged(),
       arrangement,
@@ -268,6 +274,7 @@ class TaskListModel(
         frozen = holding,
         view = Triple(tab, search, order),
       )
+      resortPending.value = arranger.isHeld && !holding
       TaskListView(tab, search, order, groups, onTab.size)
     }
       .flowOn(dispatcher)
@@ -300,18 +307,22 @@ class TaskListModel(
   }
 
   /**
-   * Wakes the model once a second while anything downloads, otherwise at each minute. The first
-   * tick comes at once, so the first rows need not wait for it.
+   * Wakes the model once a second while anything downloads or a held order waits to re-sort,
+   * otherwise at each minute. The first tick comes at once, so the first rows need not wait for
+   * it.
    */
-  private fun ticks(): Flow<Long> = downloading.flatMapLatest { active ->
-    flow {
-      if (!active) emit(++ticks)
-      while (true) {
-        delay(if (active) SAMPLE_INTERVAL else untilNextMinute())
-        emit(++ticks)
+  private fun ticks(): Flow<Long> =
+    combine(downloading, resortPending) { active, pending -> active || pending }
+      .distinctUntilChanged()
+      .flatMapLatest { active ->
+        flow {
+          if (!active) emit(++ticks)
+          while (true) {
+            delay(if (active) SAMPLE_INTERVAL else untilNextMinute())
+            emit(++ticks)
+          }
+        }
       }
-    }
-  }
 
   private fun untilNextMinute(): Duration {
     val millis = clock.now().toEpochMilliseconds()
@@ -340,6 +351,9 @@ class TaskListModel(
     rings.keys.retainAll(seen)
     contexts.keys.retainAll(frame.devices.mapTo(HashSet()) { it.source.deviceId })
     downloading.value = rows.any { it.state is DownloadState.Downloading }
+    // Unchanged rows never reach the view, so wake it to re-sort the order it holds.
+    if (resortPending.value && rows == lastRows) resorts.value += 1
+    lastRows = rows
     return rows
   }
 
