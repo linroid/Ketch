@@ -104,14 +104,16 @@ private fun pathFileName(path: String): String? {
 /**
  * File name in a document URI such as `content://…/document/primary%3ADownload%2Fa.iso`, whose
  * last segment is a document id that ends in the path or name of the file. A tree URI
- * (`content://…/tree/{id}`) is a folder.
+ * (`content://…/tree/{id}`) is a folder, and an opaque numeric id (`msf:1234`, or the
+ * `content://media/…/1234` row of a media store) names no file.
  */
 private fun contentUriFileName(uri: String): String? {
   val segments = uri.substringAfter("://").substringBefore('?').substringBefore('#')
     .split('/').drop(1).filter { it.isNotEmpty() }
   if (segments.firstOrNull() == "tree" && segments.size <= 2) return null
   val id = percentDecode(segments.lastOrNull() ?: return null)
-  return if ('/' in id) id.substringAfterLast('/') else id.substringAfterLast(':')
+  val name = if ('/' in id) id.substringAfterLast('/') else id.substringAfterLast(':')
+  return name.takeUnless { it.all(Char::isDigit) }
 }
 
 private fun magnetName(url: String): String? {

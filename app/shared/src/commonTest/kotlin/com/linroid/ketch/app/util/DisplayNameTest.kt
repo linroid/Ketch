@@ -38,6 +38,20 @@ class DisplayNameTest {
   }
 
   @Test
+  fun displayName_completedOpaqueContentUri_fallsBackToUrl() {
+    val request = DownloadRequest("https://example.com/files/ubuntu.iso")
+    val outputPaths = listOf(
+      "content://com.android.providers.downloads.documents/document/msf%3A1000000123",
+      "content://media/external/downloads/1234"
+    )
+
+    for (outputPath in outputPaths) {
+      val state = DownloadState.Completed(outputPath)
+      assertEquals("ubuntu.iso", displayName(request, state), "output $outputPath")
+    }
+  }
+
+  @Test
   fun displayName_nameDestination_usesName() {
     val request = DownloadRequest("https://example.com/a", destination = Destination("b.iso"))
 
@@ -71,7 +85,7 @@ class DisplayNameTest {
     val request = DownloadRequest(
       url = "https://example.com/files/a.iso",
       destination = Destination(
-        "content://com.android.externalstorage.documents/tree/primary%3ADownload",
+        "content://com.android.externalstorage.documents/tree/primary%3ADownload"
       ),
     )
 
@@ -149,7 +163,7 @@ class DisplayNameTest {
   }
 
   @Test
-  fun urlHost_stripsUserInfoPortAndBrackets() {
+  fun urlHost_userInfoPortAndBrackets_areStripped() {
     assertEquals("ftp.example.com", urlHost("ftp://user:p%40ss@FTP.example.com:21/a"))
     assertEquals("::1", urlHost("http://[::1]:8080/a"))
   }

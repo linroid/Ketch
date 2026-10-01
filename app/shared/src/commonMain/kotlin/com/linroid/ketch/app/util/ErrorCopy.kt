@@ -28,14 +28,20 @@ data class ErrorCopy(
 ) {
   /**
    * First sentence of [hint] starting in lower case, to follow [title] after " · " on a row:
-   * "Access denied (403) · the link may have expired".
+   * "Access denied (403) · the link may have expired". Acronyms, "I" and Title Case phrases
+   * such as an HTTP reason ("Bad Request") keep their case.
    */
   val shortHint: String?
     get() {
       val sentence = hint?.substringBefore(". ")?.removeSuffix(".")?.trim()
       if (sentence.isNullOrEmpty()) return null
-      val isAcronym = sentence.length > 1 && sentence[1].isUpperCase()
-      return if (isAcronym) sentence else sentence.replaceFirstChar { it.lowercaseChar() }
+      val words = sentence.split(' ').filter { it.isNotEmpty() }
+      val first = words.first()
+      val isAcronym = first.length > 1 && first[1].isUpperCase()
+      val isPronoun = first == "I" || first.startsWith("I'")
+      val isTitleCase = words.size > 1 && words.all { it.first().isUpperCase() }
+      if (isAcronym || isPronoun || isTitleCase) return sentence
+      return sentence.replaceFirstChar { it.lowercaseChar() }
     }
 }
 
@@ -218,7 +224,9 @@ private fun httpCopy(
 }
 
 private fun sourceCopy(error: KetchError.SourceError): ErrorCopy {
-  val cause = error.cause?.describeCauses()?.substringBefore(" <- ")
+  // The first cause that has a message, without its class name: "FTP 550: No such file".
+  val cause = error.cause?.describeCauses()?.split(" <- ")
+    ?.firstNotNullOfOrNull { it.substringAfter(": ", "").ifEmpty { null } }
   return when (error.sourceType.lowercase()) {
     "torrent" -> ErrorCopy(
       title = "The torrent stopped",

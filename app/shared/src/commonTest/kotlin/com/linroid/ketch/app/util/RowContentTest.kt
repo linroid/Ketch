@@ -107,6 +107,16 @@ class RowContentTest {
   }
 
   @Test
+  fun rowContent_progressPastTotal_staysAtHundredPercent() {
+    val state = DownloadState.Paused(DownloadProgress(150, 100))
+
+    val content = rowContent(request, state, now, context)
+
+    assertEquals("Paused · 100%", content.detail)
+    assertEquals(1f, content.progress)
+  }
+
+  @Test
   fun rowContent_queued_explainsWait() {
     val running = listOf(DownloadRequest("https://a.com/1"), DownloadRequest("https://b.com/2"))
 
@@ -122,7 +132,7 @@ class RowContentTest {
   @Test
   fun rowContent_scheduledAtTime_countsDown() {
     val state = DownloadState.Scheduled(
-      DownloadSchedule.AtTime(Instant.parse("2026-10-01T23:00:00Z")),
+      DownloadSchedule.AtTime(Instant.parse("2026-10-01T23:00:00Z"))
     )
 
     val content = rowContent(request, state, now, context)
@@ -149,7 +159,7 @@ class RowContentTest {
 
     assertEquals(
       "Starts today at 19:00",
-      rowContent(request, DownloadState.Scheduled(past), now, context).detail,
+      rowContent(request, DownloadState.Scheduled(past), now, context).detail
     )
   }
 
@@ -243,7 +253,7 @@ class RowContentTest {
   }
 
   @Test
-  fun formatAdded_recentAndOlderDates() {
+  fun formatAdded_pastDates_namesDayOrDate() {
     assertEquals("Today 11:42", formatAdded(Instant.parse("2026-10-01T11:42:00Z"), now, UTC))
     assertEquals("Yesterday", formatAdded(Instant.parse("2026-09-30T23:59:00Z"), now, UTC))
     assertEquals("Sep 28", formatAdded(now - 3.days, now, UTC))
@@ -251,7 +261,7 @@ class RowContentTest {
   }
 
   @Test
-  fun formatAdded_usesLocalDay() {
+  fun formatAdded_otherTimeZone_usesLocalDay() {
     val tokyo = UtcOffset(hours = 9).asTimeZone()
 
     assertEquals("Yesterday", formatAdded(Instant.parse("2026-10-01T11:42:00Z"), now, tokyo))

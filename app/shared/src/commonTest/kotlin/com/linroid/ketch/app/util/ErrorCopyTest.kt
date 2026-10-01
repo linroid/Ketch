@@ -34,7 +34,7 @@ class ErrorCopyTest {
       KetchError.SourceError("torrent") to ("The torrent stopped" to RowAction.Retry),
       KetchError.AuthenticationFailed("ftp") to
         ("Wrong user name or password" to RowAction.EnterCredentials),
-      KetchError.Unknown(errorMessage = "boom") to ("Something went wrong" to RowAction.Retry),
+      KetchError.Unknown(errorMessage = "boom") to ("Something went wrong" to RowAction.Retry)
     )
 
     for ((error, copy) in expected) {
@@ -56,7 +56,7 @@ class ErrorCopyTest {
       429 to ("Server is rate-limiting" to RowAction.RetryWithConnections(1)),
       500 to ("Server error (500)" to RowAction.Retry),
       503 to ("Server error (503)" to RowAction.Retry),
-      418 to ("Server answered 418" to RowAction.Retry),
+      418 to ("Server answered 418" to RowAction.Retry)
     )
 
     for ((code, copy) in expected) {
@@ -104,7 +104,7 @@ class ErrorCopyTest {
     val captured = request.copy(
       headers = mapOf(
         "referer" to "https://github.com/releases",
-        "User-Agent" to "Mozilla/5.0 AppleWebKit/537.36 Chrome/128.0 Safari/537.36",
+        "User-Agent" to "Mozilla/5.0 AppleWebKit/537.36 Chrome/128.0 Safari/537.36"
       ),
     )
 
@@ -112,7 +112,7 @@ class ErrorCopyTest {
 
     assertEquals(
       "The link may have expired. Captured from Chrome? Capture it again from the page.",
-      copy.hint,
+      copy.hint
     )
     assertEquals(listOf(RowAction.OpenSourcePage), copy.secondary)
     assertEquals("the link may have expired", copy.shortHint)
@@ -157,12 +157,20 @@ class ErrorCopyTest {
   @Test
   fun toCopy_ftpErrors_nameTheServerAndCause() {
     val auth = KetchError.AuthenticationFailed("ftp").toCopy(request, 0, local)
-    val source = KetchError.SourceError("ftp", IllegalStateException("550 No such file"))
+    val source = KetchError.SourceError("ftp", Exception("FTP 550: No such file"))
       .toCopy(request, 0, local)
 
     assertEquals("The FTP server rejected the sign-in.", auth.hint)
     assertEquals("The FTP server reported an error", source.title)
-    assertEquals("IllegalStateException: 550 No such file", source.hint)
+    assertEquals("FTP 550: No such file", source.hint)
+    assertEquals("FTP 550: No such file", source.shortHint)
+  }
+
+  @Test
+  fun toCopy_sourceErrorWithoutCauseMessage_hasNoHint() {
+    val wrapped = KetchError.SourceError("ftp", IllegalStateException(IllegalStateException()))
+
+    assertNull(wrapped.toCopy(request, 0, local).hint)
   }
 
   @Test
@@ -185,6 +193,17 @@ class ErrorCopyTest {
     val copy = ErrorCopy("Title", "FTP said no. Try later.", RowAction.Retry)
 
     assertEquals("FTP said no", copy.shortHint)
+  }
+
+  @Test
+  fun shortHint_reasonPhraseOrPronoun_keepsCase() {
+    val reason = KetchError.Http(400, "Bad Request").toCopy(request, 0, local)
+    val teapot = KetchError.Http(418, "I'm a teapot").toCopy(request, 0, local)
+    val sentence = ErrorCopy("Title", "The FTP server rejected it.", RowAction.Retry)
+
+    assertEquals("Bad Request", reason.shortHint)
+    assertEquals("I'm a teapot", teapot.shortHint)
+    assertEquals("the FTP server rejected it", sentence.shortHint)
   }
 
   @Test
@@ -219,7 +238,7 @@ class ErrorCopyTest {
   }
 
   @Test
-  fun errorDetails_masksCredentialsAndNamesVersion() {
+  fun errorDetails_urlWithCredentials_masksThemAndNamesVersion() {
     val ftp = DownloadRequest("ftp://me:secret@ftp.example.com/a.iso")
 
     val details = errorDetails(KetchError.Http(403), ftp, taskId = "task-1")

@@ -77,7 +77,7 @@ sealed class RowAction(val label: String, val destructive: Boolean = false) {
    * @property connections connection count to retry with.
    */
   data class RetryWithConnections(val connections: Int) : RowAction(
-    if (connections == 1) "Retry with 1 connection" else "Retry with $connections connections",
+    if (connections == 1) "Retry with 1 connection" else "Retry with $connections connections"
   )
 
   /** Opens the add sheet with user name and password fields. */
@@ -202,7 +202,7 @@ fun taskActions(
     is DownloadState.Queued -> waitingOrRunning(
       RowAction.StartNow,
       listOf(RowAction.Pause, RowAction.StartNow),
-      capabilities,
+      capabilities
     )
     is DownloadState.Scheduled -> {
       val startNow = RowAction.StartNow.takeIf { capabilities.canReschedule }
@@ -228,7 +228,7 @@ private fun waitingOrRunning(
     RowAction.CopyLink,
     RowAction.Details,
     RowAction.StopAndDiscard,
-    RowAction.Remove,
+    RowAction.Remove
   )
   return TaskActions(primary, listOfNotNull(primary), menu)
 }
@@ -247,7 +247,7 @@ private fun completed(capabilities: RowCapabilities, fileMissing: Boolean): Task
     RowAction.SendTo,
     RowAction.DownloadAgain,
     RowAction.Remove,
-    removeWithFiles,
+    removeWithFiles
   )
   return if (canOpen) {
     TaskActions(RowAction.Open, listOf(RowAction.Open, RowAction.ShowInFolder), menu)
@@ -273,7 +273,7 @@ private fun failed(
     RowAction.CopyLink,
     RowAction.DownloadAgain,
     RowAction.FindAnotherSource.takeIf { device.capabilities.canDiscover },
-    RowAction.SendTo,
+    RowAction.SendTo
   )
   val menu = (fixes + others).distinct() + RowAction.Remove
   return TaskActions(copy.primary, listOf(copy.primary), menu)

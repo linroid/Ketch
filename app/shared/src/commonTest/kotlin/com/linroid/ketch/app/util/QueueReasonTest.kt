@@ -26,7 +26,7 @@ class QueueReasonTest {
 
     assertEquals(
       "Waiting for a free slot (3 of 2 in use)",
-      QueueReason.of(queued, config, running).text,
+      QueueReason.of(queued, config, running).text
     )
   }
 
@@ -36,7 +36,7 @@ class QueueReasonTest {
     val running = listOf(
       request("https://GitHub.com/1"),
       request("https://user@github.com:443/2"),
-      request("https://example.com/3"),
+      request("https://example.com/3")
     )
 
     val reason = QueueReason.of(queued, config, running)

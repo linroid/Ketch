@@ -136,14 +136,17 @@ fun rowContent(
         speed = "${formatBytes(progress.bytesPerSecond.coerceAtLeast(0))}/s",
         time = if (stalled) UNKNOWN else timeLeft(progress),
         added = added,
-        progress = progress.percent.takeIf { progress.totalBytes > 0 },
+        progress = fraction(progress),
         limited = limited,
       )
     }
     is DownloadState.Paused -> {
       val progress = state.progress
-      val known = progress.totalBytes > 0
-      val percent = if (known) "${progress.downloadedBytes * 100 / progress.totalBytes}%" else null
+      val percent = if (progress.totalBytes > 0) {
+        "${(progress.downloadedBytes * 100 / progress.totalBytes).coerceIn(0, 100)}%"
+      } else {
+        null
+      }
       RowContent(
         status = RowStatus.Paused,
         statusText = "Paused",
@@ -152,7 +155,7 @@ fun rowContent(
         speed = "",
         time = "",
         added = added,
-        progress = progress.percent.takeIf { known },
+        progress = fraction(progress),
       )
     }
     is DownloadState.Queued -> RowContent(
@@ -269,6 +272,10 @@ private fun runningSize(state: DownloadState): String =
 private fun knownSize(request: DownloadRequest): String =
   request.resolvedSource?.totalBytes?.takeIf { it > 0 }?.let(::formatBytes) ?: UNKNOWN
 
+/** Fraction downloaded, kept within `0..1`, or `null` while the size is unknown. */
+private fun fraction(progress: DownloadProgress): Float? =
+  progress.percent.coerceIn(0f, 1f).takeIf { progress.totalBytes > 0 }
+
 private fun timeLeft(progress: DownloadProgress): String {
   if (progress.totalBytes <= 0 || progress.bytesPerSecond <= 0) return UNKNOWN
   val remaining = (progress.totalBytes - progress.downloadedBytes).coerceAtLeast(0)
@@ -323,5 +330,5 @@ private fun shortDate(date: LocalDate, today: LocalDate): String {
 private const val SEPARATOR = " · "
 private const val UNKNOWN = "–"
 private val MONTHS = listOf(
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 )

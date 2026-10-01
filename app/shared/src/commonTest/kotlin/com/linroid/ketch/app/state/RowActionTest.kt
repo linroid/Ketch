@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.util.toCopy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -28,7 +29,7 @@ class RowActionTest {
     KetchError.Canceled(),
     KetchError.SourceError("torrent"),
     KetchError.AuthenticationFailed("ftp"),
-    KetchError.Unknown(),
+    KetchError.Unknown()
   )
 
   private val states: List<DownloadState> = listOf(
@@ -37,7 +38,7 @@ class RowActionTest {
     DownloadState.Downloading(progress),
     DownloadState.Paused(progress),
     DownloadState.Completed("/tmp/a.iso"),
-    DownloadState.Canceled,
+    DownloadState.Canceled
   ) + errors.map { DownloadState.Failed(it) }
 
   @Test
@@ -48,12 +49,16 @@ class RowActionTest {
         val label = "$state on ${device.name}"
 
         actions.primary?.let { assertTrue(it in actions.menu, "primary in menu for $label") }
+        if (state is DownloadState.Failed) {
+          val fix = state.error.toCopy(request, retryCount = 0, device = device).primary
+          assertEquals(fix, actions.primary, "error fix leads for $label")
+        }
         assertEquals(actions.menu.distinct(), actions.menu, "no duplicates for $label")
         val firstDestructive = actions.menu.indexOfFirst { it.destructive }
         assertTrue(firstDestructive >= 0, "a way to remove for $label")
         assertTrue(
           actions.menu.drop(firstDestructive).all { it.destructive },
-          "destructive items last for $label",
+          "destructive items last for $label"
         )
       }
     }
@@ -96,7 +101,7 @@ class RowActionTest {
       DownloadState.Failed(KetchError.FileChanged("ETag changed")),
       DownloadState.Failed(KetchError.CorruptResumeState()),
       DownloadState.Failed(KetchError.Http(416)),
-      DownloadState.Failed(KetchError.Canceled()),
+      DownloadState.Failed(KetchError.Canceled())
     )
 
     for (device in listOf(local, remote)) {
@@ -116,7 +121,7 @@ class RowActionTest {
     assertEquals(RowAction.EditLink, actions.primary)
     assertEquals(
       listOf(RowAction.EditLink, RowAction.CopyLink, RowAction.Retry),
-      actions.menu.take(3),
+      actions.menu.take(3)
     )
     assertFalse(RowAction.RetryWithOptions in actions.menu)
   }
