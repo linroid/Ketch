@@ -4,15 +4,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.util.RowStatus
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /**
  * How a row plays its download's completion: the lane strip stays for its sheen while
@@ -71,6 +75,23 @@ internal fun rememberRowCompletion(row: TaskRow): RowCompletion {
 internal fun showsLanes(row: TaskRow, completion: RowCompletion): Boolean =
   row.state is DownloadState.Downloading || row.state is DownloadState.Paused ||
     (row.state is DownloadState.Completed && completion.showsStrip)
+
+/**
+ * Where [row]'s stalled connections start, whose write heads its lane strip draws in amber; read
+ * from the app's speed history.
+ */
+@Composable
+internal fun rememberStalledLanes(row: TaskRow): Set<Long> {
+  val history = LocalAppState.current.speedHistory
+  val stalled by remember(history, row.key) {
+    history.rates
+      .map { rates ->
+        rates[row.key].orEmpty().filter { it.stalledFor != null }.mapTo(HashSet()) { it.start }
+      }
+      .distinctUntilChanged()
+  }.collectAsState(emptySet())
+  return stalled
+}
 
 /**
  * [row] as the list shows it once its finished file turned out to be [missing]: a warning dot,

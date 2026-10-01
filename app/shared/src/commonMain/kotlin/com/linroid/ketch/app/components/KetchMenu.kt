@@ -394,11 +394,14 @@ private fun MenuPopup(
   val density = LocalDensity.current
   val shift = with(density) { IntOffset(offset.x.roundToPx(), offset.y.roundToPx()) }
   val gap = with(density) { MenuGap.roundToPx() }
+  val margin = with(density) { KetchTheme.spacing.s2.roundToPx() }
   val root = remember { MenuLevel() }
   val menuFocus = remember { MenuFocus() }
   val currentEntries by rememberUpdatedState(entries)
   Popup(
-    popupPositionProvider = remember(shift, gap) { DropdownPositionProvider(shift, gap) },
+    popupPositionProvider = remember(shift, gap, margin) {
+      DropdownPositionProvider(shift, gap, margin)
+    },
     onDismissRequest = onDismiss,
     properties = PopupProperties(focusable = true),
   ) {
@@ -555,9 +558,11 @@ private fun SubmenuPopup(
   focus: MenuFocus,
   onDismiss: () -> Unit,
 ) {
-  val inset = with(LocalDensity.current) { (MenuInset + 1.dp).roundToPx() }
+  val density = LocalDensity.current
+  val inset = with(density) { (MenuInset + 1.dp).roundToPx() }
+  val margin = with(density) { KetchTheme.spacing.s2.roundToPx() }
   Popup(
-    popupPositionProvider = remember(inset) { SubmenuPositionProvider(inset) },
+    popupPositionProvider = remember(inset, margin) { SubmenuPositionProvider(inset, margin) },
     properties = PopupProperties(focusable = false),
   ) {
     MenuPanel(entry.entries, level, focus, onDismiss)
@@ -818,10 +823,14 @@ private fun SheetRow(
   }
 }
 
-/** Opens under the anchor's start edge, or above it when there is no room below. */
+/**
+ * Opens under the anchor's start edge, or above it when there is no room below, keeping
+ * [margin] from the window's edges where the window has room for it.
+ */
 private class DropdownPositionProvider(
   private val offset: IntOffset,
   private val gap: Int,
+  private val margin: Int,
 ) : PopupPositionProvider {
   override fun calculatePosition(
     anchorBounds: IntRect,
@@ -834,20 +843,26 @@ private class DropdownPositionProvider(
     } else {
       anchorBounds.right - popupContentSize.width - offset.x
     }
-    val x = start.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+    val x = inWindow(start, popupContentSize.width, windowSize.width, margin)
     val below = anchorBounds.bottom + gap + offset.y
     val above = anchorBounds.top - gap - popupContentSize.height - offset.y
     val y = when {
-      below + popupContentSize.height <= windowSize.height -> below
-      above >= 0 -> above
-      else -> (windowSize.height - popupContentSize.height).coerceAtLeast(0)
+      below + popupContentSize.height <= windowSize.height - margin -> below
+      above >= margin -> above
+      else -> inWindow(below, popupContentSize.height, windowSize.height, margin)
     }
     return IntOffset(x, y)
   }
 }
 
-/** Opens beside its row, on the end side when it fits, with its first item level with it. */
-private class SubmenuPositionProvider(private val inset: Int) : PopupPositionProvider {
+/**
+ * Opens beside its row, on the end side when it fits, with its first item level with it, and
+ * [margin] from the window's edges where the window has room for it.
+ */
+private class SubmenuPositionProvider(
+  private val inset: Int,
+  private val margin: Int,
+) : PopupPositionProvider {
   override fun calculatePosition(
     anchorBounds: IntRect,
     windowSize: IntSize,
@@ -856,17 +871,27 @@ private class SubmenuPositionProvider(private val inset: Int) : PopupPositionPro
   ): IntOffset {
     val end = anchorBounds.right + inset
     val start = anchorBounds.left - inset - popupContentSize.width
-    val endFits = end + popupContentSize.width <= windowSize.width
-    val startFits = start >= 0
+    val endFits = end + popupContentSize.width <= windowSize.width - margin
+    val startFits = start >= margin
     val x = if (layoutDirection == LayoutDirection.Ltr) {
       if (endFits || !startFits) end else start
     } else {
       if (startFits || !endFits) start else end
     }
-    val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-    val maxY = (windowSize.height - popupContentSize.height).coerceAtLeast(0)
-    return IntOffset(x.coerceIn(0, maxX), (anchorBounds.top - inset).coerceIn(0, maxY))
+    return IntOffset(
+      inWindow(x, popupContentSize.width, windowSize.width, margin),
+      inWindow(anchorBounds.top - inset, popupContentSize.height, windowSize.height, margin),
+    )
   }
+}
+
+/**
+ * [position] moved so [size] fits within [window], [margin] from both edges, or flush with them
+ * when the window is too small for the margin.
+ */
+private fun inWindow(position: Int, size: Int, window: Int, margin: Int): Int {
+  val inset = if (window - size >= margin * 2) margin else 0
+  return position.coerceIn(inset, (window - size - inset).coerceAtLeast(inset))
 }
 
 private const val SUBMENU_DELAY_MILLIS = 150L

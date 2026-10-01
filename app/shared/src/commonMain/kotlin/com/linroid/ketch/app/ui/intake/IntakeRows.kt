@@ -278,13 +278,15 @@ internal fun TorrentWaiting(actions: IntakeActions, entry: IntakeEntry) {
         variant = KetchButtonVariant.Secondary,
         size = KetchButtonSize.Small,
       )
-      KetchButton(
-        text = "Finish in background",
-        onClick = actions::finishInBackground,
-        variant = KetchButtonVariant.Ghost,
-        size = KetchButtonSize.Small,
-        enabled = session.entries.size == 1,
-      )
+      if (actions.canFinishInBackground) {
+        KetchButton(
+          text = "Finish in background",
+          onClick = actions::finishInBackground,
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+          enabled = session.entries.size == 1,
+        )
+      }
     }
   }
 }

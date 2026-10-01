@@ -42,12 +42,12 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.countChoices
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.folderName
+import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.state.isAppPrivateFolder
 import com.linroid.ketch.app.state.isDocumentTree
 import com.linroid.ketch.app.state.isSameFolder
 import com.linroid.ketch.app.state.recentDownloadFolders
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.config.IntakePreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -128,7 +128,7 @@ private fun FolderGroup(
         KetchTheme.colors.textSecondary
       },
     ) {
-      val free = system?.usableSpace?.takeIf { it > 0 }?.let { "${formatFreeSpace(it)} free" }
+      val free = system?.usableSpace?.takeIf { it > 0 }?.let { "${formatSpace(it)} free" }
       // Typing replaces the pill, so the folder shows once.
       if (typing) {
         SettingsTextInput(
@@ -412,17 +412,6 @@ private fun StepperRow(
   )
 }
 
-/** Disk space as "412 GB" or "1.8 TB": whole gigabytes from 10 GB, else one decimal. */
-private fun formatFreeSpace(bytes: Long): String {
-  val gb = 1L shl GB_SHIFT
-  val tb = gb shl TB_SHIFT
-  return when {
-    bytes >= tb -> "${bytes * 10 / tb / 10}.${bytes * 10 / tb % 10} TB"
-    bytes >= 10 * gb -> "${(bytes + gb / 2) / gb} GB"
-    else -> formatBytes(bytes)
-  }
-}
-
 private suspend fun readSystem(device: InstanceEntry): SystemInfo? = try {
   device.instance.status().system
 } catch (e: CancellationException) {
@@ -435,8 +424,6 @@ private suspend fun readSystem(device: InstanceEntry): SystemInfo? = try {
   null
 }
 
-private const val GB_SHIFT = 30
-private const val TB_SHIFT = 10
 private val RunAtOnceChoices = (1..10).toList() + 0
 private val PerServerChoices = (1..8).toList() + listOf(10, 12, 16, 0)
 private val RetryChoices = (0..10).toList()

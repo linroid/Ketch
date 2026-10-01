@@ -38,6 +38,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.platform.HorizontalResizePointerIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchElevationLevel
@@ -114,6 +116,7 @@ private fun ResizeHandle(
     modifier = modifier
       .width(InspectorHandleWidth)
       .fillMaxHeight()
+      .pointerHoverIcon(HorizontalResizePointerIcon)
       .hoverable(interactions)
       .draggable(
         state = rememberDraggableState { delta ->

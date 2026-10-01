@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.state
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -20,7 +21,6 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.feedback.ActivityEvent
-import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
@@ -209,13 +209,6 @@ class AppState(
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
 
-  private var latestError by mutableStateOf<AppMessage?>(null)
-
-  /** The newest error on screen, as the error banner showed it before toasts replaced it. */
-  @Deprecated("Read the Error messages of messages instead.")
-  val errorMessage: String?
-    get() = latestError?.let { listOfNotNull(it.title, it.detail).joinToString(": ") }
-
   /** State of the current AI discovery search. */
   val aiDiscoverState: AiDiscoverState get() = aiDiscover.state
 
@@ -232,6 +225,13 @@ class AppState(
 
   /** Settings page to show, or `null` while Settings is closed. */
   var settingsRequest by mutableStateOf<SettingsTarget?>(null)
+    private set
+
+  /**
+   * Counts the Settings requests, so asking again for the page Settings opened at goes back to
+   * it after the user moved on, although the request is the same.
+   */
+  var settingsRequests by mutableIntStateOf(0)
     private set
 
   /** A Discover search the shell should navigate to, cleared with [discoverRequestHandled]. */
@@ -361,11 +361,6 @@ class AppState(
       }
     }
     scope.launch {
-      messages.active.collect { active ->
-        latestError = active.lastOrNull { it.level == MessageLevel.Error }
-      }
-    }
-    scope.launch {
       activeInstance.collect {
         instanceSettings = settingsForActive()
         instanceSettings.loadDownload()
@@ -439,6 +434,7 @@ class AppState(
   /** Opens Settings at [target]. */
   fun openSettings(target: SettingsTarget = SettingsTarget(SettingsTarget.Page.General)) {
     settingsRequest = target
+    settingsRequests++
   }
 
   /** Closes Settings. */
@@ -1075,16 +1071,6 @@ class AppState(
 
   fun resetAiDiscover() {
     aiDiscover.reset()
-  }
-
-  /**
-   * Dismisses every error message still on screen, so the banner clears at once instead of
-   * showing the next older error.
-   */
-  fun dismissError() {
-    messages.active.value.filter { it.level == MessageLevel.Error }
-      .forEach { messages.dismiss(it.id) }
-    latestError = null
   }
 
   /** Reports [event] from the host's activity monitor as a message. */

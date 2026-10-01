@@ -212,7 +212,9 @@ internal fun KetchMenuScope.rowMenuEntries(
       RowAction.Connections -> {
         val peers = targets.all { it.isTorrent }
         val name = if (single != null && peers) "Peer limit" else label
-        submenu(name, action.icon) { connectionEntries(targets, runner, peers) }
+        // A connection count is no peer limit, so a mixed selection leaves its torrents alone.
+        val counted = if (peers) targets else targets.filterNot { it.isTorrent }
+        submenu(name, action.icon) { connectionEntries(counted, runner, peers) }
       }
       RowAction.Priority -> submenu(label, action.icon) {
         priorityEntries(targets, runner, context.urgentVictim)

@@ -66,6 +66,7 @@ import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
+import com.linroid.ketch.app.ui.shell.KetchLayout
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlinx.coroutines.launch
@@ -89,7 +90,7 @@ internal fun Launchpad(state: AppState, phone: Boolean, modifier: Modifier = Mod
       modifier = Modifier
         .align(Alignment.TopCenter)
         .padding(horizontal = spacing.s4)
-        .padding(top = spacing.s8, bottom = if (phone) FabClearance else spacing.s8)
+        .padding(top = spacing.s8, bottom = if (phone) KetchLayout.FabClearance else spacing.s8)
         .widthIn(max = LaunchpadWidth)
         .fillMaxWidth(),
     ) {

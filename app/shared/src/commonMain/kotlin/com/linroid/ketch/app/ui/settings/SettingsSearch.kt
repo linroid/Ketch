@@ -173,6 +173,10 @@ internal class SettingsJump(val highlight: Color, val shape: Shape) {
   var highlighted: String? by mutableStateOf(null)
     private set
 
+  /** Anchors the latest jump asked for, so a collapsed section can open for one of its rows. */
+  var requested: List<String> by mutableStateOf(emptyList())
+    private set
+
   /** How strongly [name] is highlighted now, from 0 to 1; read while drawing. */
   fun highlightOf(name: String): Float = if (name == highlighted) flash.value else 0f
 
@@ -183,8 +187,8 @@ internal class SettingsJump(val highlight: Color, val shape: Shape) {
 
   /**
    * Waits a few frames for one of [names] to be laid out, scrolls [scroll] so it sits near the
-   * top of the page, and flashes it. Gives up quietly when none shows, such as a row inside a
-   * collapsed section.
+   * top of the page, and flashes it. A collapsed section that holds one of them opens through
+   * [requested]; otherwise the jump gives up quietly when none shows.
    *
    * @param content coordinates of the scrolled content, which anchors are measured against.
    * @param margin room left above the anchor.
@@ -197,6 +201,7 @@ internal class SettingsJump(val highlight: Color, val shape: Shape) {
     animate: Boolean,
   ) {
     if (names.isEmpty()) return
+    requested = names
     var target: Pair<String, LayoutCoordinates>? = null
     var frames = 0
     while (target == null && frames < MAX_WAIT_FRAMES) {

@@ -156,6 +156,7 @@ private fun RowBody(
           LaneStrip(
             state = row.state,
             segments = row.segments,
+            stalled = rememberStalledLanes(row),
             onCompletionShown = completion::onSheenShown,
             modifier = Modifier.fillMaxWidth().padding(top = spacing.s1),
           )

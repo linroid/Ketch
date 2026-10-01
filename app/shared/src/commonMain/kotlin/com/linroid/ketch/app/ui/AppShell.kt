@@ -41,6 +41,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.devices.DevicesScreen
 import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
@@ -48,6 +49,8 @@ import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.ketch.app.ui.discover.DiscoverScreen
 import com.linroid.ketch.app.ui.downloads.DownloadsScreen
 import com.linroid.ketch.app.ui.downloads.LayoutTier
+import com.linroid.ketch.app.ui.downloads.actions.compactSelectionBarHeight
+import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
 import com.linroid.ketch.app.ui.feedback.BannerHost
 import com.linroid.ketch.app.ui.feedback.ToastHost
 import com.linroid.ketch.app.ui.intake.IntakeHost
@@ -403,6 +406,9 @@ private fun PhoneShell(
   }
   val showsBottomBar = destinations.size >= BOTTOM_BAR_MIN_DESTINATIONS
   val downloads = shell.destination == AppDestination.Downloads
+  // The selection bar takes the bottom of the Downloads page while rows are selected.
+  val pointer = KetchTheme.density == KetchDensity.Compact
+  val selecting = isSelectionMode(appState.selectedKeys.size, pointer)
   val clearance = with(LocalDensity.current) { KetchLayout.FabClearance.toPx() }
   // Read through a derived state, so scrolling recomposes only when the button changes shape.
   val fabExpanded by remember(shell, clearance) {
@@ -437,9 +443,15 @@ private fun PhoneShell(
         modifier = Modifier
           .align(Alignment.BottomCenter)
           .padding(horizontal = spacing.s4)
-          .padding(bottom = if (downloads) KetchLayout.FabClearance else spacing.s2),
+          .padding(
+            bottom = when {
+              !downloads -> spacing.s2
+              selecting -> compactSelectionBarHeight + spacing.s2
+              else -> KetchLayout.FabClearance
+            },
+          ),
       )
-      if (downloads) {
+      if (downloads && !selecting) {
         AddFab(
           expanded = fabExpanded,
           onClick = { appState.openIntake() },

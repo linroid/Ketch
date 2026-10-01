@@ -13,7 +13,6 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
-import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
@@ -37,9 +36,10 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.ui.pulse.switchSpeedMode
+import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.links
 import com.linroid.ketch.config.SpeedLimitMode
 import kotlinx.coroutines.CancellationException
@@ -473,7 +473,7 @@ internal class DesktopCommands(
   fun perform(action: MenuAction) {
     when (action) {
       is MenuAction.Run -> run(action.command)
-      is MenuAction.SetSpeedMode -> setSpeedMode(action.mode)
+      is MenuAction.SetSpeedMode -> if (speedMode != null) state.switchSpeedMode(action.mode)
       is MenuAction.OpenFile -> openFile(action.path, action.name)
       MenuAction.ShowWindow -> actions.showWindow()
     }
@@ -507,7 +507,7 @@ internal class DesktopCommands(
       KetchCommands.PauseAll -> state.pauseAll()
       KetchCommands.ResumeAll -> state.resumeAll()
       KetchCommands.RetryFailed -> state.retryFailed()
-      KetchCommands.SlowLane -> toggleSlowLane()
+      KetchCommands.SlowLane -> if (speedMode != null) state.toggleSlowLane()
       KetchCommands.ToggleInspector -> state.updateInspectorOpen(!state.inspectorOpen)
       KetchCommands.Undo -> state.pendingOps.undoLast()
       KetchCommands.Settings -> {
@@ -586,47 +586,6 @@ internal class DesktopCommands(
       dialog.dispose()
     }
     if (picked.isNotEmpty()) actions.openFiles(picked)
-  }
-
-  private fun toggleSlowLane() {
-    val speed = speedMode ?: return
-    val next = if (speed.mode.value.isSlowLane) SpeedLimitMode.Full else SpeedLimitMode.SlowLane
-    setSpeedMode(next)
-  }
-
-  private fun setSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true) {
-    val speed = speedMode ?: return
-    val previous = speed.settings.value.mode
-    if (mode == previous) return
-    controller.scope.launch {
-      try {
-        speed.setMode(mode)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        log.w { "Couldn't switch the speed mode to $mode: ${e.describeCauses()}" }
-        state.messages.post(
-          level = MessageLevel.Error,
-          title = "Couldn't switch to ${speedModeName(mode)}",
-          detail = e.message,
-          cause = e,
-        )
-        return@launch
-      }
-      val title = when (mode) {
-        SpeedLimitMode.SlowLane -> {
-          "Slow lane on · ${formatBytes(speed.slowLaneSpeed.bytesPerSecond)}/s"
-        }
-        SpeedLimitMode.Full -> "Slow lane off"
-        SpeedLimitMode.Auto -> "Speed follows your rules"
-      }
-      val undo = MessageAction("Undo") { setSpeedMode(previous, undoable = false) }
-      state.messages.post(
-        level = MessageLevel.Success,
-        title = title,
-        actions = if (undoable) listOf(undo) else emptyList(),
-      )
-    }
   }
 
   private fun togglePause() {

@@ -56,6 +56,7 @@ import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.list.GroupCollapse
+import com.linroid.ketch.app.ui.shell.KetchLayout
 import com.linroid.ketch.app.util.SearchQuery
 import com.linroid.ketch.config.DownloadsLayout
 import com.linroid.ketch.remote.ConnectionState
@@ -108,9 +109,9 @@ data class KetchLayoutInfo(
  * [AppState.taskList], as a table where a pointer has room for it and as two-line rows
  * elsewhere. Before the first download it shows the launchpad.
  *
- * The inspector docks beside the table on cards from [DockedInspectorWidth], floats over the
- * list on narrower ones and opens in a bottom sheet on phones. On phones the status tabs are
- * chips that scroll away with the top bar.
+ * The inspector docks beside the table on cards from [KetchLayout.DockedInspectorWidth], floats
+ * over the list on narrower ones and opens in a bottom sheet on phones. On phones the status
+ * tabs are chips that scroll away with the top bar.
  */
 @Composable
 fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier = Modifier) {
@@ -317,7 +318,7 @@ private fun WideDownloads(
   val instances by state.instances.collectAsState()
   val content = pageContent(state, view)
   val firstRun = content.isBare
-  val docked = cardWidth >= DockedInspectorWidth
+  val docked = cardWidth >= KetchLayout.DockedInspectorWidth
   var draggedWidth by remember { mutableStateOf<Dp?>(null) }
   val inspectorWidth = (draggedWidth ?: ui.inspectorWidth.dp)
     .coerceIn(spacing.inspectorMinWidth, spacing.inspectorMaxWidth)
@@ -440,7 +441,7 @@ private fun PageBody(
   val density = KetchTheme.density
   val active by state.activeInstance.collectAsState()
   val deviceName = active?.displayName ?: localDeviceNoun()
-  val bottom = if (phone) FabClearance else spacing.s4
+  val bottom = if (phone) KetchLayout.FabClearance else spacing.s4
   val onAction: (EmptyAction) -> Unit = { action ->
     when (action) {
       EmptyAction.ClearSearch -> state.searchQuery = ""
@@ -585,12 +586,6 @@ private fun PhoneDownloads(page: DownloadsPage, view: TaskListView) {
     SheetInspector(state, inspected, onClose = { state.inspect(null) })
   }
 }
-
-/** Narrowest content card whose inspector docks beside the table. */
-internal val DockedInspectorWidth: Dp = 1040.dp
-
-/** Room a phone list leaves under its last row for the floating Add button. */
-internal val FabClearance: Dp = 88.dp
 
 /** Width of the 1 dp lines that frame the page's parts. */
 internal val HairlineWidth: Dp = 1.dp

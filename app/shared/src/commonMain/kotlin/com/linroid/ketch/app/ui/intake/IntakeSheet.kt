@@ -147,8 +147,11 @@ internal class IntakeActions(
   val fileActions: FileActions?,
   private val scope: CoroutineScope,
   private val onClose: () -> Unit,
-  private val onFinishInBackground: () -> Unit,
+  private val onFinishInBackground: (() -> Unit)?,
 ) {
+  /** Whether the sheet may close while a torrent's file list keeps loading. */
+  val canFinishInBackground: Boolean get() = onFinishInBackground != null
+
   /** Closes the sheet, asking first when typed text would be lost. */
   fun close() {
     if (session.requestClose()) onClose()
@@ -172,7 +175,7 @@ internal class IntakeActions(
 
   /** Closes the sheet and leaves the torrent's file list to load. */
   fun finishInBackground() {
-    onFinishInBackground()
+    onFinishInBackground?.invoke()
   }
 
   /** Asks for `.torrent` files and adds them as rows. */
@@ -233,7 +236,7 @@ internal class IntakeActions(
 internal fun IntakeSheet(
   session: IntakeSession,
   onClose: () -> Unit,
-  onFinishInBackground: () -> Unit,
+  onFinishInBackground: (() -> Unit)?,
 ) {
   val window = LocalWindowInfo.current.containerSize
   val density = LocalDensity.current
@@ -246,7 +249,8 @@ internal fun IntakeSheet(
   val scope = rememberCoroutineScope()
   val close by rememberUpdatedState(onClose)
   val background by rememberUpdatedState(onFinishInBackground)
-  val actions = remember(session, clipboard, picker, fileActions, scope) {
+  val backgroundAllowed = onFinishInBackground != null
+  val actions = remember(session, clipboard, picker, fileActions, scope, backgroundAllowed) {
     IntakeActions(
       session = session,
       clipboard = clipboard,
@@ -254,7 +258,11 @@ internal fun IntakeSheet(
       fileActions = fileActions,
       scope = scope,
       onClose = { close() },
-      onFinishInBackground = { background() },
+      onFinishInBackground = if (backgroundAllowed) {
+        { background?.invoke() }
+      } else {
+        null
+      },
     )
   }
   val available = if (phone) height else height * IntakeSheetDefaults.MAX_HEIGHT_SHARE

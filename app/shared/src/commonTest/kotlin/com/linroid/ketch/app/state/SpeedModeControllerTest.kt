@@ -230,6 +230,21 @@ class SpeedModeControllerTest {
   }
 
   @Test
+  fun setSlowLane_fullSpeedWithACapSetElsewhere_keepsTheCap() = runTest {
+    val device = Device()
+    val controller = controller(device)
+    device.config = device.config.copy(speedLimit = SpeedLimit.mbps(8))
+
+    controller.setSlowLane(SpeedLimit.mbps(2))
+    controller.setRules(listOf(SpeedRule()))
+    controller.toggleSlowLane()
+    controller.toggleSlowLane()
+
+    assertEquals(listOf(SpeedLimit.mbps(2), SpeedLimit.mbps(8)), device.applied)
+    assertEquals(SpeedLimit.mbps(8), controller.settings.value.standard)
+  }
+
+  @Test
   fun setStandard_slowLane_keepsSlowLane() = runTest {
     val device = Device()
     val controller = controller(device)

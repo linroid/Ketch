@@ -63,6 +63,7 @@ import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.PulseModel
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.state.isPairingLink
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.LocalWindowChrome
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
@@ -134,7 +135,9 @@ fun main(args: Array<String>) {
   }
   fun open(opened: OpenedArguments, source: LinkSource) {
     if (opened.files.isNotEmpty()) fileReader.execute { incoming.offerFiles(opened.files) }
-    incoming.offerLinks(opened.links, source)
+    val (pairings, links) = opened.links.partition(::isPairingLink)
+    pairings.forEach { incoming.offerLink(it, source) }
+    incoming.offerLinks(links, source)
   }
 
   val launched = fileArguments(args.toList())

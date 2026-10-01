@@ -120,24 +120,6 @@ class AppStateCommandsTest {
     controller.close()
   }
 
-  @Suppress("DEPRECATION")
-  @Test
-  fun dismissError_severalErrors_clearsTheBanner() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
-    val tasks = List(2) { api.add(downloading).apply { failure = IllegalStateException("No") } }
-
-    tasks.forEach { controller.state.runTaskCommand(it, "pause") { pause() } }
-    runCurrent()
-    assertEquals("Couldn't pause on This Mac: No", controller.state.errorMessage)
-    controller.state.dismissError()
-    runCurrent()
-
-    assertEquals(null, controller.state.errorMessage)
-    assertEquals(2, controller.errors().size)
-    controller.close()
-  }
-
   @Test
   fun runTaskCommand_inFlight_isPending() = runTest {
     val api = RecordingKetchApi()

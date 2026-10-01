@@ -194,6 +194,9 @@ internal fun SpeedControl(
         icon = { option ->
           KetchIcon.More.takeIf { option?.isMore == true && option.custom == null }
         },
+        description = { option ->
+          "Another speed limit".takeIf { option?.isMore == true && option.custom == null }
+        },
       )
     }
     PulsePopover(

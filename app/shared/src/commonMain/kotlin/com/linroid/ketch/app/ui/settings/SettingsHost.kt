@@ -135,8 +135,8 @@ internal fun SettingsContent(
       val last = pageNamed(appSettings.ui.settingsPage)
       mutableStateOf(pageFor(target, current = null, last = last, list = !twoPane)?.name)
     }
-    // Later requests, such as "Speed settings…" while Settings shows.
-    LaunchedEffect(target) {
+    // Later requests, such as "Speed settings…" while Settings shows, even for the same page.
+    LaunchedEffect(target, state.settingsRequests) {
       target?.deviceId?.let { deviceId = it }
       val last = pageNamed(appSettings.ui.settingsPage)
       pageName = pageFor(target, pageNamed(pageName), last, list = !twoPane)?.name

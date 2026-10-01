@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
@@ -482,6 +483,17 @@ private fun BarButton(
     }
   }
 }
+
+/**
+ * Height of the phone form of the selection bar ([SelectionBar] with `compact`), which things
+ * floating over the bottom of the page keep clear of.
+ */
+internal val compactSelectionBarHeight: Dp
+  @Composable get() {
+    val target = KetchTheme.density.iconButtonTarget
+    val spacing = KetchTheme.spacing
+    return target + (target + spacing.s4) + spacing.s1 * 2
+  }
 
 /** The phone form: what is selected and Select all, over labelled icons for the first verbs. */
 @Composable
