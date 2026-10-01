@@ -1,11 +1,11 @@
+@file:OptIn(ExperimentalWasmJsInterop::class)
+
 package com.linroid.ketch.app
 
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -13,19 +13,24 @@ import androidx.compose.ui.window.ComposeViewport
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.app.feedback.reportWebActivity
+import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.WebConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
 import com.linroid.ketch.app.theme.rememberKetchFontsLoaded
 import kotlinx.browser.document
 import kotlinx.browser.window
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
+import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -40,34 +45,20 @@ fun main() {
     onFile = { name, base64 -> incoming.offerTorrentFile(name, Base64.decode(base64)) },
     onError = { name, message -> incoming.offer(IncomingDownload.Failed(name, message)) },
   )
+  val configStore = WebConfigStore()
+  val config = configStore.load()
+  val instanceManager = InstanceManager(
+    factory = InstanceFactory(),
+    initialRemotes = config.remotes,
+    configStore = configStore,
+  )
+  // The page owns the controller and the activity monitor for as long as it is open.
+  val controller = AppController(instanceManager, incoming = incoming)
+  connectOnLoad(instanceManager, config, controller.scope)
+  val activityEvents = reportWebActivity(controller)
+  // Removals and other undoable operations still pending commit when the tab closes.
+  window.addEventListener("pagehide", { controller.state.pendingOps.flush() })
   ComposeViewport(body) {
-    val configStore = remember { WebConfigStore() }
-    val config = remember { configStore.load() }
-    val instanceManager = remember {
-      InstanceManager(
-        factory = InstanceFactory(),
-        initialRemotes = config.remotes,
-        configStore = configStore,
-      )
-    }
-    val scope = rememberCoroutineScope()
-    DisposableEffect(Unit) {
-      // Auto-connect from config remotes or meta tag
-      if (config.remotes.isEmpty() && shouldAutoConnect()) {
-        val host = window.location.hostname
-        val port = window.location.port.toIntOrNull() ?: 80
-        val entry = instanceManager.addRemote(host, port)
-        scope.launch { instanceManager.switchTo(entry) }
-      } else if (config.remotes.isNotEmpty()) {
-        // Web has no embedded instance, so select by type rather than index.
-        val first = instanceManager.instances.value
-          .filterIsInstance<RemoteInstance>().firstOrNull()
-        if (first != null) {
-          scope.launch { instanceManager.switchTo(first) }
-        }
-      }
-      onDispose { instanceManager.close() }
-    }
     // The splash in index.html stays until the fonts are cached, so text never flashes in a
     // fallback font. A font that fails to load must not keep the app hidden.
     var fontWaitOver by remember { mutableStateOf(false) }
@@ -80,12 +71,33 @@ fun main() {
         withFrameNanos {}
         document.getElementById("splash")?.remove()
       }
-      App(instanceManager, incoming = incoming)
+      App(controller, activityEvents = activityEvents)
     }
   }
 }
 
 private val FONT_WAIT_LIMIT = 5.seconds
+
+// Connects to the server that serves this page, or to the first saved remote.
+private fun connectOnLoad(
+  instanceManager: InstanceManager,
+  config: KetchConfig,
+  scope: CoroutineScope,
+) {
+  if (config.remotes.isEmpty() && shouldAutoConnect()) {
+    val host = window.location.hostname
+    val port = window.location.port.toIntOrNull() ?: 80
+    val entry = instanceManager.addRemote(host, port)
+    scope.launch { instanceManager.switchTo(entry) }
+  } else if (config.remotes.isNotEmpty()) {
+    // Web has no embedded instance, so select by type rather than index.
+    val first = instanceManager.instances.value
+      .filterIsInstance<RemoteInstance>().firstOrNull()
+    if (first != null) {
+      scope.launch { instanceManager.switchTo(first) }
+    }
+  }
+}
 
 /**
  * Receives `.torrent` files opened with the installed web app, via the manifest's
