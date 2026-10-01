@@ -143,7 +143,7 @@ internal fun PairingDialog(
           tint = colors.status.completed.color,
         )
         Text(
-          text = "The link includes its access code. Anyone with it can control $name.",
+          text = "The link includes its access code.",
           style = type.caption,
           color = colors.textSecondary,
         )

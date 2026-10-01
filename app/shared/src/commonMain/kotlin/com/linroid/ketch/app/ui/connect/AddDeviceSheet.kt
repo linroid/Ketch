@@ -214,6 +214,15 @@ private fun NearbySection(
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val spacing = KetchTheme.spacing
+  if (!nearby.searched && !nearby.searching) {
+    KetchButton(
+      text = "Find on network",
+      onClick = onFind,
+      variant = KetchButtonVariant.Secondary,
+      leadingIcon = KetchIcon.Search,
+    )
+    return
+  }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -243,12 +252,6 @@ private fun NearbySection(
     }
     when {
       servers.isNotEmpty() -> NearbyList(servers, added, busy, onPick)
-      !nearby.searched && !nearby.searching -> KetchButton(
-        text = "Find on network",
-        onClick = onFind,
-        variant = KetchButtonVariant.Secondary,
-        leadingIcon = KetchIcon.Search,
-      )
       else -> Text(
         text = when {
           nearby.searching -> "Looking for Ketch devices on this network…"

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -35,8 +36,12 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
+import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
@@ -45,7 +50,9 @@ import com.linroid.ketch.app.components.healthColor
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.theme.KetchColors
@@ -170,7 +177,8 @@ internal fun ConnectLandingContent(
         if (devices.isNotEmpty()) {
           Divider(colors)
           LandingSection("Your devices") {
-            Column(Modifier.fillMaxWidth()) {
+            // The rows' hover reaches past the text, which lines up with the rest of the card.
+            Column(Modifier.fillMaxWidth().bleed(spacing.s2)) {
               devices.forEach { device -> LandingDeviceRow(device, onClick = { onPick(device) }) }
             }
           }
@@ -223,6 +231,8 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
   val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
   val (label, tone) = landingStatus(device, colors)
+  // A device without a name of its own goes by its address, which makes no monogram.
+  val unnamed = (device.entry as? RemoteInstance)?.let { it.remoteConfig.name == null } == true
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
@@ -242,12 +252,16 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
       )
       .padding(horizontal = spacing.s2),
   ) {
-    DevicePennant(
-      deviceId = device.deviceId,
-      name = device.name,
-      health = device.health.takeIf { device.connected },
-      failures = device.unseenFailures,
-    )
+    // Sized for the ring, so names line up whether or not a device has one.
+    Box(Modifier.size(DevicePennantDefaults.Large), contentAlignment = Alignment.Center) {
+      DevicePennant(
+        deviceId = device.deviceId,
+        name = device.name,
+        health = device.health.takeIf { device.connected },
+        failures = device.unseenFailures,
+        icon = KetchIcon.Server.takeIf { unnamed },
+      )
+    }
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
       Text(
         text = device.name,
@@ -256,13 +270,15 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      Text(
-        text = device.detail,
-        style = type.caption,
-        color = colors.textSecondary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
+      if (!unnamed) {
+        Text(
+          text = device.detail,
+          style = type.caption,
+          color = colors.textSecondary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
     }
     Text(text = label, style = type.labelS, color = tone, maxLines = 1)
   }
@@ -275,6 +291,20 @@ private fun landingStatus(device: DevicePresence, colors: KetchColors) = when {
   device.health is DeviceHealth.Offline -> "Offline" to colors.status.failed.color
   device.health == DeviceHealth.Connecting -> "Connecting…" to colors.textSecondary
   else -> "Online" to colors.healthColor(device.health)
+}
+
+/** Widens this element by [horizontal] on each side, past its parent's padding. */
+private fun Modifier.bleed(horizontal: Dp): Modifier = layout { measurable, constraints ->
+  val extra = if (constraints.hasBoundedWidth) horizontal.roundToPx() else 0
+  val placeable = measurable.measure(
+    constraints.copy(
+      minWidth = constraints.minWidth + extra * 2,
+      maxWidth = constraints.maxWidth + extra * 2,
+    ),
+  )
+  layout(constraints.constrainWidth(placeable.width - extra * 2), placeable.height) {
+    placeable.place(-extra, 0)
+  }
 }
 
 private val CardWidth = 480.dp
