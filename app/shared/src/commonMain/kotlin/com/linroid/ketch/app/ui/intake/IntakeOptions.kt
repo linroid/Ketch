@@ -358,7 +358,7 @@ private fun StartPill(session: IntakeSession) {
 @Composable
 private fun ConnectionsPill(session: IntakeSession) {
   var expanded by remember { mutableStateOf(false) }
-  val torrents = session.entries.isNotEmpty() && session.entries.all { it.isTorrent }
+  val torrents = session.torrentsOnly
   val connections = session.connections
   val max = session.maxConnections ?: IntakeSession.MAX_CONNECTIONS
   val single = !torrents && max <= 1
@@ -491,7 +491,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
         value = single.fileName,
         onValueChange = { single.fileName = it },
         label = "File name",
-        placeholder = single.resolved?.suggestedFileName ?: single.name,
+        placeholder = single.name,
         enabled = !session.isSystemFolder,
         modifier = Modifier.fillMaxWidth(),
       )

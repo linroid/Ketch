@@ -28,8 +28,8 @@ import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.components.startTimeLabel
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.DroppedFile
@@ -63,6 +63,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
@@ -197,14 +198,19 @@ class IntakeEntry internal constructor(source: IntakeSource) {
       is IntakeSource.File -> resolved?.url
     }
 
-  /** Name shown for the row: the typed one, the source's, or one taken from the link. */
+  /**
+   * Name shown for the row, the one it is saved as: the typed one, the one it arrived with, the
+   * source's, or one taken from the link.
+   */
   val name: String
     get() {
       fileName.trim().takeIf { it.isNotEmpty() }?.let { return it }
+      (source as? IntakeSource.Link)?.fileName?.trim()?.takeIf { it.isNotEmpty() }
+        ?.let { return it }
       val suggested = resolved?.suggestedFileName?.trim()?.takeIf { it.isNotEmpty() }
       if (suggested != null && source !is IntakeSource.Range) return suggested
       return when (val current = source) {
-        is IntakeSource.Link -> current.fileName ?: displayName(DownloadRequest(current.url))
+        is IntakeSource.Link -> displayName(DownloadRequest(current.url))
         is IntakeSource.Range ->
           "${extractFilename(current.urls.first())} … ${extractFilename(current.urls.last())}"
         is IntakeSource.File -> current.file.name.removeSuffix(".torrent")
@@ -233,6 +239,14 @@ class IntakeEntry internal constructor(source: IntakeSource) {
   /** Whether the row is a magnet whose peers sent no file list in time; it keeps waiting. */
   val isTimedOut: Boolean
     get() = (status as? IntakeStatus.Problem)?.problem == IntakeProblem.MagnetTimeout
+
+  /**
+   * Whether submitting waits for the row's check, which is under way, so that a link that fails
+   * stays out of the batch. Torrents are not waited for: their peers may take minutes.
+   */
+  internal val checkPending: Boolean
+    get() = wanted && !isTorrent && addable &&
+      (status is IntakeStatus.Waiting || status is IntakeStatus.Checking)
 
   /** Whether submitting adds the row. */
   val addable: Boolean
@@ -269,7 +283,8 @@ data class IntakeSummary(
       add(if (links == 1) "1 link" else "$links links")
       add("$ready ready")
       if (checking > 0) add("$checking checking")
-      if (attention > 0) add("$attention needs attention")
+      if (attention == 1) add("1 needs attention")
+      if (attention > 1) add("$attention need attention")
       if (duplicates > 0) add("$duplicates already in Ketch")
       if (bytes > 0) add(formatBytes(bytes))
     }.joinToString(SEPARATOR)
@@ -430,6 +445,9 @@ class IntakeSession internal constructor(
   private var watchJob: Job? = null
   private var fileCount = 0
 
+  // The retried task's headers as the Advanced fields give them back, to tell a real change.
+  private var boundHeaders: Map<String, String> = emptyMap()
+
   /** Typed or pasted text. */
   var text: TextFieldValue by mutableStateOf(TextFieldValue())
     private set
@@ -487,6 +505,12 @@ class IntakeSession internal constructor(
 
   /** The row whose torrent files are being picked, or `null`. */
   var torrentStage: IntakeEntry? by mutableStateOf(null)
+
+  /**
+   * [torrentStage] while its file list is there; a row checked again, such as on another
+   * device, shows its waiting state until the list is back.
+   */
+  val activeStage: IntakeEntry? get() = torrentStage?.takeIf { it.files.isNotEmpty() }
 
   /** Whether the submit is running. */
   var submitting: Boolean by mutableStateOf(false)
@@ -559,8 +583,23 @@ class IntakeSession internal constructor(
    * checked yet.
    */
   val maxConnections: Int?
-    get() = entries.mapNotNull { it.resolved }.filter { it.sourceType != TORRENT_SOURCE }
+    get() = (entries.mapNotNull { it.resolved } + listOfNotNull(boundRequest?.resolvedSource))
+      .filter { it.sourceType != TORRENT_SOURCE }
       .maxOfOrNull { it.maxSegments }?.coerceIn(1, MAX_CONNECTIONS)
+
+  /** Whether every download is a torrent, whose connections are a peer limit. */
+  val torrentsOnly: Boolean
+    get() {
+      val bound = boundRequest
+      if (mode == IntakeMode.Edit && bound != null) {
+        val kind = LinkKind.of(bound.url)
+        return kind == LinkKind.Magnet || kind == LinkKind.TorrentFile ||
+          bound.resolvedSource?.sourceType == TORRENT_SOURCE
+      }
+      return entries.isNotEmpty() && entries.all { it.isTorrent }
+    }
+
+  private val boundRequest: DownloadRequest? get() = task?.requestState?.value
 
   /** Connections a download gets with Auto, from the target's settings. */
   val autoConnections: Int? get() = targetStatus?.config?.maxConnectionsPerDownload
@@ -614,9 +653,9 @@ class IntakeSession internal constructor(
   /** Whether a retry adds the task again, discarding its progress, because its link changed. */
   val startsOver: Boolean
     get() {
-      val current = task?.requestState?.value ?: return false
+      val current = boundRequest ?: return false
       val entry = entries.singleOrNull() ?: return false
-      return entry.url != current.url || effectiveHeaders(entry) != current.headers
+      return entry.url != current.url || effectiveHeaders(entry) != boundHeaders
     }
 
   /** Text of the main button. */
@@ -625,8 +664,8 @@ class IntakeSession internal constructor(
       mode == IntakeMode.Edit -> "Apply"
       mode == IntakeMode.Retry -> if (startsOver) "Start over" else "Retry"
       allFailed -> "Retry"
-      torrentStage != null && entries.size == 1 -> {
-        val count = torrentStage?.selectedFiles?.size ?: 0
+      activeStage != null && entries.size == 1 -> {
+        val count = activeStage?.selectedFiles?.size ?: 0
         if (count == 1) "Add 1 file" else "Add $count files"
       }
       single?.waitsForFiles == true && single?.addAnyway == false -> "Waiting for file list"
@@ -818,6 +857,10 @@ class IntakeSession internal constructor(
    * as `.txt` or `.csv` files to the input.
    */
   fun addFiles(files: List<DroppedFile>) {
+    if (mode != IntakeMode.Add) {
+      notice = "Close this sheet to add other downloads"
+      return
+    }
     val torrents = files.filter { it.name.endsWith(".torrent", ignoreCase = true) }
     torrents.forEach(::addFile)
     val lists = files.filter { LinkParser.isLinkList(it.name) }
@@ -829,11 +872,16 @@ class IntakeSession internal constructor(
     scope.launch {
       val links = lists.flatMap { file ->
         val content = catchingUnlessCancelled { file.readBytes(MAX_LINK_LIST_BYTES) }
-          .onFailure { e -> notice = "Couldn't read ${file.name}: ${e.message}" }
+          .onFailure { e ->
+            notice = listOfNotNull("Couldn't read ${file.name}", e.message).joinToString(": ")
+          }
           .getOrNull() ?: return@flatMap emptyList()
         LinkParser.parseIntake(content.decodeToString(), file.name).links().map { it.url }
       }
-      if (links.isEmpty()) return@launch
+      if (links.isEmpty()) {
+        if (notice == null) notice = "Found no links in what was dropped"
+        return@launch
+      }
       val updated = (listOf(text.text.trimEnd()) + links).filter { it.isNotEmpty() }
         .joinToString("\n")
       text = TextFieldValue(updated, TextRange(updated.length))
@@ -843,6 +891,7 @@ class IntakeSession internal constructor(
 
   /** Adds one `.torrent` [file] as a row, unless it is a row already. */
   fun addFile(file: DroppedFile) {
+    if (mode != IntakeMode.Add) return
     if (fileEntries.any { (it.source as IntakeSource.File).file === file }) return
     val entry = IntakeEntry(IntakeSource.File(file, "file:${fileCount++}:${file.name}"))
     fileEntries = fileEntries + entry
@@ -939,13 +988,20 @@ class IntakeSession internal constructor(
 
   private fun add(onDone: () -> Unit) {
     val target = target ?: return
-    val rows = entries.filter { it.addable }
-    val planned = rows.flatMap { entry -> requestsFor(entry).map { entry to it } }
-    if (planned.isEmpty()) return
-    // Duplicates left out on purpose are not offered for review.
-    val skipped = entries.filter { !it.addable && (it.duplicate == null || it.downloadAgain) }
     submitting = true
     scope.launch {
+      // Links still being checked get a moment, so one that fails stays out like the others.
+      val pending = entries.filter { it.checkPending }.mapNotNull { it.job }
+      if (pending.isNotEmpty()) withTimeoutOrNull(SUBMIT_CHECK_WAIT) { pending.joinAll() }
+      val rows = entries.filter { it.addable }
+      val planned = rows.flatMap { entry -> requestsFor(entry).map { entry to it } }
+      if (planned.isEmpty()) {
+        // Every link failed meanwhile; the sheet stays open with their problems.
+        submitting = false
+        return@launch
+      }
+      // Duplicates left out on purpose are not offered for review.
+      val skipped = entries.filter { !it.addable && (it.duplicate == null || it.downloadAgain) }
       val results = supervisorScope {
         planned.map { (entry, request) ->
           async {
@@ -1023,7 +1079,12 @@ class IntakeSession internal constructor(
     val deviceName = targetName()
     val onActive = target == state.activeInstance.value
     val review = (failed.map { it.first } + skipped).distinct()
-    val reviewAction = if (review.isEmpty()) null else MessageAction("Review") { reopen(review) }
+    val failedUrls = failed.mapTo(HashSet()) { it.second.url }
+    val reviewAction = if (review.isEmpty()) {
+      null
+    } else {
+      MessageAction("Review") { reopen(review, failedUrls) }
+    }
     if (added.isEmpty()) {
       val error = failed.firstOrNull()?.third?.exceptionOrNull()
       state.messages.post(
@@ -1076,18 +1137,30 @@ class IntakeSession internal constructor(
     if (state.statusFilter != StatusFilter.All) state.showDownloads(StatusFilter.All)
   }
 
-  /** Opens the sheet again with [rows], to fix what failed or was left out. */
-  private fun reopen(rows: List<IntakeEntry>) {
-    val seeds = rows.mapNotNull { row ->
+  /**
+   * Opens the sheet again with [rows], to fix what failed or was left out. A range of which only
+   * some links, [failedUrls], failed comes back as those links, since the others were added.
+   */
+  private fun reopen(rows: List<IntakeEntry>, failedUrls: Set<String>) {
+    val seeds = rows.flatMap { row ->
       when (val source = row.source) {
-        is IntakeSource.Link -> IntakeSeed(
-          url = source.url,
-          fileName = row.fileName.trim().ifEmpty { null } ?: source.fileName,
-          headers = source.headers,
-          properties = source.properties,
+        is IntakeSource.Link -> listOf(
+          IntakeSeed(
+            url = source.url,
+            fileName = row.fileName.trim().ifEmpty { null } ?: source.fileName,
+            headers = source.headers,
+            properties = source.properties,
+          ),
         )
-        is IntakeSource.Range -> IntakeSeed(source.pattern, headers = source.headers)
-        is IntakeSource.File -> null
+        is IntakeSource.Range -> {
+          val parts = source.urls.filter { it in failedUrls }
+          if (parts.isEmpty() || parts.size == source.urls.size) {
+            listOf(IntakeSeed(source.pattern, headers = source.headers))
+          } else {
+            parts.map { IntakeSeed(it, headers = source.headers) }
+          }
+        }
+        is IntakeSource.File -> emptyList()
       }
     }
     val files = rows.mapNotNull { (it.source as? IntakeSource.File)?.file }
@@ -1178,6 +1251,7 @@ class IntakeSession internal constructor(
     if (mode == IntakeMode.Retry) {
       // The task's headers move to Advanced, where they can be changed.
       headers.fill(current.headers)
+      boundHeaders = headers.toMap()
       if (current.headers.isNotEmpty()) advancedOpen = true
       request.seeds.forEach { seedsByUrl[it.url] = it.copy(headers = emptyMap()) }
     }
@@ -1402,6 +1476,9 @@ class IntakeSession internal constructor(
     /** Characters a change must add at once to count as a paste, which is read at once. */
     const val PASTE_GROWTH = 8
 
+    /** How long submitting waits for links still being checked before it adds them as they are. */
+    val SUBMIT_CHECK_WAIT = 10.seconds
+
     /** How long a new download can be undone, together with its file. */
     val ADD_UNDO_WINDOW = 8.seconds
 
@@ -1437,6 +1514,7 @@ class IntakeController(
 
   private var resuming: IntakeSession? = null
   private var carriedFiles: Pair<IntakeRequest, List<DroppedFile>>? = null
+  private var backgroundJob: Job? = null
 
   /** A session for [request]: the one coming back from the background, or a new one. */
   fun start(request: IntakeRequest): IntakeSession {
@@ -1465,10 +1543,11 @@ class IntakeController(
    */
   fun finishInBackground(session: IntakeSession) {
     background?.takeIf { it !== session }?.cancel()
+    backgroundJob?.cancel()
     session.inBackground = true
     background = session
     state.closeAddDialog()
-    scope.launch {
+    backgroundJob = scope.launch {
       val torrents = snapshotFlow { session.entries.filter { it.isTorrent } }
         .first { rows -> rows.none { it.waitsForFiles || it.isTimedOut } }
       if (background !== session || !session.inBackground) return@launch
@@ -1589,7 +1668,9 @@ internal fun intakeOutcome(
     (task.state.value as DownloadState.Downloading).progress.bytesPerSecond
   }
   val eta = if (bytes != null && speed > 0) {
-    " · ≈ ${approximateTime(bytes / speed)} at current speed"
+    val seconds = bytes / speed
+    val time = approximateTime(seconds).let { if (seconds < 60) it else "≈ $it" }
+    " · $time at current speed"
   } else {
     ""
   }

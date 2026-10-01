@@ -41,8 +41,10 @@ fun IntakeHost(state: AppState) {
     if (!empty || session.mode != IntakeMode.Add || session.clipboardMode != ClipboardMode.Fill) {
       return@LaunchedEffect
     }
-    // Opening the sheet is the user action that lets the clipboard be read.
-    catchingUnlessCancelled { clipboard.readText() }.getOrNull()?.let(session::offerClipboard)
+    // Opening the sheet is the user action that lets the clipboard be read, and only when it
+    // can hold a link, so an image or a file on it is never read.
+    catchingUnlessCancelled { if (clipboard.hasLink()) clipboard.readText() else null }
+      .getOrNull()?.let(session::offerClipboard)
   }
   IntakeSheet(
     session = session,

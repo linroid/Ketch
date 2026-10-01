@@ -45,7 +45,10 @@ import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchProgressBar
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.KetchTriStateCheckbox
+import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.IntakeEntry
@@ -283,6 +286,7 @@ private fun TreeRow(
   val glyph = KetchTheme.density.controlGlyph
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
+  val focus = rememberFocusVisibility()
   var shift by remember { mutableStateOf(false) }
   Row(
     verticalAlignment = Alignment.CenterVertically,
@@ -290,7 +294,10 @@ private fun TreeRow(
     modifier = Modifier
       .fillMaxWidth()
       .heightIn(min = IntakeSheetDefaults.TreeRowHeight)
+      // Drawn inside the row, since the tree clips anything outside it.
+      .focusRing(focus.visible, KetchTheme.shapes.sm, colors.focusRing, gap = -spacing.s0_5)
       .background(overlay)
+      .trackFocusVisibility(focus)
       .pointerInput(Unit) {
         awaitPointerEventScope {
           while (true) {

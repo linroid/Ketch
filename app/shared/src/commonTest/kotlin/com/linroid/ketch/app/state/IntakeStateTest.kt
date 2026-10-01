@@ -76,6 +76,25 @@ class IntakeStateTest {
   }
 
   @Test
+  fun review_partOfARangeFailed_reopensOnlyThatPart() = runTest {
+    val api = IntakeTestApi()
+    val parts = (1..3).map { "https://cdn.example.com/set/part$it.rar" }
+    api.base.downloadFailure = { if (it.url == parts[1]) KetchError.Network() else null }
+    val (state, session) = stateAndSession(
+      api,
+      IntakeRequest("https://cdn.example.com/set/part[1-3].rar"),
+    )
+
+    session.submit {}
+    runCurrent()
+    val review = state.messages.active.value.last().actions.first()
+    assertEquals("Review", review.label)
+    review.onClick()
+
+    assertEquals(listOf(parts[1]), state.intakeRequest?.seeds?.map { it.url })
+  }
+
+  @Test
   fun submit_oneCheckFails_keepsItOutAndAddsTheRest() = runTest {
     val api = IntakeTestApi(check = { url, _ ->
       if (url == links[0]) throw KetchError.Http(404) else ready(url)
@@ -88,6 +107,55 @@ class IntakeStateTest {
     runCurrent()
 
     assertEquals(links.drop(1), api.base.requests.map { it.url })
+  }
+
+  @Test
+  fun submit_linksStillChecking_waitsAndLeavesOutTheOneThatFails() = runTest {
+    val gate = CompletableDeferred<Unit>()
+    val api = IntakeTestApi(check = { url, _ ->
+      gate.await()
+      if (url == links[1]) throw KetchError.Http(404) else ready(url)
+    })
+    val session = session(api, IntakeRequest(links.take(3).joinToString("\n")))
+    var closed = false
+
+    session.submit { closed = true }
+    runCurrent()
+    assertTrue(api.base.requests.isEmpty())
+    assertFalse(session.canSubmit)
+    gate.complete(Unit)
+    runCurrent()
+
+    assertTrue(closed)
+    assertEquals(listOf(links[0], links[2]), api.base.requests.map { it.url })
+  }
+
+  @Test
+  fun submit_checkThatNeverAnswers_addsTheLinkAfterTheWait() = runTest {
+    val api = IntakeTestApi(check = { _, _ -> CompletableDeferred<ResolvedSource>().await() })
+    val session = session(api, IntakeRequest(links.first()))
+
+    session.submit {}
+    runCurrent()
+    assertTrue(api.base.requests.isEmpty())
+    advanceTimeBy(IntakeSession.SUBMIT_CHECK_WAIT.inWholeMilliseconds + 1)
+    runCurrent()
+
+    assertEquals(listOf(links.first()), api.base.requests.map { it.url })
+  }
+
+  @Test
+  fun name_seedFileName_winsOverTheCheckedName() = runTest {
+    val seed = IntakeSeed(url = "https://files.example.com/get?id=7", fileName = "report.pdf")
+    val session = session(IntakeTestApi(), IntakeRequest(seeds = listOf(seed)))
+
+    assertEquals("report.pdf", session.entries.single().name)
+  }
+
+  @Test
+  fun summaryText_severalProblems_agreesInNumber() {
+    assertEquals("2 links · 1 ready · 1 needs attention", IntakeSummary(2, 1, 0, 1, 0, 0).text)
+    assertEquals("3 links · 1 ready · 2 need attention", IntakeSummary(3, 1, 0, 2, 0, 0).text)
   }
 
   @Test
@@ -301,6 +369,25 @@ class IntakeStateTest {
   }
 
   @Test
+  fun startsOver_headerNamesInAnotherCase_keepsTheTaskUntilOneChanges() = runTest {
+    val api = IntakeTestApi()
+    val headers = mapOf("referer" to "https://a.example/", "cookie" to "id=1")
+    val failed = api.base.add(
+      DownloadState.Failed(KetchError.Http(403)),
+      DownloadRequest(links.first(), headers = headers),
+    )
+    val request = IntakeRequest(
+      seeds = listOf(IntakeSeed(links.first(), headers = headers)),
+      retryOf = TaskKey(LOCAL_DEVICE_ID, failed.taskId),
+    )
+    val session = session(api, request)
+
+    assertFalse(session.startsOver)
+    session.headers.referer = "https://b.example/"
+    assertTrue(session.startsOver)
+  }
+
+  @Test
   fun remove_linkInTheText_takesItsLineOut() = runTest {
     val session = session(IntakeTestApi(), IntakeRequest(links.take(3).joinToString("\n")))
 
@@ -344,6 +431,24 @@ class IntakeStateTest {
     )
 
     assertEquals("Starts now · 1 of 2 slots free · ≈ 4 min at current speed", outcome)
+  }
+
+  @Test
+  fun intakeOutcome_lessThanAMinuteLeft_saysSoWithoutApproximating() {
+    val config = DownloadConfig(maxConcurrentDownloads = 2)
+    val running = listOf(task("a", downloading(speed = 1_000_000)))
+    val outcome = intakeOutcome(
+      hosts = listOf("a.example"),
+      priority = DownloadPriority.NORMAL,
+      schedule = DownloadSchedule.Immediate,
+      config = config,
+      tasks = running,
+      bytes = 30_000_000,
+      now = NOW,
+      zone = TimeZone.UTC,
+    )
+
+    assertEquals("Starts now · 1 of 2 slots free · under a minute at current speed", outcome)
   }
 
   @Test
