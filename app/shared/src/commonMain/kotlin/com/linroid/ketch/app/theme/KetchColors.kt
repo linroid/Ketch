@@ -110,48 +110,6 @@ data class KetchColors(
     is ConnectionState.Connecting -> status.paused.color
     is ConnectionState.Disconnected, is ConnectionState.Unauthorized -> status.failed.color
   }
-
-  @Deprecated("Use canvas.", ReplaceWith("canvas"))
-  val background: Color get() = canvas
-
-  @Deprecated("Use surfaceSunken.", ReplaceWith("surfaceSunken"))
-  val surfaceVariant: Color get() = surfaceSunken
-
-  @Deprecated("Use borderStrong.", ReplaceWith("borderStrong"))
-  val outline: Color get() = borderStrong
-
-  @Deprecated("Use hairline.", ReplaceWith("hairline"))
-  val outlineVariant: Color get() = hairline
-
-  @Deprecated("Use textPrimary.", ReplaceWith("textPrimary"))
-  val onBackground: Color get() = textPrimary
-
-  @Deprecated("Use textSecondary.", ReplaceWith("textSecondary"))
-  val onSurfaceVariant: Color get() = textSecondary
-
-  @Deprecated("Use textTertiary.", ReplaceWith("textTertiary"))
-  val onSurfaceDim: Color get() = textTertiary
-
-  @Deprecated("Use accent.", ReplaceWith("accent"))
-  val primary: Color get() = accent
-
-  @Deprecated("Use accentSoft.", ReplaceWith("accentSoft"))
-  val primaryContainer: Color get() = accentSoft
-
-  @Deprecated("Use accentText.", ReplaceWith("accentText"))
-  val onPrimaryContainer: Color get() = accentText
-
-  @Deprecated("Use status.completed.color.", ReplaceWith("status.completed.color"))
-  val success: Color get() = status.completed.color
-
-  @Deprecated("Use status.paused.color.", ReplaceWith("status.paused.color"))
-  val warning: Color get() = status.paused.color
-
-  @Deprecated("Use status.failed.color.", ReplaceWith("status.failed.color"))
-  val error: Color get() = status.failed.color
-
-  @Deprecated("Use lanes.", ReplaceWith("lanes"))
-  val segments: List<Color> get() = lanes
 }
 
 /**

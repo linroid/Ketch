@@ -40,10 +40,10 @@ fun AiDiscoveryPage(
         verticalArrangement = Arrangement.spacedBy(20.dp),
       ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text("AI discovery", style = KetchTheme.typography.displaySmall,
-            color = KetchTheme.colors.onBackground)
+          Text("AI discovery", style = KetchTheme.typography.titleL,
+            color = KetchTheme.colors.textPrimary)
           Text("Find the files you need, in your own words.",
-            style = KetchTheme.typography.bodyMedium, color = KetchTheme.colors.onSurfaceVariant)
+            style = KetchTheme.typography.bodyS, color = KetchTheme.colors.textSecondary)
         }
         KetchCard(modifier = Modifier.fillMaxWidth(), padding = if (compact) 16.dp else 24.dp) {
           AiDiscoverForm(state, draft, onDiscover, onCancelSearch)
