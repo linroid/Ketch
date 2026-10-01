@@ -3,6 +3,15 @@
 const LINK_SCHEMES = ['http:', 'https:', 'ftp:', 'ftps:', 'magnet:'];
 
 /**
+ * `DownloadRequest.properties` key that names the client a task was added from. Ketch itself
+ * never reads it; the app groups and filters downloads by it.
+ */
+const ORIGIN_PROPERTY = 'ketch.origin';
+
+/** Value of {@link ORIGIN_PROPERTY} on every task the extension adds. */
+const BROWSER_ORIGIN = 'browser';
+
+/**
  * Whether Ketch can download `url` on its own: HTTP(S), FTP(S) and magnet links. Links that only
  * exist inside the browser, such as `blob:` and `data:`, cannot be handed over.
  *
@@ -75,17 +84,25 @@ export function buildHeaders({ cookies = [], referrer, userAgent }) {
  *
  * The browser's file name becomes a bare-name destination, so the file lands in Ketch's default
  * folder under the name the browser would have used; Ketch picks a free name if it is taken.
- * Torrents choose their own file layout, so they never get one.
+ * Torrents choose their own file layout, so they never get one. Every request is tagged with the
+ * browser origin; the tag goes only into `properties`, never into the headers.
  *
- * @param {{ url: string, fileName?: string, headers?: Record<string, string> }} download
+ * @param {{
+ *   url: string,
+ *   fileName?: string,
+ *   headers?: Record<string, string>,
+ *   resolvedSource?: object,
+ * }} download `resolvedSource` is a `ResolvedSource` from `resolveContent`
  */
-export function buildDownloadRequest({ url, fileName, headers = {} }) {
+export function buildDownloadRequest({ url, fileName, headers = {}, resolvedSource }) {
   const request = { url };
   const name = fileNameFromPath(fileName);
   if (name && name !== '.' && name !== '..' && !isTorrentUrl(url) && !isTorrentFile({ fileName })) {
     request.destination = name;
   }
   if (Object.keys(headers).length > 0) request.headers = headers;
+  if (resolvedSource) request.resolvedSource = resolvedSource;
+  request.properties = { [ORIGIN_PROPERTY]: BROWSER_ORIGIN };
   return request;
 }
 
