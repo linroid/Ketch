@@ -10,7 +10,6 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -66,12 +65,11 @@ class AiDiscoverController(
     state = AiDiscoverState.Loading
     val siteList = sites.split(",", " ").map { it.trim() }.filter { it.isNotBlank() }
     job = scope.launch {
-      try {
-        val response = provider.discover(AiDiscoverRequest(query = query, sites = siteList))
+      catchingUnlessCancelled {
+        provider.discover(AiDiscoverRequest(query = query, sites = siteList))
+      }.onSuccess { response ->
         state = AiDiscoverState.Results(candidates = response.candidates)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
+      }.onFailure { e ->
         log.w { "Discovery failed: ${e.describeCauses()}" }
         state = AiDiscoverState.Error(e.message ?: "Discovery failed")
       }
@@ -107,14 +105,12 @@ class AiDiscoverController(
     val added = mutableListOf<DownloadTask>()
     val failed = mutableListOf<Pair<AiCandidate, Throwable>>()
     for (candidate in candidates) {
-      try {
-        added += api.download(candidate.toRequest(query))
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        log.w { "Couldn't add ${redactUrl(candidate.url)}: ${e.describeCauses()}" }
-        failed += candidate to e
-      }
+      catchingUnlessCancelled { api.download(candidate.toRequest(query)) }
+        .onSuccess { added += it }
+        .onFailure { e ->
+          log.w { "Couldn't add ${redactUrl(candidate.url)}: ${e.describeCauses()}" }
+          failed += candidate to e
+        }
     }
     return CandidateAddResult(added, failed)
   }

@@ -101,7 +101,7 @@ class MessageCenter(
    */
   val active: StateFlow<List<AppMessage>> = activeState.asStateFlow()
 
-  /** Messages posted since the history was last marked read. */
+  /** Messages in [history] posted since it was last marked read. */
   val unreadCount: StateFlow<Int> = unreadState.asStateFlow()
 
   /**
@@ -136,7 +136,7 @@ class MessageCenter(
       cause = cause,
     )
     historyState.update { (listOf(message) + it).take(historyLimit) }
-    unreadState.update { it + 1 }
+    unreadState.update { minOf(it + 1, historyLimit) }
     if (toast != ToastMode.Silent) activeState.update { (it + message).takeLast(historyLimit) }
     return message
   }

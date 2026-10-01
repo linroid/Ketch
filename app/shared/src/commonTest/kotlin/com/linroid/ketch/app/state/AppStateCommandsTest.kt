@@ -18,6 +18,7 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -91,13 +92,46 @@ class AppStateCommandsTest {
   fun runTaskCommand_cancelled_postsNothing() = runTest {
     val api = RecordingKetchApi()
     val controller = controller(api)
-    val task = api.add(downloading).apply { failure = CancellationException("Window closed") }
+    val task = api.add(downloading)
 
-    controller.state.runTaskCommand(task, "pause") { pause() }
+    val command = controller.state.runTaskCommand(task, "pause") { awaitCancellation() }
+    runCurrent()
+    command.cancel()
     runCurrent()
 
     assertTrue(controller.errors().isEmpty())
     assertTrue(controller.state.pending.value.isEmpty())
+    controller.close()
+  }
+
+  @Test
+  fun runTaskCommand_callThrowsCancellation_postsOneError() = runTest {
+    val api = RecordingKetchApi()
+    val controller = controller(api)
+    val task = api.add(downloading).apply { failure = CancellationException("Client closed") }
+
+    controller.state.runTaskCommand(task, "pause") { pause() }
+    runCurrent()
+
+    assertEquals("Couldn't pause on This Mac", controller.errors().single().title)
+    controller.close()
+  }
+
+  @Suppress("DEPRECATION")
+  @Test
+  fun dismissError_severalErrors_clearsTheBanner() = runTest {
+    val api = RecordingKetchApi()
+    val controller = controller(api)
+    val tasks = List(2) { api.add(downloading).apply { failure = IllegalStateException("No") } }
+
+    tasks.forEach { controller.state.runTaskCommand(it, "pause") { pause() } }
+    runCurrent()
+    assertEquals("Couldn't pause on This Mac: No", controller.state.errorMessage)
+    controller.state.dismissError()
+    runCurrent()
+
+    assertEquals(null, controller.state.errorMessage)
+    assertEquals(2, controller.errors().size)
     controller.close()
   }
 
@@ -137,6 +171,41 @@ class AppStateCommandsTest {
     assertTrue((running + queued).all { it.state.value is DownloadState.Paused })
     assertTrue(done.calls.isEmpty())
     assertEquals("Paused 5 downloads", controller.messages.active.value.last().title)
+    controller.close()
+  }
+
+  @Test
+  fun pauseAll_oneTaskFails_pausesTheOthersAndReportsIt() = runTest {
+    val api = RecordingKetchApi()
+    val controller = controller(api)
+    val failing = api.add(downloading).apply { failure = CancellationException("Client closed") }
+    val others = List(2) { api.add(downloading) }
+
+    controller.state.pauseAll()
+    runCurrent()
+
+    assertTrue(others.all { it.state.value is DownloadState.Paused })
+    assertEquals(listOf("pause"), failing.calls)
+    val toast = controller.messages.active.value.last()
+    assertEquals(MessageLevel.Warning, toast.level)
+    assertEquals("Paused 2 downloads · 1 failed", toast.title)
+    controller.close()
+  }
+
+  @Test
+  fun pauseAll_nothingPaused_leavesUndoToTheEarlierOperation() = runTest {
+    val api = RecordingKetchApi()
+    val controller = controller(api)
+    val removed = api.add(DownloadState.Completed("/downloads/a.iso"))
+    api.add(downloading).apply { failure = IllegalStateException("Server said no") }
+
+    controller.state.remove(listOf(removed))
+    controller.state.pauseAll()
+    runCurrent()
+
+    assertEquals(listOf("Remove"), controller.state.pendingOps.ops.value.map { it.label })
+    assertEquals(1, controller.errors().size)
+    assertTrue(controller.state.pendingOps.undoLast())
     controller.close()
   }
 
@@ -249,11 +318,15 @@ class AppStateCommandsTest {
     val nas = RecordingKetchApi("NAS")
     val controller = controller(api)
     val task = api.add(paused)
+    val key = TaskKey(LOCAL_DEVICE_ID, task.taskId)
+    controller.state.selectedKeys = setOf(key)
+    controller.state.inspect(key)
 
     controller.state.sendTo(listOf(task), EmbeddedInstance(nas, "NAS"), move = true)
     runCurrent()
-    val key = TaskKey(LOCAL_DEVICE_ID, task.taskId)
     assertEquals(setOf(key), controller.state.pendingOps.hidden.value)
+    assertEquals(emptySet(), controller.state.selectedKeys)
+    assertEquals(null, controller.state.inspectedTask)
 
     advanceTimeBy(7.seconds)
     runCurrent()

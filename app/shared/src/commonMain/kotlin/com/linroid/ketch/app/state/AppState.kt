@@ -43,6 +43,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -257,7 +259,7 @@ class AppState(
           next != openedDownload -> {
             openedDownload = next
             resolveDroppedFile(DroppedFile(next.label) { next.content })
-            showAddDialog = true
+            openIntake(intakeRequest ?: IntakeRequest())
           }
         }
       }
@@ -645,7 +647,9 @@ class AppState(
    * Runs [block] on [task] in the app scope, so leaving the screen never cancels it.
    *
    * While it runs, [pending] holds the task with [label]. A failure is logged and posted as one
-   * Error message naming the device, with a Try again button; cancellation posts nothing.
+   * Error message naming the device, with a Try again button. Cancelling the command posts
+   * nothing; a `CancellationException` thrown by the call itself, such as from a closed client,
+   * is a failure.
    *
    * @param label what the command does, in lower case, such as "set speed limit"; the error
    *   reads "Couldn't {label} on {device}".
@@ -659,11 +663,7 @@ class AppState(
     val key = TaskKey(device?.deviceId ?: LOCAL_DEVICE_ID, task.taskId)
     return scope.launch {
       trackPending(key, label) {
-        try {
-          task.block()
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
+        catchingUnlessCancelled { task.block() }.onFailure { e ->
           val deviceName = nameOf(device)
           log.w { "Couldn't $label on $deviceName: taskId=${task.taskId} ${e.describeCauses()}" }
           postError(
@@ -692,8 +692,13 @@ class AppState(
       val failures = results.flatMap { (_, result) -> result.failures }
       val scheduled = targets.flatMap { visibleTasks(it) }
         .mapNotNull { (it.state.value as? DownloadState.Scheduled)?.schedule }
-      if (paused.isEmpty() && failures.isEmpty()) {
-        messages.post(MessageLevel.Info, "Nothing to pause")
+      if (paused.isEmpty()) {
+        // Nothing to undo, so no operation is registered for ⌘Z to land on.
+        if (failures.isEmpty()) {
+          messages.post(MessageLevel.Info, "Nothing to pause")
+        } else {
+          reportFailures("pause", failures)
+        }
         return@launch
       }
       val op = pendingOps.register(label = "Pause All", undo = {
@@ -709,7 +714,7 @@ class AppState(
         level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
         title = title,
         detail = failures.firstOrNull()?.second?.message,
-        actions = if (paused.isEmpty()) emptyList() else listOf(undoAction(op)),
+        actions = listOf(undoAction(op)),
         cause = failures.firstOrNull()?.second,
       )
     }
@@ -803,26 +808,20 @@ class AppState(
     val entry = deviceOf(task) ?: return@launch
     val key = TaskKey(entry.deviceId, task.taskId)
     trackPending(key, "download again") {
-      try {
-        restart(entry, task)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        val name = task.requestState.value.label()
-        log.w { "Couldn't restart taskId=${task.taskId}: ${e.describeCauses()}" }
-        postError(
-          title = "Couldn't download $name again on ${nameOf(entry)}",
-          detail = e.message,
-          cause = e,
-          taskKey = key,
-        )
-        return@trackPending
-      }
-      messages.post(
-        MessageLevel.Success,
-        "Restarted ${task.requestState.value.label()}",
-        deviceId = entry.deviceId,
-      )
+      val name = task.requestState.value.label()
+      catchingUnlessCancelled { restart(entry, task) }
+        .onSuccess {
+          messages.post(MessageLevel.Success, "Restarted $name", deviceId = entry.deviceId)
+        }
+        .onFailure { e ->
+          log.w { "Couldn't restart taskId=${task.taskId}: ${e.describeCauses()}" }
+          postError(
+            title = "Couldn't download $name again on ${nameOf(entry)}",
+            detail = e.message,
+            cause = e,
+            taskKey = key,
+          )
+        }
     }
   }
 
@@ -869,7 +868,8 @@ class AppState(
       val results = supervisorScope {
         tasks.map { task ->
           async {
-            task to catching { target.instance.download(task.requestState.value.forDevice()) }
+            val request = task.requestState.value.forDevice()
+            task to catchingUnlessCancelled { target.instance.download(request) }
           }
         }.awaitAll()
       }
@@ -902,7 +902,7 @@ class AppState(
         val sources = sent.map { it.first }
         val op = pendingOps.register(
           label = "Move",
-          hides = sources.mapTo(mutableSetOf()) { keyOf(it) },
+          hides = hide(sources),
           commit = {
             reportFailures("remove", runEach(sources) { it.remove(deleteFiles = false) })
           },
@@ -938,6 +938,7 @@ class AppState(
   /** Adds [candidates] to the active device, each on its own, and closes the results. */
   fun aiDownloadSelected(candidates: List<AiCandidate>) {
     showAddDialog = false
+    intakeRequest = null
     val entry = activeInstance.value
     val api = activeApi.value
     val query = aiDiscover.draft.submittedQuery
@@ -956,9 +957,13 @@ class AppState(
     aiDiscover.reset()
   }
 
-  /** Dismisses the error the banner shows. */
+  /**
+   * Dismisses every error message still on screen, so the banner clears at once instead of
+   * showing the next older error.
+   */
   fun dismissError() {
-    latestError?.let { messages.dismiss(it.id) }
+    messages.active.value.filter { it.level == MessageLevel.Error }
+      .forEach { messages.dismiss(it.id) }
     latestError = null
   }
 
@@ -1082,15 +1087,21 @@ class AppState(
     label: String,
     title: (Int) -> String,
   ) {
-    val keys = tasks.mapTo(mutableSetOf()) { keyOf(it) }
-    selectedKeys = selectedKeys - keys
-    if (inspectedTask in keys) inspectedTask = null
+    val keys = hide(tasks)
     val op = pendingOps.register(
       label = label,
       hides = keys,
       commit = { reportFailures("remove", runEach(tasks) { it.remove(deleteFiles) }) },
     )
     messages.post(MessageLevel.Success, title(tasks.size), actions = listOf(undoAction(op)))
+  }
+
+  /** Keys of [tasks], which leave the selection and the inspector as their rows hide. */
+  private fun hide(tasks: List<DownloadTask>): Set<TaskKey> {
+    val keys = tasks.mapTo(mutableSetOf()) { keyOf(it) }
+    selectedKeys = selectedKeys - keys
+    if (inspectedTask in keys) inspectedTask = null
+    return keys
   }
 
   /** Removes [task] and adds its request again on [entry]. */
@@ -1132,8 +1143,9 @@ class AppState(
   ) {
     val api = entry?.instance ?: activeApi.value
     val results = supervisorScope {
-      requests.map { request -> async { request to catching { api.download(request) } } }
-        .awaitAll()
+      requests.map { request ->
+        async { request to catchingUnlessCancelled { api.download(request) } }
+      }.awaitAll()
     }
     val added = results.mapNotNull { it.second.getOrNull() }
     val failed = results.mapNotNull { (request, result) ->
@@ -1249,8 +1261,9 @@ class AppState(
     items: List<T>,
     action: suspend (T) -> Unit,
   ): List<Pair<T, Throwable?>> = supervisorScope {
-    items.map { item -> async { item to catching { action(item) }.exceptionOrNull() } }
-      .awaitAll()
+    items.map { item ->
+      async { item to catchingUnlessCancelled { action(item) }.exceptionOrNull() }
+    }.awaitAll()
   }
 
   private suspend fun trackPending(key: TaskKey, label: String, block: suspend () -> Unit) {
@@ -1302,7 +1315,8 @@ class AppState(
     if (folder.endsWith('/') || folder.endsWith('\\') || folder.startsWith("content://")) {
       return Destination(folder)
     }
-    val separator = catching { entry.instance.status().system.separator }.getOrDefault("/")
+    val separator = catchingUnlessCancelled { entry.instance.status().system.separator }
+      .getOrDefault("/")
     return Destination(folder + separator)
   }
 
@@ -1327,12 +1341,17 @@ class AppState(
   }
 }
 
-/** Runs [block], turning failures other than cancellation into a failed [Result]. */
-private suspend fun <R> catching(block: suspend () -> R): Result<R> =
+/**
+ * Runs [block], turning its failures into a failed [Result]. Cancellation of the calling
+ * coroutine is rethrown, but a `CancellationException` the call throws while the caller is still
+ * active, such as from a closed HTTP client, is a failure like any other.
+ */
+internal suspend fun <R> catchingUnlessCancelled(block: suspend () -> R): Result<R> =
   try {
     Result.success(block())
   } catch (e: CancellationException) {
-    throw e
+    currentCoroutineContext().ensureActive()
+    Result.failure(e)
   } catch (e: Exception) {
     Result.failure(e)
   }

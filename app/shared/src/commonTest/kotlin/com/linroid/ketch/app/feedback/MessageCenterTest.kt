@@ -13,7 +13,7 @@ class MessageCenterTest {
 
     assertEquals(listOf("third", "second"), center.history.value.map { it.title })
     assertEquals(listOf("second", "third"), center.active.value.map { it.title })
-    assertEquals(3, center.unreadCount.value)
+    assertEquals(2, center.unreadCount.value)
   }
 
   @Test

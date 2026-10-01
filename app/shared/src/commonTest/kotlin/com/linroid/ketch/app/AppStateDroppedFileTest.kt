@@ -8,6 +8,8 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.IncomingDownload
+import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.ResolveState
 import kotlinx.coroutines.CompletableDeferred
@@ -66,6 +68,23 @@ class AppStateDroppedFileTest {
     assertNull(state.droppedFile)
     assertNull(state.intakeRequest)
     assertEquals(MessageLevel.Error, state.messages.history.value.single().level)
+  }
+
+  @Test
+  fun incomingFile_offered_opensAnIntakeRequest() = runTest {
+    val incoming = IncomingDownloads()
+    val manager = InstanceManager(InstanceFactory(embeddedFactory = { FakeKetchApi() }))
+    val state = AppState(manager, backgroundScope, incoming = incoming)
+
+    incoming.offer(IncomingDownload.Ready("a.torrent", byteArrayOf(1)))
+    runCurrent()
+    assertTrue(state.showAddDialog)
+    assertEquals(IntakeRequest(), state.intakeRequest)
+
+    state.closeAddDialog()
+    runCurrent()
+    assertFalse(state.showAddDialog)
+    assertNull(state.intakeRequest)
   }
 
   @Test
