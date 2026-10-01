@@ -33,6 +33,9 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.components.KetchSegmentDetail
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.util.averageSpeed
+import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.util.formatDuration
 import com.linroid.ketch.app.util.priorityLabel
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -156,6 +159,19 @@ private fun MetadataGrid(task: DownloadTask, state: DownloadState, fileName: Str
       )
       val dest = (state as? DownloadState.Completed)?.outputPath ?: task.request.destination?.value
       if (!dest.isNullOrBlank()) MetaRow("Saved to", dest)
+      val totalBytes = when (state) {
+        is DownloadState.Downloading -> state.progress.totalBytes.takeIf { it > 0 }
+        is DownloadState.Paused -> state.progress.totalBytes.takeIf { it > 0 }
+        is DownloadState.Completed -> state.totalBytes
+        else -> null
+      }
+      if (totalBytes != null) MetaRow("Size", formatBytes(totalBytes))
+      val downloadTime = (state as? DownloadState.Completed)?.downloadTime
+      if (downloadTime != null) {
+        MetaRow("Time spent", formatDuration(downloadTime))
+        val average = totalBytes?.let { averageSpeed(it, downloadTime) }
+        if (average != null) MetaRow("Avg speed", "${formatBytes(average)}/s")
+      }
       if (state is DownloadState.Failed) {
         MetaRow("Error", state.error.message.orEmpty(), valueColor = colors.error)
       }
@@ -175,7 +191,7 @@ private fun MetaRow(
       text = label,
       style = type.bodySmall,
       color = KetchTheme.colors.onSurfaceDim,
-      modifier = Modifier.width(70.dp),
+      modifier = Modifier.width(80.dp),
     )
     Text(
       text = value,

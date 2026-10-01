@@ -54,6 +54,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
@@ -174,6 +175,7 @@ class Ketch(
       taskId = taskId,
       request = request,
       state = initialState,
+      downloadTime = Duration.ZERO,
       createdAt = now,
       updatedAt = now,
     )
@@ -409,7 +411,9 @@ class Ketch(
       )
 
       TaskState.COMPLETED -> DownloadState.Completed(
-        record.outputPath ?: "",
+        outputPath = record.outputPath ?: "",
+        totalBytes = record.totalBytes.takeIf { it >= 0 },
+        downloadTime = record.downloadTime,
       )
 
       TaskState.FAILED -> DownloadState.Failed(
@@ -448,7 +452,8 @@ class Ketch(
 
   private fun DownloadState.logLabel(): String = when (this) {
     is DownloadState.Failed -> "Failed(${error.describeCauses()})"
-    is DownloadState.Completed -> "Completed($outputPath)"
+    is DownloadState.Completed ->
+      "Completed($outputPath, totalBytes=$totalBytes, downloadTime=$downloadTime)"
     else -> this::class.simpleName ?: toString()
   }
 

@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchFileTypeChip
@@ -65,8 +64,9 @@ import com.linroid.ketch.app.ui.common.TaskSettingsIcon
 import com.linroid.ketch.app.ui.common.TaskSettingsPanel
 import com.linroid.ketch.app.ui.dialog.RemoveDownloadDialog
 import com.linroid.ketch.app.util.extractFilename
-import com.linroid.ketch.app.util.formatBytes
-import com.linroid.ketch.app.util.formatEta
+import com.linroid.ketch.app.util.speedLimitLabel
+import com.linroid.ketch.app.util.speedSummary
+import com.linroid.ketch.app.util.transferSummary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -172,6 +172,7 @@ fun DownloadListItem(
     val totalBytes = when (val s = state) {
       is DownloadState.Downloading -> s.progress.totalBytes
       is DownloadState.Paused -> s.progress.totalBytes
+      is DownloadState.Completed -> s.totalBytes
       else -> null
     }
     RemoveDownloadDialog(
@@ -200,6 +201,9 @@ private fun DownloadRow(
   val type = KetchTheme.typography
   val progress = stateProgress(state)
   val animatedPct by animateFloatAsState(progress, tween(400), label = "row-progress")
+  val transfer = transferSummary(state)
+  val speed = speedSummary(state)
+  val limit = listOfNotNull(speedLimitLabel(state, request.speedLimit))
 
   BoxWithConstraints {
     val compact = maxWidth < 600.dp
@@ -238,16 +242,26 @@ private fun DownloadRow(
           fillColor = stateColors.foreground,
         )
         if (compact) {
-          FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
+          ) {
             StatusPill(state = state, foreground = stateColors.foreground)
-            PrimaryMetric(state = state, speedLimit = request.speedLimit)
+            // One item per part, so lines wrap between parts rather than inside them.
+            val parts = transfer + speed + limit
+            parts.forEachIndexed { i, part ->
+              MetricText(if (i < parts.lastIndex) "$part ·" else part)
+            }
           }
+        } else {
+          MetricText((transfer + limit).joinToString(" · "))
         }
       }
 
-      // Primary metric (mono)
+      // Live speed (mono)
       if (!compact) {
-        PrimaryMetric(state = state, speedLimit = request.speedLimit)
+        MetricText(speed.joinToString(" · "), Modifier.widthIn(max = 200.dp))
         StatusPill(state = state, foreground = stateColors.foreground)
       }
 
@@ -258,43 +272,15 @@ private fun DownloadRow(
 }
 
 @Composable
-private fun PrimaryMetric(state: DownloadState, speedLimit: SpeedLimit) {
-  val colors = KetchTheme.colors
-  val type = KetchTheme.typography
-  val text = when (state) {
-    is DownloadState.Downloading -> {
-      val p = state.progress
-      val speed = buildString {
-        append(if (p.bytesPerSecond > 0) "${formatBytes(p.bytesPerSecond)}/s" else "--")
-        if (!speedLimit.isUnlimited) {
-          append(" (limit: ${formatBytes(speedLimit.bytesPerSecond)}/s)")
-        }
-      }
-      val eta = if (p.bytesPerSecond > 0 && p.totalBytes > 0) {
-        val remaining = (p.totalBytes - p.downloadedBytes).coerceAtLeast(0)
-        formatEta(remaining / p.bytesPerSecond)
-      } else ""
-      if (eta.isNotEmpty()) "$speed · $eta" else speed
-    }
-    is DownloadState.Paused -> {
-      val p = state.progress
-      if (p.totalBytes > 0) "${formatBytes(p.downloadedBytes)} / ${formatBytes(p.totalBytes)}"
-      else if (p.downloadedBytes > 0) formatBytes(p.downloadedBytes) else ""
-    }
-    is DownloadState.Queued -> ""
-    is DownloadState.Scheduled -> ""
-    is DownloadState.Completed -> ""
-    is DownloadState.Failed -> ""
-    is DownloadState.Canceled -> ""
-  }
+private fun MetricText(text: String, modifier: Modifier = Modifier) {
   if (text.isEmpty()) return
   Text(
     text = text,
-    style = type.monoSmall,
-    color = colors.onSurfaceVariant,
+    style = KetchTheme.typography.monoSmall,
+    color = KetchTheme.colors.onSurfaceVariant,
     maxLines = 1,
     overflow = TextOverflow.Ellipsis,
-    modifier = Modifier.widthIn(max = 160.dp),
+    modifier = modifier,
   )
 }
 

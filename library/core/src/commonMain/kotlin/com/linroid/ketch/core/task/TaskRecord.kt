@@ -5,6 +5,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.SourceResumeState
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
@@ -13,6 +14,9 @@ import kotlin.time.Instant
  * fields used for resume validation and segment-level progress.
  *
  * This is the data model used by [TaskStore].
+ *
+ * @property downloadTime time spent downloading over every run of the task; `null` for records
+ *   created before it was tracked, which keep it unknown rather than undercount it
  */
 @Serializable
 data class TaskRecord(
@@ -25,6 +29,7 @@ data class TaskRecord(
   val segments: List<Segment>? = null,
   val sourceType: String? = null,
   val sourceResumeState: SourceResumeState? = null,
+  val downloadTime: Duration? = null,
   val createdAt: Instant,
   val updatedAt: Instant,
 )

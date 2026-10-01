@@ -105,7 +105,7 @@ Debug: (Ketch) [SegmentDownloader] Starting segment 0 for taskId=3f2a: range 0..
 Debug: (Ketch) [SegmentDownloader] Starting segment 1 for taskId=3f2a: range 262144..524287 (262144 bytes remaining)
 ...
 Info: (Ketch) [Execution] Download completed for taskId=3f2a
-Info: (Ketch) [Ketch] Task state: taskId=3f2a, Downloading -> Completed(/Users/me/Downloads/file.zip)
+Info: (Ketch) [Ketch] Task state: taskId=3f2a, Downloading -> Completed(/Users/me/Downloads/file.zip, totalBytes=1048576, downloadTime=1.204s)
 ```
 
 On Android the tag is the Logcat tag, and on iOS Kermit writes to OSLog.
