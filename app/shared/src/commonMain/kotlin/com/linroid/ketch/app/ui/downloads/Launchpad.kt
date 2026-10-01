@@ -25,22 +25,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButton
@@ -62,21 +58,14 @@ import com.linroid.ketch.app.platform.DesktopHooks
 import com.linroid.ketch.app.platform.IntegrationStatus
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
-import com.linroid.ketch.app.util.LinkParser
-import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.links
-import com.linroid.ketch.app.util.urlHost
-import com.linroid.ketch.config.ClipboardMode
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlinx.coroutines.launch
@@ -156,7 +145,7 @@ internal fun Launchpad(state: AppState, phone: Boolean, modifier: Modifier = Mod
 private fun PasteTile(state: AppState, phone: Boolean, modifier: Modifier) {
   val clipboard = rememberSystemClipboard()
   val scope = rememberCoroutineScope()
-  val clip = rememberClipboardLink(state, clipboard)
+  val clip = rememberClipboardLink(state, clipboard, skipOffered = false)
   val shortcut = KetchCommands.PasteLinks.shortcutLabel()
   val paste = {
     scope.launch {
@@ -374,69 +363,6 @@ private fun TileGlyph(icon: KetchIcon) {
       .background(colors.accentSoft, KetchTheme.shapes.sm),
   ) {
     KetchIconImage(icon, size = KetchTheme.density.controlGlyph, tint = colors.accentText)
-  }
-}
-
-/** What the paste tile knows about the clipboard. */
-private sealed interface ClipboardLink {
-  /** Nothing to offer, or the clipboard is off limits. */
-  data object None : ClipboardLink
-
-  /** Probably a link, which is read only when the tile is used. */
-  data object Maybe : ClipboardLink
-
-  /** A link Ketch does not have yet, read without a notice. */
-  data class Found(val url: String, val label: String) : ClipboardLink
-}
-
-/**
- * The link on the clipboard, looked at each time the window gains focus. It is read only where
- * that shows no notice ([SystemClipboard.readsSilently]); elsewhere the platform only says
- * whether a link is probably there. Nothing is looked at when the clipboard mode is off.
- */
-@Composable
-private fun rememberClipboardLink(state: AppState, clipboard: SystemClipboard): ClipboardLink {
-  val window = LocalWindowInfo.current
-  val focused = window.isWindowFocused
-  val mode = state.appSettings.ui.clipboardMode
-  val tasks by state.tasks.collectAsState()
-  var link by remember { mutableStateOf<ClipboardLink>(ClipboardLink.None) }
-  LaunchedEffect(clipboard, focused, mode, tasks.size) {
-    if (!focused || mode == ClipboardMode.Off) {
-      if (mode == ClipboardMode.Off) link = ClipboardLink.None
-      return@LaunchedEffect
-    }
-    link = catchingUnlessCancelled {
-      when {
-        clipboard.readsSilently -> {
-          val text = clipboard.readText().orEmpty()
-          val known = tasks.mapTo(HashSet()) { it.request.url }
-          val url = LinkParser.parseIntake(text).links().map { it.url }.firstOrNull { it !in known }
-          url?.let { ClipboardLink.Found(it, linkLabel(it)) } ?: ClipboardLink.None
-        }
-        clipboard.hasLink() -> ClipboardLink.Maybe
-        else -> ClipboardLink.None
-      }
-    }.onFailure { log.d { "Couldn't look at the clipboard: ${it.describeCauses()}" } }
-      .getOrDefault(ClipboardLink.None)
-  }
-  return link
-}
-
-/** "ubuntu-24.04.iso · releases.ubuntu.com" for a link on the clipboard. */
-private fun linkLabel(url: String): String {
-  val name = displayName(DownloadRequest(url = url))
-  val host = urlHost(url)
-  return listOfNotNull(name, host?.takeIf { it != name }).joinToString(" · ")
-}
-
-/** Adds pasted [text]: one link at once, several or none through the add sheet. */
-private fun addPasted(state: AppState, text: String) {
-  val links = LinkParser.parseIntake(text).links()
-  if (links.size == 1) {
-    state.quickAdd(listOf(links.single().url))
-  } else {
-    state.openIntake(IntakeRequest(text = text))
   }
 }
 

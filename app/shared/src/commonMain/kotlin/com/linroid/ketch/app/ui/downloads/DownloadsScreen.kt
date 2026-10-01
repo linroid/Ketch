@@ -523,6 +523,7 @@ private fun PhoneDownloads(page: DownloadsPage, view: TaskListView) {
           )
         }
       }
+      if (content == PageContent.Rows) ClipboardChip(state)
       if (view.query.tokens.isNotEmpty()) {
         FacetRow(
           query = view.query,
