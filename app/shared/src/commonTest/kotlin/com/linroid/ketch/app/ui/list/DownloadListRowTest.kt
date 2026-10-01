@@ -19,7 +19,19 @@ class DownloadListRowTest {
 
     val text = secondLine(row, touch = true, colors).text
 
-    assertEquals("1.00 of 4.00 GB · 1.0 MB/s · 51m 12s", text)
+    assertEquals("1.00 of 4.00 GB · 1.0 MB/s · 51m 12s", text.replace(NO_BREAK, ' '))
+  }
+
+  @Test
+  fun secondLine_downloadingOnTouch_wrapsOnlyBetweenParts() {
+    val state = DownloadState.Downloading(DownloadProgress(1L shl 30, 4L shl 30, 1L shl 20))
+    val row = ListFixtures.row("iso", state)
+
+    val parts = secondLine(row, touch = true, colors).text.split(" · ")
+
+    val expected = listOf("1.00 of 4.00 GB", "1.0 MB/s", "51m 12s")
+    assertEquals(expected, parts.map { it.replace(NO_BREAK, ' ') })
+    assertTrue(parts.none { ' ' in it })
   }
 
   @Test
@@ -39,3 +51,5 @@ class DownloadListRowTest {
     assertEquals(row.content.detail, secondLine(row, touch = false, colors).text)
   }
 }
+
+private const val NO_BREAK = '\u00A0'

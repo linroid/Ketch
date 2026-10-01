@@ -244,7 +244,7 @@ internal fun GroupHeader(
         color = colors.textTertiary,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f).padding(start = spacing.s1),
+        modifier = Modifier.weight(1f),
       )
     } else {
       Spacer(Modifier.weight(1f))

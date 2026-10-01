@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchMenuPanel
 import com.linroid.ketch.app.platform.DesktopHooks
 import com.linroid.ketch.app.platform.DetectedBrowser
@@ -27,11 +29,16 @@ import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.downloads.ClipboardChipRow
+import com.linroid.ketch.app.ui.downloads.EmptyMessage
 import com.linroid.ketch.app.ui.downloads.Launchpad
 import com.linroid.ketch.app.ui.downloads.RowDensity
+import com.linroid.ketch.app.ui.downloads.SkeletonRows
 import com.linroid.ketch.app.ui.downloads.TableColumn
 import com.linroid.ketch.app.ui.downloads.TableLayout
 import com.linroid.ketch.app.ui.downloads.columnChooser
+import com.linroid.ketch.app.ui.downloads.emptyCopy
+import com.linroid.ketch.app.ui.downloads.offlineCopy
+import com.linroid.ketch.app.ui.downloads.remoteEmptyCopy
 import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.DownloadsLayout
 import kotlin.test.BeforeTest
@@ -76,6 +83,11 @@ class TableSnapshots {
     appSnapshots("list-picked", listOf(SnapshotSize.Desktop)) {
       state.updateInspectorOpen(false)
       state.appSettings.saveUi { it.copy(layout = DownloadsLayout.List) }
+    }
+    appSnapshots("list-narrow", listOf(SnapshotSize(600.dp, 700.dp, KetchDensity.Compact)))
+    // A narrow browser window: a pointer on the phone layout shows a clicked row in the sheet.
+    appSnapshots("list-pointer", listOf(SnapshotSize(390.dp, 844.dp, KetchDensity.Compact))) {
+      scene.click(200.dp, 300.dp)
     }
   }
 
@@ -169,6 +181,37 @@ class TableSnapshots {
             onDismiss = {},
           )
           ClipboardChipRow(label = null, onClick = {}, onDismiss = {})
+        }
+      }
+    }
+  }
+
+  @Test
+  fun emptyStates_page_sayWhyAndOfferAWayOut() {
+    val size = SnapshotSize(760.dp, 360.dp, KetchDensity.Compact)
+    val states: Map<String, @Composable () -> Unit> = mapOf(
+      "empty-waiting" to {
+        EmptyMessage(emptyCopy(StatusFilter.Waiting, "", "This Mac", slots = 3), onAction = {})
+      },
+      "empty-links" to {
+        val links = "https://example.com/a.iso https://example.com/b.iso"
+        EmptyMessage(emptyCopy(StatusFilter.All, links, "This Mac", slots = 3), onAction = {})
+      },
+      "empty-offline" to {
+        EmptyMessage(offlineCopy("nas.local:8642", unauthorized = false), onAction = {})
+      },
+      "empty-remote" to { EmptyMessage(remoteEmptyCopy("nas.local:8642"), onAction = {}) },
+      "loading-rows" to {
+        SkeletonRows(
+          rowHeight = KetchTheme.density.tableRow,
+          chip = KetchFileTypeChipDefaults.TableSize,
+        )
+      },
+    )
+    for ((name, content) in states) {
+      for (theme in SnapshotTheme.entries) {
+        snapshot(name, size, theme) {
+          Box(Modifier.fillMaxSize().background(KetchTheme.colors.surface)) { content() }
         }
       }
     }

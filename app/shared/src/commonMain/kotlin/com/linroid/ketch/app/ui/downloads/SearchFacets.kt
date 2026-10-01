@@ -50,10 +50,11 @@ internal fun FacetRow(
       .height(spacing.s8)
       .padding(horizontal = spacing.pageHeaderPadding),
   ) {
+    val scroll = rememberScrollState()
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
-      modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+      modifier = Modifier.weight(1f).scrollFade(scroll).horizontalScroll(scroll),
     ) {
       for (token in query.tokens) {
         KetchChip(

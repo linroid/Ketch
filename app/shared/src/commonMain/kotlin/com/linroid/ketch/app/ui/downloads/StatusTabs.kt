@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.downloads
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -24,12 +25,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.LayoutDirection
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchSegmented
@@ -60,6 +69,7 @@ internal fun StatusTabs(
   trailing: @Composable RowScope.() -> Unit = {},
 ) {
   val spacing = KetchTheme.spacing
+  val scroll = rememberScrollState()
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
@@ -68,7 +78,7 @@ internal fun StatusTabs(
       .height(spacing.tabRowHeight)
       .padding(horizontal = spacing.pageHeaderPadding),
   ) {
-    Box(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+    Box(Modifier.weight(1f).scrollFade(scroll).horizontalScroll(scroll)) {
       KetchSegmented(
         options = StatusFilter.entries,
         selected = selected,
@@ -96,13 +106,15 @@ internal fun StatusChips(
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
+  val scroll = rememberScrollState()
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = modifier
       .fillMaxWidth()
       .height(spacing.tabRowHeight)
-      .horizontalScroll(rememberScrollState())
+      .scrollFade(scroll)
+      .horizontalScroll(scroll)
       .padding(horizontal = spacing.s4),
   ) {
     for (filter in StatusFilter.entries) {
@@ -144,7 +156,7 @@ internal fun TabAction(
     StatusFilter.Done -> TextAction(clearFinishedLabel(count), onClearFinished)
     StatusFilter.Failed -> Row(
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+      horizontalArrangement = Arrangement.spacedBy(spacing.s1),
     ) {
       Text(
         text = "$count failed",
@@ -152,8 +164,10 @@ internal fun TabAction(
         color = colors.textSecondary,
         maxLines = 1,
       )
+      Separator()
       TextAction("Retry all", onRetryAll)
       if (needsLink > 0) {
+        Separator()
         Text(
           text = if (needsLink == 1) "1 needs a new link" else "$needsLink need a new link",
           style = KetchTheme.typography.caption,
@@ -165,6 +179,59 @@ internal fun TabAction(
     }
     else -> Unit
   }
+}
+
+/**
+ * Fades a row that scrolls sideways out toward each edge it can still scroll past, so a tab or
+ * chip cut by the edge reads as more to come. Put it before [horizontalScroll] with [scroll].
+ */
+@Composable
+internal fun Modifier.scrollFade(scroll: ScrollState): Modifier {
+  val fade = KetchTheme.spacing.s6
+  return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+      drawContent()
+      val width = fade.toPx().coerceAtMost(size.width / 2)
+      val rtl = layoutDirection == LayoutDirection.Rtl
+      val left = if (rtl) scroll.canScrollForward else scroll.canScrollBackward
+      val right = if (rtl) scroll.canScrollBackward else scroll.canScrollForward
+      if (left) {
+        drawRect(
+          brush = Brush.horizontalGradient(
+            0f to Color.Transparent,
+            1f to Color.Black,
+            endX = width,
+          ),
+          size = Size(width, size.height),
+          blendMode = BlendMode.DstIn,
+        )
+      }
+      if (right) {
+        val start = size.width - width
+        drawRect(
+          brush = Brush.horizontalGradient(
+            0f to Color.Black,
+            1f to Color.Transparent,
+            startX = start,
+            endX = size.width,
+          ),
+          topLeft = Offset(start, 0f),
+          size = Size(width, size.height),
+          blendMode = BlendMode.DstIn,
+        )
+      }
+    }
+}
+
+/** The " · " between the parts of a tab's summary. */
+@Composable
+private fun Separator() {
+  Text(
+    text = "·",
+    style = KetchTheme.typography.caption,
+    color = KetchTheme.colors.textTertiary,
+    maxLines = 1,
+  )
 }
 
 /**

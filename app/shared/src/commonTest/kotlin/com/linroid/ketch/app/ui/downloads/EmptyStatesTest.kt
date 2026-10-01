@@ -23,6 +23,30 @@ class EmptyStatesTest {
   }
 
   @Test
+  fun emptyCopy_searchForTwoLinks_speaksOfThem() {
+    val copy = emptyCopy(
+      filter = StatusFilter.All,
+      query = "https://example.com/a.iso https://example.com/b.iso",
+      deviceName = "NAS",
+      slots = null,
+    )
+
+    assertEquals("These links aren't in your downloads", copy.title)
+    assertEquals("Add them to NAS instead.", copy.hint)
+    assertEquals("Add these links", copy.actionLabel)
+  }
+
+  @Test
+  fun offlineCopy_unreachableDevice_offersNoButton() {
+    val offline = offlineCopy("NAS", unauthorized = false)
+    val refused = offlineCopy("NAS", unauthorized = true)
+
+    assertEquals("Can't reach NAS", offline.title)
+    assertEquals("NAS needs a new access token", refused.title)
+    assertNull(offline.action)
+  }
+
+  @Test
   fun emptyCopy_failedTab_saysNothingNeedsAttention() {
     val copy = emptyCopy(StatusFilter.Failed, "", "This Mac", slots = 3)
 

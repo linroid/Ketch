@@ -41,12 +41,14 @@ import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.LaneStrip
+import com.linroid.ketch.app.components.LaneStripDefaults
 import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
@@ -59,7 +61,6 @@ import com.linroid.ketch.app.ui.downloads.actions.icon
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.formatSizeOf
-import com.linroid.ketch.app.util.speedLimitLabel
 import kotlinx.coroutines.launch
 
 /**
@@ -162,7 +163,7 @@ private fun RowBody(
       }
       if (touch) TrailingAction(row, actions)
     }
-    if (!touch) HoverOverlay(row, actions, frame)
+    if (!touch) HoverOverlay(row, actions, frame, aboveLanes = lanes)
   }
 }
 
@@ -230,15 +231,24 @@ internal fun secondLine(row: TaskRow, touch: Boolean, colors: KetchColors): Anno
     is DownloadState.Completed -> content.size.takeIf { it != UNKNOWN }
     else -> null
   }
+  // The line wraps between its parts, never inside a size, speed or time.
   val parts = buildList {
-    size?.let(::add)
+    size?.let { add(it.unbroken()) }
     if (touch && content.status == RowStatus.Downloading) {
-      add(content.speed)
-      content.time.takeIf { it.isNotEmpty() && it != UNKNOWN }?.let(::add)
+      add(content.speed.unbroken())
+      content.time.takeIf { it.isNotEmpty() && it != UNKNOWN }?.let { add(it.unbroken()) }
     } else if (error == null) {
-      add(content.detail)
+      // A queue reason is a sentence and may wrap; the other details are short facts.
+      if (state is DownloadState.Queued) {
+        add(content.detail)
+      } else {
+        content.detail.split(SEPARATOR).forEach { add(it.unbroken()) }
+      }
     }
-    speedLimitLabel(state, row.request.speedLimit)?.let(::add)
+    val limit = row.request.speedLimit
+    if (state is DownloadState.Downloading && !limit.isUnlimited) {
+      add("limit ${formatSpeedLimit(limit)}".unbroken())
+    }
   }
   return buildAnnotatedString {
     if (error != null) {
@@ -252,6 +262,9 @@ internal fun secondLine(row: TaskRow, touch: Boolean, colors: KetchColors): Anno
     append(parts.joinToString(SEPARATOR))
   }
 }
+
+/** This text with no-break spaces, so a line never wraps inside it. */
+private fun String.unbroken(): String = replace(' ', NO_BREAK_SPACE)
 
 private fun sizeOf(progress: DownloadProgress): String? =
   progress.totalBytes.takeIf { it > 0 }
@@ -285,15 +298,28 @@ private fun TrailingAction(row: TaskRow, actions: ListActions) {
 
 /**
  * A pointer row's hover actions at its end, over a fade into the row's hover fill so the metric
- * below never shows through.
+ * below never shows through. With [aboveLanes] they stop above the row's lane strip, which stays
+ * in view.
  */
 @Composable
-internal fun BoxScope.HoverOverlay(row: TaskRow, actions: ListActions, frame: RowFrameState) {
+internal fun BoxScope.HoverOverlay(
+  row: TaskRow,
+  actions: ListActions,
+  frame: RowFrameState,
+  aboveLanes: Boolean = false,
+) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val fill = rowFill(colors, frame, actions.keyboard.hasFocus)
   val fade = spacing.s6
-  Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+  // The strip, the write heads reaching above it and the row's bottom padding.
+  val lanes = LaneStripDefaults.RowHeight + spacing.s0_5 + spacing.s2
+  Box(
+    contentAlignment = Alignment.CenterEnd,
+    modifier = Modifier
+      .matchParentSize()
+      .then(if (aboveLanes) Modifier.padding(bottom = lanes) else Modifier),
+  ) {
     HoverButtons(row, actions, frame, fill, fade)
   }
 }
@@ -395,4 +421,5 @@ private fun SwipeableRow(
 }
 
 private const val SEPARATOR = " · "
+private const val NO_BREAK_SPACE = '\u00A0'
 private const val UNKNOWN = "–"

@@ -43,13 +43,15 @@ import com.linroid.ketch.app.util.links
  * @property title the headline, such as "Nothing needs attention".
  * @property hint a line under it, or `null`.
  * @property icon the glyph above it.
- * @property action the button's label, or `null` for none.
+ * @property action what the button does, or `null` for no button.
+ * @property actionLabel the button's label.
  */
 internal data class EmptyCopy(
   val title: String,
   val hint: String?,
   val icon: KetchIcon,
   val action: EmptyAction?,
+  val actionLabel: String? = action?.label,
 )
 
 /** What the button of an empty tab or search does. */
@@ -57,6 +59,9 @@ internal enum class EmptyAction(val label: String) {
   ClearSearch("Clear search"),
   AddLinks("Add this link"),
   ShowAll("Show all downloads"),
+
+  /** Opens the add sheet. */
+  Add("Add a link"),
 }
 
 /**
@@ -76,13 +81,15 @@ internal fun emptyCopy(
   if (search.isNotEmpty()) {
     val links = LinkParser.parseIntake(search).links()
     return if (links.isNotEmpty()) {
+      val one = links.size == 1
       EmptyCopy(
-        title = if (links.size == 1) "This link isn't in your downloads" else {
+        title = if (one) "This link isn't in your downloads" else {
           "These links aren't in your downloads"
         },
-        hint = "Add it to $deviceName instead.",
+        hint = "Add ${if (one) "it" else "them"} to $deviceName instead.",
         icon = KetchIcon.Link,
         action = EmptyAction.AddLinks,
+        actionLabel = if (one) EmptyAction.AddLinks.label else "Add these links",
       )
     } else {
       EmptyCopy(
@@ -133,6 +140,26 @@ internal fun emptyCopy(
   }
 }
 
+/** The copy of a remote device that has no downloads yet, with a button that adds one to it. */
+internal fun remoteEmptyCopy(deviceName: String): EmptyCopy = EmptyCopy(
+  title = "Downloads on $deviceName will appear here",
+  hint = null,
+  icon = KetchIcon.Server,
+  action = EmptyAction.Add,
+  actionLabel = "Add a link to $deviceName",
+)
+
+/**
+ * The copy of a remote device that cannot be reached and has sent no downloads yet: offline, or
+ * refusing its access token when [unauthorized]. The banner above the page offers the way out.
+ */
+internal fun offlineCopy(deviceName: String, unauthorized: Boolean): EmptyCopy = EmptyCopy(
+  title = if (unauthorized) "$deviceName needs a new access token" else "Can't reach $deviceName",
+  hint = "Its downloads show here once it connects.",
+  icon = KetchIcon.Server,
+  action = null,
+)
+
 private fun runsAtATime(slots: Int): String =
   if (slots == 1) "one download at a time" else "$slots at a time"
 
@@ -182,51 +209,19 @@ internal fun EmptyMessage(
           textAlign = TextAlign.Center,
         )
       }
-      copy.action?.let { action ->
+      val action = copy.action
+      if (action != null && copy.actionLabel != null) {
         Spacer(Modifier.height(spacing.s1))
         KetchButton(
-          text = action.label,
+          text = copy.actionLabel,
           onClick = { onAction(action) },
-          variant = if (action == EmptyAction.AddLinks) {
+          variant = if (action == EmptyAction.AddLinks || action == EmptyAction.Add) {
             KetchButtonVariant.Tonal
           } else {
             KetchButtonVariant.Secondary
           },
         )
       }
-    }
-  }
-}
-
-/**
- * A device whose downloads show here once it has any, with a button that adds one to it.
- *
- * @param deviceName the device, such as "NAS-Basement".
- */
-@Composable
-internal fun RemoteEmpty(deviceName: String, onAdd: () -> Unit, modifier: Modifier = Modifier) {
-  val colors = KetchTheme.colors
-  val spacing = KetchTheme.spacing
-  Box(modifier.fillMaxSize().padding(spacing.s6), contentAlignment = Alignment.Center) {
-    Column(
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(spacing.s2),
-      modifier = Modifier.widthIn(max = MessageWidth),
-    ) {
-      KetchIconImage(KetchIcon.Server, size = spacing.s8, tint = colors.textTertiary)
-      Spacer(Modifier.height(spacing.s1))
-      Text(
-        text = "Downloads on $deviceName will appear here",
-        style = KetchTheme.typography.titleM,
-        color = colors.textPrimary,
-        textAlign = TextAlign.Center,
-      )
-      Spacer(Modifier.height(spacing.s1))
-      KetchButton(
-        text = "Add a link to $deviceName",
-        onClick = onAdd,
-        leadingIcon = KetchIcon.Plus,
-      )
     }
   }
 }
