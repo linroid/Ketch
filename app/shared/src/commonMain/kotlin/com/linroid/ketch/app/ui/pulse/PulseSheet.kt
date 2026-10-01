@@ -34,7 +34,10 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
+import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.AppState
@@ -53,16 +56,20 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
   val pulse by state.pulse.state.collectAsState()
   val view = rememberSpeedModeView(state)
   val colors = KetchTheme.colors
+  val shape = KetchTheme.shapes.sm
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
+  val focus = rememberFocusVisibility()
   val text = pulseSubtitle(pulse, view.label)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
     modifier = modifier
-      .clip(KetchTheme.shapes.sm)
+      .focusRing(focus.visible, shape, colors.focusRing)
+      .clip(shape)
       .background(overlay)
       .semantics(mergeDescendants = true) { contentDescription = "$text, show the speed" }
+      .trackFocusVisibility(focus)
       .clickable(
         interactionSource = interactions,
         indication = null,
@@ -234,15 +241,19 @@ private fun RowScope.CountTile(
   alert: Boolean = false,
 ) {
   val colors = KetchTheme.colors
+  val shape = KetchTheme.shapes.md
   val interactions = remember { MutableInteractionSource() }
   val overlay = rememberInteractionOverlay(interactions)
+  val focus = rememberFocusVisibility()
   Column(
     modifier = Modifier
       .weight(1f)
       .heightIn(min = TileHeight)
-      .clip(KetchTheme.shapes.md)
+      .focusRing(focus.visible, shape, colors.focusRing)
+      .clip(shape)
       .background(colors.surfaceSunken)
       .background(overlay)
+      .trackFocusVisibility(focus)
       .clickable(
         interactionSource = interactions,
         indication = null,

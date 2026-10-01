@@ -13,7 +13,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -36,7 +35,6 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.config.SpeedLimitMode
-import kotlinx.coroutines.Job
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
 
@@ -82,14 +80,12 @@ internal fun ColumnScope.SpeedModeOptions(
   val view = rememberSpeedModeView(state)
   val active by state.activeInstance.collectAsState()
   val controller = view.controller
-  val scope = rememberCoroutineScope()
   val deviceName = when (val entry = active) {
     null -> "this device"
     is EmbeddedInstance -> localDeviceNoun()
     else -> entry.label
   }
-  var job by remember { mutableStateOf<Job?>(null) }
-  val pending = job?.isActive == true
+  val command = rememberPendingJob()
   var asSlowLane by remember(controller) { mutableStateOf(view.mode.isSlowLane) }
 
   if (controller != null) {
@@ -101,7 +97,7 @@ internal fun ColumnScope.SpeedModeOptions(
       onSelect = { mode ->
         asSlowLane = mode == SpeedLimitMode.SlowLane ||
           mode == SpeedLimitMode.Auto && asSlowLane
-        job = state.switchSpeedMode(mode, scope)
+        command.track(state.switchSpeedMode(mode))
       },
       label = ::speedModeName,
       fill = fillModes,
@@ -120,13 +116,15 @@ internal fun ColumnScope.SpeedModeOptions(
     controller != null && view.mode != SpeedMode.Full -> controller.settings.value.standard
     else -> state.instanceSettings.download?.speedLimit ?: view.limit
   }
+  val error = state.instanceSettings.downloadError.takeIf { state.limitGoesToSettings(asSlowLane) }
   Eyebrow(if (asSlowLane) "Slow lane speed" else "Speed limit")
   SpeedLimitPicker(
     value = limit,
-    onCommit = { job = state.setSpeedLimit(it, asSlowLane, scope) ?: job },
-    caption = limitCaption(view, asSlowLane, deviceName),
+    onCommit = { command.track(state.setSpeedLimit(it, asSlowLane)) },
+    caption = error?.let { "Couldn't update $deviceName · $it" }
+      ?: limitCaption(view, asSlowLane, deviceName),
     enabled = controller != null || state.instanceSettings.download != null,
-    pending = pending,
+    pending = command.pending,
   )
   if (controller != null) {
     Spacer(Modifier.height(spacing.s2))

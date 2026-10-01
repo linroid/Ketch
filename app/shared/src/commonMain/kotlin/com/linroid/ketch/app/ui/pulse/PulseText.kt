@@ -8,8 +8,8 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.formatSpace
+import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.config.SpeedLimitMode

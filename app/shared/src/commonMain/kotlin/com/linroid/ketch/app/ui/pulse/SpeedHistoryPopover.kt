@@ -31,6 +31,7 @@ import com.linroid.ketch.app.theme.eyebrowText
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -53,7 +54,7 @@ internal fun SpeedHistoryPopover(
     val instances by state.instances.collectAsState()
     val histories by state.speedHistory.histories.collectAsState()
     val view = rememberSpeedModeView(state)
-    val chart = remember(histories) { totalHistory(histories.values) }
+    val chart = remember(histories) { totalHistory(histories.values, Clock.System.now()) }
     SpeedHistoryContent(
       samples = chart.samples,
       end = chart.end,
@@ -156,11 +157,16 @@ internal class TotalHistory(val samples: List<Long>, val end: Instant?)
 
 /**
  * Sums the speed [histories] of tasks second by second over the last
- * [SpeedHistoryStore.CAPACITY] seconds, ending at the newest sample. A task that was not
- * downloading at a second adds nothing to it.
+ * [SpeedHistoryStore.CAPACITY] seconds. A task that was not downloading at a second adds nothing
+ * to it.
+ *
+ * The chart ends at the newest sample while tasks download, and at [now] once nothing has been
+ * sampled for a while: histories stop when downloads stop, so their newest sample can be long
+ * past.
  */
-internal fun totalHistory(histories: Collection<SpeedHistory>): TotalHistory {
-  val end = histories.maxOfOrNull { it.lastAt } ?: return TotalHistory(emptyList(), null)
+internal fun totalHistory(histories: Collection<SpeedHistory>, now: Instant): TotalHistory {
+  val newest = histories.maxOfOrNull { it.lastAt } ?: return TotalHistory(emptyList(), null)
+  val end = if (now - newest > SpeedHistoryStore.INTERVAL * 2) now else newest
   val slots = SpeedHistoryStore.CAPACITY
   val totals = LongArray(slots)
   for (history in histories) {

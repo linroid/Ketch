@@ -7,11 +7,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -27,11 +29,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -48,11 +53,15 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+
+private val log = KetchLogger("BannerHost")
 
 /** Color of a [Banner]. */
 internal enum class BannerTone {
@@ -86,9 +95,9 @@ internal data class Banner(
 
 /**
  * The banner about the active device's connection, or `null` when it is fine: "Connecting to
- * NAS…" once [connectingLong] says it has taken a while, "NAS is offline · retrying" with Switch
- * to [localName], or "NAS needs a new access token" with Enter token. It never opens a dialog by
- * itself.
+ * NAS…" once [connectingLong] says it has taken a while, "NAS is offline · retrying" with Retry
+ * now and Switch to [localName], or "NAS needs a new access token" with Enter token. It never
+ * opens a dialog by itself.
  *
  * @param localName name of the embedded device; `null` when there is none to switch to.
  */
@@ -97,6 +106,7 @@ internal fun deviceBanner(
   name: String,
   connectingLong: Boolean,
   localName: String?,
+  onRetry: () -> Unit,
   onSwitchToLocal: () -> Unit,
   onEnterToken: () -> Unit,
 ): Banner? = when (health) {
@@ -111,6 +121,7 @@ internal fun deviceBanner(
     text = listOfNotNull("$name is offline", "retrying", health.reason).joinToString(" · "),
     icon = KetchIcon.Warning,
     actions = listOfNotNull(
+      MessageAction("Retry now", onRetry),
       localName?.let { MessageAction("Switch to $it", onSwitchToLocal) }
     ),
   )
@@ -166,6 +177,7 @@ fun BannerHost(state: AppState, modifier: Modifier = Modifier) {
         name = device.name,
         connectingLong = connectingLong,
         localName = local?.let { localDeviceNoun() },
+        onRetry = { (state.activeInstance.value as? RemoteInstance)?.let(state::retryNow) },
         onSwitchToLocal = { local?.let(state::switchInstance) },
         onEnterToken = {
           val remote = state.activeInstance.value as? RemoteInstance
@@ -180,6 +192,25 @@ fun BannerHost(state: AppState, modifier: Modifier = Modifier) {
       .forEach { message -> add(messageBanner(message) { state.messages.dismiss(message.id) }) }
   }
   BannerStack(banners, modifier)
+}
+
+// Connects to the offline device now rather than at its next attempt.
+private fun AppState.retryNow(device: RemoteInstance) {
+  launchCommand {
+    try {
+      instanceManager.reconnect(device)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.w { "Couldn't reconnect to ${device.deviceId}: ${e.describeCauses()}" }
+      messages.post(
+        level = MessageLevel.Error,
+        title = "Couldn't reconnect to ${device.label}",
+        cause = e,
+        deviceId = device.deviceId,
+      )
+    }
+  }
 }
 
 /** [banners] stacked, each sliding in and out; drawn without the state it reads. */
@@ -228,23 +259,34 @@ private fun BannerRow(banner: Banner, modifier: Modifier = Modifier) {
   ) {
     // A narrow card puts the buttons under the text, so the text keeps the width.
     val stacked = maxWidth < StackedBelowWidth && banner.actions.isNotEmpty()
+    val textStyle = KetchTheme.typography.bodyS
+    val firstLine = with(LocalDensity.current) { textStyle.lineHeight.toDp() }
+    // Wrapped text keeps the icon and the close button on its first line.
+    var wraps by remember(banner.text) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
       Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.s2),
         modifier = Modifier.heightIn(min = BannerHeight - spacing.s2),
       ) {
-        if (banner.busy) {
-          KetchSpinner(size = IconSize, color = ink)
-        } else {
-          KetchIconImage(icon = banner.icon, size = IconSize, tint = ink)
+        val firstLineOnly = if (wraps) Modifier.align(Alignment.Top) else Modifier
+        Box(
+          contentAlignment = Alignment.Center,
+          modifier = firstLineOnly.padding(vertical = spacing.s1).height(firstLine),
+        ) {
+          if (banner.busy) {
+            KetchSpinner(size = IconSize, color = ink)
+          } else {
+            KetchIconImage(icon = banner.icon, size = IconSize, tint = ink)
+          }
         }
         Text(
           text = banner.text,
-          style = KetchTheme.typography.bodyS,
+          style = textStyle,
           color = colors.textPrimary,
           maxLines = if (stacked) STACKED_LINES else 2,
           overflow = TextOverflow.Ellipsis,
+          onTextLayout = { wraps = it.lineCount > 1 },
           modifier = Modifier.weight(1f).padding(vertical = spacing.s1),
         )
         if (!stacked) BannerActions(banner.actions)
@@ -255,6 +297,7 @@ private fun BannerRow(banner: Banner, modifier: Modifier = Modifier) {
             onClick = dismiss,
             size = KetchButtonSize.Small,
             contentDescription = "Dismiss",
+            modifier = firstLineOnly,
           )
         } else {
           Spacer(Modifier.width(spacing.s1))

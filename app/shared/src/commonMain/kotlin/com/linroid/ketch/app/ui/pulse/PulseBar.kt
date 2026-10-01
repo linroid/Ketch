@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -37,7 +39,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchDot
 import com.linroid.ketch.app.components.KetchSpeedChart
@@ -88,8 +93,8 @@ fun rememberPulseBarState(): PulseBarState = remember { PulseBarState() }
  * connection and the Activity bell with its unread count.
  *
  * While rows are selected, the connection gives way to a summary of the selection. As the card
- * narrows, free space goes below 720 dp and the counts below 600 dp. Metrics of a device that is
- * not online are dimmed.
+ * narrows, free space goes below 720 dp and the counts below 600 dp, and any part that still
+ * does not fit is left out from the end. Metrics of a device that is not online are dimmed.
  *
  * @param barState which popovers are open; hoist it to open Activity from a shortcut.
  */
@@ -183,38 +188,40 @@ internal fun PulseBarContent(
     Spacer(Modifier.fillMaxWidth().height(1.dp).background(colors.hairline))
     Row(
       verticalAlignment = Alignment.CenterVertically,
-      modifier = Modifier.fillMaxSize().padding(horizontal = spacing.s2),
+      modifier = Modifier.fillMaxSize().padding(horizontal = spacing.rowPadding),
     ) {
       pill()
       Spacer(Modifier.width(spacing.s2))
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.weight(1f).alpha(if (online) 1f else OFFLINE_ALPHA),
-      ) {
+      // Whatever does not fit is left out from the end, so no part is ever cut off.
+      FittingRow(Modifier.weight(1f).alpha(if (online) 1f else OFFLINE_ALPHA)) {
         Box {
           SpeedReadout(pulse, online, showSparkline, onSpeedClick)
           speedPopover()
         }
         if (showCounts) {
           countParts(pulse.counts, pulse.failures).forEach { part ->
-            Separator()
-            BarLink(
-              text = part.text,
-              description = "${part.description}, show the ${part.filter.label} tab",
-              color = if (part.alert) colors.status.failed.color else colors.textSecondary,
-              onClick = { onShowTab(part.filter) },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Separator()
+              BarLink(
+                text = part.text,
+                description = "${part.description}, show the ${part.filter.label} tab",
+                color = if (part.alert) colors.status.failed.color else colors.textSecondary,
+                onClick = { onShowTab(part.filter) },
+              )
+            }
           }
         }
         val disk = pulse.diskDevice
         if (showDisk && disk?.disk != null) {
-          Separator()
-          DiskReadout(
-            label = diskLabel(disk.disk),
-            used = diskUsed(disk.disk),
-            short = pulse.isDiskShort,
-            tooltip = "${diskLabel(disk.disk)} on ${disk.name} · ${disk.disk.directory}",
-          )
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Separator()
+            DiskReadout(
+              label = diskLabel(disk.disk),
+              used = diskUsed(disk.disk),
+              short = pulse.isDiskShort,
+              tooltip = "${diskLabel(disk.disk)} on ${disk.name} · ${disk.disk.directory}",
+            )
+          }
         }
       }
       if (selection != null) {
@@ -419,6 +426,33 @@ private fun BarButton(
       .padding(horizontal = KetchTheme.spacing.s1),
     content = content,
   )
+}
+
+/**
+ * Lays [content] out in a row, centered vertically, and leaves out the children from the first
+ * one that does not fit to the end.
+ */
+@Composable
+private fun FittingRow(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+  Layout(content, modifier) { measurables, constraints ->
+    val loose = Constraints(maxHeight = constraints.maxHeight)
+    val placed = ArrayList<Placeable>(measurables.size)
+    var width = 0
+    for (measurable in measurables) {
+      val placeable = measurable.measure(loose)
+      if (width + placeable.width > constraints.maxWidth) break
+      placed += placeable
+      width += placeable.width
+    }
+    val height = constraints.constrainHeight(placed.maxOfOrNull { it.height } ?: 0)
+    layout(constraints.constrainWidth(width), height) {
+      var x = 0
+      for (placeable in placed) {
+        placeable.placeRelative(x, (height - placeable.height) / 2)
+        x += placeable.width
+      }
+    }
+  }
 }
 
 /**
