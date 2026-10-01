@@ -238,6 +238,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   other hosts and the output parser drops their candidates, but redirects a listed
   site answers with (e.g. github.com to its CDN) are followed
 - JVM/Android only (uses Koog + Ktor CIO and OkHttp clients)
+- Shrunk app releases keep what Koog reaches by reflection: `app/proguard-rules.pro` (Android
+  R8 and desktop ProGuard) keeps `ToolSet` classes and `@LLMDescription`. The Android app also
+  registers Koog's HTTP client factory under `META-INF/services` (Koog's Android AAR omits it)
+  and must package `kotlin/**/*.kotlin_builtins` and `kotlinx-schema.properties`
 - See [AI discovery configuration](docs/ai-discovery.md)
 
 ### Configuration (`config/`)

@@ -62,6 +62,10 @@ android {
 
   packaging {
     resources {
+      // AI discovery reads two resources at runtime, so neither "kotlin/**" nor every
+      // "*.properties" can be excluded: kotlin-reflect, which Koog calls the tools through,
+      // loads kotlin/**/*.kotlin_builtins, and kotlinx-schema, which writes the tool schemas,
+      // loads kotlinx-schema.properties.
       excludes += setOf(
         "META-INF/DEPENDENCIES",
         "META-INF/{INDEX.LIST,io.netty.versions.properties}",
@@ -70,10 +74,9 @@ android {
         "META-INF/version-control-info.textproto",
         "META-INF/com/android/build/gradle/app-metadata.properties",
         "META-INF/androidx/**",
-        "kotlin/**",
+        "META-INF/**/*.properties",
         "DebugProbesKt.bin",
         "org/fusesource/**",
-        "**/*.properties",
       )
     }
   }

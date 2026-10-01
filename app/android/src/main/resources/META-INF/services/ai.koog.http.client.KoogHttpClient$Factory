@@ -1,0 +1,5 @@
+# Koog's LLM clients look up their HTTP client factory through ServiceLoader. The JVM jar of
+# ai.koog:http-client-ktor registers this provider, but its Android AAR (1.2.0) ships without
+# the service file, so on Android every client fails with "No KoogHttpClient.Factory provider
+# found" and R8 removes AI discovery from the release build as unreachable code.
+ai.koog.http.client.ktor.KtorKoogHttpClient$Factory

@@ -18,14 +18,6 @@
 }
 -keep class * implements ai.koog.http.client.KoogHttpClient$Factory { <init>(); }
 
-# Koog finds a ToolSet's @Tool methods through Kotlin reflection and resolves every member
-# function, inherited ones included, to its JVM method. ProGuard strips the ones nothing calls
-# directly, leaving Kotlin metadata that names missing methods (KotlinReflectionInternalError).
-# The parameters' @LLMDescription annotations describe the tool arguments to the model.
--keep interface ai.koog.agents.core.tools.reflect.ToolSet { *; }
--keepclassmembers class * implements ai.koog.agents.core.tools.reflect.ToolSet { *; }
--keepattributes RuntimeVisibleParameterAnnotations
-
 # Enum.valueOf() looks up the public values() reflectively; ProGuard removes or privatizes it
 # when nothing calls it directly. Android's default R8 rules keep it, Compose Desktop's do not.
 -keepclassmembers enum * {
