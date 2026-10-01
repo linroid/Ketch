@@ -86,6 +86,22 @@ Common tests also check response validation without sockets and regression cases
 progress snapshots, cancellation, and resegmentation. Keep fault-injection tests local so they
 remain reproducible without relying on a public server to misbehave.
 
+## UI Snapshots
+
+```shell
+./gradlew :app:shared:jvmTest -Psnapshots --tests '*Snapshots*'
+```
+
+The snapshot harness in `app/shared/src/jvmTest/.../app/snapshot/` renders the shared Compose UI
+headlessly and writes PNGs to `app/shared/build/snapshots/`, named
+`<scenario>-<theme>-<width>x<height>.png`, to look at while working on the UI. Scenarios are
+skipped without `-Psnapshots`. `appSnapshot` and `appSnapshots` render the real `App` root over
+`SampleData` (downloads in every state, a remote NAS, the clock fixed at 2026-10-01 14:30 UTC) at
+desktop, medium and phone sizes, in light and dark; `snapshot` renders any composable in
+`KetchTheme`. Add scenarios in a file of your own, such as `InspectorSnapshots.kt`, opening
+surfaces through `AppScenario` (`inspect`, `select`, `openAddSheet`, `openSettings`, `showTab`) and
+pressing keys or hovering through its `scene`.
+
 ## Other Suites
 
 - iOS simulator tests of `library:core`, `library:ftp` and `library:torrent` are skipped unless

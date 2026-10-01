@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Clock
 
 /**
  * Owns the app's state outside of any composition, so the window, the tray, the menu bar and
@@ -28,6 +29,7 @@ import kotlin.coroutines.CoroutineContext
  * @param speedMode speed mode of the embedded device when the host owns one, such as the
  *   service whose notification switches it, so the app and the host never fight over the speed
  *   limit; `null` when the host keeps none.
+ * @param clock current time of the task list and the speed history.
  */
 class AppController(
   val instanceManager: InstanceManager,
@@ -35,6 +37,7 @@ class AppController(
   incoming: IncomingDownloads = IncomingDownloads(),
   context: CoroutineContext = Dispatchers.Main,
   speedMode: SpeedModeController? = null,
+  clock: Clock = Clock.System,
 ) {
   private val log = KetchLogger("AppController")
   private var closed = false
@@ -61,6 +64,7 @@ class AppController(
     aiSettings = aiSettings,
     incoming = incoming,
     speedMode = speedMode,
+    clock = clock,
   )
 
   /** Toasts, banners and the Activity history. */
