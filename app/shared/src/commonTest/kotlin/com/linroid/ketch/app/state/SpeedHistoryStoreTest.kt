@@ -182,6 +182,18 @@ class SpeedHistoryStoreTest {
   }
 
   @Test
+  fun record_segmentFinishedBefore_getsNoLane() = runTest {
+    val store = store()
+    val segments = listOf(seg(0, 999, 1000), seg(1000, 1999, 0), seg(2000, 2999, 0))
+
+    store.record(START, mapOf(a to 100L), mapOf(a to segments))
+
+    val lanes = store.history(a)!!.lanes
+    assertEquals(listOf(1000L, 2000L), lanes.map { it.start })
+    assertEquals(100L, lanes.sumOf { it[0] })
+  }
+
+  @Test
   fun plus_missedSeconds_fillsLanesWithZero() {
     val history = SpeedHistory.of(100, START, mapOf(0L to 100L))
       .plus(40, START + 3.seconds, mapOf(0L to 40L))

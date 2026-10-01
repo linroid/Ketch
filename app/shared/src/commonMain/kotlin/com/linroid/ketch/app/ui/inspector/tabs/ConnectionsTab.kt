@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -19,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -36,7 +38,6 @@ import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -124,9 +125,12 @@ internal fun ConnectionsTabContent(
   val model = remember(row.segments, rates, downloading) {
     connectionsModel(row.segments, rates, downloading)
   }
-  var highlight by remember { mutableStateOf<Long?>(null) }
+  var hovered by remember { mutableStateOf<Long?>(null) }
+  // A lane that finishes or is re-split under the pointer sends no exit, so drop it here.
+  val highlight = hovered?.takeIf { start -> model.lanes.any { it.segment.start == start } }
   val currentOnHighlight by rememberUpdatedState(onHighlight)
   LaunchedEffect(highlight) { currentOnHighlight(highlight) }
+  DisposableEffect(Unit) { onDispose { currentOnHighlight(null) } }
 
   val requested = row.request.connections
   val single = downloading && requested > 1 && row.segments.size == 1
@@ -182,7 +186,7 @@ internal fun ConnectionsTabContent(
         phase = row.state.lanePhase(),
         initial = remember { model.lanes.mapTo(HashSet()) { it.segment.start } },
         highlight = highlight,
-        onHighlight = { highlight = it },
+        onHighlight = { hovered = it },
       )
     }
     if (model.finished > 0) {
@@ -279,12 +283,15 @@ private fun LaneRow(
   val currentOnHighlight by rememberUpdatedState(onHighlight)
   val currentHighlighted by rememberUpdatedState(highlighted)
   val description = laneDescription(lane)
+  val dense = scale == LaneScale.Dense
+  // Dense lanes carry no text, except the slowest three, which get a row tall enough for it.
+  val labelled = !dense || lane.annotated
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = Modifier
       .fillMaxWidth()
-      .height(metrics.rowHeight(scale))
+      .height(metrics.rowHeight(if (dense && labelled) LaneScale.Medium else scale))
       .background(
         color = if (highlighted) colors.surfaceHover else Color.Transparent,
         shape = KetchTheme.shapes.xs,
@@ -304,9 +311,9 @@ private fun LaneRow(
         }
       }
       .padding(horizontal = spacing.s1)
-      .semantics(mergeDescendants = true) { contentDescription = description },
+      .clearAndSetSemantics { contentDescription = description },
   ) {
-    if (scale != LaneScale.Dense) {
+    if (labelled) {
       Text(
         text = "#${lane.number}",
         style = type.monoS,
@@ -314,6 +321,8 @@ private fun LaneRow(
         maxLines = 1,
         modifier = Modifier.width(metrics.numberWidth),
       )
+    } else {
+      Spacer(Modifier.width(metrics.numberWidth))
     }
     LaneStripCanvas(
       segments = own,
@@ -324,7 +333,7 @@ private fun LaneRow(
       stalled = if (stalled) StalledOwnLane else emptySet(),
       modifier = Modifier.weight(1f).clearAndSetSemantics {},
     )
-    if (scale != LaneScale.Dense) {
+    if (!dense) {
       Text(
         text = rate?.stalledFor?.let(::formatStall) ?: formatByteRange(start, lane.segment.end + 1),
         style = type.caption,
@@ -334,26 +343,27 @@ private fun LaneRow(
         modifier = Modifier.width(metrics.rangeWidth),
       )
     }
-    val value = when {
-      scale == LaneScale.Dense && !lane.annotated -> ""
-      scale == LaneScale.Dense -> "#${lane.number} ${formatSpeed(rate?.bytesPerSecond ?: 0)}"
-      rate != null -> formatSpeed(rate.bytesPerSecond)
-      else -> "${lane.percent}%"
-    }
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     ) {
-      Text(
-        text = value,
-        style = if (scale == LaneScale.Dense) type.numeralS else type.numeral,
-        color = if (rate != null) colors.textPrimary else colors.textSecondary,
-        textAlign = TextAlign.End,
-        maxLines = 1,
-        modifier = Modifier
-          .width(if (scale == LaneScale.Dense) metrics.annotationWidth else metrics.rateWidth)
-          .wrapContentHeight(unbounded = true),
-      )
+      if (labelled) {
+        Text(
+          text = if (rate != null) formatSpeed(rate.bytesPerSecond) else "${lane.percent}%",
+          style = if (dense) type.numeralS else type.numeral,
+          color = when {
+            rate == null -> colors.textSecondary
+            // A dense lane has no range to say it stalled, so its rate does.
+            dense && health != null -> colors.laneRateColor(health)
+            else -> colors.textPrimary
+          },
+          textAlign = TextAlign.End,
+          maxLines = 1,
+          modifier = Modifier.width(metrics.rateWidth).wrapContentHeight(unbounded = true),
+        )
+      } else {
+        Spacer(Modifier.width(metrics.rateWidth))
+      }
       if (health != null) {
         KetchDot(color = colors.laneHealthColor(health), size = StatusDotDefaults.TableSize)
       }
@@ -366,7 +376,6 @@ private class LaneMetrics(spacing: KetchSpacing) {
   val numberWidth: Dp = spacing.s6
   val rangeWidth: Dp = spacing.s16 + spacing.s4
   val rateWidth: Dp = spacing.s16 + spacing.s2
-  val annotationWidth: Dp = spacing.s16 + spacing.s6
   val maxHeight: Dp = spacing.s16 * 5
   private val tall: Dp = spacing.s6 + spacing.s1
   private val medium: Dp = spacing.s5
@@ -387,7 +396,10 @@ internal enum class LaneScale {
   /** 9 to 16 lanes: 20 dp rows. */
   Medium,
 
-  /** More than 16: 12 dp rows without text, slowest first, the slowest three labelled. */
+  /**
+   * More than 16: 12 dp rows without text, slowest first. The slowest three keep their number
+   * and rate in 20 dp rows.
+   */
   Dense;
 
   companion object {
@@ -513,8 +525,8 @@ internal fun connectionsCaption(
   lanes == 1 && serverLimited -> SERVER_LIMIT
   lanes == 1 -> "Single connection"
   !editable -> null
-  downloading -> "Changing connections re-splits the remaining bytes live."
-  else -> "A new number of connections applies when the download resumes."
+  downloading -> "A new count re-splits the remaining bytes live."
+  else -> "A new count applies when the download resumes."
 }
 
 /** The color of a lane's dot: green while data arrives, amber once stalled, red when stuck. */
@@ -527,6 +539,10 @@ internal fun KetchColors.laneHealthColor(health: LaneHealth): Color = when (heal
 /** The color of a lane's range, or of the stall that replaces it. */
 private fun KetchColors.laneTextColor(health: LaneHealth): Color =
   if (health == LaneHealth.Moving) textTertiary else laneHealthColor(health)
+
+/** The color of a dense lane's rate, which also says that it stalled. */
+private fun KetchColors.laneRateColor(health: LaneHealth): Color =
+  if (health == LaneHealth.Moving) textPrimary else laneHealthColor(health)
 
 /** What a screen reader says for a lane, such as "Connection 3, 1.4–2.1 GB, 1.3 MB/s". */
 private fun laneDescription(lane: ConnectionLane): String {

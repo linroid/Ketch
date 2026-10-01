@@ -130,6 +130,18 @@ class FilesTabTest {
   }
 
   @Test
+  fun torrentFileCount_withAndWithoutSegments_countsWhatTheTabLists() {
+    val files = listOf(SourceFile("0", "a.mkv", 100), SourceFile("1", "b.nfo", 2))
+    val selection = torrent(files = files, selected = setOf("1"), state = DownloadState.Queued)
+    val running = torrent(files = files, segments = listOf(seg(0, 0, 99, 10), seg(1, 100, 101, 0)))
+
+    assertEquals(torrentFiles(selection).size, torrentFileCount(selection))
+    assertEquals(1, torrentFileCount(selection))
+    assertEquals(torrentFiles(running).size, torrentFileCount(running))
+    assertEquals(2, torrentFileCount(running))
+  }
+
+  @Test
   fun inspectorTabs_segmentedHttpTask_showsConnectionsAndActivity() {
     val row = row("a", downloading(500, total = 2000))
       .copy(segments = listOf(seg(0, 0, 999, 1000), seg(1, 1000, 1999, 0)))

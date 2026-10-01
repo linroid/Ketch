@@ -26,6 +26,15 @@ class TabFormatTest {
   }
 
   @Test
+  fun formatSize_roundingUp_movesToTheNextUnitOrAWholeNumber() {
+    assertEquals("1.0 MB", formatSize(1_048_100))
+    assertEquals("1023 KB", formatSize(1_047_552))
+    assertEquals("100 MB", formatSize(104_830_000))
+    assertEquals("99.9 MB", formatSize(104_752_742))
+    assertEquals("1.0 GB", formatSize((1L shl 30) - 1))
+  }
+
+  @Test
   fun formatBytesOf_partOfTotal_usesTheTotalsUnit() {
     assertEquals("3.2 of 7.9 GB", formatBytesOf(3_435_973_837, 8_482_560_410))
     assertEquals("0 of 12.0 MB", formatBytesOf(0, 12L shl 20))

@@ -328,20 +328,25 @@ internal class LaneSplitter {
   private var bytes: Map<Long, Long> = emptyMap()
   private var shares: Map<Long, Long> = emptyMap()
 
-  /** [speed] split between [segments] by their first byte; the parts add up to [speed]. */
+  /**
+   * [speed] split by first byte between the unfinished [segments] and any that received bytes;
+   * the parts add up to [speed]. A segment that finished earlier gets no part, so it does not
+   * keep an empty lane.
+   */
   fun split(segments: List<Segment>, speed: Long): Map<Long, Long> {
     val received = segments.associate { segment ->
       val before = bytes[segment.start] ?: segment.downloadedBytes
       segment.start to (segment.downloadedBytes - before).coerceAtLeast(0)
     }
     bytes = segments.associate { it.start to it.downloadedBytes }
-    val starts = segments.mapTo(HashSet()) { it.start }
+    val open = segments.filter { !it.isComplete }.ifEmpty { segments }
+    val starts = open.mapTo(HashSet()) { it.start }
     shares = when {
       received.values.any { it > 0 } -> received.filterValues { it > 0 }
       shares.keys.any { it in starts } -> shares.filterKeys { it in starts }
-      else -> segments.filter { !it.isComplete }.ifEmpty { segments }.associate { it.start to 1L }
+      else -> open.associate { it.start to 1L }
     }
-    return allocate(speed, shares, segments.map { it.start })
+    return allocate(speed, shares, open.map { it.start })
   }
 
   /** [total] in proportion to [weights], each of [keys] present, the rounding on the largest. */
