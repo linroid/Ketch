@@ -16,6 +16,7 @@ import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsCategory
@@ -36,9 +37,11 @@ import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.Weekday
+import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
@@ -83,6 +86,13 @@ class SettingsDeviceSnapshots {
   @Test
   fun network_twoOfThreeSelected_showsChips() {
     pageSnapshots("settings-network", SettingsCategory.Network, sizes = listOf(Pane, PhonePage))
+    pageSnapshots(
+      name = "settings-network-error",
+      category = SettingsCategory.Network,
+      sizes = listOf(Pane),
+      themes = listOf(SnapshotTheme.Light),
+      setup = DeviceSetup(networksFail = true),
+    )
   }
 
   @Test
@@ -99,6 +109,13 @@ class SettingsDeviceSnapshots {
     )
     pageSnapshots("settings-sharing-on", SettingsCategory.RemoteAccess)
     pageSnapshots(
+      name = "settings-sharing-nocode",
+      category = SettingsCategory.RemoteAccess,
+      sizes = listOf(Pane),
+      themes = listOf(SnapshotTheme.Light),
+      setup = DeviceSetup(token = null),
+    )
+    pageSnapshots(
       name = "settings-sharing-restart",
       category = SettingsCategory.RemoteAccess,
       sizes = listOf(Pane),
@@ -108,6 +125,28 @@ class SettingsDeviceSnapshots {
         hover(0.dp, 0.dp)
       },
     )
+  }
+
+  @Test
+  fun remote_devicePages_saveOnTheDeviceUntilItRestarts() {
+    val remote = DeviceSetup(remote = true)
+    for (category in listOf(SettingsCategory.Downloads, SettingsCategory.Speed)) {
+      pageSnapshots(
+        name = "settings-remote-${category.name.lowercase()}",
+        category = category,
+        sizes = listOf(Pane),
+        setup = remote,
+      )
+    }
+    for (category in listOf(SettingsCategory.BitTorrent, SettingsCategory.RemoteAccess)) {
+      pageSnapshots(
+        name = "settings-remote-${category.name.lowercase()}",
+        category = category,
+        sizes = listOf(PhonePage),
+        themes = listOf(SnapshotTheme.Light),
+        setup = remote,
+      )
+    }
   }
 
   @Test
@@ -134,7 +173,7 @@ class SettingsDeviceSnapshots {
       for (theme in themes) {
         withEnvironment(setup, theme, size.density) { environment ->
           SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, interact) {
-            PageFrame(environment, theme, size.density, category)
+            PageFrame(environment, theme, size.density, category, remote = setup.remote)
           }
         }
       }
@@ -198,8 +237,10 @@ private fun PageFrame(
   theme: SnapshotTheme,
   density: KetchDensity,
   category: SettingsCategory,
+  remote: Boolean,
 ) {
   val state = environment.controller.state
+  val instances = state.instances.value
   KetchTheme(
     darkTheme = theme == SnapshotTheme.Dark,
     density = density.toMode(),
@@ -214,7 +255,7 @@ private fun PageFrame(
           SettingsCategoryContent(
             category = it,
             state = state,
-            device = state.instances.value.first(),
+            device = if (remote) instances.last() else instances.first(),
             appSettings = state.appSettings,
             aiSettings = state.aiSettings,
             systemDeviceName = environment.data.deviceName,
@@ -230,9 +271,12 @@ private fun PageFrame(
  * What a device page snapshot starts from.
  *
  * @property speed speed settings of the embedded device.
- * @property sharing whether the device is shared with other devices, with an access code.
+ * @property sharing whether the device is shared with other devices.
+ * @property token the access code of its sharing server.
  * @property folder the download folder chosen for it; `null` uses its Downloads folder.
  * @property pendingPort a port saved after sharing started, which asks for a restart.
+ * @property remote whether the pages show the NAS, a remote device, instead of this one.
+ * @property networksFail whether asking the device for its networks fails.
  */
 private data class DeviceSetup(
   val speed: SpeedSettings = SpeedSettings(
@@ -254,8 +298,11 @@ private data class DeviceSetup(
     ),
   ),
   val sharing: Boolean = true,
+  val token: String? = DeviceEnvironment.TOKEN,
   val folder: String? = null,
   val pendingPort: Int? = null,
+  val remote: Boolean = false,
+  val networksFail: Boolean = false,
 )
 
 /**
@@ -270,7 +317,7 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
     SampleData(
       tasks = sample.tasks,
       downloadConfig = sample.downloadConfig,
-      remotes = emptyList(),
+      remotes = if (setup.remote) listOf(Nas) else emptyList(),
       ui = { ui ->
         ui.copy(
           intake = mapOf(
@@ -282,7 +329,7 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
       },
     )
   }
-  private val api = NetworkedApi(SampleKetchApi(data))
+  private val api = NetworkedApi(SampleKetchApi(data), fail = setup.networksFail)
   private val store = RecordingConfigStore(config(theme, density, setup))
   private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
@@ -294,7 +341,16 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
           override fun stop() {}
         }
       },
+      // The NAS answers like this device, from its own copy of the sample.
+      remoteFactory = { config ->
+        RemoteInstance(
+          instance = NetworkedApi(SampleKetchApi(data)),
+          remoteConfig = config,
+          connectionState = MutableStateFlow(ConnectionState.Connected),
+        )
+      },
     ),
+    initialRemotes = data.remotes,
     configStore = store,
   )
   private val speedMode = SpeedModeController(
@@ -344,21 +400,32 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
           ),
         ),
         server = if (setup.sharing) {
-          ServerConfig(apiToken = TOKEN, mdnsEnabled = true)
+          ServerConfig(apiToken = setup.token, mdnsEnabled = true)
         } else {
           ServerConfig(host = ServerConfig.LOOPBACK_HOST)
         },
       )
     }
 
-  private companion object {
-    const val PEAK = 10_840_000L
+  companion object {
+    private const val PEAK = 10_840_000L
+
+    /** Access code of the sharing server. */
     const val TOKEN = "3f2a9c1e5b7d4a60b8e2c9f1a3d5e7b9"
+
+    /** The remote device of [DeviceSetup.remote]. */
+    val Nas = SampleData.NAS.copy(name = "NAS-Basement")
   }
 }
 
-/** [SampleKetchApi] with Wi-Fi, Ethernet and a VPN, the first two picked for downloads. */
-private class NetworkedApi(private val sample: SampleKetchApi) : KetchApi by sample {
+/**
+ * [SampleKetchApi] with Wi-Fi, Ethernet and a VPN, the first two picked for downloads, or, when
+ * it should [fail], no answer about them.
+ */
+private class NetworkedApi(
+  private val sample: SampleKetchApi,
+  private val fail: Boolean = false,
+) : KetchApi by sample {
   private var networks = NetworkInterfaces(
     supported = true,
     available = listOf(
@@ -369,7 +436,10 @@ private class NetworkedApi(private val sample: SampleKetchApi) : KetchApi by sam
     config = NetworkInterfaceConfig(listOf("en0", "en7")),
   )
 
-  override suspend fun networkInterfaces(): NetworkInterfaces = networks
+  override suspend fun networkInterfaces(): NetworkInterfaces {
+    if (fail) throw IllegalStateException("The device didn't answer.")
+    return networks
+  }
 
   override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     networks = networks.copy(config = config)

@@ -43,6 +43,7 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
@@ -257,7 +258,11 @@ private fun PairDetails(
   }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) {
     Text(
-      text = "Control $noun from your phone, tablet or another browser.",
+      text = if (isMobilePlatform) {
+        "Control $noun from a computer or another device."
+      } else {
+        "Control $noun from your phone, tablet or another browser."
+      },
       style = type.titleM,
       color = colors.textPrimary,
     )
@@ -270,17 +275,26 @@ private fun PairDetails(
         KetchButton(text = "Try again", onClick = onAllow, leadingIcon = KetchIcon.Retry)
       }
       !shared -> {
-        Text(
-          text = if (serverState is ServerState.Running) {
-            "Only apps on $noun can connect now. Allowing another device shares it on your " +
-              "network, protected by a code."
-          } else {
-            "Ketch shares $noun on your network, protected by a code that only the devices " +
-              "you pair receive."
-          },
-          style = type.bodyS,
-          color = colors.textSecondary,
-        )
+        if (serverState is ServerState.Running && !serverState.config.isLoopbackOnly) {
+          // Reachable from the network, but without an access code.
+          SettingsNotice(
+            text = "Anyone on your network can control $noun now, since it has no access " +
+              "code. Allowing another device adds one.",
+            tone = NoticeTone.Warning,
+          )
+        } else {
+          Text(
+            text = if (serverState is ServerState.Running) {
+              "Only apps on $noun can connect now. Allowing another device shares it on your " +
+                "network, protected by a code."
+            } else {
+              "Ketch shares $noun on your network, protected by a code that only the " +
+                "devices you pair receive."
+            },
+            style = type.bodyS,
+            color = colors.textSecondary,
+          )
+        }
         KetchButton(
           text = "Allow another device",
           onClick = onAllow,
@@ -312,7 +326,11 @@ private fun PairDetails(
       else -> {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
           Text(
-            text = "Scan the code with your phone's camera, or open",
+            text = if (isMobilePlatform) {
+              "Scan the code with another device's camera, or open"
+            } else {
+              "Scan the code with your phone's camera, or open"
+            },
             style = type.bodyS,
             color = colors.textSecondary,
           )
@@ -406,7 +424,8 @@ private fun QrTile(link: PairingLink?, modifier: Modifier = Modifier) {
   Box(
     contentAlignment = Alignment.Center,
     modifier = modifier
-      .size(QrSize + KetchTheme.spacing.s3 * 2)
+      // The light margin around the code is the quiet zone cameras need to find it.
+      .size(QrSize + KetchTheme.spacing.s4 * 2)
       .background(if (link == null) palette.surfaceSunken else fill, shape)
       .border(HairlineWidth, palette.hairline, shape),
   ) {

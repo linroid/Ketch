@@ -15,6 +15,7 @@ import com.linroid.ketch.app.state.formatSpeedAmount
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isAppPrivateFolder
 import com.linroid.ketch.app.state.isDocumentTree
+import com.linroid.ketch.app.state.isSameFolder
 import com.linroid.ketch.app.state.newSpeedRule
 import com.linroid.ketch.app.state.normalizeRuleTime
 import com.linroid.ketch.app.state.parseHostList
@@ -209,6 +210,14 @@ class SettingsChoicesTest {
       "Internal storage",
       folderName("content://com.android.externalstorage.documents/tree/primary%3A"),
     )
+  }
+
+  @Test
+  fun isSameFolder_trailingSeparatorOrNoOther_comparesThePaths() {
+    assertTrue(isSameFolder("/Users/alex/Downloads/", "/Users/alex/Downloads"))
+    assertTrue(isSameFolder("C:\\Users\\alex\\Downloads\\", "C:\\Users\\alex\\Downloads"))
+    assertFalse(isSameFolder("/Users/alex/Downloads", "/Users/alex/Movies"))
+    assertFalse(isSameFolder("/Users/alex/Downloads", null))
   }
 
   @Test

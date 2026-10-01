@@ -398,6 +398,11 @@ private val TimeFieldWidth = 72.dp
  * Outside full speed, the device's limit is the Slow lane's, so the full speed cap is saved as
  * the controller's standing cap instead of in the download settings.
  *
+ * At full speed the controller only learns the device's limit when it leaves full speed, and
+ * any change it makes before that puts back the standing cap it last knew. So every change
+ * first hands it the limit the device uses, which may have been set elsewhere, such as in the
+ * Pulse bar or the config file.
+ *
  * @param scope runs the changes; failures are posted to [AppState.messages].
  */
 internal class SpeedSettingsModel(
@@ -422,9 +427,11 @@ internal class SpeedSettingsModel(
   fun setFullSpeedCap(limit: SpeedLimit): Job? {
     val modes = speedMode
     if (modes == null || modes.settings.value.mode == SpeedLimitMode.Full) {
+      // At full speed the cap is the device's own limit, saved with its download settings.
       val config = settings.download ?: return null
       settings.updateDownload(config.copy(speedLimit = limit))
-      return null
+      if (modes == null) return null
+      return change("change the full speed cap", syncCap = false) { it.setStandard(limit) }
     }
     return change("change the full speed cap") { it.setStandard(limit) }
   }
@@ -445,10 +452,19 @@ internal class SpeedSettingsModel(
     }
   }
 
-  private fun change(action: String, block: suspend (SpeedModeController) -> Unit): Job? {
+  // syncCap: whether to hand the controller the device's limit first; see the class KDoc.
+  private fun change(
+    action: String,
+    syncCap: Boolean = true,
+    block: suspend (SpeedModeController) -> Unit,
+  ): Job? {
     val modes = speedMode ?: return null
     return scope.launch {
       try {
+        if (syncCap && modes.settings.value.mode == SpeedLimitMode.Full) {
+          val limit = device.instance.status().config.speedLimit
+          if (modes.settings.value.standard != limit) modes.setStandard(limit)
+        }
         block(modes)
       } catch (e: CancellationException) {
         throw e
