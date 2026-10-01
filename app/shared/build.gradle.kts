@@ -87,6 +87,8 @@ kotlin {
     }
     androidMain.dependencies {
       implementation(libs.androidx.core)
+      // Result launchers for the folder and file pickers.
+      implementation(libs.androidx.activity.compose)
       implementation(projects.library.core)
       implementation(projects.library.ktor)
       implementation(projects.ai.discover)

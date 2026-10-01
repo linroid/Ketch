@@ -8,6 +8,12 @@
       android:authorities="${applicationId}.logs"
       android:exported="false"
       android:grantUriPermissions="true" />
+    <!-- Lets other apps open and receive downloads; see DownloadFileProvider.kt. -->
+    <provider
+      android:name="com.linroid.ketch.app.platform.DownloadFileProvider"
+      android:authorities="${applicationId}.downloads"
+      android:exported="false"
+      android:grantUriPermissions="true" />
   </application>
 
 </manifest>
