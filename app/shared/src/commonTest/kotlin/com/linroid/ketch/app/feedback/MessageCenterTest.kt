@@ -51,4 +51,20 @@ class MessageCenterTest {
     assertEquals(listOf(message), center.history.value)
     assertEquals(0, center.unreadCount.value)
   }
+
+  @Test
+  fun post_banner_showsWithoutEnteringTheHistory() {
+    val center = MessageCenter()
+
+    val banner = center.post(
+      level = MessageLevel.Info,
+      title = "Downloads pause when Ketch is in the background",
+      toast = ToastMode.Sticky,
+      placement = MessagePlacement.Banner,
+    )
+
+    assertEquals(listOf(banner), center.active.value)
+    assertEquals(emptyList(), center.history.value)
+    assertEquals(0, center.unreadCount.value)
+  }
 }

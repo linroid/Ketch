@@ -609,7 +609,8 @@ private fun <T> Flow<T>.throttleLatest(period: Duration): Flow<T> = conflate().t
 
 private fun plural(count: Int, one: String, many: String): String = if (count == 1) one else many
 
-private fun formatSpace(bytes: Long): String {
+/** Disk space as "412 GB", "3.1 GB" or "1.8 TB": whole gigabytes from 10 GB, else one decimal. */
+internal fun formatSpace(bytes: Long): String {
   val gb = 1024L * 1024 * 1024
   val tb = gb * 1024
   return when {

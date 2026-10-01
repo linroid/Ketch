@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.feedback
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.feedback.MessagePlacement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
@@ -67,7 +68,7 @@ class ToastHostTest {
       message(id = 2, level = MessageLevel.Error),
       message(id = 3, level = MessageLevel.Success),
       message(id = 4, level = MessageLevel.Info),
-      message(id = 5, level = MessageLevel.Success),
+      message(id = 5, level = MessageLevel.Success)
     )
 
     assertEquals(listOf(1L), overflowingToasts(active).map { it.id })
@@ -78,5 +79,24 @@ class ToastHostTest {
     val active = (1L..3L).map { message(id = it, level = MessageLevel.Success) }
 
     assertEquals(emptyList(), overflowingToasts(active))
+  }
+
+  @Test
+  fun visibleToasts_withBanner_leavesItToTheBannerHost() {
+    val active = listOf(
+      message(id = 1, level = MessageLevel.Info).copy(placement = MessagePlacement.Banner),
+      message(id = 2, level = MessageLevel.Success)
+    )
+
+    assertEquals(listOf(2L), visibleToasts(active).map { it.id })
+  }
+
+  @Test
+  fun overflowingToasts_bannersBeyondThree_neverDismissed() {
+    val banners = (1L..4L).map {
+      message(id = it, level = MessageLevel.Info).copy(placement = MessagePlacement.Banner)
+    }
+
+    assertEquals(emptyList(), overflowingToasts(banners))
   }
 }
