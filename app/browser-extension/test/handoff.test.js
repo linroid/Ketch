@@ -69,6 +69,7 @@ describe('sendToKetch', () => {
         url: 'https://a.com/get?id=1',
         destination: 'report.pdf',
         headers: { Cookie: 'sid=42', Referer: 'https://a.com/page', 'User-Agent': 'Browser/1.0' },
+        properties: { 'ketch.origin': 'browser' },
       },
     }]);
   });
@@ -108,7 +109,10 @@ describe('sendToKetch', () => {
 
     assert.deepEqual(cookieQueries, []);
     assert.deepEqual(ketchCalls, [
-      { path: '/api/tasks', body: { url: 'magnet:?xt=urn:btih:abc' } },
+      {
+        path: '/api/tasks',
+        body: { url: 'magnet:?xt=urn:btih:abc', properties: { 'ketch.origin': 'browser' } },
+      },
     ]);
   });
 
@@ -127,6 +131,7 @@ describe('sendToKetch', () => {
         body: {
           url: 'torrent:abc',
           resolvedSource: { url: 'torrent:abc', sourceType: 'torrent' },
+          properties: { 'ketch.origin': 'browser' },
         },
       });
     });

@@ -61,7 +61,7 @@ export async function sendToKetch(instance, download, settings, options = {}) {
   let request;
   let torrentContent;
   if (url.toLowerCase().startsWith('magnet:')) {
-    request = { url };
+    request = buildDownloadRequest({ url });
   } else if (isTorrentFile(download) && !isTorrentUrl(url)) {
     torrentContent = await fetchTorrentFile(deps.fetch, url, settings.forwardCookies, deadline());
   } else {
@@ -84,7 +84,7 @@ export async function sendToKetch(instance, download, settings, options = {}) {
     });
     if (torrentContent) {
       const resolved = await client.resolveContent(torrentContent, download.fileName || undefined);
-      return client.createTask({ url: resolved.url, resolvedSource: resolved });
+      request = buildDownloadRequest({ url: resolved.url, resolvedSource: resolved });
     }
     return client.createTask(request);
   }, { deps: deps.connection });

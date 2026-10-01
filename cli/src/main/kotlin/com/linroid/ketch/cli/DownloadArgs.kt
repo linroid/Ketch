@@ -2,6 +2,7 @@ package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
 import java.io.File
@@ -24,6 +25,15 @@ internal sealed interface DownloadArgs {
 }
 
 private val valueOptions = setOf("--speed-limit", "--priority", "--max-concurrent")
+
+/**
+ * [DownloadRequest.properties] key naming the client a task was added from. Ketch never reads
+ * it; apps group and filter downloads by it.
+ */
+private const val ORIGIN_PROPERTY = "ketch.origin"
+
+/** Value of [ORIGIN_PROPERTY] on downloads started from the command line. */
+private const val CLI_ORIGIN = "cli"
 
 /** Parses [args], which no longer contain the global flags. */
 internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
@@ -75,6 +85,16 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     maxConcurrent = maxConcurrent,
   )
 }
+
+/** The request that downloads these arguments' URL to [destination], tagged as a CLI download. */
+internal fun DownloadArgs.Download.toRequest(destination: Destination): DownloadRequest =
+  DownloadRequest(
+    url = url,
+    destination = destination,
+    speedLimit = speedLimit,
+    priority = priority,
+    properties = mapOf(ORIGIN_PROPERTY to CLI_ORIGIN),
+  )
 
 /**
  * Resolves the destination argument against the current directory, like other command-line

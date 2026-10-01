@@ -5,7 +5,6 @@ import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.SpeedLimit
@@ -106,14 +105,7 @@ private fun runDownload(args: DownloadArgs.Download) {
   )
 
   runBlocking {
-    val request = DownloadRequest(
-      url = args.url,
-      destination = destination,
-      speedLimit = speedLimit,
-      priority = args.priority,
-    )
-
-    val task = ketch.download(request)
+    val task = ketch.download(args.toRequest(destination))
 
     val limitLabel = if (speedLimit.isUnlimited) ""
       else " [limit: ${formatBytes(speedLimit.bytesPerSecond)}/s]"
