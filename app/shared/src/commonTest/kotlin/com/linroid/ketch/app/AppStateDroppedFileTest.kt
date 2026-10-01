@@ -5,8 +5,10 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.ResolveState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.TestScope
@@ -17,7 +19,6 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -55,7 +56,7 @@ class AppStateDroppedFileTest {
   }
 
   @Test
-  fun addDroppedFiles_noTorrent_reportsErrorWithoutOpeningDialog() = runTest {
+  fun addDroppedFiles_noTorrentOrLinkList_reportsErrorWithoutOpeningDialog() = runTest {
     val state = appState(FakeKetchApi())
 
     state.addDroppedFiles(listOf(DroppedFile("movie.mkv") { error("Must not be read") }))
@@ -63,7 +64,36 @@ class AppStateDroppedFileTest {
 
     assertFalse(state.showAddDialog)
     assertNull(state.droppedFile)
-    assertNotNull(state.errorMessage)
+    assertNull(state.intakeRequest)
+    assertEquals(MessageLevel.Error, state.messages.history.value.single().level)
+  }
+
+  @Test
+  fun addDroppedText_link_opensIntakeRequest() = runTest {
+    val state = appState(FakeKetchApi())
+
+    state.addDroppedText("  https://example.com/ubuntu.iso\n")
+
+    assertEquals(IntakeRequest(text = "https://example.com/ubuntu.iso"), state.intakeRequest)
+    assertTrue(state.showAddDialog)
+    assertTrue(state.messages.history.value.isEmpty())
+  }
+
+  @Test
+  fun addDroppedFiles_linkList_opensIntakeRequestWithItsText() = runTest {
+    val state = appState(FakeKetchApi())
+    val links = "https://example.com/a.iso\nhttps://example.com/b.iso"
+
+    state.addDroppedFiles(
+      listOf(
+        DroppedFile("movie.mkv") { error("Must not be read") },
+        DroppedFile("links.TXT") { links.encodeToByteArray() },
+      ),
+    )
+    runCurrent()
+
+    assertEquals(IntakeRequest(text = links), state.intakeRequest)
+    assertTrue(state.showAddDialog)
   }
 
   @Test

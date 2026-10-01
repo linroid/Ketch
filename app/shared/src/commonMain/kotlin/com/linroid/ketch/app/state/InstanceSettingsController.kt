@@ -7,6 +7,8 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.config.TorrentSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +24,10 @@ import kotlinx.coroutines.sync.withLock
  * settings are also saved to this app's config file; a remote instance
  * keeps them until it restarts, since the server does not persist them.
  * Torrent settings can only be changed on the embedded instance.
+ *
+ * The download settings are read back from [KetchApi.status] after each
+ * change, and whenever [loadDownload] is called, so they show what the
+ * instance really uses, including a speed limit set from elsewhere.
  *
  * @param api instance the settings are read from and applied to.
  * @param local settings controller of this app when [api] is the
@@ -65,10 +71,16 @@ class InstanceSettingsController(
   /** Whether the settings live on another device. */
   val isRemote: Boolean get() = local == null
 
+  private val log = KetchLogger("InstanceSettings")
   private val downloadLock = Mutex()
   private val networkLock = Mutex()
   private val torrentLock = Mutex()
   private var appliedDownload: DownloadConfig? = null
+
+  // Counts download edits; appliedEdit is the newest one sent to the instance, accepted or not. A
+  // read-back only replaces what the page shows when no edit is waiting to be sent.
+  private var edits = 0
+  private var appliedEdit = 0
   private var appliedTorrent: TorrentSettings? = null
 
   // What the instance last reported, to fall back to when a change fails.
@@ -77,15 +89,16 @@ class InstanceSettingsController(
   // Newest selection not yet sent; older unsent ones are dropped.
   private var pendingNetworkIds: List<String>? = null
 
-  /** Reads the download settings of a remote instance. */
+  /**
+   * Reads the download settings the instance uses; call again to refresh them, such as after
+   * switching to the instance or when the window regains focus. A failure is shown in
+   * [downloadError] for a remote instance; the embedded one keeps showing its saved settings.
+   */
   fun loadDownload() {
-    if (local != null) return
     scope.launch {
-      downloadError = null
-      attempt(onError = { downloadError = it }) {
-        val config = api.status().config
-        appliedDownload = config
-        download = config
+      if (local == null) downloadError = null
+      downloadLock.withLock {
+        attempt(onError = { if (local == null) downloadError = it }) { readDownload() }
       }
     }
   }
@@ -114,17 +127,26 @@ class InstanceSettingsController(
    */
   fun updateDownload(config: DownloadConfig) {
     download = config
+    edits++
     downloadError = null
     scope.launch {
       // Rapid changes queue up here; each turn applies the newest value,
       // so the instance always ends on what the page shows.
       downloadLock.withLock {
         val latest = download ?: return@withLock
-        if (latest == appliedDownload) return@withLock
+        val edit = edits
+        if (latest == appliedDownload) {
+          appliedEdit = edit
+          return@withLock
+        }
+        appliedEdit = edit
         attempt(onError = { downloadError = it }) {
           api.updateConfig(latest)
           appliedDownload = latest
           local?.saveDownload(latest)
+        }
+        if (appliedDownload == latest) {
+          attempt(onError = {}) { readDownload() }
         }
       }
     }
@@ -185,12 +207,23 @@ class InstanceSettingsController(
     }
   }
 
+  /** Shows what the instance reports, unless an edit made meanwhile has not been sent yet. */
+  private suspend fun readDownload() {
+    val before = edits
+    val config = api.status().config
+    if (edits == before && appliedEdit == edits) {
+      download = config
+      appliedDownload = config
+    }
+  }
+
   private suspend fun attempt(onError: (String) -> Unit, block: suspend () -> Unit) {
     try {
       block()
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
+      log.w { "Instance settings call failed: ${e.describeCauses()}" }
       onError(e.message ?: "Something went wrong. Try again.")
     }
   }

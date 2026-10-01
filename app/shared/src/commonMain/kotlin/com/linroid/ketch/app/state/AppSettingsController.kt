@@ -10,6 +10,7 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.UiPreferences
 import com.linroid.ketch.app.theme.KetchAccent
 
 /**
@@ -34,6 +35,9 @@ class AppSettingsController(
 
   /** Whether the UI follows the system or forces light or dark. */
   val themeMode: ThemeMode get() = config.appearance.theme
+
+  /** UI state remembered between launches. */
+  val ui: UiPreferences get() = config.ui
 
   /** Persists the instance name; blank clears it back to the default. */
   fun saveName(name: String) {
@@ -65,6 +69,14 @@ class AppSettingsController(
   /** Persists the light/dark mode. */
   fun saveThemeMode(mode: ThemeMode) {
     update { it.copy(appearance = it.appearance.copy(theme = mode)) }
+  }
+
+  /**
+   * Persists a change to the remembered UI state. [transform] receives the stored preferences,
+   * so concurrent changes to other fields are kept.
+   */
+  fun saveUi(transform: (UiPreferences) -> UiPreferences) {
+    update { it.copy(ui = transform(it.ui)) }
   }
 
   private fun update(block: (KetchConfig) -> KetchConfig) {

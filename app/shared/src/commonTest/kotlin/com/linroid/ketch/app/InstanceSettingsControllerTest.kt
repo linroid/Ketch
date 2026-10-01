@@ -35,6 +35,9 @@ private class SettingsKetchApi(
   var gate: CompletableDeferred<Unit>? = null
   var failUpdates = false
 
+  /** What the instance makes of an accepted config, like a server clamping a value. */
+  var accept: (DownloadConfig) -> DownloadConfig = { it }
+
   override suspend fun download(request: DownloadRequest): DownloadTask =
     throw UnsupportedOperationException()
 
@@ -58,7 +61,7 @@ private class SettingsKetchApi(
     gate?.await()
     if (failUpdates) throw IllegalStateException("Server said no")
     applied += config
-    this.config = config
+    this.config = accept(config)
   }
 
   override suspend fun networkInterfaces(): NetworkInterfaces = networks
@@ -257,5 +260,50 @@ class InstanceSettingsControllerTest {
     // Neither was accepted, so nothing is ticked.
     assertEquals(emptyList(), controller.networks?.config?.interfaceIds)
     assertNotNull(controller.networkError)
+  }
+
+  @Test
+  fun loadDownload_embeddedInstance_showsWhatTheInstanceUses() = runTest {
+    val live = DownloadConfig(speedLimit = SpeedLimit.mbps(2))
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(config = live),
+      local = AppSettingsController(RecordingConfigStore()),
+      scope = this,
+    )
+
+    controller.loadDownload()
+    advanceUntilIdle()
+
+    assertEquals(live, controller.download)
+  }
+
+  @Test
+  fun updateDownload_accepted_readsBackTheInstanceConfig() = runTest {
+    val api = SettingsKetchApi().apply { accept = { it.copy(maxConcurrentDownloads = 10) } }
+    val controller = InstanceSettingsController(api, local = null, scope = this)
+
+    controller.updateDownload(DownloadConfig(maxConcurrentDownloads = 99))
+    advanceUntilIdle()
+
+    assertEquals(10, controller.download?.maxConcurrentDownloads)
+  }
+
+  @Test
+  fun loadDownload_editWaitingToBeSent_keepsTheEdit() = runTest {
+    val api = SettingsKetchApi()
+    val controller = InstanceSettingsController(api, local = null, scope = this)
+    val first = DownloadConfig(maxConcurrentDownloads = 1)
+    val second = DownloadConfig(maxConcurrentDownloads = 2)
+    api.gate = CompletableDeferred()
+
+    controller.updateDownload(first)
+    advanceUntilIdle() // first is in flight
+    controller.updateDownload(second)
+    controller.loadDownload()
+    api.gate?.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(second, controller.download)
+    assertEquals(listOf(first, second), api.applied)
   }
 }

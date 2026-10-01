@@ -2,14 +2,14 @@ package com.linroid.ketch.app
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
-import com.linroid.ketch.app.state.AiSettingsController
-import com.linroid.ketch.app.state.AppSettingsController
+import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.IncomingDownloads
+import com.linroid.ketch.app.state.rememberAppController
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.AppShell
 import com.linroid.ketch.config.ThemeMode
@@ -17,7 +17,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 /**
- * Root of the Ketch app, shared by every platform.
+ * Root of the Ketch app, shared by every platform, with an [AppController] that lives as long
+ * as this composition.
  *
  * @param openSettingsRequests emits when the platform asks to open
  *   Settings, e.g. from a keyboard shortcut or the macOS app menu.
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.emptyFlow
  *   the system file manager; each one is shown in the add dialog.
  * @param fileLogger the app's log files, which Settings → About opens
  *   or shares for bug reports; `null` when the app keeps none.
+ * @param activityEvents events from the host's activity monitor while the app is in front.
  */
 @Composable
 fun App(
@@ -33,27 +35,42 @@ fun App(
   openSettingsRequests: Flow<Unit> = emptyFlow(),
   incoming: IncomingDownloads? = null,
   fileLogger: FileLogger? = null,
+  activityEvents: Flow<ActivityEvent> = emptyFlow(),
 ) {
-  // The controllers are created here because the theme needs the saved
-  // accent and theme mode before the shell composes.
-  val appSettings = remember(instanceManager) {
-    AppSettingsController(instanceManager.configStore)
+  App(
+    controller = rememberAppController(instanceManager, aiProviderFactory, incoming),
+    activityEvents = activityEvents,
+    openSettingsRequests = openSettingsRequests,
+    fileLogger = fileLogger,
+  )
+}
+
+/**
+ * Root of the Ketch app for a host that owns [controller], such as the desktop app, whose tray
+ * and menu bar share it with the window.
+ *
+ * @param activityEvents events from the host's activity monitor while the app is in front; they
+ *   show as messages.
+ * @param openSettingsRequests emits when the platform asks to open Settings.
+ * @param fileLogger the app's log files; `null` when the app keeps none.
+ */
+@Composable
+fun App(
+  controller: AppController,
+  activityEvents: Flow<ActivityEvent> = emptyFlow(),
+  openSettingsRequests: Flow<Unit> = emptyFlow(),
+  fileLogger: FileLogger? = null,
+) {
+  LaunchedEffect(controller, activityEvents) {
+    activityEvents.collect { controller.state.report(it) }
   }
-  val aiSettings = remember(instanceManager) {
-    AiSettingsController(instanceManager.configStore, aiProviderFactory)
-  }
-  // The instance manager can outlive this composition (Android keeps it
-  // in the service across activity recreation), so the discovery engine
-  // is released here rather than with the manager.
-  DisposableEffect(aiSettings) {
-    onDispose { aiSettings.close() }
-  }
+  val appSettings = controller.appSettings
   val darkTheme = when (appSettings.themeMode) {
     ThemeMode.System -> isSystemInDarkTheme()
     ThemeMode.Light -> false
     ThemeMode.Dark -> true
   }
   KetchTheme(darkTheme = darkTheme, accent = appSettings.accent) {
-    AppShell(instanceManager, appSettings, aiSettings, openSettingsRequests, incoming, fileLogger)
+    AppShell(controller.state, openSettingsRequests, fileLogger)
   }
 }
