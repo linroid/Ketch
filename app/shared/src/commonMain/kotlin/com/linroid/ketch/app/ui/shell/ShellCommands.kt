@@ -66,9 +66,8 @@ internal fun clipboardLinksAction(text: String?): ClipboardAdd {
 
 /**
  * Runs the global [KetchCommands] in the window: adding, the tabs and destinations, the speed
- * and queue commands, the sidebar, the inspector, Activity, Undo, Settings and the shortcut
- * sheet. The command palette (`⌘K`) focuses the search until it exists; while Settings shows,
- * both leave the key to Settings' own search.
+ * and queue commands, the sidebar, the inspector, Activity, Undo, Settings, the shortcut sheet
+ * and the command palette (`⌘K`). While Settings shows, `⌘F` is left to Settings' own search.
  *
  * @param clipboard where pasted and added links come from.
  * @param files picks `.torrent` files to open.
@@ -114,7 +113,8 @@ internal class ShellCommands(
       }
       KetchCommands.AddClipboardLink -> addFromClipboard(warnEmpty = true, ::clipboardLinksAction)
       KetchCommands.OpenTorrent -> openTorrentFiles()
-      KetchCommands.Palette, KetchCommands.Search -> {
+      KetchCommands.Palette -> shell.paletteOpen = !shell.paletteOpen
+      KetchCommands.Search -> {
         // Settings in the shell searches its own pages.
         if (shell.settingsOpen) return false
         // The shell shows Downloads for it, and the page's field takes the focus.
