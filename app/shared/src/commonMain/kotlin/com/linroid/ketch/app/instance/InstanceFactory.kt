@@ -22,12 +22,15 @@ import com.linroid.ketch.remote.RemoteKetch
  * @param applyTorrentSettings applies changed torrent settings to the
  *   torrent source of the embedded instance, so they take effect without
  *   a restart. `null` when the embedded instance has no torrent support.
+ * @param remoteFactory creates a new, unconnected client for a remote device; a [RemoteKetch]
+ *   by default. [InstanceManager] calls it each time it connects to the device again.
  */
 class InstanceFactory(
   val deviceName: String = "Embedded",
   private val embeddedFactory: (() -> KetchApi)? = null,
   private val localServerFactory: ((KetchApi) -> LocalServerHandle)? = null,
   internal val applyTorrentSettings: (suspend (TorrentSettings) -> Unit)? = null,
+  private val remoteFactory: (RemoteConfig) -> RemoteInstance = ::remoteKetchInstance,
 ) {
   /** Whether an embedded instance is available. */
   val hasEmbedded: Boolean get() = embeddedFactory != null
@@ -50,16 +53,8 @@ class InstanceFactory(
     )
   }
 
-  /** Create a remote instance from a [RemoteConfig]. */
-  fun createRemote(config: RemoteConfig): RemoteInstance {
-    return RemoteInstance(
-      instance = RemoteKetch(
-        config.host, config.port, config.apiToken, config.secure,
-      ),
-      label = "${config.host}:${config.port}",
-      remoteConfig = config,
-    )
-  }
+  /** Create a remote instance with a new, unconnected client from a [RemoteConfig]. */
+  fun createRemote(config: RemoteConfig): RemoteInstance = remoteFactory(config)
 
   /** Create a remote instance for the given host/port/token. */
   fun createRemote(
@@ -90,3 +85,8 @@ class InstanceFactory(
     localServer = null
   }
 }
+
+private fun remoteKetchInstance(config: RemoteConfig): RemoteInstance = RemoteInstance(
+  client = RemoteKetch(config.host, config.port, config.apiToken, config.secure),
+  remoteConfig = config,
+)
