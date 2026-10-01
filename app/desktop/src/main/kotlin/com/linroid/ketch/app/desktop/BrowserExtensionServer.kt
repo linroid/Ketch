@@ -17,8 +17,12 @@ import kotlin.time.Duration.Companion.seconds
  * turn on in Settings: it only listens on 127.0.0.1, on a port the system picks, requires a token
  * made for this run, and starts the first time the extension asks for it through
  * [NativeMessagingHost].
+ *
+ * @param onConnect called on the requesting thread each time the extension connects, before it
+ *   gets the reply, while the native messaging host that asked for it still runs.
  */
 internal class BrowserExtensionServer(
+  private val onConnect: () -> Unit = {},
   private val startServer: (api: KetchApi, token: String) -> Started = ::startKetchServer,
 ) : AutoCloseable {
   private val api = CompletableFuture<KetchApi>()
@@ -50,6 +54,7 @@ internal class BrowserExtensionServer(
         return errorReply("server_failed", "Couldn't start the connection: ${e.message}")
       }.also { started = it }
     }
+    onConnect()
     return buildJsonObject {
       put("url", "http://127.0.0.1:${server.port}")
       put("token", server.token)

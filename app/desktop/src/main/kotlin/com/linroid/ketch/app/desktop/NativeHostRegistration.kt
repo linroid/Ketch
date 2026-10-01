@@ -18,6 +18,8 @@ import java.io.File
  * copied when the browser's data directory exists; on Windows, registry values point to them.
  *
  * @param runCommand runs `reg.exe` on Windows
+ * @param windowsLocalAppData `%LOCALAPPDATA%`, where Chromium browsers keep their data on Windows
+ * @param windowsAppData `%APPDATA%`, where Firefox keeps its data on Windows
  */
 internal class NativeHostRegistration(
   private val configDir: File,
@@ -27,6 +29,10 @@ internal class NativeHostRegistration(
   private val linuxConfigHome: File = System.getenv("XDG_CONFIG_HOME")?.let(::File)
     ?: File(home, ".config"),
   private val runCommand: (List<String>) -> Unit = ::runQuietly,
+  private val windowsLocalAppData: File = System.getenv("LOCALAPPDATA")?.let(::File)
+    ?: File(home, "AppData/Local"),
+  private val windowsAppData: File = System.getenv("APPDATA")?.let(::File)
+    ?: File(home, "AppData/Roaming"),
 ) {
 
   /** Registers the host and returns where manifests were written or registry values set. */
@@ -55,6 +61,31 @@ internal class NativeHostRegistration(
       location.manifestDir.path
     }
   }
+
+  /**
+   * Names of the browsers installed for this user that the host is registered with, such as
+   * "Chrome" and "Firefox", once each and most common first; a browser counts once its data
+   * directory exists. Names match [browserNamed].
+   */
+  fun browsers(): List<String> {
+    val installed = if (os == DesktopOs.WINDOWS) {
+      windowsBrowserDirs().filter { (_, dir) -> dir.isDirectory }.map { (name, _) -> name }
+    } else {
+      manifestLocations().filter { it.browserDir.isDirectory }.map { it.browser }
+    }
+    return installed.distinct().sortedBy { name ->
+      BROWSER_ORDER.indexOf(name).takeIf { it >= 0 } ?: BROWSER_ORDER.size
+    }
+  }
+
+  // Data directories of the browsers WINDOWS_CHROMIUM_KEYS and WINDOWS_FIREFOX_KEY cover.
+  private fun windowsBrowserDirs(): List<Pair<String, File>> = listOf(
+    "Chrome" to File(windowsLocalAppData, "Google/Chrome/User Data"),
+    "Chromium" to File(windowsLocalAppData, "Chromium/User Data"),
+    "Edge" to File(windowsLocalAppData, "Microsoft/Edge/User Data"),
+    "Brave" to File(windowsLocalAppData, "BraveSoftware/Brave-Browser/User Data"),
+    "Firefox" to File(windowsAppData, "Mozilla/Firefox"),
+  )
 
   /** A script that starts this app as the host, passing on the browser's arguments. */
   internal fun hostScript(): String {
@@ -91,20 +122,28 @@ internal class NativeHostRegistration(
   internal fun manifestLocations(): List<ManifestLocation> = when (os) {
     DesktopOs.MAC -> {
       val support = File(home, "Library/Application Support")
-      MAC_CHROMIUM_DIRS.map { ManifestLocation(File(support, it)) } +
-        ManifestLocation(File(support, "Mozilla"), firefox = true)
+      MAC_CHROMIUM_DIRS.map { (dir, browser) -> ManifestLocation(browser, File(support, dir)) } +
+        ManifestLocation("Firefox", File(support, "Mozilla"), firefox = true)
     }
     DesktopOs.LINUX ->
-      LINUX_CHROMIUM_DIRS.map { ManifestLocation(File(linuxConfigHome, it)) } +
-        ManifestLocation(File(home, ".mozilla"), "native-messaging-hosts", firefox = true)
+      LINUX_CHROMIUM_DIRS.map { (dir, browser) ->
+        ManifestLocation(browser, File(linuxConfigHome, dir))
+      } + ManifestLocation(
+        browser = "Firefox",
+        browserDir = File(home, ".mozilla"),
+        hostsDir = "native-messaging-hosts",
+        firefox = true,
+      )
     DesktopOs.WINDOWS -> emptyList()
   }
 
   /**
+   * @property browser name of the browser, as [browsers] lists it
    * @property browserDir the browser's data directory, which exists once it has been used
    * @property firefox whether the browser takes Firefox's manifest format
    */
   internal data class ManifestLocation(
+    val browser: String,
     val browserDir: File,
     private val hostsDir: String = "NativeMessagingHosts",
     val firefox: Boolean = false,
@@ -122,31 +161,34 @@ internal class NativeHostRegistration(
     /** The add-on id in the Firefox build of the extension. */
     const val FIREFOX_EXTENSION_ID = "ketch@linroid.github.io"
 
+    // Browsers in the order Settings lists them; the others follow.
+    private val BROWSER_ORDER = listOf("Chrome", "Edge", "Brave", "Firefox")
+
     private val MAC_CHROMIUM_DIRS = listOf(
-      "Google/Chrome",
-      "Google/Chrome Beta",
-      "Google/Chrome Dev",
-      "Google/Chrome Canary",
-      "Chromium",
-      "Microsoft Edge",
-      "Microsoft Edge Beta",
-      "Microsoft Edge Dev",
-      "Microsoft Edge Canary",
-      "BraveSoftware/Brave-Browser",
-      "Vivaldi",
-      "Arc/User Data",
+      "Google/Chrome" to "Chrome",
+      "Google/Chrome Beta" to "Chrome",
+      "Google/Chrome Dev" to "Chrome",
+      "Google/Chrome Canary" to "Chrome",
+      "Chromium" to "Chromium",
+      "Microsoft Edge" to "Edge",
+      "Microsoft Edge Beta" to "Edge",
+      "Microsoft Edge Dev" to "Edge",
+      "Microsoft Edge Canary" to "Edge",
+      "BraveSoftware/Brave-Browser" to "Brave",
+      "Vivaldi" to "Vivaldi",
+      "Arc/User Data" to "Arc",
     )
 
     private val LINUX_CHROMIUM_DIRS = listOf(
-      "google-chrome",
-      "google-chrome-beta",
-      "google-chrome-unstable",
-      "chromium",
-      "microsoft-edge",
-      "microsoft-edge-beta",
-      "microsoft-edge-dev",
-      "BraveSoftware/Brave-Browser",
-      "vivaldi",
+      "google-chrome" to "Chrome",
+      "google-chrome-beta" to "Chrome",
+      "google-chrome-unstable" to "Chrome",
+      "chromium" to "Chromium",
+      "microsoft-edge" to "Edge",
+      "microsoft-edge-beta" to "Edge",
+      "microsoft-edge-dev" to "Edge",
+      "BraveSoftware/Brave-Browser" to "Brave",
+      "vivaldi" to "Vivaldi",
     )
 
     private val WINDOWS_CHROMIUM_KEYS = listOf(

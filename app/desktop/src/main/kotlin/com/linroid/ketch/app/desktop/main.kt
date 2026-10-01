@@ -48,6 +48,7 @@ import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.LocalDesktopHooks
+import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
@@ -60,6 +61,7 @@ import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.PulseModel
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.theme.LocalWindowChrome
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.FileConfigStore
@@ -133,7 +135,14 @@ fun main(args: Array<String>) {
 
   val launched = fileArguments(args.toList())
   val background = BACKGROUND_FLAG in args
-  val extensionServer = BrowserExtensionServer()
+  val registration = NativeHostRegistration(configDir, File(System.getProperty("user.home")))
+  val integration = DesktopIntegrationStatus(
+    file = File(configDir, "browser-extension.properties"),
+    browsers = registration::browsers,
+  )
+  val extensionServer = BrowserExtensionServer(
+    onConnect = { integration.extensionConnected(connectingBrowser()) },
+  )
   val singleInstance = SingleInstance.acquire(
     configDir,
     launched.toArguments() + listOfNotNull(BACKGROUND_FLAG.takeIf { background }),
@@ -167,7 +176,7 @@ fun main(args: Array<String>) {
     windowRequests.trySend(Unit)
   }
   open(launched, LinkSource.Arguments)
-  registerNativeHost(configDir, logger)
+  registerNativeHost(registration, integration, logger)
   // Before the UI thread starts: this can run a command and, as a last resort, wait on a lookup.
   val hostName = localHostName()
 
@@ -179,6 +188,7 @@ fun main(args: Array<String>) {
     background = background,
     singleInstance = singleInstance,
     extensionServer = extensionServer,
+    integration = integration,
     logger = logger,
     fileLogger = fileLogger,
     openFiles = { files -> open(OpenedArguments(files = files), LinkSource.Arguments) },
@@ -191,6 +201,7 @@ fun main(args: Array<String>) {
  *
  * @property windowRequests emits when the window should come forward.
  * @property background whether the app starts hidden ([BACKGROUND_FLAG]).
+ * @property integration how Ketch is wired into the browsers and the system, for Settings.
  * @property openFiles adds `.torrent` files, as if opened from the file manager.
  */
 private class LaunchContext(
@@ -201,21 +212,29 @@ private class LaunchContext(
   val background: Boolean,
   val singleInstance: SingleInstance,
   val extensionServer: BrowserExtensionServer,
+  val integration: DesktopIntegrationStatus,
   val logger: Logger,
   val fileLogger: FileLogger,
   val openFiles: (List<File>) -> Unit,
 )
 
-/** Lets the browser extension find this app; see [NativeHostRegistration]. */
-private fun registerNativeHost(configDir: File, logger: Logger) {
+/**
+ * Lets the browser extension find this app, see [NativeHostRegistration], then looks for the
+ * browsers and default apps [integration] reports.
+ */
+private fun registerNativeHost(
+  registration: NativeHostRegistration,
+  integration: DesktopIntegrationStatus,
+  logger: Logger,
+) {
   thread(isDaemon = true, name = "ketch-native-host-registration") {
     try {
-      val home = File(System.getProperty("user.home"))
-      val registered = NativeHostRegistration(configDir, home).register()
+      val registered = registration.register()
       logger.d("[NativeHost] Registered for the browser extension: $registered")
     } catch (e: Exception) {
       logger.w("[NativeHost] Couldn't register for the browser extension", e)
     }
+    integration.refresh()
   }
 }
 
@@ -281,10 +300,35 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     val integration = controller.appSettings.config.integration
     withContext(Dispatchers.IO) { hooks.refresh(integration) }
   }
+  val providedHooks = remember(hooks) { hooks.refreshingDefaults(launch.integration) }
+  val fullWindowContent = remember { usesFullWindowContent() }
+
+  val settingsWindow = remember { SettingsWindowState(controller.state) }
+  DisposableEffect(settingsWindow) {
+    val claim = settingsWindow.claimRequests()
+    onDispose { claim.dispose() }
+  }
+  val settingsStateStore = remember {
+    WindowStateStore(File(launch.configDir, "settings-window.properties"))
+  }
+  val savedSettingsBounds = remember { settingsStateStore.load() }
+  val settingsWindowState = remember {
+    initialWindowState(
+      saved = savedSettingsBounds,
+      defaultSize = SettingsWindowSize,
+      minimumSize = MinSettingsWindowSize,
+    )
+  }
+  LaunchedEffect(settingsWindowState) {
+    settingsStateStore.saveChanges(settingsWindowState, savedSettingsBounds)
+  }
+  // Close Window and Minimize, from the menu bar or the keyboard, act on the window in front.
   val actions = remember {
     DesktopActions(
       showWindow = behavior::showWindow,
-      closeWindow = behavior::closeWindow,
+      closeWindow = {
+        if (settingsWindow.focused) settingsWindow.close() else behavior.closeWindow()
+      },
       quit = { behavior.requestQuit() },
       openFiles = launch.openFiles,
     )
@@ -294,7 +338,11 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   val speedMode = controller.speedMode.takeIf { active == null || active is EmbeddedInstance }
   val commands = remember(speedMode, files, clipboard) {
     DesktopCommands(controller, actions, speedMode, files, clipboard) {
-      windowState.isMinimized = true
+      if (settingsWindow.focused) {
+        settingsWindowState.isMinimized = true
+      } else {
+        windowState.isMinimized = true
+      }
     }
   }
   LaunchedEffect(behavior) {
@@ -304,8 +352,8 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     val remove = installAppHandlers(behavior)
     onDispose { remove() }
   }
-  DisposableEffect(commands) {
-    val remove = installPreferencesHandler { commands.run(KetchCommands.Settings) }
+  DisposableEffect(settingsWindow) {
+    val remove = installPreferencesHandler(settingsWindow::show)
     onDispose { remove() }
   }
 
@@ -314,8 +362,11 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   var mainWindow by remember { mutableStateOf<ComposeWindow?>(null) }
   var windowFocused by remember { mutableStateOf(false) }
   // A hidden window stops composing, so the focus it last reported only counts while it shows.
-  fun inFront() = behavior.windowVisible && windowFocused && !windowState.isMinimized
-  val status = rememberDesktopStatus(controller, controller.pulse.state, inFront())
+  fun mainInFront() = behavior.windowVisible && windowFocused && !windowState.isMinimized
+  // Toasts show in the main window, which stays in view beside the Settings window.
+  fun inFront() = behavior.windowVisible && !windowState.isMinimized &&
+    (windowFocused || settingsWindow.focused)
+  val status = rememberDesktopStatus(controller, controller.pulse.state, mainInFront())
   val activityEvents = remember {
     reportDesktopActivity(controller, notifier, ::inFront)
   }
@@ -327,17 +378,23 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   }
   CloseDialogs(behavior, controller.appSettings)
 
+  val icon = painterResource("icon.svg")
   val exceptionHandlers = remember { windowExceptionHandlers(controller) }
   CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides exceptionHandlers) {
     Window(
       onCloseRequest = behavior::closeWindow,
       state = windowState,
       visible = behavior.windowVisible,
-      title = "Ketch",
-      icon = painterResource("icon.svg"),
+      title = windowTitle(status.pulse),
+      icon = icon,
       onPreviewKeyEvent = { event ->
         val command = windowShortcuts.match(event, ShortcutContext())
-        if (command != null) commands.run(command)
+        when (command) {
+          null -> Unit
+          // Settings has a window of its own, which opens without bringing this one forward.
+          KetchCommands.Settings -> settingsWindow.show()
+          else -> commands.run(command)
+        }
         command != null
       },
     ) {
@@ -353,11 +410,29 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       }
       val focused = LocalWindowInfo.current.isWindowFocused
       SideEffect { windowFocused = focused }
+      MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.isDarkTheme())
       KetchMenuBar(controller, status, actions, speedMode)
-      CompositionLocalProvider(LocalDesktopHooks provides hooks) {
-        App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
+      CompositionLocalProvider(
+        LocalDesktopHooks provides providedHooks,
+        LocalIntegrationStatus provides launch.integration.status,
+        LocalWindowChrome provides windowChrome(fullWindowContent, windowState.placement),
+      ) {
+        val app = @Composable {
+          App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
+        }
+        if (fullWindowContent) TitleBarArea(windowState, app) else app()
       }
     }
+    SettingsWindow(
+      settings = settingsWindow,
+      windowState = settingsWindowState,
+      icon = icon,
+      controller = controller,
+      hooks = providedHooks,
+      integration = launch.integration,
+      fileLogger = launch.fileLogger,
+      onQuit = { behavior.requestQuit() },
+    )
   }
 }
 

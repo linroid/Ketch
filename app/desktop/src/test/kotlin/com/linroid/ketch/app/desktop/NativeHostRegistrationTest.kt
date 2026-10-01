@@ -24,7 +24,16 @@ class NativeHostRegistrationTest {
   }
 
   private fun registration(os: DesktopOs, runCommand: (List<String>) -> Unit = { }) =
-    NativeHostRegistration(configDir, home, os, app, File(home, ".config"), runCommand)
+    NativeHostRegistration(
+      configDir = configDir,
+      home = home,
+      os = os,
+      appCommand = app,
+      linuxConfigHome = File(home, ".config"),
+      runCommand = runCommand,
+      windowsLocalAppData = File(home, "AppData/Local"),
+      windowsAppData = File(home, "AppData/Roaming"),
+    )
 
   @Test
   fun register_mac_writesManifestsOnlyForBrowsersThatWereUsed() {
@@ -90,6 +99,26 @@ class NativeHostRegistrationTest {
     assertEquals("HKCU\\Software\\Mozilla\\NativeMessagingHosts\\com.linroid.ketch", firefox[2])
     assertEquals(File(dir, "firefox.json").path, firefox[7])
     assertTrue(File(dir, "ketch-native-host.bat").isFile)
+  }
+
+  @Test
+  fun browsers_mac_listsEachUsedBrowserOnceMostCommonFirst() {
+    val support = File(home, "Library/Application Support")
+    File(support, "Mozilla").mkdirs()
+    File(support, "Arc/User Data").mkdirs()
+    File(support, "Google/Chrome Canary").mkdirs()
+    File(support, "Google/Chrome").mkdirs()
+    File(support, "Microsoft Edge").mkdirs()
+
+    assertEquals(listOf("Chrome", "Edge", "Firefox", "Arc"), registration(DesktopOs.MAC).browsers())
+  }
+
+  @Test
+  fun browsers_windows_looksInTheBrowsersDataFolders() {
+    File(home, "AppData/Local/BraveSoftware/Brave-Browser/User Data").mkdirs()
+    File(home, "AppData/Roaming/Mozilla/Firefox").mkdirs()
+
+    assertEquals(listOf("Brave", "Firefox"), registration(DesktopOs.WINDOWS).browsers())
   }
 
   @Test

@@ -36,7 +36,7 @@ internal const val MIN_WINDOW_HEIGHT = 480
 private val SAVE_DELAY = 500.milliseconds
 
 /**
- * Floating bounds of the main window in window (AWT) coordinates, plus
+ * Floating bounds of a window in window (AWT) coordinates, plus
  * whether it was maximized. Compose window dp map 1:1 to these coordinates.
  */
 internal data class WindowBounds(
@@ -48,7 +48,7 @@ internal data class WindowBounds(
 )
 
 /**
- * Remembers where the user left the main window, since neither the OS nor
+ * Remembers where the user left a window, since neither the OS nor
  * AWT restores the frame of a JVM window on relaunch.
  */
 internal class WindowStateStore(private val file: File) {
@@ -145,11 +145,16 @@ internal class WindowStateStore(private val file: File) {
  * nothing was saved.
  *
  * @param screens usable bounds of each connected screen, primary first
+ * @param defaultSize size, width by height, when nothing was saved
+ * @param minimumSize smallest size, width by height, the window can have
  */
 internal fun initialWindowState(
   saved: WindowBounds?,
   screens: List<Rectangle> = usableScreenBounds(),
+  defaultSize: Pair<Int, Int> = DEFAULT_WINDOW_WIDTH to DEFAULT_WINDOW_HEIGHT,
+  minimumSize: Pair<Int, Int> = MIN_WINDOW_WIDTH to MIN_WINDOW_HEIGHT,
 ): WindowState {
+  val (minWidth, minHeight) = minimumSize
   val placement = if (saved?.maximized == true) {
     WindowPlacement.Maximized
   } else {
@@ -162,13 +167,13 @@ internal fun initialWindowState(
       placement = placement,
       position = WindowPosition(Alignment.Center),
       size = DpSize(
-        width = fit(saved?.width ?: DEFAULT_WINDOW_WIDTH, MIN_WINDOW_WIDTH, primary.width).dp,
-        height = fit(saved?.height ?: DEFAULT_WINDOW_HEIGHT, MIN_WINDOW_HEIGHT, primary.height).dp,
+        width = fit(saved?.width ?: defaultSize.first, minWidth, primary.width).dp,
+        height = fit(saved?.height ?: defaultSize.second, minHeight, primary.height).dp,
       ),
     )
   }
-  val width = fit(saved.width, MIN_WINDOW_WIDTH, screen.width)
-  val height = fit(saved.height, MIN_WINDOW_HEIGHT, screen.height)
+  val width = fit(saved.width, minWidth, screen.width)
+  val height = fit(saved.height, minHeight, screen.height)
   return WindowState(
     placement = placement,
     position = WindowPosition(
