@@ -49,7 +49,7 @@ sealed class KetchError(
     val retryAfterSeconds: Long? = null,
     val rateLimitRemaining: Long? = null,
     @Transient override val cause: Throwable? = null,
-  ) : KetchError("HTTP error $code: $statusMessage", cause)
+  ) : KetchError("HTTP error $code" + statusMessage?.let { ": $it" }.orEmpty(), cause)
 
   /** File I/O failure (write, flush, preallocate). Not retryable. */
   @Serializable
