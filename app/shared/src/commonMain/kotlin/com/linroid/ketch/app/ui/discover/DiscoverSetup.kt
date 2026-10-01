@@ -38,12 +38,15 @@ import com.linroid.ketch.config.LlmProvider
 /**
  * Discover before it is set up: what it does, searches it could run, and a button per model
  * provider that switches discovery on with that provider and opens its settings for the key.
- * Where discovery cannot run, it says so instead.
+ * Once one is picked, its button stands out and the settings link says to finish it. Where
+ * discovery cannot run, it says so instead.
  */
 @Composable
 internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier = Modifier) {
   val supported = state.aiSettings.supported
   val pending = state.aiDiscover.pending
+  // Switched on but not usable yet: the provider picked here still needs its key.
+  val chosen = state.aiSettings.settings.takeIf { it.enabled }?.llm?.provider
   val spacing = KetchTheme.spacing
   val colors = KetchTheme.colors
   DiscoverHero(
@@ -89,14 +92,18 @@ internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier =
             state.aiSettings.chooseProvider(provider)
             state.openSettings(SettingsTarget(SettingsTarget.Page.Discover))
           },
-          variant = KetchButtonVariant.Secondary,
+          variant = if (provider == chosen) {
+            KetchButtonVariant.Primary
+          } else {
+            KetchButtonVariant.Secondary
+          },
           modifier = if (phone) Modifier.fillMaxWidth() else Modifier,
         )
       }
     }
     Spacer(Modifier.height(spacing.s2))
     KetchButton(
-      text = "Set up in Settings",
+      text = chosen?.let { "Finish setting up ${it.shortLabel}" } ?: "Set up in Settings",
       onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Discover)) },
       variant = KetchButtonVariant.Ghost,
       leadingIcon = KetchIcon.Settings,

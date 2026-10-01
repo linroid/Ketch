@@ -178,6 +178,22 @@ class AiDiscoverControllerTest {
   }
 
   @Test
+  fun retry_fieldClearedAfterTheSearch_runsTheSubmittedSearchAgain() = runTest {
+    val provider = FakeProvider()
+    val controller = AiDiscoverController(settingsWith(provider), backgroundScope)
+    controller.draft.query = "blender"
+    controller.search()
+    runCurrent()
+    controller.draft.query = ""
+
+    controller.retry()
+    runCurrent()
+
+    assertEquals(listOf("blender", "blender"), provider.requests.map { it.query })
+    assertEquals("blender", controller.draft.submittedQuery)
+  }
+
+  @Test
   fun search_blankQuery_doesNothing() = runTest {
     val provider = FakeProvider()
     val controller = AiDiscoverController(settingsWith(provider), backgroundScope)

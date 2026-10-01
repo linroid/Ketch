@@ -119,6 +119,15 @@ class AiDiscoverController(
     discover(draft.submittedQuery, draft.sites)
   }
 
+  /**
+   * Runs the search the results are for again, with the websites in the form, even after the
+   * search field was changed or cleared.
+   */
+  fun retry() {
+    if (draft.submittedQuery.isEmpty()) return
+    discover(draft.submittedQuery, draft.sites)
+  }
+
   /** Runs the [pending] search, once discovery is set up. Returns whether it did. */
   fun runPending(): Boolean {
     val request = pending ?: return false

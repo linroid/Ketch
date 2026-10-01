@@ -25,8 +25,12 @@ class AiDiscoverDraftTest {
 
   @Test
   fun onlyCurrentUniqueSelectedLinksCanBeDownloaded() {
-    val candidate = AiCandidate("https://example.com/file.zip", "A file",
-      confidence = 0.9f, description = "")
+    val candidate = AiCandidate(
+      url = "https://example.com/file.zip",
+      title = "A file",
+      confidence = 0.9f,
+      description = "",
+    )
     val draft = AiDiscoverDraft()
     draft.selected = setOf(candidate.url, "https://example.com/stale.zip")
     val state = AiDiscoverState.Results(listOf(candidate, candidate.copy(title = "Duplicate")))
@@ -44,8 +48,12 @@ class AiDiscoverDraftTest {
 
   @Test
   fun toggle_twice_leavesTheSelectionAsItWas() {
-    val candidate = AiCandidate("https://example.com/file.zip", "A file",
-      confidence = 0.9f, description = "")
+    val candidate = AiCandidate(
+      url = "https://example.com/file.zip",
+      title = "A file",
+      confidence = 0.9f,
+      description = "",
+    )
     val draft = AiDiscoverDraft()
     draft.toggle(candidate)
     assertEquals(setOf(candidate.url), draft.selected)
