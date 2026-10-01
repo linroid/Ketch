@@ -130,6 +130,24 @@ class ActivityMonitorTest {
   }
 
   @Test
+  fun events_deviceLeavesAndReturns_reportsRecoveredOnce() = runTest {
+    val tasks = MutableStateFlow<List<DownloadTask>>(listOf(task("a", downloading())))
+    val source = ActivitySource(DEVICE, tasks, MutableStateFlow(true))
+    val devices = MutableStateFlow(listOf(source))
+    val events = mutableListOf<ActivityEvent>()
+    val monitor = ActivityMonitor(devices, backgroundScope, clock)
+    backgroundScope.launch { monitor.events.collect { events += it } }
+    runCurrent()
+
+    devices.value = emptyList()
+    runCurrent()
+    devices.value = listOf(source)
+    runCurrent()
+
+    assertEquals(listOf<ActivityEvent>(ActivityEvent.Recovered(DEVICE, 1)), events)
+  }
+
+  @Test
   fun events_activeTasksRestoredAfterEmptyList_reportRecoveredNotAdded() = runTest {
     val harness = monitor()
 

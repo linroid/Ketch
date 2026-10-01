@@ -41,9 +41,10 @@ class ActivitySource(
  *
  * The first task list of a device is its baseline: it produces no events, so tasks that are
  * already finished stay quiet, and the tasks in it that are queued or downloading are reported
- * once as [ActivityEvent.Recovered]. A task that shows up later counts as added only when it was
- * created after the monitor started; older ones, such as tasks the engine restores after an
- * empty first list, join the baseline.
+ * once as [ActivityEvent.Recovered]. A device that leaves the list and comes back, such as a
+ * remote the app switched away from, gets a new baseline but no second report. A task that
+ * shows up later counts as added only when it was created after the monitor started; older
+ * ones, such as tasks the engine restores after an empty first list, join the baseline.
  *
  * Completions are held for up to [COALESCE_WINDOW] while other tasks of the device are still
  * running: more than [COALESCE_LIMIT] of them become one [ActivityEvent.CompletedBatch]. The
@@ -69,6 +70,7 @@ class ActivityMonitor(
 
   // Only touched by the single coroutine that handles signals.
   private val trackers = HashMap<String, DeviceTracker>()
+  private val recoveryReported = HashSet<String>()
 
   /** Events in the order they happened. Each event goes to one collector. */
   val events: Flow<ActivityEvent> = output.receiveAsFlow()
@@ -148,8 +150,7 @@ class ActivityMonitor(
         else -> events += ActivityEvent.Added(key, task.request)
       }
     }
-    if (preexisting && !tracker.recoveryReported) {
-      tracker.recoveryReported = true
+    if (preexisting && recoveryReported.add(deviceId)) {
       if (recovered > 0) send(ActivityEvent.Recovered(deviceId, recovered))
     }
     events.forEach(::send)
@@ -242,7 +243,6 @@ class ActivityMonitor(
 
   private class DeviceTracker {
     var loaded = false
-    var recoveryReported = false
     val states = HashMap<String, DownloadState>()
     val held = ArrayList<ActivityEvent.Completed>()
     var windowOpen = false
