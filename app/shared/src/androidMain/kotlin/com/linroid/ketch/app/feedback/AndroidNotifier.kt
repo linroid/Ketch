@@ -15,10 +15,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.linroid.ketch.api.DownloadProgress
-import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.platform.FileActionException
@@ -29,9 +26,6 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.darkKetchColors
 import com.linroid.ketch.app.theme.lightKetchColors
-import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.formatBytes
-import com.linroid.ketch.app.util.formatEta
 
 /**
  * Posts Ketch's notifications on Android, in three channels:
@@ -72,7 +66,7 @@ class AndroidNotifier(
       listOf(
         channel(CHANNEL_ACTIVE, "Active downloads", NotificationManager.IMPORTANCE_LOW),
         channel(CHANNEL_DONE, "Finished downloads", NotificationManager.IMPORTANCE_DEFAULT),
-        channel(CHANNEL_FAILED, "Failed downloads", NotificationManager.IMPORTANCE_HIGH),
+        channel(CHANNEL_FAILED, "Failed downloads", NotificationManager.IMPORTANCE_HIGH)
       )
     )
     system.deleteNotificationChannel(LEGACY_CHANNEL)
@@ -80,22 +74,13 @@ class AndroidNotifier(
 
   /**
    * The download service's ongoing notification about [tasks], the embedded device's tasks.
-   * Tapping it opens the Downloading tab.
+   * Tapping it opens the Downloading tab, or the Waiting tab while every task waits.
    *
    * @param serverPort port of the local server, or `null` when it is not running.
    * @param slowLane whether the slow lane is on, which turns its button into Full speed.
    */
   fun ongoing(tasks: List<DownloadTask>, serverPort: Int?, slowLane: Boolean): Notification {
-    val downloading = ArrayList<Pair<DownloadTask, DownloadProgress>>()
-    val queued = ArrayList<DownloadTask>()
-    for (task in tasks) {
-      when (val state = task.state.value) {
-        is DownloadState.Downloading -> downloading += task to state.progress
-        is DownloadState.Queued -> queued += task
-        else -> Unit
-      }
-    }
-    val active = downloading.isNotEmpty() || queued.isNotEmpty()
+    val downloads = OngoingDownloads.of(tasks)
     val builder = NotificationCompat.Builder(context, CHANNEL_ACTIVE)
       .setSmallIcon(smallIcon)
       .setColor(accentColor())
@@ -104,22 +89,17 @@ class AndroidNotifier(
       .setOnlyAlertOnce(true)
       .setSilent(true)
       .setShowWhen(false)
-      .setContentIntent(
-        showIntent(ONGOING_TAG, filter = StatusFilter.Downloading.takeIf { active }),
-      )
+      .setContentIntent(showIntent(ONGOING_TAG, filter = downloads?.filter))
       .setDeleteIntent(serviceIntent(ACTION_REPOST_NOTIFICATION))
     if (slowLane) builder.setSubText("Slow lane")
     when {
-      downloading.isNotEmpty() -> describeDownloads(builder, downloading, queued)
-      queued.isNotEmpty() -> builder
-        .setContentTitle("Waiting to download ${files(queued.size)}")
-        .setProgress(0, 0, true)
+      downloads != null -> describe(builder, downloads)
       serverPort != null -> builder
         .setContentTitle("Sharing this device")
         .setContentText("Server on port $serverPort")
       else -> builder.setContentTitle("Ketch")
     }
-    if (active) {
+    if (downloads != null) {
       builder.addAction(0, "Pause all", serviceIntent(ACTION_PAUSE_ALL))
       val speedLabel = if (slowLane) "Full speed" else "Slow lane"
       builder.addAction(0, speedLabel, serviceIntent(ACTION_SLOW_LANE))
@@ -178,60 +158,33 @@ class AndroidNotifier(
     }
   }
 
-  private fun describeDownloads(
-    builder: NotificationCompat.Builder,
-    downloading: List<Pair<DownloadTask, DownloadProgress>>,
-    queued: List<DownloadTask>,
-  ) {
-    val speed = downloading.sumOf { it.second.bytesPerSecond }
-    val received = downloading.sumOf { it.second.downloadedBytes }
-    val total = if (downloading.all { it.second.totalBytes > 0 }) {
-      downloading.sumOf { it.second.totalBytes }
+  private fun describe(builder: NotificationCompat.Builder, downloads: OngoingDownloads) {
+    builder.setContentTitle(downloads.title).setContentText(downloads.text)
+    val lanes = downloads.lanes
+    if (lanes != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+      builder.setStyle(laneStyle(lanes, downloads)).setRequestPromotedOngoing(true)
+      downloads.percent?.let { builder.setShortCriticalText("$it%") }
     } else {
-      0L
-    }
-    val title = "Downloading ${files(downloading.size)}" +
-      if (speed > 0) " · ${formatBytes(speed)}/s" else ""
-    val text = if (total > 0) {
-      val left = timeLeft(total - received, speed)
-      listOfNotNull("${formatBytes(received)} of ${formatBytes(total)}", left).joinToString(" · ")
-    } else {
-      formatBytes(received)
-    }
-    builder.setContentTitle(title).setContentText(text)
-    val single = downloading.singleOrNull()?.takeIf { queued.isEmpty() }
-    if (single != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-      builder.setStyle(laneStyle(single.first, single.second)).setRequestPromotedOngoing(true)
-      if (total > 0) builder.setShortCriticalText("${(received * 100 / total).coerceIn(0, 100)}%")
-    } else {
-      val permille = if (total > 0) (received * PROGRESS_MAX / total).toInt() else 0
-      builder.setProgress(PROGRESS_MAX, permille, total <= 0)
-        .setStyle(inboxStyle(downloading, queued))
+      val permille = downloads.permille
+      builder.setProgress(OngoingDownloads.PROGRESS_MAX, permille ?: 0, permille == null)
+        .setStyle(inboxStyle(downloads))
     }
   }
 
   // One segment per connection range, filled with the accent as far as the download got.
-  private fun laneStyle(task: DownloadTask, progress: DownloadProgress): NotificationCompat.Style {
+  private fun laneStyle(lanes: List<Int>, downloads: OngoingDownloads): NotificationCompat.Style {
     val color = accentColor()
-    val total = progress.totalBytes
-    val lanes = if (total > 0) laneLengths(task.segments.value) else listOf(PROGRESS_MAX)
-    val received = progress.downloadedBytes.coerceIn(0L, maxOf(total, 0L))
     val segments = lanes.map { NotificationCompat.ProgressStyle.Segment(it).setColor(color) }
     return NotificationCompat.ProgressStyle()
       .setProgressSegments(segments)
-      .setProgressIndeterminate(total <= 0)
-      .setProgress(if (total > 0) (received * lanes.sum() / total).toInt() else 0)
+      .setProgressIndeterminate(downloads.permille == null)
+      .setProgress(downloads.lanePosition)
   }
 
-  private fun inboxStyle(
-    downloading: List<Pair<DownloadTask, DownloadProgress>>,
-    queued: List<DownloadTask>,
-  ): NotificationCompat.InboxStyle {
-    val lines = downloading.map { (task, progress) -> "${nameOf(task)}  ${progressLine(progress)}" }
-      .plus(queued.map { "${nameOf(it)}  Waiting" })
+  private fun inboxStyle(downloads: OngoingDownloads): NotificationCompat.InboxStyle {
     val style = NotificationCompat.InboxStyle()
-    lines.take(MAX_LINES).forEach(style::addLine)
-    if (lines.size > MAX_LINES) style.setSummaryText("+${lines.size - MAX_LINES} more")
+    downloads.lines.forEach(style::addLine)
+    if (downloads.more > 0) style.setSummaryText("+${downloads.more} more")
     return style
   }
 
@@ -313,7 +266,7 @@ class AndroidNotifier(
     context,
     requestCode(ONGOING_TAG, action),
     Intent(context, service).setAction(action),
-    FLAGS,
+    FLAGS
   )
 
   // The notification shade follows the system's dark mode, not the app's.
@@ -367,11 +320,6 @@ class AndroidNotifier(
     private const val ID_TASK = 2
     private const val ID_SUMMARY = 3
     private const val ID_GROUP = 4
-    private const val PROGRESS_MAX = 1000
-    private const val MAX_LINES = 5
-
-    // Android 16 shows at most 10 segments, and falls back to one bar beyond that.
-    private const val MAX_LANES = 10
     private const val FLAGS = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 
     /**
@@ -398,39 +346,6 @@ class AndroidNotifier(
 
     // PendingIntents differing only in extras are the same one, so each gets its own code.
     private fun requestCode(tag: String, what: String): Int = "$tag/$what".hashCode()
-
-    private fun laneLengths(segments: List<Segment>): List<Int> {
-      val ranges = segments.sortedBy { it.start }.map { it.totalBytes }.filter { it > 0 }
-      val bytes = ranges.sum()
-      if (bytes <= 0) return listOf(PROGRESS_MAX)
-      val perLane = (ranges.size + MAX_LANES - 1) / MAX_LANES
-      return ranges.chunked(perLane).map { maxOf(1, (it.sum() * PROGRESS_MAX / bytes).toInt()) }
-    }
-
-    private fun nameOf(task: DownloadTask): String =
-      displayName(task.requestState.value, task.state.value)
-
-    // "45% · 2.1 MB/s"; the bytes so far while the size is unknown.
-    private fun progressLine(progress: DownloadProgress): String = listOfNotNull(
-      if (progress.totalBytes > 0) {
-        "${progress.downloadedBytes * 100 / progress.totalBytes}%"
-      } else {
-        formatBytes(progress.downloadedBytes)
-      },
-      progress.bytesPerSecond.takeIf { it > 0 }?.let { "${formatBytes(it)}/s" },
-    ).joinToString(" · ")
-
-    private fun timeLeft(bytes: Long, speed: Long): String? {
-      if (speed <= 0) return null
-      val seconds = bytes / speed
-      return when {
-        seconds < 60 -> "less than a minute left"
-        seconds < 3600 -> "about ${(seconds + 59) / 60} min left"
-        else -> "about ${formatEta(seconds)} left"
-      }
-    }
-
-    private fun files(count: Int): String = if (count == 1) "1 file" else "$count files"
   }
 }
 

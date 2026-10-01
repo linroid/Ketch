@@ -33,6 +33,7 @@ import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.pauseActiveTasks
 import com.linroid.ketch.app.state.toKetchAccent
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
@@ -66,6 +67,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 @SuppressLint("InlinedApi")
 class KetchService : Service() {
@@ -99,6 +102,7 @@ class KetchService : Service() {
   private var isStarted = false
   private var inFront = false
   private var heldRecovery: ActivityEvent.Recovered? = null
+  private var heldUntil: TimeMark? = null
   private var lastStartId = 0
   private var latestStatus = ForegroundStatus()
 
@@ -223,8 +227,11 @@ class KetchService : Service() {
   fun setInFront(inFront: Boolean) {
     this.inFront = inFront
     if (!inFront) return
-    heldRecovery?.let(toasts::trySend)
+    val held = heldRecovery ?: return
     heldRecovery = null
+    // Hours later, such as after Android restarted the service in the background, the downloads
+    // it resumed are old news.
+    if (heldUntil?.hasNotPassedNow() == true) toasts.trySend(held)
   }
 
   override fun onBind(intent: Intent?): IBinder {
@@ -284,8 +291,11 @@ class KetchService : Service() {
           enterForeground(ongoing(status))
         }
         keepStarted()
-        while (isForeground && status.downloading > 0) {
+        while (status.downloading > 0) {
           delay(ForegroundPolicy.samplePeriod)
+          // The service can leave the foreground meanwhile, such as at its time limit; posting
+          // then would leave a notification behind that nothing removes.
+          if (!isForeground) break
           speed.value = totalSpeed(embedded.tasks.value)
           notifier.refreshOngoing(ongoing(status))
         }
@@ -322,6 +332,7 @@ class KetchService : Service() {
     ) {
       // The service usually starts a moment before the app comes to the front.
       heldRecovery = event
+      heldUntil = TimeSource.Monotonic.markNow() + RECOVERY_HOLD
     }
     return if (delivery.notify) ActivityRouting.copyOf(event) else null
   }
@@ -330,23 +341,9 @@ class KetchService : Service() {
   private fun pauseAll() {
     val embedded = instanceManager.embedded ?: return
     scope.launch {
-      // A paused download frees its slot, and the queue may start a task it re-queued meanwhile;
-      // later rounds catch those.
-      repeat(MAX_PAUSE_ROUNDS) {
-        val tasks = embedded.tasks.value
-        val queued = tasks.filter { it.state.value is DownloadState.Queued }
-        val running = tasks.filter { it.state.value is DownloadState.Downloading }
-        if (queued.isEmpty() && running.isEmpty()) return@launch
-        log.i { "Pausing ${queued.size + running.size} downloads from the notification" }
-        for (task in queued + running) {
-          try {
-            task.pause()
-          } catch (e: CancellationException) {
-            throw e
-          } catch (e: Exception) {
-            log.w { "Couldn't pause taskId=${task.taskId}: ${e.describeCauses()}" }
-          }
-        }
+      log.i { "Pausing all downloads from the notification" }
+      pauseActiveTasks({ embedded.tasks.value }).forEach { (task, e) ->
+        log.w { "Couldn't pause taskId=${task.taskId}: ${e.describeCauses()}" }
       }
     }
   }
@@ -455,7 +452,7 @@ class KetchService : Service() {
 
   private companion object {
     const val EVENT_BUFFER = 64
-    const val MAX_PAUSE_ROUNDS = 3
     val PEAK_SAVE_DELAY = 10.seconds
+    val RECOVERY_HOLD = 30.seconds
   }
 }

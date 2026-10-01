@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
         val controller = rememberAppController(
           svc.instanceManager,
           svc.aiProviderFactory,
-          ketchApplication.incoming,
+          ketchApplication.incoming
         )
         val link = notificationLink
         LaunchedEffect(controller, link) {
