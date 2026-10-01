@@ -35,7 +35,7 @@ internal class ShellState(
   /** Whether the keyboard shortcut sheet is open. */
   var shortcutsOpen: Boolean by mutableStateOf(false)
 
-  /** Whether the phone's top bar is a search field. */
+  /** Whether the phone's top bar is a search field; see [closeSearch]. */
   var searchOpen: Boolean by mutableStateOf(false)
 
   /** Whether the phone's Pulse sheet is open. */
@@ -53,21 +53,34 @@ internal class ShellState(
   /** The phone's collapsing top bar. */
   val chrome: PhoneChromeState = PhoneChromeState()
 
+  /** Id of the device that was active before the current one, which a long press goes back to. */
+  var previousDeviceId: String? by mutableStateOf(null)
+
   /** Asks for the Downloads search field once Downloads shows; counts up with each request. */
   var searchFocusRequests: Int by mutableIntStateOf(0)
     private set
 
   /**
-   * Shows [destination] and closes Settings and the phone's search; returns whether the
-   * navigation offers it.
+   * Shows [destination] and closes Settings, and the phone's search when it leaves Downloads;
+   * returns whether the navigation offers it.
    */
   fun show(destination: AppDestination): Boolean {
     if (destination !in destinations) return false
     if (destination != this.destination) chrome.expand()
     this.destination = destination
     closeSettings()
-    if (destination != AppDestination.Downloads) searchOpen = false
+    if (destination != AppDestination.Downloads) closeSearch()
     return true
+  }
+
+  /**
+   * Turns the phone's search field back into the top bar and clears the search, so the list it
+   * filtered never stays filtered out of sight.
+   */
+  fun closeSearch() {
+    if (!searchOpen) return
+    searchOpen = false
+    app.searchQuery = ""
   }
 
   /** Shows Settings; the app's request names the page. */

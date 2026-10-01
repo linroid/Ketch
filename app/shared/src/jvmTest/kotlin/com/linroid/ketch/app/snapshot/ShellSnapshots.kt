@@ -24,6 +24,7 @@ import com.linroid.ketch.app.ui.shell.PhoneBottomBar
 import com.linroid.ketch.app.ui.shell.ShortcutSheet
 import com.linroid.ketch.app.ui.shell.shortcutGroups
 import com.linroid.ketch.config.DensityMode
+import com.linroid.ketch.config.RemoteConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -108,6 +109,30 @@ class ShellSnapshots {
   }
 
   @Test
+  fun shell_phoneDevices_opensFromTheMenu() {
+    appSnapshots("shell-phone-devices", listOf(SnapshotSize.Phone)) {
+      // The ⋮ button, then its Devices item.
+      scene.click(362.dp, 32.dp)
+      scene.settle()
+      scene.click(100.dp, 756.dp)
+    }
+  }
+
+  @Test
+  fun shell_pointerOnAPhoneWidth_keepsThePennantWhole() {
+    appSnapshots("shell-phone-pointer", listOf(PhonePointer), themes = listOf(SnapshotTheme.Light))
+  }
+
+  @Test
+  fun shell_manyDevicesInAShortWindow_scrollsTheDevices() {
+    appSnapshots(
+      name = "shell-many-devices",
+      sizes = listOf(Short1024, Short760),
+      data = { SampleData(tasks = SampleData.downloads().tasks, remotes = ManyRemotes) },
+    )
+  }
+
+  @Test
   fun shell_settings_takesTheCardsPlace() {
     val sizes = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
     appSnapshots("shell-settings", sizes) { openSettings() }
@@ -144,6 +169,20 @@ private val Width600 = SnapshotSize(600.dp, 760.dp, KetchDensity.Compact)
 private val Width840 = SnapshotSize(840.dp, 720.dp, KetchDensity.Compact)
 private val Width1440 = SnapshotSize(1440.dp, 900.dp, KetchDensity.Compact)
 private val BottomBarSize = SnapshotSize(390.dp, 160.dp, KetchDensity.Comfortable)
+private val PhonePointer = SnapshotSize(390.dp, 844.dp, KetchDensity.Compact)
+private val Short1024 = SnapshotSize(1024.dp, 480.dp, KetchDensity.Compact)
+private val Short760 = SnapshotSize(760.dp, 480.dp, KetchDensity.Compact)
+
+// More devices than the sidebar shows at once, one of them with a long name.
+private val ManyRemotes = listOf(
+  SampleData.NAS,
+  RemoteConfig(host = "den-pc.local", name = "Den-PC", watch = false),
+  RemoteConfig(host = "media.local", name = "Living room media server upstairs", watch = false),
+  RemoteConfig(host = "seedbox.example.net", port = 443, secure = true, watch = false),
+  RemoteConfig(host = "office.local", name = "Office", watch = false),
+  RemoteConfig(host = "pi.local", name = "Raspberry Pi", watch = false),
+  RemoteConfig(host = "laptop.local", name = "Travel laptop", watch = false),
+)
 
 private val ShellWidths = listOf(
   Width1440,

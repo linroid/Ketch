@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -197,7 +198,6 @@ private fun RailItem(
       horizontalAlignment = Alignment.CenterHorizontally,
       modifier = Modifier
         .widthIn(min = CellWidth)
-        .semantics(mergeDescendants = true) { contentDescription = label }
         .trackFocusVisibility(focus)
         .selectable(
           selected = selected,
@@ -206,6 +206,10 @@ private fun RailItem(
           role = Role.Tab,
           onClick = onClick,
         )
+        // After selectable: a clear before it would drop its click and selected state too.
+        .clearAndSetSemantics {
+          contentDescription = if (badge > 0) "$label, $badge downloading" else label
+        }
         .padding(vertical = KetchTheme.spacing.s1),
     ) {
       Box(
@@ -222,7 +226,10 @@ private fun RailItem(
             tint = if (selected) colors.accentText else colors.textSecondary,
           )
           if (badge > 0) {
-            RailBadge(badge, Modifier.align(Alignment.TopEnd).offset(x = BadgeShift, y = -BadgeRise))
+            RailBadge(
+              count = badge,
+              modifier = Modifier.align(Alignment.TopEnd).offset(x = BadgeShift, y = -BadgeRise),
+            )
           }
         }
       }
