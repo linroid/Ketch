@@ -50,6 +50,13 @@ class SettingsPageTest {
   }
 
   @Test
+  fun notificationsSummary_finishedOff_leavesOutAllDownloadsFinished() {
+    val settings = NotificationSettings(finished = NotificationMode.Off, queueDrained = true)
+
+    assertEquals("2 on", notificationsSummary(settings))
+  }
+
+  @Test
   fun integrationSummary_extensionConnected_namesTheBrowsers() {
     val chrome = DetectedBrowser("Chrome", extensionConnected = true)
     val edge = DetectedBrowser("Edge", extensionConnected = true)
@@ -110,7 +117,7 @@ class SettingsPageTest {
       downloadsSummary(config.copy(maxConcurrentDownloads = 3)),
     )
     assertEquals(
-      "Downloads folder · no queue",
+      "Downloads folder · all at once",
       downloadsSummary(DownloadConfig(maxConcurrentDownloads = 0)),
     )
   }

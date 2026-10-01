@@ -88,7 +88,7 @@ class SettingsSearchRenderTest {
     val FRAME = 16.milliseconds
 
     /** What the desktop app offers; the web's and phones' entries are not on its pages. */
-    val Shown = setOf(null, SettingsFeature.Desktop)
+    val Shown = setOf(null, SettingsFeature.Desktop, SettingsFeature.SetupChecklist)
 
     /**
      * Settings that only show sometimes: the add sheet's folders once there are any, and the

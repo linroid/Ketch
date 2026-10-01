@@ -25,6 +25,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchLogoTile
@@ -43,6 +46,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private const val PROJECT_URL = "https://github.com/linroid/Ketch"
+
+private val log = KetchLogger("AboutSettings")
 
 /**
  * Who made Ketch and which version this is, the licenses it ships under, its log files, and
@@ -82,21 +87,25 @@ fun AboutSettings(state: AppState, fileLogger: FileLogger? = null) {
     )
   }
   SettingsGroup(title = "Getting started") {
-    var checklistShown by remember { mutableStateOf(false) }
-    SettingsRow(
-      title = "Show setup checklist",
-      description = if (checklistShown) {
-        "Done. It shows on the Downloads page while the list is empty."
-      } else {
-        "The setup steps on an empty Downloads page."
-      },
-      modifier = Modifier.clickable(role = Role.Button) {
-        appSettings.saveUi { it.copy(setupChecklistDismissed = false, setupChecklistShownAt = 0) }
-        checklistShown = true
-      },
-      trailing = { Chevron() },
-    )
-    if (isMobilePlatform) {
+    // The mobile apps have welcome screens; their Downloads page shows no checklist.
+    if (!isMobilePlatform) {
+      var checklistShown by remember { mutableStateOf(false) }
+      SettingsRow(
+        title = "Show setup checklist",
+        description = if (checklistShown) {
+          "Done. It shows on the Downloads page while the list is empty."
+        } else {
+          "The setup steps on an empty Downloads page."
+        },
+        modifier = Modifier.clickable(role = Role.Button) {
+          appSettings.saveUi {
+            it.copy(setupChecklistDismissed = false, setupChecklistShownAt = 0)
+          }
+          checklistShown = true
+        },
+        trailing = { Chevron() },
+      )
+    } else {
       var welcomeShown by remember { mutableStateOf(false) }
       SettingsRow(
         title = "Show welcome again",
@@ -127,7 +136,7 @@ fun AboutSettings(state: AppState, fileLogger: FileLogger? = null) {
   }
 }
 
-/** The app's tile, name and version over the one line about the name. */
+/** The app's tile and name over the one line about the name. */
 @Composable
 private fun BrandHeader() {
   val colors = KetchTheme.colors
@@ -145,11 +154,6 @@ private fun BrandHeader() {
       modifier = Modifier.padding(top = spacing.s2),
     )
     Text(
-      text = "Version ${KetchApi.VERSION}",
-      style = KetchTheme.typography.mono,
-      color = colors.textSecondary,
-    )
-    Text(
       text = "A ketch is a two-masted sailboat. Ketch splits every download into lanes, like " +
         "its sails.",
       style = KetchTheme.typography.bodyS,
@@ -164,9 +168,16 @@ private fun BrandHeader() {
 private fun LicenseDialog(onDismiss: () -> Unit) {
   var licenseText by remember { mutableStateOf("Loading licenses…") }
   LaunchedEffect(Unit) {
-    licenseText = listOf("LICENSE.txt", "THIRD-PARTY-NOTICES.txt").map {
-      Res.readBytes("files/licenses/$it").decodeToString()
-    }.joinToString("\n\n")
+    licenseText = try {
+      listOf("LICENSE.txt", "THIRD-PARTY-NOTICES.txt").map {
+        Res.readBytes("files/licenses/$it").decodeToString()
+      }.joinToString("\n\n")
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.w { "Couldn't read the licenses: ${e.describeCauses()}" }
+      "Couldn't load the licenses. They are in the LICENSE file at $PROJECT_URL."
+    }
   }
   AdaptiveModal(
     onDismissRequest = onDismiss,
@@ -209,6 +220,7 @@ private fun LogFilesRow(action: LogFilesAction) {
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
+          log.w { "Couldn't ${action.title.lowercase()}: ${e.describeCauses()}" }
           "Couldn't ${action.title.lowercase()}: ${e.message ?: e::class.simpleName}"
         } finally {
           running = false
@@ -240,7 +252,11 @@ private fun LinkRow(title: String, description: String, url: String) {
     title = title,
     description = description,
     modifier = Modifier.clickable(role = Role.Button) {
-      runCatching { uriHandler.openUri(url) }
+      try {
+        uriHandler.openUri(url)
+      } catch (e: Exception) {
+        log.w { "Couldn't open ${redactUrl(url)}: ${e.describeCauses()}" }
+      }
     },
     trailing = {
       KetchIconImage(

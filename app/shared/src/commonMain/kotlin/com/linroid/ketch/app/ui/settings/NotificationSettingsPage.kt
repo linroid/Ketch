@@ -11,6 +11,7 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchSwitch
 import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.detail
 import com.linroid.ketch.app.instance.displayName
@@ -71,10 +72,13 @@ fun NotificationSettingsPage(state: AppState) {
 
   if (permission != null) BrowserPermissionGroup(permission)
 
+  val finishedOn = settings.finished != NotificationMode.Off
+  val notifies = settings.finished == NotificationMode.Notify ||
+    settings.failed == NotificationMode.Notify
   SettingsGroup(
     title = "Downloads",
-    footer = "Notify shows a system notification while Ketch is in the background. In app " +
-      "only shows a message inside Ketch.",
+    footer = "Notify posts a system notification. In app only shows a message inside Ketch " +
+      "while it is open.",
   ) {
     SettingsRow(
       title = "Download finished",
@@ -96,9 +100,25 @@ fun NotificationSettingsPage(state: AppState) {
     )
     SettingsSwitchRow(
       title = "All downloads finished",
-      description = "One message when the queue is empty, with what it added up to.",
-      checked = settings.queueDrained,
+      description = if (finishedOn) {
+        "One message when the queue is empty, with what it added up to."
+      } else {
+        "Reported like finished downloads, which are off."
+      },
+      checked = finishedOn && settings.queueDrained,
+      enabled = finishedOn,
       onCheckedChange = { on -> save { it.copy(queueDrained = on) } },
+    )
+    SettingsSwitchRow(
+      title = "Only when Ketch is in the background",
+      description = when {
+        !notifies -> "Nothing is set to Notify."
+        settings.onlyInBackground -> "While Ketch is in front, events show inside it instead."
+        else -> "Notifications show even while Ketch is in front."
+      },
+      checked = settings.onlyInBackground,
+      enabled = notifies,
+      onCheckedChange = { on -> save { it.copy(onlyInBackground = on) } },
     )
   }
 
@@ -108,16 +128,6 @@ fun NotificationSettingsPage(state: AppState) {
       description = "A message inside Ketch when a device stops answering.",
       checked = settings.deviceOffline,
       onCheckedChange = { on -> save { it.copy(deviceOffline = on) } },
-    )
-    SettingsSwitchRow(
-      title = "Only when Ketch is in the background",
-      description = if (settings.onlyInBackground) {
-        "While Ketch is in front, events show inside it instead."
-      } else {
-        "Notifications show even while Ketch is in front."
-      },
-      checked = settings.onlyInBackground,
-      onCheckedChange = { on -> save { it.copy(onlyInBackground = on) } },
     )
   }
 
@@ -163,8 +173,9 @@ private fun BrowserPermissionGroup(permission: NotificationPermission) {
 }
 
 /**
- * One switch per device: whether its events are reported. Turning a remote device's on also
- * keeps the app connected to it, so its events arrive while another device shows.
+ * One switch per device: whether its events are reported. A remote device's events only arrive
+ * while the app stays connected to it, so its switch is on only while it is also watched, and
+ * turning it on watches it.
  */
 @Composable
 private fun DeviceMutesGroup(
@@ -180,7 +191,7 @@ private fun DeviceMutesGroup(
   ) {
     instances.forEach { entry ->
       key(entry.deviceId) {
-        val notify = entry.deviceId !in muted
+        val notify = notifiesAbout(entry, muted)
         val toggle = { on: Boolean ->
           onChange(entry.deviceId, on)
           if (on && entry is RemoteInstance) state.instanceManager.setWatched(entry, true)
@@ -201,6 +212,10 @@ private fun DeviceMutesGroup(
     }
   }
 }
+
+/** Whether [device]'s events are reported: not [muted], and for a remote device, watched. */
+internal fun notifiesAbout(device: InstanceEntry, muted: List<String>): Boolean =
+  device.deviceId !in muted && (device !is RemoteInstance || device.remoteConfig.watch)
 
 @Composable
 private fun ModeSegmented(value: NotificationMode, onSelect: (NotificationMode) -> Unit) {

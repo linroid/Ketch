@@ -26,6 +26,7 @@ import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.ClipboardMode
+import com.linroid.ketch.config.IntegrationSettings
 import kotlinx.coroutines.CancellationException
 
 private val log = KetchLogger("IntegrationSettings")
@@ -57,7 +58,13 @@ private fun BrowserGroup() {
   val getExtension = @Composable {
     KetchButton(
       text = "Get extension",
-      onClick = { runCatching { uriHandler.openUri(EXTENSION_URL) } },
+      onClick = {
+        try {
+          uriHandler.openUri(EXTENSION_URL)
+        } catch (e: Exception) {
+          log.w { "Couldn't open the extension's page: ${e.describeCauses()}" }
+        }
+      },
       variant = KetchButtonVariant.Secondary,
       size = KetchButtonSize.Small,
       leadingIcon = KetchIcon.Open,
@@ -95,13 +102,22 @@ private fun DefaultAppsGroup(state: AppState) {
   val status = LocalIntegrationStatus.current
   val appSettings = state.appSettings
   var registering by remember { mutableStateOf<String?>(null) }
+  // What this page registered, shown as done before the system's answer is read again, which
+  // happens only when the window comes back to the front.
+  var registered by remember { mutableStateOf(emptySet<String>()) }
   var failure by remember { mutableStateOf<String?>(null) }
-  val register = { what: String, block: suspend () -> Unit ->
+  val register = { what: String, hook: suspend () -> Boolean, save: IntegrationChange ->
     registering = what
     failure = null
     state.launchCommand {
       try {
-        block()
+        if (hook()) {
+          appSettings.saveIntegration(save)
+          registered = registered + what
+        } else {
+          log.w { "The system didn't make Ketch open $what" }
+          failure = "Ketch couldn't make itself open $what. Choose it in your system's settings."
+        }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
@@ -113,53 +129,55 @@ private fun DefaultAppsGroup(state: AppState) {
     }
   }
   SettingsGroup(title = "Default apps", footer = failure) {
-    SettingsRow(
+    DefaultAppRow(
       title = "Open magnet links with Ketch",
       description = "Magnet links you click in any app start a download here.",
-      trailing = {
-        if (status.magnetHandler) {
-          Confirmed("Ketch is the default")
-        } else {
-          KetchButton(
-            text = "Make default",
-            onClick = {
-              register(MAGNET_LINKS) {
-                if (hooks.registerMagnetHandler()) {
-                  appSettings.saveIntegration { it.copy(magnetHandler = true) }
-                }
-              }
-            },
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-            loading = registering == MAGNET_LINKS,
-          )
-        }
+      isDefault = status.magnetHandler || MAGNET_LINKS in registered,
+      registering = registering == MAGNET_LINKS,
+      onMakeDefault = {
+        register(MAGNET_LINKS, hooks::registerMagnetHandler) { it.copy(magnetHandler = true) }
       },
     )
-    SettingsRow(
+    DefaultAppRow(
       title = "Open .torrent files with Ketch",
       description = "Opening a .torrent file shows it in Ketch, ready to add.",
-      trailing = {
-        if (status.torrentFileHandler) {
-          Confirmed("Ketch is the default")
-        } else {
-          KetchButton(
-            text = "Make default",
-            onClick = {
-              register(TORRENT_FILES) {
-                if (hooks.registerTorrentFileHandler()) {
-                  appSettings.saveIntegration { it.copy(torrentFileHandler = true) }
-                }
-              }
-            },
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-            loading = registering == TORRENT_FILES,
-          )
+      isDefault = status.torrentFileHandler || TORRENT_FILES in registered,
+      registering = registering == TORRENT_FILES,
+      onMakeDefault = {
+        register(TORRENT_FILES, hooks::registerTorrentFileHandler) {
+          it.copy(torrentFileHandler = true)
         }
       },
     )
   }
+}
+
+/** A kind of link or file Ketch can open: done when [isDefault], else a Make default button. */
+@Composable
+private fun DefaultAppRow(
+  title: String,
+  description: String,
+  isDefault: Boolean,
+  registering: Boolean,
+  onMakeDefault: () -> Unit,
+) {
+  SettingsRow(
+    title = title,
+    description = description,
+    trailing = {
+      if (isDefault) {
+        Confirmed("Ketch is the default")
+      } else {
+        KetchButton(
+          text = "Make default",
+          onClick = onMakeDefault,
+          variant = KetchButtonVariant.Secondary,
+          size = KetchButtonSize.Small,
+          loading = registering,
+        )
+      }
+    },
+  )
 }
 
 /** What Ketch does with a copied link, and with one pasted into the list. */
@@ -229,6 +247,8 @@ private fun Confirmed(text: String) {
     KetchIconImage(icon = KetchIcon.Check, size = KetchTheme.density.controlGlyph, tint = color)
   }
 }
+
+private typealias IntegrationChange = (IntegrationSettings) -> IntegrationSettings
 
 private const val MAGNET_LINKS = "magnet links"
 private const val TORRENT_FILES = ".torrent files"
