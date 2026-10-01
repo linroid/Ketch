@@ -14,8 +14,9 @@ import com.linroid.ketch.app.feedback.ToastMode
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.PendingOps
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -42,27 +43,15 @@ import kotlin.time.Duration.Companion.seconds
  *
  * iOS suspends an app soon after it leaves the screen, and the downloads' connections die with
  * it. Pausing first saves their progress, so they show as Paused rather than failed. The tasks
- * it paused are remembered across launches, so they also resume when iOS ended Ketch meanwhile.
- * While downloads run, a banner tells the user that they pause in the background.
+ * it paused are remembered across launches, so they also resume when iOS ended Ketch meanwhile,
+ * which it does without notice; operations still waiting for their Undo window are committed
+ * for the same reason. While downloads run, a banner tells the user that they pause in the
+ * background.
  */
 object KetchBackground {
   private val log = KetchLogger("KetchBackground")
   private val scope = MainScope()
-  private var api: KetchApi? = null
-  private var suspension: Job? = null
-
-  // Ids of the tasks paused for the background, downloading ones first.
-  private var pausedIds: List<String>
-    get() = NSUserDefaults.standardUserDefaults.stringArrayForKey(PAUSED_KEY)
-      ?.filterIsInstance<String>().orEmpty()
-    set(value) {
-      val defaults = NSUserDefaults.standardUserDefaults
-      if (value.isEmpty()) {
-        defaults.removeObjectForKey(PAUSED_KEY)
-      } else {
-        defaults.setObject(value, forKey = PAUSED_KEY)
-      }
-    }
+  private var pauser: BackgroundPauser? = null
 
   /**
    * Pauses this device's queued and downloading tasks and waits until their progress is saved.
@@ -70,52 +59,54 @@ object KetchBackground {
    *
    * @return how many tasks it paused.
    */
-  suspend fun prepareForSuspension(): Int {
-    val api = api ?: return 0
-    val earlier = pausedIds
-    // Recorded as it goes, so the tasks paused before iOS runs out of time still resume.
-    val paused = pauseActive(api) { pausedIds = (earlier + it).distinct() }
-    if (paused.isNotEmpty()) log.i { "Paused ${paused.size} downloads for the background" }
-    return paused.size
-  }
+  suspend fun prepareForSuspension(): Int = pauser?.prepareForSuspension() ?: 0
 
   /**
-   * Follows [api], the embedded device, until the returned handle is disposed: pauses its
-   * downloads in the background, resumes them in front, and posts the background banner to
-   * [messages], whose button runs [onUseComputer].
+   * Follows [api], the embedded device, until the returned handle is disposed: commits
+   * [pendingOps] and pauses its downloads in the background, resumes them in front, and posts
+   * the background banner to [messages], whose button runs [onUseComputer].
    */
   internal fun attach(
     api: KetchApi,
     messages: MessageCenter,
+    pendingOps: PendingOps,
     onUseComputer: () -> Unit,
   ): DisposableHandle {
-    this.api = api
+    val pauser = BackgroundPauser(
+      api = api,
+      scope = scope,
+      saved = SavedPausedIds,
+      commitPending = pendingOps::flush,
+      onPaused = IosNotifier::notifyPaused,
+      onResumed = IosNotifier::clearPaused,
+    )
+    this.pauser = pauser
     val center = NSNotificationCenter.defaultCenter
     val queue = NSOperationQueue.mainQueue
     val observers = listOf(
       center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, queue) {
-        enterBackground()
+        pauser.enterBackground()?.let(::holdBackgroundTime)
       },
       center.addObserverForName(UIApplicationWillEnterForegroundNotification, null, queue) {
-        enterForeground()
+        pauser.enterForeground()
       },
     )
-    val jobs = listOf(
-      scope.launch { resumeAfterRelaunch(api) },
-      scope.launch { showBanner(api, messages, onUseComputer) },
-    )
+    // Resumes the tasks paused before iOS ended Ketch, if any.
+    val app = UIApplication.sharedApplication
+    if (app.applicationState != UIApplicationState.UIApplicationStateBackground) {
+      pauser.enterForeground()
+    }
+    val banner = scope.launch { showBanner(api, messages, onUseComputer) }
     return DisposableHandle {
       observers.forEach { center.removeObserver(it) }
-      jobs.forEach { it.cancel() }
-      if (this.api === api) this.api = null
+      banner.cancel()
+      pauser.close()
+      if (this.pauser === pauser) this.pauser = null
     }
   }
 
-  // Holds off suspension with a background task until the downloads are paused.
-  private fun enterBackground() {
-    val api = api ?: return
-    if (suspension?.isActive == true) return
-    if (api.tasks.value.none { it.state.value.isQueuedOrDownloading }) return
+  // Keeps Ketch running in the background until [work] completes or iOS runs out of time.
+  private fun holdBackgroundTime(work: Job) {
     val app = UIApplication.sharedApplication
     var taskId = UIBackgroundTaskInvalid
     val end = {
@@ -124,51 +115,12 @@ object KetchBackground {
         taskId = UIBackgroundTaskInvalid
       }
     }
-    val job = scope.launch(start = CoroutineStart.LAZY) {
-      try {
-        val paused = prepareForSuspension()
-        if (paused > 0) IosNotifier.notifyPaused(pausedIds.size)
-      } finally {
-        end()
-      }
-    }
     taskId = app.beginBackgroundTaskWithName(BACKGROUND_TASK) {
       log.w { "Background time ran out while pausing downloads" }
-      job.cancel()
+      work.cancel()
       end()
     }
-    suspension = job
-    job.start()
-  }
-
-  private fun enterForeground() {
-    val pending = suspension
-    scope.launch {
-      pending?.join()
-      resumeSaved()
-    }
-  }
-
-  private suspend fun resumeSaved() {
-    val api = api ?: return
-    IosNotifier.clearPaused()
-    val ids = pausedIds
-    if (ids.isEmpty()) return
-    pausedIds = emptyList()
-    val resumed = resumePaused(api, ids)
-    log.i { "Resumed $resumed downloads paused for the background" }
-  }
-
-  // Tasks paused before iOS ended Ketch resume once the engine has restored them.
-  private suspend fun resumeAfterRelaunch(api: KetchApi) {
-    val ids = pausedIds.toSet()
-    if (ids.isEmpty()) return
-    withTimeoutOrNull(RESTORE_TIMEOUT) {
-      api.tasks.first { tasks -> tasks.any { it.taskId in ids } }
-    }
-    val app = UIApplication.sharedApplication
-    if (app.applicationState == UIApplicationState.UIApplicationStateBackground) return
-    resumeSaved()
+    work.invokeOnCompletion { end() }
   }
 
   // Shown while this device downloads, until the user closes it.
@@ -215,17 +167,140 @@ object KetchBackground {
     }
   }
 
+  private const val BACKGROUND_TASK = "ketch.downloads"
+}
+
+/** Ids of the tasks paused for the background, downloading ones first. */
+internal interface PausedTaskIds {
+  var ids: List<String>
+}
+
+// Kept in the user defaults, so they outlive a process that iOS ended in the background.
+private object SavedPausedIds : PausedTaskIds {
+  private const val KEY = "ketch.background.paused"
+
+  override var ids: List<String>
+    get() = NSUserDefaults.standardUserDefaults.stringArrayForKey(KEY)
+      ?.filterIsInstance<String>().orEmpty()
+    set(value) {
+      val defaults = NSUserDefaults.standardUserDefaults
+      if (value.isEmpty()) {
+        defaults.removeObjectForKey(KEY)
+      } else {
+        defaults.setObject(value, forKey = KEY)
+      }
+    }
+}
+
+/**
+ * Pauses the queued and downloading tasks of [api] when Ketch goes to the background and resumes
+ * them when it returns. [KetchBackground] drives it from the app's lifecycle.
+ *
+ * Resuming waits for pausing still in progress. Going back to the background before resuming
+ * finished stops it, so the tasks it had not reached stay paused and remembered.
+ *
+ * @param scope runs the pausing and resuming.
+ * @param saved ids of the tasks it paused, kept until they resume.
+ * @param commitPending commits the operations still waiting for their Undo window and returns
+ *   the job that completes with their commits.
+ * @param onPaused tells the user how many downloads wait for Ketch to return.
+ * @param onResumed withdraws what [onPaused] told.
+ */
+internal class BackgroundPauser(
+  private val api: KetchApi,
+  private val scope: CoroutineScope,
+  private val saved: PausedTaskIds,
+  private val commitPending: () -> Job = { Job().apply { complete() } },
+  private val onPaused: (count: Int) -> Unit = {},
+  private val onResumed: () -> Unit = {},
+) {
+  private val log = KetchLogger("KetchBackground")
+  private var suspension: Job? = null
+  private var resumption: Job? = null
+
   /**
-   * Pauses the queued tasks of [api], then the downloading ones, so the queue cannot start a
-   * waiting task as slots free up, and repeats for any it started meanwhile.
+   * Commits pending operations and pauses the active tasks, after stopping any resuming.
    *
-   * @param onPaused receives the ids paused so far after each pause.
-   * @return the ids of the paused tasks, downloading ones first.
+   * @return the job doing it, which Ketch must stay running for, or `null` when there is
+   *   nothing to do.
    */
-  internal suspend fun pauseActive(
-    api: KetchApi,
-    onPaused: (List<String>) -> Unit = {},
-  ): List<String> {
+  fun enterBackground(): Job? {
+    val resuming = resumption?.takeIf { it.isActive }
+    resuming?.cancel()
+    resumption = null
+    val pausing = suspension?.takeIf { it.isActive }
+    val commits = commitPending()
+    if (resuming == null && pausing == null && commits.isCompleted && !hasActiveTasks()) {
+      return null
+    }
+    return scope.launch {
+      try {
+        resuming?.join()
+        pausing?.join()
+        commits.join()
+        prepareForSuspension()
+      } finally {
+        // Also when iOS ran out of time, for the tasks paused until then.
+        val waiting = saved.ids.size
+        if (waiting > 0) onPaused(waiting)
+      }
+    }.also { suspension = it }
+  }
+
+  /** Resumes the tasks paused for the background once any pausing in progress has finished. */
+  fun enterForeground(): Job {
+    val pausing = suspension
+    val previous = resumption
+    previous?.cancel()
+    return scope.launch {
+      previous?.join()
+      pausing?.join()
+      resumeSaved()
+    }.also { resumption = it }
+  }
+
+  /**
+   * Pauses the queued and downloading tasks, remembering each as it goes, so the ones paused
+   * before iOS runs out of time still resume.
+   *
+   * @return how many tasks it paused.
+   */
+  suspend fun prepareForSuspension(): Int {
+    val earlier = saved.ids
+    val paused = pauseActive { saved.ids = (earlier + it).distinct() }
+    if (paused.isNotEmpty()) log.i { "Paused ${paused.size} downloads for the background" }
+    return paused.size
+  }
+
+  /** Stops resuming; pausing in progress still finishes. */
+  fun close() {
+    resumption?.cancel()
+  }
+
+  // The ids are forgotten only once every task has been resumed.
+  private suspend fun resumeSaved() {
+    val ids = saved.ids
+    if (ids.isEmpty()) return
+    // After a relaunch, the engine restores its tasks a moment after it starts.
+    withTimeoutOrNull(RESTORE_TIMEOUT) {
+      api.tasks.first { tasks -> tasks.any { it.taskId in ids } }
+    }
+    val tasks = api.tasks.value.associateBy { it.taskId }
+    val resumed = ids.count { id ->
+      val task = tasks[id]
+      task != null && task.state.value is DownloadState.Paused && attempt("resume", task) {
+        task.resume()
+      }
+    }
+    saved.ids = emptyList()
+    onResumed()
+    log.i { "Resumed $resumed downloads paused for the background" }
+  }
+
+  // Pauses the queued tasks before the downloading ones, so the queue cannot start a waiting
+  // task as slots free up, and repeats for any it started meanwhile. Returns the paused ids,
+  // downloading ones first, and passes them to [record] after each pause.
+  private suspend fun pauseActive(record: (List<String>) -> Unit): List<String> {
     val downloading = mutableListOf<String>()
     val queued = mutableListOf<String>()
     val attempted = mutableSetOf<String>()
@@ -237,9 +312,9 @@ object KetchBackground {
       for ((group, paused) in listOf(waiting to queued, running to downloading)) {
         for (task in group) {
           attempted += task.taskId
-          if (pause(task)) {
+          if (attempt("pause", task) { task.pause() }) {
             paused += task.taskId
-            onPaused(downloading + queued)
+            record(downloading + queued)
           }
         }
       }
@@ -247,27 +322,10 @@ object KetchBackground {
     return downloading + queued
   }
 
-  /**
-   * Resumes the tasks of [api] with [ids], in that order, that are still paused.
-   *
-   * @return how many it resumed.
-   */
-  internal suspend fun resumePaused(api: KetchApi, ids: List<String>): Int {
-    val tasks = api.tasks.value.associateBy { it.taskId }
-    return ids.count { id ->
-      val task = tasks[id]
-      task != null && task.state.value is DownloadState.Paused && resume(task)
-    }
+  private fun hasActiveTasks(): Boolean = api.tasks.value.any {
+    val state = it.state.value
+    state is DownloadState.Queued || state is DownloadState.Downloading
   }
-
-  private val DownloadState.isQueuedOrDownloading: Boolean
-    get() = this is DownloadState.Queued || this is DownloadState.Downloading
-
-  private suspend fun pause(task: DownloadTask): Boolean =
-    attempt("pause", task) { task.pause() }
-
-  private suspend fun resume(task: DownloadTask): Boolean =
-    attempt("resume", task) { task.resume() }
 
   private suspend fun attempt(
     action: String,
@@ -283,8 +341,8 @@ object KetchBackground {
     false
   }
 
-  private const val PAUSED_KEY = "ketch.background.paused"
-  private const val BACKGROUND_TASK = "ketch.downloads"
-  private val RESTORE_TIMEOUT = 10.seconds
-  private const val MAX_PAUSE_ROUNDS = 3
+  private companion object {
+    val RESTORE_TIMEOUT = 10.seconds
+    const val MAX_PAUSE_ROUNDS = 3
+  }
 }

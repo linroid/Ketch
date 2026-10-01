@@ -75,7 +75,7 @@ fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
   }
   DisposableEffect(controller) {
     val background = instanceManager.embedded?.let { embedded ->
-      KetchBackground.attach(embedded, controller.messages) {
+      KetchBackground.attach(embedded, controller.messages, controller.state.pendingOps) {
         controller.state.showAddRemoteDialog = true
       }
     }
