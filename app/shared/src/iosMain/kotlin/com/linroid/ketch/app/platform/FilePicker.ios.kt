@@ -57,16 +57,19 @@ private class IosFilePicker(private val viewController: UIViewController) : File
 
   private suspend fun pick(picker: UIDocumentPickerViewController): List<NSURL> =
     withContext(Dispatchers.Main) {
-      // The picker holds its delegate weakly; this coroutine keeps it alive until it answers.
       val delegate = PickerDelegate()
       picker.delegate = delegate
-      val top = viewController.topPresented()
-      top.presentViewController(picker, animated = true, completion = null)
+      // The picker holds its delegate weakly, and the waiting coroutine may not keep it either.
+      openPickers += delegate
       try {
+        val top = viewController.topPresented()
+        top.presentViewController(picker, animated = true, completion = null)
         delegate.result.await()
       } catch (e: CancellationException) {
         picker.dismissViewControllerAnimated(true, completion = null)
         throw e
+      } finally {
+        openPickers -= delegate
       }
     }
 
@@ -75,6 +78,9 @@ private class IosFilePicker(private val viewController: UIViewController) : File
     const val TORRENT_TYPE = "org.bittorrent.torrent"
   }
 }
+
+/** Delegates of the pickers on screen, kept here until they answer; used on the main thread. */
+private val openPickers = mutableSetOf<PickerDelegate>()
 
 private class PickerDelegate : NSObject(), UIDocumentPickerDelegateProtocol {
   val result = CompletableDeferred<List<NSURL>>()

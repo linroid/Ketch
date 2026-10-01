@@ -28,23 +28,24 @@ internal object AwtFilePicker : FilePicker {
     }
 
   override suspend fun pickTorrentFiles(): List<DroppedFile> = withContext(Dispatchers.Swing) {
-    val dialog = fileDialog("Open torrent files")
-    dialog.isMultipleMode = true
-    dialog.setFilenameFilter { _, name -> name.endsWith(".torrent", ignoreCase = true) }
-    // Windows ignores filename filters but takes a pattern as the file name.
-    if (DesktopOs.current == DesktopOs.Windows) dialog.file = "*.torrent"
-    dialog.isVisible = true
-    dialog.files.filter { it.isFile }.map { it.toDroppedFile() }
+    showFileDialog("Open torrent files") { dialog ->
+      dialog.isMultipleMode = true
+      dialog.setFilenameFilter { _, name -> name.endsWith(".torrent", ignoreCase = true) }
+      // Windows ignores filename filters but takes a pattern as the file name.
+      if (DesktopOs.current == DesktopOs.Windows) dialog.file = "*.torrent"
+      dialog.isVisible = true
+      dialog.files.filter { it.isFile }.map { it.toDroppedFile() }
+    }
   }
 
   private fun pickMacFolder(initialFolder: String?): String? {
     System.setProperty(MAC_FOLDER_DIALOG, "true")
     try {
-      val dialog = fileDialog("Choose a download folder")
-      dialog.directory = initialFolder
-      dialog.isVisible = true
-      val name = dialog.file ?: return null
-      return File(dialog.directory, name).path
+      return showFileDialog("Choose a download folder") { dialog ->
+        dialog.directory = initialFolder
+        dialog.isVisible = true
+        dialog.file?.let { File(dialog.directory, it).path }
+      }
     } finally {
       System.clearProperty(MAC_FOLDER_DIALOG)
     }
@@ -59,9 +60,17 @@ internal object AwtFilePicker : FilePicker {
     return if (result == JFileChooser.APPROVE_OPTION) chooser.selectedFile?.path else null
   }
 
-  private fun fileDialog(title: String): FileDialog = when (val owner = focusedWindow()) {
-    is Dialog -> FileDialog(owner, title, FileDialog.LOAD)
-    else -> FileDialog(owner as? Frame, title, FileDialog.LOAD)
+  /** Shows a file dialog through [show], then releases its native window. */
+  private fun <T> showFileDialog(title: String, show: (FileDialog) -> T): T {
+    val dialog = when (val owner = focusedWindow()) {
+      is Dialog -> FileDialog(owner, title, FileDialog.LOAD)
+      else -> FileDialog(owner as? Frame, title, FileDialog.LOAD)
+    }
+    try {
+      return show(dialog)
+    } finally {
+      dialog.dispose()
+    }
   }
 
   private fun focusedWindow() = KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow

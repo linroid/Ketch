@@ -7,5 +7,5 @@ actual fun localDeviceNoun(): String =
   if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
     "This iPad"
   } else {
-    "This iPhone"
+    "This phone"
   }

@@ -78,16 +78,17 @@ private class IosFileActions(private val viewController: UIViewController) : Fil
       activityItems = listOf(existingUrl(path)),
       applicationActivities = null,
     )
-    // On iPad the sheet is a popover, which needs an anchor; it opens mid-screen.
+    val top = viewController.topPresented()
+    // On iPad the sheet is a popover, which needs an anchor in the presenter; it opens mid-screen.
     sheet.popoverPresentationController?.let { popover ->
-      val view = viewController.view
+      val view = top.view
       popover.sourceView = view
       popover.sourceRect = view.bounds.useContents {
         CGRectMake(size.width / 2, size.height / 2, 0.0, 0.0)
       }
       popover.permittedArrowDirections = 0uL
     }
-    viewController.topPresented().presentViewController(sheet, animated = true, completion = null)
+    top.presentViewController(sheet, animated = true, completion = null)
   }
 
   override suspend fun exists(path: String): Boolean =

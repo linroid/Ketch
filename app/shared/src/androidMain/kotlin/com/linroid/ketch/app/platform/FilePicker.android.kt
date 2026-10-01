@@ -3,6 +3,7 @@ package com.linroid.ketch.app.platform
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -51,7 +52,8 @@ private class AndroidFilePicker(
   override val canPickFolder: Boolean = true
 
   override suspend fun pickFolder(initialFolder: String?): String? {
-    val initial = initialFolder?.takeIf { it.startsWith(CONTENT_SCHEME) }?.let(Uri::parse)
+    val initial = initialFolder?.takeIf { it.startsWith(CONTENT_SCHEME) }
+      ?.let { treeRoot(Uri.parse(it)) }
     val uri = folderRequest.launch { folderLauncher.launch(initial) } ?: return null
     // Without a persisted grant, downloads could no longer write there after a restart.
     val access = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -64,23 +66,33 @@ private class AndroidFilePicker(
     return withContext(Dispatchers.IO) { uris.map { contentFile(context, it) } }
   }
 
+  /** The root document of the folder [tree], where the picker can start; `null` if no tree. */
+  private fun treeRoot(tree: Uri): Uri? = try {
+    DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+  } catch (e: IllegalArgumentException) {
+    null
+  }
+
   private companion object {
     // Many providers report .torrent files as plain binary data.
     val TORRENT_MIME_TYPES = arrayOf("application/x-bittorrent", "application/octet-stream")
   }
 }
 
-/** One picker request at a time: a new request ends the one still waiting with [canceled]. */
+/**
+ * One picker request at a time: a new request ends the one still waiting with [canceled]. Runs on
+ * the main thread, where results arrive.
+ */
 private class PickRequest<T>(private val canceled: T) {
   private var pending: CompletableDeferred<T>? = null
 
-  suspend fun launch(start: () -> Unit): T {
+  suspend fun launch(start: () -> Unit): T = withContext(Dispatchers.Main.immediate) {
     pending?.complete(canceled)
     val result = CompletableDeferred<T>()
     pending = result
     try {
       start()
-      return result.await()
+      result.await()
     } finally {
       if (pending === result) pending = null
     }

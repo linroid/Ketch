@@ -27,16 +27,16 @@ actual fun rememberSystemClipboard(): SystemClipboard {
 private class AndroidClipboard(private val context: Context) : SystemClipboard {
   private val manager = context.getSystemService(ClipboardManager::class.java)
 
+  override val readsSilently: Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+
   override val pasteEvents: Flow<String> = emptyFlow()
 
   override suspend fun hasLink(): Boolean {
     val description = manager?.primaryClipDescription ?: return false
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      // Clips that were not classified, such as long text, count as no link.
-      return description.classificationStatus == ClipDescription.CLASSIFICATION_COMPLETE &&
-        description.getConfidenceScore(TextClassifier.TYPE_URL) >= LINK_CONFIDENCE
-    }
-    return readText()?.let(::holdsLink) == true
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return readText()?.let(::holdsLink) == true
+    // Clips that were not classified, such as long text, count as no link.
+    return description.classificationStatus == ClipDescription.CLASSIFICATION_COMPLETE &&
+      description.getConfidenceScore(TextClassifier.TYPE_URL) >= LINK_CONFIDENCE
   }
 
   override suspend fun readText(): String? = withContext(Dispatchers.IO) {

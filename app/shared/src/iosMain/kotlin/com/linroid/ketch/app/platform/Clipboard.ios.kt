@@ -16,6 +16,8 @@ actual fun rememberSystemClipboard(): SystemClipboard = IosClipboard
  * the system to detect a web link instead, which shows none.
  */
 private object IosClipboard : SystemClipboard {
+  override val readsSilently: Boolean = false
+
   override val pasteEvents: Flow<String> = emptyFlow()
 
   override suspend fun hasLink(): Boolean {

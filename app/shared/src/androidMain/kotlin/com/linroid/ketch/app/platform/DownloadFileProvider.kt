@@ -3,14 +3,14 @@ package com.linroid.ketch.app.platform
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
-import com.linroid.ketch.app.shared.R
 import java.io.File
 
 /**
  * Lets other apps read downloaded files, for Open and Share in the app and in notifications. A
- * subclass, so that it cannot clash with another `FileProvider` in the merged manifest.
+ * subclass, so that it cannot clash with another `FileProvider` in the merged manifest. Its
+ * folders are the manifest's `FILE_PROVIDER_PATHS` meta-data, which [downloadUri] needs.
  */
-internal class DownloadFileProvider : FileProvider(R.xml.ketch_download_paths)
+internal class DownloadFileProvider : FileProvider()
 
 /**
  * A URI through which other apps can read the download at [path]: a `content://` document URI

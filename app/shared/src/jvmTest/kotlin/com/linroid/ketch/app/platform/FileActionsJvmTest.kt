@@ -75,4 +75,13 @@ class FileActionsJvmTest {
 
     assertEquals("gone.iso was moved or deleted", error.message)
   }
+
+  @Test
+  fun moveToTrash_missingFile_throwsMovedOrDeleted() = runTest {
+    val error = assertFailsWith<FileActionException> {
+      DesktopFileActions.moveToTrash(File(dir, "gone.iso").path)
+    }
+
+    assertEquals("gone.iso was moved or deleted", error.message)
+  }
 }

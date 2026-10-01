@@ -16,16 +16,21 @@ import java.awt.datatransfer.StringSelection
 @Composable
 actual fun rememberSystemClipboard(): SystemClipboard = AwtClipboard
 
-/** The AWT system clipboard. Desktops show no notice when it is read. */
+/**
+ * The AWT system clipboard. Windows and Linux show no notice when it is read; macOS may ask the
+ * user before an app reads it on its own, so there [hasLink] only checks for text.
+ */
 internal object AwtClipboard : SystemClipboard {
   private val log = KetchLogger("Clipboard")
+
+  override val readsSilently: Boolean = DesktopOs.current != DesktopOs.MacOs
 
   override val pasteEvents: Flow<String> = emptyFlow()
 
   override suspend fun hasLink(): Boolean = withContext(Dispatchers.IO) {
     val clipboard = systemClipboard() ?: return@withContext false
     // Only text can hold a link; checking the flavor first skips reading images and files.
-    available(clipboard) && clipboard.text()?.let(::holdsLink) == true
+    available(clipboard) && (!readsSilently || clipboard.text()?.let(::holdsLink) == true)
   }
 
   override suspend fun readText(): String? = withContext(Dispatchers.IO) {

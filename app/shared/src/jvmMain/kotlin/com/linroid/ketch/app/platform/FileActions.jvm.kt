@@ -92,7 +92,9 @@ internal object DesktopFileActions : FileActions {
     val file = File(path)
     when (val command = revealCommand(os, file, supports(Desktop.Action.BROWSE_FILE_DIR))) {
       is RevealCommand.Run -> run(command.command, "Couldn't show ${file.name}")
-      is RevealCommand.Browse -> Desktop.getDesktop().browseFileDirectory(command.file)
+      is RevealCommand.Browse -> attempt("Couldn't show ${file.name}") {
+        Desktop.getDesktop().browseFileDirectory(command.file)
+      }
       is RevealCommand.OpenFolder -> openFile(command.folder)
     }
   }
@@ -109,8 +111,9 @@ internal object DesktopFileActions : FileActions {
     val file = existingFile(path)
     val trash = if (os == DesktopOs.Windows) "Recycle Bin" else "Trash"
     if (!canTrash) throw FileActionException("This computer has no $trash for Ketch to use")
-    if (!Desktop.getDesktop().moveToTrash(file)) {
-      throw FileActionException("Couldn't move ${file.name} to the $trash")
+    val failure = "Couldn't move ${file.name} to the $trash"
+    if (!attempt(failure) { Desktop.getDesktop().moveToTrash(file) }) {
+      throw FileActionException(failure)
     }
   }
 
@@ -122,10 +125,8 @@ internal object DesktopFileActions : FileActions {
 
   private fun openFile(file: File) {
     when {
-      supports(Desktop.Action.OPEN) -> try {
+      supports(Desktop.Action.OPEN) -> attempt("No app can open ${file.name}") {
         Desktop.getDesktop().open(file)
-      } catch (e: IOException) {
-        throw FileActionException("No app can open ${file.name}", e)
       }
       os == DesktopOs.Linux -> run(listOf("xdg-open", file.path), "No app can open ${file.name}")
       else -> throw FileActionException("This computer can't open ${file.name}")
@@ -134,14 +135,22 @@ internal object DesktopFileActions : FileActions {
 
   /** Starts [command] without waiting: Explorer exits with 1 even when it worked. */
   private fun run(command: List<String>, failure: String) {
-    try {
+    attempt(failure) {
       ProcessBuilder(command)
         .redirectOutput(ProcessBuilder.Redirect.DISCARD)
         .redirectError(ProcessBuilder.Redirect.DISCARD)
         .start()
-    } catch (e: IOException) {
-      throw FileActionException(failure, e)
     }
+  }
+
+  /** Runs [action] and reports its I/O and runtime failures as [failure]. */
+  private inline fun <T> attempt(failure: String, action: () -> T): T = try {
+    action()
+  } catch (e: IOException) {
+    throw FileActionException(failure, e)
+  } catch (e: RuntimeException) {
+    // The file vanished meanwhile, or the system refused the action after all.
+    throw FileActionException(failure, e)
   }
 
   private fun supports(action: Desktop.Action): Boolean =

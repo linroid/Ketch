@@ -29,6 +29,8 @@ actual fun rememberSystemClipboard(): SystemClipboard = BrowserClipboard
 private object BrowserClipboard : SystemClipboard {
   private val log = KetchLogger("Clipboard")
 
+  override val readsSilently: Boolean = false
+
   override val pasteEvents: Flow<String> = callbackFlow {
     val listener: (Event) -> Unit = { event ->
       // Text fields handle their own pastes.

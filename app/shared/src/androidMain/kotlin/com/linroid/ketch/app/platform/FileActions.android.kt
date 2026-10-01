@@ -58,6 +58,9 @@ private class AndroidFileActions(private val context: Context) : FileActions {
       context.startActivity(intent)
     } catch (e: ActivityNotFoundException) {
       throw FileActionException("No app can open ${fileName(path)}", e)
+    } catch (e: SecurityException) {
+      // Ketch can only pass on access to a document it still has access to itself.
+      throw FileActionException("Ketch lost access to ${fileName(path)}", e)
     }
   }
 }

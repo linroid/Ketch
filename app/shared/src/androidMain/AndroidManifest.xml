@@ -2,18 +2,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
   <application>
+    <!--
+      FileProvider.getUriForFile reads a provider's folders from its FILE_PROVIDER_PATHS
+      meta-data, not from the provider's constructor, so each provider declares it here.
+    -->
     <!-- Hands a copy of the logs to the share sheet; see LogFilesAction.android.kt. -->
     <provider
       android:name="com.linroid.ketch.app.log.LogFileProvider"
       android:authorities="${applicationId}.logs"
       android:exported="false"
-      android:grantUriPermissions="true" />
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/ketch_log_paths" />
+    </provider>
     <!-- Lets other apps open and receive downloads; see DownloadFileProvider.kt. -->
     <provider
       android:name="com.linroid.ketch.app.platform.DownloadFileProvider"
       android:authorities="${applicationId}.downloads"
       android:exported="false"
-      android:grantUriPermissions="true" />
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/ketch_download_paths" />
+    </provider>
   </application>
 
 </manifest>
