@@ -20,9 +20,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.window.FrameWindowScope
+import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import com.linroid.ketch.app.input.KetchCommands
+import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
 import com.linroid.ketch.app.log.FileLogger
@@ -62,7 +65,7 @@ internal class SettingsWindowState(private val takeRequest: () -> SettingsTarget
   /** Whether the window is open. */
   val isOpen: Boolean get() = target != null
 
-  /** Whether the window has focus, so the menu bar's Close Window closes it. */
+  /** Whether the window has focus, which counts as Ketch being in front. */
   var focused: Boolean by mutableStateOf(false)
 
   private val fronts = MutableSharedFlow<Unit>(
@@ -122,8 +125,15 @@ internal val MinSettingsWindowSize = 640 to 480
  * Esc, ⌘W (Ctrl+W elsewhere) and the close button close it; Ctrl+Q quits on Windows and Linux,
  * which have no menu bar to own it.
  *
+ * On macOS it has a menu bar of its own, whose Close Window and Minimize own ⌘W and ⌘M here.
+ * Without one, macOS would show the menu bar Ketch keeps for when no window is open, where ⌘W
+ * closes the main window and ⌘F searches the downloads.
+ *
+ * @param windowState where the window is, kept while it is closed so it reopens there.
  * @param icon the app's icon.
  * @param hooks the desktop's [DesktopHooks], for the pages that change how Ketch runs.
+ * @param integration the browsers and default apps the Integration page shows; asked again
+ *   whenever the window comes to the front.
  * @param fileLogger the app's log files, which the About page opens.
  * @param onQuit quits Ketch.
  */
@@ -145,7 +155,7 @@ internal fun SettingsWindow(
     title = "Settings",
     icon = icon,
     onPreviewKeyEvent = { event ->
-      val command = settingsShortcuts.match(event, ShortcutContext())
+      val command = settingsShortcuts?.match(event, ShortcutContext())
       when (command) {
         KetchCommands.CloseWindow -> settings.close()
         KetchCommands.Quit -> onQuit()
@@ -162,11 +172,17 @@ internal fun SettingsWindow(
     LaunchedEffect(Unit) {
       val (minWidth, minHeight) = MinSettingsWindowSize
       window.minimumSize = Dimension(minWidth, minHeight)
+      windowState.isMinimized = false
       bringToFront(window)
     }
     LaunchedEffect(settings) {
-      settings.frontRequests.collect { bringToFront(window) }
+      settings.frontRequests.collect {
+        // Coming to the front does not bring a window back from the Dock.
+        windowState.isMinimized = false
+        bringToFront(window)
+      }
     }
+    SettingsMenuBar(onClose = settings::close, onMinimize = { windowState.isMinimized = true })
     val focused = LocalWindowInfo.current.isWindowFocused
     SideEffect { settings.focused = focused }
     // Browsers and default apps may have changed while Ketch was in the background.
@@ -197,10 +213,31 @@ internal fun SettingsWindow(
   }
 }
 
-private val settingsShortcuts = ShortcutMatcher(
-  commands = if (DesktopOs.current == DesktopOs.MAC) {
-    listOf(KetchCommands.CloseWindow)
-  } else {
-    listOf(KetchCommands.CloseWindow, KetchCommands.Quit)
-  },
-)
+/** The Settings window's macOS menu bar: Close Window and Minimize. */
+@Composable
+private fun FrameWindowScope.SettingsMenuBar(onClose: () -> Unit, onMinimize: () -> Unit) {
+  if (DesktopOs.current != DesktopOs.MAC) return
+  val platform = KeyboardPlatform.Mac
+  val onAction: (MenuAction) -> Unit = { action ->
+    when ((action as? MenuAction.Run)?.command) {
+      KetchCommands.CloseWindow -> onClose()
+      KetchCommands.Minimize -> onMinimize()
+    }
+  }
+  MenuBar {
+    Menu("File") {
+      MenuEntries(listOf(commandItem(KetchCommands.CloseWindow, platform)), platform, onAction)
+    }
+    Menu("Window") {
+      MenuEntries(listOf(commandItem(KetchCommands.Minimize, platform)), platform, onAction)
+    }
+  }
+}
+
+// Closing the window and quitting on Windows and Linux, which have no menu bar to own them; on
+// macOS the menu bars do.
+private val settingsShortcuts: ShortcutMatcher? = if (DesktopOs.current == DesktopOs.MAC) {
+  null
+} else {
+  ShortcutMatcher(commands = listOf(KetchCommands.CloseWindow, KetchCommands.Quit))
+}

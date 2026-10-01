@@ -322,13 +322,11 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   LaunchedEffect(settingsWindowState) {
     settingsStateStore.saveChanges(settingsWindowState, savedSettingsBounds)
   }
-  // Close Window and Minimize, from the menu bar or the keyboard, act on the window in front.
+  // The Settings window closes and minimizes itself, from its own menu bar or keys.
   val actions = remember {
     DesktopActions(
       showWindow = behavior::showWindow,
-      closeWindow = {
-        if (settingsWindow.focused) settingsWindow.close() else behavior.closeWindow()
-      },
+      closeWindow = behavior::closeWindow,
       quit = { behavior.requestQuit() },
       openFiles = launch.openFiles,
     )
@@ -338,11 +336,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   val speedMode = controller.speedMode.takeIf { active == null || active is EmbeddedInstance }
   val commands = remember(speedMode, files, clipboard) {
     DesktopCommands(controller, actions, speedMode, files, clipboard) {
-      if (settingsWindow.focused) {
-        settingsWindowState.isMinimized = true
-      } else {
-        windowState.isMinimized = true
-      }
+      windowState.isMinimized = true
     }
   }
   LaunchedEffect(behavior) {

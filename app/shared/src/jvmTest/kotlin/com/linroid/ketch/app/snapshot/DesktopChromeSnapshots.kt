@@ -46,7 +46,12 @@ class DesktopChromeSnapshots {
 
   @Test
   fun macChrome_desktopSizes_leavesRoomForTheTrafficLights() {
-    val sizes = listOf(SnapshotSize.Desktop, SnapshotSize.SmallDesktop, SnapshotSize.Medium)
+    val sizes = listOf(
+      SnapshotSize.Desktop,
+      SnapshotSize.SmallDesktop,
+      SnapshotSize.Medium,
+      MinMainWindowSize,
+    )
     for (size in sizes) {
       for (theme in SnapshotTheme.entries) {
         chromeSnapshot("mac-chrome", size, theme) { controller -> MacWindow(controller) }
@@ -75,10 +80,25 @@ class DesktopChromeSnapshots {
       }
     }
   }
+
+  @Test
+  fun settingsWindow_minimumSize_keepsSettingsInTheWindow() {
+    for (theme in SnapshotTheme.entries) {
+      chromeSnapshot("settings-window-general", MinSettingsWindowSize, theme) { controller ->
+        SettingsWindowContent(controller, SettingsTarget(SettingsTarget.Page.General), theme)
+      }
+    }
+  }
 }
 
 /** The Settings window's size until the user resizes it, as the desktop app opens it. */
 private val SettingsWindowSize = SnapshotSize(860.dp, 640.dp, KetchDensity.Compact)
+
+/** The smallest the Settings window gets. */
+private val MinSettingsWindowSize = SnapshotSize(640.dp, 480.dp, KetchDensity.Compact)
+
+/** The smallest the main window gets. */
+private val MinMainWindowSize = SnapshotSize(720.dp, 480.dp, KetchDensity.Compact)
 
 /** What the desktop app reports while the extension is set up in Chrome only. */
 private val SampleIntegration = IntegrationStatus(

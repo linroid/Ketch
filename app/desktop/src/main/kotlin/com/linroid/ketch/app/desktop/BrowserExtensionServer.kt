@@ -1,6 +1,8 @@
 package com.linroid.ketch.app.desktop
 
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.server.KetchServer
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
@@ -19,12 +21,14 @@ import kotlin.time.Duration.Companion.seconds
  * [NativeMessagingHost].
  *
  * @param onConnect called on the requesting thread each time the extension connects, before it
- *   gets the reply, while the native messaging host that asked for it still runs.
+ *   gets the reply, while the native messaging host that asked for it still runs. A failure there
+ *   is logged and the extension still gets its reply.
  */
 internal class BrowserExtensionServer(
   private val onConnect: () -> Unit = {},
   private val startServer: (api: KetchApi, token: String) -> Started = ::startKetchServer,
 ) : AutoCloseable {
+  private val log = KetchLogger("BrowserExtension")
   private val api = CompletableFuture<KetchApi>()
   private var started: Started? = null
 
@@ -54,7 +58,11 @@ internal class BrowserExtensionServer(
         return errorReply("server_failed", "Couldn't start the connection: ${e.message}")
       }.also { started = it }
     }
-    onConnect()
+    try {
+      onConnect()
+    } catch (e: Exception) {
+      log.w { "Couldn't record the extension's connection: ${e.describeCauses()}" }
+    }
     return buildJsonObject {
       put("url", "http://127.0.0.1:${server.port}")
       put("token", server.token)

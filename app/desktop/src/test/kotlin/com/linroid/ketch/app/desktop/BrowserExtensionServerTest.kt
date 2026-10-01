@@ -87,6 +87,16 @@ class BrowserExtensionServerTest {
   }
 
   @Test
+  fun connect_reportingTheConnectionFails_stillReplies() {
+    val server = BrowserExtensionServer(onConnect = { error("no processes") }) { _, token ->
+      BrowserExtensionServer.Started(port = 5123, token = token, stop = { })
+    }
+    server.attach(api)
+
+    assertTrue(server.connect().contains("5123"))
+  }
+
+  @Test
   fun connect_whenTheServerFails_reportsNoConnection() {
     var connections = 0
     val server = BrowserExtensionServer(onConnect = { connections++ }) { _, _ ->
