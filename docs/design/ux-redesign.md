@@ -1865,8 +1865,8 @@ to 4 sit in a row; more form a 2 × n grid. Offline devices show disabled berths
 | Web, tablets | An in-shell page (sidebar Settings item shown as selected; Esc returns to the previous destination) |
 | Phones | A grouped list page that opens sub-pages |
 
-Changes still apply as they are made. The footer reads "Changes apply as you make them." There is
-no Motrix-style card grid on desktop.
+Changes still apply as they are made. The footer reads "Changes apply as you make them." Desktop
+has no landing grid of category cards; the category list opens straight onto a page.
 
 ```
 ╭ Settings ───────────────────────────────────────────────────────────────────────────────╮
@@ -3698,7 +3698,7 @@ the banner countdown matches `nextRetryAt`; stats tiles appear only when `stats(
 ### 8.2 Open questions for the maintainer
 
 1. Default close action: should the first close **Ask** (as specified) or silently keep running in
-   the tray, as Motrix does?
+   the tray?
 2. Should `⌘V` quick add (no dialog, Undo toast) be on by default on desktop and web? The spec says
    yes. The alternative is to always open the sheet prefilled.
 3. Accept the default desktop window change to 1280 × 800 and the docking threshold of 1040 dp?
