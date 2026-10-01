@@ -63,6 +63,7 @@ import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
 import com.linroid.ketch.app.ui.feedback.BannerHost
 import com.linroid.ketch.app.ui.feedback.ToastHost
 import com.linroid.ketch.app.ui.intake.IntakeHost
+import com.linroid.ketch.app.ui.palette.CommandPalette
 import com.linroid.ketch.app.ui.pulse.PulseBar
 import com.linroid.ketch.app.ui.pulse.PulseSheet
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
@@ -192,7 +193,11 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
   ) {
     ShortcutHost(
       onCommand = commands::run,
-      overlay = if (appState.showAddDialog) CommandScope.Intake else null,
+      overlay = when {
+        appState.showAddDialog -> CommandScope.Intake
+        shell.paletteOpen -> CommandScope.Palette
+        else -> null
+      },
       modifier = Modifier.fillMaxSize(),
     ) {
       CompositionLocalProvider(
@@ -214,6 +219,16 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
   }
 
   IntakeHost(appState)
+  if (shell.paletteOpen) {
+    CommandPalette(
+      state = appState,
+      onDismiss = { shell.paletteOpen = false },
+      onCommand = commands::run,
+      canRun = commands::binds,
+      destinations = destinations,
+      initialQuery = appState.searchQuery,
+    )
+  }
   if (shell.shortcutsOpen) {
     val hostShortcuts = LocalHostShortcuts.current
     val groups = remember(commands, hostShortcuts) {
