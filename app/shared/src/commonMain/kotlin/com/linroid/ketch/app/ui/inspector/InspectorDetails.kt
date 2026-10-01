@@ -122,11 +122,7 @@ internal fun TaskDetails(
   val request = row.request
   val completed = row.state as? DownloadState.Completed
   InspectorSection("Details", modifier) {
-    // One line like its neighbours; the Link below shows the host whole.
-    val source = sourceLabel(request, row.isTorrent)
-    DetailRow("Source", copier, copy = source) {
-      MiddleText(source, KetchTheme.typography.bodyS, KetchTheme.colors.textPrimary)
-    }
+    DetailRow("Source", copier, sourceLabel(request, row.isTorrent))
     LinkRow(request.url, copier)
     val path = row.outputPath
     if (path != null) {
@@ -166,7 +162,19 @@ internal fun TaskDetails(
       val auto = state.instanceSettings.download?.maxConnectionsPerDownload?.takeIf { it > 0 }
       DetailRow("Connections", copier, connectionLabel(request.connections, auto))
     }
-    DetailRow("Device", copier, copy = device.name) { DeviceName(device) }
+    DetailRow("Device", copier, copy = device.name) {
+      // The pennant is taller than a line; it overhangs the row's padding instead.
+      Box(
+        contentAlignment = Alignment.CenterStart,
+        modifier = Modifier.height(KetchTheme.spacing.s4).wrapContentHeight(unbounded = true),
+      ) {
+        DeviceName(
+          device = device,
+          style = KetchTheme.typography.bodyS,
+          color = KetchTheme.colors.textPrimary,
+        )
+      }
+    }
     capturedText(request)?.let { DetailRow("Captured", copier, it) }
     Advanced(row, copier)
   }

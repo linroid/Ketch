@@ -55,6 +55,7 @@ import com.linroid.ketch.app.state.IntakeEntry
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.downloads.MenuLabel
 import com.linroid.ketch.app.util.formatBytes
 
 /**
@@ -259,12 +260,7 @@ private fun KindChip(
 private fun SortButton(sort: TorrentSort, onSort: (TorrentSort) -> Unit) {
   var expanded by remember { mutableStateOf(false) }
   Box {
-    KetchButton(
-      text = "Sort: ${sort.label}",
-      onClick = { expanded = true },
-      variant = KetchButtonVariant.Ghost,
-      size = KetchButtonSize.Small,
-    )
+    MenuLabel(label = "Sort", value = sort.label, open = expanded, onClick = { expanded = true })
     KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = "Sort files") {
       for (option in TorrentSort.entries) {
         item(label = option.label, checked = option == sort, onClick = { onSort(option) })

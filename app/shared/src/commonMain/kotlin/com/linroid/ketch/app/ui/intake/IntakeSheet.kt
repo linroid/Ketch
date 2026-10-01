@@ -526,7 +526,7 @@ private fun IntakeInput(actions: IntakeActions, matcher: ShortcutMatcher, phone:
       }
       if (session.mode != IntakeMode.Add) {
         // A retry keeps its link; files are added from a new sheet.
-      } else if (phone && session.entries.isNotEmpty()) {
+      } else if (phone && session.entries.isNotEmpty() && session.single == null) {
         KetchIconButton(
           command = KetchCommands.IntakeOpenTorrent,
           onClick = actions::pickTorrents,
