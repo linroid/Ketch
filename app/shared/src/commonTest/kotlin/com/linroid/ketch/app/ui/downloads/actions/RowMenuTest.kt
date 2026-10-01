@@ -145,6 +145,26 @@ class RowMenuTest {
   }
 
   @Test
+  fun rowMenuEntries_mixedTorrentSelection_setsConnectionsOnTheOthersOnly() = runTest {
+    val f = ActionsFixture(this)
+    val magnet = DownloadRequest("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567")
+    val torrent = f.add(downloading, magnet)
+    val http = f.add(downloading)
+
+    val entries = buildMenu {
+      rowMenuEntries(listOf(rowOf(torrent), rowOf(http)), f.runner, RowMenuContext())
+    }
+    val connections = entries.filterIsInstance<MenuEntry.Submenu>()
+      .single { it.label.startsWith("Connections") }
+    connections.entries.filterIsInstance<MenuEntry.Item>().single { it.label == "16" }.onClick()
+    runCurrent()
+
+    assertEquals(emptyList(), torrent.calls)
+    assertEquals(listOf("connections 16"), http.calls)
+    f.close()
+  }
+
+  @Test
   fun priorityEntries_urgentOnQueuedRow_startsItNowAndNamesTheVictim() = runTest {
     val f = ActionsFixture(this)
     val queued = f.add(DownloadState.Queued)

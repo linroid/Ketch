@@ -2,6 +2,7 @@ package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,8 +34,10 @@ import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.platform.LocalDesktopHooks
+import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
@@ -135,6 +138,18 @@ fun GeneralSettings(
   }
 
   if (LocalDesktopHooks.current.isSupported) StartupGroup(state, appSettings)
+  // Phones have no keyboard to speak of.
+  if (!isMobilePlatform) {
+    val chord = KetchCommands.Shortcuts.shortcutLabel(KeyboardPlatform.current)
+    SettingsGroup {
+      SettingsRow(
+        title = "Keyboard shortcuts…",
+        description = chord?.let { "Every shortcut in Ketch, also shown by $it." },
+        modifier = Modifier.clickable(role = Role.Button) { state.showShortcuts() },
+        trailing = { Chevron() },
+      )
+    }
+  }
 }
 
 /** Closing the window, opening at login and the app icon badge, on desktop. */

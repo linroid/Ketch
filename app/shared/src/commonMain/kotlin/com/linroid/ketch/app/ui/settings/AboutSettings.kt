@@ -236,8 +236,9 @@ private fun MonoValue(text: String) {
   Text(text = text, style = KetchTheme.typography.mono, color = KetchTheme.colors.textSecondary)
 }
 
+/** The chevron at the end of a row that opens something. */
 @Composable
-private fun Chevron() {
+internal fun Chevron() {
   KetchIconImage(
     icon = KetchIcon.Chevron,
     size = KetchTheme.density.controlGlyph,

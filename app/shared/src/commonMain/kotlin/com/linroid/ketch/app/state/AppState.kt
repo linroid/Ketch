@@ -234,6 +234,13 @@ class AppState(
   var settingsRequests by mutableIntStateOf(0)
     private set
 
+  /**
+   * Whether the keyboard shortcut sheet was asked for, such as from Settings; the shell shows it
+   * and clears this with [shortcutsShown].
+   */
+  var shortcutsRequested by mutableStateOf(false)
+    private set
+
   /** A Discover search the shell should navigate to, cleared with [discoverRequestHandled]. */
   var discoverRequest by mutableStateOf<DiscoverRequest?>(null)
     private set
@@ -317,6 +324,12 @@ class AppState(
 
   /** Speed of each task once a second, for the inspector's Activity chart. */
   val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.rows, scope, clock)
+
+  /**
+   * The add sheet's sessions. They run in the app scope, so adding, or a torrent's file list
+   * left to load in the background, outlives the sheet and the screen that showed it.
+   */
+  val intake: IntakeController by lazy { IntakeController(this, scope) }
 
   /** Speed, counts, speed limit, free space and health of the active device. */
   val pulse: PulseModel = PulseModel(
@@ -440,6 +453,16 @@ class AppState(
   /** Closes Settings. */
   fun closeSettings() {
     settingsRequest = null
+  }
+
+  /** Asks the shell to show the keyboard shortcut sheet, as `⌘/` does. */
+  fun showShortcuts() {
+    shortcutsRequested = true
+  }
+
+  /** Marks [shortcutsRequested] as shown. */
+  fun shortcutsShown() {
+    shortcutsRequested = false
   }
 
   /** Fills Discover with [request], starts the search and asks the shell to show Discover. */

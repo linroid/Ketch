@@ -42,6 +42,9 @@ internal enum class SettingsFeature {
   /** An app whose empty Downloads page shows the setup checklist: desktop and the web. */
   SetupChecklist,
 
+  /** An app used with a keyboard, which lists its shortcuts: desktop and the web. */
+  Keyboard,
+
   /** The browser asks before the web app may notify. */
   BrowserNotifications,
 
@@ -364,6 +367,13 @@ internal val SettingsIndex: List<SettingsEntry> = listOf(
     description = "What the Dock or taskbar icon shows",
     keywords = listOf("count", "dock", "taskbar"),
     needs = SettingsFeature.Desktop,
+  ),
+  SettingsEntry(
+    category = SettingsCategory.General,
+    title = "Keyboard shortcuts…",
+    description = "Every shortcut in Ketch",
+    keywords = listOf("keys", "hotkeys", "keybindings"),
+    needs = SettingsFeature.Keyboard,
   ),
   // Notifications
   SettingsEntry(

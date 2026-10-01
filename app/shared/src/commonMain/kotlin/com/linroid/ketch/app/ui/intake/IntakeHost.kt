@@ -4,11 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.IntakeController
 import com.linroid.ketch.app.state.IntakeMode
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.catchingUnlessCancelled
@@ -26,8 +24,7 @@ import kotlinx.coroutines.flow.filterNotNull
  */
 @Composable
 fun IntakeHost(state: AppState, canFinishInBackground: Boolean = true) {
-  val scope = rememberCoroutineScope()
-  val controller = remember(state, scope) { IntakeController(state, scope) }
+  val controller = state.intake
   val clipboard = rememberSystemClipboard()
   if (!state.showAddDialog) return
   val request = state.intakeRequest ?: IntakeRequest()

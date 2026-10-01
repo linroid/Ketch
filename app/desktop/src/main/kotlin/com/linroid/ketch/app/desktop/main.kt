@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -94,6 +95,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -348,6 +350,12 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   }
   LaunchedEffect(behavior) {
     launch.windowRequests.collect { behavior.showWindow() }
+  }
+  LaunchedEffect(behavior) {
+    // The shortcut sheet shows in the main window, also when the Settings window asks for it.
+    snapshotFlow { controller.state.shortcutsRequested }
+      .filter { it }
+      .collect { behavior.showWindow() }
   }
   DisposableEffect(behavior) {
     val remove = installAppHandlers(behavior)
