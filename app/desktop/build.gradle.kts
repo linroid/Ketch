@@ -28,6 +28,7 @@ dependencies {
   runtimeOnly(libs.slf4j.simple)
 
   testImplementation(libs.kotlin.test)
+  testImplementation(libs.kotlinx.coroutines.test)
 }
 
 // sqlite-jdbc bundles its native library for ~30 OS/arch pairs (~25 MB). A desktop package only

@@ -41,11 +41,12 @@ internal data class AppCommand(
 
   /**
    * The command line that starts the app on its own with [args], as a login item does: through
-   * Launch Services for a macOS bundle, else [command] itself.
+   * Launch Services for a macOS bundle, else [command] itself. A macOS bundle started with
+   * [BACKGROUND_FLAG] also stays behind the app in front, such as the browser.
    */
   fun startCommand(args: List<String> = emptyList()): List<String> {
     val bundle = macBundle ?: return command + args
-    val open = listOf("/usr/bin/open", bundle.path)
+    val open = listOfNotNull("/usr/bin/open", "-g".takeIf { BACKGROUND_FLAG in args }, bundle.path)
     return if (args.isEmpty()) open else open + "--args" + args
   }
 

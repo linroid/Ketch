@@ -56,11 +56,20 @@ class OpenedFilesTest {
       File("/Applications/Ketch.app"),
     )
 
+    assertEquals(listOf("/usr/bin/open", "/Applications/Ketch.app"), app.startCommand())
+  }
+
+  @Test
+  fun startCommand_macBundleInTheBackground_leavesTheFrontAppInFront() {
+    val app = AppCommand(
+      listOf("/Applications/Ketch.app/Contents/MacOS/Ketch"),
+      File("/Applications/Ketch.app"),
+    )
+
     assertEquals(
-      listOf("/usr/bin/open", "/Applications/Ketch.app", "--args", BACKGROUND_FLAG),
+      listOf("/usr/bin/open", "-g", "/Applications/Ketch.app", "--args", BACKGROUND_FLAG),
       app.startCommand(listOf(BACKGROUND_FLAG)),
     )
-    assertEquals(listOf("/usr/bin/open", "/Applications/Ketch.app"), app.startCommand())
   }
 
   @Test

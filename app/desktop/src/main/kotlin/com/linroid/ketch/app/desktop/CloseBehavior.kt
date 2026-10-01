@@ -53,6 +53,7 @@ import java.awt.EventQueue
 import java.awt.MenuItem
 import java.awt.PopupMenu
 import java.awt.Taskbar
+import java.awt.Window
 import java.awt.desktop.AppReopenedListener
 import java.awt.desktop.QuitResponse
 import java.awt.event.InputEvent
@@ -198,8 +199,15 @@ internal class CloseBehavior(
   var windowVisible: Boolean by mutableStateOf(!startHidden || !traySupported)
     private set
 
-  /** What closing the main window does, following the `[desktop]` settings. */
-  var closeAction: CloseAction by mutableStateOf(closeAction)
+  /**
+   * What closing the main window does, following the `[desktop]` settings. Setting it forgets the
+   * answer given in this run, so choosing Ask in Settings asks again.
+   */
+  var closeAction: CloseAction = closeAction
+    set(value) {
+      field = value
+      answer = null
+    }
 
   /** The question shown, or `null`. */
   var dialog: LifecycleDialog? by mutableStateOf(null)
@@ -291,12 +299,17 @@ internal class CloseBehavior(
 
   private fun answer(action: CloseAction, dontAskAgain: Boolean) {
     dialog = null
-    answer = action
     if (dontAskAgain) {
       closeAction = action
       saveCloseAction(action)
     }
-    if (action == CloseAction.Quit) quitNow(null) else hide()
+    answer = action
+    when {
+      action == CloseAction.Quit -> quitNow(null)
+      traySupported -> hide()
+      // Hidden, the window could only come back with another launch.
+      else -> windowState.isMinimized = true
+    }
   }
 
   private fun hide() {
@@ -319,7 +332,8 @@ internal class CloseBehavior(
 
 /**
  * The window of [behavior]'s question, if one is asked, themed like the app with [settings].
- * Return confirms and Escape closes it without an answer.
+ * Return confirms, unless a focused button or checkbox takes it, and Escape closes it without an
+ * answer.
  */
 @Composable
 internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsController) {
@@ -340,7 +354,7 @@ internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsControll
     title = "Ketch",
     resizable = false,
     alwaysOnTop = true,
-    onPreviewKeyEvent = { event ->
+    onKeyEvent = { event ->
       if (event.type != KeyEventType.KeyDown) return@DialogWindow false
       when (event.key) {
         Key.Enter -> behavior.confirm(dontAskAgain)
@@ -350,7 +364,8 @@ internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsControll
       true
     },
   ) {
-    LaunchedEffect(Unit) { window.toFront() }
+    // Asked from the tray or the Dock, Ketch is not the active app, so the keys would go elsewhere.
+    LaunchedEffect(Unit) { bringToFront(window) }
     KetchTheme(darkTheme = darkTheme, accent = settings.accent) {
       val spacing = KetchTheme.spacing
       Column(
@@ -386,6 +401,16 @@ internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsControll
       }
     }
   }
+}
+
+/** Brings [window] to the front; on macOS, which only does that for the active app, Ketch first. */
+internal fun bringToFront(window: Window) {
+  if (Desktop.isDesktopSupported()) {
+    val desktop = Desktop.getDesktop()
+    if (desktop.isSupported(Desktop.Action.APP_REQUEST_FOREGROUND)) desktop.requestForeground(true)
+  }
+  window.toFront()
+  window.requestFocus()
 }
 
 /**

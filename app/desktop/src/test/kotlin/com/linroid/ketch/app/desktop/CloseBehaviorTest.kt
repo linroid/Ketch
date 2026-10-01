@@ -148,6 +148,34 @@ class CloseBehaviorTest {
   }
 
   @Test
+  fun confirm_keepRunningWithoutTray_minimizesInsteadOfHiding() {
+    downloads = 2
+    val behavior = behavior(traySupported = false)
+    behavior.closeWindow()
+
+    behavior.confirm()
+
+    assertNull(behavior.dialog)
+    assertTrue(behavior.windowVisible)
+    assertTrue(windowState.isMinimized)
+    assertEquals(0, hides)
+  }
+
+  @Test
+  fun closeAction_setAfterAnAnswer_asksAgain() {
+    downloads = 2
+    val behavior = behavior()
+    behavior.closeWindow()
+    behavior.confirm()
+    behavior.showWindow()
+
+    behavior.closeAction = CloseAction.Ask
+    behavior.closeWindow()
+
+    assertEquals(LifecycleDialog.KeepRunning(2), behavior.dialog)
+  }
+
+  @Test
   fun init_startHiddenWithoutTray_startsMinimized() {
     val behavior = behavior(startHidden = true, traySupported = false)
 

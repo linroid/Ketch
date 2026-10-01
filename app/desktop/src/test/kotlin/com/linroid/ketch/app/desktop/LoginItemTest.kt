@@ -41,6 +41,7 @@ class LoginItemTest {
       |  <key>ProgramArguments</key>
       |  <array>
       |    <string>/usr/bin/open</string>
+      |    <string>-g</string>
       |    <string>/Applications/Ketch.app</string>
       |    <string>--args</string>
       |    <string>--background</string>

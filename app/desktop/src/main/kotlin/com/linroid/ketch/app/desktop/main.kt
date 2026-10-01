@@ -74,6 +74,7 @@ import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -86,6 +87,7 @@ import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -114,7 +116,9 @@ import java.awt.desktop.QuitResponse
 import java.io.File
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 private val log = KetchLogger("DesktopApp")
 
@@ -322,11 +326,11 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   // hidden lives out here.
   var mainWindow by remember { mutableStateOf<ComposeWindow?>(null) }
   var windowFocused by remember { mutableStateOf(false) }
-  val status = rememberDesktopStatus(controller, models.pulse, windowFocused)
+  // A hidden window stops composing, so the focus it last reported only counts while it shows.
+  fun inFront() = behavior.windowVisible && windowFocused && !windowState.isMinimized
+  val status = rememberDesktopStatus(controller, models.pulse, inFront())
   val activityEvents = remember {
-    reportDesktopActivity(controller, notifier) {
-      behavior.windowVisible && windowFocused && !windowState.isMinimized
-    }
+    reportDesktopActivity(controller, notifier, ::inFront)
   }
   KetchTray(controller, status, actions, speedMode, trayState)
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
@@ -488,16 +492,6 @@ private fun installPreferencesHandler(onOpen: () -> Unit): () -> Unit {
   return { desktop.setPreferencesHandler(null) }
 }
 
-// macOS only brings the window of an app in front, so the app comes forward first.
-private fun bringToFront(window: ComposeWindow) {
-  if (Desktop.isDesktopSupported()) {
-    val desktop = Desktop.getDesktop()
-    if (desktop.isSupported(Desktop.Action.APP_REQUEST_FOREGROUND)) desktop.requestForeground(true)
-  }
-  window.toFront()
-  window.requestFocus()
-}
-
 // The window's own shortcuts: Settings everywhere, and on Windows and Linux, which have no menu
 // bar to own them, closing the window and quitting.
 private val windowShortcuts = ShortcutMatcher(
@@ -508,11 +502,19 @@ private val windowShortcuts = ShortcutMatcher(
   },
 )
 
-/** An error the window could not handle becomes an error message instead of closing it. */
+/**
+ * An error the window could not handle becomes an error message instead of closing it. A failure
+ * while drawing comes back with every frame, and the message draws one more, so failures within
+ * [WINDOW_ERROR_QUIET] of the last one reported are left out.
+ */
 @OptIn(ExperimentalComposeUiApi::class)
 private fun windowExceptionHandlers(controller: AppController) =
   WindowExceptionHandlerFactory { _ ->
+    var reportedAt: TimeSource.Monotonic.ValueTimeMark? = null
     WindowExceptionHandler { e ->
+      val last = reportedAt
+      if (last != null && last.elapsedNow() < WINDOW_ERROR_QUIET) return@WindowExceptionHandler
+      reportedAt = TimeSource.Monotonic.markNow()
       log.e(e) { "Uncaught failure in the window: ${e.describeCauses()}" }
       controller.messages.post(
         level = MessageLevel.Error,
@@ -568,8 +570,10 @@ private fun reportDesktopActivity(
   val manager = controller.instanceManager
   val monitor = ActivityMonitor(ActivityRouting.devices(manager), controller.scope)
   val toasts = Channel<ActivityEvent>(Channel.UNLIMITED)
-  val added = ArrayList<ActivityEvent.Added>()
-  var announcing: Job? = null
+  val added = AddedNotices(controller.scope) { batch ->
+    val deviceName = ActivityRouting.deviceNameOf(batch.first(), manager)
+    notifier.notify(batch.first(), addedCopy(batch, deviceName))
+  }
   controller.scope.launch {
     monitor.events.collect { event ->
       val front = inFront()
@@ -580,24 +584,49 @@ private fun reportDesktopActivity(
         ActivityRouting.copyOf(event, ActivityRouting.deviceNameOf(event, manager))
           ?.let { notifier.notify(event, it) }
       }
-      val announce = !front && ActivityRouting.deliveryOf(event, settings, inFront = true).toast
-      if (event is ActivityEvent.Added && announce) {
-        added += event
-        if (announcing == null) {
-          announcing = launch {
-            // Links sent together are announced together.
-            delay(ADDED_COALESCE_WINDOW)
-            val batch = added.toList()
-            added.clear()
-            announcing = null
-            val deviceName = ActivityRouting.deviceNameOf(batch.first(), manager)
-            notifier.notify(batch.first(), addedCopy(batch, deviceName))
-          }
-        }
-      }
+      if (event is ActivityEvent.Added && announcesAdded(event, settings, front)) added.add(event)
     }
   }
   return toasts.receiveAsFlow()
+}
+
+/**
+ * Whether [event] gets a notification of its own: a download added while the window is not
+ * [inFront], on a device whose messages the user has not muted, would otherwise go unseen.
+ */
+internal fun announcesAdded(
+  event: ActivityEvent.Added,
+  settings: NotificationSettings,
+  inFront: Boolean,
+): Boolean = !inFront && ActivityRouting.deliveryOf(event, settings, inFront = true).toast
+
+/**
+ * Announces downloads added while the window is not in front, one notification for those added
+ * within [window] of the first, such as links the browser extension sends together. Meant to be
+ * used from one thread, the one [scope] runs on.
+ *
+ * @param notify posts the notification for the downloads added together, oldest first.
+ */
+internal class AddedNotices(
+  private val scope: CoroutineScope,
+  private val window: Duration = ADDED_COALESCE_WINDOW,
+  private val notify: (List<ActivityEvent.Added>) -> Unit,
+) {
+  private val held = ArrayList<ActivityEvent.Added>()
+  private var announcing: Job? = null
+
+  /** Adds [event] to the next notification. */
+  fun add(event: ActivityEvent.Added) {
+    held += event
+    if (announcing != null) return
+    announcing = scope.launch {
+      delay(window)
+      val batch = held.toList()
+      held.clear()
+      announcing = null
+      notify(batch)
+    }
+  }
 }
 
 /**
@@ -753,3 +782,4 @@ private const val ADDED_NAMES_SHOWN = 3
 private val ADDED_COALESCE_WINDOW = 1.seconds
 private val PEAK_SAVE_DELAY = 10.seconds
 private val QUIT_COMMIT_TIMEOUT = 5.seconds
+private val WINDOW_ERROR_QUIET = 5.seconds

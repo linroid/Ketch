@@ -35,6 +35,7 @@ internal class DesktopHooksImpl(
   private val loginItem: LoginItem = LoginItem(),
   private val handlers: MagnetHandler = MagnetHandler(),
   private val io: CoroutineDispatcher = Dispatchers.IO,
+  private val os: DesktopOs = DesktopOs.current,
 ) : DesktopHooks {
   private val log = KetchLogger("DesktopHooks")
   private var openAtLogin = settings.openAtLogin
@@ -90,7 +91,7 @@ internal class DesktopHooksImpl(
       if (openAtLogin && loginItem.isEnabled()) loginItem.set(enabled = true, hidden = startHidden)
     }
     // macOS keeps the default handlers by bundle, which updates and moves keep.
-    if (DesktopOs.current == DesktopOs.MAC) return
+    if (os == DesktopOs.MAC) return
     if (integration.magnetHandler) attempt("register for magnet links", handlers::registerMagnet)
     if (integration.torrentFileHandler) {
       attempt("register for .torrent files", handlers::registerTorrentFiles)
