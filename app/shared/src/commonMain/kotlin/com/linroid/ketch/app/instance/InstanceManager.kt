@@ -49,6 +49,12 @@ class InstanceManager(
   private val embeddedInstance: EmbeddedInstance? =
     if (factory.hasEmbedded) factory.createEmbedded() else null
 
+  /**
+   * The embedded [KetchApi], whether or not it is the active instance.
+   * `null` in remote-only mode (e.g. wasmJs/web).
+   */
+  val embedded: KetchApi? get() = embeddedInstance?.instance
+
   private val _instances =
     MutableStateFlow(listOfNotNull<InstanceEntry>(embeddedInstance))
   val instances: StateFlow<List<InstanceEntry>> =

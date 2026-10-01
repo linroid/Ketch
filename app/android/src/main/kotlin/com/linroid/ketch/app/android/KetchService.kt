@@ -15,12 +15,15 @@ import androidx.core.app.ServiceCompat
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
+import com.linroid.ketch.app.state.ForegroundPolicy
+import com.linroid.ketch.app.state.ForegroundStatus
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -33,12 +36,9 @@ import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
 @SuppressLint("InlinedApi")
@@ -59,9 +59,7 @@ class KetchService : Service() {
   private val binder = LocalBinder()
   private var isForeground = false
   private var isBound = false
-  private var latestActiveCount = 0
-  private var latestServerState: ServerState = ServerState.Stopped
-  private var shouldStayForeground = false
+  private var latestStatus = ForegroundStatus()
 
   override fun onCreate() {
     super.onCreate()
@@ -71,7 +69,7 @@ class KetchService : Service() {
     ServiceCompat.startForeground(
       this,
       NOTIFICATION_ID,
-      buildNotification(0, ServerState.Stopped),
+      buildNotification(latestStatus),
       ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
     )
     isForeground = true
@@ -147,12 +145,11 @@ class KetchService : Service() {
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    if (intent?.action == ACTION_REPOST_NOTIFICATION && isForeground && shouldStayForeground) {
-      val notification = buildNotification(latestActiveCount, latestServerState)
+    if (intent?.action == ACTION_REPOST_NOTIFICATION && isForeground && latestStatus.isRequired) {
       ServiceCompat.startForeground(
         this,
         NOTIFICATION_ID,
-        notification,
+        buildNotification(latestStatus),
         ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
       )
     }
@@ -188,66 +185,66 @@ class KetchService : Service() {
     manager.createNotificationChannel(channel)
   }
 
-  @OptIn(ExperimentalCoroutinesApi::class)
+  /**
+   * Keeps the service in the foreground while the embedded device downloads or shares itself,
+   * whichever device the app shows.
+   */
   private fun startForegroundMonitor() {
+    val embedded = checkNotNull(instanceManager.embedded) { "No embedded instance" }
     scope.launch {
-      combine(
-        instanceManager.activeApi.flatMapLatest { api ->
-          api.tasks.map { tasks ->
-            tasks.count { it.state.value.isActive }
+      ForegroundPolicy.observe(embedded.tasks, instanceManager.serverState)
+        .flowOn(Dispatchers.Default)
+        .collect { status ->
+          latestStatus = status
+          if (status.isRequired) {
+            if (!isForeground) {
+              log.i {
+                "Entering the foreground: downloading=${status.downloading} " +
+                  "queued=${status.queued} server=${status.serverState is ServerState.Running}"
+              }
+            }
+            enterForeground(status)
+          } else if (isForeground) {
+            log.i { "Leaving the foreground" }
+            ServiceCompat.stopForeground(
+              this@KetchService,
+              ServiceCompat.STOP_FOREGROUND_REMOVE,
+            )
+            isForeground = false
+            if (!isBound) stopSelf()
           }
-        },
-        instanceManager.serverState,
-      ) { activeCount, serverState ->
-        Triple(activeCount, serverState, activeCount > 0 || serverState is ServerState.Running)
-      }.collect { (activeCount, serverState, shouldBeForeground) ->
-        latestActiveCount = activeCount
-        latestServerState = serverState
-        shouldStayForeground = shouldBeForeground
-        if (shouldBeForeground) {
-          val notification = buildNotification(activeCount, serverState)
-          if (!isForeground) {
-            log.i { "Start notification" }
-          }
-          ServiceCompat.startForeground(
-            this@KetchService,
-            NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-          )
-          isForeground = true
-        } else if (isForeground) {
-          ServiceCompat.stopForeground(
-            this@KetchService,
-            ServiceCompat.STOP_FOREGROUND_REMOVE,
-          )
-          isForeground = false
-          if (!isBound) stopSelf()
         }
-      }
     }
   }
 
-  private fun buildNotification(
-    activeCount: Int,
-    serverState: ServerState,
-  ): android.app.Notification {
+  private fun enterForeground(status: ForegroundStatus) {
+    try {
+      ServiceCompat.startForeground(
+        this,
+        NOTIFICATION_ID,
+        buildNotification(status),
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+      )
+      isForeground = true
+    } catch (e: IllegalStateException) {
+      // Android 12+ refuses to start a foreground service while the app is in the background,
+      // e.g. when a scheduled download starts after the service left the foreground.
+      log.w { "Could not enter the foreground: ${e.describeCauses()}" }
+    }
+  }
+
+  private fun buildNotification(status: ForegroundStatus): android.app.Notification {
     val contentIntent = PendingIntent.getActivity(
       this,
       0,
       Intent(this, MainActivity::class.java),
       PendingIntent.FLAG_IMMUTABLE,
     )
-    val text = buildString {
-      if (activeCount > 0) {
-        append("Downloading $activeCount file")
-        if (activeCount > 1) append("s")
-      }
-      if (serverState is ServerState.Running) {
-        if (activeCount > 0) append(" · ")
-        append("Server on :${serverState.port}")
-      }
-    }
+    val text = listOfNotNull(
+      status.downloading.takeIf { it > 0 }?.let { "Downloading $it ${files(it)}" },
+      status.queued.takeIf { it > 0 }?.let { "$it waiting" },
+      (status.serverState as? ServerState.Running)?.let { "Server on :${it.port}" },
+    ).joinToString(" · ")
     val deleteIntent = PendingIntent.getService(
       this,
       1,
@@ -268,6 +265,8 @@ class KetchService : Service() {
     notification.flags = notification.flags or android.app.Notification.FLAG_NO_CLEAR
     return notification
   }
+
+  private fun files(count: Int): String = if (count == 1) "file" else "files"
 
   companion object {
     private const val CHANNEL_ID = "ketch_service"
