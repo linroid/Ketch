@@ -26,7 +26,8 @@ import kotlin.time.TimeSource
  * the API server users turn on in Settings. The browser starts this app's launcher with [FLAG]
  * (see [NativeHostRegistration]); the host reads one request, gets the address and token of
  * [BrowserExtensionServer] from the running app, starting the app first if asked to, replies and
- * exits.
+ * exits. The app it starts stays hidden in the menu bar or notification area
+ * ([AppCommand.launchDetached]), so a captured download never pops up a window.
  *
  * Requests are `{"type":"connect","launch":true}`. Replies are the app's
  * `{"url":…,"token":…}`, or `{"error":…,"message":…}`.

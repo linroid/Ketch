@@ -3,6 +3,7 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
@@ -31,6 +32,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 class AppStateCommandsTest {
@@ -249,6 +251,48 @@ class AppStateCommandsTest {
       listOf(changed, refused, unsupported).map { it.request.url },
       api.requests.map { it.url },
     )
+    controller.close()
+  }
+
+  @Test
+  fun retry_eachState_resumesOrStartsOver() = runTest {
+    val api = RecordingKetchApi()
+    val controller = controller(api)
+    val dropped = api.add(DownloadState.Failed(KetchError.Network()))
+    val changed = api.add(DownloadState.Failed(KetchError.FileChanged("ETag changed")))
+    val canceled = api.add(DownloadState.Canceled)
+    val waiting = api.add(paused)
+    val running = api.add(downloading)
+
+    listOf(dropped, changed, canceled, waiting, running).forEach { controller.state.retry(it) }
+    runCurrent()
+
+    assertEquals(listOf("resume"), dropped.calls)
+    assertEquals(listOf("resume"), waiting.calls)
+    assertEquals(listOf("remove deleteFiles=true"), changed.calls)
+    assertEquals(listOf("remove deleteFiles=true"), canceled.calls)
+    assertTrue(running.calls.isEmpty())
+    assertEquals(listOf(changed, canceled).map { it.request.url }, api.requests.map { it.url })
+    controller.close()
+  }
+
+  @Test
+  fun redownload_delayedRequest_startsAtOnce() = runTest {
+    val api = RecordingKetchApi()
+    val controller = controller(api)
+    val request = DownloadRequest(
+      url = "https://example.com/a.iso",
+      schedule = DownloadSchedule.AfterDelay(30.minutes),
+    )
+    val canceled = api.add(DownloadState.Canceled, request)
+
+    controller.state.redownload(canceled)
+    runCurrent()
+
+    assertEquals(listOf("remove deleteFiles=true"), canceled.calls)
+    val again = api.requests.single()
+    assertEquals(request.url, again.url)
+    assertEquals(DownloadSchedule.Immediate, again.schedule)
     controller.close()
   }
 

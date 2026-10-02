@@ -17,14 +17,19 @@ internal data class AppCommand(
   val macBundle: File? = null,
 ) {
 
-  /** Starts the app so it outlives the process that started it, with no console attached. */
+  /**
+   * Starts the app hidden in the menu bar or notification area ([BACKGROUND_FLAG]), so it
+   * outlives the process that started it, with no console attached. The browser extension's
+   * native messaging host starts it this way, so a captured download never pops up a window.
+   */
   fun launchDetached() {
+    val start = startCommand(listOf(BACKGROUND_FLAG))
     val launch = when {
-      macBundle != null -> listOf("open", macBundle.path)
-      DesktopOs.current == DesktopOs.WINDOWS -> listOf("cmd", "/c", "start", "\"\"") + command
+      macBundle != null -> start
+      DesktopOs.current == DesktopOs.WINDOWS -> listOf("cmd", "/c", "start", "\"\"") + start
       // A new session, so closing the browser's native messaging host doesn't take it along.
-      File("/usr/bin/setsid").exists() -> listOf("/usr/bin/setsid") + command
-      else -> command
+      File("/usr/bin/setsid").exists() -> listOf("/usr/bin/setsid") + start
+      else -> start
     }
     val nullDevice = File(if (DesktopOs.current == DesktopOs.WINDOWS) "NUL" else "/dev/null")
     ProcessBuilder(launch)
@@ -32,6 +37,17 @@ internal data class AppCommand(
       .redirectOutput(ProcessBuilder.Redirect.DISCARD)
       .redirectError(ProcessBuilder.Redirect.DISCARD)
       .start()
+  }
+
+  /**
+   * The command line that starts the app on its own with [args], as a login item does: through
+   * Launch Services for a macOS bundle, else [command] itself. A macOS bundle started with
+   * [BACKGROUND_FLAG] also stays behind the app in front, such as the browser.
+   */
+  fun startCommand(args: List<String> = emptyList()): List<String> {
+    val bundle = macBundle ?: return command + args
+    val open = listOfNotNull("/usr/bin/open", "-g".takeIf { BACKGROUND_FLAG in args }, bundle.path)
+    return if (args.isEmpty()) open else open + "--args" + args
   }
 
   companion object {

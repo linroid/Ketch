@@ -1,21 +1,27 @@
 package com.linroid.ketch.app.android
 
 import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
+import android.app.Notification
 import android.app.Service
 import android.net.ConnectivityManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
-import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.feedback.ActivityEvent
+import com.linroid.ketch.app.feedback.ActivityMonitor
+import com.linroid.ketch.app.feedback.ActivityRouting
+import com.linroid.ketch.app.feedback.ActivitySource
+import com.linroid.ketch.app.feedback.AndroidNotifier
+import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
@@ -23,7 +29,14 @@ import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.ForegroundStatus
+import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.ObservedPeak
+import com.linroid.ketch.app.state.SpeedModeController
+import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.pauseActiveTasks
+import com.linroid.ketch.app.state.toKetchAccent
 import com.linroid.ketch.config.FileConfigStore
+import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
@@ -33,12 +46,29 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 @SuppressLint("InlinedApi")
 class KetchService : Service() {
@@ -50,29 +80,56 @@ class KetchService : Service() {
 
   lateinit var instanceManager: InstanceManager
     private set
+
+  /**
+   * Speed mode of the embedded device. The service owns it, so speed rules keep applying while
+   * the app is closed and the ongoing notification's Slow lane button can switch it.
+   */
+  lateinit var speedMode: SpeedModeController
+    private set
+
   /** Builds discovery providers from the settings the user saves. */
   val aiProviderFactory: AiDiscoveryProviderFactory =
     EmbeddedAiDiscoveryProviderFactory()
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private val binder = LocalBinder()
+  private val toasts = Channel<ActivityEvent>(EVENT_BUFFER, BufferOverflow.DROP_OLDEST)
+  private val speed = MutableStateFlow(0L)
+  private lateinit var notifier: AndroidNotifier
   private var isForeground = false
   private var isBound = false
   private var isStarted = false
+  private var inFront = false
+  private var heldRecovery: ActivityEvent.Recovered? = null
+  private var heldUntil: TimeMark? = null
   private var lastStartId = 0
   private var latestStatus = ForegroundStatus()
 
+  /**
+   * What happens on the embedded device while the app is in front, for
+   * `App(activityEvents = …)`, which shows it as toasts. Each event goes to one collector.
+   */
+  val activityEvents: Flow<ActivityEvent> = toasts.receiveAsFlow()
+
   override fun onCreate() {
     super.onCreate()
+    notifier = AndroidNotifier(
+      context = this,
+      activity = MainActivity::class.java,
+      service = KetchService::class.java,
+      smallIcon = R.drawable.ic_stat_ketch,
+    )
+    notifier.createChannels()
     // Call startForeground() immediately to avoid ANR from
     // startForegroundService() timeout. The monitor updates it later.
-    createNotificationChannel()
-    enterForeground(latestStatus)
+    enterForeground(notifier.ongoing(emptyList(), serverPort = null, slowLane = false))
 
     val configStore = FileConfigStore(
       filesDir.resolve("config.toml").absolutePath,
     )
     val config = configStore.load()
+    notifier.accent = config.appearance.accent.toKetchAccent()
     val taskStore = createSqliteTaskStore(DriverFactory(this))
     val instanceName = config.name
       ?: android.os.Build.MODEL
@@ -135,17 +192,46 @@ class KetchService : Service() {
       initialRemotes = config.remotes,
       configStore = configStore,
     )
+    val embedded = checkNotNull(instanceManager.embedded) { "No embedded instance" }
+    speedMode = SpeedModeController(
+      config = { embedded.status().config },
+      apply = { embedded.updateConfig(it) },
+      scope = scope,
+      settings = config.speed,
+      observedPeak = ObservedPeak(config.ui.observedPeak, config.ui.observedPeakAt),
+      speed = speed,
+    )
 
-    startForegroundMonitor()
+    saveSpeedMode()
+    startForegroundMonitor(embedded)
+    startActivityMonitor(embedded)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     isStarted = true
     lastStartId = startId
-    if (intent?.action == ACTION_REPOST_NOTIFICATION && isForeground && latestStatus.isRequired) {
-      enterForeground(latestStatus)
+    when (intent?.action) {
+      AndroidNotifier.ACTION_REPOST_NOTIFICATION -> {
+        if (isForeground && latestStatus.isRequired) enterForeground(ongoing(latestStatus))
+      }
+      AndroidNotifier.ACTION_PAUSE_ALL -> pauseAll()
+      AndroidNotifier.ACTION_SLOW_LANE -> toggleSlowLane()
     }
     return START_STICKY
+  }
+
+  /**
+   * Tells the service whether the app is in front, as MainActivity is while it is resumed. Events
+   * then go to [activityEvents] instead of becoming notifications.
+   */
+  fun setInFront(inFront: Boolean) {
+    this.inFront = inFront
+    if (!inFront) return
+    val held = heldRecovery ?: return
+    heldRecovery = null
+    // Hours later, such as after Android restarted the service in the background, the downloads
+    // it resumed are old news.
+    if (heldUntil?.hasNotPassedNow() == true) toasts.trySend(held)
   }
 
   override fun onBind(intent: Intent?): IBinder {
@@ -178,46 +264,157 @@ class KetchService : Service() {
     scope.cancel()
   }
 
-  private fun createNotificationChannel() {
-    val channel = NotificationChannel(
-      CHANNEL_ID,
-      "Ketch Service",
-      NotificationManager.IMPORTANCE_LOW,
-    )
-    val manager = getSystemService(NotificationManager::class.java)
-    manager.createNotificationChannel(channel)
-  }
-
   /**
    * Keeps the service in the foreground while the embedded device downloads or shares itself,
-   * whichever device the app shows.
+   * whichever device the app shows, and refreshes the ongoing notification once a second while
+   * it downloads.
    */
-  private fun startForegroundMonitor() {
-    val embedded = checkNotNull(instanceManager.embedded) { "No embedded instance" }
+  private fun startForegroundMonitor(embedded: KetchApi) {
+    val statuses = ForegroundPolicy.observe(embedded.tasks, instanceManager.serverState)
+      .flowOn(Dispatchers.Default)
     scope.launch {
-      ForegroundPolicy.observe(embedded.tasks, instanceManager.serverState)
-        .flowOn(Dispatchers.Default)
-        .collect { status ->
-          latestStatus = status
-          if (status.isRequired) {
-            if (!isForeground) log.i { "Entering the foreground: $status" }
-            enterForeground(status)
-            keepStarted()
-          } else if (isForeground) {
+      // A new speed mode only relabels the Slow lane button.
+      combine(statuses, speedMode.mode) { status, _ -> status }.collectLatest { status ->
+        latestStatus = status
+        if (!status.isRequired) {
+          if (isForeground) {
             log.i { "Leaving the foreground" }
             leaveForeground()
             if (!isBound) stop()
           }
+          return@collectLatest
         }
+        if (isForeground) {
+          notifier.refreshOngoing(ongoing(status))
+        } else {
+          log.i { "Entering the foreground: $status" }
+          enterForeground(ongoing(status))
+        }
+        keepStarted()
+        while (status.downloading > 0) {
+          delay(ForegroundPolicy.samplePeriod)
+          // The service can leave the foreground meanwhile, such as at its time limit; posting
+          // then would leave a notification behind that nothing removes.
+          if (!isForeground) break
+          speed.value = totalSpeed(embedded.tasks.value)
+          notifier.refreshOngoing(ongoing(status))
+        }
+      }
     }
   }
 
-  private fun enterForeground(status: ForegroundStatus) {
+  /**
+   * Reports what happens on the embedded device as the notification settings allow: to the app
+   * while it is in front, as notifications otherwise.
+   */
+  private fun startActivityMonitor(embedded: KetchApi) {
+    val source = ActivitySource(LOCAL_DEVICE_ID, embedded.tasks)
+    val monitor = ActivityMonitor(flowOf(listOf(source)), scope)
+    scope.launch {
+      monitor.events.collect { event ->
+        val copy = route(event) ?: return@collect
+        // Open and Share read the file's details.
+        withContext(Dispatchers.IO) { notifier.notify(event, copy) }
+      }
+    }
+  }
+
+  /** Sends [event] to the app if it shows as a toast, and returns its notification, if any. */
+  private fun route(event: ActivityEvent): NotificationCopy? {
+    val config = loadConfig()
+    notifier.accent = config.appearance.accent.toKetchAccent()
+    val settings = config.notifications
+    val delivery = ActivityRouting.deliveryOf(event, settings, inFront)
+    if (delivery.toast) {
+      toasts.trySend(event)
+    } else if (event is ActivityEvent.Recovered &&
+      ActivityRouting.deliveryOf(event, settings, inFront = true).toast
+    ) {
+      // The service usually starts a moment before the app comes to the front.
+      heldRecovery = event
+      heldUntil = TimeSource.Monotonic.markNow() + RECOVERY_HOLD
+    }
+    return if (delivery.notify) ActivityRouting.copyOf(event) else null
+  }
+
+  /** Pauses every queued task, then every downloading one, so the queue cannot start one. */
+  private fun pauseAll() {
+    val embedded = instanceManager.embedded ?: return
+    scope.launch {
+      log.i { "Pausing all downloads from the notification" }
+      pauseActiveTasks({ embedded.tasks.value }).forEach { (task, e) ->
+        log.w { "Couldn't pause taskId=${task.taskId}: ${e.describeCauses()}" }
+      }
+    }
+  }
+
+  private fun toggleSlowLane() {
+    scope.launch {
+      try {
+        val mode = speedMode.toggleSlowLane()
+        log.i { "Switched to $mode from the notification" }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        // The controller already logged why; the button keeps its label.
+        log.d { "Couldn't switch the slow lane: ${e.describeCauses()}" }
+      }
+    }
+  }
+
+  /** Saves the speed mode and the observed peak to `config.toml` as they change. */
+  @OptIn(FlowPreview::class)
+  private fun saveSpeedMode() {
+    scope.launch {
+      speedMode.settings.drop(1).collect { speed -> saveConfig { it.copy(speed = speed) } }
+    }
+    scope.launch {
+      // The peak climbs in steps while a download speeds up.
+      speedMode.observedPeak.drop(1).debounce(PEAK_SAVE_DELAY).collect { peak ->
+        saveConfig {
+          it.copy(
+            ui = it.ui.copy(
+              observedPeak = peak.bytesPerSecond,
+              observedPeakAt = peak.atEpochMillis,
+            ),
+          )
+        }
+      }
+    }
+  }
+
+  // Reads and writes run on the main thread, like the app's settings, so they cannot interleave.
+  private fun loadConfig(): KetchConfig = try {
+    instanceManager.configStore?.load() ?: KetchConfig()
+  } catch (e: Exception) {
+    log.w { "Couldn't read config.toml: ${e.describeCauses()}" }
+    KetchConfig()
+  }
+
+  private fun saveConfig(transform: (KetchConfig) -> KetchConfig) {
+    val store = instanceManager.configStore ?: return
+    try {
+      store.save(transform(store.load()))
+    } catch (e: Exception) {
+      log.w { "Couldn't save config.toml: ${e.describeCauses()}" }
+    }
+  }
+
+  private fun ongoing(status: ForegroundStatus): Notification = notifier.ongoing(
+    tasks = instanceManager.embedded?.tasks?.value.orEmpty(),
+    serverPort = status.serverPort,
+    slowLane = speedMode.mode.value.isSlowLane,
+  )
+
+  private fun totalSpeed(tasks: List<DownloadTask>): Long =
+    tasks.sumOf { (it.state.value as? DownloadState.Downloading)?.progress?.bytesPerSecond ?: 0L }
+
+  private fun enterForeground(notification: Notification) {
     try {
       ServiceCompat.startForeground(
         this,
-        NOTIFICATION_ID,
-        buildNotification(status),
+        AndroidNotifier.ONGOING_ID,
+        notification,
         ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
       )
       isForeground = true
@@ -253,45 +450,9 @@ class KetchService : Service() {
     if (stopSelfResult(lastStartId)) isStarted = false
   }
 
-  private fun buildNotification(status: ForegroundStatus): android.app.Notification {
-    val contentIntent = PendingIntent.getActivity(
-      this,
-      0,
-      Intent(this, MainActivity::class.java),
-      PendingIntent.FLAG_IMMUTABLE,
-    )
-    val text = listOfNotNull(
-      status.downloading.takeIf { it > 0 }?.let { "Downloading $it ${files(it)}" },
-      status.queued.takeIf { it > 0 }?.let { "$it waiting" },
-      status.serverPort?.let { "Server on :$it" },
-    ).joinToString(" · ")
-    val deleteIntent = PendingIntent.getService(
-      this,
-      1,
-      Intent(this, KetchService::class.java).setAction(ACTION_REPOST_NOTIFICATION),
-      PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-    )
-    val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-      .setSmallIcon(R.drawable.ic_notification)
-      .setContentTitle("Ketch")
-      .setContentText(text)
-      .setContentIntent(contentIntent)
-      .setDeleteIntent(deleteIntent)
-      .setOnlyAlertOnce(true)
-      .setOngoing(true)
-      .setAutoCancel(false)
-      .setSilent(true)
-      .build()
-    notification.flags = notification.flags or android.app.Notification.FLAG_NO_CLEAR
-    return notification
-  }
-
-  private fun files(count: Int): String = if (count == 1) "file" else "files"
-
-  companion object {
-    private const val CHANNEL_ID = "ketch_service"
-    private const val NOTIFICATION_ID = 1
-    private const val ACTION_REPOST_NOTIFICATION =
-      "com.linroid.ketch.app.android.action.REPOST_NOTIFICATION"
+  private companion object {
+    const val EVENT_BUFFER = 64
+    val PEAK_SAVE_DELAY = 10.seconds
+    val RECOVERY_HOLD = 30.seconds
   }
 }

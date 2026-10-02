@@ -1,85 +1,43 @@
 package com.linroid.ketch.app.ui.common
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchBadge
+import com.linroid.ketch.app.components.KetchBadgeTone
+import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.remote.ConnectionState
 
+/** Dot in the health color of a remote device's connection; it pulses while connecting. */
 @Composable
-fun ConnectionStatusDot(state: ConnectionState) {
-  val color = when (state) {
-    is ConnectionState.Connected ->
-      MaterialTheme.colorScheme.tertiary
-    is ConnectionState.Connecting ->
-      MaterialTheme.colorScheme.secondary
-    is ConnectionState.Disconnected ->
-      MaterialTheme.colorScheme.error
-    is ConnectionState.Unauthorized ->
-      MaterialTheme.colorScheme.error
-  }
-  Box(
-    modifier = Modifier
-      .size(8.dp)
-      .clip(CircleShape)
-      .background(color)
+fun ConnectionStatusDot(state: ConnectionState, modifier: Modifier = Modifier) {
+  KetchDot(
+    color = KetchTheme.colors.healthColor(state),
+    modifier = modifier,
+    pulse = state is ConnectionState.Connecting,
   )
 }
 
+/**
+ * Badge naming a remote device's connection [state].
+ *
+ * @param isActive whether the device is the active one, whose lost connection reads
+ *   "Disconnected" rather than "Not connected".
+ */
 @Composable
 fun ConnectionStatusChip(
   state: ConnectionState,
   isActive: Boolean = false,
 ) {
-  val (label, bgColor, textColor) = when (state) {
-    is ConnectionState.Connected -> Triple(
-      "Connected",
-      MaterialTheme.colorScheme.tertiaryContainer,
-      MaterialTheme.colorScheme.onTertiaryContainer
-    )
-    is ConnectionState.Connecting -> Triple(
-      "Connecting",
-      MaterialTheme.colorScheme.secondaryContainer,
-      MaterialTheme.colorScheme.onSecondaryContainer
-    )
+  val (label, tone) = when (state) {
+    is ConnectionState.Connected -> "Connected" to KetchBadgeTone.Success
+    is ConnectionState.Connecting -> "Connecting" to KetchBadgeTone.Warning
     is ConnectionState.Disconnected -> if (isActive) {
-      Triple(
-        "Disconnected",
-        MaterialTheme.colorScheme.errorContainer,
-        MaterialTheme.colorScheme.onErrorContainer
-      )
+      "Disconnected" to KetchBadgeTone.Danger
     } else {
-      Triple(
-        "Not connected",
-        MaterialTheme.colorScheme.surfaceVariant,
-        MaterialTheme.colorScheme.onSurfaceVariant
-      )
+      "Not connected" to KetchBadgeTone.Neutral
     }
-    is ConnectionState.Unauthorized -> Triple(
-      "Unauthorized",
-      MaterialTheme.colorScheme.errorContainer,
-      MaterialTheme.colorScheme.onErrorContainer
-    )
+    is ConnectionState.Unauthorized -> "Unauthorized" to KetchBadgeTone.Danger
   }
-  Box(
-    modifier = Modifier
-      .background(
-        color = bgColor,
-        shape = MaterialTheme.shapes.small,
-      )
-      .padding(horizontal = 6.dp, vertical = 2.dp),
-  ) {
-    Text(
-      text = label,
-      style = MaterialTheme.typography.labelSmall,
-      color = textColor,
-    )
-  }
+  KetchBadge(text = label, tone = tone)
 }

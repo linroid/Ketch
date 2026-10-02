@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Folders whose downloads other apps may open or receive; see DownloadFileProvider.kt. -->
+<paths>
+  <!-- The default download folder, Android/data/<package>/files/Download. -->
+  <external-files-path name="downloads" path="." />
+  <!-- The default download folder on devices without external storage. -->
+  <files-path name="internal" path="downloads/" />
+  <!-- Folders on shared storage chosen in Settings. -->
+  <external-path name="storage" path="." />
+</paths>

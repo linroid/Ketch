@@ -1,28 +1,21 @@
 package com.linroid.ketch.app.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LowPriority
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchSegmented
+import com.linroid.ketch.app.components.KetchSpinner
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.priorityLabel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
+/** Button that shows or hides a priority panel; [active] while the priority is not Normal. */
 @Composable
 fun PriorityIcon(
   active: Boolean,
@@ -31,57 +24,49 @@ fun PriorityIcon(
   modifier: Modifier = Modifier,
   label: String = "Priority",
 ) {
-  com.linroid.ketch.app.components.KetchButton(
+  KetchButton(
     text = label,
-    leadingIcon = com.linroid.ketch.app.icons.KetchIcon.Filter,
-    variant = if (active || selected) com.linroid.ketch.app.components.KetchButtonVariant.Secondary
-      else com.linroid.ketch.app.components.KetchButtonVariant.Ghost,
-    size = com.linroid.ketch.app.components.KetchButtonSize.Small,
+    leadingIcon = KetchIcon.Filter,
+    variant = if (active || selected) KetchButtonVariant.Secondary else KetchButtonVariant.Ghost,
+    size = KetchButtonSize.Small,
     modifier = modifier,
     onClick = onClick,
   )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** Picks one of the [DownloadPriority] values. */
 @Composable
 fun PrioritySelector(
   value: DownloadPriority,
   onValueChange: (DownloadPriority) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  FlowRow(
-    modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(6.dp),
-    verticalArrangement = Arrangement.spacedBy(4.dp),
-  ) {
-    DownloadPriority.entries.forEach { priority ->
-      FilterChip(
-        selected = value == priority,
-        onClick = { onValueChange(priority) },
-        label = {
-          Text(
-            text = priorityLabel(priority),
-            style =
-              MaterialTheme.typography.labelSmall
-          )
-        }
-      )
-    }
-  }
-}
-
-@Composable
-fun PriorityPanel(
-  task: DownloadTask,
-  scope: CoroutineScope,
-  modifier: Modifier = Modifier,
-) {
-  val request by task.requestState.collectAsState()
-  PrioritySelector(
-    value = request.priority,
-    onValueChange = { priority ->
-      scope.launch { task.setPriority(priority) }
-    },
+  KetchSegmented(
+    options = DownloadPriority.entries,
+    selected = value,
+    onSelect = onValueChange,
+    label = ::priorityLabel,
     modifier = modifier,
   )
+}
+
+/**
+ * The priority of a running or waiting task: [value] is its priority, [onSelect] applies a new
+ * one, and [pending] shows that the last change is still being applied.
+ */
+@Composable
+fun PriorityPanel(
+  value: DownloadPriority,
+  onSelect: (DownloadPriority) -> Unit,
+  modifier: Modifier = Modifier,
+  pending: Boolean = false,
+) {
+  Row(
+    modifier = modifier,
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+  ) {
+    PrioritySelector(value = value, onValueChange = { if (it != value) onSelect(it) })
+    if (pending) KetchSpinner()
+  }
 }

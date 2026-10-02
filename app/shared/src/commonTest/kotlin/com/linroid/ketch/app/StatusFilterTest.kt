@@ -64,6 +64,28 @@ class StatusFilterTest {
     }
   }
 
+  @Test
+  fun count_all_countsEveryTask() {
+    assertEquals(allStates.size, StatusFilter.All.count(allStates))
+  }
+
+  @Test
+  fun count_failed_countsFailedAndCanceledTasks() {
+    assertEquals(2, StatusFilter.Failed.count(allStates + downloading))
+  }
+
+  @Test
+  fun counts_everyTab_matchesItsDefinition() {
+    val states = allStates + listOf(downloading, queued, canceled)
+
+    val counts = StatusFilter.counts(states)
+
+    StatusFilter.entries.forEach { filter ->
+      assertEquals(states.count { filter.matches(it) }, counts[filter], "count of $filter")
+    }
+    assertEquals(states.size, counts.filterKeys { it != StatusFilter.All }.values.sum())
+  }
+
   private fun assertMatchesOnly(filter: StatusFilter, expected: List<DownloadState>) {
     allStates.forEach { state ->
       assertEquals(state in expected, filter.matches(state), "$filter matches $state")

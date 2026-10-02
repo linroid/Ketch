@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.IncomingDownloads
@@ -50,7 +51,7 @@ fun App(
  * and menu bar share it with the window.
  *
  * @param activityEvents events from the host's activity monitor while the app is in front; they
- *   show as messages.
+ *   show as toasts.
  * @param openSettingsRequests emits when the platform asks to open Settings.
  * @param fileLogger the app's log files; `null` when the app keeps none.
  */
@@ -70,7 +71,14 @@ fun App(
     ThemeMode.Light -> false
     ThemeMode.Dark -> true
   }
-  KetchTheme(darkTheme = darkTheme, accent = appSettings.accent) {
+  // The preference only adds to the system setting; off follows the system.
+  val systemReducesMotion = rememberReduceMotion()
+  KetchTheme(
+    darkTheme = darkTheme,
+    accent = appSettings.accent,
+    density = appSettings.ui.density,
+    reduceMotion = appSettings.ui.reduceMotion || systemReducesMotion,
+  ) {
     AppShell(controller.state, openSettingsRequests, fileLogger)
   }
 }

@@ -7,17 +7,48 @@ import java.io.File
 import java.io.IOException
 import java.net.URI
 
+/** Launch argument that starts the app hidden in the menu bar or notification area. */
+internal const val BACKGROUND_FLAG = "--background"
+
 /**
- * Files named by launch arguments: plain paths from Windows file associations, or `file:` URIs
- * from Linux desktop entries. Paths are made absolute so another process can open them.
+ * What launch arguments ask the app to open.
+ *
+ * @property files `.torrent` files, made absolute so another process can open them.
+ * @property links links for the add sheet, such as a `magnet:` link a browser opened.
  */
-internal fun fileArguments(args: List<String>): List<File> = args.mapNotNull { arg ->
-  when {
-    arg.startsWith("file:", ignoreCase = true) -> runCatching { File(URI(arg)) }.getOrNull()
-    arg.isBlank() || arg.startsWith("-") -> null
-    else -> File(arg)
-  }?.absoluteFile
+internal data class OpenedArguments(
+  val files: List<File> = emptyList(),
+  val links: List<String> = emptyList(),
+) {
+  /** The arguments that hand these to another instance of the app. */
+  fun toArguments(): List<String> = files.map { it.path } + links
 }
+
+/**
+ * Sorts launch arguments into files and links. Files are plain paths from Windows file
+ * associations or `file:` URIs from Linux desktop entries; `magnet:`, `http(s):` and `ftp(s):`
+ * arguments, which the OS passes for links Ketch is registered to open, are links. Flags and
+ * URIs of other schemes are left out.
+ */
+internal fun fileArguments(args: List<String>): OpenedArguments {
+  val files = ArrayList<File>()
+  val links = ArrayList<String>()
+  for (arg in args) {
+    when {
+      arg.isBlank() || arg.startsWith("-") -> continue
+      LINK_ARGUMENT.containsMatchIn(arg) -> links += arg
+      arg.startsWith("file:", ignoreCase = true) ->
+        runCatching { File(URI(arg)) }.getOrNull()?.let { files += it.absoluteFile }
+      // Two letters at least, so a Windows drive such as C: stays a path.
+      URI_SCHEME.containsMatchIn(arg) -> continue
+      else -> files += File(arg).absoluteFile
+    }
+  }
+  return OpenedArguments(files, links)
+}
+
+private val LINK_ARGUMENT = Regex("^(magnet:|https?://|ftps?://)", RegexOption.IGNORE_CASE)
+private val URI_SCHEME = Regex("^[a-z][a-z0-9+.-]+:", RegexOption.IGNORE_CASE)
 
 /** Reads each file as a `.torrent`, stopping one byte past the size the apps accept. */
 internal fun IncomingDownloads.offerFiles(files: List<File>) {

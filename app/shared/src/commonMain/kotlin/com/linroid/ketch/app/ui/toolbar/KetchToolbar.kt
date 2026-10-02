@@ -1,35 +1,42 @@
 package com.linroid.ketch.app.ui.toolbar
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.app.components.KetchTextField
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.downloads.KetchLayoutInfo
 import com.linroid.ketch.app.util.formatBytes
 
-/** Responsive toolbar with search and download actions. */
+/**
+ * Header of the Downloads page: the title and count, the speed readout and search on wide
+ * windows, the bulk actions and Add.
+ *
+ * @param downloadCount downloads listed under the current tab and search.
+ * @param globalCapBytesPerSec the device's speed limit, or `null` when unlimited.
+ * @param bulkActions what the bulk actions can act on.
+ */
 @Composable
 fun KetchToolbar(
   title: String,
@@ -38,76 +45,78 @@ fun KetchToolbar(
   onSearchQueryChange: (String) -> Unit,
   bandwidthBytesPerSec: Long,
   globalCapBytesPerSec: Long?,
-  hasActiveDownloads: Boolean,
-  hasPausedDownloads: Boolean,
-  hasCompletedDownloads: Boolean,
+  bulkActions: BulkActions,
   onPauseAll: () -> Unit,
   onResumeAll: () -> Unit,
+  onRetryFailed: () -> Unit,
   onClearCompleted: () -> Unit,
   onAddClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
+  val spacing = KetchTheme.spacing
 
-  BoxWithConstraints(modifier = modifier.fillMaxWidth().background(colors.background)) {
-    val wide = maxWidth >= 1000.dp
+  BoxWithConstraints(modifier = modifier.fillMaxWidth().background(colors.canvas)) {
+    val wide = maxWidth >= KetchLayoutInfo.ExpandedWidth
     Column {
       Row(
         modifier = Modifier
           .fillMaxWidth()
-          .heightIn(min = 88.dp)
-          .background(colors.background)
-          .padding(horizontal = 24.dp, vertical = 16.dp),
+          .padding(horizontal = spacing.s6, vertical = spacing.s4),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
           Text(
             text = title,
-            style = type.displayMedium,
-            color = colors.onBackground,
+            style = type.pageTitle,
+            color = colors.textPrimary,
             maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            overflow = TextOverflow.Ellipsis,
           )
           Text(
             text = "$downloadCount ${if (downloadCount == 1) "download" else "downloads"}",
-            style = type.bodySmall,
-            color = colors.onSurfaceVariant,
+            style = type.caption,
+            color = colors.textSecondary,
           )
         }
 
-        if (wide) BandwidthReadout(
-          bandwidthBytesPerSec = bandwidthBytesPerSec,
-          globalCapBytesPerSec = globalCapBytesPerSec,
-        )
-
-        if (wide) KetchTextField(
-          value = searchQuery, onValueChange = onSearchQueryChange,
-          placeholder = "Search downloads…", leadingIcon = KetchIcon.Search,
-          modifier = Modifier.width(240.dp),
-        )
+        if (wide) {
+          BandwidthReadout(
+            bandwidthBytesPerSec = bandwidthBytesPerSec,
+            globalCapBytesPerSec = globalCapBytesPerSec,
+          )
+          KetchTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            placeholder = "Search downloads…",
+            leadingIcon = KetchIcon.Search,
+            modifier = Modifier.width(SearchFieldWidth),
+          )
+        }
 
         BatchActionBar(
-          hasActiveDownloads = hasActiveDownloads,
-          hasPausedDownloads = hasPausedDownloads,
-          hasCompletedDownloads = hasCompletedDownloads,
+          actions = bulkActions,
           onPauseAll = onPauseAll,
           onResumeAll = onResumeAll,
+          onRetryFailed = onRetryFailed,
           onClearCompleted = onClearCompleted,
         )
 
-        KetchButton(
-          text = "Add download",
-          onClick = onAddClick,
-          leadingIcon = KetchIcon.Plus,
+        KetchButton(text = "Add download", onClick = onAddClick, leadingIcon = KetchIcon.Plus)
+      }
+      if (!wide) {
+        KetchTextField(
+          value = searchQuery,
+          onValueChange = onSearchQueryChange,
+          placeholder = "Search downloads…",
+          leadingIcon = KetchIcon.Search,
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = spacing.s6, end = spacing.s6, bottom = spacing.s4),
         )
       }
-      if (!wide) KetchTextField(
-        value = searchQuery, onValueChange = onSearchQueryChange,
-        placeholder = "Search downloads…", leadingIcon = KetchIcon.Search,
-        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
-      )
     }
   }
 }
@@ -119,56 +128,74 @@ private fun BandwidthReadout(
 ) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
-  val capLabel = globalCapBytesPerSec?.let { "/ ${formatBytes(it)}/s" } ?: "/ ∞"
+  val spacing = KetchTheme.spacing
+  val shape = KetchTheme.shapes.sm
+  val capLabel = capLabel(globalCapBytesPerSec)
   val capFraction = if (globalCapBytesPerSec != null && globalCapBytesPerSec > 0) {
     (bandwidthBytesPerSec.toFloat() / globalCapBytesPerSec).coerceIn(0f, 1f)
   } else {
     0f
   }
-  val nearCap = capFraction > 0.9f
-  val fillColor = if (nearCap) colors.warning else colors.primary
+  val nearCap = capFraction > NEAR_CAP
+  val fillColor = if (nearCap) colors.status.paused.color else colors.accent
 
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(10.dp),
+    horizontalArrangement = Arrangement.spacedBy(spacing.s3),
     modifier = Modifier
-      .height(36.dp)
-      .clip(RoundedCornerShape(8.dp))
-      .background(colors.background)
-      .border(1.dp, colors.outline, RoundedCornerShape(8.dp))
-      .padding(horizontal = 12.dp),
+      .height(KetchTheme.density.buttonLarge)
+      .ketchSurface(KetchElevationLevel.E0, shape, colors.canvas, border = colors.borderStrong)
+      .padding(horizontal = spacing.s3),
   ) {
-    KetchIconImage(icon = KetchIcon.Speed, size = 13.dp, tint = colors.onSurfaceVariant)
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
+    KetchIconImage(
+      icon = KetchIcon.Speed,
+      size = KetchTheme.density.controlGlyph,
+      tint = colors.textSecondary,
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.s1),
+      ) {
         Text(
           text = "${formatBytes(bandwidthBytesPerSec)}/s",
-          style = type.monoSmall.copy(fontWeight = FontWeight.SemiBold),
-          color = colors.onBackground,
+          style = type.numeral,
+          color = colors.textPrimary,
         )
-        Spacer(Modifier.width(4.dp))
-        Text(
-          text = capLabel,
-          style = type.monoXSmall,
-          color = colors.onSurfaceDim,
-        )
+        Text(text = capLabel, style = type.numeralS, color = colors.textTertiary)
       }
       Box(
         Modifier
-          .width(110.dp)
-          .height(3.dp)
-          .clip(RoundedCornerShape(2.dp))
-          .background(colors.outlineVariant),
+          .width(CapBarWidth)
+          .height(spacing.s0_5)
+          .background(colors.hairline, KetchTheme.shapes.progressBar),
       ) {
         if (capFraction > 0f) {
           Box(
             Modifier
               .fillMaxWidth(capFraction)
               .fillMaxHeight()
-              .background(fillColor),
+              .background(fillColor, KetchTheme.shapes.progressBar),
           )
         }
       }
     }
   }
 }
+
+/** The readout's cap, such as "/ 5 MB/s", or "/ ∞" without one. */
+internal fun capLabel(capBytesPerSec: Long?): String =
+  if (capBytesPerSec == null || capBytesPerSec <= 0) {
+    "/ ∞"
+  } else {
+    "/ ${formatSpeedLimit(SpeedLimit.of(capBytesPerSec))}"
+  }
+
+/** Share of the cap from which the readout turns amber. */
+private const val NEAR_CAP = 0.9f
+
+/** Width of the search field on wide windows (§4.7.1). */
+private val SearchFieldWidth = 240.dp
+
+/** Width of the readout's cap bar. */
+private val CapBarWidth = 112.dp

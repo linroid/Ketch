@@ -5,139 +5,78 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.theme.KetchElevationLevel
+import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.util.priorityLabel
 
+/** Button that shows or hides a task's [TaskSettingsPanel]. */
 @Composable
 fun TaskSettingsIcon(
   selected: Boolean,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  com.linroid.ketch.app.components.KetchButton(
+  KetchButton(
     text = "Details",
-    leadingIcon = com.linroid.ketch.app.icons.KetchIcon.Settings,
-    variant = if (selected) com.linroid.ketch.app.components.KetchButtonVariant.Secondary
-      else com.linroid.ketch.app.components.KetchButtonVariant.Ghost,
-    size = com.linroid.ketch.app.components.KetchButtonSize.Small,
+    leadingIcon = KetchIcon.Info,
+    variant = if (selected) KetchButtonVariant.Secondary else KetchButtonVariant.Ghost,
+    size = KetchButtonSize.Small,
     modifier = modifier,
     onClick = onClick,
   )
 }
 
+/**
+ * What a task asked for: its link, destination, connections, priority and speed limit.
+ *
+ * @param onCopyLink copies the task's link.
+ */
 @Composable
 fun TaskSettingsPanel(
-  task: DownloadTask,
+  row: TaskRow,
+  onCopyLink: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val request by task.requestState.collectAsState()
-  val segments by task.segments.collectAsState()
-
-  Surface(
-    modifier = modifier.fillMaxWidth(),
-    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    shape = RoundedCornerShape(8.dp),
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val request = row.request
+  Column(
+    modifier = modifier
+      .fillMaxWidth()
+      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.sm, colors.surfaceSunken)
+      .padding(spacing.s3),
+    verticalArrangement = Arrangement.spacedBy(spacing.s1),
   ) {
-    Column(
-      modifier = Modifier.padding(12.dp),
-      verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-      CopyableInfoRow("URL", request.url)
-
-      request.destination?.let { dest ->
-        InfoRow("Destination", dest.value)
-      }
-
-      InfoRow(
-        "Connections",
-        if (request.connections > 0) {
-          request.connections.toString()
-        } else {
-          "Auto"
-        }
-      )
-      if (segments.isNotEmpty()) {
-        val completed = segments.count { it.isComplete }
-        InfoRow(
-          "Segments",
-          "$completed / ${segments.size} complete"
-        )
-      }
-      InfoRow(
-        "Priority",
-        priorityLabel(request.priority)
-      )
-      val limit = request.speedLimit
-      InfoRow(
-        "Speed limit",
-        if (limit.isUnlimited) "Unlimited"
-        else "${formatBytes(limit.bytesPerSecond)}/s"
-      )
-      InfoRow("Task ID", task.taskId)
-    }
-  }
-}
-
-@Composable
-private fun CopyableInfoRow(
-  label: String,
-  value: String,
-  modifier: Modifier = Modifier,
-) {
-  val clipboardManager = LocalClipboardManager.current
-  Row(
-    modifier = modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(
-      text = label,
-      style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.weight(0.3f),
-    )
-    Text(
-      text = value,
-      style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onSurface,
-      maxLines = 2,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.weight(0.7f),
-    )
-    IconButton(
-      onClick = {
-        clipboardManager.setText(AnnotatedString(value))
-      },
-      modifier = Modifier.size(24.dp),
-    ) {
-      Icon(
-        Icons.Filled.ContentCopy,
-        contentDescription = "Copy",
-        modifier = Modifier.size(14.dp),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    InfoRow("URL", request.url) {
+      KetchIconButton(
+        icon = KetchIcon.Copy,
+        contentDescription = "Copy link",
+        size = KetchButtonSize.Small,
+        onClick = onCopyLink,
       )
     }
+    request.destination?.let { InfoRow("Destination", it.value) }
+    InfoRow("Connections", if (request.connections > 0) "${request.connections}" else "Auto")
+    if (row.segments.isNotEmpty()) {
+      val completed = row.segments.count { it.isComplete }
+      InfoRow("Segments", "$completed / ${row.segments.size} complete")
+    }
+    InfoRow("Priority", priorityLabel(request.priority))
+    InfoRow("Speed limit", formatSpeedLimit(request.speedLimit))
+    InfoRow("Task ID", row.task.taskId)
   }
 }
 
@@ -145,26 +84,32 @@ private fun CopyableInfoRow(
 private fun InfoRow(
   label: String,
   value: String,
-  modifier: Modifier = Modifier,
+  trailing: (@Composable () -> Unit)? = null,
 ) {
+  val colors = KetchTheme.colors
+  val type = KetchTheme.typography
   Row(
-    modifier = modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
-    verticalAlignment = Alignment.Top,
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s3),
+    verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(
       text = label,
-      style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.weight(0.3f),
+      style = type.caption,
+      color = colors.textSecondary,
+      modifier = Modifier.weight(LabelWeight),
     )
     Text(
       text = value,
-      style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onSurface,
+      style = type.caption,
+      color = colors.textPrimary,
       maxLines = 2,
       overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.weight(0.7f),
+      modifier = Modifier.weight(ValueWeight),
     )
+    trailing?.invoke()
   }
 }
+
+private const val LabelWeight = 0.3f
+private const val ValueWeight = 0.7f

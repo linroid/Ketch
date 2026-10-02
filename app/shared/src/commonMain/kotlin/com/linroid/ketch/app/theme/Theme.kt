@@ -14,10 +14,6 @@ import androidx.compose.ui.graphics.Color
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.config.DensityMode
 
-@Suppress("DEPRECATION")
-@Deprecated("Use KetchTheme.colors.status.")
-val LocalDownloadStateColors = staticCompositionLocalOf { DarkStateColors }
-
 val LocalKetchColors = staticCompositionLocalOf<KetchColors> {
   error("KetchColors not provided. Wrap your UI in KetchTheme { … }.")
 }
@@ -69,10 +65,7 @@ fun KetchTheme(
     val shapes = remember(resolvedDensity) { ketchShapes(resolvedDensity) }
     val elevation = remember(darkTheme) { ketchElevation(darkTheme) }
     val motion = remember(reduceMotion) { ketchMotion(reduceMotion) }
-    val stateColors = remember(colors) { colors.toDownloadStateColors() }
-    @Suppress("DEPRECATION")
     CompositionLocalProvider(
-      LocalDownloadStateColors provides stateColors,
       LocalKetchColors provides colors,
       LocalKetchTypography provides typography,
       LocalKetchShapes provides shapes,

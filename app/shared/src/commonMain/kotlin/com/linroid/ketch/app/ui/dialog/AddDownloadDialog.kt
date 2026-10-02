@@ -86,6 +86,8 @@ private enum class DialogPanel {
  *   URL field; the download then uses the file's resolved source.
  * @param onDropFiles receives files dropped onto the dialog, which sits in
  *   its own layer above the window's drop target. Null disables dropping.
+ * @param initialUrl link the URL field starts with, such as one opened from
+ *   another app; it is resolved like a typed one.
  */
 @Composable
 fun AddDownloadDialog(
@@ -105,8 +107,9 @@ fun AddDownloadDialog(
   droppedFileName: String? = null,
   onRetryDroppedFile: () -> Unit = {},
   onDropFiles: ((List<DroppedFile>) -> Unit)? = null,
+  initialUrl: String = "",
 ) {
-  var url by remember { mutableStateOf("") }
+  var url by remember { mutableStateOf(initialUrl) }
   var fileName by remember { mutableStateOf("") }
   var fileNameEditedByUser by remember {
     mutableStateOf(false)

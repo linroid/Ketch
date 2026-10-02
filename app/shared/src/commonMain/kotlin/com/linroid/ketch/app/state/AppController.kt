@@ -25,12 +25,16 @@ import kotlin.coroutines.CoroutineContext
  * @param aiProviderFactory builds the AI discovery engine; `null` where it cannot run.
  * @param incoming downloads opened from outside the app.
  * @param context dispatcher of [scope]; the main thread by default.
+ * @param speedMode speed mode of the embedded device when the host owns one, such as the
+ *   service whose notification switches it, so the app and the host never fight over the speed
+ *   limit; `null` when the host keeps none.
  */
 class AppController(
   val instanceManager: InstanceManager,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   incoming: IncomingDownloads = IncomingDownloads(),
   context: CoroutineContext = Dispatchers.Main,
+  speedMode: SpeedModeController? = null,
 ) {
   private val log = KetchLogger("AppController")
   private var closed = false
@@ -56,10 +60,23 @@ class AppController(
     appSettings = appSettings,
     aiSettings = aiSettings,
     incoming = incoming,
+    speedMode = speedMode,
   )
 
   /** Toasts, banners and the Activity history. */
   val messages: MessageCenter get() = state.messages
+
+  /** Rows of the active device's tasks and the tab, search and order the list shows them in. */
+  val taskList: TaskListModel get() = state.taskList
+
+  /** Speed of each task once a second. */
+  val speedHistory: SpeedHistoryStore get() = state.speedHistory
+
+  /** Speed, counts, speed limit, free space and health of the active device. */
+  val pulse: PulseModel get() = state.pulse
+
+  /** Speed mode of the embedded device, as the host passed it; `null` when it keeps none. */
+  val speedMode: SpeedModeController? get() = state.speedMode
 
   /**
    * Commits pending operations, releases the discovery engine and stops the scope. Commits
@@ -77,17 +94,23 @@ class AppController(
 /**
  * Creates an [AppController] that lives as long as this composition and is closed with it.
  *
- * The instance manager can outlive the composition (Android keeps it in the service across
- * activity recreation), so the controller is released here rather than with the manager.
+ * The instance manager and [speedMode] can outlive the composition (Android keeps them in the
+ * service across activity recreation), so the controller is released here rather than with them.
  */
 @Composable
 fun rememberAppController(
   instanceManager: InstanceManager,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   incoming: IncomingDownloads? = null,
+  speedMode: SpeedModeController? = null,
 ): AppController {
-  val controller = remember(instanceManager, aiProviderFactory, incoming) {
-    AppController(instanceManager, aiProviderFactory, incoming ?: IncomingDownloads())
+  val controller = remember(instanceManager, aiProviderFactory, incoming, speedMode) {
+    AppController(
+      instanceManager = instanceManager,
+      aiProviderFactory = aiProviderFactory,
+      incoming = incoming ?: IncomingDownloads(),
+      speedMode = speedMode,
+    )
   }
   DisposableEffect(controller) {
     onDispose { controller.close() }

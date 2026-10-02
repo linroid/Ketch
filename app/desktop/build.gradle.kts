@@ -18,6 +18,7 @@ dependencies {
   implementation(projects.library.ktor)
   implementation(projects.library.ftp)
   implementation(projects.library.torrent)
+  implementation(projects.library.remote)
   implementation(projects.library.server)
   implementation(projects.library.sqlite)
   implementation(compose.desktop.currentOs)
@@ -27,6 +28,7 @@ dependencies {
   runtimeOnly(libs.slf4j.simple)
 
   testImplementation(libs.kotlin.test)
+  testImplementation(libs.kotlinx.coroutines.test)
 }
 
 // sqlite-jdbc bundles its native library for ~30 OS/arch pairs (~25 MB). A desktop package only
@@ -130,6 +132,34 @@ compose.desktop {
 
       macOS {
         iconFile.set(rootProject.file("art/icon.icns"))
+        // The identifier earlier releases shipped with, so an update keeps its notification
+        // permission and other per-app macOS state.
+        bundleID = "com.linroid.ketch.app.desktop"
+        // Lists Ketch as an app for magnet: links, and for ketch: pairing links; macOS delivers
+        // them through Desktop.setOpenURIHandler (MagnetHandler.kt).
+        infoPlist {
+          extraKeysRawXml = """
+            |  <key>CFBundleURLTypes</key>
+            |  <array>
+            |    <dict>
+            |      <key>CFBundleURLName</key>
+            |      <string>Magnet link</string>
+            |      <key>CFBundleURLSchemes</key>
+            |      <array>
+            |        <string>magnet</string>
+            |      </array>
+            |    </dict>
+            |    <dict>
+            |      <key>CFBundleURLName</key>
+            |      <string>Ketch link</string>
+            |      <key>CFBundleURLSchemes</key>
+            |      <array>
+            |        <string>ketch</string>
+            |      </array>
+            |    </dict>
+            |  </array>
+            |""".trimMargin()
+        }
       }
       windows {
         iconFile.set(rootProject.file("art/icon.ico"))

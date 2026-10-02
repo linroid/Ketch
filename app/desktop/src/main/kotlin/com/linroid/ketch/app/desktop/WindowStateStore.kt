@@ -20,14 +20,18 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Properties
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
-// Wide enough for the sidebar layout, which the shared UI switches to at the
-// 840dp expanded breakpoint, and tall enough to show the whole sidebar.
-internal const val DEFAULT_WINDOW_WIDTH = 1024
-internal const val DEFAULT_WINDOW_HEIGHT = 720
+// Wide enough to show the inspector docked beside the list.
+internal const val DEFAULT_WINDOW_WIDTH = 1280
+internal const val DEFAULT_WINDOW_HEIGHT = 800
+
+// The smallest window the medium layout, with the sidebar as a rail, still fits.
+internal const val MIN_WINDOW_WIDTH = 720
+internal const val MIN_WINDOW_HEIGHT = 480
 
 private val SAVE_DELAY = 500.milliseconds
 
@@ -158,13 +162,13 @@ internal fun initialWindowState(
       placement = placement,
       position = WindowPosition(Alignment.Center),
       size = DpSize(
-        width = min(saved?.width ?: DEFAULT_WINDOW_WIDTH, primary.width).dp,
-        height = min(saved?.height ?: DEFAULT_WINDOW_HEIGHT, primary.height).dp,
+        width = fit(saved?.width ?: DEFAULT_WINDOW_WIDTH, MIN_WINDOW_WIDTH, primary.width).dp,
+        height = fit(saved?.height ?: DEFAULT_WINDOW_HEIGHT, MIN_WINDOW_HEIGHT, primary.height).dp,
       ),
     )
   }
-  val width = min(saved.width, screen.width)
-  val height = min(saved.height, screen.height)
+  val width = fit(saved.width, MIN_WINDOW_WIDTH, screen.width)
+  val height = fit(saved.height, MIN_WINDOW_HEIGHT, screen.height)
   return WindowState(
     placement = placement,
     position = WindowPosition(
@@ -174,6 +178,9 @@ internal fun initialWindowState(
     size = DpSize(width.dp, height.dp),
   )
 }
+
+// At least the minimum, unless the screen is smaller.
+private fun fit(size: Int, minimum: Int, available: Int): Int = min(max(size, minimum), available)
 
 private fun List<Rectangle>.mostOverlapping(bounds: WindowBounds): Rectangle? {
   val window = Rectangle(bounds.x, bounds.y, bounds.width, bounds.height)

@@ -1,91 +1,65 @@
 package com.linroid.ketch.app.ui.dialog
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import com.linroid.ketch.app.theme.KetchTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchCheckbox
+import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.util.formatBytes
 
+/**
+ * Asks before removing a download together with its file. Removing a download and keeping the
+ * file needs no dialog; the toast offers Undo instead.
+ *
+ * @param fileName display name of the download.
+ * @param deviceName the device the download is on, such as "This Mac".
+ * @param totalBytes size of the file, or `null` when unknown.
+ * @param onConfirm removes the download, and its file when `deleteFiles` is set.
+ * @param deleteFiles whether the box that deletes the file starts checked.
+ */
 @Composable
 fun RemoveDownloadDialog(
   fileName: String,
+  deviceName: String,
   totalBytes: Long?,
   onDismiss: () -> Unit,
   onConfirm: (deleteFiles: Boolean) -> Unit,
+  deleteFiles: Boolean = true,
 ) {
-  var deleteFiles by remember { mutableStateOf(false) }
-
-  AlertDialog(
-    containerColor = KetchTheme.colors.surface,
-    tonalElevation = 0.dp,
-    shape = RoundedCornerShape(20.dp),
+  var delete by remember { mutableStateOf(deleteFiles) }
+  val size = totalBytes?.takeIf { it > 0 }?.let(::formatBytes)
+  AdaptiveModal(
     onDismissRequest = onDismiss,
-    title = { Text("Remove download?") },
-    text = {
-      Column {
-        Text(
-          text = fileName,
-          fontWeight = FontWeight.Medium,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-        )
-        if (totalBytes != null && totalBytes > 0) {
-          Text(
-            text = formatBytes(totalBytes),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .clickable { deleteFiles = !deleteFiles }
-            .padding(vertical = 4.dp),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-          Checkbox(
-            checked = deleteFiles,
-            onCheckedChange = { deleteFiles = it },
-          )
-          Text("Also delete downloaded file")
-        }
-      }
+    title = { Text("Remove “$fileName”?") },
+    dismissButton = {
+      KetchButton(text = "Cancel", variant = KetchButtonVariant.Secondary, onClick = onDismiss)
     },
     confirmButton = {
-      TextButton(
+      KetchButton(
+        text = if (delete) listOfNotNull("Remove and delete", size).joinToString(" ") else "Remove",
+        variant = if (delete) KetchButtonVariant.Danger else KetchButtonVariant.Secondary,
         onClick = {
-          onConfirm(deleteFiles)
+          onConfirm(delete)
           onDismiss()
         },
-      ) {
-        Text("Remove")
-      }
+      )
     },
-    dismissButton = {
-      TextButton(onClick = onDismiss) { Text("Cancel") }
-    },
-  )
+  ) {
+    Text(
+      text = "From the list on $deviceName.",
+      style = KetchTheme.typography.body,
+      color = KetchTheme.colors.textSecondary,
+    )
+    KetchCheckbox(
+      checked = delete,
+      onCheckedChange = { delete = it },
+      label = listOfNotNull("Also delete the file permanently", size).joinToString(" · "),
+    )
+  }
 }

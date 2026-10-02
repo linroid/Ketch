@@ -116,6 +116,35 @@ class PendingOpsTest {
   }
 
   @Test
+  fun flush_commitsStillRunning_completesOnceTheyFinish() = runTest {
+    val scope = opsScope()
+    val ops = PendingOps(scope)
+    val removed = CompletableDeferred<Unit>()
+    val cleared = CompletableDeferred<Unit>()
+    val first = ops.register("Remove", hides = setOf(keyA), commit = { removed.await() })
+    ops.register("Clear Finished", hides = setOf(keyB), commit = { cleared.await() })
+    ops.commitNow(first.id)
+    runCurrent()
+
+    val done = ops.flush()
+    scope.cancel()
+    cleared.complete(Unit)
+    runCurrent()
+    assertFalse(done.isCompleted)
+
+    removed.complete(Unit)
+    runCurrent()
+    assertTrue(done.isCompleted)
+  }
+
+  @Test
+  fun flush_nothingPending_isAlreadyComplete() = runTest {
+    val ops = PendingOps(opsScope())
+
+    assertTrue(ops.flush().isCompleted)
+  }
+
+  @Test
   fun commit_failure_showsTheTasksAgain() = runTest {
     val ops = PendingOps(opsScope())
     ops.register("Remove", hides = setOf(keyA), commit = { error("Connection lost") })
