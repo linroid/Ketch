@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.pulse
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,9 +33,9 @@ import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.AppState
@@ -72,13 +70,7 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
       .clip(shape)
       .background(overlay)
       .semantics(mergeDescendants = true) { contentDescription = "$text, show the speed" }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      ),
+      .ketchClickable(interactions, focus, onClick = onClick),
   ) {
     Text(
       text = text,
@@ -256,13 +248,7 @@ private fun RowScope.CountTile(
       .clip(shape)
       .background(colors.surfaceSunken)
       .background(overlay)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = { onShowTab(filter) },
-      )
+      .ketchClickable(interactions, focus, onClick = { onShowTab(filter) })
       .padding(horizontal = KetchTheme.spacing.s3, vertical = KetchTheme.spacing.s2),
   ) {
     Text(

@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.downloads.actions
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,9 +37,9 @@ import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -455,10 +454,9 @@ private fun BarButton(
         .heightIn(min = density.buttonSmall)
         .clip(shape)
         .background(overlay)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           role = if (dropdown) Role.DropdownList else Role.Button,
           onClick = onClick,
         )
@@ -596,13 +594,7 @@ private fun LabelledVerb(
       .heightIn(min = KetchTheme.density.iconButtonTarget + spacing.s4)
       .clip(shape)
       .background(overlay)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClickLabel = description,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, onClickLabel = description, onClick = onClick)
       .padding(vertical = spacing.s2),
   ) {
     KetchIconImage(icon, size = KetchTheme.density.controlGlyph, tint = colors.textSecondary)
@@ -630,9 +622,7 @@ private fun TextAction(text: String, onClick: () -> Unit) {
       .widthIn(min = KetchTheme.density.iconButtonTarget)
       .clip(shape)
       .background(overlay)
-      .clickable(interactionSource = interactions, indication = null, role = Role.Button) {
-        onClick()
-      }
+      .ketchClickable(interactions) { onClick() }
       .padding(horizontal = spacing.s3),
   ) {
     Text(

@@ -64,6 +64,7 @@ import com.linroid.ketch.app.components.KetchHueTileDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
@@ -577,13 +578,7 @@ private fun SearchResult(
     modifier = outer
       .focusRing(focus.visible, shape, colors.focusRing)
       .background(fill, if (filled) RectangleShape else shape)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(
         horizontal = if (filled) spacing.s4 else spacing.s1,
         vertical = if (filled) spacing.s3 else spacing.s1,
@@ -657,10 +652,9 @@ internal fun SettingsDeviceChip(
         .background(colors.surface)
         .background(overlay)
         .border(HairlineWidth, colors.borderStrong, shape)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           enabled = choosable,
           role = Role.DropdownList,
           onClickLabel = "Choose device",

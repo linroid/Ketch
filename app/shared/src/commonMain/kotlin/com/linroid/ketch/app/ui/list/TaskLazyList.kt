@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.list
 
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,8 +33,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.RowGroup
@@ -213,10 +212,10 @@ internal fun GroupHeader(
         drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = density)
       }
       .focusRing(focus.visible, KetchTheme.shapes.xs, colors.focusRing, gap = -spacing.s0_5)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
+      .ketchClickable(
+        interactions = interactions,
+        focus = focus,
+        role = null,
         onClickLabel = if (entry.collapsed) "Show ${group.title}" else "Hide ${group.title}",
         onClick = onToggle,
       )

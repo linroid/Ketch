@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.shell
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +54,7 @@ import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchTextField
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -468,12 +468,7 @@ private fun SuggestionRow(icon: KetchIcon, text: String, detail: String?, onClic
       .padding(horizontal = spacing.s3, vertical = spacing.s1)
       .clip(KetchTheme.shapes.md)
       .background(colors.accentSoft)
-      .clickable(
-        interactionSource = remember { MutableInteractionSource() },
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(remember { MutableInteractionSource() }, onClick = onClick)
       .heightIn(min = KetchTheme.density.menuItem)
       .padding(horizontal = spacing.s3),
   ) {

@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.downloads
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -46,9 +44,9 @@ import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -68,8 +66,8 @@ import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.shell.KetchLayout
-import kotlin.time.Duration.Companion.days
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.days
 
 /**
  * What the Downloads page shows before the first download: the sail lanes, three ways to add
@@ -303,13 +301,7 @@ private fun LaunchTile(
     .background(colors.surface)
     .background(overlay)
     .border(HairlineWidth, colors.hairline, shape)
-    .trackFocusVisibility(focus)
-    .clickable(
-      interactionSource = interactions,
-      indication = null,
-      role = Role.Button,
-      onClick = onClick,
-    )
+    .ketchClickable(interactions, focus, onClick = onClick)
     .padding(spacing.s4)
   if (compact) {
     Row(

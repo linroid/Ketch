@@ -53,7 +53,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +69,7 @@ import androidx.compose.ui.window.PopupProperties
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.interactionOverlay
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -517,12 +517,7 @@ private fun SwitcherItem(
       .padding(horizontal = inset)
       .heightIn(min = minHeight)
       .background(KetchTheme.colors.interactionOverlay(highlighted, pressed), shape)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, onClick = onClick)
       .padding(horizontal = spacing.s2),
     content = content,
   )

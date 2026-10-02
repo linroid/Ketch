@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -52,10 +51,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -69,9 +68,9 @@ import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.KetchSwitch
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.elideMiddle
@@ -344,10 +343,9 @@ fun <T> SettingsSelect(
         .background(colors.surface, shape)
         .background(overlay, shape)
         .border(HairlineWidth, colors.borderStrong, shape)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           enabled = enabled,
           role = Role.DropdownList,
           onClick = { expanded = true },
@@ -462,14 +460,7 @@ private fun StepButton(plus: Boolean, description: String, enabled: Boolean, onC
       .background(overlay, shape)
       .border(HairlineWidth, colors.borderStrong, shape)
       .semantics { contentDescription = description }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      ),
+      .ketchClickable(interactions, focus, enabled = enabled, onClick = onClick),
   ) {
     val ink = colors.textPrimary
     Canvas(Modifier.size(KetchTheme.density.controlGlyph)) {

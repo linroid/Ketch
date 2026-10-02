@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.intake
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +52,7 @@ import com.linroid.ketch.app.components.PeerLimitRange
 import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.components.StartTimePicker
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
@@ -347,13 +347,7 @@ private fun OptionPill(
       )
       .trackFocusVisibility(focus)
       .semantics { if (text.isEmpty() && description != null) contentDescription = description }
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.DropdownList,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, enabled = enabled, role = Role.DropdownList, onClick = onClick)
       .padding(start = if (text.isEmpty()) spacing.s2 else spacing.s3, end = spacing.s2),
   ) {
     if (icon != null) {
@@ -410,13 +404,7 @@ private fun ValueChip(
       .clip(shape)
       .background(colors.accentSoft)
       .background(overlay)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(start = spacing.s3, end = if (onRemove != null) spacing.s1 else spacing.s3),
   ) {
     Text(
@@ -436,12 +424,7 @@ private fun ValueChip(
           .clip(shape)
           .background(removeOverlay)
           .semantics { contentDescription = removeLabel }
-          .clickable(
-            interactionSource = removeInteractions,
-            indication = null,
-            role = Role.Button,
-            onClick = onRemove,
-          ),
+          .ketchClickable(removeInteractions, onClick = onRemove),
       ) {
         KetchIconImage(KetchIcon.Close, size = spacing.s3, tint = colors.accentText)
       }
