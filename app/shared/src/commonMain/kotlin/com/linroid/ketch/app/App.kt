@@ -2,7 +2,6 @@ package com.linroid.ketch.app
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,6 +18,7 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.rememberAppController
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.AppShell
 import com.linroid.ketch.app.ui.onboarding.WelcomeFlow
 import com.linroid.ketch.app.ui.onboarding.needsWelcome
@@ -79,11 +79,7 @@ fun App(
     activityEvents.collect { controller.state.report(it) }
   }
   val appSettings = controller.appSettings
-  val darkTheme = when (appSettings.themeMode) {
-    ThemeMode.System -> isSystemInDarkTheme()
-    ThemeMode.Light -> false
-    ThemeMode.Dark -> true
-  }
+  val darkTheme = appSettings.themeMode.isDark()
   SystemAppearance(darkTheme.takeIf { appSettings.themeMode != ThemeMode.System })
   // The preference only adds to the system setting; off follows the system.
   val systemReducesMotion = rememberReduceMotion()

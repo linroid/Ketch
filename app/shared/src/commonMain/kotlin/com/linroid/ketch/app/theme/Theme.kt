@@ -14,6 +14,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.config.DensityMode
+import com.linroid.ketch.config.ThemeMode
 
 val LocalKetchColors = tokenLocal<KetchColors>("KetchColors")
 
@@ -30,6 +31,14 @@ val LocalKetchMotion = tokenLocal<KetchMotion>("KetchMotion")
 /** A local for the [name] tokens, which only `KetchTheme` provides. */
 private fun <T> tokenLocal(name: String): ProvidableCompositionLocal<T> =
   staticCompositionLocalOf { error("$name not provided. Wrap your UI in KetchTheme { … }.") }
+
+/** Whether this mode shows the dark theme; [ThemeMode.System] follows the system's. */
+@Composable
+fun ThemeMode.isDark(): Boolean = when (this) {
+  ThemeMode.System -> isSystemInDarkTheme()
+  ThemeMode.Light -> false
+  ThemeMode.Dark -> true
+}
 
 /**
  * Provides the Ketch design tokens, and a Material theme mapped onto them, to [content].

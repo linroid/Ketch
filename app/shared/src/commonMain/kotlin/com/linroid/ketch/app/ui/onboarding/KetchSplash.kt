@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.ui.onboarding
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -14,6 +13,7 @@ import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
 import com.linroid.ketch.app.platform.SystemAppearance
 import com.linroid.ketch.app.state.toKetchAccent
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.shell.canvasWash
 import com.linroid.ketch.config.AppearanceConfig
 import com.linroid.ketch.config.ThemeMode
@@ -27,11 +27,7 @@ fun KetchSplash(
   appearance: AppearanceConfig = AppearanceConfig(),
   modifier: Modifier = Modifier,
 ) {
-  val dark = when (appearance.theme) {
-    ThemeMode.System -> isSystemInDarkTheme()
-    ThemeMode.Light -> false
-    ThemeMode.Dark -> true
-  }
+  val dark = appearance.theme.isDark()
   SystemAppearance(dark.takeIf { appearance.theme != ThemeMode.System })
   KetchTheme(darkTheme = dark, accent = appearance.accent.toKetchAccent()) {
     Box(
