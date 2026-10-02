@@ -73,8 +73,8 @@ import kotlinx.coroutines.launch
 
 /**
  * What the Downloads page shows before the first download: the sail lanes, three ways to add
- * one (a copied link, a dropped or opened `.torrent`, the browser), and on desktop and the web
- * the setup checklist.
+ * one (a copied link, a dropped or opened `.torrent`, the browser), where it is supported a line
+ * that opens Discover, and on desktop and the web the setup checklist.
  *
  * @param phone whether the page is laid out for a phone, which stacks the ways and leaves out
  *   the checklist.
@@ -135,8 +135,11 @@ internal fun Launchpad(state: AppState, phone: Boolean, modifier: Modifier = Mod
         ) {
           tiles(Modifier.weight(1f).fillMaxHeight())
         }
-        SetupChecklist(state, hooks, Modifier.padding(top = spacing.s8))
       }
+      if (state.aiSettings.supported) {
+        DiscoverLine(state, phone, Modifier.padding(top = spacing.s4))
+      }
+      if (!phone) SetupChecklist(state, hooks, Modifier.padding(top = spacing.s6))
     }
   }
 }
@@ -247,6 +250,28 @@ private fun PairTile(state: AppState, modifier: Modifier) {
     modifier = modifier,
     compact = true,
   )
+}
+
+/** The line under the ways to add: describe what you want and Discover finds it. */
+@Composable
+private fun DiscoverLine(state: AppState, phone: Boolean, modifier: Modifier = Modifier) {
+  val shortcut = KetchCommands.Discover.shortcutLabel().takeUnless { phone }
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
+    modifier = modifier,
+  ) {
+    KetchButton(
+      text = "Or describe what you want · Discover",
+      onClick = { state.runInShell(KetchCommands.Discover) },
+      variant = KetchButtonVariant.Ghost,
+      size = KetchButtonSize.Small,
+      leadingIcon = KetchIcon.Discover,
+    )
+    if (shortcut != null) {
+      Text(shortcut, style = KetchTheme.typography.labelS, color = KetchTheme.colors.textTertiary)
+    }
+  }
 }
 
 /**

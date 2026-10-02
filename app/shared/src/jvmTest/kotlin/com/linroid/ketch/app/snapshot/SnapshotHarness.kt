@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.App
+import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
@@ -340,10 +341,11 @@ internal fun appSnapshot(
   size: SnapshotSize,
   theme: SnapshotTheme,
   data: SampleData = SampleData.downloads(),
+  aiProviderFactory: AiDiscoveryProviderFactory? = null,
   setup: suspend AppScenario.() -> Unit = {},
 ): File {
   val environment = runBlocking(SnapshotHarness.ui) {
-    SampleEnvironment(data, theme, size.density.toMode())
+    SampleEnvironment(data, theme, size.density.toMode(), aiProviderFactory)
   }
   try {
     runBlocking(SnapshotHarness.ui) {
@@ -368,9 +370,10 @@ internal fun appSnapshots(
   sizes: List<SnapshotSize> = SnapshotSize.All,
   themes: List<SnapshotTheme> = SnapshotTheme.entries,
   data: () -> SampleData = SampleData::downloads,
+  aiProviderFactory: AiDiscoveryProviderFactory? = null,
   setup: suspend AppScenario.() -> Unit = {},
 ): List<File> = sizes.flatMap { size ->
-  themes.map { theme -> appSnapshot(name, size, theme, data(), setup) }
+  themes.map { theme -> appSnapshot(name, size, theme, data(), aiProviderFactory, setup) }
 }
 
 private val START_TIMEOUT = 5.seconds
