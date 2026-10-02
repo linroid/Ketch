@@ -248,18 +248,14 @@ fun KetchIconButton(
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   icon: KetchIcon = checkNotNull(command.icon) { "${command.id} has no icon" },
-  size: KetchButtonSize = KetchButtonSize.Medium,
   enabled: Boolean = true,
-  tint: Color = KetchTheme.colors.textSecondary,
   selected: Boolean = false,
 ) {
   KetchIconButton(
     icon = icon,
     onClick = onClick,
     modifier = modifier,
-    size = size,
     enabled = enabled,
-    tint = tint,
     contentDescription = command.label,
     shortcut = command.shortcutLabel(),
     selected = selected,

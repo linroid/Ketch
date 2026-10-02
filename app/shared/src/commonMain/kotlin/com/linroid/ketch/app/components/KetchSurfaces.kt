@@ -128,7 +128,6 @@ private fun BadgePill(text: String, fill: Color, ink: Color, modifier: Modifier)
 fun KetchProgressBar(
   progress: Float,
   modifier: Modifier = Modifier,
-  trackColor: Color = KetchTheme.colors.surfaceSunken,
   fillColor: Color = KetchTheme.colors.accent,
 ) {
   val shape = KetchTheme.shapes.progressBar
@@ -140,7 +139,7 @@ fun KetchProgressBar(
     modifier = modifier
       .fillMaxWidth()
       .height(ProgressHeight)
-      .background(trackColor, shape),
+      .background(KetchTheme.colors.surfaceSunken, shape),
   ) {
     Box(
       Modifier
@@ -155,7 +154,6 @@ fun KetchProgressBar(
  * Sidebar destination. The selected item sits on the translucent `sidebarItemSelected` pill,
  * never on the accent.
  *
- * @param count number shown after the label, such as active downloads.
  * @param trailing optional marker after the label, e.g. an unsaved dot.
  */
 @Composable
@@ -165,7 +163,6 @@ fun KetchSidebarItem(
   selected: Boolean,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
-  count: Int? = null,
   trailing: (@Composable () -> Unit)? = null,
 ) {
   val colors = KetchTheme.colors
@@ -217,13 +214,6 @@ fun KetchSidebarItem(
       overflow = TextOverflow.Ellipsis,
       modifier = Modifier.weight(1f),
     )
-    if (count != null) {
-      Text(
-        text = count.toString(),
-        style = KetchTheme.typography.numeralS,
-        color = colors.textSecondary,
-      )
-    }
     trailing?.invoke()
   }
 }

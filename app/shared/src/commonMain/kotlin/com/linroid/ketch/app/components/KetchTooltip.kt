@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
@@ -115,23 +114,6 @@ fun KetchTooltip(
       }
     }
   }
-}
-
-/** [KetchTooltip] naming [command] and its shortcut on this platform. */
-@Composable
-fun KetchTooltip(
-  command: KetchCommand,
-  modifier: Modifier = Modifier,
-  enabled: Boolean = true,
-  content: @Composable () -> Unit,
-) {
-  KetchTooltip(
-    text = command.label,
-    modifier = modifier,
-    shortcut = command.shortcutLabel(),
-    enabled = enabled,
-    content = content,
-  )
 }
 
 /** The bubble of a [KetchTooltip], without the popup that positions it. */

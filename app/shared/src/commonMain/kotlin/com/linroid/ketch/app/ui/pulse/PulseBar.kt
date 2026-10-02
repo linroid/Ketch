@@ -359,7 +359,8 @@ private fun HealthBadge(
 private fun ActivityBell(unread: Int, onClick: () -> Unit) {
   val colors = KetchTheme.colors
   val description = if (unread > 0) "Activity, $unread unread" else "Activity"
-  KetchTooltip(command = KetchCommands.Activity) {
+  val command = KetchCommands.Activity
+  KetchTooltip(text = command.label, shortcut = command.shortcutLabel()) {
     BarButton(onClick = onClick, description = description) {
       KetchIconImage(
         icon = KetchIcon.Bell,

@@ -122,7 +122,6 @@ private fun ControlsGallery() {
         items = listOf(
           KetchPillItem(icon = KetchIcon.Filter, label = "List", onClick = {}),
           KetchPillItem(icon = KetchIcon.Columns, label = "Table", onClick = {}, selected = true),
-          KetchPillItem(command = KetchCommands.ToggleSidebar, onClick = {}),
         ),
       )
     }
@@ -185,7 +184,6 @@ private fun ControlsGallery() {
         onValueChange = {},
         placeholder = "Paste links, magnets or a cURL command, one per line",
         mono = true,
-        minLines = 3,
         maxLines = 8,
         modifier = Modifier.width(FieldWidth),
       )

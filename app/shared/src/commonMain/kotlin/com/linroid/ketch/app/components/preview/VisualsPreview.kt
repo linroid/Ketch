@@ -122,7 +122,7 @@ private fun VisualsGallery() {
     Section("Brand") {
       KetchLogoTile(size = KetchLogoTileDefaults.Sidebar)
       KetchLogoTile(size = KetchLogoTileDefaults.Onboarding)
-      KetchLogoTile(size = KetchLogoTileDefaults.About, contentDescription = "Ketch")
+      KetchLogoTile(size = KetchLogoTileDefaults.About)
       SailLanesIllustration()
       SailLanesIllustration(width = SailLanesIllustrationDefaults.CompactWidth)
     }
@@ -262,7 +262,6 @@ private fun Devices() {
     )
     var target by remember { mutableStateOf("local") }
     DeviceTargetChip(selectedId = target, options = options, onSelect = { target = it.id })
-    DeviceTargetChip(selectedId = "nas", options = options, onSelect = {}, enabled = false)
   }
 }
 
