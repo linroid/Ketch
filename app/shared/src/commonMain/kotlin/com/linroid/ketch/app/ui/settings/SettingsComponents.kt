@@ -65,7 +65,6 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchMenu
-import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.KetchSwitch
 import com.linroid.ketch.app.components.focusRing
@@ -360,24 +359,6 @@ fun <T> SettingsSelectRow(
         }
       }
     },
-  )
-}
-
-/** Mutually exclusive [options] on a sliding track, for two to four short choices. */
-@Composable
-fun <T> SettingsSegmented(
-  value: T,
-  options: List<T>,
-  label: (T) -> String,
-  onSelect: (T) -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  KetchSegmented(
-    options = options,
-    selected = value,
-    onSelect = onSelect,
-    label = label,
-    modifier = modifier,
   )
 }
 

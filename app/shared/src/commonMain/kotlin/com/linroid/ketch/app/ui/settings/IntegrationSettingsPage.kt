@@ -15,6 +15,7 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -191,8 +192,8 @@ private fun ClipboardGroup(appSettings: AppSettingsController) {
         ClipboardMode.Off -> "Ketch never reads the clipboard."
       },
       trailing = {
-        SettingsSegmented(
-          value = mode,
+        KetchSegmented(
+          selected = mode,
           options = ClipboardMode.entries,
           label = { option ->
             when (option) {
