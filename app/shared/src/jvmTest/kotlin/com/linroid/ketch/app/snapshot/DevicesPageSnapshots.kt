@@ -18,7 +18,6 @@ import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.SystemInfo
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -43,7 +42,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.math.sin
@@ -176,29 +174,13 @@ private fun devicesPageSnapshot(
   fleet: DevicesPageFleet = DevicesPageFleet.Mixed,
   history: Int = HISTORY_SAMPLES,
   setup: suspend AppScenario.() -> Unit = {},
-): File {
-  val density = size.density.toMode()
-  val environment = runBlocking(SnapshotHarness.ui) {
-    DevicesPageEnvironment(fleet, theme, density)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      val timeout = DevicesPageEnvironment.START_TIMEOUT + history.seconds
-      withTimeoutOrNull(timeout) { environment.start(history) }
-        ?: error("The devices of $name never settled")
-    }
-    return SnapshotHarness.capture(
-      name = "$name-${theme.id}-${size.id}",
-      size = size,
-      interact = {
-        openDevicesPage(size)
-        AppScenario(environment.controller, environment.data, this).setup()
-      },
-    ) {
-      App(environment.controller)
-    }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
+): File = withEnvironment(
+  create = { DevicesPageEnvironment(fleet, theme, size.density.toMode(), history) },
+  timeout = DevicesPageEnvironment.START_TIMEOUT + history.seconds,
+) { environment ->
+  captureApp(name, size, theme, environment) {
+    scene.openDevicesPage(size)
+    setup()
   }
 }
 
@@ -230,8 +212,9 @@ private class DevicesPageEnvironment(
   fleet: DevicesPageFleet,
   theme: SnapshotTheme,
   density: DensityMode,
-) {
-  val data = SampleData(
+  private val history: Int,
+) : SnapshotEnvironment {
+  override val data = SampleData(
     tasks = if (fleet == DevicesPageFleet.Idle) emptyList() else SampleData.downloads().tasks,
     remotes = if (fleet == DevicesPageFleet.Mixed) {
       listOf(Nas, DenPc, Seedbox, GaragePi)
@@ -275,8 +258,7 @@ private class DevicesPageEnvironment(
     clock = SampleData.CLOCK,
   )
 
-  /** The controller the app root shows. */
-  val controller = AppController(
+  override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     speedMode = speedMode,
@@ -292,7 +274,7 @@ private class DevicesPageEnvironment(
    * [SampleData.NOW], and lets the speed history gather [history] samples while the speeds
    * wander, so the sparklines have a shape; the sample speeds then return.
    */
-  suspend fun start(history: Int) {
+  override suspend fun start() {
     val presence = instanceManager.presence
     val count = data.remotes.size + 1
     presence.first { devices -> devices.size == count && devices.all { it.ready } }
@@ -326,7 +308,7 @@ private class DevicesPageEnvironment(
     }
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     speedScope.cancel()
     instanceManager.close()

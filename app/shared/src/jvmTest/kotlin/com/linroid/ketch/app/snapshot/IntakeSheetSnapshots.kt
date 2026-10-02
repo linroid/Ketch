@@ -17,14 +17,9 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.App
-import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.input.ShortcutMatcher
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.platform.rememberFilePicker
-import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.IntakeSeed
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -41,12 +36,9 @@ import com.linroid.ketch.config.IntakePreferences
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -217,10 +209,7 @@ class IntakeSheetSnapshots {
   fun dropping_desktop_lightsUpTheInput() {
     val size = SnapshotSize(DROP_WIDTH, DROP_HEIGHT, KetchDensity.Compact)
     for (theme in SnapshotTheme.entries) {
-      val environment = runBlocking(SnapshotHarness.ui) {
-        IntakeEnvironment(SampleData.downloads(), theme, DensityMode.Compact, ::readyResolve)
-      }
-      try {
+      withEnvironment({ intakeEnvironment(theme, DensityMode.Compact) }) { environment ->
         val session = runBlocking(SnapshotHarness.ui) {
           environment.controller.state.intake.start(IntakeRequest())
         }
@@ -245,8 +234,6 @@ class IntakeSheetSnapshots {
             )
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }
@@ -273,21 +260,11 @@ class IntakeSheetSnapshots {
     clipboard: SystemClipboard?,
     setup: suspend AppScenario.() -> Unit,
   ) {
-    val data = SampleData.downloads()
-    val density = size.density.toMode()
-    val environment = runBlocking(SnapshotHarness.ui) {
-      IntakeEnvironment(data, theme, density, resolve)
-    }
-    try {
-      runBlocking(SnapshotHarness.ui) {
-        withTimeoutOrNull(5.seconds) {
-          environment.controller.taskList.rows.first { it.size == data.tasks.size }
-        } ?: error("The task list of $name never listed every sample task")
-      }
+    withEnvironment({ intakeEnvironment(theme, size.density.toMode(), resolve) }) { environment ->
       SnapshotHarness.capture(
         name = "$name-${theme.id}-${size.id}",
         size = size,
-        interact = { AppScenario(environment.controller, data, this).setup() },
+        interact = { AppScenario(environment.controller, environment.data, this).setup() },
       ) {
         // The clipboard is only looked at while the window has the focus, which a scene
         // without a window never gets.
@@ -300,39 +277,22 @@ class IntakeSheetSnapshots {
           App(environment.controller)
         }
       }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 }
 
 /** The sample devices, with links checked by [resolve] on the embedded one. */
-private class IntakeEnvironment(
-  data: SampleData,
+private fun intakeEnvironment(
   theme: SnapshotTheme,
   density: DensityMode,
-  resolve: suspend (String) -> ResolvedSource,
-) {
-  private val api = ResolvingApi(SampleKetchApi(data), resolve)
-  private val instanceManager = InstanceManager(
-    factory = InstanceFactory(deviceName = data.deviceName, embeddedFactory = { api }),
-    initialRemotes = data.remotes,
-    configStore = RecordingConfigStore(data.config(theme, density)),
-  )
-
-  val controller: AppController = AppController(
-    instanceManager = instanceManager,
-    context = SnapshotHarness.ui,
-    clock = SampleData.CLOCK,
-  )
-
-  fun close() {
-    controller.close()
-    instanceManager.instances.value.filterIsInstance<RemoteInstance>()
-      .forEach { it.instance.close() }
-    instanceManager.close()
-  }
-}
+  resolve: suspend (String) -> ResolvedSource = ::readyResolve,
+) = SampleEnvironment(
+  data = SampleData.downloads(),
+  theme = theme,
+  density = density,
+  embedded = { ResolvingApi(SampleKetchApi(it), resolve) },
+  seedHistory = false,
+)
 
 /** [window], focused. */
 private class FocusedWindow(window: WindowInfo) : WindowInfo by window {

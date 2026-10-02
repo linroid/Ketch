@@ -8,16 +8,14 @@ import androidx.compose.ui.semantics.getOrNull
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.snapshot.SettingsEnvironment
 import com.linroid.ketch.app.snapshot.SettingsFrame
-import com.linroid.ketch.app.snapshot.SnapshotHarness
 import com.linroid.ketch.app.snapshot.SnapshotTheme
 import com.linroid.ketch.app.snapshot.frames
 import com.linroid.ketch.app.snapshot.nodes
 import com.linroid.ketch.app.snapshot.sendKey
 import com.linroid.ketch.app.snapshot.withScene
+import com.linroid.ketch.app.snapshot.withSettings
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchDensity
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -78,16 +76,11 @@ class SettingsHostRenderTest {
     onClose: () -> Unit = {},
     test: suspend (ImageComposeScene) -> Unit,
   ) {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SettingsEnvironment(SnapshotTheme.Light, DensityMode.Compact)
-    }
-    try {
+    withSettings(SnapshotTheme.Light, KetchDensity.Compact) { environment ->
       withScene(WIDTH, HEIGHT, content = { Settings(environment, query, onClose) }) {
         frames(FRAMES)
         test(this)
       }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 

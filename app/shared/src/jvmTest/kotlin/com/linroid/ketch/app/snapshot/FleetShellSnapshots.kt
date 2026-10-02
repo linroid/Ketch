@@ -53,8 +53,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.io.File
 import kotlin.test.BeforeTest
@@ -224,18 +222,12 @@ private fun fleetSnapshots(
 ): List<File> = sizes.flatMap { size ->
   themes.map { theme ->
     withFleet(theme, size.density.toMode(), collapsed) { environment ->
-      SnapshotHarness.capture(
-        name = "$name-${theme.id}-${size.id}",
-        size = size,
-        interact = {
-          // The All devices ring and the sidebar's lines follow the first readings.
-          delay(READINGS_WAIT)
-          AppScenario(environment.controller, environment.data, this).setup()
-          // The pointer rests in the window's corner, away from rows it would light up.
-          hover(size.width - 2.dp, 2.dp)
-        },
-      ) {
-        App(environment.controller)
+      captureApp(name, size, theme, environment) {
+        // The All devices ring and the sidebar's lines follow the first readings.
+        delay(READINGS_WAIT)
+        setup()
+        // The pointer rests in the window's corner, away from rows it would light up.
+        scene.hover(size.width - 2.dp, 2.dp)
       }
     }
   }
@@ -299,20 +291,11 @@ private fun <T> withFleet(
   collapsed: Boolean = false,
   single: Boolean = false,
   block: (FleetEnvironment) -> T,
-): T {
-  val environment = runBlocking(SnapshotHarness.ui) {
-    FleetEnvironment(theme, density, collapsed, single)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(FleetEnvironment.START_TIMEOUT) { environment.start() }
-        ?: error("The fleet's devices never settled")
-    }
-    return block(environment)
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
-  }
-}
+): T = withEnvironment(
+  create = { FleetEnvironment(theme, density, collapsed, single) },
+  timeout = FleetEnvironment.START_TIMEOUT,
+  block = block,
+)
 
 /**
  * This Mac over the sample downloads, NAS-Basement connected and downloading with a failure,
@@ -324,8 +307,8 @@ private class FleetEnvironment(
   density: DensityMode,
   collapsed: Boolean,
   single: Boolean,
-) {
-  val data = SampleData(
+) : SnapshotEnvironment {
+  override val data = SampleData(
     tasks = SampleData.downloads().tasks,
     remotes = if (single) emptyList() else listOf(Nas, DenPc),
     ui = { it.copy(sidebarCollapsed = collapsed) },
@@ -361,8 +344,7 @@ private class FleetEnvironment(
     clock = clock,
   )
 
-  /** The controller the app root shows. */
-  val controller = AppController(
+  override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     clock = SampleData.CLOCK,
@@ -376,7 +358,7 @@ private class FleetEnvironment(
    * Waits for every device's first status and the rows of This Mac and the NAS, then takes
    * Den-PC offline [OFFLINE_FOR] before [SampleData.NOW].
    */
-  suspend fun start() {
+  override suspend fun start() {
     repeat(STARTUP_YIELDS) { yield() }
     val presence = instanceManager.presence
     val count = data.remotes.size + 1
@@ -392,7 +374,7 @@ private class FleetEnvironment(
     clock.now = SampleData.NOW
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     instanceManager.close()
   }

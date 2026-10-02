@@ -2,18 +2,15 @@ package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import com.linroid.ketch.app.snapshot.SettingsEnvironment
 import com.linroid.ketch.app.snapshot.SettingsFrame
-import com.linroid.ketch.app.snapshot.SnapshotHarness
 import com.linroid.ketch.app.snapshot.SnapshotTheme
 import com.linroid.ketch.app.snapshot.frames
 import com.linroid.ketch.app.snapshot.nodes
 import com.linroid.ketch.app.snapshot.withScene
+import com.linroid.ketch.app.snapshot.withSettings
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchDensity
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -36,12 +33,9 @@ class SettingsSearchRenderTest {
   }
 
   /** Every text on [category]'s page, in lower case, as group titles show in capitals. */
-  private fun renderedTexts(category: SettingsCategory): Set<String> {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SettingsEnvironment(SnapshotTheme.Light, DensityMode.Compact)
-    }
-    try {
-      return withScene(
+  private fun renderedTexts(category: SettingsCategory): Set<String> =
+    withSettings(SnapshotTheme.Light, KetchDensity.Compact) { environment ->
+      withScene(
         width = WIDTH,
         height = HEIGHT,
         content = {
@@ -61,10 +55,7 @@ class SettingsSearchRenderTest {
           .map { it.text.lowercase() }
           .toSet()
       }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
-  }
 
   private companion object {
     const val WIDTH = 860

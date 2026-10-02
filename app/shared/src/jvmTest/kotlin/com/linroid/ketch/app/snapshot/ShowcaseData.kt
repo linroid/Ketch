@@ -273,7 +273,7 @@ internal class ShowcaseEnvironment(
   density: DensityMode,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   ui: (UiPreferences) -> UiPreferences = { it },
-) {
+) : SnapshotEnvironment {
   /** Studio's downloads, whose flows a scenario can move on. */
   val studioTasks: List<ListTestTask> = ShowcaseData.studioTasks()
 
@@ -282,7 +282,7 @@ internal class ShowcaseEnvironment(
   private val desktop = device == ShowcaseDevice.Desktop
   private val localTasks = if (desktop) laptopTasks else emptyList()
   private val laptopId = if (desktop) LOCAL_DEVICE_ID else ShowcaseData.LAPTOP_ID
-  private val data = SampleData(
+  override val data = SampleData(
     tasks = localTasks,
     downloadConfig = ShowcaseData.StudioConfig,
     remotes = listOfNotNull(
@@ -332,8 +332,7 @@ internal class ShowcaseEnvironment(
     configStore = RecordingConfigStore(data.config(theme, density)),
   )
 
-  /** The controller the app root shows. */
-  val controller: AppController = AppController(
+  override val controller: AppController = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = aiProviderFactory,
     context = SnapshotHarness.ui,
@@ -347,7 +346,7 @@ internal class ShowcaseEnvironment(
    * Fills the speed history with three minutes of samples of every device, then waits until
    * the active device's downloads are listed and every device has reported its status.
    */
-  suspend fun start() {
+  override suspend fun start() {
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
     seedSpeedHistory()
@@ -387,8 +386,7 @@ internal class ShowcaseEnvironment(
     delay(SETTLE_SAMPLES.seconds)
   }
 
-  /** Closes the controller and the devices. */
-  fun close() {
+  override fun close() {
     controller.close()
     instanceManager.close()
   }

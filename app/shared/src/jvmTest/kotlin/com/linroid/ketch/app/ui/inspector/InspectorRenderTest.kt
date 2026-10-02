@@ -24,20 +24,17 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.snapshot.SampleData
-import com.linroid.ketch.app.snapshot.SampleEnvironment
-import com.linroid.ketch.app.snapshot.SnapshotHarness
 import com.linroid.ketch.app.snapshot.SnapshotTheme
 import com.linroid.ketch.app.snapshot.frames
 import com.linroid.ketch.app.snapshot.nodes
 import com.linroid.ketch.app.snapshot.sendKey
+import com.linroid.ketch.app.snapshot.withSample
 import com.linroid.ketch.app.snapshot.withScene
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -165,14 +162,9 @@ class InspectorRenderTest {
     name: String,
     test: suspend (AppState, TaskKey, ImageComposeScene) -> Unit,
   ) {
-    val data = SampleData.downloads()
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SampleEnvironment(data, SnapshotTheme.Light, DensityMode.Compact)
-    }
-    try {
-      runBlocking(SnapshotHarness.ui) { withTimeout(5.seconds) { environment.start() } }
+    withSample(SnapshotTheme.Light) { environment ->
       val state = environment.controller.state
-      val key = data.keyOf(name)
+      val key = environment.data.keyOf(name)
       runScene(
         width = INSPECTOR_WIDTH,
         height = INSPECTOR_HEIGHT,
@@ -182,8 +174,6 @@ class InspectorRenderTest {
           }
         },
       ) { scene -> test(state, key, scene) }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 

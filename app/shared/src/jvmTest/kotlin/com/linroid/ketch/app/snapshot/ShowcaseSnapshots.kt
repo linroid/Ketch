@@ -23,20 +23,16 @@ import androidx.compose.ui.platform.PlatformInsets
 import androidx.compose.ui.platform.PlatformWindowInsets
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.App
-import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.shell.canvasWash
 import com.linroid.ketch.config.DensityMode
-import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.SamplingMode
@@ -84,7 +80,9 @@ private class Screens(val desktop: Image, val android: Image, val ios: Image)
 
 /** The laptop's window on Studio: the Downloads table with the ISO in the docked inspector. */
 private fun desktopScreen(theme: SnapshotTheme): Image =
-  withEnvironment(ShowcaseDevice.Desktop, theme, DensityMode.Compact, null) { environment ->
+  withEnvironment(
+    create = { ShowcaseEnvironment(ShowcaseDevice.Desktop, theme, DensityMode.Compact) },
+  ) { environment ->
     val state = environment.controller.state
     SnapshotHarness.render(
       width = DesktopWidth,
@@ -106,10 +104,9 @@ private fun desktopScreen(theme: SnapshotTheme): Image =
  */
 private fun androidScreen(theme: SnapshotTheme): Image =
   withEnvironment(
-    device = ShowcaseDevice.Phone,
-    theme = theme,
-    density = DensityMode.Comfortable,
-    aiProviderFactory = ShowcaseDiscovery,
+    create = {
+      ShowcaseEnvironment(ShowcaseDevice.Phone, theme, DensityMode.Comfortable, ShowcaseDiscovery)
+    },
   ) { environment ->
     SnapshotHarness.render(
       width = PhoneWidth,
@@ -126,7 +123,9 @@ private fun androidScreen(theme: SnapshotTheme): Image =
 
 /** The iOS phone: the ISO's inspector sheet, its lanes moving. */
 private fun iosScreen(theme: SnapshotTheme): Image =
-  withEnvironment(ShowcaseDevice.Phone, theme, DensityMode.Comfortable, null) { environment ->
+  withEnvironment(
+    create = { ShowcaseEnvironment(ShowcaseDevice.Phone, theme, DensityMode.Comfortable) },
+  ) { environment ->
     val state = environment.controller.state
     val iso = environment.studioTasks.first { it.taskId == ShowcaseData.ISO_ID }
     val feeder = CoroutineScope(SnapshotHarness.ui)
@@ -162,29 +161,6 @@ private fun iosScreen(theme: SnapshotTheme): Image =
       feeder.cancel()
     }
   }
-
-/** Runs [block] over a started [ShowcaseEnvironment] and closes it afterwards. */
-private fun <T> withEnvironment(
-  device: ShowcaseDevice,
-  theme: SnapshotTheme,
-  density: DensityMode,
-  aiProviderFactory: AiDiscoveryProviderFactory?,
-  ui: (UiPreferences) -> UiPreferences = { it },
-  block: (ShowcaseEnvironment) -> T,
-): T {
-  val environment = runBlocking(SnapshotHarness.ui) {
-    ShowcaseEnvironment(device, theme, density, aiProviderFactory, ui)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(START_TIMEOUT) { environment.start() }
-        ?: error("The showcase's $device never listed Studio's downloads")
-    }
-    return block(environment)
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
-  }
-}
 
 /** The app on a phone of [kind], under its status bar and over its gesture area. */
 @OptIn(InternalComposeUiApi::class)
@@ -388,4 +364,3 @@ private val SheetHeld = 206.dp
 private const val SPEED_HISTORY_SECONDS = 20
 private val LANE_RATE_WAIT = 14.seconds
 private val FEED_INTERVAL = 16.milliseconds
-private val START_TIMEOUT = 5.seconds

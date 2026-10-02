@@ -11,7 +11,6 @@ import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -42,7 +41,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -171,7 +169,7 @@ class SettingsDeviceSnapshots {
   ) {
     for (size in sizes) {
       for (theme in themes) {
-        withEnvironment(setup, theme, size.density) { environment ->
+        withEnvironment({ DeviceEnvironment(setup, theme, size.density.toMode()) }) { environment ->
           SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, interact) {
             PageFrame(environment, theme, size.density, category, remote = setup.remote)
           }
@@ -188,33 +186,10 @@ class SettingsDeviceSnapshots {
   ) {
     for (size in sizes) {
       for (theme in SnapshotTheme.entries) {
-        withEnvironment(DeviceSetup(), theme, size.density) { environment ->
-          val data = environment.data
-          SnapshotHarness.capture(
-            name = "$name-${theme.id}-${size.id}",
-            size = size,
-            interact = { AppScenario(environment.controller, data, this).open() },
-          ) {
-            App(environment.controller)
-          }
+        withEnvironment({ DeviceEnvironment(DeviceSetup(), theme, size.density.toMode()) }) {
+          captureApp(name, size, theme, it, open)
         }
       }
-    }
-  }
-
-  private fun withEnvironment(
-    setup: DeviceSetup,
-    theme: SnapshotTheme,
-    density: KetchDensity,
-    block: (DeviceEnvironment) -> Unit,
-  ) {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      DeviceEnvironment(setup, theme, density.toMode())
-    }
-    try {
-      block(environment)
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 
@@ -307,8 +282,12 @@ private data class DeviceSetup(
  * observed speed, three network interfaces, extra trackers, pinned folders, and a sharing server
  * that only pretends to listen.
  */
-private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, density: DensityMode) {
-  val data = SampleData.downloads(
+private class DeviceEnvironment(
+  setup: DeviceSetup,
+  theme: SnapshotTheme,
+  density: DensityMode,
+) : SnapshotEnvironment {
+  override val data = SampleData.downloads(
     SampleData.DOWNLOAD_CONFIG.copy(defaultDirectory = setup.folder ?: SampleData.DOWNLOAD_DIR),
   ).let { sample ->
     SampleData(
@@ -364,7 +343,7 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
   )
 
   /** The controller the pages and the app root show. */
-  val controller = AppController(
+  override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     speedMode = speedMode,
@@ -379,7 +358,7 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
     check(instanceManager.instances.value.first().deviceId == "local")
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     speedScope.cancel()
     instanceManager.close()

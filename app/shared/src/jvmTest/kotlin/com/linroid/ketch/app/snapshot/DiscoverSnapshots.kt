@@ -8,17 +8,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.app.App
-import com.linroid.ketch.app.RecordingConfigStore
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.state.AiDiscoverRequest
 import com.linroid.ketch.app.state.AiDiscoverResponse
 import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
-import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.theme.KetchDensity
@@ -27,7 +22,6 @@ import com.linroid.ketch.app.ui.discover.DiscoverScreen
 import com.linroid.ketch.app.ui.shell.KetchLayout
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
 import com.linroid.ketch.config.AiSettings
-import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
 import com.linroid.ketch.remote.ConnectionState
@@ -150,14 +144,10 @@ class DiscoverSnapshots {
     script: DiscoverScript,
     twoDevices: Boolean = false,
     open: suspend AppScenario.() -> Unit,
-  ): File = withEnvironment(theme, size.density, script, configured = true, twoDevices) { env ->
-    SnapshotHarness.capture(
-      name = "$name-${theme.id}-${size.id}",
-      size = size,
-      interact = { AppScenario(env.controller, env.data, this).open() },
-    ) {
-      App(env.controller)
-    }
+  ): File = withEnvironment(
+    create = { discovery(theme, size, script, configured = true, twoDevices = twoDevices) },
+  ) {
+    captureApp(name, size, theme, it, open)
   }
 
   /**
@@ -168,34 +158,13 @@ class DiscoverSnapshots {
     name: String,
     size: SnapshotSize,
     theme: SnapshotTheme,
-    open: (DiscoverEnvironment) -> Unit = {},
+    open: (SampleEnvironment) -> Unit = {},
   ): File = withEnvironment(
-    theme = theme,
-    density = size.density,
-    script = DiscoverScript.Results,
-    configured = false,
+    create = { discovery(theme, size, DiscoverScript.Results, configured = false) },
   ) { env ->
     runBlocking(SnapshotHarness.ui) { open(env) }
     snapshot(name, size, theme) {
       CardFrame(windowWidth = WindowWidths.getValue(size)) { DiscoverScreen(env.controller.state) }
-    }
-  }
-
-  private fun <T> withEnvironment(
-    theme: SnapshotTheme,
-    density: KetchDensity,
-    script: DiscoverScript,
-    configured: Boolean,
-    twoDevices: Boolean = false,
-    block: (DiscoverEnvironment) -> T,
-  ): T {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      DiscoverEnvironment(theme, density.toMode(), script, configured, twoDevices)
-    }
-    try {
-      return block(environment)
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 
@@ -234,33 +203,33 @@ internal enum class DiscoverScript {
 }
 
 /**
- * The sample's devices with discovery: set up with Anthropic when [configured], else not set up
- * on a platform that can run it. With [twoDevices] the NAS is connected, so results can go to it.
+ * The sample's devices with discovery, at [size]'s density: set up with Anthropic when
+ * [configured], else not set up on a platform that can run it. With [twoDevices] the NAS is
+ * connected, so results can go to it.
  */
-internal class DiscoverEnvironment(
+private fun discovery(
   theme: SnapshotTheme,
-  density: DensityMode,
+  size: SnapshotSize,
   script: DiscoverScript,
   configured: Boolean,
-  twoDevices: Boolean,
-) {
-  private val nas = SampleData.NAS.copy(name = "NAS-Basement", watch = twoDevices)
+  twoDevices: Boolean = false,
+): SampleEnvironment {
+  val nas = SampleData.NAS.copy(name = "NAS-Basement", watch = twoDevices)
   val data = SampleData(tasks = SampleData.downloads().tasks, remotes = listOf(nas))
-  private val instanceManager = InstanceManager(
-    factory = InstanceFactory(
-      deviceName = data.deviceName,
-      embeddedFactory = { SampleKetchApi(data) },
-      remoteFactory = { config ->
-        RemoteInstance(
-          instance = SampleKetchApi(data),
-          remoteConfig = config,
-          connectionState = MutableStateFlow(ConnectionState.Connected),
-        )
-      },
-    ),
-    initialRemotes = data.remotes,
-    configStore = RecordingConfigStore(
-      data.config(theme, density).copy(
+  return SampleEnvironment(
+    data = data,
+    theme = theme,
+    density = size.density.toMode(),
+    aiProviderFactory = SampleDiscovery(script),
+    remote = { config ->
+      RemoteInstance(
+        instance = SampleKetchApi(data),
+        remoteConfig = config,
+        connectionState = MutableStateFlow(ConnectionState.Connected),
+      )
+    },
+    config = { config ->
+      config.copy(
         ai = if (configured) {
           AiSettings(
             enabled = true,
@@ -269,24 +238,10 @@ internal class DiscoverEnvironment(
         } else {
           AiSettings()
         },
-      ),
-    ),
+      )
+    },
+    seedHistory = false,
   )
-
-  /** The controller the app root shows. */
-  val controller = AppController(
-    instanceManager = instanceManager,
-    aiProviderFactory = SampleDiscovery(script),
-    context = SnapshotHarness.ui,
-    clock = SampleData.CLOCK,
-  )
-
-  fun close() {
-    controller.close()
-    instanceManager.instances.value.filterIsInstance<RemoteInstance>()
-      .forEach { it.instance.close() }
-    instanceManager.close()
-  }
 }
 
 /** Discovery that follows [script] once settings are usable. */

@@ -16,7 +16,6 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SystemInfo
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.KetchMenuPanel
@@ -157,10 +156,7 @@ class AllDevicesSnapshots {
       ),
     )
     for (theme in SnapshotTheme.entries) {
-      val environment = runBlocking(SnapshotHarness.ui) {
-        AllDevicesEnvironment(theme, DensityMode.Compact).also { it.start() }
-      }
-      try {
+      withEnvironment({ AllDevicesEnvironment(theme, DensityMode.Compact) }) { environment ->
         val state = environment.controller.state
         val presence = runBlocking(SnapshotHarness.ui) {
           withTimeoutOrNull(START_TIMEOUT) {
@@ -182,8 +178,6 @@ class AllDevicesSnapshots {
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }
@@ -208,30 +202,11 @@ private fun allDevicesSnapshot(
   theme: SnapshotTheme,
   empty: Boolean,
   setup: suspend AppScenario.() -> Unit,
-): File {
-  val density = size.density.toMode()
-  val environment = runBlocking(SnapshotHarness.ui) {
-    AllDevicesEnvironment(theme, density, empty)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(START_TIMEOUT) { environment.start() }
-        ?: error("The task list of $name never listed every device's tasks")
-    }
-    return SnapshotHarness.capture(
-      name = "$name-${theme.id}-${size.id}",
-      size = size,
-      interact = {
-        val scenario = AppScenario(environment.controller, environment.data, this)
-        // The Pulse bar's history fills once a second; give it a few samples.
-        delay(HISTORY_WAIT)
-        scenario.setup()
-      },
-    ) {
-      App(environment.controller)
-    }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
+): File = withEnvironment({ AllDevicesEnvironment(theme, size.density.toMode(), empty) }) {
+  captureApp(name, size, theme, it) {
+    // The Pulse bar's history fills once a second; give it a few samples.
+    delay(HISTORY_WAIT)
+    setup()
   }
 }
 
@@ -240,8 +215,8 @@ private class AllDevicesEnvironment(
   theme: SnapshotTheme,
   density: DensityMode,
   empty: Boolean = false,
-) {
-  val data = SampleData(
+) : SnapshotEnvironment {
+  override val data = SampleData(
     tasks = if (empty) emptyList() else SampleData.downloads().tasks,
     remotes = listOf(RemoteConfig(host = "nas.local", port = 8642, name = "NAS-Basement")),
   )
@@ -259,8 +234,7 @@ private class AllDevicesEnvironment(
     configStore = RecordingConfigStore(data.config(theme, density)),
   )
 
-  /** The controller the app root shows. */
-  val controller: AppController = AppController(
+  override val controller: AppController = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     clock = SampleData.CLOCK,
@@ -270,7 +244,7 @@ private class AllDevicesEnvironment(
    * Fills the speed history with three minutes of samples of both devices, shows every device
    * and waits until both devices' tasks are listed.
    */
-  suspend fun start() {
+  override suspend fun start() {
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
     seedSpeedHistory()
@@ -279,7 +253,7 @@ private class AllDevicesEnvironment(
     controller.state.taskList.rows.first { it.size == data.tasks.size + nas.tasks.value.size }
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     instanceManager.close()
   }

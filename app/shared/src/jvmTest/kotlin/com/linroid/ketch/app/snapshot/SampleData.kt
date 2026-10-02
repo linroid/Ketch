@@ -23,6 +23,7 @@ import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
+import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
@@ -33,6 +34,9 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.UiPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -375,37 +379,64 @@ internal class SampleKetchApi(private val data: SampleData) : KetchApi {
  * the clock at [SampleData.NOW].
  *
  * @param aiProviderFactory AI discovery of this platform; `null` where it is not supported.
+ * @param embedded the engine of the embedded device, over [data].
+ * @param remote the client of a remote device; `null` leaves the app's own, which the
+ *   unwatched sample remotes never connect.
+ * @param config the saved config, from the one [data] gives.
+ * @param speedMode the speed mode of the embedded device, running in the given scope.
+ * @param seedHistory whether [start] fills the speed history before the rows are listed.
+ * @param wave how far below or above its speed each second of the seeded history is.
  */
 internal class SampleEnvironment(
   override val data: SampleData,
   theme: SnapshotTheme,
   density: DensityMode,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
+  embedded: (SampleData) -> KetchApi = ::SampleKetchApi,
+  remote: ((RemoteConfig) -> RemoteInstance)? = null,
+  config: (KetchConfig) -> KetchConfig = { it },
+  speedMode: ((KetchApi, CoroutineScope) -> SpeedModeController)? = null,
+  private val seedHistory: Boolean = true,
+  private val wave: (second: Int, random: Random) -> Double = { second, random ->
+    0.8 + 0.15 * sin(second * PI / 23) + 0.1 * random.nextDouble()
+  },
 ) : SnapshotEnvironment {
+  private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
-    factory = InstanceFactory(
-      deviceName = data.deviceName,
-      embeddedFactory = { SampleKetchApi(data) },
-    ),
+    factory = if (remote == null) {
+      InstanceFactory(deviceName = data.deviceName, embeddedFactory = { embedded(data) })
+    } else {
+      InstanceFactory(
+        deviceName = data.deviceName,
+        embeddedFactory = { embedded(data) },
+        remoteFactory = remote,
+      )
+    },
     initialRemotes = data.remotes,
-    configStore = RecordingConfigStore(data.config(theme, density)),
+    configStore = RecordingConfigStore(config(data.config(theme, density))),
   )
 
   override val controller: AppController = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = aiProviderFactory,
     context = SnapshotHarness.ui,
+    speedMode = speedMode?.invoke(checkNotNull(instanceManager.embedded), speedScope),
     clock = SampleData.CLOCK,
   )
 
   /**
    * Fills the speed history with three minutes of samples ending at [SampleData.NOW], so the
-   * Activity chart has a shape, then waits until the task list has a row for every sample task.
+   * Activity chart has a shape, then waits until the task list has a row for every sample task;
+   * without [seedHistory], only waits for the rows.
    *
    * The history takes no sample older than its newest one, so this runs before the store's own
    * sampling starts, which waits for the first rows.
    */
   override suspend fun start() {
+    if (!seedHistory) {
+      controller.taskList.rows.first { it.size == data.tasks.size }
+      return
+    }
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
     seedSpeedHistory()
@@ -425,10 +456,7 @@ internal class SampleEnvironment(
     for (second in HISTORY_SECONDS downTo 0) {
       val speeds = keys.mapValues { (_, state) ->
         val speed = (state as? DownloadState.Downloading)?.progress?.bytesPerSecond
-        speed?.let {
-          val wave = 0.8 + 0.15 * sin(second * PI / 23) + 0.1 * random.nextDouble()
-          (it * wave).roundToLong()
-        }
+        speed?.let { (it * wave(second, random)).roundToLong() }
       }
       controller.speedHistory.record(SampleData.NOW - second.seconds, speeds)
     }
@@ -436,6 +464,7 @@ internal class SampleEnvironment(
 
   override fun close() {
     controller.close()
+    speedScope.cancel()
     instanceManager.instances.value.filterIsInstance<RemoteInstance>()
       .forEach { it.instance.close() }
     instanceManager.close()

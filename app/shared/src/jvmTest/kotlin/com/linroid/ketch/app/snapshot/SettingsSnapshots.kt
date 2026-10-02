@@ -13,7 +13,6 @@ import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -55,7 +54,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -199,7 +197,7 @@ class SettingsSnapshots {
     lastPage: SettingsTarget.Page? = null,
     interact: suspend SnapshotScene.() -> Unit = {},
   ) {
-    withEnvironment(theme, size.density, lastPage) { environment ->
+    withSettings(theme, size.density, lastPage) { environment ->
       SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, interact) {
         SettingsFrame(environment, theme, size.density, desktop = true) {
           SettingsContent(environment.controller.state, target, onClose = {}, initialQuery = query)
@@ -210,7 +208,7 @@ class SettingsSnapshots {
 
   /** Renders [SettingsContent] on the card of a tablet or the web, beside nothing else. */
   private fun cardSnapshot(name: String, theme: SnapshotTheme, query: String) {
-    withEnvironment(theme, CardSize.density, lastPage = null) { environment ->
+    withSettings(theme, CardSize.density) { environment ->
       SnapshotHarness.capture("$name-${theme.id}-${CardSize.id}", CardSize) {
         SettingsFrame(environment, theme, CardSize.density, desktop = false) {
           SettingsContent(environment.controller.state, null, onClose = {}, initialQuery = query)
@@ -221,7 +219,7 @@ class SettingsSnapshots {
 
   /** Renders [SettingsContent] full screen on a phone, as the app's shell shows it. */
   private fun phoneSnapshot(name: String, theme: SnapshotTheme, query: String) {
-    withEnvironment(theme, PhoneTall.density, lastPage = null) { environment ->
+    withSettings(theme, PhoneTall.density) { environment ->
       SnapshotHarness.capture("$name-${theme.id}-${PhoneTall.id}", PhoneTall) {
         SettingsFrame(environment, theme, PhoneTall.density, desktop = false) {
           SettingsContent(environment.controller.state, null, onClose = {}, initialQuery = query)
@@ -237,31 +235,7 @@ class SettingsSnapshots {
     theme: SnapshotTheme,
     open: AppScenario.() -> Unit,
   ) {
-    withEnvironment(theme, size.density, lastPage = null) { environment ->
-      SnapshotHarness.capture(
-        name = "$name-${theme.id}-${size.id}",
-        size = size,
-        interact = { AppScenario(environment.controller, environment.data, this).open() },
-      ) {
-        App(environment.controller)
-      }
-    }
-  }
-
-  private fun withEnvironment(
-    theme: SnapshotTheme,
-    density: KetchDensity,
-    lastPage: SettingsTarget.Page?,
-    block: (SettingsEnvironment) -> Unit,
-  ) {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SettingsEnvironment(theme, density.toMode(), lastPage)
-    }
-    try {
-      block(environment)
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
-    }
+    withSettings(theme, size.density) { captureApp(name, size, theme, it) { open() } }
   }
 
   private companion object {
@@ -349,9 +323,9 @@ internal class SettingsEnvironment(
   theme: SnapshotTheme,
   density: DensityMode,
   lastPage: SettingsTarget.Page? = null,
-) {
+) : SnapshotEnvironment {
   private val nas = SampleData.NAS.copy(name = "NAS-Basement", watch = true)
-  val data = SampleData(
+  override val data = SampleData(
     tasks = SampleData.downloads().tasks,
     remotes = listOf(nas),
     ui = { it.copy(settingsPage = lastPage?.name) },
@@ -410,7 +384,7 @@ internal class SettingsEnvironment(
   )
 
   /** The controller Settings and the app root show. */
-  val controller = AppController(
+  override val controller = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = IdleDiscovery,
     context = SnapshotHarness.ui,
@@ -422,12 +396,23 @@ internal class SettingsEnvironment(
     instanceManager.startServer()
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     speedScope.cancel()
     instanceManager.close()
   }
 }
+
+/**
+ * Runs [block] over a [SettingsEnvironment] in [theme] at [density] that shows [lastPage] when
+ * Settings opens without a page.
+ */
+internal fun <T> withSettings(
+  theme: SnapshotTheme,
+  density: KetchDensity,
+  lastPage: SettingsTarget.Page? = null,
+  block: (SettingsEnvironment) -> T,
+): T = withEnvironment({ SettingsEnvironment(theme, density.toMode(), lastPage) }, block = block)
 
 /** [sample] on Wi-Fi, Ethernet and a VPN, with downloads spread over the first two. */
 private class TwoNetworks(private val sample: SampleKetchApi) : KetchApi by sample {
