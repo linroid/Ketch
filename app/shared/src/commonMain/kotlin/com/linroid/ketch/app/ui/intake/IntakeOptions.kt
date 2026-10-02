@@ -77,9 +77,7 @@ import com.linroid.ketch.app.state.folderLabel
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.toDeviceHealth
-import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.inspector.FirstThatFits
 import com.linroid.ketch.app.util.priorityLabel
 
@@ -581,10 +579,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
   val changed = { session.onHeadersChanged() }
   Column(
     verticalArrangement = Arrangement.spacedBy(spacing.s3),
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
-      .padding(spacing.s3),
+    modifier = Modifier.intakeCard().padding(spacing.s3),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       KetchEyebrow("Advanced", Modifier.weight(1f))

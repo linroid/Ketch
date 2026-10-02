@@ -91,9 +91,7 @@ internal fun EntryList(
   // Half a row more than fits shows that the list scrolls.
   val maxHeight = rowHeight * maxRows + rowHeight / 2
   Box(
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline),
+    modifier = Modifier.intakeCard(),
   ) {
     LazyColumn(
       modifier = Modifier.heightIn(max = maxHeight),
@@ -163,32 +161,14 @@ private fun EntryRow(actions: IntakeActions, entry: IntakeEntry, phone: Boolean,
 @Composable
 internal fun PreviewCard(actions: IntakeActions, entry: IntakeEntry) {
   val session = actions.session
-  val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val now by rememberNow(entry.status is IntakeStatus.Checking)
   var signingIn by remember(entry) { mutableStateOf(false) }
   Column(
     verticalArrangement = Arrangement.spacedBy(spacing.s3),
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
-      .padding(spacing.s4),
+    modifier = Modifier.intakeCard().padding(spacing.s4),
   ) {
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(spacing.s3),
-    ) {
-      KetchFileTypeChip(
-        fileName = entry.name,
-        sourceUrl = entry.url,
-        size = KetchFileTypeChipDefaults.LargeSize,
-      )
-      Column(Modifier.weight(1f)) {
-        EntryName(entry, KetchTheme.typography.titleM)
-        EntryStatus(entry, now)
-      }
-      if (session.mode == IntakeMode.Add) RemoveButton(actions, entry)
-    }
+    LargeEntryHeader(actions, entry, now, removable = session.mode == IntakeMode.Add)
     if (entryActions(actions, entry).isNotEmpty()) {
       EntryActions(actions, entry, onSignIn = { signingIn = true })
     }
@@ -197,6 +177,31 @@ internal fun PreviewCard(actions: IntakeActions, entry: IntakeEntry) {
       session.signIn(entry, user, password)
     })
     LanesPreview(actions, entry)
+  }
+}
+
+/** The large file chip, name and status of a single row; [removable] adds its remove button. */
+@Composable
+private fun LargeEntryHeader(
+  actions: IntakeActions,
+  entry: IntakeEntry,
+  now: Instant,
+  removable: Boolean,
+) {
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s3),
+  ) {
+    KetchFileTypeChip(
+      fileName = entry.name,
+      sourceUrl = entry.url,
+      size = KetchFileTypeChipDefaults.LargeSize,
+    )
+    Column(Modifier.weight(1f)) {
+      EntryName(entry, KetchTheme.typography.titleM)
+      EntryStatus(entry, now)
+    }
+    if (removable) RemoveButton(actions, entry)
   }
 }
 
@@ -238,26 +243,9 @@ internal fun TorrentWaiting(actions: IntakeActions, entry: IntakeEntry) {
   val now by rememberNow(true)
   Column(
     verticalArrangement = Arrangement.spacedBy(spacing.s3),
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
-      .padding(spacing.s4),
+    modifier = Modifier.intakeCard().padding(spacing.s4),
   ) {
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(spacing.s3),
-    ) {
-      KetchFileTypeChip(
-        fileName = entry.name,
-        sourceUrl = entry.url,
-        size = KetchFileTypeChipDefaults.LargeSize,
-      )
-      Column(Modifier.weight(1f)) {
-        EntryName(entry, KetchTheme.typography.titleM)
-        EntryStatus(entry, now)
-      }
-      RemoveButton(actions, entry)
-    }
+    LargeEntryHeader(actions, entry, now, removable = true)
     LinearProgressIndicator(
       color = colors.accent,
       trackColor = colors.surfaceSunken,
@@ -303,10 +291,7 @@ internal fun TaskPreview(task: DownloadTask) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
-      .padding(spacing.s4),
+    modifier = Modifier.intakeCard().padding(spacing.s4),
   ) {
     KetchFileTypeChip(
       fileName = name,
@@ -623,4 +608,12 @@ internal fun evenSegments(totalBytes: Long, count: Int): List<Segment> {
     val end = if (index == count - 1) totalBytes - 1 else start + size - 1
     Segment(index, start, end, 0)
   }
+}
+
+/** The bordered card, full width, that the add sheet's rows, previews and panels sit on. */
+@Composable
+internal fun Modifier.intakeCard(): Modifier {
+  val colors = KetchTheme.colors
+  return fillMaxWidth()
+    .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
 }

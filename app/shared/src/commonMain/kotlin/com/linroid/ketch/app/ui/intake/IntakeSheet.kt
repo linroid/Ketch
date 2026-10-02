@@ -585,10 +585,7 @@ private fun DiscoverOffer(actions: IntakeActions, query: String) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
-      .padding(horizontal = spacing.s3, vertical = spacing.s2),
+    modifier = Modifier.intakeCard().padding(horizontal = spacing.s3, vertical = spacing.s2),
   ) {
     KetchIconImage(KetchIcon.Discover, size = KetchTheme.density.controlGlyph, tint = colors.accent)
     Text(
@@ -637,15 +634,7 @@ private fun EditBody(actions: IntakeActions) {
   // Changing options is all this sheet does, so they show in place rather than in a popover.
   OptionsPanel(
     session = session,
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(
-        KetchElevationLevel.E0,
-        KetchTheme.shapes.lg,
-        KetchTheme.colors.surface,
-        KetchTheme.colors.hairline,
-      )
-      .padding(KetchTheme.spacing.s4),
+    modifier = Modifier.intakeCard().padding(KetchTheme.spacing.s4),
   )
 }
 
