@@ -36,6 +36,7 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
+import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.TaskOrigin
@@ -982,6 +983,49 @@ class AppState(
     if (tasks.isEmpty()) return
     deferRemoval(tasks, deleteFiles = { false }, label = "Clear Finished") { count ->
       "Cleared $count finished ${if (count == 1) "download" else "downloads"}"
+    }
+  }
+
+  /**
+   * Removes the finished tasks of each of [targets] (the shown devices by default) whose files
+   * have been moved or deleted, as [files] finds them now. Only files on this device can be
+   * checked, so remote devices keep their tasks. The rows hide once checked and are removed when
+   * the Undo window ends.
+   */
+  fun clearMissing(files: FileActions, targets: List<InstanceEntry> = shownInstances.value): Job =
+    scope.launch {
+      val finished = targets.filter { it !is RemoteInstance }.flatMap { entry ->
+        visibleTasks(entry).filter { it.state.value is DownloadState.Completed }
+      }
+      val checked = supervisorScope {
+        finished.map { task -> async { task to hasFile(task, files) } }.awaitAll()
+      }
+      // A task removed or hidden by another operation while its file was checked is left to it.
+      val hidden = pendingOps.hidden.value
+      val missing = checked
+        .filter { (task, present) -> !present && task.state.value is DownloadState.Completed }
+        .map { it.first }
+        .filter { keyOf(it) !in hidden }
+      if (missing.isEmpty()) {
+        messages.post(MessageLevel.Info, "No missing files to clear")
+        return@launch
+      }
+      deferRemoval(missing, deleteFiles = { false }, label = "Clear Missing") { count ->
+        if (count == 1) {
+          "Cleared 1 download with a missing file"
+        } else {
+          "Cleared $count downloads with missing files"
+        }
+      }
+    }
+
+  /** Whether the file a finished [task] saved is still there; `true` when it cannot be told. */
+  private suspend fun hasFile(task: DownloadTask, files: FileActions): Boolean {
+    val path = (task.state.value as? DownloadState.Completed)?.outputPath
+    if (path.isNullOrBlank()) return true
+    return catchingUnlessCancelled { files.exists(path) }.getOrElse { e ->
+      log.d { "Couldn't check the file of taskId=${task.taskId}: ${e.describeCauses()}" }
+      true
     }
   }
 

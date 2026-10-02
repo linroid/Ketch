@@ -904,8 +904,8 @@ The choice is persisted in `UiPreferences.sidebarCollapsed`.
   speed, a 60 s chart, the Full / Slow lane / Auto segmented control, counts and the disk bar.
 - `⌕` expands into a full-width M3 `SearchBar`. It is also the command bar: a link becomes
   "Download on This phone", and plain text offers "✦ Discover …".
-- `⋮` holds: Pause all, Resume all, Retry failed, Clear finished…, Activity (with badge),
-  Settings.
+- `⋮` holds: Pause all, Resume all, Retry failed, Clear finished…, Clear missing (where files
+  can be checked), Activity (with badge), Settings.
 
 **Bottom bar:**
 - The `NavigationBar` appears only when there are at least 3 destinations (Android with
@@ -1266,7 +1266,7 @@ host, output path and error title. Tokens turn into removable chips:
 | Queued | ○ grey | Reason from `QueueReason`: "Waiting for a free slot (2 of 2 in use)" or "Waiting for github.com (8 per site)", using `status().config` and the running tasks | size or "–" | blank | blank | ▷ Start now | ⋯ |
 | Scheduled | ◷ violet | `AtTime`: "Starts today at 23:00 · in 3h 12m" (refreshed every 60 s). `AfterDelay`: "Starts after 30 min" (no invented clock time) | size | blank | blank | ▷ Start now (local only) | ⋯ |
 | Completed | none | `transferSummary()` from #305: "took 3m 12s · avg 6.4 MB/s · {host}" | `Completed.totalBytes` | blank | "took 3m" | **Open** (double-click / `↩`) | `↗ Open`, `⌂ Show in Finder` |
-| Completed, file missing (checked lazily on hover or menu open via `FileActions.exists`) | ⚠ tertiary | "File moved or deleted" | size | | | Download again | |
+| Completed, file missing (checked via `FileActions.exists` on hover, menu open and while the Done tab shows; "Clear 2 missing" in the Done header and the `⋯` menu removes them, with Undo) | ⚠ tertiary | "File moved or deleted" | size | | | Download again | |
 | Completed on a remote device | none | "Saved on NAS-Basement" | size | | | Copy path | ⋯ |
 | Failed | ✕ red | `ErrorCopy.title` in failed color, then " · " + short hint | size or "–" | blank | blank | `ErrorCopy.primary` (Retry / Download again / Retry with 1 connection / Edit link… / Enter credentials… / Show folder) | ⋯ |
 | Canceled | ⊘ tertiary | "Canceled · {host}" | | | | Download again | ⋯ |

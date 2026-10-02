@@ -16,6 +16,7 @@ import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.ui.downloads.actions.FakeFileActions
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -192,6 +193,25 @@ class AllDevicesTest {
     val tasks = fleet.state.tasksOf(keys)
 
     assertEquals(listOf<DownloadTask>(there, here), tasks)
+    fleet.controller.close()
+  }
+
+  @Test
+  fun clearMissing_allDevices_leavesTheRemoteDevicesTasksAlone() = runTest {
+    val fleet = fleet()
+    val gone = DownloadState.Completed("/downloads/a.iso", totalBytes = 100)
+    val here = fleet.mac.recording.add(gone)
+    val there = fleet.nas.recording.add(gone)
+    fleet.state.showAllDevices()
+    advanceTimeBy(1.seconds)
+    val files = FakeFileActions(revealLabel = null).apply { missing += "/downloads/a.iso" }
+
+    fleet.state.clearMissing(files)
+    advanceTimeBy(UNDO_WINDOW_PASSED)
+
+    assertEquals(listOf("remove deleteFiles=false"), here.calls)
+    assertTrue(there.calls.isEmpty())
+    assertEquals(listOf<DownloadTask>(there), fleet.state.tasks.value)
     fleet.controller.close()
   }
 

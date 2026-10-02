@@ -52,9 +52,11 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.RowActionDialogs
+import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.SelectionBar
 import com.linroid.ketch.app.ui.downloads.actions.SendConfirmationDialog
 import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
+import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.list.GroupCollapse
@@ -419,12 +421,17 @@ private fun WideDownloads(
   }
 }
 
-/** The status tabs, or the selection bar in their place while two or more rows are selected. */
+/**
+ * The status tabs, or the selection bar in their place while two or more rows are selected. On
+ * the Done tab it checks the finished files, so their rows say "File missing" without being
+ * hovered first and the tab offers to clear them.
+ */
 @Composable
 private fun TabArea(page: DownloadsPage, view: TaskListView, showsTable: Boolean) {
   val state = page.state
   val actions = page.actions
   val counts by state.taskList.counts.collectAsState()
+  val missing = if (view.filter == StatusFilter.Done) missingFiles(state, actions.runner) else 0
   val selected = actions.selectedRows
   val motion = KetchTheme.motion
   Crossfade(
@@ -449,7 +456,9 @@ private fun TabArea(page: DownloadsPage, view: TaskListView, showsTable: Boolean
           filter = view.filter,
           counts = counts,
           needsLink = view.rows.count { it.content.error?.primary == RowAction.EditLink },
+          missing = missing,
           onClearFinished = { state.clearCompleted() },
+          onClearMissing = actions.runner::clearMissing,
           onRetryAll = { page.retry(view.rows.filter { it.state.needsAttention }) },
         )
         ArrangementMenu(
@@ -460,6 +469,18 @@ private fun TabArea(page: DownloadsPage, view: TaskListView, showsTable: Boolean
       }
     }
   }
+}
+
+/**
+ * How many finished downloads of the shown devices have lost their files, checking each one
+ * while this is in the composition and again whenever the finished downloads change.
+ */
+@Composable
+private fun missingFiles(state: AppState, runner: RowActionRunner): Int {
+  val rows by state.taskList.rows.collectAsState()
+  val finished = rows.filter { it.outputFile != null }
+  LaunchedEffect(runner, finished.map { it.key to it.outputFile }) { runner.checkFiles(finished) }
+  return finished.count(runner::isFileMissing)
 }
 
 /** The content under the tabs: the rows, or what stands in for them. */

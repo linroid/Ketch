@@ -186,6 +186,48 @@ class RowActionRunnerTest {
   }
 
   @Test
+  fun clearMissing_someFilesGone_removesOnlyThoseOnceTheUndoWindowEnds() = runTest {
+    val f = ActionsFixture(this)
+    val gone = f.add(completed)
+    val kept = f.add(DownloadState.Completed("/downloads/b.iso", totalBytes = 100))
+    val running = f.add(downloading)
+    backgroundScope.launch { f.state.tasks.collect {} }
+    runCurrent()
+    f.files.missing += "/downloads/a.iso"
+
+    f.runner.clearMissing()
+    runCurrent()
+
+    assertEquals(listOf(kept, running), f.state.tasks.value)
+    val message = f.messages().last()
+    assertEquals("Cleared 1 download with a missing file", message.title)
+    assertTrue(message.actions.any { it.label == "Undo" })
+    assertTrue(gone.calls.isEmpty())
+    advanceTimeBy(7.seconds)
+    runCurrent()
+    assertEquals(listOf("remove deleteFiles=false"), gone.calls)
+    assertTrue(kept.calls.isEmpty())
+    assertTrue(running.calls.isEmpty())
+    f.close()
+  }
+
+  @Test
+  fun clearMissing_everyFileInPlace_removesNothing() = runTest {
+    val f = ActionsFixture(this)
+    val task = f.add(completed)
+
+    f.runner.clearMissing()
+    advanceTimeBy(7.seconds)
+    runCurrent()
+
+    assertTrue(task.calls.isEmpty())
+    val message = f.messages().last()
+    assertEquals("No missing files to clear", message.title)
+    assertEquals(MessageLevel.Info, message.level)
+    f.close()
+  }
+
+  @Test
   fun remove_withFilesToTheTrash_removesThenTrashesOnceTheUndoWindowEnds() = runTest {
     val f = ActionsFixture(this, canTrash = true)
     val task = f.add(completed)
