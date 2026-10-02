@@ -506,33 +506,19 @@ class InstanceManager(
  */
 private object DisconnectedApi : KetchApi {
   override val backendLabel = "Not connected"
-  override val tasks =
-    MutableStateFlow(emptyList<DownloadTask>())
+  override val tasks = MutableStateFlow(emptyList<DownloadTask>())
 
-  override suspend fun download(
-    request: DownloadRequest,
-  ): DownloadTask {
-    throw IllegalStateException(
-      "No instance connected. Add a remote server first.",
-    )
-  }
+  override suspend fun download(request: DownloadRequest): DownloadTask = notConnected()
 
-  override suspend fun resolve(
-    url: String,
-    properties: Map<String, String>,
-  ): ResolvedSource {
-    throw IllegalStateException(
-      "No instance connected. Add a remote server first.",
-    )
-  }
+  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+    notConnected()
 
-  override suspend fun status(): KetchStatus {
-    throw IllegalStateException(
-      "No instance connected. Add a remote server first.",
-    )
-  }
+  override suspend fun status(): KetchStatus = notConnected()
 
   override suspend fun updateConfig(config: DownloadConfig) {}
   override suspend fun start() {}
   override fun close() {}
+
+  private fun notConnected(): Nothing =
+    throw IllegalStateException("No instance connected. Add a remote server first.")
 }
