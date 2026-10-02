@@ -84,11 +84,12 @@ private fun AppState.reportDiscovered(
       }
     }
   })
-  val onActive = target.deviceId == activeInstance.value?.deviceId
+  // Under All devices the target may show already; switching to it would hide the others.
+  val shown = target in shownInstances.value
   val single = tasks.singleOrNull()?.takeIf { failed.isEmpty() }
   val key = single?.let { TaskKey(target.deviceId, it.taskId) }
   val show = MessageAction("Show") {
-    if (!onActive) switchInstance(target)
+    if (!shown) switchInstance(target)
     showDownloads(StatusFilter.All)
     key?.let(::inspect)
   }
@@ -96,7 +97,7 @@ private fun AppState.reportDiscovered(
     ?: downloads(tasks.size)
   val device = target.displayName
   val title = buildString {
-    append(if (onActive) "Added $what → $device" else "Added $what to $device")
+    append(if (shown) "Added $what → $device" else "Added $what to $device")
     if (failed.isNotEmpty()) append(" · ${failed.size} failed")
   }
   messages.post(
