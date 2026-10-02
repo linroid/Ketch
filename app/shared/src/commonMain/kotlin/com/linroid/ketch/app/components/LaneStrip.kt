@@ -2,16 +2,12 @@ package com.linroid.ketch.app.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -212,16 +208,7 @@ internal fun LaneStripCanvas(
 
   val indeterminate = segments.isEmpty() && (progress == null || progress.totalBytes <= 0)
   val shimmering = indeterminate && phase == LanePhase.Downloading && !motion.reduced
-  val shimmer: State<Float>? = if (shimmering) {
-    rememberInfiniteTransition(label = "laneShimmer").animateFloat(
-      initialValue = 0f,
-      targetValue = 1f,
-      animationSpec = infiniteRepeatable(tween(SHIMMER_MILLIS, easing = LinearEasing)),
-      label = "laneShimmer",
-    )
-  } else {
-    null
-  }
+  val shimmer = if (shimmering) rememberLoop(SHIMMER_MILLIS, "laneShimmer") else null
   val description = remember(segments, progress, phase, stalled) {
     laneStripDescription(segments, progress, phase, stalled.size)
   }

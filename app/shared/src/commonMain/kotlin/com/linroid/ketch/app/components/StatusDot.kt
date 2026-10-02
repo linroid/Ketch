@@ -130,13 +130,18 @@ internal fun KetchColors.statusColor(status: RowStatus): Color = when (status) {
 internal fun rememberPulse(enabled: Boolean): State<Float>? {
   val period = KetchTheme.motion.pulse
   if (!enabled || period <= 0) return null
-  return rememberInfiniteTransition(label = "pulse").animateFloat(
+  return rememberLoop(period, "pulse")
+}
+
+/** A value that goes from 0 to 1 over [millis] at a steady pace, then starts over. */
+@Composable
+internal fun rememberLoop(millis: Int, label: String): State<Float> =
+  rememberInfiniteTransition(label = label).animateFloat(
     initialValue = 0f,
     targetValue = 1f,
-    animationSpec = infiniteRepeatable(tween(period, easing = LinearEasing)),
-    label = "pulse",
+    animationSpec = infiniteRepeatable(tween(millis, easing = LinearEasing)),
+    label = label,
   )
-}
 
 /** A halo [progress] of the way through a pulse: grown by [growth] and faded out. */
 internal fun DrawScope.drawHalo(color: Color, progress: Float, alpha: Float, growth: Dp) {

@@ -7,10 +7,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -493,7 +490,7 @@ private fun AddGlyphCanvas(glyph: AddGlyph, flow: Boolean, ink: Color, size: Dp)
     animationSpec = tween(motion.medium, easing = motion.easeStandard),
     label = "addArrow",
   )
-  val cycle = if (flow) rememberLaneFlow() else null
+  val cycle = if (flow) rememberLoop(LANE_FLOW_MILLIS, "addFlow") else null
   val easing = motion.easeStandard
   Spacer(
     Modifier
@@ -501,15 +498,6 @@ private fun AddGlyphCanvas(glyph: AddGlyph, flow: Boolean, ink: Color, size: Dp)
       .drawBehind { drawAddGlyph(lanes.value, arrow.value, cycle?.value, ink, easing) },
   )
 }
-
-@Composable
-private fun rememberLaneFlow(): State<Float> = rememberInfiniteTransition(label = "addFlow")
-  .animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(tween(LANE_FLOW_MILLIS, easing = LinearEasing)),
-    label = "addFlowCycle",
-  )
 
 /**
  * Draws the glyph on the 20-unit icon grid with a 1.7-unit stroke: [lanes] from the + (0) to the
