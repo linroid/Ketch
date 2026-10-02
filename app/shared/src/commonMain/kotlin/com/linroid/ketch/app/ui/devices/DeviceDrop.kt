@@ -25,23 +25,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawOutline
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.platform.DragExitEffect
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.rememberFileDropReader
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.dashedOutline
 import kotlinx.coroutines.launch
 
 /**
@@ -125,7 +117,7 @@ private fun DeviceDropOverlay(label: String, shape: Shape) {
     modifier = Modifier
       .fillMaxSize()
       .background(colors.accentSoft, shape)
-      .dashedBorder(colors.accent, shape)
+      .dashedOutline(colors.accent, shape)
       .padding(spacing.s5),
   ) {
     Box(
@@ -142,19 +134,3 @@ private fun DeviceDropOverlay(label: String, shape: Shape) {
     )
   }
 }
-
-/** A dashed [color] line just inside the edge of [shape]. */
-internal fun Modifier.dashedBorder(color: Color, shape: Shape): Modifier = drawWithCache {
-  val width = DashWidth.toPx()
-  val dash = DashLength.toPx()
-  val dashes = PathEffect.dashPathEffect(floatArrayOf(dash, dash))
-  val stroke = Stroke(width = width, pathEffect = dashes)
-  val inset = Size(size.width - width, size.height - width)
-  val outline = shape.createOutline(inset, layoutDirection, this)
-  onDrawBehind {
-    translate(width / 2, width / 2) { drawOutline(outline, color, style = stroke) }
-  }
-}
-
-private val DashWidth: Dp = 1.5.dp
-private val DashLength: Dp = 6.dp
