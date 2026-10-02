@@ -73,8 +73,8 @@ class SelectionBarTest {
     val withDevice = barVerbs(f.runner.batch(rows), canSend = true).first
     val alone = barVerbs(f.runner.batch(rows), canSend = false).first
 
-    assertTrue(withDevice.any { it.kind == BarVerbKind.SendTo })
-    assertFalse(alone.any { it.kind == BarVerbKind.SendTo })
+    assertTrue(withDevice.any { it.action == RowAction.SendTo })
+    assertFalse(alone.any { it.action == RowAction.SendTo })
     f.close()
   }
 
@@ -85,7 +85,7 @@ class SelectionBarTest {
 
     val remove = barVerbs(f.runner.batch(rows), canSend = false).first.last()
 
-    assertEquals(BarVerbKind.RemoveDialog, remove.kind)
+    assertTrue(remove.asks)
     assertEquals("Remove 3 downloads…", remove.tooltip(rows.size))
     f.close()
   }
