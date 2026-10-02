@@ -58,6 +58,7 @@ import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
+import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.DiscoverRequest
@@ -66,6 +67,7 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.feedback.ActivityPopover
 import com.linroid.ketch.app.ui.pulse.PulseSubtitle
+import com.linroid.ketch.app.ui.sidebar.PennantCluster
 import com.linroid.ketch.app.ui.sidebar.pennantHealth
 import com.linroid.ketch.app.ui.sidebar.pennantName
 import com.linroid.ketch.app.ui.sidebar.rememberDevices
@@ -165,7 +167,15 @@ internal fun PhoneTopBar(
 ) {
   val state = shell.app
   if (shell.searchOpen) {
-    SearchBar(shell)
+    Box {
+      SearchBar(shell)
+      // ⌘J reaches Activity while the search shows too.
+      ActivityPopover(
+        state = state,
+        expanded = shell.pulseBar.activityOpen,
+        onDismissRequest = { shell.pulseBar.activityOpen = false },
+      )
+    }
     return
   }
   val spacing = KetchTheme.spacing
@@ -198,8 +208,9 @@ internal fun PhoneTopBar(
 }
 
 /**
- * The active device's pennant in its health ring, with its unseen failures: a tap opens the
- * devices, and a long press goes back to the device that was active before.
+ * The active device's pennant in its health ring, with its unseen failures, or every device's
+ * pennants while they all show: a tap opens the devices, and a long press goes back to the
+ * device that was active before.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -208,14 +219,17 @@ private fun DeviceButton(shell: ShellState) {
   // Read here, so the device's live numbers recompose the button and not the whole bar.
   val devices = rememberDevices(state)
   val active by state.activeInstance.collectAsState()
+  val scope by state.deviceScope.collectAsState()
+  val all = scope == DeviceScope.All && devices.size >= DeviceScope.MIN_DEVICES
   val device = devices.firstOrNull { it.deviceId == active?.deviceId }
   val target = KetchTheme.density.iconButtonTarget
+  val name = if (all) KetchCommands.AllDevices.label else device?.name
   Box(
     contentAlignment = Alignment.Center,
     modifier = Modifier
       .sizeIn(minWidth = target, minHeight = target)
       .clip(KetchTheme.shapes.full)
-      .semantics { contentDescription = device?.name?.let { "$it, switch device" } ?: "Devices" }
+      .semantics { contentDescription = name?.let { "$it, switch device" } ?: "Devices" }
       .combinedClickable(
         role = Role.Button,
         onLongClickLabel = "Back to the previous device",
@@ -226,7 +240,9 @@ private fun DeviceButton(shell: ShellState) {
         onClick = { state.showInstanceSelector = true },
       ),
   ) {
-    if (device == null) {
+    if (all) {
+      PennantCluster(devices)
+    } else if (device == null) {
       KetchIconImage(KetchIcon.Devices, tint = KetchTheme.colors.textSecondary)
     } else {
       DevicePennant(

@@ -52,6 +52,8 @@ import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.downloads.LocalShownDevices
+import com.linroid.ketch.app.ui.downloads.RowPennant
 import com.linroid.ketch.app.ui.downloads.actions.HoverActions
 import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.RowFrameState
@@ -170,7 +172,7 @@ private fun RowBody(
 
 /**
  * The name, its priority and, with a pointer, the metric at the end, which gives way to the
- * hover actions while [hovered].
+ * hover actions while [hovered]. Under All devices the device's pennant leads the name.
  */
 @Composable
 private fun FirstLine(row: TaskRow, metric: Boolean, hovered: Boolean) {
@@ -178,6 +180,9 @@ private fun FirstLine(row: TaskRow, metric: Boolean, hovered: Boolean) {
   val spacing = KetchTheme.spacing
   Row(verticalAlignment = Alignment.CenterVertically) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+      if (LocalShownDevices.current.several) {
+        RowPennant(row, Modifier.padding(end = spacing.s2))
+      }
       FileNameText(
         text = row.name,
         style = KetchTheme.typography.bodyStrong,
@@ -300,7 +305,7 @@ private fun TrailingAction(row: TaskRow, actions: ListActions) {
 /**
  * A pointer row's hover actions at its end, over a fade into the row's hover fill so the metric
  * below never shows through. With [aboveLanes] they stop above the row's lane strip, which stays
- * in view.
+ * in view. [placement] moves and widens them, such as over a table row's Left and Added cells.
  */
 @Composable
 internal fun BoxScope.HoverOverlay(
@@ -308,11 +313,11 @@ internal fun BoxScope.HoverOverlay(
   actions: ListActions,
   frame: RowFrameState,
   aboveLanes: Boolean = false,
+  placement: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val fill = rowFill(colors, frame, actions.keyboard.hasFocus)
-  val fade = spacing.s6
   // The strip, the write heads reaching above it and the row's bottom padding.
   val lanes = LaneStripDefaults.RowHeight + spacing.s0_5 + spacing.s2
   Box(
@@ -321,7 +326,14 @@ internal fun BoxScope.HoverOverlay(
       .matchParentSize()
       .then(if (aboveLanes) Modifier.padding(bottom = lanes) else Modifier),
   ) {
-    HoverButtons(row, actions, frame, fill, fade)
+    HoverButtons(
+      row = row,
+      actions = actions,
+      frame = frame,
+      fill = fill,
+      fade = spacing.s6,
+      modifier = placement,
+    )
   }
 }
 
@@ -332,10 +344,12 @@ private fun HoverButtons(
   frame: RowFrameState,
   fill: Color,
   fade: Dp,
+  modifier: Modifier = Modifier,
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    modifier = Modifier
+    horizontalArrangement = Arrangement.End,
+    modifier = modifier
       .fillMaxHeight()
       .then(
         if (frame.hovered) {

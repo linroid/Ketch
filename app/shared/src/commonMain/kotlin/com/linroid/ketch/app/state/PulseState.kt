@@ -301,6 +301,16 @@ data class PulseState(
     return "$downloading downloading · ${online.sumOf { it.downloadedBytes } * 100 / size}%"
   }
 
+  /** Title of the web app's tab: "↓ 45% · Ketch" while downloads run, otherwise "Ketch". */
+  fun tabTitle(): String {
+    val online = devices.filter { it.health.isOnline }
+    val downloading = online.sumOf { it.counts.downloading }
+    if (downloading == 0) return APP_NAME
+    val size = online.sumOf { it.sizeBytes }
+    if (size <= 0) return "↓ $downloading · $APP_NAME"
+    return "↓ ${online.sumOf { it.downloadedBytes } * 100 / size}% · $APP_NAME"
+  }
+
   private fun activeSentence(
     online: List<DevicePulse>,
     downloading: Int,
@@ -314,22 +324,22 @@ data class PulseState(
     return "$files · all done ≈ ${clockLabel(finish, now, timeZone)}"
   }
 
-  // Remaining bytes over the speed each device can reach under its cap.
+  // Each device's remaining bytes over the speed it can reach under its cap. Bandwidth never
+  // moves between devices, so the scope is done when its slowest device is.
   private fun finishTime(busy: List<DevicePulse>, now: Instant): Instant? {
-    var remaining = 0L
-    var speed = 0L
+    var latest = Duration.ZERO
     for (device in busy) {
-      remaining += device.remainingBytes ?: return null
-      speed += if (device.cap.isUnlimited) {
+      val remaining = device.remainingBytes ?: return null
+      val speed = if (device.cap.isUnlimited) {
         device.speed
       } else {
         minOf(device.speed, device.cap.bytesPerSecond)
       }
+      if (speed <= 0) return null
+      latest = maxOf(latest, (remaining / speed).seconds)
     }
-    if (speed <= 0) return null
-    val eta = (remaining / speed).seconds
-    if (eta > MAX_ETA) return null
-    return now + eta
+    if (latest > MAX_ETA) return null
+    return now + latest
   }
 
   private fun offlineSentence(device: DevicePulse): String = when (device.health) {
@@ -350,6 +360,7 @@ data class PulseState(
 
   private companion object {
     val MAX_ETA = 7.days
+    const val APP_NAME = "Ketch"
   }
 }
 

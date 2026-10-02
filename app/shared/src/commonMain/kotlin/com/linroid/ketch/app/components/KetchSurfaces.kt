@@ -47,33 +47,10 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchColors
-import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.ketchSurface
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
-
-/**
- * Bordered container on the `surface` color.
- *
- * @param padding space between the border and [content].
- * @param level elevation; cards inside the content card stay flat.
- */
-@Composable
-fun KetchCard(
-  modifier: Modifier = Modifier,
-  padding: Dp = KetchTheme.spacing.s4,
-  level: KetchElevationLevel = KetchElevationLevel.E0,
-  content: @Composable () -> Unit,
-) {
-  val colors = KetchTheme.colors
-  Box(
-    modifier = modifier
-      .ketchSurface(level, KetchTheme.shapes.card, colors.surface, colors.hairline)
-      .padding(padding),
-  ) { content() }
-}
 
 /** Color of a [KetchBadge]. */
 enum class KetchBadgeTone {

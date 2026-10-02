@@ -22,6 +22,12 @@ class HostShortcutsTest {
       KetchCommands.SlowLane,
       KetchCommands.Search,
       KetchCommands.ToggleInspector,
+      KetchCommands.ToggleSidebar,
+      KetchCommands.Palette,
+      KetchCommands.Discover,
+      KetchCommands.Devices,
+      KetchCommands.Activity,
+      KetchCommands.Shortcuts,
       KetchCommands.tab(StatusFilter.Failed),
       KetchCommands.CloseWindow,
       KetchCommands.Minimize,
@@ -39,13 +45,8 @@ class HostShortcutsTest {
     for (command in listOf(
       KetchCommands.PasteLinks,
       KetchCommands.OpenTorrent,
-      KetchCommands.Palette,
-      KetchCommands.Discover,
-      KetchCommands.Devices,
-      KetchCommands.ToggleSidebar,
-      KetchCommands.Activity,
+      KetchCommands.SwitchDevice,
       KetchCommands.Undo,
-      KetchCommands.Shortcuts,
       KetchCommands.device(1),
     )) {
       assertFalse(command in owned, "${command.id} is the shell's")

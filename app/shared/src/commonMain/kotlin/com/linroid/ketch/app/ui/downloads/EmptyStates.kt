@@ -140,6 +140,18 @@ internal fun emptyCopy(
   }
 }
 
+/**
+ * The copy of every device shown at once while none has downloads, with a button that adds one
+ * to [targetName], where new downloads go.
+ */
+internal fun fleetEmptyCopy(targetName: String): EmptyCopy = EmptyCopy(
+  title = "No downloads on any device",
+  hint = "Downloads from all your devices appear here.",
+  icon = KetchIcon.Fleet,
+  action = EmptyAction.Add,
+  actionLabel = "Add a link to $targetName",
+)
+
 /** The copy of a remote device that has no downloads yet, with a button that adds one to it. */
 internal fun remoteEmptyCopy(deviceName: String): EmptyCopy = EmptyCopy(
   title = "Downloads on $deviceName will appear here",

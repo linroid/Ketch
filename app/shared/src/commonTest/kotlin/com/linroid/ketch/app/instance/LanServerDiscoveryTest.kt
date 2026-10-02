@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FakeMdnsDiscoverer(
@@ -29,6 +30,14 @@ class FakeMdnsDiscoverer(
 }
 
 class LanServerDiscoveryTest {
+
+  @Test
+  fun preferredAddress_linkLocalIpv6First_picksTheIpv4Address() {
+    assertEquals("192.168.1.20", preferredAddress(listOf("fe80::1", "192.168.1.20")))
+    assertEquals("fd00::20", preferredAddress(listOf("fe80::1", "fd00::20")))
+    assertEquals("fe80::1", preferredAddress(listOf("fe80::1")))
+    assertNull(preferredAddress(emptyList()))
+  }
 
   @Test
   fun supported_discovererThatCanBrowse_isTrue() {

@@ -19,6 +19,7 @@ import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
@@ -372,11 +373,14 @@ internal class SampleKetchApi(private val data: SampleData) : KetchApi {
 /**
  * The devices, config and controller behind one app snapshot, run on [SnapshotHarness.ui] with
  * the clock at [SampleData.NOW].
+ *
+ * @param aiProviderFactory AI discovery of this platform; `null` where it is not supported.
  */
 internal class SampleEnvironment(
   private val data: SampleData,
   theme: SnapshotTheme,
   density: DensityMode,
+  aiProviderFactory: AiDiscoveryProviderFactory? = null,
 ) {
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
@@ -390,6 +394,7 @@ internal class SampleEnvironment(
   /** The controller the app root shows. */
   val controller: AppController = AppController(
     instanceManager = instanceManager,
+    aiProviderFactory = aiProviderFactory,
     context = SnapshotHarness.ui,
     clock = SampleData.CLOCK,
   )

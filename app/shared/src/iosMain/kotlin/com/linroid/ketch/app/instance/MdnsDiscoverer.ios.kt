@@ -17,7 +17,7 @@ internal class DnsSdDiscoverer : MdnsDiscoverer {
           is DiscoveryEvent.Discovered -> event.resolve()
           is DiscoveryEvent.Resolved -> {
             val service = event.service
-            val host = service.addresses.firstOrNull()
+            val host = preferredAddress(service.addresses)
               ?: return@collect
             results[service.key] = DiscoveredServer(
               name = service.name,

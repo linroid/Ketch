@@ -37,7 +37,7 @@ internal enum class TableColumn(
   Source("source", "Source", 128.dp, SortKey.Source, optional = true),
   Origin("origin", "Origin", 88.dp, SortKey.Origin, optional = true),
   Priority("priority", "Priority", 72.dp, SortKey.Priority, optional = true),
-  Device("device", "Device", 112.dp, SortKey.Device, optional = true);
+  Device("device", "Device", 128.dp, SortKey.Device, optional = true);
 
   /** Whether the reason of a waiting, failed or finished row spans this column. */
   val inReasonSpan: Boolean

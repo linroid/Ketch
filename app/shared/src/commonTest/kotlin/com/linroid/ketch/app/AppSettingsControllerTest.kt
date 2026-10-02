@@ -169,18 +169,18 @@ class AppSettingsControllerTest {
 class AppDestinationTest {
 
   @Test
-  fun `discover is hidden until discovery works`() {
+  fun `discover is hidden where discovery cannot run`() {
     assertEquals(
       listOf(AppDestination.Downloads, AppDestination.Devices),
-      AppDestination.visible(aiAvailable = false),
+      AppDestination.visible(aiSupported = false),
     )
   }
 
   @Test
-  fun `discover appears once discovery works`() {
+  fun `discover shows wherever discovery can run`() {
     assertEquals(
       AppDestination.entries.toList(),
-      AppDestination.visible(aiAvailable = true),
+      AppDestination.visible(aiSupported = true),
     )
   }
 }

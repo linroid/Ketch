@@ -219,14 +219,21 @@ class TableSnapshots {
 
   @Test
   fun empty_everySize_showsTheLaunchpad() {
-    appSnapshots("launchpad", data = SampleData::empty)
+    // Discovery is supported but not set up, as on a fresh desktop or Android install.
+    appSnapshots("launchpad", data = SampleData::empty, aiProviderFactory = { null })
   }
 
   @Test
   fun launchpad_desktop_showsTheBrowserTileAndChecklist() {
     for (theme in SnapshotTheme.entries) {
       val environment = runBlocking(SnapshotHarness.ui) {
-        SampleEnvironment(SampleData.empty(), theme, DensityMode.Compact)
+        // Discovery is supported but not set up, as on a fresh desktop install.
+        SampleEnvironment(
+          data = SampleData.empty(),
+          theme = theme,
+          density = DensityMode.Compact,
+          aiProviderFactory = { null },
+        )
       }
       try {
         runBlocking(SnapshotHarness.ui) { environment.start() }

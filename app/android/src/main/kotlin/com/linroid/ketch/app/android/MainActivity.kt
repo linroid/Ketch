@@ -2,8 +2,10 @@ package com.linroid.ketch.app.android
 
 import android.Manifest
 import android.app.AlertDialog
+import android.app.Application
 import android.content.ComponentName
 import android.content.ContentResolver
+import android.content.Context.BIND_AUTO_CREATE
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
@@ -15,25 +17,33 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.core.content.edit
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.rememberAppController
+import com.linroid.ketch.app.ui.onboarding.KetchSplash
+import com.linroid.ketch.config.AppearanceConfig
+import com.linroid.ketch.config.FileConfigStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
@@ -44,7 +54,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class MainActivity : ComponentActivity() {
 
-  private var service: KetchService? by mutableStateOf(null)
+  private val model: MainModel by viewModels()
   private var notificationLink: NotificationLink? by mutableStateOf(null)
   private val ketchApplication get() = application as KetchApplication
   private val requestNotificationPermission = registerForActivityResult(
@@ -57,29 +67,20 @@ class MainActivity : ComponentActivity() {
   private var notificationOffer: Job? = null
   private var notificationRationale: AlertDialog? = null
 
-  private val connection = object : ServiceConnection {
-    override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-      val connected = (binder as KetchService.LocalBinder).service
-      service = connected
-      connected.setInFront(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
-      offerNotificationsAfterFirstAdd(connected.instanceManager)
-    }
-
-    override fun onServiceDisconnected(name: ComponentName) {
-      service = null
-      notificationOffer?.cancel()
-    }
-  }
-
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     requestExternalStoragePermissionIfNeeded()
-    bindService(
-      Intent(this, KetchService::class.java),
-      connection,
-      BIND_AUTO_CREATE,
-    )
+    model.connect()
+    lifecycleScope.launch {
+      // A recreated activity finds the service already bound.
+      snapshotFlow { model.service }.collect { connected ->
+        notificationOffer?.cancel()
+        if (connected == null) return@collect
+        connected.setInFront(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+        offerNotificationsAfterFirstAdd(connected.instanceManager)
+      }
+    }
     // Skip intents already handled: a recreated activity carries its old intent (the file is
     // still pending in the application), and reopening from Recents replays the task's launch
     // intent, whose one-time read grant may have expired.
@@ -88,26 +89,24 @@ class MainActivity : ComponentActivity() {
       handleIntent(intent)
     }
     setContent {
-      val svc = service
-      if (svc != null) {
-        val controller = rememberAppController(
-          instanceManager = svc.instanceManager,
-          aiProviderFactory = svc.aiProviderFactory,
-          incoming = ketchApplication.incoming,
-          speedMode = svc.speedMode,
-        )
-        val link = notificationLink
-        LaunchedEffect(controller, link) {
-          if (link == null) return@LaunchedEffect
-          controller.state.open(link)
-          notificationLink = null
-        }
-        App(
-          controller,
-          activityEvents = svc.activityEvents,
-          fileLogger = ketchApplication.fileLogger,
-        )
+      val svc = model.service
+      val controller = model.controller
+      if (svc == null || controller == null) {
+        // Instead of a blank window while the service starts its engine.
+        KetchSplash(model.appearance)
+        return@setContent
       }
+      val link = notificationLink
+      LaunchedEffect(controller, link) {
+        if (link == null) return@LaunchedEffect
+        controller.state.open(link)
+        notificationLink = null
+      }
+      App(
+        controller,
+        activityEvents = svc.activityEvents,
+        fileLogger = ketchApplication.fileLogger,
+      )
     }
   }
 
@@ -119,11 +118,11 @@ class MainActivity : ComponentActivity() {
   // The service's events show as toasts only while the activity is resumed.
   override fun onResume() {
     super.onResume()
-    service?.setInFront(true)
+    model.service?.setInFront(true)
   }
 
   override fun onPause() {
-    service?.setInFront(false)
+    model.service?.setInFront(false)
     super.onPause()
   }
 
@@ -151,7 +150,6 @@ class MainActivity : ComponentActivity() {
     super.onDestroy()
     // Dismissed without an answer, the offer shows again in the recreated activity.
     notificationRationale?.dismiss()
-    unbindService(connection)
   }
 
   /**
@@ -227,6 +225,78 @@ class MainActivity : ComponentActivity() {
     const val PERMISSION_PREFS = "permissions"
     const val KEY_NOTIFICATIONS_OFFERED = "notifications_offered"
     const val KEY_NOTIFICATIONS_DUE = "notifications_due"
+  }
+}
+
+/**
+ * What a [MainActivity] keeps while it is recreated, such as on rotation: the service binding
+ * and the controller of the service's devices, so adds and other commands in flight keep running
+ * and the window never waits for the service again. Both go when the activity finishes.
+ */
+internal class MainModel(application: Application) : AndroidViewModel(application) {
+  private val log = KetchLogger("MainModel")
+
+  /** The download service, once [connect] has bound it. */
+  var service: KetchService? by mutableStateOf(null)
+    private set
+
+  /** The controller of [service]'s devices; `null` while the service is not bound. */
+  var controller: AppController? by mutableStateOf(null)
+    private set
+
+  /** The saved theme and accent, read once for the splash shown until the service binds. */
+  val appearance: AppearanceConfig by lazy {
+    val path = application.filesDir.resolve(CONFIG_FILE).absolutePath
+    try {
+      FileConfigStore(path).load().appearance
+    } catch (e: Exception) {
+      log.d { "Couldn't read the appearance for the splash: ${e.describeCauses()}" }
+      AppearanceConfig()
+    }
+  }
+
+  private var bound = false
+
+  private val connection = object : ServiceConnection {
+    override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+      val connected = (binder as KetchService.LocalBinder).service
+      controller?.close()
+      controller = AppController(
+        instanceManager = connected.instanceManager,
+        aiProviderFactory = connected.aiProviderFactory,
+        incoming = getApplication<KetchApplication>().incoming,
+        speedMode = connected.speedMode,
+      )
+      service = connected
+    }
+
+    override fun onServiceDisconnected(name: ComponentName) {
+      service = null
+      controller?.close()
+      controller = null
+    }
+  }
+
+  /** Binds the service once; a recreated activity reuses the binding. */
+  fun connect() {
+    if (bound) return
+    val app = getApplication<Application>()
+    bound = app.bindService(Intent(app, KetchService::class.java), connection, BIND_AUTO_CREATE)
+  }
+
+  override fun onCleared() {
+    // The service closes its devices once unbound, so the controller goes first.
+    controller?.close()
+    controller = null
+    service = null
+    if (!bound) return
+    bound = false
+    getApplication<Application>().unbindService(connection)
+  }
+
+  private companion object {
+    // Where the service keeps the app's settings.
+    const val CONFIG_FILE = "config.toml"
   }
 }
 

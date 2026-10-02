@@ -159,7 +159,7 @@ internal fun TaskDetails(
     }
     // While the Controls show, they show the connections too.
     if (!row.state.hasControls && !row.isTorrent) {
-      val auto = state.instanceSettings.download?.maxConnectionsPerDownload?.takeIf { it > 0 }
+      val auto = autoConnectionsOf(state, listOf(row))
       DetailRow("Connections", copier, connectionLabel(request.connections, auto))
     }
     DetailRow("Device", copier, copy = device.name) {

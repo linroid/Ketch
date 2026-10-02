@@ -3370,7 +3370,7 @@ Sharing are hidden for remote devices.
 2. The mobile background policy closes after 10 minutes (virtual time).
 3. Old config files without `name` or `watch` load.
 4. `InstanceManager`'s existing public members (`instances`, `activeInstance`, `activeApi`,
-   `serverState`, `switchTo`, `addRemote`, `removeInstance`, `reconnectWithToken`, `startServer`,
+   `serverState`, `switchTo`, `addRemote`, `removeInstance`, `reconnectWith`, `startServer`,
    `stopServer`, `embedded`) stay source-compatible, because other W3 packages build against them.
 
 *Verification:* **std**, `./gradlew :config:jvmTest`.

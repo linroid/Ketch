@@ -1,5 +1,8 @@
 package com.linroid.ketch.app.ui.inspector
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -16,6 +19,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.DevicePennant
@@ -27,12 +32,18 @@ import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
+import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.rememberFocusVisibility
+import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
@@ -41,18 +52,27 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.downloads.StackedPennants
 import com.linroid.ketch.app.ui.inspector.tabs.formatSize
 import com.linroid.ketch.app.ui.inspector.tabs.formatSpeed
 import com.linroid.ketch.app.ui.inspector.tabs.plural
+import com.linroid.ketch.app.ui.pulse.totalHistory
 
 /**
  * What the inspector shows with no download selected: the active device's speed over the last
  * minute, connections in flight, slots and per-site limits in use, free space, the networks it
- * downloads over, and Up next, the first waiting downloads, each with Start now.
+ * downloads over, and Up next, the first waiting downloads, each with Start now. While every
+ * device shows, it sums them up instead (see [FleetOverview]).
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ScopeOverview(state: AppState, onClose: () -> Unit) {
+  val scope by state.deviceScope.collectAsState()
+  if (scope == DeviceScope.All) FleetOverview(state, onClose) else DeviceOverview(state, onClose)
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DeviceOverview(state: AppState, onClose: () -> Unit) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
@@ -195,6 +215,196 @@ internal fun ScopeOverview(state: AppState, onClose: () -> Unit) {
   }
 }
 
+/**
+ * The overview of every device at once: their total speed over the last minute, one band per
+ * device in its pennant hue, a line per device that shows it alone when clicked, connections in
+ * flight, and Up next across them.
+ */
+@Composable
+private fun FleetOverview(state: AppState, onClose: () -> Unit) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val type = KetchTheme.typography
+  val instances by state.instances.collectAsState()
+  val rows by state.taskList.rows.collectAsState()
+  val pulse by state.pulse.state.collectAsState()
+  val histories by state.speedHistory.histories.collectAsState()
+  val summary = remember(rows) { scopeSummary(rows, config = null) }
+  val labels = instances.associate { it.deviceId to it.label }
+
+  Column(verticalArrangement = Arrangement.spacedBy(spacing.s4)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(spacing.s3)) {
+      StackedPennants(
+        devices = pulse.devices.map { it.deviceId to (labels[it.deviceId] ?: it.name) },
+        size = DevicePennantDefaults.Medium,
+        modifier = Modifier.padding(top = spacing.s0_5),
+      )
+      Column(
+        verticalArrangement = Arrangement.spacedBy(spacing.s0_5),
+        modifier = Modifier.weight(1f),
+      ) {
+        Text(
+          text = "All devices",
+          style = type.titleM,
+          color = colors.textPrimary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+          text = keepPartsTogether(pulse.sentence(now = LocalClock.current.now())),
+          style = type.caption,
+          color = colors.textSecondary,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+      KetchIconButton(
+        icon = KetchIcon.Close,
+        contentDescription = "Close inspector",
+        onClick = onClose,
+        size = KetchButtonSize.Small,
+      )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
+      Text(
+        text = formatSpeed(pulse.totalSpeed),
+        style = type.numeralL,
+        color = colors.textPrimary,
+      )
+      val clock = LocalClock.current
+      // Every download of the last minute counts, finished ones too, each at the time it ran.
+      val bands = remember(histories, rows, colors) {
+        val now = clock.now()
+        rows.groupBy { it.key.deviceId }.mapNotNull { (deviceId, own) ->
+          val total = totalHistory(own.mapNotNull { histories[it.key] }, now)
+          val samples = total.samples.takeLast(CHART_SECONDS)
+          if (samples.none { it > 0 }) return@mapNotNull null
+          val hue = colors.deviceHue(deviceId)
+          SpeedBand(samples, if (colors.isDark) hue.dark else hue.light)
+        }
+      }
+      KetchSpeedChart(
+        bands = bands,
+        slots = CHART_SECONDS,
+        modifier = Modifier.fillMaxWidth().height(spacing.s16),
+      )
+      Row {
+        Text(
+          text = "1 min ago",
+          style = type.numeralS,
+          color = colors.textTertiary,
+          modifier = Modifier.weight(1f),
+        )
+        Text(text = "Now", style = type.numeralS, color = colors.textTertiary)
+      }
+    }
+
+    InspectorSection("Devices") {
+      for (device in pulse.devices) {
+        val entry = instances.firstOrNull { it.deviceId == device.deviceId } ?: continue
+        DeviceLine(
+          device = device,
+          pennantName = entry.label,
+          onClick = { state.switchInstance(entry) },
+        )
+      }
+    }
+
+    InspectorSection("In flight") {
+      Stat("Connections", connectionsText(summary))
+      Stat("Downloading", "${summary.running}")
+    }
+
+    InspectorSection("Up next") {
+      if (summary.upNext.isEmpty()) {
+        Text(
+          text = "Nothing is waiting on any device.",
+          style = type.bodyS,
+          color = colors.textTertiary,
+        )
+      }
+      for (row in summary.upNext) UpNextRow(state, row, showDevice = true)
+    }
+  }
+}
+
+/**
+ * One device of the [FleetOverview]: its pennant with its health, its name and what it does,
+ * such as "2 downloading · 1 failed · 412 GB free", and its speed; clicking it shows it alone.
+ */
+@Composable
+private fun DeviceLine(device: DevicePulse, pennantName: String, onClick: () -> Unit) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val type = KetchTheme.typography
+  val shape = KetchTheme.shapes.md
+  val interactions = remember { MutableInteractionSource() }
+  val overlay = rememberInteractionOverlay(interactions)
+  val focus = rememberFocusVisibility()
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+    modifier = Modifier
+      .fillMaxWidth()
+      .focusRing(focus.visible, shape, colors.focusRing)
+      .clip(shape)
+      .background(overlay)
+      .trackFocusVisibility(focus)
+      .clickable(
+        interactionSource = interactions,
+        indication = null,
+        role = Role.Button,
+        onClickLabel = "Show ${device.name} alone",
+        onClick = onClick,
+      )
+      .padding(horizontal = spacing.s1, vertical = spacing.s1),
+  ) {
+    DevicePennant(
+      deviceId = device.deviceId,
+      name = pennantName,
+      size = DevicePennantDefaults.Small,
+      health = device.health,
+    )
+    Column(Modifier.weight(1f)) {
+      Text(
+        text = device.name,
+        style = type.bodyStrong,
+        color = colors.textPrimary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+      Text(
+        text = keepPartsTogether(deviceLine(device)),
+        style = type.caption,
+        color = if (device.health.isOnline) colors.textSecondary else colors.status.failed.color,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
+    if (device.health.isOnline && device.speed > 0) {
+      Text(text = formatSpeed(device.speed), style = type.numeral, color = colors.textPrimary)
+    }
+  }
+}
+
+/** What [device] does, such as "2 downloading · 1 failed · 412 GB free", or why it is away. */
+internal fun deviceLine(device: DevicePulse): String = when (device.health) {
+  DeviceHealth.Connecting -> "Connecting…"
+  DeviceHealth.Unauthorized -> "Needs a new access token"
+  is DeviceHealth.Offline -> "Offline"
+  else -> {
+    val counts = device.counts
+    listOfNotNull(
+      "${counts.downloading} downloading".takeIf { counts.downloading > 0 },
+      "${counts.waiting} waiting".takeIf { counts.waiting > 0 },
+      "${device.failures} failed".takeIf { device.failures > 0 },
+      "Idle".takeIf { counts.downloading == 0 && counts.waiting == 0 && device.failures == 0 },
+      device.disk?.let { "${formatSize(it.usableBytes)} free" },
+    ).joinToString(" · ")
+  }
+}
+
 private fun connectionsText(summary: ScopeSummary): String {
   if (summary.transfers == 0) return "None"
   return "${summary.connections} across ${plural(summary.transfers, "download")}"
@@ -220,9 +430,12 @@ private fun Stat(label: String, value: String) {
   }
 }
 
-/** A waiting download: its chip, name and why it waits, and Start now. */
+/**
+ * A waiting download: its chip, name and why it waits, after its device when [showDevice], and
+ * Start now.
+ */
 @Composable
-private fun UpNextRow(state: AppState, row: TaskRow) {
+private fun UpNextRow(state: AppState, row: TaskRow, showDevice: Boolean = false) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   Row(
@@ -238,7 +451,11 @@ private fun UpNextRow(state: AppState, row: TaskRow) {
     Column(modifier = Modifier.weight(1f)) {
       MiddleText(row.name, KetchTheme.typography.bodyS, colors.textPrimary)
       Text(
-        text = row.content.detail,
+        text = if (showDevice) {
+          "${row.device.name} · ${row.content.detail}"
+        } else {
+          row.content.detail
+        },
         style = KetchTheme.typography.caption,
         color = colors.textTertiary,
         maxLines = 1,

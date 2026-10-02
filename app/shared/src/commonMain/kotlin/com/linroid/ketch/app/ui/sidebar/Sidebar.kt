@@ -1,5 +1,8 @@
 package com.linroid.ketch.app.ui.sidebar
 
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,8 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButtonSize
@@ -32,19 +38,21 @@ import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
+import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.shell.AddButton
 import com.linroid.ketch.app.ui.shell.AddButtonDefaults
 
 /**
  * The sidebar of wide windows, transparent over the canvas wash: the title zone with the
  * sidebar toggle and the ⊕ add button (beside the traffic lights on macOS, after the Ketch mark
- * on the web), the destinations, the DEVICES with their health and live lines, and Settings at
- * the bottom.
+ * on the web), the destinations, the DEVICES (All devices from two on, then each device with its
+ * health and live line, its menu and its drops), and Settings at the bottom.
  *
  * @param destination the destination shown, which sits on the selected pill.
  * @param settingsSelected whether Settings shows, which then takes the pill instead.
@@ -66,6 +74,7 @@ internal fun Sidebar(
   val spacing = KetchTheme.spacing
   val pulse by state.pulse.state.collectAsState()
   val active by state.activeInstance.collectAsState()
+  val scope by state.deviceScope.collectAsState()
   val devices = rememberDevices(state)
   Column(modifier.width(spacing.sidebarWidth).fillMaxHeight()) {
     TitleZone(
@@ -90,34 +99,32 @@ internal fun Sidebar(
       }
     }
     // The devices take the room left above Settings, and scroll in a short window.
-    Column(Modifier.weight(1f)) {
-      Text(
-        text = eyebrowText("Devices"),
-        style = KetchTheme.typography.eyebrow,
-        color = KetchTheme.colors.textSecondary,
-        modifier = Modifier.padding(
-          start = spacing.s4,
-          top = spacing.s6,
-          bottom = spacing.s1,
-        ),
-      )
+    val devicesHover = remember { MutableInteractionSource() }
+    val hovered by devicesHover.collectIsHoveredAsState()
+    Column(Modifier.weight(1f).hoverable(devicesHover)) {
+      DevicesEyebrow(showShortcut = hovered)
       Column(
         Modifier
           .weight(1f, fill = false)
           .heightIn(max = (KetchTheme.density.deviceRow + spacing.s1) * VISIBLE_DEVICE_ROWS)
           .verticalScroll(rememberScrollState()),
       ) {
-        for (device in devices) {
+        val all = scope == DeviceScope.All
+        if (devices.size >= DeviceScope.MIN_DEVICES) {
+          AllDevicesRow(devices = devices, selected = all, onClick = { state.showAllDevices() })
+        }
+        devices.forEachIndexed { index, device ->
           key(device.deviceId) {
             SidebarDeviceRow(
+              state = state,
               device = device,
-              active = device.deviceId == active?.deviceId,
-              onClick = { state.switchInstance(device.entry) },
+              number = index + 1,
+              active = !all && device.deviceId == active?.deviceId,
             )
           }
         }
       }
-      AddDeviceRow(onClick = { state.showAddRemoteDialog = true })
+      AddDeviceRow(onClick = { state.addDevice() })
     }
     KetchTooltip(text = "Settings", shortcut = KetchCommands.Settings.shortcutLabel()) {
       KetchSidebarItem(
@@ -126,6 +133,35 @@ internal fun Sidebar(
         selected = settingsSelected,
         onClick = onOpenSettings,
         modifier = Modifier.padding(bottom = spacing.s2),
+      )
+    }
+  }
+}
+
+/** The DEVICES label over the device rows, naming the switcher's chord while [showShortcut]. */
+@Composable
+private fun DevicesEyebrow(showShortcut: Boolean) {
+  val spacing = KetchTheme.spacing
+  val colors = KetchTheme.colors
+  Row(
+    verticalAlignment = Alignment.Bottom,
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(start = spacing.s4, end = spacing.s4, top = spacing.s6, bottom = spacing.s1),
+  ) {
+    Text(
+      text = eyebrowText("Devices"),
+      style = KetchTheme.typography.eyebrow,
+      color = colors.textSecondary,
+      modifier = Modifier.weight(1f),
+    )
+    val shortcut = KetchCommands.SwitchDevice.shortcutLabel()
+    if (shortcut != null) {
+      Text(
+        text = shortcut,
+        style = KetchTheme.typography.numeralS,
+        color = colors.textTertiary,
+        modifier = Modifier.alpha(if (showShortcut) 1f else 0f).clearAndSetSemantics {},
       )
     }
   }

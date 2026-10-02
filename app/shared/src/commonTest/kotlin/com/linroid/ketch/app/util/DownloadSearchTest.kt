@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.util
 
-import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
@@ -237,22 +236,6 @@ class DownloadSearchTest {
 
     assertEquals(TaskOrigin.Cli, TaskOrigin.of(request))
     assertNull(TaskOrigin.of(DownloadRequest("https://a.com/x")))
-  }
-
-  @Test
-  fun matchesSearch_request_searchesDecodedNameHostAndDestination() {
-    val request = DownloadRequest(
-      "https://example.com/assets%20v2.zip",
-      Destination("Design package.zip"),
-      headers = mapOf("referer" to "https://pages.example.org/"),
-    )
-
-    assertTrue(request.matchesSearch("  "))
-    assertTrue(request.matchesSearch(" DESIGN PACKAGE "))
-    assertTrue(request.matchesSearch("example.com"))
-    assertTrue(request.matchesSearch("pages.example.org"))
-    assertFalse(request.matchesSearch("holiday"))
-    assertTrue(DownloadRequest("https://example.com/my%20image.png").matchesSearch("my image"))
   }
 
   private fun query(text: String) = SearchQuery.parse(text)

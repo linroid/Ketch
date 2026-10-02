@@ -641,7 +641,11 @@ private fun MenuRow(
         overflow = TextOverflow.Ellipsis,
       )
       if (caption != null) {
-        Text(caption, style = KetchTheme.typography.caption, color = colors.textSecondary)
+        Text(
+          text = caption,
+          style = KetchTheme.typography.caption,
+          color = if (enabled) colors.textSecondary else colors.textDisabled,
+        )
       }
     }
     if (shortcut != null) {
@@ -810,13 +814,22 @@ private fun SheetRow(
       KetchIconImage(
         icon = icon,
         size = glyph,
-        tint = if (checked == true) colors.accentText else colors.textSecondary,
+        tint = when {
+          !enabled -> colors.textDisabled
+          checked == true -> colors.accentText
+          destructive -> ink
+          else -> colors.textSecondary
+        },
       )
     }
     Column(Modifier.weight(1f)) {
       Text(label, style = KetchTheme.typography.body, color = ink)
       if (caption != null) {
-        Text(caption, style = KetchTheme.typography.caption, color = colors.textSecondary)
+        Text(
+          text = caption,
+          style = KetchTheme.typography.caption,
+          color = if (enabled) colors.textSecondary else colors.textDisabled,
+        )
       }
     }
     if (submenu) KetchIconImage(KetchIcon.Chevron, size = glyph, tint = colors.textTertiary)

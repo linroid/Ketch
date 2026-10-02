@@ -13,6 +13,7 @@ import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.util.TaskOrigin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 /**
@@ -27,10 +28,14 @@ data class CandidateAddResult(
 )
 
 /**
- * Runs AI discovery searches and adds the candidates the user picks.
+ * Runs AI discovery searches, follows the steps the agent reports, and adds the candidates the
+ * user picks.
+ *
+ * A search asked for before discovery is set up waits in [pending] and runs with [runPending]
+ * once it is.
  *
  * @param aiSettings supplies the discovery provider.
- * @param scope runs the searches.
+ * @param scope runs the searches; it should use the main dispatcher.
  */
 class AiDiscoverController(
   private val aiSettings: AiSettingsController,
@@ -46,29 +51,50 @@ class AiDiscoverController(
   var state by mutableStateOf<AiDiscoverState>(AiDiscoverState.Idle)
     private set
 
+  /** Steps the agent reported during the current or last search, oldest first. */
+  var steps by mutableStateOf<List<DiscoveryStep>>(emptyList())
+    private set
+
+  /** A search that waits for discovery to be set up, or `null`. */
+  var pending by mutableStateOf<DiscoverRequest?>(null)
+    private set
+
   /**
    * Searches for [query], limited to [sites] (comma or space separated; blank searches the whole
-   * web). Cancels a search in progress.
+   * web). Cancels a search in progress. While discovery is not set up, the search waits in
+   * [pending] instead.
    */
   fun discover(query: String, sites: String) {
     job?.cancel()
+    steps = emptyList()
+    val siteList = parseSites(sites)
     val provider = aiSettings.provider
     if (provider == null) {
-      state = AiDiscoverState.Error(
-        if (aiSettings.supported) {
-          "Add an AI provider and API token in Settings first."
-        } else {
-          "AI discovery is not available on this platform."
-        },
-      )
+      if (aiSettings.supported) {
+        pending = DiscoverRequest(query, siteList).takeIf { query.isNotBlank() }
+        state = AiDiscoverState.Idle
+      } else {
+        state = AiDiscoverState.Error("AI discovery is not available on this device.")
+      }
       return
     }
+    pending = null
     state = AiDiscoverState.Loading
-    val siteList = sites.split(",", " ").map { it.trim() }.filter { it.isNotBlank() }
+    val request = AiDiscoverRequest(query = query, sites = siteList)
     job = scope.launch {
-      catchingUnlessCancelled {
-        provider.discover(AiDiscoverRequest(query = query, sites = siteList))
-      }.onSuccess { response ->
+      // The agent reports steps from its own threads; they reach the state in order, here.
+      val reported = Channel<DiscoveryStep>(Channel.UNLIMITED)
+      val follower = launch { for (step in reported) steps = steps + step }
+      val result = catchingUnlessCancelled {
+        try {
+          provider.discover(request) { reported.trySend(it) }
+        } finally {
+          reported.close()
+        }
+      }
+      follower.join()
+      result.onSuccess { response ->
+        log.i { "Found ${response.candidates.size} candidates in ${steps.size} steps" }
         state = AiDiscoverState.Results(candidates = response.candidates)
       }.onFailure { e ->
         log.w { "Discovery failed: ${e.describeCauses()}" }
@@ -77,7 +103,7 @@ class AiDiscoverController(
     }
   }
 
-  /** Fills the form from [request] and searches. */
+  /** Fills the form from [request] and searches, or keeps it in [pending] until set up. */
   fun discover(request: DiscoverRequest) {
     draft.query = request.query
     draft.sites = request.sites.joinToString(", ")
@@ -86,10 +112,43 @@ class AiDiscoverController(
     discover(draft.submittedQuery, draft.sites)
   }
 
-  /** Cancels the search and clears its results. */
+  /** Searches the form as it stands. */
+  fun search() {
+    draft.prepareSearch()
+    if (draft.submittedQuery.isEmpty()) return
+    discover(draft.submittedQuery, draft.sites)
+  }
+
+  /**
+   * Runs the search the results are for again, with the websites in the form, even after the
+   * search field was changed or cleared.
+   */
+  fun retry() {
+    if (draft.submittedQuery.isEmpty()) return
+    discover(draft.submittedQuery, draft.sites)
+  }
+
+  /** Runs the [pending] search, once discovery is set up. Returns whether it did. */
+  fun runPending(): Boolean {
+    val request = pending ?: return false
+    if (aiSettings.provider == null) return false
+    discover(request)
+    return true
+  }
+
+  /** Stops the search in progress, keeping the steps it reported. */
+  fun stop() {
+    if (job?.isActive != true) return
+    job?.cancel()
+    job = null
+    state = AiDiscoverState.Idle
+  }
+
+  /** Cancels the search and clears its results and steps. */
   fun reset() {
     job?.cancel()
     job = null
+    steps = emptyList()
     state = AiDiscoverState.Idle
   }
 
@@ -115,18 +174,46 @@ class AiDiscoverController(
     }
     return CandidateAddResult(added, failed)
   }
+
+  /**
+   * The add sheet's request for reviewing [candidates] before adding them to [targetDeviceId].
+   *
+   * @param query search that found them, recorded in the request properties.
+   */
+  fun reviewRequest(
+    candidates: List<AiCandidate>,
+    targetDeviceId: String?,
+    query: String = draft.submittedQuery,
+  ): IntakeRequest = IntakeRequest(
+    seeds = candidates.map { it.toSeed(query) },
+    targetDeviceId = targetDeviceId,
+  )
 }
 
 /** Builds the request that adds this candidate, remembering where it came from. */
 internal fun AiCandidate.toRequest(query: String): DownloadRequest = DownloadRequest(
   url = url,
   destination = fileName?.takeIf { it.isNotBlank() }?.let(::Destination),
-  headers = if (sourceUrl.isNotBlank()) mapOf("Referer" to sourceUrl) else emptyMap(),
-  properties = buildMap {
-    put(TaskOrigin.PROPERTY, TaskOrigin.Discover.id)
-    if (query.isNotBlank()) put(QUERY_PROPERTY, query)
-  },
+  headers = discoverHeaders(),
+  properties = discoverProperties(query),
 )
+
+/** The add sheet's row for this candidate, with the same headers and properties. */
+internal fun AiCandidate.toSeed(query: String): IntakeSeed = IntakeSeed(
+  url = url,
+  fileName = fileName?.takeIf { it.isNotBlank() },
+  headers = discoverHeaders(),
+  properties = discoverProperties(query),
+)
+
+// Servers that check the referrer see the page the link was found on, as a browser would send.
+private fun AiCandidate.discoverHeaders(): Map<String, String> =
+  if (sourceUrl.isNotBlank()) mapOf("Referer" to sourceUrl) else emptyMap()
+
+private fun discoverProperties(query: String): Map<String, String> = buildMap {
+  put(TaskOrigin.PROPERTY, TaskOrigin.Discover.id)
+  if (query.isNotBlank()) put(QUERY_PROPERTY, query)
+}
 
 /** Request property holding the Discover query that found a download. */
 internal const val QUERY_PROPERTY = "ketch.query"

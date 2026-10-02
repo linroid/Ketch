@@ -9,13 +9,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.window.ComposeViewport
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.feedback.reportWebActivity
-import com.linroid.ketch.config.KetchConfig
-import com.linroid.ketch.config.WebConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -24,10 +24,16 @@ import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
+import com.linroid.ketch.app.theme.darkKetchColors
+import com.linroid.ketch.app.theme.lightKetchColors
 import com.linroid.ketch.app.theme.rememberKetchFontsLoaded
+import com.linroid.ketch.app.ui.connect.connectTo
+import com.linroid.ketch.app.util.PairingLink
+import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.config.ThemeMode
+import com.linroid.ketch.config.WebConfigStore
 import kotlinx.browser.document
 import kotlinx.browser.window
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
@@ -40,9 +46,14 @@ fun main() {
   // No embedded Ketch installs a logger here, so the remote client's logs need one.
   KetchLogger.setLogger(Logger.console(LogLevel.INFO))
   val incoming = IncomingDownloads()
+  // The server that serves this page. A pairing link to it (`http://host:port/#token=…`) holds
+  // the access code in the fragment, which leaves the address before anything can show or keep
+  // it.
+  val launchUrl = window.location.href
+  val page = PairingLink.parse(launchUrl)
+  clearPairingCode()
   // Links the page was opened with, from the magnet protocol handler or the share target. They
   // leave the address at once, so a reload does not add them again.
-  val launchUrl = window.location.href
   incoming.offerLaunchLinks(launchUrl)
   clearLaunchLinks()
   var loadLaunch: String? = launchUrl
@@ -67,11 +78,25 @@ fun main() {
   )
   // The page owns the controller and the activity monitor for as long as it is open.
   val controller = AppController(instanceManager, incoming = incoming)
-  connectOnLoad(instanceManager, config, controller.scope)
+  connectOnLoad(controller, page)
   val activityEvents = reportWebActivity(controller)
   // Removals and other undoable operations still pending commit when the tab closes.
   window.addEventListener("pagehide", { controller.state.pendingOps.flush() })
+  controller.scope.launch {
+    controller.pulse.state.collect { document.title = it.tabTitle() }
+  }
   ComposeViewport(body) {
+    // The installed app's title bar takes the canvas color of the theme the app shows.
+    val themeMode = controller.appSettings.themeMode
+    LaunchedEffect(themeMode) {
+      val light = lightKetchColors().canvas.toHex()
+      val dark = darkKetchColors().canvas.toHex()
+      when (themeMode) {
+        ThemeMode.System -> setThemeColors(light, dark)
+        ThemeMode.Light -> setThemeColors(light, light)
+        ThemeMode.Dark -> setThemeColors(dark, dark)
+      }
+    }
     // The splash in index.html stays until the fonts are cached, so text never flashes in a
     // fallback font. A font that fails to load must not keep the app hidden.
     var fontWaitOver by remember { mutableStateOf(false) }
@@ -91,24 +116,43 @@ fun main() {
 
 private val FONT_WAIT_LIMIT = 5.seconds
 
-// Connects to the server that serves this page, or to the first saved remote.
-private fun connectOnLoad(
-  instanceManager: InstanceManager,
-  config: KetchConfig,
-  scope: CoroutineScope,
-) {
-  if (config.remotes.isEmpty() && shouldAutoConnect()) {
-    val host = window.location.hostname
-    val port = window.location.port.toIntOrNull() ?: 80
-    val entry = instanceManager.addRemote(host, port)
-    scope.launch { instanceManager.switchTo(entry) }
-  } else if (config.remotes.isNotEmpty()) {
-    // Web has no embedded instance, so select by type rather than index.
-    val first = instanceManager.instances.value
-      .filterIsInstance<RemoteInstance>().firstOrNull()
-    if (first != null) {
-      scope.launch { instanceManager.switchTo(first) }
+/** [this] as `#RRGGBB`. */
+private fun Color.toHex(): String = "#" + (toArgb() and RGB_MASK).toString(HEX).padStart(6, '0')
+
+private const val RGB_MASK = 0xFFFFFF
+private const val HEX = 16
+
+/**
+ * Sets the `theme-color` metas of index.html, which color the installed app's title bar: [light]
+ * where the system is light and [dark] where it is dark.
+ */
+private fun setThemeColors(light: String, dark: String): Unit = js(
+  """{
+  for (const meta of document.querySelectorAll("meta[name='theme-color']")) {
+    const isDark = (meta.getAttribute('media') || '').includes('dark');
+    meta.setAttribute('content', isDark ? dark : light);
+  }
+}"""
+)
+
+/**
+ * Connects to the server of the [page] when the address carried its access code, or when
+ * nothing is saved and the page was served by that server ([shouldAutoConnect]); otherwise
+ * shows the first saved device, unless the one shown last time is shown again. With none of
+ * these, the app shows its connect page.
+ */
+private fun connectOnLoad(controller: AppController, page: PairingLink?) {
+  val state = controller.state
+  val manager = state.instanceManager
+  // Web has no embedded instance, so every device is a remote one.
+  val remotes = manager.instances.value.filterIsInstance<RemoteInstance>()
+  when {
+    page?.token != null -> controller.scope.launch { state.connectTo(page) }
+    page != null && remotes.isEmpty() && shouldAutoConnect() -> {
+      val server = RemoteConfig(host = page.host, port = page.port, secure = page.secure)
+      state.switchInstance(manager.addRemote(server))
     }
+    manager.activeInstance.value == null -> remotes.firstOrNull()?.let(state::switchInstance)
   }
 }
 
@@ -127,6 +171,20 @@ private fun IncomingDownloads.offerLaunchLinks(url: String) {
 /** Every value of the query parameter [name] in [url], one per line. */
 private fun queryValues(url: String, name: String): String =
   js("""new URL(url).searchParams.getAll(name).join('\n')""")
+
+/** Removes the access code from the address's fragment, keeping its history entry. */
+private fun clearPairingCode(): Unit = js(
+  """{
+  const url = new URL(window.location.href);
+  const fragment = new URLSearchParams(url.hash.substring(1));
+  if (fragment.has('token')) {
+    fragment.delete('token');
+    const rest = fragment.toString();
+    url.hash = rest ? '#' + rest : '';
+    window.history.replaceState(window.history.state, '', url.href);
+  }
+}"""
+)
 
 /** Removes the launch links' parameters from the address, keeping its history entry. */
 private fun clearLaunchLinks(): Unit = js(

@@ -11,8 +11,8 @@ import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.ui.feedback.toastDetail
-import com.linroid.ketch.app.ui.intake.initialUrl
 import com.linroid.ketch.config.KetchConfig
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -48,6 +48,9 @@ class AppStateSeamsTest {
     )
   }
 
+  private fun firstLink(state: AppState): String =
+    assertNotNull(state.intakeRequest).text.lines().first()
+
   @Test
   fun incomingLinks_offered_openTheAddDialogWithTheFirstLink() = runTest {
     val incoming = IncomingDownloads()
@@ -57,7 +60,7 @@ class AppStateSeamsTest {
     runCurrent()
 
     assertTrue(state.showAddDialog)
-    assertEquals(magnet, initialUrl(assertNotNull(state.intakeRequest)))
+    assertEquals(magnet, firstLink(state))
   }
 
   @Test
@@ -71,7 +74,7 @@ class AppStateSeamsTest {
     state.closeAddDialog()
     runCurrent()
 
-    assertEquals("https://example.com/b.iso", initialUrl(assertNotNull(state.intakeRequest)))
+    assertEquals("https://example.com/b.iso", firstLink(state))
     state.closeAddDialog()
     runCurrent()
     assertFalse(state.showAddDialog)
@@ -91,7 +94,7 @@ class AppStateSeamsTest {
     runCurrent()
 
     assertTrue(state.showAddDialog)
-    assertEquals(magnet, initialUrl(assertNotNull(state.intakeRequest)))
+    assertEquals(magnet, firstLink(state))
   }
 
   @Test
@@ -102,24 +105,21 @@ class AppStateSeamsTest {
     runCurrent()
 
     assertTrue(state.showAddDialog)
-    assertEquals(
-      "https://example.com/ubuntu.iso",
-      initialUrl(assertNotNull(state.intakeRequest))
-    )
+    assertEquals("https://example.com/ubuntu.iso", firstLink(state))
   }
 
   @Test
-  fun addDroppedText_whileTheDialogShowsAnotherLink_dropsItsResolution() = runTest {
+  fun addDroppedText_whileTheDialogShowsAFile_dropsItsResolution() = runTest {
     val state = appState()
     state.openIntake()
-    state.resolveUrl("https://example.com/a.iso")
+    state.resolveDroppedFile(DroppedFile("a.torrent") { _ -> byteArrayOf(1) })
     runCurrent()
     assertIs<ResolveState.Error>(state.resolveState)
 
     state.addDroppedText("https://example.com/b.iso")
 
     assertEquals(ResolveState.Idle, state.resolveState)
-    assertEquals("https://example.com/b.iso", initialUrl(assertNotNull(state.intakeRequest)))
+    assertEquals("https://example.com/b.iso", firstLink(state))
   }
 
   @Test

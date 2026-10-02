@@ -316,9 +316,6 @@ sealed class SearchToken {
   }
 
   companion object {
-    /** The keys tokens may have. */
-    val KEYS: List<String> = listOf(IS, TYPE, HOST, ORIGIN, DEVICE, SIZE, ADDED)
-
     /** Reads `key:value`, or returns `null` when the key or value is not recognized. */
     fun parse(key: String, value: String): SearchToken? {
       val text = value.trim()
@@ -464,23 +461,6 @@ data class SearchQuery(
       return SearchQuery(terms, tokens)
     }
   }
-}
-
-/**
- * Whether the task downloading this request matches the free text of [query], searching its
- * decoded display name, host, referer host and destination. Tokens are ignored, since the
- * request alone has no state.
- */
-internal fun DownloadRequest.matchesSearch(query: String): Boolean {
-  val terms = SearchQuery.parse(query).terms
-  if (terms.isEmpty()) return true
-  val fields = listOfNotNull(
-    displayName(this),
-    urlHost(url),
-    referer?.let(::urlHost),
-    destination?.value?.let(::decodePath)
-  )
-  return terms.all { term -> fields.any { it.contains(term, ignoreCase = true) } }
 }
 
 /** [path] with the escapes of an Android `content://` URI decoded; other paths are kept. */

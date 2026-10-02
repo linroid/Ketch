@@ -25,6 +25,8 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.ToastMode
+import com.linroid.ketch.app.input.KetchCommand
+import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
@@ -32,6 +34,7 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LanServerDiscovery
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.util.LinkKind
@@ -106,8 +109,9 @@ val InstanceEntry.deviceId: String
   }
 
 /**
- * App state shared by every screen: the devices, the active device's tasks, the commands that act
- * on them and the requests that open the app's surfaces.
+ * App state shared by every screen: the devices, the tasks of the device shown or of every
+ * device at once ([deviceScope]), the commands that act on them and the requests that open the
+ * app's surfaces.
  *
  * Commands run in [scope], which outlives the UI (see [AppController]), report failures through
  * [messages] and register their Undo with [pendingOps]. Like the Compose state it holds, it is
@@ -116,6 +120,8 @@ val InstanceEntry.deviceId: String
  * @param scope runs the commands; it should use a `SupervisorJob` and the main dispatcher.
  * @param speedMode speed mode of the embedded device, owned by the host, such as the service whose
  *   notification switches it; `null` when the host keeps none.
+ * @property incoming downloads and pairing links opened from outside the app; the shell asks
+ *   before it connects to a device a pairing link names.
  * @property clock current time of the task list, the speed history and the time labels.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -124,7 +130,7 @@ class AppState(
   private val scope: CoroutineScope,
   val appSettings: AppSettingsController = AppSettingsController(),
   val aiSettings: AiSettingsController = AiSettingsController(),
-  private val incoming: IncomingDownloads = IncomingDownloads(),
+  val incoming: IncomingDownloads = IncomingDownloads(),
   val messages: MessageCenter = MessageCenter(),
   val speedMode: SpeedModeController? = null,
   val clock: Clock = Clock.System,
@@ -159,10 +165,27 @@ class AppState(
       null
     )
 
-  /** Tasks of the active device, without the ones a pending operation hides. */
+  /**
+   * Which devices the app shows: the active one, or every device at once (see
+   * [showAllDevices]). New downloads go to the active device either way.
+   */
+  val deviceScope: StateFlow<DeviceScope> = instanceManager.deviceScope
+
+  /** The devices the app shows, in the order of [instances]. */
+  val shownInstances: StateFlow<List<InstanceEntry>> =
+    combine(instances, activeInstance, deviceScope) { entries, active, shown ->
+      if (shown == DeviceScope.All) entries else listOfNotNull(active)
+    }.stateIn(scope, SharingStarted.Eagerly, listOfNotNull(activeInstance.value))
+
+  /** Tasks of the shown devices, without the ones a pending operation hides. */
   val tasks: StateFlow<List<DownloadTask>> =
-    activeInstance.flatMapLatest { entry -> entry?.let(::visibleTasksOf) ?: flowOf(emptyList()) }
-      .stateIn(scope, SharingStarted.Eagerly, emptyList())
+    shownInstances.flatMapLatest { entries ->
+      if (entries.isEmpty()) {
+        flowOf(emptyList())
+      } else {
+        combine(entries.map(::visibleTasksOf)) { lists -> lists.flatMap { it } }
+      }
+    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
   private val pendingCounts = mutableMapOf<Pair<TaskKey, String>, Int>()
   private val pendingState = MutableStateFlow<Set<Pair<TaskKey, String>>>(emptySet())
@@ -211,9 +234,6 @@ class AppState(
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
 
-  /** State of the current AI discovery search. */
-  val aiDiscoverState: AiDiscoverState get() = aiDiscover.state
-
   /** The opened file the add dialog shows, or null when the user types a URL. */
   var openedDownload by mutableStateOf<IncomingDownload.Ready?>(null)
     private set
@@ -243,6 +263,13 @@ class AppState(
   var shortcutsRequested by mutableStateOf(false)
     private set
 
+  /**
+   * A command only the window's shell runs, such as the command palette picked from the macOS
+   * menu bar; the shell runs it and clears this with [shellCommandHandled].
+   */
+  var shellCommand by mutableStateOf<KetchCommand?>(null)
+    private set
+
   /** A Discover search the shell should navigate to, cleared with [discoverRequestHandled]. */
   var discoverRequest by mutableStateOf<DiscoverRequest?>(null)
     private set
@@ -257,6 +284,10 @@ class AppState(
 
   /** Selected rows of the task list. */
   var selectedKeys by mutableStateOf(emptySet<TaskKey>())
+
+  /** A Send to waiting for the user to accept that cookies go along; see [sendTo]. */
+  var sendConfirmation by mutableStateOf<SendConfirmation?>(null)
+    private set
 
   private val focusSearch = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -292,28 +323,32 @@ class AppState(
   var droppedFile by mutableStateOf<DroppedFile?>(null)
     private set
 
-  /** The URL or file whose resolution [resolveState] reflects. */
-  private var resolving: Any? = null
+  /** The dropped file whose resolution [resolveState] reflects. */
+  private var resolving: DroppedFile? = null
+
+  /** The device [droppedFile] is resolved on, whose result the add sheet can reuse. */
+  internal var droppedFileApi: KetchApi? = null
+    private set
 
   /** Speed mode of the embedded device; full speed when the host keeps no [speedMode]. */
   private val localMode: StateFlow<SpeedMode> = speedMode?.mode ?: MutableStateFlow(SpeedMode.Full)
 
-  // Built on the main thread, which owns the settings cache; the models collect them elsewhere.
+  // Every device is listed and watched, shown or not, so switching keeps each device's speed
+  // samples, histories and timelines. Built on the main thread, which owns the settings cache;
+  // the models collect them elsewhere.
   private val listSources: StateFlow<List<TaskListSource>> =
-    combine(activeInstance, snapshotFlow { aiSettings.available }) { entry, discover ->
-      listOfNotNull(entry?.let { listSourceOf(it, discover) })
+    combine(instances, snapshotFlow { aiSettings.supported }) { entries, discover ->
+      entries.map { listSourceOf(it, discover) }
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-  // The embedded device is watched even while another one shows, so its speed mode keeps
-  // recording its speed.
   private val pulseSources: StateFlow<List<PulseSource>> =
-    combine(instances, activeInstance) { entries, active ->
-      entries.filter { it is EmbeddedInstance && it != active } + listOfNotNull(active)
-    }.distinctUntilChanged()
-      .map { entries -> entries.map(::pulseSourceOf) }
+    instances.map { entries -> entries.map(::pulseSourceOf) }
       .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-  /** Rows of the active device's tasks, and the tab, search and order the Downloads list shows. */
+  /**
+   * Rows of the shown devices' tasks, and the tab, search and order the Downloads list shows.
+   * It keeps rows for the other devices too, in [TaskListModel.allRows].
+   */
   val taskList: TaskListModel = TaskListModel(
     sources = listSources,
     scope = scope,
@@ -321,11 +356,12 @@ class AppState(
     query = searchState.flow,
     arrangement = arrangementState.flow,
     frozen = frozenState.flow,
+    shown = shownScope(),
     clock = clock,
   )
 
-  /** Speed of each task once a second, for the inspector's Activity chart. */
-  val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.rows, scope, clock)
+  /** Speed of each task of every device once a second, for the inspector's Activity chart. */
+  val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.allRows, scope, clock)
 
   /**
    * The add sheet's sessions. They run in the app scope, so adding, or a torrent's file list
@@ -333,15 +369,21 @@ class AppState(
    */
   val intake: IntakeController by lazy { IntakeController(this, scope) }
 
-  /** Speed, counts, speed limit, free space and health of the active device. */
+  /**
+   * Speed, counts, speed limit, free space and health of the shown devices. Every device is
+   * watched, so each keeps its speed history while another one shows.
+   */
   val pulse: PulseModel = PulseModel(
     sources = pulseSources,
-    pulseScope = activeInstance.map { PulseScope.Device(it?.deviceId ?: LOCAL_DEVICE_ID) },
-    mode = combine(activeInstance, localMode) { entry, mode ->
-      if (entry is RemoteInstance) SpeedMode.Full else mode
+    pulseScope = shownScope().map { it.toPulseScope() },
+    mode = combine(activeInstance, deviceScope, localMode) { entry, shown, mode ->
+      if (entry is RemoteInstance && shown != DeviceScope.All) SpeedMode.Full else mode
     },
     scope = scope,
   )
+
+  // Devices named by the last add of each kind this session, by device id.
+  private val lastTargets = mutableMapOf<IntakeKind, String>()
 
   init {
     scope.launch {
@@ -385,6 +427,25 @@ class AppState(
       instances.collect { entries -> settingsCache.keys.retainAll(entries.toSet()) }
     }
     scope.launch {
+      // Picking another device to work on picks where adds go, until another add says otherwise.
+      activeInstance.drop(1).collect { lastTargets.clear() }
+    }
+    scope.launch {
+      // Every shown device's limits explain why its queued tasks wait, including devices added
+      // while every device shows.
+      val loaded = mutableSetOf<InstanceEntry>()
+      combine(deviceScope, instances) { shown, entries ->
+        entries.takeIf { shown == DeviceScope.All }
+      }.collect { entries ->
+        if (entries == null) {
+          loaded.clear()
+          return@collect
+        }
+        entries.filter { it != activeInstance.value && loaded.add(it) }
+          .forEach { settingsFor(it).loadDownload() }
+      }
+    }
+    scope.launch {
       // A speed mode changes the embedded device's limit; read it back for the speed readout.
       localMode.drop(1).collect {
         instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)?.loadDownload()
@@ -413,6 +474,20 @@ class AppState(
     val settings = speedMode?.settings?.value ?: return live
     return if (settings.mode == SpeedLimitMode.Full) live else settings.standard
   }
+
+  /** [deviceScope], naming the active device when it shows alone. */
+  private fun shownScope(): Flow<DeviceScope> =
+    combine(activeInstance, deviceScope) { active, shown ->
+      if (shown == DeviceScope.All) {
+        shown
+      } else {
+        DeviceScope.Single(active?.deviceId ?: LOCAL_DEVICE_ID)
+      }
+    }.distinctUntilChanged()
+
+  /** Settings controller of the device with [deviceId], or `null` when it is not configured. */
+  fun settingsOf(deviceId: String): InstanceSettingsController? =
+    instances.value.firstOrNull { it.deviceId == deviceId }?.let(::settingsFor)
 
   private fun settingsForActive(): InstanceSettingsController =
     activeInstance.value?.let(::settingsFor)
@@ -475,6 +550,16 @@ class AppState(
     shortcutsRequested = false
   }
 
+  /** Asks the window's shell to run [command], which needs the shell's own state. */
+  fun runInShell(command: KetchCommand) {
+    shellCommand = command
+  }
+
+  /** Marks [shellCommand] as run. */
+  fun shellCommandHandled() {
+    shellCommand = null
+  }
+
   /** Fills Discover with [request], starts the search and asks the shell to show Discover. */
   fun openDiscover(request: DiscoverRequest) {
     aiDiscover.discover(request)
@@ -506,28 +591,6 @@ class AppState(
   fun showDownloads(filter: StatusFilter = StatusFilter.All) {
     statusFilter = filter
     showDownloadsRequests.tryEmit(Unit)
-  }
-
-  fun resolveUrl(url: String) {
-    resolving = url
-    resolveState = ResolveState.Resolving
-    scope.launch {
-      runCatching {
-        activeApi.value.resolve(url)
-      }.onSuccess { result ->
-        if (resolving == url) {
-          resolveState = ResolveState.Resolved(result)
-        }
-      }.onFailure { e ->
-        if (e is CancellationException) throw e
-        if (resolving == url) {
-          resolveState = ResolveState.Error(
-            message = e.message ?: "Failed to resolve URL",
-            cause = e,
-          )
-        }
-      }
-    }
   }
 
   /**
@@ -571,15 +634,20 @@ class AppState(
     if (trimmed.isNotEmpty()) openIntake(IntakeRequest(text = trimmed))
   }
 
-  /** Reads [file] and resolves its content; also retries a failed attempt. */
-  fun resolveDroppedFile(file: DroppedFile) {
+  /**
+   * Reads [file] and resolves its content on [target], by default the active device; also
+   * retries a failed attempt.
+   */
+  fun resolveDroppedFile(file: DroppedFile, target: InstanceEntry? = null) {
+    val api = target?.instance ?: activeApi.value
     droppedFile = file
+    droppedFileApi = api
     resolving = file
     resolveState = ResolveState.Resolving
     scope.launch {
       runCatching {
         val content = file.readBytes(MAX_DROPPED_FILE_BYTES)
-        activeApi.value.resolveContent(content, file.name)
+        api.resolveContent(content, file.name)
       }.onSuccess { result ->
         if (resolving === file) {
           resolveState = ResolveState.Resolved(result)
@@ -604,35 +672,8 @@ class AppState(
   fun resetResolveState() {
     resolving = null
     droppedFile = null
+    droppedFileApi = null
     resolveState = ResolveState.Idle
-  }
-
-  fun startDownload(
-    url: String,
-    fileName: String,
-    speedLimit: SpeedLimit,
-    priority: DownloadPriority,
-    schedule: DownloadSchedule = DownloadSchedule.Immediate,
-    resolvedUrl: ResolvedSource? = null,
-    selectedFileIds: Set<String> = emptySet(),
-  ) {
-    val entry = activeInstance.value
-    val request = try {
-      DownloadRequest(
-        url = url,
-        destination = fileName.ifBlank { null }
-          ?.let { Destination(it) },
-        speedLimit = speedLimit,
-        priority = priority,
-        schedule = schedule,
-        resolvedSource = resolvedUrl,
-        selectedFileIds = selectedFileIds,
-      )
-    } catch (e: IllegalArgumentException) {
-      postError("Couldn't add the download", detail = e.message, cause = e)
-      return
-    }
-    scope.launch { addRequests(entry, listOf(request)) }
   }
 
   /**
@@ -640,7 +681,7 @@ class AppState(
    * and connections from [com.linroid.ketch.config.UiPreferences.intake]). The toast offers
    * Options and, for 8 seconds, Undo, which removes the new tasks and their files.
    */
-  fun quickAdd(urls: List<String>, target: InstanceEntry? = activeInstance.value): Job =
+  fun quickAdd(urls: List<String>, target: InstanceEntry? = quickAddTarget()): Job =
     scope.launch {
       val entry = target ?: run {
         showAddRemoteDialog = true
@@ -665,14 +706,18 @@ class AppState(
         }
       }
       if (requests.isEmpty()) return@launch
+      rememberTarget(IntakeKind.Links, entry)
       if (statusFilter != StatusFilter.All) statusFilter = StatusFilter.All
       addRequests(entry, requests, offerOptions = true)
     }
 
+  /**
+   * Shows [instance] alone and makes it the target of new downloads. Picking the active device
+   * while every device shows goes back to showing it alone.
+   */
   fun switchInstance(instance: InstanceEntry) {
-    if (instance == activeInstance.value ||
-      switchingInstance != null
-    ) return
+    val shown = instance == activeInstance.value && deviceScope.value != DeviceScope.All
+    if (shown || switchingInstance != null) return
     switchingInstance = instance
     scope.launch {
       try {
@@ -690,17 +735,37 @@ class AppState(
     }
   }
 
-  fun addRemoteServer(
-    host: String,
-    port: Int,
-    token: String?,
-  ) {
-    try {
-      instanceManager.addRemote(host, port, token)
-    } catch (e: Exception) {
-      log.w { "Couldn't add $host:$port: ${e.describeCauses()}" }
-      postError("Couldn't add $host:$port", detail = e.message, cause = e)
-    }
+  /**
+   * Shows the downloads of every device at once (`⌘⌥0`); the active device stays the target of
+   * new downloads. Returns `false`, and changes nothing, with fewer than
+   * [DeviceScope.MIN_DEVICES] devices.
+   */
+  fun showAllDevices(): Boolean {
+    val shown = instanceManager.showAllDevices()
+    if (shown) showInstanceSelector = false
+    return shown
+  }
+
+  /**
+   * The device downloads of [kind] were last added to this session, while it is still
+   * configured; `null` before the first add.
+   */
+  fun lastTarget(kind: IntakeKind): InstanceEntry? =
+    lastTargets[kind]?.let { id -> instances.value.firstOrNull { it.deviceId == id } }
+
+  /** Remembers [target] as where downloads of [kind] go, for the rest of the session. */
+  fun rememberTarget(kind: IntakeKind, target: InstanceEntry) {
+    lastTargets[kind] = target.deviceId
+  }
+
+  /**
+   * Where a link added without the sheet goes: the active device, or under All devices the
+   * device links were last added to.
+   */
+  fun quickAddTarget(): InstanceEntry? {
+    val active = activeInstance.value
+    if (deviceScope.value != DeviceScope.All) return active
+    return lastTarget(IntakeKind.Links) ?: active
   }
 
   fun discoverRemoteServers(port: Int = 8642) {
@@ -722,19 +787,6 @@ class AppState(
     }
   }
 
-  fun stopDiscovery() {
-    discoveryJob?.cancel()
-    discoveryJob = null
-    val current = discoveryState
-    discoveryState = DiscoveryState.Finished(
-      servers = if (current is DiscoveryState.Discovering) {
-        current.servers
-      } else {
-        emptyList()
-      }
-    )
-  }
-
   fun resetDiscovery() {
     discoveryJob?.cancel()
     discoveryJob = null
@@ -750,23 +802,6 @@ class AppState(
       } catch (e: Exception) {
         log.w { "Couldn't remove ${instance.label}: ${e.describeCauses()}" }
         postError("Couldn't remove ${instance.label}", detail = e.message, cause = e)
-      }
-    }
-  }
-
-  fun reconnectWithToken(
-    instance: RemoteInstance,
-    token: String,
-  ) {
-    unauthorizedInstance = null
-    scope.launch {
-      try {
-        instanceManager.reconnectWithToken(instance, token)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        log.w { "Couldn't reconnect to ${instance.label}: ${e.describeCauses()}" }
-        postError("Couldn't reconnect to ${instance.label}", detail = e.message, cause = e)
       }
     }
   }
@@ -814,11 +849,11 @@ class AppState(
   }
 
   /**
-   * Pauses every queued task, then every downloading one, on each of [targets], so the queue
-   * cannot start a task that was waiting. Scheduled tasks keep their schedule. Undo resumes
-   * exactly the tasks this paused.
+   * Pauses every queued task, then every downloading one, on each of [targets] (the shown
+   * devices by default), so the queue cannot start a task that was waiting. Scheduled tasks keep
+   * their schedule. Undo resumes exactly the tasks this paused.
    */
-  fun pauseAll(targets: List<InstanceEntry> = listOfNotNull(activeInstance.value)): Job =
+  fun pauseAll(targets: List<InstanceEntry> = shownInstances.value): Job =
     scope.launch {
       val results = supervisorScope {
         targets.map { entry -> async { entry to pauseDevice(entry) } }.awaitAll()
@@ -839,9 +874,10 @@ class AppState(
       val op = pendingOps.register(label = "Pause All", undo = {
         reportFailures("resume", runEach(paused) { it.resume() })
       })
+      val devices = results.count { (_, result) -> result.paused.isNotEmpty() }
       val title = buildString {
         append("Paused ${downloads(paused.size)}")
-        if (targets.size > 1) append(" on ${targets.size} devices")
+        if (devices > 1) append(" on $devices devices")
         scheduledNote(scheduled)?.let { append(" · ").append(it) }
         if (failures.isNotEmpty()) append(" · ${failures.size} failed")
       }
@@ -854,47 +890,52 @@ class AppState(
       )
     }
 
-  /** Resumes every paused task on each of [targets]. */
-  fun resumeAll(targets: List<InstanceEntry> = listOfNotNull(activeInstance.value)): Job =
+  /** Resumes every paused task on each of [targets], the shown devices by default. */
+  fun resumeAll(targets: List<InstanceEntry> = shownInstances.value): Job =
     scope.launch {
-      val tasks = targets.flatMap { visibleTasks(it) }
-        .filter { it.state.value is DownloadState.Paused }
+      val tasks = targets.flatMap { entry ->
+        visibleTasks(entry).filter { it.state.value is DownloadState.Paused }.map { entry to it }
+      }
       if (tasks.isEmpty()) return@launch
-      val results = runEach(tasks) { it.resume() }
-      reportBatch("Resumed", "resume", results, devices = targets.size)
+      val results = runEach(tasks) { (_, task) -> task.resume() }
+      reportBatch(
+        verb = "Resumed",
+        command = "resume",
+        results = results.map { (pair, error) -> pair.second to error },
+        devices = tasks.distinctBy { it.first.deviceId }.size,
+      )
     }
 
   /**
-   * Retries every failed task on each of [targets]. Tasks whose progress cannot be reused (the
-   * file changed, the saved progress is damaged, or the server refused to resume) start over.
+   * Retries every failed task on each of [targets], the shown devices by default. Tasks whose
+   * progress cannot be reused (the file changed, the saved progress is damaged, or the server
+   * refused to resume) start over.
    */
-  fun retryFailed(targets: List<InstanceEntry> = listOfNotNull(activeInstance.value)): Job =
+  fun retryFailed(targets: List<InstanceEntry> = shownInstances.value): Job =
     scope.launch {
       val tasks = targets.flatMap { entry ->
         visibleTasks(entry).filter { it.state.value is DownloadState.Failed }.map { entry to it }
       }
       if (tasks.isEmpty()) return@launch
-      val results = runEach(tasks) { (entry, task) ->
-        val failed = task.state.value as? DownloadState.Failed
-        if (failed != null && failed.error.needsFreshStart()) {
-          restart(entry, task)
-        } else {
-          task.resume()
-        }
-      }
-      reportBatch("Retrying", "retry", results.map { (pair, error) -> pair.second to error })
+      val results = runEach(tasks) { (entry, task) -> retryOn(entry, task) }
+      reportBatch(
+        verb = "Retrying",
+        command = "retry",
+        results = results.map { (pair, error) -> pair.second to error },
+        devices = tasks.distinctBy { it.first.deviceId }.size,
+      )
     }
 
   /**
-   * Removes the finished tasks of each of [targets] from the list, keeping their files. The rows
-   * hide at once and are removed when the Undo window ends.
+   * Removes the finished tasks of each of [targets] (the shown devices by default) from the
+   * list, keeping their files. The rows hide at once and are removed when the Undo window ends.
    */
-  fun clearCompleted(targets: List<InstanceEntry> = listOfNotNull(activeInstance.value)) {
+  fun clearCompleted(targets: List<InstanceEntry> = shownInstances.value) {
     val tasks = targets.flatMap { entry ->
       visibleTasks(entry).filter { it.state.value is DownloadState.Completed }
     }
     if (tasks.isEmpty()) return
-    deferRemoval(tasks, deleteFiles = false, label = "Clear Finished") { count ->
+    deferRemoval(tasks, deleteFiles = { false }, label = "Clear Finished") { count ->
       "Cleared $count finished ${if (count == 1) "download" else "downloads"}"
     }
   }
@@ -904,6 +945,10 @@ class AppState(
    * once and are removed when the Undo window ends or the app closes.
    */
   fun remove(tasks: List<DownloadTask>, deleteFiles: Boolean = false) {
+    removeTasks(tasks) { deleteFiles }
+  }
+
+  private fun removeTasks(tasks: List<DownloadTask>, deleteFiles: (DownloadTask) -> Boolean) {
     if (tasks.isEmpty()) return
     deferRemoval(tasks, deleteFiles, label = "Remove") { count ->
       if (count == 1) "Removed ${tasks.single().displayName()}"
@@ -939,25 +984,56 @@ class AppState(
    * Starts [task] over as a new task on the same device and removes the old one, with its
    * partial file. A finished task keeps its file.
    */
-  fun redownload(task: DownloadTask): Job = scope.launch {
-    val entry = deviceOf(task) ?: return@launch
-    val key = TaskKey(entry.deviceId, task.taskId)
-    trackPending(key, "download again") {
-      val name = task.displayName()
-      catchingUnlessCancelled { restart(entry, task) }
-        .onSuccess {
-          messages.post(MessageLevel.Success, "Restarted $name", deviceId = entry.deviceId)
-        }
-        .onFailure { e ->
-          log.w { "Couldn't restart taskId=${task.taskId}: ${e.describeCauses()}" }
-          postError(
-            title = "Couldn't download $name again on ${nameOf(entry)}",
-            detail = e.message,
-            cause = e,
-            taskKey = key,
-          )
-        }
+  fun redownload(task: DownloadTask): Job = redownload(listOf(task))
+
+  /**
+   * Starts each of [tasks] over, like [redownload] for one, and reports them in one message,
+   * such as "Restarted 3 downloads". Try again repeats what failed: it adds a request again
+   * when its old task was already removed.
+   */
+  fun redownload(tasks: List<DownloadTask>): Job = scope.launch {
+    val targets = tasks.mapNotNull { task -> deviceOf(task)?.let { it to task } }
+    if (targets.isEmpty()) return@launch
+    val results = runEach(targets) { (entry, task) ->
+      trackPending(TaskKey(entry.deviceId, task.taskId), "download again") {
+        restart(entry, task)
+      }
     }
+    val done = results.filter { it.second == null }.map { it.first.second }
+    val failed = results.mapNotNull { (target, e) -> e?.let { target to it } }
+    failed.forEach { (target, e) ->
+      log.w { "Couldn't restart taskId=${target.second.taskId}: ${e.describeCauses()}" }
+    }
+    val retry = MessageAction("Try again") { retryRestarts(failed) }
+    if (done.isEmpty()) {
+      val (target, e) = failed.first()
+      val (entry, task) = target
+      postError(
+        title = if (failed.size == 1) {
+          "Couldn't download ${task.displayName()} again on ${nameOf(entry)}"
+        } else {
+          "Couldn't download ${downloads(failed.size)} again"
+        },
+        detail = e.message,
+        cause = e,
+        taskKey = TaskKey(entry.deviceId, task.taskId).takeIf { failed.size == 1 },
+        actions = listOf(retry),
+      )
+      return@launch
+    }
+    val title = buildString {
+      append("Restarted ")
+      append(if (done.size == 1) done.single().displayName() else downloads(done.size))
+      if (failed.isNotEmpty()) append(" · ${failed.size} failed")
+    }
+    messages.post(
+      level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
+      title = title,
+      detail = failed.firstOrNull()?.second?.message,
+      deviceId = targets.map { it.first.deviceId }.distinct().singleOrNull(),
+      actions = if (failed.isEmpty()) emptyList() else listOf(retry),
+      cause = failed.firstOrNull()?.second,
+    )
   }
 
   /**
@@ -978,45 +1054,125 @@ class AppState(
   }
 
   /**
+   * Retries [task] on its device as [retry] does, for a batch that reports the outcome itself:
+   * it resumes, or starts over when its progress cannot be reused or it was canceled.
+   */
+  internal suspend fun retryInBatch(task: DownloadTask) {
+    val entry = deviceOf(task) ?: return
+    retryOn(entry, task)
+  }
+
+  /**
    * Starts [task] at once: it becomes [DownloadPriority.URGENT], which may pause a running task
    * to make room. The toast names that task, and Undo restores the previous priority and state.
    */
-  fun startNow(task: DownloadTask): Job {
-    val entry = deviceOf(task)
-    val before = task.state.value
-    val previousPriority = task.requestState.value.priority
-    val name = task.displayName()
-    val running = entry?.let { visibleTasks(it) }.orEmpty()
-      .filter { it !== task && it.state.value is DownloadState.Downloading }
-    return runTaskCommand(task, "start $name now") {
-      if (before is DownloadState.Scheduled) reschedule(DownloadSchedule.Immediate)
-      setPriority(DownloadPriority.URGENT)
-      if (before is DownloadState.Paused || before is DownloadState.Failed) resume()
-      withTimeoutOrNull(START_TIMEOUT) { state.first { it is DownloadState.Downloading } }
-      val preempted = running.filter { it.state.value is DownloadState.Queued }
-      val op = pendingOps.register(label = "Start Now", undo = {
-        val results = runEach(listOf(task)) { undoStartNow(it, before, previousPriority) }
-        reportFailures("undo start now of", results)
-      })
-      val title = buildString {
-        append("Started $name now")
-        if (preempted.isNotEmpty()) {
-          val names = preempted.joinToString(", ") { it.displayName() }
-          append(" · paused $names to make room")
-        }
-      }
-      messages.post(MessageLevel.Success, title, actions = listOf(undoAction(op)))
+  fun startNow(task: DownloadTask): Job = startNow(listOf(task))
+
+  /**
+   * Starts each of [tasks] at once, like [startNow] for one, with one message naming what they
+   * paused to make room, and one Undo for all of them.
+   */
+  fun startNow(tasks: List<DownloadTask>): Job = scope.launch {
+    if (tasks.isEmpty()) return@launch
+    val starts = tasks.map { task ->
+      Start(task, deviceOf(task), task.state.value, task.requestState.value.priority)
     }
+    val starting = starts.mapTo(HashSet()) { it.task }
+    val running = starts.mapNotNull { it.entry }.distinct()
+      .flatMap { visibleTasks(it) }
+      .filter { it.state.value is DownloadState.Downloading && it !in starting }
+    val results = runEach(starts) { start ->
+      val key = TaskKey(start.entry?.deviceId ?: LOCAL_DEVICE_ID, start.task.taskId)
+      trackPending(key, "start now") { start.run() }
+    }
+    val started = results.filter { it.second == null }.map { it.first }
+    val failed = results.mapNotNull { (start, e) -> e?.let { start to it } }
+    failed.forEach { (start, e) ->
+      log.w { "Couldn't start taskId=${start.task.taskId} now: ${e.describeCauses()}" }
+    }
+    val retry = MessageAction("Try again") { startNow(failed.map { it.first.task }) }
+    if (started.isEmpty()) {
+      val (start, e) = failed.first()
+      postError(
+        title = if (failed.size == 1) {
+          "Couldn't start ${start.task.displayName()} now on ${nameOf(start.entry)}"
+        } else {
+          "Couldn't start ${downloads(failed.size)} now"
+        },
+        detail = e.message,
+        cause = e,
+        taskKey = start.entry?.let { TaskKey(it.deviceId, start.task.taskId) }
+          ?.takeIf { failed.size == 1 },
+        actions = listOf(retry),
+      )
+      return@launch
+    }
+    val preempted = running.filter { it.state.value is DownloadState.Queued }
+    val op = pendingOps.register(label = "Start Now", undo = {
+      reportFailures("undo start now of", runEach(started) { it.undo() }.map { (start, e) ->
+        start.task to e
+      })
+    })
+    val title = buildString {
+      val what = started.singleOrNull()?.task?.displayName() ?: downloads(started.size)
+      append("Started $what now")
+      if (preempted.isNotEmpty()) {
+        append(" · paused ${preempted.joinToString(", ") { it.displayName() }} to make room")
+      }
+      if (failed.isNotEmpty()) append(" · ${failed.size} failed")
+    }
+    messages.post(
+      level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
+      title = title,
+      detail = failed.firstOrNull()?.second?.message,
+      actions = listOfNotNull(undoAction(op), retry.takeIf { failed.isNotEmpty() }),
+      cause = failed.firstOrNull()?.second,
+    )
   }
 
   /**
    * Adds [tasks] to [target] with the same headers, speed limit, priority and connections; they
-   * start over there. With [move], each task whose copy was added is removed here when the Undo
-   * window ends; Undo instead removes the copies.
+   * start over there. Tasks already on [target] are left alone. With [move], each task whose copy
+   * was added is removed here when the Undo window ends, with its partial file; Undo instead
+   * removes the copies.
+   *
+   * Tasks that carry cookies or a sign-in for a remote [target], which would keep them, first
+   * wait in [sendConfirmation] until [confirmSend]; [confirmed] skips that.
    */
-  fun sendTo(tasks: List<DownloadTask>, target: InstanceEntry, move: Boolean = false): Job =
+  fun sendTo(
+    tasks: List<DownloadTask>,
+    target: InstanceEntry,
+    move: Boolean = false,
+    confirmed: Boolean = false,
+  ) {
+    val outgoing = tasks.filter { deviceOf(it)?.instance !== target.instance }
+    if (outgoing.isEmpty()) return
+    val warning = if (target is RemoteInstance) {
+      credentialWarning(outgoing.map { it.requestState.value.headers }, nameOf(target))
+    } else {
+      null
+    }
+    if (warning != null && !confirmed) {
+      sendConfirmation = SendConfirmation(outgoing, target, move, warning)
+      return
+    }
+    send(outgoing, target, move)
+  }
+
+  /** Sends what [sendConfirmation] waits for. */
+  fun confirmSend() {
+    val pending = sendConfirmation ?: return
+    sendConfirmation = null
+    send(pending.tasks, pending.target, pending.move)
+  }
+
+  /** Drops what [sendConfirmation] waits for. */
+  fun dismissSendConfirmation() {
+    sendConfirmation = null
+  }
+
+  private fun send(tasks: List<DownloadTask>, target: InstanceEntry, move: Boolean): Job =
     scope.launch {
-      if (tasks.isEmpty()) return@launch
       val results = supervisorScope {
         tasks.map { task ->
           async {
@@ -1043,20 +1199,22 @@ class AppState(
           },
           detail = e.message,
           cause = e,
-          actions = listOf(MessageAction("Try again") { sendTo(tasks, target, move) }),
+          actions = listOf(
+            MessageAction("Try again") { sendTo(tasks, target, move, confirmed = true) },
+          ),
         )
         return@launch
       }
       val what = if (sent.size == 1) sent.single().first.displayName()
       else downloads(sent.size)
       val failedNote = if (failures.isEmpty()) "" else " · ${failures.size} failed"
+      val sources = sent.map { it.first }
       if (move) {
-        val sources = sent.map { it.first }
         val op = pendingOps.register(
           label = "Move",
           hides = hide(sources),
           commit = {
-            reportFailures("remove", runEach(sources) { it.remove(deleteFiles = false) })
+            reportFailures("remove", runEach(sources) { it.remove(it.hasPartialFile) })
           },
           undo = {
             val copies = sent.map { it.second }
@@ -1075,38 +1233,21 @@ class AppState(
           title = "Sent $what to $targetName$failedNote",
           deviceId = target.deviceId,
           actions = listOf(
-            MessageAction("Show") { switchInstance(target) },
-            MessageAction("Remove here") { remove(sent.map { it.first }) },
+            MessageAction("Show") { showOn(target, sent.singleOrNull()?.second) },
+            MessageAction("Remove here") { removeTasks(sources) { it.hasPartialFile } },
           ),
         )
       }
     }
 
-  /** Starts the AI discovery search for [query], limited to the comma-separated [sites]. */
-  fun aiDiscover(query: String, sites: String) {
-    aiDiscover.discover(query, sites)
-  }
-
-  /** Adds [candidates] to the active device, each on its own, and closes the results. */
-  fun aiDownloadSelected(candidates: List<AiCandidate>) {
-    showAddDialog = false
-    intakeRequest = null
-    val entry = activeInstance.value
-    val api = activeApi.value
-    val query = aiDiscover.draft.submittedQuery
-    resetAiDiscover()
-    scope.launch {
-      val result = aiDiscover.add(api, candidates, query)
-      reportAdded(
-        entry = entry,
-        added = result.added,
-        failures = result.failed.map { (candidate, e) -> candidate.title to e },
-      )
-    }
-  }
-
-  fun resetAiDiscover() {
-    aiDiscover.reset()
+  /**
+   * Shows the Downloads list with [task] of [target] inspected, switching to [target] only when
+   * it is not shown already, such as under All devices.
+   */
+  private fun showOn(target: InstanceEntry, task: DownloadTask?) {
+    if (target !in shownInstances.value) switchInstance(target)
+    showDownloads()
+    task?.let { inspect(TaskKey(target.deviceId, it.taskId)) }
   }
 
   /** Reports [event] from the host's activity monitor as a message. */
@@ -1192,6 +1333,15 @@ class AppState(
   fun keyOf(task: DownloadTask): TaskKey =
     TaskKey(deviceOf(task)?.deviceId ?: LOCAL_DEVICE_ID, task.taskId)
 
+  /**
+   * The tasks of [keys] on the devices that hold them, in that order, such as rows dragged onto
+   * a device to [sendTo] it; keys of tasks no device lists are skipped.
+   */
+  fun tasksOf(keys: Collection<TaskKey>): List<DownloadTask> = keys.mapNotNull { key ->
+    instances.value.firstOrNull { it.deviceId == key.deviceId }
+      ?.instance?.tasks?.value?.firstOrNull { it.taskId == key.taskId }
+  }
+
   private fun visibleTasks(entry: InstanceEntry): List<DownloadTask> {
     val hidden = pendingOps.hidden.value
     return entry.instance.tasks.value.filter { TaskKey(entry.deviceId, it.taskId) !in hidden }
@@ -1211,7 +1361,7 @@ class AppState(
     return TaskListSource(
       deviceId = entry.deviceId,
       device = DeviceInfo(
-        name = entry.label,
+        name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label,
         capabilities = if (remote) {
           RowCapabilities.remote(canDiscover = canDiscover)
         } else {
@@ -1267,7 +1417,7 @@ class AppState(
 
   private fun deferRemoval(
     tasks: List<DownloadTask>,
-    deleteFiles: Boolean,
+    deleteFiles: (DownloadTask) -> Boolean,
     label: String,
     title: (Int) -> String,
   ) {
@@ -1275,7 +1425,7 @@ class AppState(
     val op = pendingOps.register(
       label = label,
       hides = keys,
-      commit = { reportFailures("remove", runEach(tasks) { it.remove(deleteFiles) }) },
+      commit = { reportFailures("remove", runEach(tasks) { it.remove(deleteFiles(it)) }) },
     )
     messages.post(MessageLevel.Success, title(tasks.size), actions = listOf(undoAction(op)))
   }
@@ -1290,7 +1440,8 @@ class AppState(
 
   /**
    * Removes [task] and adds its request again on [entry], to start at once. The old task and its
-   * partial file go first, since the new task writes to the same path.
+   * partial file go first, since the new task writes to the same path; when the add then fails,
+   * the [AddFailed] it throws keeps the request for Try again.
    */
   private suspend fun restart(entry: InstanceEntry, task: DownloadTask) {
     val request = task.requestState.value.copy(
@@ -1298,26 +1449,68 @@ class AppState(
       resolvedSource = null,
     )
     task.remove(deleteFiles = task.state.value !is DownloadState.Completed)
-    entry.instance.download(request)
-  }
-
-  private suspend fun undoStartNow(
-    task: DownloadTask,
-    before: DownloadState,
-    previousPriority: DownloadPriority,
-  ) {
-    task.setPriority(previousPriority)
-    when (before) {
-      is DownloadState.Scheduled -> task.reschedule(before.schedule)
-      is DownloadState.Queued -> {
-        // Pausing frees the slot for the task the start preempted; resuming queues this again.
-        task.pause()
-        task.resume()
-      }
-      is DownloadState.Paused -> task.pause()
-      else -> Unit
+    try {
+      entry.instance.download(request)
+    } catch (e: CancellationException) {
+      currentCoroutineContext().ensureActive()
+      throw AddFailed(entry, request, e)
+    } catch (e: Exception) {
+      throw AddFailed(entry, request, e)
     }
   }
+
+  /** Resumes [task] on [entry], or starts it over when that is what its Retry promises. */
+  private suspend fun retryOn(entry: InstanceEntry, task: DownloadTask) {
+    val current = task.state.value
+    val fresh = current is DownloadState.Canceled ||
+      current is DownloadState.Failed && current.error.needsFreshStart()
+    if (fresh) restart(entry, task) else task.resume()
+  }
+
+  /** Repeats the restarts that [failed]: adds again what was removed, restarts the rest. */
+  private fun retryRestarts(failed: List<Pair<Pair<InstanceEntry, DownloadTask>, Throwable>>) {
+    val again = failed.filter { it.second !is AddFailed }.map { it.first.second }
+    if (again.isNotEmpty()) redownload(again)
+    failed.mapNotNull { it.second as? AddFailed }.groupBy { it.entry }.forEach { (entry, adds) ->
+      scope.launch { addRequests(entry, adds.map { it.request }) }
+    }
+  }
+
+  /** A task's state and priority before Start now, to undo it. */
+  private class Start(
+    val task: DownloadTask,
+    val entry: InstanceEntry?,
+    val before: DownloadState,
+    val priority: DownloadPriority,
+  ) {
+    suspend fun run() {
+      if (before is DownloadState.Scheduled) task.reschedule(DownloadSchedule.Immediate)
+      task.setPriority(DownloadPriority.URGENT)
+      if (before is DownloadState.Paused || before is DownloadState.Failed) task.resume()
+      withTimeoutOrNull(START_TIMEOUT) { task.state.first { it is DownloadState.Downloading } }
+    }
+
+    suspend fun undo() {
+      task.setPriority(priority)
+      when (before) {
+        is DownloadState.Scheduled -> task.reschedule(before.schedule)
+        is DownloadState.Queued -> {
+          // Pausing frees the slot for the task the start preempted; resuming queues this again.
+          task.pause()
+          task.resume()
+        }
+        is DownloadState.Paused -> task.pause()
+        else -> Unit
+      }
+    }
+  }
+
+  /** The old task of a restart is gone, but its [request] could not be added on [entry]. */
+  private class AddFailed(
+    val entry: InstanceEntry,
+    val request: DownloadRequest,
+    cause: Throwable,
+  ) : Exception(cause.message, cause)
 
   private fun retry(key: TaskKey) {
     val entry = instances.value.firstOrNull { it.deviceId == key.deviceId } ?: return
@@ -1538,6 +1731,43 @@ class AppState(
   }
 }
 
+/**
+ * A Send to that waits for the user to accept that cookies or a sign-in go along.
+ *
+ * @property tasks the downloads to send.
+ * @property target the device they go to.
+ * @property move whether they are removed here once sent.
+ * @property warning what goes along, such as "Cookies from your browser will be sent to
+ *   NAS-Basement."
+ */
+data class SendConfirmation(
+  val tasks: List<DownloadTask>,
+  val target: InstanceEntry,
+  val move: Boolean,
+  val warning: String,
+)
+
+/**
+ * What of [headers] a device named [deviceName] would receive and keep: cookies, a sign-in or
+ * both; `null` when none of the requests sends any.
+ */
+internal fun credentialWarning(headers: List<Map<String, String>>, deviceName: String): String? {
+  val names = headers.flatMap { it.keys }
+  val cookies = names.any { it.equals(COOKIE_HEADER, ignoreCase = true) }
+  val signIn = names.any { it.equals(AUTHORIZATION_HEADER, ignoreCase = true) }
+  return when {
+    cookies && signIn -> {
+      "Cookies and sign-in details from your browser will be sent to $deviceName."
+    }
+    cookies -> "Cookies from your browser will be sent to $deviceName."
+    signIn -> "Sign-in details will be sent to $deviceName."
+    else -> null
+  }
+}
+
+private const val COOKIE_HEADER = "Cookie"
+private const val AUTHORIZATION_HEADER = "Authorization"
+
 /** Compose state that the models outside composition also read, through [flow]. */
 private class FlowState<T>(initial: T) {
   private var state by mutableStateOf(initial)
@@ -1586,6 +1816,13 @@ private fun scheduledNote(schedules: List<DownloadSchedule>): String? {
 
 /** Name of this task for messages, from its current request and state. */
 private fun DownloadTask.displayName(): String = displayName(requestState.value, state.value)
+
+/**
+ * Whether this task's file is unfinished, so removing the task once it was sent elsewhere takes
+ * the file too; a finished file is kept.
+ */
+private val DownloadTask.hasPartialFile: Boolean
+  get() = state.value !is DownloadState.Completed
 
 /**
  * This request as another device should run it: a folder or file path of this device is

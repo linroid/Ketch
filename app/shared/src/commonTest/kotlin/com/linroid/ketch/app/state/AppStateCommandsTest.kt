@@ -20,9 +20,10 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -48,7 +49,9 @@ class AppStateCommandsTest {
       factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
       configStore = configStore,
     ),
-    context = StandardTestDispatcher(testScheduler),
+    // A child of the background scope, so a failed assertion never leaves its loops running.
+    context = backgroundScope.coroutineContext +
+      SupervisorJob(backgroundScope.coroutineContext[Job]),
   )
 
   private fun AppController.errors(): List<AppMessage> =
@@ -380,7 +383,8 @@ class AppStateCommandsTest {
 
     advanceTimeBy(7.seconds)
     runCurrent()
-    assertEquals(listOf("remove deleteFiles=false"), task.calls)
+    // The paused source's partial file goes with it; the copy starts over on the NAS.
+    assertEquals(listOf("remove deleteFiles=true"), task.calls)
     controller.close()
   }
 
@@ -400,30 +404,6 @@ class AppStateCommandsTest {
     assertTrue(task.calls.isEmpty())
     assertTrue(controller.state.pendingOps.hidden.value.isEmpty())
     assertEquals("Couldn't send file1.bin to NAS", controller.errors().single().title)
-    controller.close()
-  }
-
-  @Test
-  fun aiDownloadSelected_oneCandidateFails_addsTheOthers() = runTest {
-    val api = RecordingKetchApi().apply {
-      downloadFailure = { if ("broken" in it.url) IllegalStateException("Not found") else null }
-    }
-    val controller = controller(api)
-    val candidates = listOf("a.iso", "broken.iso", "b.iso").map {
-      AiCandidate("https://example.com/$it", title = it, confidence = 0.9f, description = "")
-    }
-
-    controller.state.aiDownloadSelected(candidates)
-    runCurrent()
-
-    assertEquals(
-      listOf("https://example.com/a.iso", "https://example.com/b.iso"),
-      api.requests.map { it.url },
-    )
-    assertEquals(
-      "Added 2 downloads → This Mac · 1 failed",
-      controller.messages.history.value.first().title,
-    )
     controller.close()
   }
 

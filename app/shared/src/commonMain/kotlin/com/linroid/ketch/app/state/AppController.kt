@@ -102,8 +102,8 @@ class AppController(
 /**
  * Creates an [AppController] that lives as long as this composition and is closed with it.
  *
- * The instance manager and [speedMode] can outlive the composition (Android keeps them in the
- * service across activity recreation), so the controller is released here rather than with them.
+ * A host whose screen is recreated, such as an Android activity on rotation, keeps its own
+ * controller across that instead, so adds and commands in flight survive.
  */
 @Composable
 fun rememberAppController(

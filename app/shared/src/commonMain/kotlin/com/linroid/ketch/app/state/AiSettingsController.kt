@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.ConfigStore
+import com.linroid.ketch.config.LlmProvider
 import kotlinx.coroutines.CancellationException
 
 /** Outcome of a "test connection" attempt on the settings page. */
@@ -61,6 +62,21 @@ class AiSettingsController(
    */
   fun withPlatformCredentials(settings: AiSettings): AiSettings =
     factory?.withPlatformCredentials(settings) ?: settings
+
+  /**
+   * Switches discovery on with [provider], as the Discover setup page's provider buttons do.
+   * Changing the provider resets the model and endpoint to its defaults, as the settings page
+   * does, and keeps the API key.
+   */
+  fun chooseProvider(provider: LlmProvider) {
+    val llm = settings.llm
+    val chosen = if (llm.provider == provider) {
+      llm
+    } else {
+      llm.copy(provider = provider, model = "", baseUrl = "")
+    }
+    save(settings.copy(enabled = true, llm = chosen))
+  }
 
   /** Persists [settings] and rebuilds the provider. */
   fun save(settings: AiSettings) {

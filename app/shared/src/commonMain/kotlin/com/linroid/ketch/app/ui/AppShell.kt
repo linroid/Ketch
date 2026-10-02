@@ -1,5 +1,11 @@
 package com.linroid.ketch.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -45,9 +51,9 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.connect.ConnectHost
+import com.linroid.ketch.app.ui.connect.ConnectLanding
 import com.linroid.ketch.app.ui.devices.DevicesScreen
-import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
-import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
 import com.linroid.ketch.app.ui.discover.DiscoverScreen
 import com.linroid.ketch.app.ui.downloads.DownloadsScreen
 import com.linroid.ketch.app.ui.downloads.LayoutTier
@@ -56,12 +62,16 @@ import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
 import com.linroid.ketch.app.ui.feedback.BannerHost
 import com.linroid.ketch.app.ui.feedback.ToastHost
 import com.linroid.ketch.app.ui.intake.IntakeHost
+import com.linroid.ketch.app.ui.palette.CommandPalette
 import com.linroid.ketch.app.ui.pulse.PulseBar
 import com.linroid.ketch.app.ui.pulse.PulseSheet
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
 import com.linroid.ketch.app.ui.settings.SettingsHost
 import com.linroid.ketch.app.ui.shell.AddFab
 import com.linroid.ketch.app.ui.shell.BOTTOM_BAR_MIN_DESTINATIONS
+import com.linroid.ketch.app.ui.shell.DeviceSheet
+import com.linroid.ketch.app.ui.shell.DeviceSwitcherPopover
+import com.linroid.ketch.app.ui.shell.DropBerths
 import com.linroid.ketch.app.ui.shell.KetchLayout
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
@@ -76,7 +86,10 @@ import com.linroid.ketch.app.ui.shell.ShellScaffold
 import com.linroid.ketch.app.ui.shell.ShellState
 import com.linroid.ketch.app.ui.shell.ShortcutHost
 import com.linroid.ketch.app.ui.shell.ShortcutSheet
+import com.linroid.ketch.app.ui.shell.dropFilesOn
+import com.linroid.ketch.app.ui.shell.dropTextOn
 import com.linroid.ketch.app.ui.shell.shortcutGroups
+import com.linroid.ketch.app.ui.shell.switcherOffset
 import com.linroid.ketch.app.ui.sidebar.Sidebar
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.drop
@@ -111,13 +124,7 @@ fun AppShell(
 
 @Composable
 private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
-  val instances by appState.instances.collectAsState()
-  // Without any device (the web before one is added), ask for one.
-  LaunchedEffect(instances) {
-    if (instances.isEmpty()) appState.showAddRemoteDialog = true
-  }
   val activeInstance by appState.activeInstance.collectAsState()
-  val serverState by appState.serverState.collectAsState()
   RestoreListState(appState)
 
   var savedDestination by rememberSaveable { mutableStateOf(AppDestination.Downloads.name) }
@@ -137,7 +144,7 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     }
   }
 
-  val destinations = AppDestination.visible(appState.aiSettings.available)
+  val destinations = AppDestination.visible(appState.aiSettings.supported)
   val windowInfo = LocalWindowInfo.current
   val windowWidth = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
   val layout = KetchLayout.of(windowWidth, appState.appSettings.ui.sidebarCollapsed)
@@ -176,21 +183,39 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     // The web pastes through the browser's event, since a key press cannot read the clipboard.
     clipboard.pasteEvents.collect(commands::paste)
   }
+  val shellCommand = appState.shellCommand
+  LaunchedEffect(shellCommand, commands) {
+    // Asked for from outside the window's content, such as the macOS menu bar.
+    if (shellCommand != null) {
+      commands.run(shellCommand)
+      appState.shellCommandHandled()
+    }
+  }
+  // A drop away from the berths and devices adds where a paste would.
+  val windowDrop = remember { DropHoverState() }
   FileDropTarget(
     onDrop = { dropped ->
-      // Show the list the new task will appear in.
-      shell.show(AppDestination.Downloads)
-      appState.addDroppedFiles(dropped)
+      val target = appState.quickAddTarget()
+      if (target != null) {
+        appState.dropFilesOn(target, dropped)
+      } else {
+        appState.addDroppedFiles(dropped)
+      }
     },
     onDropText = { text ->
-      shell.show(AppDestination.Downloads)
-      appState.addDroppedText(text)
+      val target = appState.quickAddTarget()
+      if (target != null) appState.dropTextOn(target, text) else appState.addDroppedText(text)
     },
+    hover = windowDrop,
     modifier = Modifier.fillMaxSize(),
   ) {
     ShortcutHost(
       onCommand = commands::run,
-      overlay = if (appState.showAddDialog) CommandScope.Intake else null,
+      overlay = when {
+        appState.showAddDialog -> CommandScope.Intake
+        shell.paletteOpen -> CommandScope.Palette
+        else -> null
+      },
       modifier = Modifier.fillMaxSize(),
     ) {
       CompositionLocalProvider(
@@ -198,17 +223,31 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
         LocalPhoneChrome provides shell.chrome.takeIf {
           layout.navigation == ShellNavigation.Phone
         },
+        LocalWindowDrop provides windowDrop,
       ) {
-        if (layout.navigation == ShellNavigation.Phone) {
-          PhoneShell(shell, commands, destinations)
+        if (activeInstance == null) {
+          // No device to show yet, as in the web app before one is connected.
+          ConnectLanding(appState)
+        } else if (layout.navigation == ShellNavigation.Phone) {
+          PhoneShell(shell, commands, destinations, windowDrop)
         } else {
-          WideShell(shell, commands, destinations, layout)
+          WideShell(shell, commands, destinations, layout, windowDrop)
         }
       }
     }
   }
 
   IntakeHost(appState)
+  if (shell.paletteOpen) {
+    CommandPalette(
+      state = appState,
+      onDismiss = { shell.paletteOpen = false },
+      onCommand = commands::run,
+      canRun = commands::binds,
+      destinations = destinations,
+      initialQuery = appState.searchQuery,
+    )
+  }
   if (shell.shortcutsOpen) {
     val hostShortcuts = LocalHostShortcuts.current
     val groups = remember(commands, hostShortcuts) {
@@ -222,46 +261,18 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     PulseSheet(appState, onDismissRequest = { shell.pulseSheetOpen = false })
   }
 
-  if (appState.showInstanceSelector) {
-    InstanceSelectorSheet(
-      instanceManager = appState.instanceManager,
-      activeInstance = activeInstance,
-      switchingInstance = appState.switchingInstance,
-      serverState = serverState,
-      onSelectInstance = { instance -> appState.switchInstance(instance) },
-      onRemoveInstance = { instance -> appState.removeInstance(instance) },
-      onAddRemoteServer = {
-        appState.showInstanceSelector = false
-        appState.showAddRemoteDialog = true
-      },
-      onDismiss = { appState.showInstanceSelector = false },
+  val switcherAsked = appState.showInstanceSelector
+  if (switcherAsked && activeInstance == null) {
+    // The connect page lists the devices itself.
+    LaunchedEffect(Unit) { appState.showInstanceSelector = false }
+  } else if (switcherAsked && layout.navigation == ShellNavigation.Phone) {
+    DeviceSheet(
+      state = appState,
+      onDismissRequest = { appState.showInstanceSelector = false },
+      onShowOverview = { shell.show(AppDestination.Devices) },
     )
   }
-  if (appState.showAddRemoteDialog) {
-    val unauthorized = appState.unauthorizedInstance
-    AddRemoteServerDialog(
-      onDismiss = {
-        appState.resetDiscovery()
-        appState.showAddRemoteDialog = false
-        appState.unauthorizedInstance = null
-      },
-      discoveryState = appState.discoveryState,
-      onDiscover = { port -> appState.discoverRemoteServers(port) },
-      onStopDiscovery = { appState.stopDiscovery() },
-      onAdd = { host, port, token ->
-        appState.resetDiscovery()
-        appState.showAddRemoteDialog = false
-        if (unauthorized != null) {
-          appState.reconnectWithToken(unauthorized, token ?: "")
-        } else {
-          appState.addRemoteServer(host, port, token)
-        }
-      },
-      initialHost = unauthorized?.host ?: "",
-      initialPort = unauthorized?.port?.toString() ?: "8642",
-      authRequired = unauthorized != null,
-    )
-  }
+  ConnectHost(appState)
 }
 
 /** Keeps the Downloads tab and search across an Android activity recreation. */
@@ -329,13 +340,17 @@ private fun ShellRequests(appState: AppState, shell: ShellState, openSettingsReq
   }
 }
 
-/** The sidebar or the rail beside the content card, with the banners and the Pulse bar. */
+/**
+ * The sidebar or the rail beside the content card, with the banners, the Pulse bar, the device
+ * switcher under the page header and, while links are dragged over the window, the drop berths.
+ */
 @Composable
 private fun WideShell(
   shell: ShellState,
   commands: ShellCommands,
   destinations: List<AppDestination>,
   layout: KetchLayout,
+  windowDrop: DropHoverState,
 ) {
   val appState = shell.app
   val spacing = KetchTheme.spacing
@@ -377,6 +392,22 @@ private fun WideShell(
           .padding(horizontal = spacing.s4)
           .padding(bottom = spacing.s2),
       )
+      if (appState.showInstanceSelector) {
+        // Under the page header, by the device chip.
+        Box(Modifier.align(Alignment.TopStart)) {
+          DeviceSwitcherPopover(
+            state = appState,
+            onDismissRequest = { appState.showInstanceSelector = false },
+            offset = switcherOffset(spacing.pageHeaderPadding, spacing.pageHeaderHeight),
+          )
+        }
+      }
+    },
+    cover = {
+      // Device cards take drops on the Devices page themselves.
+      if (shell.destination != AppDestination.Devices || shell.settingsOpen) {
+        DropBerths(appState, windowDrop)
+      }
     },
   ) {
     // Desktop shows Settings in a window of its own; elsewhere it takes the card's place.
@@ -388,12 +419,16 @@ private fun WideShell(
   }
 }
 
-/** The phone's top bar, content, Add button and, with enough destinations, bottom bar. */
+/**
+ * The phone's top bar, content, Add button, with enough destinations a bottom bar and, while
+ * links are dragged over the window, the drop berths.
+ */
 @Composable
 private fun PhoneShell(
   shell: ShellState,
   commands: ShellCommands,
   destinations: List<AppDestination>,
+  windowDrop: DropHoverState,
 ) {
   val appState = shell.app
   val spacing = KetchTheme.spacing
@@ -425,6 +460,11 @@ private fun PhoneShell(
   // Read through a derived state, so scrolling recomposes only when the button changes shape.
   val fabExpanded by remember(shell, clearance) {
     derivedStateOf { shell.chrome.contentOffset < clearance }
+  }
+  // The button leaves with the top bar while the list scrolls down, so it never sits over the
+  // actions of the rows passing under it, and comes back as soon as the list scrolls up.
+  val fabShown by remember(shell) {
+    derivedStateOf { shell.chrome.collapsedFraction < FAB_HIDE_FRACTION }
   }
   PhoneScaffold(
     chrome = shell.chrome,
@@ -463,14 +503,22 @@ private fun PhoneShell(
             },
           ),
       )
-      if (downloads && !selecting) {
+      val motion = KetchTheme.motion
+      AnimatedVisibility(
+        visible = downloads && !selecting && fabShown,
+        enter = slideInVertically(tween(motion.short, easing = motion.easeDecelerate)) { it } +
+          fadeIn(tween(motion.short)),
+        exit = slideOutVertically(tween(motion.short, easing = motion.easeAccelerate)) { it } +
+          fadeOut(tween(motion.short)),
+        modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.s4),
+      ) {
         AddFab(
           expanded = fabExpanded,
           onClick = { appState.openIntake() },
           onLongClick = { commands.run(KetchCommands.AddClipboardLink) },
-          modifier = Modifier.align(Alignment.BottomEnd).padding(spacing.s4),
         )
       }
+      if (shell.destination != AppDestination.Devices) DropBerths(appState, windowDrop)
     },
   ) {
     Destination(shell.destination, appState, LocalKetchLayout.current)
@@ -496,3 +544,6 @@ private fun KetchCommand.isWindowCommand(): Boolean =
 
 private val WindowCommands =
   setOf(KetchCommands.CloseWindow, KetchCommands.Minimize, KetchCommands.Quit)
+
+// How far the top bar collapses before the phone's Add button leaves with it.
+private const val FAB_HIDE_FRACTION = 0.5f

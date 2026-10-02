@@ -13,7 +13,7 @@ import com.linroid.ketch.app.ui.pulse.PulseBarState
 
 /**
  * What the shell shows around the screens of [app]: the destination, Settings, the shortcut
- * sheet, the phone's search and Pulse sheet, and the Pulse bar's popovers.
+ * sheet, the command palette, the phone's search and Pulse sheet, and the Pulse bar's popovers.
  *
  * @param destination destination shown first.
  * @param settingsOpen whether Settings shows first.
@@ -34,6 +34,9 @@ internal class ShellState(
 
   /** Whether the keyboard shortcut sheet is open. */
   var shortcutsOpen: Boolean by mutableStateOf(false)
+
+  /** Whether the command palette is open. */
+  var paletteOpen: Boolean by mutableStateOf(false)
 
   /** Whether the phone's top bar is a search field; see [closeSearch]. */
   var searchOpen: Boolean by mutableStateOf(false)

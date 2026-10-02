@@ -37,7 +37,8 @@ import kotlin.math.sin
 /**
  * The frame of a wide window: [navigation] on the canvas wash at the start, and the content
  * card filling the rest, with [top] (the banners) over [content] and [bottom] (the Pulse bar)
- * under it. [overlay] floats over the content, such as the toasts.
+ * under it. [overlay] floats over the content, such as the toasts, and [cover] over the whole
+ * card, such as the drop berths.
  *
  * The card floats with an 8 dp inset, rounded corners and a hairline, except on windows of a
  * [full-bleed][KetchLayout.fullBleed] layout, where it fills its area beside a hairline. On
@@ -51,6 +52,7 @@ internal fun ShellScaffold(
   bottom: @Composable () -> Unit,
   overlay: @Composable BoxScope.() -> Unit,
   modifier: Modifier = Modifier,
+  cover: @Composable BoxScope.() -> Unit = {},
   content: @Composable () -> Unit,
 ) {
   val colors = KetchTheme.colors
@@ -77,13 +79,16 @@ internal fun ShellScaffold(
     if (layout.fullBleed) {
       Spacer(Modifier.width(HairlineWidth).fillMaxHeight().background(colors.hairline))
     }
-    Column(Modifier.weight(1f).fillMaxHeight().then(card)) {
-      top()
-      Box(Modifier.weight(1f).fillMaxWidth()) {
-        content()
-        overlay()
+    Box(Modifier.weight(1f).fillMaxHeight().then(card)) {
+      Column(Modifier.fillMaxSize()) {
+        top()
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+          content()
+          overlay()
+        }
+        bottom()
       }
-      bottom()
+      cover()
     }
   }
 }

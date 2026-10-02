@@ -23,6 +23,7 @@ import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.StartTimeDialog
 import com.linroid.ketch.app.components.parseSpeedInput
 import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.formatSpeedLimit
@@ -30,6 +31,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.dialog.RemoveTasksDialog
+import com.linroid.ketch.app.util.displayName
 
 /**
  * Shows the dialog [runner] asks for, if any: Remove with its files, Stop and discard progress,
@@ -178,3 +180,44 @@ internal fun CustomSpeedDialog(
     )
   }
 }
+
+/**
+ * Asks before a Send to whose downloads carry cookies or a sign-in, which the other device keeps
+ * with them; see [AppState.sendTo]. Place it once next to the list.
+ */
+@Composable
+internal fun SendConfirmationDialog(state: AppState) {
+  val pending = state.sendConfirmation ?: return
+  val verb = if (pending.move) "Move" else "Send"
+  val task = pending.tasks.singleOrNull()
+  val what = task?.let { displayName(it.requestState.value, it.state.value) }
+    ?: downloads(pending.tasks.size)
+  // A device name such as NAS-Basement reads as one word, never broken at its hyphen.
+  val device = pending.target.label
+  val whole = device.replace("-", "-$WORD_JOINER")
+  AdaptiveModal(
+    onDismissRequest = state::dismissSendConfirmation,
+    title = { Text("$verb $what to $whole?") },
+    dismissButton = {
+      KetchButton(
+        text = "Cancel",
+        variant = KetchButtonVariant.Secondary,
+        onClick = state::dismissSendConfirmation,
+      )
+    },
+    confirmButton = { KetchButton(text = verb, onClick = state::confirmSend) },
+  ) {
+    Text(
+      text = pending.warning.replace(device, whole),
+      style = KetchTheme.typography.body,
+      color = KetchTheme.colors.textSecondary,
+    )
+    Text(
+      text = "They are saved with the download there, where anyone who controls it can see them.",
+      style = KetchTheme.typography.bodyS,
+      color = KetchTheme.colors.textTertiary,
+    )
+  }
+}
+
+private const val WORD_JOINER = "\u2060"

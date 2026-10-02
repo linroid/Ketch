@@ -149,7 +149,7 @@ private fun ConnectionsRow(
       else -> {
         val single = rows.singleOrNull()
         val limited = single != null && rememberServerLimited(single)
-        val auto = state.instanceSettings.download?.maxConnectionsPerDownload?.takeIf { it > 0 }
+        val auto = autoConnectionsOf(state, targets)
           ?: single?.segments?.size?.takeIf { it > 0 }
         ConnectionStepper(
           value = value,
@@ -199,7 +199,7 @@ private fun PriorityRow(
   fun urgent() {
     asking = null
     choose(DownloadPriority.URGENT)
-    waiting.forEach { state.startNow(it.task) }
+    if (waiting.isNotEmpty()) state.startNow(waiting.map { it.task })
     val running = rows - waiting.toSet()
     if (running.isNotEmpty()) runner.setPriority(running, DownloadPriority.URGENT)
   }
@@ -252,8 +252,17 @@ private fun victimFor(state: AppState, rows: List<TaskRow>): TaskRow? {
   val running = state.taskList.rows.value.filter {
     it.key.deviceId == deviceId && it.state is DownloadState.Downloading
   }
-  val slots = state.instanceSettings.download?.maxConcurrentDownloads
+  val slots = state.settingsOf(deviceId)?.download?.maxConcurrentDownloads
   return preemptionVictim(running, slots, starting = rows.mapTo(HashSet()) { it.key })
+}
+
+/**
+ * The connections Auto gives [rows] on their device, from its settings; `null` while they are
+ * unknown or the rows are on several devices.
+ */
+internal fun autoConnectionsOf(state: AppState, rows: List<TaskRow>): Int? {
+  val deviceId = rows.map { it.key.deviceId }.distinct().singleOrNull() ?: return null
+  return state.settingsOf(deviceId)?.download?.maxConnectionsPerDownload?.takeIf { it > 0 }
 }
 
 @Composable

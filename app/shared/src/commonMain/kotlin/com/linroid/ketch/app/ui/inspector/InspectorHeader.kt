@@ -69,6 +69,7 @@ import com.linroid.ketch.app.ui.downloads.actions.command
 import com.linroid.ketch.app.ui.downloads.actions.icon
 import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
+import com.linroid.ketch.app.ui.downloads.actions.rememberSendMode
 import com.linroid.ketch.app.ui.downloads.actions.sendEntries
 import com.linroid.ketch.app.ui.downloads.actions.sendTargets
 import com.linroid.ketch.app.ui.inspector.tabs.formatSize
@@ -175,7 +176,8 @@ internal fun TaskHeader(
         )
       }
     }
-    val parts = metricParts(row, LocalClock.current.now(), remember { TimeZone.currentSystemDefault() })
+    val zone = remember { TimeZone.currentSystemDefault() }
+    val parts = metricParts(row, LocalClock.current.now(), zone)
     if (parts.isNotEmpty()) MetricLine(parts)
     if (reason != null) ReasonLine(row, reason, onReason)
   }
@@ -450,8 +452,10 @@ private fun SendToButton(row: TaskRow, runner: RowActionRunner, instances: List<
       variant = KetchButtonVariant.Secondary,
       leadingIcon = KetchIcon.Devices,
     )
+    val mode = rememberSendMode()
+    val presence by runner.state.instanceManager.presence.collectAsState()
     KetchMenu(expanded = open, onDismissRequest = { open = false }, title = "Send to") {
-      sendEntries(listOf(row), runner, sendTargets(instances, listOf(row)))
+      sendEntries(listOf(row), runner, sendTargets(instances, listOf(row), presence), mode)
     }
   }
 }
@@ -469,6 +473,8 @@ private fun MoreButton(
 ) {
   var open by remember { mutableStateOf(false) }
   val revealLabel = runner.files?.revealLabel
+  val mode = rememberSendMode()
+  val presence by runner.state.instanceManager.presence.collectAsState()
   Box {
     KetchIconButton(
       icon = KetchIcon.More,
@@ -493,7 +499,7 @@ private fun MoreButton(
         if (action == RowAction.SendTo) {
           if (instances != null) {
             submenu(action.label, action.icon) {
-              sendEntries(listOf(row), runner, sendTargets(instances, listOf(row)))
+              sendEntries(listOf(row), runner, sendTargets(instances, listOf(row), presence), mode)
             }
           }
           continue
@@ -518,13 +524,26 @@ private val TaskRow.hasLanes: Boolean
   get() = segments.isNotEmpty() || state is DownloadState.Downloading ||
     state is DownloadState.Paused
 
-/** [text] with its " · "-separated parts kept whole, so it only wraps between them. */
+/**
+ * [text] with its short " · "-separated parts kept whole, so it wraps between them, after the
+ * dot rather than before it. A part longer than [MAX_JOINED_PART] characters may still wrap at
+ * its spaces, keeping each number with the word after it, so a narrow pane never breaks it
+ * inside a word.
+ */
 internal fun keepPartsTogether(text: String): String =
-  text.split(SEPARATOR).joinToString(SEPARATOR) { it.replace(' ', NO_BREAK) }
+  text.split(SEPARATOR).joinToString("$NO_BREAK· ") { part ->
+    if (part.length > MAX_JOINED_PART) {
+      part.replace(NumberThenSpace) { "${it.groupValues[1]}$NO_BREAK" }
+    } else {
+      part.replace(' ', NO_BREAK)
+    }
+  }
 
 private const val NAME_LINES = 2
 private const val ZERO_WIDTH_SPACE = "\u200B"
 private val NameSeparator = Regex("[-_]")
 private const val SEPARATOR = " · "
 private const val NO_BREAK = '\u00A0'
+private const val MAX_JOINED_PART = 24
+private val NumberThenSpace = Regex("(\\d) ")
 private val CHECK_SHOWN = 1.2.seconds

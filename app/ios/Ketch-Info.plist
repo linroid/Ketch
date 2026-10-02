@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).downloads.*</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDocumentTypes</key>
@@ -48,6 +52,12 @@
 	</array>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_ketch._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Ketch looks for your other devices running Ketch on this network, so you can add them and control their downloads.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UTImportedTypeDeclarations</key>

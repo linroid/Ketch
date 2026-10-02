@@ -26,12 +26,12 @@ enum class AppDestination(val label: String, val icon: KetchIcon, val command: K
     /**
      * Destinations to offer in the navigation.
      *
-     * Discover stays hidden until discovery can actually run, so the app never shows a page
-     * that only leads to a dead end; Settings is where discovery gets switched on.
+     * Discover shows wherever discovery can run, set up or not: until it is set up, the page
+     * shows how to set it up.
      *
-     * @param aiAvailable whether AI discovery is configured and usable.
+     * @param aiSupported whether this platform can run AI discovery.
      */
-    fun visible(aiAvailable: Boolean): List<AppDestination> =
-      entries.filter { it != Discover || aiAvailable }
+    fun visible(aiSupported: Boolean): List<AppDestination> =
+      entries.filter { it != Discover || aiSupported }
   }
 }

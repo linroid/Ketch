@@ -110,13 +110,6 @@ class StartTimePickerTest {
   }
 
   @Test
-  fun startCountdown_futureAndPast_countsDownThenStops() {
-    val now = local("2026-10-01T09:00")
-    assertEquals("in 3h 12m", startCountdown(now + 3.hours + 12.minutes, now))
-    assertNull(startCountdown(now, now))
-  }
-
-  @Test
   fun offPeakStart_insideTheSlowLaneWindow_isWhenItEnds() {
     val scheduler = SpeedScheduler { zone }
     val rules = listOf(SpeedRule(start = "09:00", end = "18:00"))

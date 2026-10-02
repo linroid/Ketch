@@ -208,7 +208,7 @@ class ShellCommandsTest {
   @Test
   fun run_discoverWhileHidden_leavesTheKey() = runTest {
     val fixture = fixture()
-    fixture.shell.destinations = AppDestination.visible(aiAvailable = false)
+    fixture.shell.destinations = AppDestination.visible(aiSupported = false)
 
     assertFalse(fixture.commands.run(KetchCommands.Discover))
     assertEquals(AppDestination.Downloads, fixture.shell.destination)
@@ -271,12 +271,31 @@ class ShellCommandsTest {
   }
 
   @Test
-  fun binds_deviceSwitcher_isLeftForLater() = runTest {
+  fun binds_deviceCommands_bindsEachOne() = runTest {
     val fixture = fixture()
 
-    assertFalse(fixture.commands.binds(KetchCommands.SwitchDevice))
-    assertFalse(fixture.commands.binds(KetchCommands.AllDevices))
+    assertTrue(fixture.commands.binds(KetchCommands.SwitchDevice))
+    assertTrue(fixture.commands.binds(KetchCommands.AllDevices))
     assertTrue(fixture.commands.binds(KetchCommands.device(2)))
+    fixture.controller.close()
+  }
+
+  @Test
+  fun run_switchDevice_opensAndClosesTheSwitcher() = runTest {
+    val fixture = fixture()
+
+    assertTrue(fixture.commands.run(KetchCommands.SwitchDevice))
+    assertTrue(fixture.controller.state.showInstanceSelector)
+    fixture.commands.run(KetchCommands.SwitchDevice)
+    assertFalse(fixture.controller.state.showInstanceSelector)
+    fixture.controller.close()
+  }
+
+  @Test
+  fun run_allDevicesWithOneDevice_leavesTheKey() = runTest {
+    val fixture = fixture()
+
+    assertFalse(fixture.commands.run(KetchCommands.AllDevices))
     fixture.controller.close()
   }
 }

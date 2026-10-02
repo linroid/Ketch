@@ -26,7 +26,8 @@ import com.linroid.ketch.app.util.SearchToken
 
 /**
  * The 32 dp row under the tabs while searching: the search's tokens as removable chips, the
- * Type, Site and Origin menus that add more, and how many downloads match, such as "12 of 340".
+ * Type, Site, Device (with rows of several devices) and Origin menus that add more, and how
+ * many downloads match, such as "12 of 340".
  *
  * @param rows the downloads on the tab before the search, which the menus offer values from.
  * @param onQueryChange replaces the search with a changed query.
@@ -81,6 +82,17 @@ internal fun FacetRow(
         query = query,
         onQueryChange = onQueryChange,
       )
+      val devices = rows.groupingBy { it.device.name }.eachCount()
+      if (devices.size > 1) {
+        Facet(
+          label = "Device",
+          options = devices.entries.map { (name, count) ->
+            FacetOption(SearchToken.Device(name), name, count)
+          },
+          query = query,
+          onQueryChange = onQueryChange,
+        )
+      }
       Facet(
         label = "Origin",
         options = rows.mapNotNull { it.origin }.groupingBy { it }.eachCount().entries
