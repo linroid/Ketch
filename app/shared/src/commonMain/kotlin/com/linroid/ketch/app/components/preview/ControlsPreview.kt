@@ -1,11 +1,5 @@
 package com.linroid.ketch.app.components.preview
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.tooling.preview.Preview
@@ -50,7 +43,6 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.common.DialogPanel
 import com.linroid.ketch.config.DensityMode
 
@@ -81,24 +73,8 @@ private fun ControlsDarkComfortablePreview() {
 /** Every control of the component library on one page, in one theme and density. */
 @Composable
 internal fun ControlsPreview(darkTheme: Boolean, density: DensityMode) {
-  KetchTheme(darkTheme = darkTheme, density = density, reduceMotion = true) {
-    ControlsGallery()
-  }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ControlsGallery() {
-  val colors = KetchTheme.colors
-  val spacing = KetchTheme.spacing
-  Column(
-    verticalArrangement = Arrangement.spacedBy(spacing.s4),
-    modifier = Modifier
-      .width(GalleryWidth)
-      .background(colors.surface)
-      .padding(spacing.s6),
-  ) {
-    Section("Buttons") {
+  PreviewGallery(darkTheme, density) {
+    PreviewSection("Buttons") {
       KetchButtonVariant.entries.forEach { variant ->
         KetchButton(text = variant.name, variant = variant, onClick = {})
       }
@@ -114,7 +90,7 @@ private fun ControlsGallery() {
         )
       }
     }
-    Section("Icon buttons and pill group") {
+    PreviewSection("Icon buttons and pill group") {
       KetchIconButton(command = KetchCommands.PauseAll, onClick = {})
       KetchIconButton(command = KetchCommands.ResumeAll, onClick = {}, enabled = false)
       KetchIconButton(command = KetchCommands.ToggleSidebar, onClick = {}, selected = true)
@@ -125,7 +101,7 @@ private fun ControlsGallery() {
         ),
       )
     }
-    Section("Segmented") {
+    PreviewSection("Segmented") {
       var filter by remember { mutableStateOf(StatusFilter.All) }
       KetchSegmented(
         options = StatusFilter.entries,
@@ -136,7 +112,7 @@ private fun ControlsGallery() {
         alert = { it == StatusFilter.Failed },
       )
     }
-    Section("Chips") {
+    PreviewSection("Chips") {
       var selected by remember { mutableStateOf(true) }
       KetchChip(
         label = "Video",
@@ -154,7 +130,7 @@ private fun ControlsGallery() {
       )
       KetchChip(label = "Disabled", selected = false, enabled = false, onClick = {})
     }
-    Section("Text fields") {
+    PreviewSection("Text fields") {
       var link by remember { mutableStateOf("https://releases.ubuntu.com/24.04/") }
       KetchTextField(
         value = link,
@@ -188,7 +164,7 @@ private fun ControlsGallery() {
         modifier = Modifier.width(FieldWidth),
       )
     }
-    Section("Checkboxes and switches") {
+    PreviewSection("Checkboxes and switches") {
       var checked by remember { mutableStateOf(true) }
       KetchCheckbox(
         checked = checked,
@@ -202,13 +178,13 @@ private fun ControlsGallery() {
       KetchSwitch(checked = on, onCheckedChange = { on = it }, label = "Open at login")
       KetchSwitch(checked = false, onCheckedChange = {})
     }
-    Section("Badges and priority") {
+    PreviewSection("Badges and priority") {
       KetchCountBadge(count = 14)
       KetchCountBadge(count = 2, alert = true)
       KetchBadgeTone.entries.forEach { KetchBadge(text = it.name, tone = it) }
       DownloadPriority.entries.forEach { PriorityGlyph(it) }
     }
-    Section("Menu and tooltip") {
+    PreviewSection("Menu and tooltip") {
       KetchMenuPanel {
         item(command = KetchCommands.PauseAll, onClick = {})
         item(command = KetchCommands.ResumeAll, onClick = {}, enabled = false)
@@ -219,7 +195,7 @@ private fun ControlsGallery() {
       }
       KetchTooltipBubble(text = "Pause all", shortcut = KetchCommands.PauseAll.shortcutLabel())
     }
-    Section("Dialog") {
+    PreviewSection("Dialog") {
       DialogPanel(
         title = { Text("Remove 3 downloads?") },
         confirmButton = {
@@ -237,7 +213,7 @@ private fun ControlsGallery() {
         KetchCheckbox(checked = false, onCheckedChange = {}, label = "Also move the files to Trash")
       }
     }
-    Section("Toasts") {
+    PreviewSection("Toasts") {
       KetchToast(
         title = "Removed 5 downloads",
         level = MessageLevel.Success,
@@ -253,7 +229,7 @@ private fun ControlsGallery() {
         onDismiss = {},
       )
     }
-    Section("Pickers") {
+    PreviewSection("Pickers") {
       var limit by remember { mutableStateOf(SpeedLimit.mbps(2)) }
       SpeedLimitPicker(
         value = limit,
@@ -269,23 +245,4 @@ private fun ControlsGallery() {
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-  val spacing = KetchTheme.spacing
-  Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textTertiary,
-    )
-    FlowRow(
-      horizontalArrangement = Arrangement.spacedBy(spacing.s3),
-      verticalArrangement = Arrangement.spacedBy(spacing.s3),
-      itemVerticalAlignment = Alignment.CenterVertically,
-    ) { content() }
-  }
-}
-
-private val GalleryWidth = 720.dp
 private val FieldWidth = 280.dp

@@ -1,22 +1,15 @@
 package com.linroid.ketch.app.components.preview
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -47,7 +40,6 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.config.DensityMode
 
@@ -78,37 +70,22 @@ private fun VisualsDarkComfortablePreview() {
 /** Every visual of the component library on one page, in one theme and density. */
 @Composable
 internal fun VisualsPreview(darkTheme: Boolean, density: DensityMode) {
-  KetchTheme(darkTheme = darkTheme, density = density, reduceMotion = true) {
-    VisualsGallery()
-  }
-}
-
-@Composable
-private fun VisualsGallery() {
-  val colors = KetchTheme.colors
-  val spacing = KetchTheme.spacing
-  Column(
-    verticalArrangement = Arrangement.spacedBy(spacing.s4),
-    modifier = Modifier
-      .width(GalleryWidth)
-      .background(colors.surface)
-      .padding(spacing.s6),
-  ) {
+  PreviewGallery(darkTheme, density) {
     LaneStrips()
     SpeedCharts()
-    Section("Status dots") {
+    PreviewSection("Status dots") {
       RowStatus.entries.forEach { status -> StatusDot(status, label = status.name) }
       RowStatus.entries.forEach { status -> StatusDot(status, size = StatusDotDefaults.TableSize) }
     }
     Devices()
-    Section("Hue tiles") {
+    PreviewSection("Hue tiles") {
       listOf(KetchHueTileDefaults.Small, KetchHueTileDefaults.Medium, KetchHueTileDefaults.Large)
         .forEach { size -> KetchHueTile(KetchIcon.Speed, FileTypeHue.Sky, size = size) }
       KetchHueTile(KetchIcon.Discover, FileTypeHue.Violet, size = KetchHueTileDefaults.Large)
       KetchHueTile(KetchIcon.Server, FileTypeHue.Teal)
       KetchHueTile(KetchIcon.Network, FileTypeHue.Orange)
     }
-    Section("File-type chips") {
+    PreviewSection("File-type chips") {
       listOf(
         KetchFileTypeChipDefaults.TableSize,
         KetchFileTypeChipDefaults.ListSize,
@@ -119,7 +96,7 @@ private fun VisualsGallery() {
       KetchFileTypeChip("q3-report.pdf", size = KetchFileTypeChipDefaults.LargeSize)
       KetchFileTypeChip("blender.dmg", size = KetchFileTypeChipDefaults.LargeSize, showCheck = true)
     }
-    Section("Brand") {
+    PreviewSection("Brand") {
       KetchLogoTile(size = KetchLogoTileDefaults.Sidebar)
       KetchLogoTile(size = KetchLogoTileDefaults.Onboarding)
       KetchLogoTile(size = KetchLogoTileDefaults.About)
@@ -136,7 +113,7 @@ private fun LaneStrips() {
   val downloaded = running.sumOf { it.downloadedBytes }
   val progress = DownloadProgress(downloaded, total, bytesPerSecond = 6_400_000)
   val downloading = DownloadState.Downloading(progress)
-  Section("Lane strips", fill = true) {
+  PreviewSection("Lane strips", fill = true) {
     listOf(
       LaneStripDefaults.RowHeight,
       LaneStripDefaults.CellHeight,
@@ -193,7 +170,7 @@ private fun SpeedCharts() {
       )
     }
   }
-  Section("Speed charts", fill = true) {
+  PreviewSection("Speed charts", fill = true) {
     KetchSpeedChart(
       bands = bands,
       limits = listOf(SpeedLimitLine(5_242_880, "Task"), SpeedLimitLine(7_340_032, "Global")),
@@ -222,7 +199,7 @@ private fun Devices() {
     DeviceHealth.Offline(),
     DeviceHealth.Unauthorized
   )
-  Section("Pennants") {
+  PreviewSection("Pennants") {
     listOf(
       DevicePennantDefaults.XSmall,
       DevicePennantDefaults.Small,
@@ -241,7 +218,7 @@ private fun Devices() {
       icon = KetchIcon.Desktop,
     )
   }
-  Section("Device target") {
+  PreviewSection("Device target") {
     val options = listOf(
       DeviceOption(
         id = "local",
@@ -275,29 +252,6 @@ private fun previewSegments(total: Long, progress: List<Float>): List<Segment> {
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun Section(title: String, fill: Boolean = false, content: @Composable () -> Unit) {
-  val spacing = KetchTheme.spacing
-  Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textTertiary,
-    )
-    if (fill) {
-      Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) { content() }
-    } else {
-      FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(spacing.s3),
-        verticalArrangement = Arrangement.spacedBy(spacing.s3),
-        itemVerticalAlignment = Alignment.CenterVertically,
-      ) { content() }
-    }
-  }
-}
-
-private val GalleryWidth = 720.dp
 private val ChartHeight = 120.dp
 private val CardSparklineHeight = 40.dp
 private val SparklineWidth = 64.dp
