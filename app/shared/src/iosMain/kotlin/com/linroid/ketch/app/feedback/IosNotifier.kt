@@ -8,10 +8,14 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import platform.Foundation.NSError
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationState
@@ -274,7 +278,7 @@ internal fun IosNotifier.reportActivity(
           launch { controller.messages.runFileAction { actions.open(tap.path) } }
         tap.path != null && actions != null && tap.action == NotificationAction.Share ->
           launch { controller.messages.runFileAction { actions.share(tap.path) } }
-        else -> controller.state.open(tap)
+        else -> launch { controller.state.open(tap) }
       }
     }
   }
@@ -289,12 +293,18 @@ private suspend fun MessageCenter.runFileAction(action: suspend () -> Unit) {
   }
 }
 
-private fun AppState.open(tap: NotificationTap) {
+// A tap can start the app, or switch devices, before the device has loaded the task.
+private val TASK_LOAD_TIMEOUT = 10.seconds
+
+private suspend fun AppState.open(tap: NotificationTap) {
   val key = tap.taskKey ?: return
   val entry = instances.value.firstOrNull { it.deviceId == key.deviceId } ?: return
   if (entry != activeInstance.value) switchInstance(entry)
   inspect(key)
   if (tap.action != NotificationAction.Retry) return
-  val task = entry.instance.tasks.value.firstOrNull { it.taskId == key.taskId } ?: return
+  val task = withTimeoutOrNull(TASK_LOAD_TIMEOUT) {
+    entry.instance.tasks.mapNotNull { tasks -> tasks.firstOrNull { it.taskId == key.taskId } }
+      .first()
+  } ?: return
   retry(task)
 }
