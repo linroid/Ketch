@@ -267,15 +267,8 @@ internal fun ArrangementMenu(
       MenuLabel("Sort", arrangement.sort.label + arrow, open) { open = true }
     }
     KetchMenu(expanded = open, onDismissRequest = { open = false }) {
-      if (table) {
-        for (group in GroupBy.entries.filter { it != GroupBy.Device }) {
-          item(
-            label = group.label,
-            checked = arrangement.group == group,
-            onClick = { onChange(arrangement.copy(group = group)) },
-          )
-        }
-      } else {
+      // The table sorts by its headers, so its menu only groups.
+      if (!table) {
         header("Sort by")
         for (key in ListSortKeys) {
           item(
@@ -286,13 +279,13 @@ internal fun ArrangementMenu(
         }
         divider()
         header("Group by")
-        for (group in GroupBy.entries.filter { it != GroupBy.Device }) {
-          item(
-            label = group.label,
-            checked = arrangement.group == group,
-            onClick = { onChange(arrangement.copy(group = group)) },
-          )
-        }
+      }
+      for (group in GroupBy.entries.filter { it != GroupBy.Device }) {
+        item(
+          label = group.label,
+          checked = arrangement.group == group,
+          onClick = { onChange(arrangement.copy(group = group)) },
+        )
       }
     }
   }

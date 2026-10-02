@@ -60,7 +60,6 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.StatusFilter
-import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.LinkParser
@@ -386,7 +385,7 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
       item(
         label = "Copy all links",
         icon = KetchIcon.Copy,
-        onClick = { copyLinks(page, visible) },
+        onClick = { page.actions.runner.run(RowAction.CopyLink, visible) },
         enabled = visible.isNotEmpty(),
       )
       divider()
@@ -458,10 +457,6 @@ private val DownloadState.isPausable: Boolean
 /** "Clear 4 finished", or "Clear finished" when there are none. */
 internal fun clearFinishedLabel(count: Int): String =
   if (count > 0) "Clear $count finished" else "Clear finished"
-
-private fun copyLinks(page: DownloadsPage, rows: List<TaskRow>) {
-  page.actions.runner.run(RowAction.CopyLink, rows)
-}
 
 /** Widest the Add button grows on a card [cardWidth] wide, as when it offers a copied link. */
 internal fun addButtonMaxWidth(cardWidth: Dp): Dp =
