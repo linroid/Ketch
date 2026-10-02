@@ -180,10 +180,14 @@ data class DiscoveryConfig(
 /**
  * Agent execution configuration.
  *
- * @param maxIterations maximum agent tool-call iterations
+ * @param maxToolCalls tool calls the agent may make in one discovery
+ *   run, progress steps included; once they are spent, every tool asks
+ *   the agent to return what it found. The default fits the searches,
+ *   page fetches and HEAD requests the agent is told to stay within,
+ *   plus its progress steps
  * @param temperature LLM sampling temperature
  */
 data class AgentConfig(
-  val maxIterations: Int = 30,
+  val maxToolCalls: Int = 40,
   val temperature: Double = 0.2,
 )

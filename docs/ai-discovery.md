@@ -88,8 +88,9 @@ Every page and HEAD request goes through the same safeguards:
   followed one hop at a time (at most 10), and each hop is checked, so a
   public page cannot redirect the agent to your router or `localhost`.
 - A discovery run may make 25 page fetches and HEAD requests in total
-  and read 20 MB of page content, with at most 2 MB per page. When the
-  budget is spent the agent returns what it has found.
+  and read 20 MB of page content, with at most 2 MB per page, and call
+  its tools 40 times, progress steps included. When a budget is spent
+  the agent returns what it has found.
 - Requests to the same host are at least a second apart, and at most
   three run at once.
 - Pages a site's `robots.txt` disallows for `KetchBot` are not fetched,
@@ -163,6 +164,11 @@ key that the environment supplies is noted under the **API key** field
 and counts as filled in the status line, and **Test** works with the
 token left empty. It also works with the switch off, so you can check a
 key before turning discovery on.
+
+When the provider fails during a search or a **Test**, such as a rejected
+API key, an unknown model or an unreachable endpoint, Discover shows why
+next to **Try again**, and `ketch ai-discover` prints it, instead of
+reporting that nothing was found.
 
 ## config.toml
 
