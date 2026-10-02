@@ -178,7 +178,7 @@ internal fun AppState.dropFiles(entry: InstanceEntry, files: List<DroppedFile>) 
   val torrent = files.firstOrNull { it.name.endsWith(".torrent", ignoreCase = true) }
   if (torrent != null) {
     openIntake(IntakeRequest(targetDeviceId = entry.deviceId))
-    if (showAddDialog) resolveDroppedFile(torrent)
+    if (showAddDialog) resolveDroppedFile(torrent, entry)
     return
   }
   val lists = files.filter { LinkParser.isLinkList(it.name) }
