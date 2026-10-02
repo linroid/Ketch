@@ -195,7 +195,7 @@ class RowActionRunnerTest {
     runCurrent()
     f.files.missing += "/downloads/a.iso"
 
-    f.runner.clearMissing()
+    f.runner.clearMissing(listOf(gone, kept).map { rowOf(it) })
     runCurrent()
 
     assertEquals(listOf(kept, running), f.state.tasks.value)
@@ -216,7 +216,7 @@ class RowActionRunnerTest {
     val f = ActionsFixture(this)
     val task = f.add(completed)
 
-    f.runner.clearMissing()
+    f.runner.clearMissing(listOf(rowOf(task)))
     advanceTimeBy(7.seconds)
     runCurrent()
 
@@ -224,6 +224,25 @@ class RowActionRunnerTest {
     val message = f.messages().last()
     assertEquals("No missing files to clear", message.title)
     assertEquals(MessageLevel.Info, message.level)
+    f.close()
+  }
+
+  @Test
+  fun clearMissing_filePutBackSinceChecked_readsAsPresentAgain() = runTest {
+    val f = ActionsFixture(this)
+    val task = f.add(completed)
+    val row = rowOf(task)
+    f.files.missing += "/downloads/a.iso"
+    f.runner.checkFile(row)
+    runCurrent()
+    f.files.missing.clear()
+
+    f.runner.clearMissing(listOf(row))
+    runCurrent()
+
+    assertFalse(f.runner.isFileMissing(row))
+    assertTrue(task.calls.isEmpty())
+    assertEquals("No missing files to clear", f.messages().last().title)
     f.close()
   }
 

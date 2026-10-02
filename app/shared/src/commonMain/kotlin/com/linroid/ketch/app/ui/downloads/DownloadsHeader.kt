@@ -390,7 +390,7 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
           label = clearMissingLabel(missing),
           icon = KetchIcon.Warning,
           caption = CLEAR_MISSING_CAPTION,
-          onClick = runner::clearMissing,
+          onClick = { runner.clearMissing(finishedRows) },
           enabled = missing > 0,
         )
       }

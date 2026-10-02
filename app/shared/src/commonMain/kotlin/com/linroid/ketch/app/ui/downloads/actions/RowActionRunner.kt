@@ -138,10 +138,13 @@ internal class RowActionRunner(
 
   /**
    * Clears the finished downloads of the shown devices whose files have been moved or deleted,
-   * checking each file again first; see [AppState.clearMissing].
+   * checking each file again first; see [AppState.clearMissing]. The files of [rows], those the
+   * caller counted, are checked again here too, so one put back since reads as present.
    */
-  fun clearMissing() {
-    files?.let { state.clearMissing(it) }
+  fun clearMissing(rows: List<TaskRow>) {
+    val files = files ?: return
+    checkFiles(rows)
+    state.clearMissing(files)
   }
 
   /** Whether removed files of [row] can go to the Trash here instead of being deleted. */
