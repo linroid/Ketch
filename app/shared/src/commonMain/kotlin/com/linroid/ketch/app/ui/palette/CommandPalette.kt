@@ -37,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -59,7 +58,6 @@ import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -97,8 +95,6 @@ import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.displayName
-import com.linroid.ketch.app.platform.rememberFileActions
-import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
@@ -110,6 +106,7 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.downloads.actions.rememberRowCommands
 import com.linroid.ketch.app.ui.list.FileNameText
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
@@ -435,17 +432,6 @@ private fun rememberPaletteSource(
     timeZone = TimeZone.currentSystemDefault(),
     platform = platform,
   )
-}
-
-@Composable
-private fun rememberRowCommands(state: AppState): RowCommands {
-  val files = rememberFileActions()
-  val clipboard = rememberSystemClipboard()
-  val uriHandler = LocalUriHandler.current
-  val scope = rememberCoroutineScope()
-  return remember(state, files, clipboard, uriHandler, scope) {
-    RowCommands(state, files, clipboard, scope, uriHandler::openUri)
-  }
 }
 
 /** What a device is doing, after its name: "2 active · 6.4 MB/s", "Idle", "Offline"… */

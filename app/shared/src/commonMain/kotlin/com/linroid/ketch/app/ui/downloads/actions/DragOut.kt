@@ -22,11 +22,11 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.list.outputFile
 
 /**
  * What dragging rows out of the Downloads list carries.
@@ -58,9 +58,8 @@ internal data class DragPayload(
     /** The payload of dragging [rows]: finished files of this device as files, all as links. */
     fun of(rows: List<TaskRow>): DragPayload = DragPayload(
       files = rows.mapNotNull { row ->
-        val done = row.state as? DownloadState.Completed ?: return@mapNotNull null
-        done.outputPath.takeIf {
-          it.isNotBlank() && row.key.deviceId == LOCAL_DEVICE_ID && !it.startsWith("content://")
+        row.outputFile?.takeIf {
+          row.key.deviceId == LOCAL_DEVICE_ID && !it.startsWith("content://")
         }
       },
       links = rows.map { it.request.url },

@@ -404,7 +404,7 @@ private fun StandInDownloads(
     val scope = rememberCoroutineScope()
     val runner = remember(state, files) {
       val commands = RowCommands(state, files, SnapshotClipboard, scope) {}
-      RowActionRunner(state, commands, files, SnapshotClipboard, scope)
+      RowActionRunner(commands)
     }
     val actions = rememberListActions(rows, state, runner)
     val listState = rememberLazyListState()

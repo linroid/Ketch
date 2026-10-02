@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.ui.list
 
-import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
@@ -25,6 +24,7 @@ import com.linroid.ketch.app.state.RowCapabilities
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.util.RowContext
 import com.linroid.ketch.app.util.rowContent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,7 +51,6 @@ import kotlin.time.Instant
 class RowCommandsTest {
 
   private val local = DeviceInfo("This Mac", RowCapabilities.local())
-  private val remote = DeviceInfo("NAS", RowCapabilities.remote())
   private val downloading = DownloadState.Downloading(RecordingTask.PROGRESS)
 
   private class Fixture(
@@ -96,55 +95,6 @@ class RowCommandsTest {
       device = device,
       content = rowContent(request, state, task.createdAt, context),
     )
-  }
-
-  @Test
-  fun trailing_canceledRow_isDownloadAgain() = runTest {
-    val f = fixture()
-    val task = f.api.add(DownloadState.Canceled)
-
-    assertEquals(RowAction.DownloadAgain, f.commands.trailing(rowOf(task)))
-    f.controller.close()
-  }
-
-  @Test
-  fun trailing_failedRow_isTheErrorCopyPrimary() = runTest {
-    val f = fixture()
-    val task = f.api.add(DownloadState.Failed(KetchError.Http(403)))
-
-    assertEquals(RowAction.EditLink, f.commands.trailing(rowOf(task)))
-    f.controller.close()
-  }
-
-  @Test
-  fun trailing_diskErrorWhereFilesCannotBeRevealed_fallsBackToRetry() = runTest {
-    val f = fixture(revealLabel = null)
-    val request = DownloadRequest("https://example.com/a.iso", Destination("/downloads/"))
-    val task = f.api.add(DownloadState.Failed(KetchError.Disk()), request)
-
-    assertEquals(RowAction.Retry, f.commands.trailing(rowOf(task)))
-    f.controller.close()
-  }
-
-  @Test
-  fun menu_remoteRow_offersNoStartLater() = runTest {
-    val f = fixture()
-    val task = f.api.add(DownloadState.Queued)
-
-    val menu = f.commands.menu(rowOf(task, remote))
-
-    assertFalse(RowAction.StartLater in menu)
-    assertTrue(RowAction.SpeedLimit in menu)
-    f.controller.close()
-  }
-
-  @Test
-  fun menu_localRow_offersStartLater() = runTest {
-    val f = fixture()
-    val task = f.api.add(DownloadState.Queued)
-
-    assertTrue(RowAction.StartLater in f.commands.menu(rowOf(task)))
-    f.controller.close()
   }
 
   @Test
@@ -277,7 +227,7 @@ class RowCommandsTest {
     )
 
     assertFalse(f.commands.canRun(RowAction.OpenSourcePage, rowOf(task)))
-    assertFalse(RowAction.OpenSourcePage in f.commands.menu(rowOf(task)))
+    assertFalse(RowAction.OpenSourcePage in RowActionRunner(f.commands).menu(rowOf(task)))
     f.controller.close()
   }
 
@@ -310,7 +260,7 @@ class RowCommandsTest {
     val task = f.api.add(downloading)
 
     assertFalse(commands.canRun(RowAction.CopyLink, rowOf(task)))
-    assertNull(commands.menu(rowOf(task)).firstOrNull { it == RowAction.CopyLink })
+    assertNull(RowActionRunner(commands).menu(rowOf(task)).firstOrNull { it == RowAction.CopyLink })
     f.controller.close()
   }
 

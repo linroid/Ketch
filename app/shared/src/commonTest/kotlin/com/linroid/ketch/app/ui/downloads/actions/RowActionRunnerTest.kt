@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.downloads.actions
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
@@ -93,7 +94,7 @@ class RowActionRunnerTest {
     val f = ActionsFixture(this)
     val tasks = List(2) { f.add(downloading) }
     val left = CoroutineScope(Job().apply { cancel() })
-    val runner = RowActionRunner(f.state, f.runner.commands, f.files, f.clipboard, left)
+    val runner = RowActionRunner(f.runner.commands, left)
 
     runner.run(RowAction.Pause, tasks.map { rowOf(it) })
     runCurrent()
@@ -301,6 +302,55 @@ class RowActionRunnerTest {
 
     assertEquals(setOf(TaskKey(LOCAL_DEVICE_ID, "other")), f.state.selectedKeys)
     assertEquals(null, f.state.inspectedTask)
+    f.close()
+  }
+
+  @Test
+  fun primary_canceledRow_isDownloadAgain() = runTest {
+    val f = ActionsFixture(this)
+    val task = f.add(DownloadState.Canceled)
+
+    assertEquals(RowAction.DownloadAgain, f.runner.primary(rowOf(task)))
+    f.close()
+  }
+
+  @Test
+  fun primary_failedRow_isTheErrorCopyPrimary() = runTest {
+    val f = ActionsFixture(this)
+    val task = f.add(DownloadState.Failed(KetchError.Http(403)))
+
+    assertEquals(RowAction.EditLink, f.runner.primary(rowOf(task)))
+    f.close()
+  }
+
+  @Test
+  fun primary_diskErrorWhereFilesCannotBeRevealed_fallsBackToRetry() = runTest {
+    val f = ActionsFixture(this, revealLabel = null)
+    val request = DownloadRequest("https://example.com/a.iso", Destination("/downloads/"))
+    val task = f.add(DownloadState.Failed(KetchError.Disk()), request)
+
+    assertEquals(RowAction.Retry, f.runner.primary(rowOf(task)))
+    f.close()
+  }
+
+  @Test
+  fun menu_remoteRow_offersNoStartLater() = runTest {
+    val f = ActionsFixture(this)
+    val task = f.add(DownloadState.Queued)
+
+    val menu = f.runner.menu(rowOf(task, RemoteDevice))
+
+    assertFalse(RowAction.StartLater in menu)
+    assertTrue(RowAction.SpeedLimit in menu)
+    f.close()
+  }
+
+  @Test
+  fun menu_localRow_offersStartLater() = runTest {
+    val f = ActionsFixture(this)
+    val task = f.add(DownloadState.Queued)
+
+    assertTrue(RowAction.StartLater in f.runner.menu(rowOf(task)))
     f.close()
   }
 }

@@ -26,6 +26,7 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.list.RowCommands
+import com.linroid.ketch.app.ui.list.outputFile
 
 /**
  * The buttons that fade in at the end of a row while the pointer is over it: Open and Show for a

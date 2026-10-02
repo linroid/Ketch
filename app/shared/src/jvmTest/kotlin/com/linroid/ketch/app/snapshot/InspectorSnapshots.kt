@@ -264,7 +264,7 @@ class InspectorSnapshots {
           val scope = rememberCoroutineScope()
           val runner = remember(scope) {
             val commands = RowCommands(state, InspectorFiles, InspectorClipboard, scope) {}
-            RowActionRunner(state, commands, InspectorFiles, InspectorClipboard, scope)
+            RowActionRunner(commands)
           }
           Pane(width, placement) {
             InspectorContent(state, key, placement, onClose = {}, runner = runner)

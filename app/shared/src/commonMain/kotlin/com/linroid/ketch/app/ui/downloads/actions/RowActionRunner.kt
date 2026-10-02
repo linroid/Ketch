@@ -20,7 +20,6 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.platform.FileActions
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
@@ -33,6 +32,7 @@ import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.taskActions
 import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.list.RowCommands
+import com.linroid.ketch.app.ui.list.outputFile
 import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.priorityLabel
 import kotlinx.coroutines.CoroutineScope
@@ -87,19 +87,21 @@ internal data class BatchAction(val action: RowAction, val rows: List<TaskRow>) 
  * offer Try again for the rows that failed. Removing, clearing and discarding progress go through
  * the Undo of [AppState].
  *
- * @param files opens, reveals and trashes downloaded files; `null` where they are out of reach.
- * @param clipboard receives copied links and paths; `null` where there is none.
- * @param scope runs clipboard writes and file checks. Batches run in the app's scope instead,
- *   so leaving the screen never stops one with half the rows done, and Try again still works.
+ * @param scope runs file checks; [commands]' own by default. Batches run in the app's scope
+ *   instead, so leaving the screen never stops one with half the rows done, and Try again still
+ *   works.
  */
 @Stable
 internal class RowActionRunner(
-  val state: AppState,
   val commands: RowCommands,
-  val files: FileActions?,
-  private val clipboard: SystemClipboard?,
-  private val scope: CoroutineScope,
+  private val scope: CoroutineScope = commands.scope,
 ) {
+  /** The app the rows belong to. */
+  val state: AppState = commands.state
+
+  /** Opens, reveals and trashes downloaded files; `null` where they are out of reach. */
+  val files: FileActions? = commands.files
+
   private val log = KetchLogger("RowActions")
   private val missing = mutableStateMapOf<TaskKey, Boolean>()
 
@@ -121,7 +123,7 @@ internal class RowActionRunner(
    */
   fun checkFile(row: TaskRow) {
     val files = files ?: return
-    val path = (row.state as? DownloadState.Completed)?.outputPath?.ifBlank { null } ?: return
+    val path = row.outputFile ?: return
     if (row.device.capabilities.isRemote) return
     scope.launch {
       catchingUnlessCancelled { files.exists(path) }
@@ -205,18 +207,14 @@ internal class RowActionRunner(
   }
 
   /** Caps each of [rows] at [limit]. */
-  fun setSpeedLimit(rows: List<TaskRow>, limit: SpeedLimit) {
-    val row = rows.singleOrNull()
-    if (row != null) {
-      commands.setSpeedLimit(row, limit)
-      return
-    }
+  fun setSpeedLimit(rows: List<TaskRow>, limit: SpeedLimit): Job {
+    rows.singleOrNull()?.let { return commands.setSpeedLimit(it, limit) }
     val title = if (limit.isUnlimited) {
       { n: Int -> "Removed the speed limit of ${downloads(n)}" }
     } else {
       { n: Int -> "Limited ${downloads(n)} to ${formatSpeedLimit(limit)}" }
     }
-    launchBatch(rows, "set the speed limit of", title) { setSpeedLimit(limit) }
+    return launchBatch(rows, "set the speed limit of", title) { setSpeedLimit(limit) }
   }
 
   /** Splits [total] evenly between [rows], each capped at its share. */
@@ -229,37 +227,25 @@ internal class RowActionRunner(
   }
 
   /** Gives each of [rows] [priority]. */
-  fun setPriority(rows: List<TaskRow>, priority: DownloadPriority) {
-    val row = rows.singleOrNull()
-    if (row != null) {
-      commands.setPriority(row, priority)
-      return
-    }
-    launchBatch(rows, "set the priority of", { n ->
+  fun setPriority(rows: List<TaskRow>, priority: DownloadPriority): Job {
+    rows.singleOrNull()?.let { return commands.setPriority(it, priority) }
+    return launchBatch(rows, "set the priority of", { n ->
       "Set ${downloads(n)} to ${priorityLabel(priority)} priority"
     }) { setPriority(priority) }
   }
 
   /** Lets each of [rows] open [connections] connections, or peers for a torrent. */
-  fun setConnections(rows: List<TaskRow>, connections: Int) {
-    val row = rows.singleOrNull()
-    if (row != null) {
-      commands.setConnections(row, connections)
-      return
-    }
-    launchBatch(rows, "set the connections of", { n ->
+  fun setConnections(rows: List<TaskRow>, connections: Int): Job {
+    rows.singleOrNull()?.let { return commands.setConnections(it, connections) }
+    return launchBatch(rows, "set the connections of", { n ->
       "Set ${downloads(n)} to $connections connections"
     }) { setConnections(connections) }
   }
 
   /** Starts each of [rows] at [schedule]. */
-  fun reschedule(rows: List<TaskRow>, schedule: DownloadSchedule) {
-    val row = rows.singleOrNull()
-    if (row != null) {
-      commands.reschedule(row, schedule)
-      return
-    }
-    launchBatch(rows, "reschedule", { n -> "Rescheduled ${downloads(n)}" }) {
+  fun reschedule(rows: List<TaskRow>, schedule: DownloadSchedule): Job {
+    rows.singleOrNull()?.let { return commands.reschedule(it, schedule) }
+    return launchBatch(rows, "reschedule", { n -> "Rescheduled ${downloads(n)}" }) {
       reschedule(schedule)
     }
   }
@@ -329,8 +315,8 @@ internal class RowActionRunner(
         dialog = RowDialog.Remove(applies, withFiles = true)
       }
       RowAction.Remove -> state.remove(applies.map { it.task })
-      RowAction.CopyLink -> copy(applies.map { it.request.url }, "link")
-      RowAction.CopyPath -> copy(applies.mapNotNull { it.outputFile }, "file path")
+      RowAction.CopyLink -> commands.copy(applies.map { it.request.url }, "link")
+      RowAction.CopyPath -> commands.copy(applies.mapNotNull { it.outputFile }, "file path")
       else -> applies.forEach { commands.run(action, it) }
     }
   }
@@ -477,22 +463,6 @@ internal class RowActionRunner(
     }
   }
 
-  private fun copy(lines: List<String>, what: String) {
-    val clipboard = clipboard ?: return
-    if (lines.isEmpty()) return
-    scope.launch {
-      catchingUnlessCancelled { clipboard.writeText(lines.joinToString("\n")) }
-        .onSuccess {
-          val title = if (lines.size == 1) "Copied $what" else "Copied ${lines.size} ${what}s"
-          state.messages.post(MessageLevel.Success, title)
-        }
-        .onFailure { e ->
-          val noun = if (lines.size == 1) what else "${what}s"
-          state.messages.post(MessageLevel.Error, "Couldn't copy the $noun", cause = e)
-        }
-    }
-  }
-
   private companion object {
     /** Order of the actions a selection offers. */
     val BATCH_ORDER: List<RowAction> = listOf(
@@ -521,14 +491,19 @@ internal class RowActionRunner(
 /** [RowActionRunner] of the app shown around this composition. */
 @Composable
 internal fun rememberRowActionRunner(): RowActionRunner {
-  val state = LocalAppState.current
+  val commands = rememberRowCommands(LocalAppState.current)
+  return remember(commands) { RowActionRunner(commands) }
+}
+
+/** [RowCommands] of [state], with this platform's files, clipboard and browser. */
+@Composable
+internal fun rememberRowCommands(state: AppState): RowCommands {
   val files = rememberFileActions()
   val clipboard = rememberSystemClipboard()
   val uriHandler = LocalUriHandler.current
   val scope = rememberCoroutineScope()
   return remember(state, files, clipboard, uriHandler, scope) {
-    val commands = RowCommands(state, files, clipboard, scope, uriHandler::openUri)
-    RowActionRunner(state, commands, files, clipboard, scope)
+    RowCommands(state, files, clipboard, scope, uriHandler::openUri)
   }
 }
 
@@ -542,10 +517,6 @@ private class TrashResult(
   val trashError: Throwable? = null,
   val removeError: Throwable? = null,
 )
-
-/** Path of the file a completed row saved, or `null`. */
-internal val TaskRow.outputFile: String?
-  get() = (state as? DownloadState.Completed)?.outputPath?.ifBlank { null }
 
 /**
  * Why a batch [command] left [skipped] rows alone, such as "1 already finished" or "2 already
