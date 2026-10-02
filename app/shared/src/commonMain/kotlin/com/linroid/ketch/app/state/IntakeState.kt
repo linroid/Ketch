@@ -1222,10 +1222,11 @@ class IntakeSession internal constructor(
     val current = task.requestState.value
     val name = displayName(current, task.state.value)
     if (!startsOver) {
+      val newConnections = connectionsFor(current)
       state.runTaskCommand(task, "retry $name") {
         if (speedLimit != current.speedLimit) setSpeedLimit(speedLimit)
         if (priority != current.priority) setPriority(priority)
-        if (connections != current.connections) setConnections(connections)
+        newConnections?.let { setConnections(it) }
         resume()
       }
       onDone()
@@ -1265,18 +1266,30 @@ class IntakeSession internal constructor(
     val name = displayName(current, task.state.value)
     val speed = speedLimit
     val newPriority = priority
-    val newConnections = connections
+    val newConnections = connectionsFor(current)
     val newSchedule = schedule
     val wasScheduled = task.state.value as? DownloadState.Scheduled
     state.runTaskCommand(task, "change the options of $name") {
       if (speed != current.speedLimit) setSpeedLimit(speed)
       if (newPriority != current.priority) setPriority(newPriority)
-      if (newConnections != current.connections) setConnections(newConnections)
+      newConnections?.let { setConnections(it) }
       if (newSchedule != (wasScheduled?.schedule ?: DownloadSchedule.Immediate)) {
         reschedule(newSchedule)
       }
     }
     onDone()
+  }
+
+  /**
+   * Connections to set on the task downloading [current], or `null` to leave them. A task cannot
+   * go back to Auto, so Auto gives a task with its own count the target's default count; a
+   * torrent's peer limit, or a default not known yet, is left as it is.
+   */
+  private fun connectionsFor(current: DownloadRequest): Int? = when {
+    connections == current.connections -> null
+    connections > 0 -> connections
+    torrentsOnly -> null
+    else -> autoConnections?.takeIf { it != current.connections }
   }
 
   private fun bindTask() {

@@ -346,6 +346,28 @@ class IntakeStateTest {
   }
 
   @Test
+  fun retry_autoConnectionsOnATaskWithItsOwnCount_setsTheDeviceDefault() = runTest {
+    val api = IntakeTestApi()
+    val failed = api.base.add(
+      DownloadState.Failed(KetchError.Network()),
+      DownloadRequest(links.first(), connections = 8),
+    )
+    val request = IntakeRequest(
+      seeds = listOf(IntakeSeed(links.first())),
+      retryOf = TaskKey(LOCAL_DEVICE_ID, failed.taskId),
+    )
+    val session = session(api, request)
+    runCurrent()
+    session.connections = 0
+
+    assertFalse(session.startsOver)
+    session.submit {}
+    runCurrent()
+
+    assertEquals(listOf("connections 4", "resume"), failed.calls)
+  }
+
+  @Test
   fun retry_linkChanged_startsOverAsANewTask() = runTest {
     val api = IntakeTestApi()
     val failed = api.base.add(
