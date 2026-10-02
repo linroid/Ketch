@@ -385,7 +385,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
     MenuBarMenu(
       "Device",
       buildList {
-        val devices = context.devices.take(MAX_DEVICE_ITEMS)
+        val devices = context.devices.take(KetchCommands.NUMBERED_DEVICES)
         add(
           item(
             KetchCommands.AllDevices,
@@ -465,7 +465,6 @@ private val SHELL_COMMANDS = setOf(
   KetchCommands.Activity,
 )
 private val TEXT_REDO_KEY = Key.Z
-private const val MAX_DEVICE_ITEMS = 9
 
 /** Renders [entries] in a tray or menu bar menu; clicks call [onAction]. */
 @Composable
@@ -585,13 +584,13 @@ internal class DesktopCommands(
 
   /** Runs [command]; a command the desktop does not bind does nothing. */
   fun run(command: KetchCommand) {
-    val filter = StatusFilter.entries.firstOrNull { KetchCommands.tab(it) == command }
+    val filter = KetchCommands.tabFilter(command)
     if (filter != null) {
       actions.showWindow()
       state.showDownloads(filter)
       return
     }
-    val device = (1..MAX_DEVICE_ITEMS).firstOrNull { KetchCommands.device(it) == command }
+    val device = KetchCommands.deviceNumber(command)
     if (device != null) {
       state.instances.value.getOrNull(device - 1)?.let {
         actions.showWindow()
