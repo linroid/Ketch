@@ -18,7 +18,6 @@ import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.search.SearchProvider
 import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.config.LlmSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
@@ -135,7 +134,7 @@ class ResourceDiscoveryService internal constructor(
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
-      log.e(e) { "Agent execution failed" }
+      logFailure("Agent execution", e)
       throw DiscoveryException(describeLlmFailure(e), e)
     }
 
@@ -180,10 +179,23 @@ class ResourceDiscoveryService internal constructor(
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
-      log.w { "Connection check failed: ${e.describeCauses()}" }
+      logFailure("Connection check", e)
       throw DiscoveryException(describeLlmFailure(e), e)
     }
     return reply.textContent().trim()
+  }
+
+  /**
+   * Logs the failure of [action]. A provider's error quotes its response
+   * body, which may echo a token, so it is logged as its status alone;
+   * other failures keep their stack trace.
+   */
+  private fun logFailure(action: String, error: Exception) {
+    if (hasProviderResponse(error)) {
+      log.w { "$action failed: ${describeLlmFailure(error, withProviderReason = false)}" }
+    } else {
+      log.e(error) { "$action failed" }
+    }
   }
 
   private fun buildUserMessage(

@@ -1,6 +1,7 @@
 package com.linroid.ketch.ai
 
 import ai.koog.agents.core.tools.ToolDescriptor
+import ai.koog.http.client.KoogHttpClientException
 import ai.koog.prompt.Prompt
 import ai.koog.prompt.dsl.ModerationResult
 import ai.koog.prompt.executor.model.PromptExecutor
@@ -17,6 +18,8 @@ import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.fetch.fakeDns
 import com.linroid.ketch.ai.search.DummySearchProvider
 import com.linroid.ketch.ai.site.SiteProfiler
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
@@ -99,6 +102,29 @@ class ResourceDiscoveryServiceTest {
     )
   }
 
+  /** Records every log message, with the stack trace of any error logged with it. */
+  private fun recordingLogger(records: MutableList<String>) = object : Logger {
+    override fun v(message: String) {
+      records += message
+    }
+
+    override fun d(message: String) {
+      records += message
+    }
+
+    override fun i(message: String) {
+      records += message
+    }
+
+    override fun w(message: String, throwable: Throwable?) {
+      records += message + throwable?.stackTraceToString().orEmpty()
+    }
+
+    override fun e(message: String, throwable: Throwable?) {
+      records += message + throwable?.stackTraceToString().orEmpty()
+    }
+  }
+
   private fun recordSteps(steps: MutableList<String>) = object : DiscoveryStepListener {
     override fun onStep(title: String, details: String) {
       steps += details
@@ -173,6 +199,30 @@ class ResourceDiscoveryServiceTest {
 
     assertEquals("The AI request failed: LLM unavailable", error.message)
     assertEquals(listOf(1), executors.map { it.closeCount })
+  }
+
+  @Test
+  fun discoverAndVerify_providerError_reportsReasonButLogsNoBody() = runTest {
+    val records = mutableListOf<String>()
+    KetchLogger.setLogger(recordingLogger(records))
+    val body = """{"error": {"message": "Invalid token sk-live-secret"}}"""
+    val service = service(mutableListOf()) { _ ->
+      throw KoogHttpClientException(clientName = "OpenAI", statusCode = 401, errorBody = body)
+    }
+
+    val query = DiscoverQuery(query = "ubuntu iso")
+    val (search, check) = try {
+      assertFailsWith<DiscoveryException> { service.discover(query) } to
+        assertFailsWith<DiscoveryException> { service.verifyConnection() }
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+
+    val reported = "The AI provider rejected the API token (HTTP 401): Invalid token sk-live-secret"
+    assertEquals(reported, search.message)
+    assertEquals(reported, check.message)
+    assertTrue(records.any { "HTTP 401" in it })
+    assertTrue(records.none { "sk-live-secret" in it }, records.joinToString("\n"))
   }
 
   @Test

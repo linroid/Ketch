@@ -2,6 +2,7 @@ package com.linroid.ketch.ai
 
 import ai.koog.agents.core.agent.exception.AIAgentMaxNumberOfIterationsReachedException
 import ai.koog.http.client.KoogHttpClientException
+import com.linroid.ketch.api.log.redactUrlsIn
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -22,14 +23,16 @@ class DiscoveryException internal constructor(
 
 /**
  * A short explanation, for the user, of [error]: the failure of an LLM
- * request or of an agent run.
+ * request or of an agent run. URLs it quotes are redacted, since Koog's
+ * Gemini client sends the API key as a query parameter.
  *
  * Provider errors arrive as several lines of client name, status and
  * response body, so they are summarized by status, with the reason the
- * provider gave when its body has one.
+ * provider gave when its body has one and [withProviderReason] is set.
+ * Leave it out for logs: a provider may echo a token in its reason.
  */
-internal fun describeLlmFailure(error: Throwable): String {
-  val chain = generateSequence(error) { it.cause }.take(MAX_CAUSES).toList()
+internal fun describeLlmFailure(error: Throwable, withProviderReason: Boolean = true): String {
+  val chain = error.causeChain()
   if (chain.any { it is AIAgentMaxNumberOfIterationsReachedException }) {
     return "The agent ran out of steps before it answered. Try a more specific search."
   }
@@ -43,7 +46,7 @@ internal fun describeLlmFailure(error: Throwable): String {
       status >= 500 -> "The AI provider had a server error"
       else -> "The AI provider refused the request"
     }
-    val reason = http.errorBody?.let(::providerReason)
+    val reason = http.errorBody?.takeIf { withProviderReason }?.let(::providerReason)
     return "$summary (HTTP $status)" + reason?.let { ": $it" }.orEmpty()
   }
   val io = chain.firstNotNullOfOrNull { it as? IOException }
@@ -54,6 +57,16 @@ internal fun describeLlmFailure(error: Throwable): String {
     ?: error::class.simpleName
   return "The AI request failed: $detail"
 }
+
+/**
+ * Whether [error] carries an LLM provider's error response, whose body
+ * may echo a token and must not be logged.
+ */
+internal fun hasProviderResponse(error: Throwable): Boolean =
+  error.causeChain().any { it is KoogHttpClientException }
+
+private fun Throwable.causeChain(): List<Throwable> =
+  generateSequence(this) { it.cause }.take(MAX_CAUSES).toList()
 
 /**
  * The reason in a provider's JSON error [body]: `error.message` for
@@ -68,12 +81,12 @@ private fun providerReason(body: String): String? {
     else -> (json["message"] as? JsonPrimitive)?.contentOrNull
   }
   return reason?.lineSequence()?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
-    ?.take(MAX_REASON_LENGTH)
+    ?.let(::redactUrlsIn)?.take(MAX_REASON_LENGTH)
 }
 
 private fun Throwable.firstLine(): String? =
   message?.lineSequence()?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
-    ?.take(MAX_REASON_LENGTH)
+    ?.let(::redactUrlsIn)?.take(MAX_REASON_LENGTH)
 
 private const val MAX_CAUSES = 10
 private const val MAX_REASON_LENGTH = 200

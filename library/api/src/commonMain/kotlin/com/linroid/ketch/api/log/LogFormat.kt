@@ -85,8 +85,10 @@ private fun redactMagnet(url: String): String {
 /**
  * Every URL or magnet link quoted in [text] passed through [redactUrl]. Exception messages,
  * such as Ktor's timeouts, quote the full request URL.
+ *
+ * @suppress This is internal API and should not be used directly by library users.
  */
-internal fun redactUrlsIn(text: String): String = EMBEDDED_URL.replace(text) { redactUrl(it.value) }
+fun redactUrlsIn(text: String): String = EMBEDDED_URL.replace(text) { redactUrl(it.value) }
 
 /**
  * Formats a log record as `2026-01-31 14:03:12.345 [INFO] message`, followed by the stack

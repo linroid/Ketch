@@ -3,9 +3,12 @@ package com.linroid.ketch.ai
 import ai.koog.agents.core.agent.exception.AIAgentMaxNumberOfIterationsReachedException
 import ai.koog.http.client.KoogHttpClientException
 import ai.koog.prompt.executor.clients.LLMClientException
+import java.io.IOException
 import java.net.ConnectException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class DiscoveryExceptionTest {
 
@@ -35,6 +38,16 @@ class DiscoveryExceptionTest {
   }
 
   @Test
+  fun describeLlmFailure_withoutProviderReason_givesStatusOnly() {
+    val body = """{"error": {"message": "Invalid token sk-live-secret"}}"""
+
+    assertEquals(
+      "The AI provider rejected the API token (HTTP 401)",
+      describeLlmFailure(httpError(401, body), withProviderReason = false),
+    )
+  }
+
+  @Test
   fun describeLlmFailure_ollamaStringError_givesProviderReason() {
     assertEquals(
       "The AI provider doesn't know this model or endpoint (HTTP 404): model 'qwen' not found",
@@ -56,6 +69,19 @@ class DiscoveryExceptionTest {
     val error = LLMClientException("Ollama", "Request failed", refused)
 
     assertEquals("Couldn't reach the AI provider: Connection refused", describeLlmFailure(error))
+  }
+
+  @Test
+  fun describeLlmFailure_timeoutQuotingApiKey_redactsIt() {
+    val timeout = IOException(
+      "Request timeout has expired [url=https://generativelanguage.googleapis.com/v1beta/" +
+        "models/gemini:generateContent?key=AIzaSecret, request_timeout=15000 ms]",
+    )
+
+    val description = describeLlmFailure(timeout)
+
+    assertTrue(description.startsWith("Couldn't reach the AI provider: Request timeout"))
+    assertFalse("AIzaSecret" in description, description)
   }
 
   @Test
