@@ -3,7 +3,6 @@ package com.linroid.ketch.app.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +25,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -180,14 +178,7 @@ private fun StepButton(plus: Boolean, description: String, enabled: Boolean, onC
       .background(overlay, shape)
       .border(1.dp, colors.borderStrong, shape)
       .semantics { contentDescription = description }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      ),
+      .ketchClickable(interactions, focus, enabled = enabled, onClick = onClick),
   ) {
     StepGlyph(plus, KetchTheme.density.controlGlyph, colors.textPrimary)
   }

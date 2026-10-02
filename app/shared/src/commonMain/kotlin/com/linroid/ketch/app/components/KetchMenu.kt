@@ -3,7 +3,6 @@ package com.linroid.ketch.app.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -52,7 +51,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -607,13 +605,7 @@ private fun MenuRow(
       .heightIn(min = KetchTheme.density.menuItem)
       .background(colors.interactionOverlay(highlighted, enabled && pressed), MenuItemShape)
       .semantics { if (checked != null) selected = checked }
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, enabled = enabled, onClick = onClick)
       .padding(horizontal = spacing.s2, vertical = if (caption != null) spacing.s1 else 0.dp),
   ) {
     if (leading) {
@@ -801,13 +793,7 @@ private fun SheetRow(
       .heightIn(min = KetchTheme.density.menuItem)
       .background(overlay)
       .semantics { if (checked != null) selected = checked }
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, enabled = enabled, onClick = onClick)
       .padding(horizontal = spacing.s4, vertical = spacing.s2),
   ) {
     if (icon != null) {

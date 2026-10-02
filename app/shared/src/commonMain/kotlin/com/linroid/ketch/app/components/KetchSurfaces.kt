@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -326,6 +327,21 @@ internal fun Modifier.trackFocusVisibility(state: FocusVisibility): Modifier = t
     }
   }
   .onFocusChanged { state.onFocusChanged(it.isFocused) }
+
+/**
+ * A click without the platform's indication, for controls that draw their own hover and press
+ * overlay from [interactions]. With [focus], it also tracks whether its focus came from the
+ * keyboard, as [trackFocusVisibility] does.
+ */
+internal fun Modifier.ketchClickable(
+  interactions: MutableInteractionSource,
+  focus: FocusVisibility? = null,
+  enabled: Boolean = true,
+  role: Role? = Role.Button,
+  onClickLabel: String? = null,
+  onClick: () -> Unit,
+): Modifier = (if (focus != null) trackFocusVisibility(focus) else this)
+  .clickable(interactions, indication = null, enabled, onClickLabel, role, onClick)
 
 /**
  * Draws a ring of [width] around the shape, [gap] outside the bounds. Place it before any clip.

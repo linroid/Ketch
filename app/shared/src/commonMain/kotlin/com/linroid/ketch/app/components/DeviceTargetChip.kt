@@ -2,7 +2,6 @@ package com.linroid.ketch.app.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,10 +83,9 @@ fun DeviceTargetChip(
         .background(colors.surface)
         .background(overlay)
         .border(1.dp, colors.borderStrong, shape)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           role = Role.DropdownList,
           onClickLabel = "Choose device",
           onClick = { expanded = true },

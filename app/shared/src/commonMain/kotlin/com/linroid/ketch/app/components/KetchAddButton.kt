@@ -57,7 +57,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -436,13 +435,7 @@ private fun Part(
       modifier = Modifier
         .fillMaxHeight()
         .background(overlay)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
-          role = Role.Button,
-          onClick = onClick,
-        )
+        .ketchClickable(interactions, focus, onClick = onClick)
         .then(
           if (description == null) {
             Modifier
