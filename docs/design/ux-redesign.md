@@ -403,10 +403,11 @@ Connection health shares one function, `healthColor(state)`, used by the device 
     in light.
   - Hues are not user-editable.
 - **Brand ember gradient:** `#FFB25B` → `#E0482B` at 135°. Allowed only on the logo tile, the
-  web splash, onboarding, About, and the completion sheen. Never on controls, status or
-  selection. `DesignTokenUsageTest` enforces this: `KetchColors.brandEmber` may be referenced
-  only from `components/KetchLogoTile.kt`, `components/SailLanesIllustration.kt` and
-  `components/LaneStrip.kt` (the sheen).
+  web splash, onboarding, About, the completion sheen and the Add button's hover and drop fills
+  (§4.7.1). Never on other controls, status or selection. `DesignTokenUsageTest` enforces this:
+  `KetchColors.brandEmber` may be referenced only from `components/KetchLogoTile.kt`,
+  `components/SailLanesIllustration.kt`, `components/LaneStrip.kt` (the sheen) and
+  `components/KetchAddButton.kt` (hover and drop fills only).
 
 #### 3.2.6 File-type hue tiles
 
@@ -590,7 +591,7 @@ In dark, shadow alpha is multiplied by 3, and raised surfaces get a 1 dp top hig
 | `short` | 150 ms | Toggles, segmented thumb, tab switch, chip → checkbox morph, tab row ↔ selection bar |
 | `medium` | 220 ms | Inspector slide, list placement, lane resize, banners |
 | `long` / `longExit` | 320 / 200 ms | Sheet and dialog enter / exit |
-| `xlong` | 480 ms | Onboarding |
+| `xlong` | 480 ms | Onboarding, the add lane flight |
 | `easeStandard` | `CubicBezier(0.2, 0, 0, 1)` | Default |
 | `easeDecelerate` (enter) | `CubicBezier(0.05, 0.7, 0.1, 1)` | Enter; also aliased as `easeEmphasized` |
 | `easeAccelerate` (exit) | `CubicBezier(0.3, 0, 0.8, 0.15)` | Exit |
@@ -598,6 +599,9 @@ In dark, shadow alpha is multiplied by 3, and raised surfaces get a 1 dp top hig
 | `placementSpring` | `spring(stiffness = 400f)` | `Modifier.animateItem(fadeInSpec = tween(150), placementSpec = placementSpring)` |
 | `headGlide` | `tween(200, LinearEasing)` | Write heads, matching the engine's 200 ms progress cadence |
 | `pulse` | 1600 ms infinite, alpha 0.28 → 0, radius r → r + 5 dp | Only Downloading dots and Connecting rings |
+| Copied-link sheen (`KetchAddButton`) | 720 ms, once per clip | The Add button turning into its split button (§4.7.1) |
+| Add lane flight (`AddFlight`) | `xlong` (480 ms), `easeStandard` | From the header's Add button to the first new row on screen (§4.9.1) |
+| Drop-target lanes (`KetchAddButton`) | 1.8 s loop | The Add button's lanes while a drag hovers the window |
 
 Motion tied to engine events:
 
@@ -704,7 +708,8 @@ horizontal stripes. The stripes read as download lanes. That **is** the motif.
 1. **`DesignTokenUsageTest`** in `app/shared/src/jvmTest/.../theme/DesignTokenUsageTest.kt` reads
    `commonMain` sources outside `theme/` and `components/`, and fails on:
    `RoundedCornerShape(<number>.dp`, `Color(0x`, `<number>.sp`, `MaterialTheme.`,
-   `androidx.compose.material.icons`, and `brandEmber` outside the three allowed files.
+   `androidx.compose.material.icons`, and `brandEmber` outside the four allowed files
+   (§3.2.5; `components/KetchAddButton.kt` for its hover and drop fills only).
    - The allowlist `app/shared/src/jvmTest/resources/design-token-allowlist.txt` lists
      `path:pattern:count` and starts with today's offenders.
    - The test also **fails when a count goes down** without the allowlist being updated, so the
@@ -1180,7 +1185,17 @@ Left to right:
      - Copy all links
      - Columns…
      - Row density ▸ Compact / Default
-   - Primary `+ Add` (h32, `⌘N`).
+   - Primary `+ Add` (h36, `⌘N`, `KetchAddButton`). Width capped at 28% of the card
+     (180–300 dp). Static under reduce motion.
+     - Hover: the + splits into three lanes and the fill picks up an ember-to-accent gradient
+       (ember behind the glyph, accent by 55%).
+     - Where the clipboard reads silently (Windows, Linux; Android before 12) and holds a link
+       Ketch doesn't have: one sheen, then a split button "⤓ Add {name, shortened in the middle
+       to fit} | ▾". The main part quick-adds it and stops offering it; the caret opens the add
+       sheet. Tooltip "Download {name} from {host}" with ⇧⌘V.
+     - While a drag hovers the window: a dashed "Drop to download" target with filling lanes,
+       lit while the drag is over it. Drops add as on the window (the drop berths start below
+       the page header on Downloads).
 
 Nothing destructive sits next to Add. Pause all and Resume all no longer appear or disappear with
 state (`BatchActionBar.kt:27-35`). Chrome above the table is 52 + 40 + 28 = 120 dp, versus
@@ -1665,8 +1680,11 @@ links immediately" is on (default on desktop and web).
   - Undo = `remove(deleteFiles = true)`, available for 8 s.
   - Options opens the sheet bound to the new task and applies changes through `setSpeedLimit`,
     `setPriority` and `setConnections`.
-- The new row flashes (`rowSelected` fading to 0 over 1.2 s). If the current tab or search would
-  hide it, the view switches to All.
+- If another status tab is shown, the view switches to All.
+- Every add from this window (`AppState.addedTasks`: quick add, drops, the add sheet, Discover)
+  flies a lane from the header's Add button to the first new row on screen; that row and the
+  other new ones glow (`rowSelected`, 300 ms hold then 900 ms fade). Rows off screen glow when
+  they show within 20 s. No lane under reduce motion or without the header button (phones).
 - **Two or more links, a magnet, a `.torrent`, a cURL command, or plain text open the intake sheet
   prefilled instead.**
 
@@ -1674,39 +1692,52 @@ links immediately" is on (default on desktop and web).
 
 - Desktop and web: 640 dp wide (480–720), **anchored 72 dp below the window top** like a command
   palette, `xl`, e4, scrim. It grows to 80% of the window height.
-- Phones: full-height sheet with a sticky 56 dp primary button.
+- Phones: a bottom sheet as tall as its input while empty, then full height with a sticky 56 dp
+  primary button.
 
 ```
 ╭─ Add downloads ───────────────────────────────────────────── On: (LM) This Mac ▾ ─╮
-│ ┌──────────────────────────────────────────────────────────────────────────────┐ │
-│ │ https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso             │ │
-│ │ https://cdn.example.org/set/part[01-04].rar                                  │ │
-│ │ magnet:?xt=urn:btih:3f2a91c0…&dn=Big.Buck.Bunny                              │ │
-│ │ https://intranet.example.com/q3-report.pdf                                   │ │
-│ └────────────────────────────────────────────────────────── Open .torrent… ⌘O ─┘ │
-│ From clipboard ✕                                                                  │
-│ 7 links · 5 ready · 1 checking · 1 needs attention · 29.1 GB          (Expands ✓) │
+│ ╭───────────────────────────────────────────────────────────────────────────────╮ │
+│ │ https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso              │ │
+│ │ https://cdn.example.org/set/part[01-04].rar                                   │ │
+│ │ magnet:?xt=urn:btih:3f2a91c0…&dn=Big.Buck.Bunny                               │ │
+│ │ https://intranet.example.com/q3-report.pdf                                    │ │
+│ │ From clipboard ✕  7 links · 5 ready · … · 29.1 GB                    [📋][🧲] │ │
+│ ╰───────────────────────────────────────────────────────────────────────────────╯ │
 │ ▣ ubuntu-24.04-desktop-amd64.iso   5.7 GB · HTTPS · resumable · up to 16       ✕ │
 │ ▣ part01.rar … part04.rar          4 × 1.1 GB · expands to 4 links              ✕ │
 │ ◌ Big.Buck.Bunny                   Fetching file list from peers… 0:14 (Add all) ✕ │
 │ ! q3-report.pdf   The server refused access (403) (Paste as cURL)(Add headers)  ✕ │
 │ ▣ report.zip      Already in Ketch · finished 2 days ago   (Open)(Download again) │
-│ (⌂ Save to: Downloads · 412 GB free ▾) (Speed: Unlimited ▾) (Priority: Normal ▾)  │
-│ (Start: Now ▾) (Connections: Auto (4) ▾)                              ▸ Advanced  │
+│ (⌂ Save to: Downloads · 412 GB free ▾) (≡ Options ▾) (⚡ Urgent ✕)                │
 │ ⓘ 2 start now (2 of 2 slots free) · 4 queued · ≈ 12 min at current speed          │
-│ ↩ Add · ⇧↩ New line · ⌥↩ Discover · ⌘O .torrent            (Cancel) (Add 6 downloads) │
+│                             ↩ to download   (Cancel) (Download 6 items · 29.1 GB) │
 ╰───────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-**Input:**
-- A multi-line `KetchTextField` in `mono` 13/18, 1–8 lines, then it scrolls.
-- Placeholder: "Paste links, magnets or a cURL command, one per line".
-- Trailing ghost button: "Open .torrent… ⌘O".
+**Input** (`ui/intake/PasteArea.kt`):
+- One paste/drop area, `body` sans 14/20, 3 lines tall when empty, growing with its text to 8
+  lines (4 while the list shows), then scrolling. It switches to `mono` only when a line is a
+  `curl` command.
+- Placeholder: "Paste links or magnets — or drop a .torrent file" (phones: "Paste links or
+  magnets").
+- Inside the area, at its end: Paste (tooltip "Paste from clipboard ⌘V"; hidden when the
+  clipboard mode is Off) and Open .torrent file (tooltip "Open .torrent file ⌘O"). The area's
+  bottom line holds "From clipboard ✕" and, for a batch, the summary (or "cURL command").
+- While empty, a link on the clipboard (read silently; or system-detected on phones in Suggest
+  mode) shows the accent chip "Paste ubuntu-24.04.iso from clipboard" (phones: "Paste
+  ubuntu-24.04.iso", or "Paste copied link" when only detected); never after the sheet was filled
+  from that clip.
 - `⌘N` prefills it from the clipboard when the clipboard holds a link that is not in Ketch and was
   not offered before (a hash of the last offer is kept in `UiPreferences`). The text is selected,
-  with the caption "From clipboard ✕".
+  with "From clipboard ✕" on the area's bottom line.
+- A drag over the sheet gives the area an accent border, `accentSoft` fill and "Drop to add".
+- Everything below the input (rows, options, outcome, main button) appears only once a link or
+  torrent is in (expand + fade, `medium`; instant under reduce motion). Retry and edit sheets
+  show it at once.
 - Keys: `↩` submits once at least one item is ready; `⇧↩` adds a line; `⌥↩` sends the text to
-  Discover; Esc closes (asks first only when the user typed more than 1 line).
+  Discover; Esc closes (asks first only when the user typed more than 1 line). `⇧↩` shows as the
+  input's tooltip once it holds text.
 - A paste (the field grows by more than 8 characters at once) resolves immediately; typing keeps
   the 500 ms debounce.
 
@@ -1723,10 +1754,18 @@ links immediately" is on (default on desktop and web).
   - amber "Already in Ketch · finished 2 days ago" [Open] [Show] [Download again]. Duplicates are
     excluded by default.
 - **Single item:** a preview card replaces the list. It has a 40 dp chip and a 6 dp lanes preview
-  under Connections, "16 × 360 MB", redrawn as the stepper changes.
-- **Summary line:** "7 links · 5 ready · 1 checking · 1 needs attention · 29.1 GB". When the total
-  exceeds the target's `usableSpace`, an amber line reads "Needs 48.2 GB · only 31.0 GB free on
-  This Mac".
+  under Connections, "16 × 360 MB", redrawn as the stepper changes. The main button reads
+  "Download <name>" (middle ellipsis at 36 characters).
+- **Summary**, on the input's bottom line for a batch: "7 links · 5 ready · 1 checking · 1 needs
+  attention · 29.1 GB". When the total exceeds the target's `usableSpace`, an amber line reads
+  "Needs 48.2 GB · only 31.0 GB free on This Mac".
+
+**Footer:** one hint left of the buttons, "↩ to download / schedule / retry / start over /
+apply". The main button says what it does: "Download <name>", "Download 3 files · 1.2 GB"
+("items" when a torrent is in the batch), "Schedule 2 files", "Download 16 files · 9.3 GB" in the
+torrent stage, "Waiting for file list", "Retry", "Start over", "Apply changes". It is hidden, not
+greyed, while the sheet holds nothing to add. Cancel stays (phones close from the header's ✕).
+Phones: the empty sheet is as tall as its input.
 
 #### 4.9.3 Option pills
 
@@ -1737,17 +1776,21 @@ on phones, and applies to every item.
 | Pill | Menu |
 |---|---|
 | `⌂ Save to: Downloads · 412 GB free` | **Default** (`status().system.downloadDirectory`) · **Recent:** up to 5 parent folders of this device's `Completed.outputPath` and directory destinations (no new storage) · **Pinned** (`UiPreferences.favoriteFolders[deviceId]`, "+ Pin current") · **Choose folder…** (this device only; `FilePicker.pickFolder()`) · **Sort by type** (Video → Movies, Audio → Music, others → Downloads; remembers the last folder per `FileKind`). Remote targets and web: a path field with completion from recent folders, captioned "Folder on NAS-Basement". The destination is built as `folder + system.separator (+ name)`, using the target device's `separator`. An Android SAF tree URI is used as is (a directory `Destination`); a custom file name cannot be combined with it until the API gains a per-request file name, so the File name field is disabled for SAF folders with the caption "Uses the server's file name". Torrents cannot write to SAF folders (`docs/torrent.md`, "Storage and restart"), so for magnet and torrent items the pill falls back to the device's app folder and says so. Remote browsing needs W6 (`GET /api/fs/dirs`). |
-| `Speed: Unlimited` | `SpeedLimitPicker` |
-| `Priority: Normal` | Low "Runs when nothing else is waiting" · Normal "Default order" · High "Ahead of Normal and Low" · ⚡ Urgent "Jumps the queue; may pause a lower-priority download" |
-| `Start: Now` | `StartTimePicker`. When scheduled, the pill reads "Starts 01:00 tonight" and the primary button "Schedule 6 downloads". "Add paused" needs `DownloadSchedule.Manual` (W5). "Only on Wi-Fi" and "While charging" need serializable conditions (W5). |
-| `Connections: Auto (4)` | `ConnectionStepper`, range 1 to min(resolved.maxSegments, 32). Disabled with "This server allows 1 connection" when `maxSegments ≤ 1`. "Peer limit" for torrents. |
+| `≡ Options: Unlimited · Normal · Now · Auto` | One popover (a bottom sheet on touch) holding `SpeedLimitPicker`, the priority segmented control with its caption (Low "Runs when nothing else is waiting" · Normal "Default order" · High "Ahead of Normal and Low" · ⚡ Urgent "Jumps the queue; may pause a lower-priority download"), `StartTimePicker` (not for Retry) and `ConnectionStepper` (range 1 to min(resolved.maxSegments, 32), Auto reset; "Peer limit" for torrents; disabled with "This server allows 1 connection" when `maxSegments ≤ 1`), then "Advanced options…". When scheduled, the primary button reads "Schedule 6 files". "Add paused" needs `DownloadSchedule.Manual` (W5). "Only on Wi-Fi" and "While charging" need serializable conditions (W5). |
 | `On: (LM) This Mac` (header) | Only with 2 or more devices. Rows: pennant, health, "1.8 TB free · 2 active · Slow lane", `⌘⌥n`. Resolution re-runs on the new target. Remembered per kind for the session ("magnets → NAS"). Cookie warning when headers are present (§4.5.5). |
 
+- Values changed from their defaults leave the summary for removable chips after the pill
+  ("Max 5 MB/s ✕", "⚡ Urgent ✕", "High priority ✕", "Starts 23:00 tonight ✕", "8 connections ✕";
+  ✕ restores the default), and once anything changed the pill reads just "Options".
+- The row never wraps: it drops the "Save to" label, then the free space, then the summary, then
+  the "Options" label, then scrolls.
+- The sheet that edits a task shows the four controls in place.
 - **Sticky defaults** per device: folder, priority and connections. Speed and start reset each
   time.
-- **▸ Advanced** (open state remembered): File name (single item only), Referer, User-Agent
-  (Ketch / Chrome / Firefox / Safari / Custom), Cookie (masked, multi-line), Authorization,
-  "+ Add header", and [Paste cURL].
+- **Advanced** (opened from "Advanced options…"; an "ADVANCED · Hide" header; open state still
+  remembered): File name (single item only), Referer, User-Agent (Ketch / Chrome / Firefox /
+  Safari / Custom), Cookie (masked, multi-line), Authorization, "+ Add header", and [Paste cURL].
+  A "2 headers" chip after the pill opens it while it is closed.
   - Headers go to **both** `resolve(url, properties = headers)` (for HTTP sources the
     `properties` of `resolve` *are* request headers) and `DownloadRequest.headers`. Bookkeeping keys
     such as `ketch.origin` go only to `DownloadRequest.properties`, which Ketch never reads, and
@@ -1758,7 +1801,7 @@ on phones, and applies to every item.
   - "Queued · 3rd in line"
   - "⚡ Urgent: starts now and pauses debian-12.iso (Low)"
   - "Waits for github.com · 8 per server"
-  - "Starts 01:00 tonight"
+  - A scheduled start is left to the Start chip.
 
 #### 4.9.4 Submit
 
@@ -1768,7 +1811,8 @@ on phones, and applies to every item.
   - single item: "✓ Added ubuntu.iso → This Mac" [Show] [Undo];
   - batch: "Added 5 downloads · 1 failed" [Review] (reopens the sheet with the failed rows);
   - another device: "Added to NAS-Basement" [Show], where Show switches the device.
-- If the active tab or search hides the new rows, the view switches to All and scrolls to them.
+- If the active tab or search hides the new rows, the view switches to All and clears the
+  search; the new rows are pointed out as in §4.9.1.
 
 #### 4.9.5 Problems (`util/IntakeProblems.kt`)
 
@@ -1798,15 +1842,15 @@ when **every** item failed, with "Add anyway" as the secondary.
 │   ☑ ▤ S01E01.en.srt                                                     48 KB     │
 │ ☐ ▸ Extras/  (sample.mkv, info.nfo)                                    880 MB     │
 │ Skipped 3 extras · Undo        ▰▰▱▱▱▱▱▱  needs 4.2 GB · 1.8 TB free on NAS        │
-│                                                  (Add all files) (Add 3 files)    │
+│                                     (Download all) (Download 3 files · 4.2 GB)    │
 ╰───────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 **Before metadata arrives:**
 - "Fetching file list from peers… 0:14" with a 3 dp indeterminate bar.
-- [Add all files now] and [Finish in background]. Finish in background closes the sheet and puts a
-  "Resolving 1" chip in the page header; when metadata arrives, the sheet reopens, or a toast
-  appears if the user has moved on.
+- [Download all files now] and [Finish in background]. Finish in background closes the sheet and
+  puts a "Resolving 1" chip in the page header; when metadata arrives, the sheet reopens, or a
+  toast appears if the user has moved on.
 - The primary button is **disabled** and reads "Waiting for file list", so an early click can no
   longer grab 61 GB.
 
