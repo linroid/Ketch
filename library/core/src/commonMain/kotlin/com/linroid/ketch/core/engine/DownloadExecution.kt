@@ -169,8 +169,13 @@ internal class DownloadExecution(
       ?: fileNameResolver.resolve(request, resolvedUrl)
     val outputPath = resolveDestPath(
       destination = request.destination,
-      // Resolved only when needed: the platform default may need an Android context.
-      defaultDir = { config.defaultDirectory ?: defaultDownloadDirectory() },
+      // Resolved only when needed: the platform default may need an Android context. Sources
+      // that write their own files need a filesystem folder, so a default folder given as a URI,
+      // such as an Android content:// tree, leaves them the platform default.
+      defaultDir = {
+        config.defaultDirectory?.takeUnless { source.managesOwnFileIo && it.contains("://") }
+          ?: defaultDownloadDirectory()
+      },
       serverFileName = fileName,
       deduplicate = true,
     )
