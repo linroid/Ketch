@@ -375,7 +375,8 @@ class IntakeHeaders {
     header(REFERER, referer)
     val agent = if (userAgent == UserAgentChoice.Custom) customUserAgent else userAgent.value
     agent?.let { header(USER_AGENT, it) }
-    header(COOKIE_HEADER, cookie.lines().joinToString("; ") { it.trim().removeSuffix(";") }.trim(';', ' '))
+    val cookies = cookie.lines().joinToString("; ") { it.trim().removeSuffix(";") }.trim(';', ' ')
+    header(COOKIE_HEADER, cookies)
     header(AUTHORIZATION_HEADER, authorization)
     for (row in extra) header(row.name, row.value)
   }
