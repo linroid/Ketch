@@ -19,6 +19,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
+import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
@@ -39,7 +40,6 @@ internal fun DeviceMenuButton(
   onRemove: () -> Unit,
 ) {
   var open by remember { mutableStateOf(false) }
-  val remote = device.entry as? RemoteInstance
   Box {
     KetchIconButton(
       icon = KetchIcon.More,
@@ -54,18 +54,30 @@ internal fun DeviceMenuButton(
         icon = KetchIcon.Settings,
       )
       divider()
-      item("Rename…", onClick = onRename)
-      if (remote != null) {
-        item(
-          label = "Stay connected",
-          onClick = { state.instanceManager.setWatched(remote, !device.watched) },
-          checked = device.watched,
-        )
-        divider()
-        item("Remove…", onClick = onRemove, icon = KetchIcon.Trash, destructive = true)
-      }
+      renameAndRemoveItems(state, device, onRename, onRemove)
     }
   }
+}
+
+/**
+ * The end of a device's menus: Rename and, for a remote device, whether the app stays connected
+ * to it and Remove.
+ */
+internal fun KetchMenuScope.renameAndRemoveItems(
+  state: AppState,
+  device: DevicePresence,
+  onRename: () -> Unit,
+  onRemove: () -> Unit,
+) {
+  item(label = "Rename…", onClick = onRename)
+  val remote = device.entry as? RemoteInstance ?: return
+  item(
+    label = "Stay connected",
+    onClick = { state.instanceManager.setWatched(remote, !device.watched) },
+    checked = device.watched,
+  )
+  divider()
+  item(label = "Remove…", onClick = onRemove, icon = KetchIcon.Trash, destructive = true)
 }
 
 /**

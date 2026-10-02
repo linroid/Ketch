@@ -12,13 +12,13 @@ import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.SpeedLimitPickerPresets
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.ui.devices.RemoveDeviceDialog
 import com.linroid.ketch.app.ui.devices.RenameDeviceDialog
 import com.linroid.ketch.app.ui.devices.openDeviceSettings
+import com.linroid.ketch.app.ui.devices.renameAndRemoveItems
 import com.linroid.ketch.app.ui.devices.setSpeedLimit
 import com.linroid.ketch.app.ui.devices.speedModeOf
 import com.linroid.ketch.app.ui.devices.switchSpeedMode
@@ -112,15 +112,7 @@ internal fun KetchMenuScope.deviceCommands(
     onClick = { state.openDeviceSettings(entry) },
     icon = KetchIcon.Settings,
   )
-  item(label = "Rename…", onClick = onRename)
-  val remote = entry as? RemoteInstance ?: return
-  item(
-    label = "Stay connected",
-    onClick = { state.instanceManager.setWatched(remote, !device.watched) },
-    checked = device.watched,
-  )
-  divider()
-  item(label = "Remove…", onClick = onRemove, icon = KetchIcon.Trash, destructive = true)
+  renameAndRemoveItems(state, device, onRename, onRemove)
 }
 
 /**
