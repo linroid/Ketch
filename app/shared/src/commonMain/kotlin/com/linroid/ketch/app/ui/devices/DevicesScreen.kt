@@ -251,7 +251,7 @@ private fun AddDeviceCard(actions: PageActions, modifier: Modifier = Modifier) {
     Text(
       text = buildAnnotatedString {
         append("Control a NAS or another computer from here. Run ")
-        withStyle(SpanStyle(fontFamily = type.mono.fontFamily)) { append("ketch server") }
+        withStyle(SpanStyle(fontFamily = type.mono.fontFamily)) { append("ketch\u00A0server") }
         append(" there, or turn on Settings › Sharing in its Ketch app.")
       },
       style = type.bodyS,

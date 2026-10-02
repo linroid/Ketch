@@ -118,11 +118,13 @@ fun DevicePennant(
       }
     }
     if (failures > 0) {
+      // Where the badge sits on a ringed pennant, so it never covers the monogram without one.
+      val overhang = BadgeOverhang + RingGap + RingWidth - ringRoom
       Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
           .align(Alignment.TopEnd)
-          .offset(x = BadgeOverhang, y = -BadgeOverhang)
+          .offset(x = overhang, y = -overhang)
           .sizeIn(minWidth = BadgeSize, minHeight = BadgeSize)
           .background(colors.dangerFill, KetchTheme.shapes.badge)
           .padding(horizontal = KetchTheme.spacing.s0_5),

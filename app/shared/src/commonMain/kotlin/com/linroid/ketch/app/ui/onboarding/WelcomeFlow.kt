@@ -320,7 +320,7 @@ private fun FolderStep(
     }
   }
   StepScaffold(
-    title = "Where should downloads go?",
+    title = "Where should downloads\u00A0go?",
     body = "Other apps can't open Ketch's own folder. Save to Download, and your files show " +
       "up everywhere.",
     header = { SailLanesIllustration(width = SailLanesIllustrationDefaults.CompactWidth) },
@@ -392,7 +392,7 @@ private fun UseStep(
   val spacing = KetchTheme.spacing
   val ios = platform == WelcomePlatform.Ios
   StepScaffold(
-    title = "How will you use Ketch here?",
+    title = "How will you use Ketch\u00A0here?",
     body = "Pick one to start. You can always do the other later.",
   ) {
     val here: @Composable () -> Unit = {

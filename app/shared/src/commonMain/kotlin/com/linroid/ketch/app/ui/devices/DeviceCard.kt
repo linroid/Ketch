@@ -50,7 +50,6 @@ import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
-import com.linroid.ketch.app.state.PulseModel
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
@@ -341,7 +340,10 @@ private fun ProblemDetails(
   }
 }
 
-/** The last minute of the device's speed along the card's bottom edge; empty while idle. */
+/**
+ * The device's recent speed along the card's bottom edge, stretched across it like the Pulse bar
+ * sparkline; empty while idle.
+ */
 @Composable
 private fun Sparkline(history: List<Long>) {
   val samples = sparklineSamples(history)
@@ -350,7 +352,6 @@ private fun Sparkline(history: List<Long>) {
       KetchSpeedChart(
         bands = listOf(SpeedBand(samples, KetchTheme.colors.accent)),
         showAxis = false,
-        slots = PulseModel.HISTORY_SIZE,
         modifier = Modifier.fillMaxSize().clearAndSetSemantics {},
       )
     }

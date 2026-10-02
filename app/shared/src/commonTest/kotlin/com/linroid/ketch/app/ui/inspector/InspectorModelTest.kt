@@ -389,7 +389,7 @@ class InspectorModelTest {
     val text = keepPartsTogether("Downloading 4 files on 2 devices · all done ≈ 14:38")
 
     assertEquals(
-      "Downloading 4\u00A0files on 2\u00A0devices · all\u00A0done\u00A0≈\u00A014:38",
+      "Downloading 4\u00A0files on 2\u00A0devices\u00A0· all\u00A0done\u00A0≈\u00A014:38",
       text
     )
   }

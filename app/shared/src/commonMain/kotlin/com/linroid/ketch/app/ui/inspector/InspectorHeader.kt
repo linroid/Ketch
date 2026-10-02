@@ -525,12 +525,13 @@ private val TaskRow.hasLanes: Boolean
     state is DownloadState.Paused
 
 /**
- * [text] with its short " · "-separated parts kept whole, so it wraps between them. A part
- * longer than [MAX_JOINED_PART] characters may still wrap at its spaces, keeping each number
- * with the word after it, so a narrow pane never breaks it inside a word.
+ * [text] with its short " · "-separated parts kept whole, so it wraps between them, after the
+ * dot rather than before it. A part longer than [MAX_JOINED_PART] characters may still wrap at
+ * its spaces, keeping each number with the word after it, so a narrow pane never breaks it
+ * inside a word.
  */
 internal fun keepPartsTogether(text: String): String =
-  text.split(SEPARATOR).joinToString(SEPARATOR) { part ->
+  text.split(SEPARATOR).joinToString("$NO_BREAK· ") { part ->
     if (part.length > MAX_JOINED_PART) {
       part.replace(NumberThenSpace) { "${it.groupValues[1]}$NO_BREAK" }
     } else {
