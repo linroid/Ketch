@@ -124,7 +124,7 @@ internal fun ConnectLandingContent(
   BoxWithConstraints(
     modifier
       .fillMaxSize()
-      .canvasWash(colors, EmberRadius)
+      .canvasWash(colors)
       .windowInsetsPadding(WindowInsets.safeDrawing),
   ) {
     val narrow = maxWidth < CardWidth + spacing.s4 * 2
@@ -319,6 +319,3 @@ private fun Modifier.bleed(horizontal: Dp): Modifier = layout { measurable, cons
 private const val NarrowPlaceholder = "nas.local:8642"
 private val CardWidth = 480.dp
 private val HairlineWidth = 1.dp
-
-// Radius of the wash's ember glow, as behind the shell.
-private val EmberRadius = 520.dp

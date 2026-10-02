@@ -115,7 +115,7 @@ internal fun WelcomeFlow(
     horizontalAlignment = Alignment.CenterHorizontally,
     modifier = modifier
       .fillMaxSize()
-      .canvasWash(colors, EmberRadius)
+      .canvasWash(colors)
       .windowInsetsPadding(WindowInsets.safeDrawing),
   ) {
     TopRow(
@@ -616,4 +616,3 @@ private const val SLIDE_DIVISOR = 4
 private val ContentMaxWidth = 480.dp
 private val ChoiceMinHeight = 64.dp
 private val HairlineWidth = 1.dp
-private val EmberRadius = 520.dp

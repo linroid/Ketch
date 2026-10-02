@@ -7,7 +7,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
 import com.linroid.ketch.app.platform.SystemAppearance
@@ -34,7 +33,7 @@ fun KetchSplash(
       contentAlignment = Alignment.Center,
       modifier = modifier
         .fillMaxSize()
-        .canvasWash(KetchTheme.colors, EmberRadius)
+        .canvasWash(KetchTheme.colors)
         .semantics { contentDescription = "Loading Ketch" },
     ) {
       // The host may hold the main thread while it starts, so the lanes do not animate.
@@ -42,5 +41,3 @@ fun KetchSplash(
     }
   }
 }
-
-private val EmberRadius = 520.dp
