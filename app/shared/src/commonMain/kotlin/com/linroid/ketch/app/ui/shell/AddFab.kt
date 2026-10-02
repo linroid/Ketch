@@ -40,6 +40,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
@@ -64,8 +66,9 @@ internal object AddButtonDefaults {
 }
 
 /**
- * The round ⊕ that opens the add sheet, on the soft accent: in the sidebar's title zone and at
- * the top of the rail. A right click offers to add the link on the clipboard at once.
+ * The ⊕ that opens the add sheet: a plain icon button in the sidebar's title zone, like the
+ * sidebar toggle beside it, and a round button on the soft accent at the top of the rail. A right
+ * click offers to add the link on the clipboard at once.
  *
  * @param size one of the [AddButtonDefaults] sizes.
  */
@@ -84,6 +87,20 @@ internal fun AddButton(
   val focus = rememberFocusVisibility()
   var menuOpen by remember { mutableStateOf(false) }
   val glyph = if (size >= AddButtonDefaults.Rail) GlyphLarge else KetchTheme.density.controlGlyph
+  if (size < AddButtonDefaults.Rail) {
+    Box(modifier) {
+      KetchIconButton(
+        command = KetchCommands.Add,
+        onClick = onClick,
+        size = KetchButtonSize.Small,
+        modifier = Modifier.onSecondaryPress { menuOpen = true },
+      )
+      KetchMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+        item(KetchCommands.AddClipboardLink, onClick = onAddClipboardLink)
+      }
+    }
+    return
+  }
   Box(modifier) {
     KetchTooltip(command = KetchCommands.Add) {
       Box(
