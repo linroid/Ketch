@@ -26,11 +26,12 @@ class KetchBackgroundTest {
   private val saved = MemoryIds()
   private val notices = mutableListOf<Int>()
   private var withdrawn = 0
+  private val api = RecordingKetchApi()
 
   private fun pauser(
-    api: RecordingKetchApi,
     scope: CoroutineScope,
     commitPending: () -> Job = { Job().apply { complete() } },
+    api: RecordingKetchApi = this.api,
   ) = BackgroundPauser(
     api = api,
     scope = scope,
@@ -50,7 +51,7 @@ class KetchBackgroundTest {
       waiting.state.collect { states += it }
     }
 
-    pauser(api, this).enterBackground()?.join()
+    pauser(this, api = api).enterBackground()?.join()
 
     assertEquals(listOf(running.taskId, waiting.taskId), saved.ids)
     assertEquals(listOf(DownloadState.Queued, paused), states)
@@ -59,11 +60,10 @@ class KetchBackgroundTest {
 
   @Test
   fun enterBackground_finishedAndPausedTasks_returnsNull() = runTest {
-    val api = RecordingKetchApi()
     val done = api.add(DownloadState.Completed("/downloads/a.bin"))
     val held = api.add(paused)
 
-    val work = pauser(api, this).enterBackground()
+    val work = pauser(this).enterBackground()
 
     assertNull(work)
     assertTrue(done.calls.isEmpty() && held.calls.isEmpty())
@@ -72,11 +72,10 @@ class KetchBackgroundTest {
 
   @Test
   fun enterBackground_failingPause_remembersOnlyPausedTasks() = runTest {
-    val api = RecordingKetchApi()
     val stuck = api.add(downloading).apply { failure = IllegalStateException("closed") }
     val running = api.add(downloading)
 
-    pauser(api, this).enterBackground()?.join()
+    pauser(this).enterBackground()?.join()
 
     assertEquals(listOf(running.taskId), saved.ids)
     assertEquals(listOf("pause"), stuck.calls)
@@ -84,12 +83,11 @@ class KetchBackgroundTest {
 
   @Test
   fun enterBackground_pendingRemovalWithoutDownloads_waitsForItsCommit() = runTest {
-    val api = RecordingKetchApi()
     val ops = PendingOps(backgroundScope)
     val removal = CompletableDeferred<Unit>()
     ops.register("Remove", commit = { removal.await() })
 
-    val work = assertNotNull(pauser(api, this, commitPending = ops::flush).enterBackground())
+    val work = assertNotNull(pauser(this, commitPending = ops::flush).enterBackground())
     runCurrent()
 
     assertTrue(work.isActive)
@@ -100,12 +98,11 @@ class KetchBackgroundTest {
 
   @Test
   fun keepRunningInBackground_pendingRemoval_commitsWithoutPausing() = runTest {
-    val api = RecordingKetchApi()
     val running = api.add(downloading)
     val ops = PendingOps(backgroundScope)
     val removal = CompletableDeferred<Unit>()
     ops.register("Remove", commit = { removal.await() })
-    val pauser = pauser(api, this, commitPending = ops::flush)
+    val pauser = pauser(this, commitPending = ops::flush)
 
     val work = assertNotNull(pauser.keepRunningInBackground())
     runCurrent()
@@ -120,19 +117,17 @@ class KetchBackgroundTest {
 
   @Test
   fun keepRunningInBackground_nothingPending_returnsNull() = runTest {
-    val api = RecordingKetchApi()
     val running = api.add(downloading)
 
-    assertNull(pauser(api, this).keepRunningInBackground())
+    assertNull(pauser(this).keepRunningInBackground())
     assertTrue(running.calls.isEmpty())
   }
 
   @Test
   fun enterForeground_afterBackground_resumesTasksStillPaused() = runTest {
-    val api = RecordingKetchApi()
     val first = api.add(downloading)
     val removed = api.add(downloading)
-    val pauser = pauser(api, this)
+    val pauser = pauser(this)
     pauser.enterBackground()?.join()
     api.removeTask(removed)
 
@@ -145,9 +140,8 @@ class KetchBackgroundTest {
 
   @Test
   fun enterForeground_whilePausing_resumesOncePausingFinished() = runTest {
-    val api = RecordingKetchApi()
     val task = api.add(downloading)
-    val pauser = pauser(api, this)
+    val pauser = pauser(this)
     pauser.enterBackground()
 
     pauser.enterForeground().join()
@@ -158,9 +152,8 @@ class KetchBackgroundTest {
 
   @Test
   fun enterBackground_beforeResumeRan_keepsTasksPausedAndRemembered() = runTest {
-    val api = RecordingKetchApi()
     val task = api.add(downloading)
-    val pauser = pauser(api, this)
+    val pauser = pauser(this)
     pauser.enterBackground()?.join()
     pauser.enterForeground()
 
@@ -175,9 +168,8 @@ class KetchBackgroundTest {
 
   @Test
   fun enterForeground_afterRelaunch_resumesOnceTasksAreRestored() = runTest {
-    val api = RecordingKetchApi()
     saved.ids = listOf("t1")
-    val resuming = pauser(api, this).enterForeground()
+    val resuming = pauser(this).enterForeground()
     runCurrent()
 
     val task = api.add(paused)
