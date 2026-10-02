@@ -1327,21 +1327,10 @@ class IntakeSession internal constructor(
     }
     if (shown) showNewRows()
     state.announceAdded(added.map { TaskKey(target.deviceId, it.taskId) })
-    val op = state.pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
-      added.forEach { task ->
-        catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
-          log.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
-        }
-      }
-    })
-    val undo = MessageAction("Undo") { state.pendingOps.undo(op.id) }
+    val undo = state.undoAddAction(added, log)
     val single = added.singleOrNull()?.takeIf { review.isEmpty() }
     val key = single?.let { TaskKey(target.deviceId, it.taskId) }
-    val show = MessageAction("Show") {
-      if (target !in state.shownInstances.value) state.switchInstance(target)
-      state.showDownloads(StatusFilter.All)
-      key?.let(state::inspect)
-    }
+    val show = MessageAction("Show") { state.showOn(target, single) }
     val what = if (single != null) displayName(single.request) else downloads(added.size)
     val title = buildString {
       append(if (shown) "Added $what → $deviceName" else "Added $what to $deviceName")

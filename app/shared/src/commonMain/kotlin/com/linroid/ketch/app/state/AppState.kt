@@ -1255,7 +1255,7 @@ class AppState(
    * Shows the Downloads list with [task] of [target] inspected, switching to [target] only when
    * it is not shown already, such as under All devices.
    */
-  private fun showOn(target: InstanceEntry, task: DownloadTask?) {
+  internal fun showOn(target: InstanceEntry, task: DownloadTask?) {
     if (target !in shownInstances.value) switchInstance(target)
     showDownloads()
     task?.let { inspect(TaskKey(target.deviceId, it.taskId)) }
@@ -1671,6 +1671,21 @@ class AppState(
 
   private fun undoAction(op: PendingOp): MessageAction =
     MessageAction("Undo") { pendingOps.undo(op.id) }
+
+  /**
+   * Registers the Undo of adding [tasks], which removes them with their files, and returns its
+   * button; [logger] notes each task that could not be removed.
+   */
+  internal fun undoAddAction(tasks: List<DownloadTask>, logger: KetchLogger): MessageAction {
+    val op = pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
+      tasks.forEach { task ->
+        catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
+          logger.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
+        }
+      }
+    })
+    return undoAction(op)
+  }
 
   private fun nameOf(entry: InstanceEntry?): String = entry?.label ?: "this device"
 

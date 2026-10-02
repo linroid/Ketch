@@ -1,18 +1,15 @@
 package com.linroid.ketch.app.ui.discover
 
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.displayName
-import com.linroid.ketch.app.state.ADD_UNDO_WINDOW
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.CandidateAddResult
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
-import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.util.downloads
 import kotlinx.coroutines.Job
@@ -79,13 +76,7 @@ private fun AppState.reportDiscovered(
     )
     return
   }
-  val op = pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
-    tasks.forEach { task ->
-      catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
-        log.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
-      }
-    }
-  })
+  val undo = undoAddAction(tasks, log)
   // Under All devices the target may show already; switching to it would hide the others.
   val shown = target in shownInstances.value
   val single = tasks.singleOrNull()?.takeIf { failed.isEmpty() }
@@ -108,7 +99,7 @@ private fun AppState.reportDiscovered(
     detail = firstError?.message,
     taskKey = key,
     deviceId = target.deviceId,
-    actions = listOf(review ?: show, MessageAction("Undo") { pendingOps.undo(op.id) }),
+    actions = listOf(review ?: show, undo),
     cause = firstError,
   )
 }
