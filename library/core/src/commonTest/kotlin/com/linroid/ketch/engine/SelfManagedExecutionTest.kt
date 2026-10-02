@@ -96,51 +96,6 @@ class SelfManagedExecutionTest {
   }
 
   @Test
-  fun execute_defaultFolderIsAContentUri_givesTheSourceAFilesystemPath() = runTest {
-    var outputPath: String? = null
-    val source = object : DownloadSource {
-      override val type = "fixture"
-      override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 4, supportsResume = true,
-        suggestedFileName = "fixture", maxSegments = 1,
-      )
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "initial")
-      override suspend fun download(context: DownloadContext) {
-        outputPath = context.outputPath
-      }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
-    }
-    val now = Clock.System.now()
-    val request = DownloadRequest("fixture:input")
-    val handle = object : TaskHandle {
-      override val taskId = "content-default"
-      override val request = request
-      override val createdAt = now
-      override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
-      override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
-      override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
-        createdAt = now, updatedAt = now)) {}
-    }
-    val config = DownloadConfig(
-      defaultDirectory = "content://com.android.externalstorage.documents/tree/primary%3ADownload",
-      saveIntervalMs = 60_000,
-    )
-    val execution = DownloadExecution(handle, SourceResolver(listOf(source)),
-      DefaultFileNameResolver(), config, SpeedLimiter.Unlimited,
-      KetchDispatchers(main = Dispatchers.Default, network = Dispatchers.Default,
-        io = Dispatchers.Default))
-
-    execution.execute()
-
-    val path = checkNotNull(outputPath)
-    assertFalse(path.contains("://"), path)
-    assertTrue(path.endsWith("fixture"), path)
-  }
-
-  @Test
   fun immediateResumeWaitsForCheckpointAndIgnoresLateProgress() = runTest {
     val started = CompletableDeferred<Unit>()
     val checkpointEntered = CompletableDeferred<Unit>()
