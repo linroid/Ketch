@@ -274,12 +274,14 @@ class DeviceTextTest {
   }
 
   @Test
-  fun shortPath_homeFolders_startWithTilde() {
+  fun shortPath_homeFoldersAndDocumentTrees_shorten() {
     assertEquals("~/Downloads", shortPath("/Users/alex/Downloads"))
     assertEquals("~/dl", shortPath("/home/sam/dl"))
     assertEquals("~\\Downloads", shortPath("C:\\Users\\sam\\Downloads"))
     assertEquals("/volume1/downloads", shortPath("/volume1/downloads"))
     assertEquals("~", shortPath("/Users/alex"))
+    val tree = "content://com.android.externalstorage.documents/tree/primary%3ADownload%2FKetch"
+    assertEquals("Ketch", shortPath(tree))
   }
 
   @Test
