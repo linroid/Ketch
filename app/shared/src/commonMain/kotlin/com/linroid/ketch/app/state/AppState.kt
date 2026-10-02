@@ -279,12 +279,12 @@ class AppState(
   var inspectedTask by mutableStateOf<TaskKey?>(null)
     private set
 
-  /** Whether the docked inspector is shown; remembered between launches. */
-  var inspectorOpen by mutableStateOf(appSettings.ui.inspectorOpen)
-    private set
-
   /** Selected rows of the task list. */
   var selectedKeys by mutableStateOf(emptySet<TaskKey>())
+
+  /** Whether the inspector shows: while it has a task, or two or more rows are selected. */
+  val inspectorShown: Boolean
+    get() = inspectedTask != null || selectedKeys.size >= 2
 
   /** A Send to waiting for the user to accept that cookies go along; see [sendTo]. */
   var sendConfirmation by mutableStateOf<SendConfirmation?>(null)
@@ -590,10 +590,19 @@ class AppState(
     inspectedTask = key
   }
 
-  /** Shows or hides the docked inspector and remembers the choice. */
-  fun updateInspectorOpen(open: Boolean) {
-    inspectorOpen = open
-    appSettings.saveUi { it.copy(inspectorOpen = open) }
+  /**
+   * Shows the selected download in the inspector, which sums up two or more by itself. Returns
+   * whether anything is selected.
+   */
+  fun showDetails(): Boolean {
+    selectedKeys.singleOrNull()?.let { inspectedTask = it }
+    return selectedKeys.isNotEmpty()
+  }
+
+  /** Closes the inspector; a selection of several rows, which it sums up, is cleared. */
+  fun closeInspector() {
+    inspectedTask = null
+    if (selectedKeys.size >= 2) selectedKeys = emptySet()
   }
 
   /** Asks the search field to take focus. */

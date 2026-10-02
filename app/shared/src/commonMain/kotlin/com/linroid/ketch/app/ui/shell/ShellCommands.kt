@@ -134,7 +134,7 @@ internal class ShellCommands(
       KetchCommands.ResumeAll -> state.resumeAll()
       KetchCommands.RetryFailed -> state.retryFailed()
       KetchCommands.SlowLane -> return state.toggleSlowLane() != null
-      KetchCommands.ToggleInspector -> state.updateInspectorOpen(!state.inspectorOpen)
+      KetchCommands.ShowDetails -> return state.showDetails()
       KetchCommands.ToggleSidebar -> return shell.toggleSidebar()
       KetchCommands.Activity -> shell.pulseBar.toggleActivity()
       KetchCommands.Undo -> return state.pendingOps.undoLast()
@@ -222,7 +222,7 @@ internal class ShellCommands(
       KetchCommands.ResumeAll,
       KetchCommands.RetryFailed,
       KetchCommands.SlowLane,
-      KetchCommands.ToggleInspector,
+      KetchCommands.ShowDetails,
       KetchCommands.ToggleSidebar,
       KetchCommands.Activity,
       KetchCommands.Undo,

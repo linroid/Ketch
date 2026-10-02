@@ -1175,7 +1175,8 @@ Left to right:
 4. **Right side:**
    - The command field `⌕ Search or paste a link  ⌘K`: 32 dp tall, 240 dp wide, 320 dp on focus,
      collapsing to a `⌕` icon below 640 dp card width.
-   - `KetchPillGroup` (`☰` List | `▦` Table | `ⓘ` Inspector `⌘I`).
+   - `KetchPillGroup` (`☰` List | `▦` Table), where the table fits. The inspector has no toggle;
+     it follows the selection (§4.8).
    - `⋯` overflow, **always present**, with items disabled rather than hidden:
      - Pause all `⇧⌘P`
      - Resume all `⇧⌘R`
@@ -1472,18 +1473,22 @@ while a magnet is still downloading needs `DownloadTask.fileName` (W5).
 
 | Tier | Placement |
 |---|---|
-| Card width ≥ 1040 | **Docked** right pane inside the card. 320 dp, drag-resizable 280–480 with a 6 dp handle; width and open state persist. 1 dp divider; the table reflows by auto-hiding columns. |
-| Card 600–1039, or Medium | **Overlay** card: `surfaceRaised`, `lg`, e3, inset 8, 340 dp. Slides in from x+24 dp over 220 ms with decelerate easing. Esc or a click on the table closes it. |
+| Card width ≥ 1040 | **Docked** right pane inside the card. 320 dp, drag-resizable 280–480 with a 6 dp handle; the width persists, capped so the table keeps its 720 dp minimum and a click never swaps it for list rows. It slides in from the card's edge, pushing the table aside. 1 dp divider; the table reflows by auto-hiding columns. |
+| Card 600–1039, or Medium | **Overlay** card: `surfaceRaised`, `lg`, e3, inset 8, 340 dp. Slides in from x+24 dp over 220 ms with decelerate easing. Esc or a click on empty space closes it. |
 | Compact | `ModalBottomSheet`. The 55% peek shows the header, actions, lanes and Controls; drag up for the tabs. |
 
 **State and opening:**
 - `AppState.inspectedTaskId` survives filter and search changes and clears when the task is
   removed.
-- A single click on a row selects and inspects it.
-- `⌘I` / `ⓘ` toggles. `→` moves focus into the inspector, `←` or Esc returns it.
-- With **nothing selected**, the docked pane shows the scope overview: 60 s speed chart,
-  connections in flight across tasks, "Slots 2 of 2 in use", per-host "github.com 6 of 8", free
-  space, network chips, and "Up next" (the first 5 waiting tasks, each with ▷ Start now).
+- There is no toggle: the inspector shows while a row is inspected or 2 or more are selected,
+  and goes away with the selection (Esc, a click on empty space) or its ✕.
+- A single click on a row selects and inspects it; the arrow keys and ⌘-clicks that leave one row
+  selected show that row.
+- `⌘I` (Show details) shows the selected row again after ✕ closed it. `→` moves focus into the
+  inspector, `←` or Esc returns it.
+- While it closes it keeps what it showed, so it never flashes another view on the way out.
+- With **nothing selected** there is no inspector. A device's numbers live on the Pulse bar and
+  on its card on the Devices page (speed, lane, counts, free space, networks, Start next).
 - With **2 or more selected**, it shows "3 selected · 2.4 GB · 9.1 MB/s", one stacked 4 dp map per
   task, and shared Controls ("—" where values differ).
 
@@ -2212,7 +2217,7 @@ icon, scope, chord per platform, and whether it shows in menus. The registry dri
 | Global | `⇧⌘R` | Ctrl+Shift+R | Resume all in scope |
 | Global | `⌥⌘R` | Ctrl+Alt+R | Retry all failed in scope |
 | Global | `⇧⌘L` | Ctrl+Shift+L | Slow lane on/off |
-| Global | `⌘I` | Ctrl+I | Toggle inspector |
+| Global | `⌘I` | Ctrl+I | Show details of the selected download |
 | Global | `⌃⌘S` | Ctrl+Shift+S | Toggle sidebar / rail |
 | Global | `⌘J` | Ctrl+J | Activity popover |
 | Global | `⌘Z` | Ctrl+Z | Undo last remove / clear / pause / move |
@@ -2545,8 +2550,8 @@ PermissionDenied, Dns, Refused, Timeout, Tls) are W5.
     Device…, Close Window ⌘W.
   - **Edit:** Undo {action} ⌘Z, Cut, Copy, Paste, Select All, Find ⌘F, Command Palette ⌘K.
   - **View:** All…Failed ⌘1–6, Table/List, Group By ▸, Columns ▸, Density ▸, Toggle Sidebar ⌃⌘S,
-    Toggle Inspector ⌘I, Discover ⌘E, Devices ⌘0, Activity ⌘J.
-  - **Downloads:** Pause/Resume, Open ↩, Show in Finder ⌘↩, Copy Link ⌘C, Start Now, Speed
+    Discover ⌘E, Devices ⌘0, Activity ⌘J.
+  - **Downloads:** Pause/Resume, Open ↩, Show Details ⌘I, Show in Finder ⌘↩, Copy Link ⌘C, Start Now, Speed
     Limit ▸, Connections ▸, Priority ▸, Start Later ▸, Send To ▸, Retry ⌘R, Remove ⌫, Pause All,
     Resume All, Retry Failed, Slow Lane ⇧⌘L.
   - **Device:** All Devices ⌘⌥0, one checkable item per device ⌘⌥1–9, Pair a Device…
@@ -2936,7 +2941,7 @@ existing screens render unchanged.
   Options/Undo toast).
 - Intent APIs: `intakeRequest` + `openIntake(IntakeRequest)`, `settingsRequest` +
   `openSettings(SettingsTarget)`, `openDiscover(DiscoverRequest)`, `inspectedTask`,
-  `inspectorOpen`, `selectedKeys`, `focusSearchRequests`.
+  `selectedKeys`, `focusSearchRequests`.
 - `addDroppedFiles` routes link text to `openIntake` instead of the "Only .torrent files" error.
 - Move AI discovery orchestration into `AiDiscoverController` (AppState keeps thin forwarding
   methods, so `AiDiscoveryContent` compiles), and make "Download selected" add each candidate on its

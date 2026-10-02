@@ -102,7 +102,6 @@ internal val populatedAppSections = KetchConfig(
     sidebarCollapsed = true,
     lastDeviceId = "nas.local:8642",
     inspectorWidth = 400,
-    inspectorOpen = false,
     intake = mapOf(
       "local" to IntakePreferences(
         folder = "/Users/me/Movies",

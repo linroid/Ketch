@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -62,7 +63,8 @@ enum class InspectorPlacement {
  * With two or more rows selected it sums them up and offers their shared Controls. Otherwise it
  * shows the task of [taskKey]: its header with the lane strip, metric and reason lines, the
  * action bar, and the tabs: Overview (problem card, Controls and Details), Connections or Files,
- * and Activity. With neither, it gives an overview of the active device.
+ * and Activity. With neither, it keeps showing what it showed last, while its container goes
+ * away.
  *
  * @param placement the container this is shown in.
  * @param onClose closes the inspector.
@@ -97,6 +99,13 @@ internal fun InspectorContent(
     if (selectedKeys.size < 2) emptyList() else rows.filter { it.key in selectedKeys }
   }
   val row = remember(rows, taskKey) { taskKey?.let { key -> rows.firstOrNull { it.key == key } } }
+  val last = remember { LastShown() }
+  val shown = when {
+    selection.size >= 2 -> Shown.Selection(selection)
+    row != null -> Shown.Task(row)
+    else -> last.value
+  }
+  SideEffect { last.value = shown }
   val spacing = KetchTheme.spacing
   val padding = if (placement == InspectorPlacement.Sheet) {
     // The sheet's drag handle already leaves room above.
@@ -107,10 +116,10 @@ internal fun InspectorContent(
   }
   // The tab stays as other downloads are inspected; the scroll position starts over.
   var tab by rememberSaveable { mutableStateOf(InspectorTab.Overview) }
-  val shows = when {
-    selection.size >= 2 -> "selection"
-    row != null -> row.key
-    else -> "overview"
+  val shows = when (shown) {
+    is Shown.Selection -> "selection"
+    is Shown.Task -> shown.row.key
+    null -> null
   }
   key(shows) {
     Column(
@@ -120,14 +129,28 @@ internal fun InspectorContent(
         .verticalScroll(rememberScrollState())
         .padding(padding),
     ) {
-      when {
-        selection.size >= 2 -> SelectionSummary(state, selection, runner, pending, onClose)
-        row != null -> TaskView(state, row, runner, pending, tab, { tab = it }, onClose)
-        else -> ScopeOverview(state, onClose)
+      when (shown) {
+        is Shown.Selection -> SelectionSummary(state, shown.rows, runner, pending, onClose)
+        is Shown.Task -> TaskView(state, shown.row, runner, pending, tab, { tab = it }, onClose)
+        null -> Unit
       }
     }
   }
   RowActionDialogs(runner)
+}
+
+/** What the inspector shows. */
+private sealed interface Shown {
+  /** One download. */
+  data class Task(val row: TaskRow) : Shown
+
+  /** Two or more selected downloads. */
+  data class Selection(val rows: List<TaskRow>) : Shown
+}
+
+/** What the inspector showed last, which it keeps while it goes away. */
+private class LastShown {
+  var value: Shown? = null
 }
 
 @Composable

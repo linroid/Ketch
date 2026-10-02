@@ -2,8 +2,10 @@ package com.linroid.ketch.app.ui.downloads
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -44,6 +46,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
@@ -59,8 +62,10 @@ import com.linroid.ketch.app.ui.inspector.TaskInspector
 /**
  * The inspector docked beside the table: a 1 dp divider whose 6 dp handle drags the width
  * between [KetchSpacing.inspectorMinWidth][com.linroid.ketch.app.theme.KetchSpacing] and its
- * maximum, then the inspector on the card's surface.
+ * maximum, then the inspector on the card's surface. It slides in from the card's edge, pushing
+ * the list aside, and back out.
  *
+ * @param visible whether it shows.
  * @param width the inspector's width.
  * @param onResize the width while it is dragged.
  * @param onResizeEnd saves the width once the drag ends.
@@ -69,6 +74,7 @@ import com.linroid.ketch.app.ui.inspector.TaskInspector
 internal fun DockedInspector(
   state: AppState,
   taskKey: TaskKey?,
+  visible: Boolean,
   width: Dp,
   onResize: (Dp) -> Unit,
   onResizeEnd: () -> Unit,
@@ -76,21 +82,33 @@ internal fun DockedInspector(
   modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
+  val motion = KetchTheme.motion
   val interactions = remember { MutableInteractionSource() }
   val hovered by interactions.collectIsHoveredAsState()
   val dragged by interactions.collectIsDraggedAsState()
   val line = if (hovered || dragged) colors.borderStrong else colors.hairline
-  Row(modifier.fillMaxHeight()) {
-    Box(Modifier.width(HairlineWidth).fillMaxHeight().drawBehind { drawRect(line) })
-    Box(Modifier.width(width).fillMaxHeight().background(colors.surface)) {
-      TaskInspector(state, taskKey, InspectorPlacement.Docked, onClose)
-      ResizeHandle(
-        width = width,
-        interactions = interactions,
-        onResize = onResize,
-        onResizeEnd = onResizeEnd,
-        modifier = Modifier.align(Alignment.CenterStart),
-      )
+  val enter = tween<IntSize>(motion.medium, easing = motion.easeDecelerate)
+  val exit = tween<IntSize>(motion.longExit, easing = motion.easeAccelerate)
+  AnimatedVisibility(
+    visible = visible,
+    enter = expandHorizontally(enter, Alignment.Start) +
+      fadeIn(tween(motion.medium, easing = motion.easeDecelerate)),
+    exit = shrinkHorizontally(exit, Alignment.Start) +
+      fadeOut(tween(motion.longExit, easing = motion.easeAccelerate)),
+    modifier = modifier.fillMaxHeight(),
+  ) {
+    Row(Modifier.fillMaxHeight()) {
+      Box(Modifier.width(HairlineWidth).fillMaxHeight().drawBehind { drawRect(line) })
+      Box(Modifier.width(width).fillMaxHeight().background(colors.surface)) {
+        TaskInspector(state, taskKey, InspectorPlacement.Docked, onClose)
+        ResizeHandle(
+          width = width,
+          interactions = interactions,
+          onResize = onResize,
+          onResizeEnd = onResizeEnd,
+          modifier = Modifier.align(Alignment.CenterStart),
+        )
+      }
     }
   }
 }

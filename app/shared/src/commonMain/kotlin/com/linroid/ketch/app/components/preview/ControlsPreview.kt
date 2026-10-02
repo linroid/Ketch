@@ -117,12 +117,12 @@ private fun ControlsGallery() {
     Section("Icon buttons and pill group") {
       KetchIconButton(command = KetchCommands.PauseAll, onClick = {})
       KetchIconButton(command = KetchCommands.ResumeAll, onClick = {}, enabled = false)
-      KetchIconButton(command = KetchCommands.ToggleInspector, onClick = {}, selected = true)
+      KetchIconButton(command = KetchCommands.ToggleSidebar, onClick = {}, selected = true)
       KetchPillGroup(
         items = listOf(
           KetchPillItem(icon = KetchIcon.Filter, label = "List", onClick = {}),
           KetchPillItem(icon = KetchIcon.Columns, label = "Table", onClick = {}, selected = true),
-          KetchPillItem(command = KetchCommands.ToggleInspector, onClick = {}),
+          KetchPillItem(command = KetchCommands.ToggleSidebar, onClick = {}),
         ),
       )
     }

@@ -61,6 +61,7 @@ import com.linroid.ketch.app.ui.shell.KetchLayout
 import com.linroid.ketch.app.util.SearchQuery
 import com.linroid.ketch.config.DownloadsLayout
 import com.linroid.ketch.remote.ConnectionState
+import kotlinx.coroutines.flow.drop
 
 /** Width tiers of the window, which set how the app lays itself out. */
 enum class LayoutTier {
@@ -111,8 +112,9 @@ data class KetchLayoutInfo(
  * has room for it and as two-line rows elsewhere. Before the first download it shows the
  * launchpad.
  *
- * The inspector docks beside the table on cards from [KetchLayout.DockedInspectorWidth], floats
- * over the list on narrower ones and opens in a bottom sheet on phones. On phones the status
+ * The inspector shows the download clicked, or sums up two or more selected, and goes away with
+ * the selection. It docks beside the list on cards from [KetchLayout.DockedInspectorWidth],
+ * floats over it on narrower ones and opens in a bottom sheet on phones. On phones the status
  * tabs are chips that scroll away with the top bar.
  *
  * Rows of downloads just added glow, after a lane flies to them from the Add button where there
@@ -220,9 +222,8 @@ internal class DownloadsPage(val state: AppState, val actions: ListActions) {
 
 /**
  * Keeps the page in step with the list: each tab shows its saved order, a new tab or search
- * starts at the top, removed tasks leave the selection and the inspector, clearing the selection
- * returns the inspector to its overview, and the order holds still while the user works in the
- * list.
+ * starts at the top, removed tasks leave the selection and the inspector, the inspector follows
+ * the selection and closes with it, and the order holds still while the user works in the list.
  */
 @Composable
 private fun PageEffects(page: DownloadsPage, view: TaskListView) {
@@ -256,6 +257,13 @@ private fun PageEffects(page: DownloadsPage, view: TaskListView) {
       if (key != null && actions.selection.count == 0 && key in actions.visibleKeys) {
         actions.selection.update(SelectionState().select(key))
       }
+    }
+  }
+  LaunchedEffect(state, pointer) {
+    if (!pointer) return@LaunchedEffect
+    // The arrow keys and ⌘-clicks that leave one row selected show it, as a click does.
+    snapshotFlow { state.selectedKeys.singleOrNull() }.drop(1).collect { key ->
+      if (key != null) state.inspect(key)
     }
   }
   LaunchedEffect(page) {
@@ -336,15 +344,21 @@ private fun WideDownloads(
   val instances by state.instances.collectAsState()
   val content = pageContent(state, view)
   val firstRun = content.isBare
+  val pointer = KetchTheme.density == KetchDensity.Compact
+  val tableFits = pointer && cardWidth >= TableColumn.TableMinWidth
+  val showsTable = tableFits && page.viewMode != DownloadsLayout.List
   val docked = cardWidth >= KetchLayout.DockedInspectorWidth
+  // Docked, the inspector leaves the table room for its columns, so a click never swaps the
+  // table for list rows.
+  val widest = if (showsTable) {
+    minOf(spacing.inspectorMaxWidth, cardWidth - HairlineWidth - TableColumn.TableMinWidth)
+  } else {
+    spacing.inspectorMaxWidth
+  }
   var draggedWidth by remember { mutableStateOf<Dp?>(null) }
   val inspectorWidth = (draggedWidth ?: ui.inspectorWidth.dp)
-    .coerceIn(spacing.inspectorMinWidth, spacing.inspectorMaxWidth)
-  val dockedOpen = docked && state.inspectorOpen && !firstRun
-  val tableWidth = if (dockedOpen) cardWidth - inspectorWidth - HairlineWidth else cardWidth
-  val pointer = KetchTheme.density == KetchDensity.Compact
-  val tableFits = pointer && tableWidth >= TableColumn.TableMinWidth
-  val showsTable = tableFits && page.viewMode != DownloadsLayout.List
+    .coerceIn(spacing.inspectorMinWidth, widest.coerceAtLeast(spacing.inspectorMinWidth))
+  val inspectorShown = state.inspectorShown && !firstRun
   // The sidebar lists the devices; on narrow cards the search field needs the room more.
   val sidebar = layout.tier == LayoutTier.Expanded && !ui.sidebarCollapsed
   val showDevice = (instances.size >= 2 || !sidebar) && (!sidebar || cardWidth >= DeviceChipWidth)
@@ -378,16 +392,16 @@ private fun WideDownloads(
           OverlayInspector(
             state = state,
             taskKey = state.inspectedTask,
-            visible = state.inspectorOpen && !firstRun &&
-              (state.inspectedTask != null || state.selectedKeys.size >= 2),
-            onClose = { state.updateInspectorOpen(false) },
+            visible = inspectorShown,
+            onClose = state::closeInspector,
           )
         }
       }
-      if (dockedOpen) {
+      if (docked) {
         DockedInspector(
           state = state,
           taskKey = state.inspectedTask,
+          visible = inspectorShown,
           width = inspectorWidth,
           onResize = { draggedWidth = it },
           onResizeEnd = {
@@ -395,7 +409,7 @@ private fun WideDownloads(
             state.appSettings.saveUi { it.copy(inspectorWidth = width) }
             draggedWidth = null
           },
-          onClose = { state.updateInspectorOpen(false) },
+          onClose = state::closeInspector,
         )
       }
     }

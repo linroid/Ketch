@@ -63,8 +63,8 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Every device at once (W4-ALL-DEVICES): the merged Downloads list with its Device column and
- * pennants, the All devices overview in the inspector, Send to and its cookie warning, and the
- * add sheet aimed at the NAS. See [SnapshotHarness] for how to run them.
+ * pennants, a NAS download in the inspector, Send to and its cookie warning, and the add sheet
+ * aimed at the NAS. See [SnapshotHarness] for how to run them.
  */
 class AllDevicesSnapshots {
   @BeforeTest
@@ -72,48 +72,32 @@ class AllDevicesSnapshots {
 
   @Test
   fun allDevices_table_showsTheDeviceColumn() {
-    allDevicesSnapshots("all-devices-table", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
-    }
+    allDevicesSnapshots("all-devices-table", listOf(SnapshotSize.Desktop))
   }
 
   @Test
   fun allDevices_hoveredRows_keepTheirDeviceInView() {
     allDevicesSnapshots("all-devices-table-hover", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       scene.hover(x = 960.dp, y = 278.dp)
     }
     allDevicesSnapshots("all-devices-table-hover-failed", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       scene.hover(x = 960.dp, y = 602.dp)
     }
   }
 
   @Test
   fun allDevices_noDownloads_offersToAddOne() {
-    allDevicesSnapshots("all-devices-empty", listOf(SnapshotSize.Desktop), empty = true) {
-      state.updateInspectorOpen(false)
-    }
-  }
-
-  @Test
-  fun allDevices_inspector_sumsUpEveryDevice() {
-    allDevicesSnapshots("all-devices-overview", listOf(SnapshotSize.Desktop, SnapshotSize.Medium)) {
-      state.updateInspectorOpen(true)
-    }
+    allDevicesSnapshots("all-devices-empty", listOf(SnapshotSize.Desktop), empty = true)
   }
 
   @Test
   fun allDevices_narrow_leadsRowsWithPennants() {
-    allDevicesSnapshots("all-devices-list", listOf(SnapshotSize.Medium, SnapshotSize.Phone)) {
-      state.updateInspectorOpen(false)
-    }
+    allDevicesSnapshots("all-devices-list", listOf(SnapshotSize.Medium, SnapshotSize.Phone))
   }
 
   @Test
   fun allDevices_nasRow_inspectsTheNasDownload() {
     allDevicesSnapshots("all-devices-nas-row", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(true)
       state.inspect(TaskKey(NAS_ID, "imagenet-02"))
     }
   }
@@ -121,7 +105,6 @@ class AllDevicesSnapshots {
   @Test
   fun allDevices_search_offersTheDeviceFacet() {
     allDevicesSnapshots("all-devices-facets", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       state.searchQuery = "is:downloading"
     }
   }
@@ -157,7 +140,6 @@ class AllDevicesSnapshots {
   @Test
   fun resolvingChip_torrentInBackground_showsInTheHeader() {
     allDevicesSnapshots("all-devices-resolving", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       val session = state.intake.start(IntakeRequest(text = SLOW_MAGNET, targetDeviceId = NAS_ID))
       delay(SETTLE)
       state.intake.finishInBackground(session)
@@ -215,7 +197,7 @@ private fun allDevicesSnapshots(
   name: String,
   sizes: List<SnapshotSize>,
   empty: Boolean = false,
-  setup: suspend AppScenario.() -> Unit,
+  setup: suspend AppScenario.() -> Unit = {},
 ): List<File> = sizes.flatMap { size ->
   SnapshotTheme.entries.map { theme -> allDevicesSnapshot(name, size, theme, empty, setup) }
 }

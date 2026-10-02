@@ -1,13 +1,11 @@
 package com.linroid.ketch.app.ui.inspector
 
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.ListFixtures
@@ -23,7 +21,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 class InspectorModelTest {
@@ -314,35 +311,6 @@ class InspectorModelTest {
   }
 
   @Test
-  fun scopeSummary_busyDevice_countsSlotsSitesConnectionsAndUpNext() {
-    val config = DownloadConfig(maxConcurrentDownloads = 3, maxConnectionsPerHost = 2)
-    val rows = listOf(
-      segmented("a", "https://one.example/a", unfinished = 4),
-      segmented("b", "https://one.example/b", unfinished = 2),
-      segmented("c", "https://two.example/c", unfinished = 1),
-      row("late", DownloadState.Queued, createdAt = start + 1.minutes),
-      row(
-        id = "high",
-        state = DownloadState.Queued,
-        createdAt = start + 2.minutes,
-        request = DownloadRequest("https://e.com/high", priority = DownloadPriority.HIGH),
-      ),
-      row("night", DownloadState.Scheduled(DownloadSchedule.AtTime(start + 9.hours))),
-      row("soon", DownloadState.Scheduled(DownloadSchedule.AtTime(start + 1.hours)))
-    )
-
-    val summary = scopeSummary(rows, config)
-
-    assertEquals(3, summary.running)
-    assertEquals(3, summary.slots)
-    assertEquals(7, summary.connections)
-    assertEquals(3, summary.transfers)
-    val hosts = listOf(HostLoad("one.example", 2, 2), HostLoad("two.example", 1, 2))
-    assertEquals(hosts, summary.hosts)
-    assertEquals(listOf("high", "late", "soon", "night"), summary.upNext.map { it.key.taskId })
-  }
-
-  @Test
   fun selectionLine_mixedRows_sumsKnownSizesAndSpeeds() {
     val rows = listOf(
       row(
@@ -375,14 +343,6 @@ class InspectorModelTest {
     state = DownloadState.Downloading(DownloadProgress(1, 10, 1)),
     request = DownloadRequest("https://example.com/$id.bin", priority = priority),
   )
-
-  private fun segmented(id: String, url: String, unfinished: Int): TaskRow {
-    val segments = List(unfinished + 1) { index ->
-      Segment(index, index * 100L, index * 100L + 99, if (index == 0) 100 else 10)
-    }
-    val state = DownloadState.Downloading(DownloadProgress(0, 1000, 1))
-    return row(id, state, request = DownloadRequest(url)).copy(segments = segments)
-  }
 
   @Test
   fun keepPartsTogether_shortAndLongParts_joinsOnlyTheShortOnes() {

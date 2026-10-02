@@ -82,7 +82,6 @@ data class IntakePreferences(
  * @property lastDeviceId device that was active when the app last ran; `null`
  *   until the user switches devices.
  * @property inspectorWidth width of the docked inspector, in dp.
- * @property inspectorOpen whether the docked inspector is shown.
  * @property intake what the add sheet remembers per device: the options of the
  *   last add (folder, priority and connections) and the pinned folders.
  * @property intakeAdvancedOpen whether the add sheet's Advanced section is open.
@@ -115,7 +114,6 @@ data class UiPreferences(
   val sidebarCollapsed: Boolean = false,
   val lastDeviceId: String? = null,
   val inspectorWidth: Int = DEFAULT_INSPECTOR_WIDTH,
-  val inspectorOpen: Boolean = true,
   val intake: Map<String, IntakePreferences> = emptyMap(),
   val intakeAdvancedOpen: Boolean = false,
   val clipboardMode: ClipboardMode? = null,

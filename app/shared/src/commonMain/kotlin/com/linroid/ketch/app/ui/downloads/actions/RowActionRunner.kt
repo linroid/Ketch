@@ -198,10 +198,9 @@ internal class RowActionRunner(
     dialog = RowDialog.PickStart(rows)
   }
 
-  /** Shows [key] in the inspector, opening it. */
+  /** Shows [key] in the inspector. */
   fun inspect(key: TaskKey) {
     state.inspect(key)
-    if (!state.inspectorOpen) state.updateInspectorOpen(true)
   }
 
   /** Caps each of [rows] at [limit]. */

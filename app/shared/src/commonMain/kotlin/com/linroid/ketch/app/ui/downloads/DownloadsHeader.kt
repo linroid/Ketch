@@ -71,8 +71,8 @@ import com.linroid.ketch.config.DownloadsLayout
 
 /**
  * The Downloads page header: the title with its count pill, the device chip when the sidebar
- * does not name the device, then the search field, the view and inspector toggles, the "⋯"
- * menu and the [AddButton]. The search field shrinks to a button on cards narrower than
+ * does not name the device, then the search field, the List and Table toggles, the "⋯" menu
+ * and the [AddButton]. The search field shrinks to a button on cards narrower than
  * [SearchCollapseWidth], or [SearchWithDeviceWidth] next to the device chip; that button opens
  * it over the header. The list and table toggles show only where the table fits.
  *
@@ -81,7 +81,7 @@ import com.linroid.ketch.config.DownloadsLayout
  * @param showDevice whether to show the device chip.
  * @param tableFits whether the table has room, so the view can be picked.
  * @param showsTable whether the page shows the table rather than list rows.
- * @param hasRows whether the device has downloads to show; without any, the view and inspector
+ * @param hasRows whether the device has downloads to show; without any, the List and Table
  *   toggles stay away.
  */
 @Composable
@@ -142,49 +142,32 @@ internal fun DownloadsHeader(
     } else {
       SearchField(page, fill = false)
     }
-    if (hasRows) ViewToggles(page, tableFits, showsTable)
+    if (hasRows && tableFits) ViewToggles(page, showsTable)
     OverflowMenu(page, showsTable)
     // A copied link's name gives way before the device chip and the search field do.
     AddButton(state, Modifier.widthIn(max = addButtonMaxWidth(cardWidth)))
   }
 }
 
-/**
- * The List and Table toggles with the inspector's, where the table fits; elsewhere only the
- * inspector's.
- */
+/** The List and Table toggles. */
 @Composable
-private fun ViewToggles(page: DownloadsPage, tableFits: Boolean, showsTable: Boolean) {
-  val state = page.state
-  if (tableFits) {
-    KetchPillGroup(
-      listOf(
-        KetchPillItem(
-          icon = KetchIcon.All,
-          label = "List",
-          onClick = { page.saveViewMode(DownloadsLayout.List) },
-          selected = !showsTable,
-        ),
-        KetchPillItem(
-          icon = KetchIcon.Columns,
-          label = "Table",
-          onClick = { page.saveViewMode(DownloadsLayout.Table) },
-          selected = showsTable,
-        ),
-        KetchPillItem(
-          command = KetchCommands.ToggleInspector,
-          onClick = { state.updateInspectorOpen(!state.inspectorOpen) },
-          selected = state.inspectorOpen,
-        )
-      )
+private fun ViewToggles(page: DownloadsPage, showsTable: Boolean) {
+  KetchPillGroup(
+    listOf(
+      KetchPillItem(
+        icon = KetchIcon.All,
+        label = "List",
+        onClick = { page.saveViewMode(DownloadsLayout.List) },
+        selected = !showsTable,
+      ),
+      KetchPillItem(
+        icon = KetchIcon.Columns,
+        label = "Table",
+        onClick = { page.saveViewMode(DownloadsLayout.Table) },
+        selected = showsTable,
+      ),
     )
-  } else {
-    KetchIconButton(
-      command = KetchCommands.ToggleInspector,
-      onClick = { state.updateInspectorOpen(!state.inspectorOpen) },
-      selected = state.inspectorOpen,
-    )
-  }
+  )
 }
 
 /** "Downloads" and its count pill: downloading and total, such as "2↓/14". */

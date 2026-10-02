@@ -173,11 +173,11 @@ object KetchCommands {
     inMenus = true,
   )
 
-  /** Shows or hides the task inspector. */
-  val ToggleInspector: KetchCommand = command(
-    id = "inspector.toggle",
-    label = "Toggle inspector",
-    icon = KetchIcon.Inspector,
+  /** Shows the selected download in the inspector. */
+  val ShowDetails: KetchCommand = command(
+    id = "inspector.show",
+    label = "Show details",
+    icon = KetchIcon.Info,
     mac = KeyChord(Key.I, primary = true),
     web = listOf(KeyChord(Key.I)),
     inMenus = true,
@@ -606,7 +606,7 @@ object KetchCommands {
     addAll(listOf(Discover, Devices))
     addAll(devices)
     addAll(listOf(AllDevices, SwitchDevice, PauseAll, ResumeAll, RetryFailed, SlowLane))
-    addAll(listOf(ToggleInspector, ToggleSidebar, Activity, Undo, Settings, Shortcuts))
+    addAll(listOf(ShowDetails, ToggleSidebar, Activity, Undo, Settings, Shortcuts))
     addAll(listOf(CloseWindow, Minimize, Quit))
     addAll(listOf(ListUp, ListDown, ExtendSelectionUp, ExtendSelectionDown))
     addAll(listOf(ListFirst, ListLast, ListPageUp, ListPageDown, SelectAll, ClearSelection))

@@ -108,7 +108,6 @@ internal class PaletteRunner(
     // Shows the task on a tab that lists it.
     val filter = state.statusFilter.takeIf { it.matches(row.state) } ?: StatusFilter.All
     state.showDownloads(filter)
-    state.updateInspectorOpen(true)
     state.inspect(action.key)
   }
 

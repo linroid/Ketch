@@ -59,18 +59,13 @@ class TableSnapshots {
   private val wide = listOf(SnapshotSize.Desktop, SnapshotSize.SmallDesktop)
 
   @Test
-  fun table_inspectorClosed_showsEveryColumn() {
-    appSnapshots("table", wide) { state.updateInspectorOpen(false) }
+  fun table_nothingSelected_showsEveryColumn() {
+    appSnapshots("table", wide)
   }
 
   @Test
   fun table_rowInspected_docksTheInspector() {
     appSnapshots("table-inspected", wide) { inspect(UBUNTU) }
-  }
-
-  @Test
-  fun table_nothingInspected_showsTheOverview() {
-    appSnapshots("table-overview", listOf(SnapshotSize.Desktop))
   }
 
   @Test
@@ -81,7 +76,6 @@ class TableSnapshots {
     }
     appSnapshots("list-hover", listOf(SnapshotSize.Medium)) { scene.hover(420.dp, 145.dp) }
     appSnapshots("list-picked", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       state.appSettings.saveUi { it.copy(layout = DownloadsLayout.List) }
     }
     appSnapshots("list-narrow", listOf(SnapshotSize(600.dp, 700.dp, KetchDensity.Compact)))
@@ -94,15 +88,12 @@ class TableSnapshots {
   @Test
   fun tabs_doneAndFailed_offerTheirActions() {
     appSnapshots("tab-done", listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
-      state.updateInspectorOpen(false)
       showTab(StatusFilter.Done)
     }
     appSnapshots("tab-failed", listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
-      state.updateInspectorOpen(false)
       showTab(StatusFilter.Failed)
     }
     appSnapshots("tab-waiting", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       showTab(StatusFilter.Waiting)
     }
   }
@@ -110,7 +101,6 @@ class TableSnapshots {
   @Test
   fun search_tokensAndText_showFacetsAndMatches() {
     appSnapshots("search-tokens", listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
-      state.updateInspectorOpen(false)
       search("is:downloading type:archive")
     }
     appSnapshots("search-none", listOf(SnapshotSize.Desktop, SnapshotSize.Medium)) {
@@ -124,11 +114,9 @@ class TableSnapshots {
   @Test
   fun table_sortedAndGrouped_showsHeaderState() {
     appSnapshots("table-sorted", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       state.listArrangement = ListArrangement(SortKey.Speed, descending = true, GroupBy.Status)
     }
     appSnapshots("table-compact-rows", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       state.appSettings.saveUi {
         it.copy(table = it.table + (RowDensity.ROWS_KEY to RowDensity.Compact.id))
       }
@@ -141,11 +129,9 @@ class TableSnapshots {
       select(UBUNTU, IMAGENET, REPORT)
     }
     appSnapshots("table-hover", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       scene.hover(700.dp, 200.dp)
     }
     appSnapshots("table-keyboard", listOf(SnapshotSize.Desktop)) {
-      state.updateInspectorOpen(false)
       scene.click(700.dp, 176.dp)
       scene.pressKey(Key.DirectionDown)
       scene.pressKey(Key.DirectionDown)
@@ -268,9 +254,7 @@ class TableSnapshots {
 
   @Test
   fun many_thousandTasks_rendersTheFirstPage() {
-    appSnapshots("table-many", listOf(SnapshotSize.Desktop), data = { manyDownloads(1000) }) {
-      state.updateInspectorOpen(false)
-    }
+    appSnapshots("table-many", listOf(SnapshotSize.Desktop), data = { manyDownloads(1000) })
   }
 }
 

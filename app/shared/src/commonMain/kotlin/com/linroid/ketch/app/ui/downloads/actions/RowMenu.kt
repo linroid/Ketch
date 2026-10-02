@@ -511,7 +511,7 @@ internal val RowAction.command: KetchCommand?
     RowAction.CopyLink -> KetchCommands.CopyLink
     RowAction.CopyPath -> KetchCommands.CopyPath
     RowAction.Retry -> KetchCommands.Retry
-    RowAction.Details -> KetchCommands.ToggleInspector
+    RowAction.Details -> KetchCommands.ShowDetails
     RowAction.Remove -> KetchCommands.Remove
     RowAction.RemoveAndTrash, RowAction.RemoveAndDelete -> KetchCommands.RemoveAndTrash
     else -> null

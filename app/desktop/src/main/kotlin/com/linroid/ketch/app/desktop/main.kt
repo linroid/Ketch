@@ -597,7 +597,6 @@ internal fun hostShortcuts(os: DesktopOs, slowLane: Boolean): Set<KetchCommand> 
       activeDevice = null,
       selection = emptyList(),
       undoLabel = null,
-      inspectorOpen = false,
       slowLane = if (slowLane) false else null,
     ),
   )
@@ -654,7 +653,6 @@ private fun defaultMenus(
       activeDevice = instances.indexOf(active).takeIf { it >= 0 },
       selection = emptyList(),
       undoLabel = ops.lastOrNull()?.label,
-      inspectorOpen = state.inspectorOpen,
       slowLane = mode?.isSlowLane,
       allDevices = shown == DeviceScope.All,
       revealLabel = files?.revealLabel,

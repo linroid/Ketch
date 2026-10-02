@@ -218,4 +218,52 @@ class AppStateSeamsTest {
     assertEquals("Download failed", message.title)
     assertEquals("q3-report.pdf: Access denied (403)", toastDetail(message))
   }
+
+  @Test
+  fun showDetails_oneRowSelected_inspectsIt() = runTest {
+    val state = appState()
+    val key = TaskKey(LOCAL_DEVICE_ID, "a")
+    state.selectedKeys = setOf(key)
+
+    assertTrue(state.showDetails())
+
+    assertEquals(key, state.inspectedTask)
+    assertTrue(state.inspectorShown)
+  }
+
+  @Test
+  fun showDetails_nothingSelected_showsNothing() = runTest {
+    val state = appState()
+
+    assertFalse(state.showDetails())
+
+    assertFalse(state.inspectorShown)
+  }
+
+  @Test
+  fun closeInspector_severalSelected_clearsTheSelection() = runTest {
+    val state = appState()
+    val keys = setOf(TaskKey(LOCAL_DEVICE_ID, "a"), TaskKey(LOCAL_DEVICE_ID, "b"))
+    state.inspect(keys.first())
+    state.selectedKeys = keys
+
+    state.closeInspector()
+
+    assertEquals(emptySet(), state.selectedKeys)
+    assertEquals(null, state.inspectedTask)
+    assertFalse(state.inspectorShown)
+  }
+
+  @Test
+  fun closeInspector_oneSelected_keepsTheRowSelected() = runTest {
+    val state = appState()
+    val key = TaskKey(LOCAL_DEVICE_ID, "a")
+    state.selectedKeys = setOf(key)
+    state.inspect(key)
+
+    state.closeInspector()
+
+    assertEquals(setOf(key), state.selectedKeys)
+    assertFalse(state.inspectorShown)
+  }
 }
