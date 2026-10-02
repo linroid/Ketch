@@ -45,7 +45,7 @@ import com.linroid.ketch.app.state.folderName
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.state.isAppPrivateFolder
 import com.linroid.ketch.app.state.isDocumentTree
-import com.linroid.ketch.app.state.isSameFolder
+import com.linroid.ketch.app.state.offersDefaultFolder
 import com.linroid.ketch.app.state.recentDownloadFolders
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.IntakePreferences
@@ -101,8 +101,8 @@ private fun FolderGroup(
     value = readSystem(device)
   }
   val folder = config.defaultDirectory ?: system?.downloadDirectory
-  // A folder chosen by path can be the Downloads folder itself.
-  val chosen = config.defaultDirectory?.takeUnless { isSameFolder(it, system?.downloadDirectory) }
+  val defaultFolder = system?.defaultDownloadDirectory
+  val offerDefault = offersDefaultFolder(config.defaultDirectory, defaultFolder)
   val canPick = local && picker.canPickFolder
   val revealLabel = files?.revealLabel.takeIf { local && folder != null && !isDocumentTree(folder) }
   var typing by rememberSaveable(device.deviceId) { mutableStateOf(!canPick) }
@@ -126,7 +126,7 @@ private fun FolderGroup(
         SettingsTextInput(
           value = config.defaultDirectory.orEmpty(),
           onCommit = { onChange(config.copy(defaultDirectory = it.ifBlank { null })) },
-          placeholder = system?.downloadDirectory ?: "Path of a folder on ${device.label}",
+          placeholder = defaultFolder ?: "Path of a folder on ${device.label}",
           mono = true,
           actions = if (free != null) {
             { FreeSpace(free, Modifier.padding(end = spacing.s2)) }
@@ -161,7 +161,7 @@ private fun FolderGroup(
           tone = NoticeTone.Info,
         )
       }
-      if (!canPick && revealLabel == null && chosen == null) return@SettingsRow
+      if (!canPick && revealLabel == null && !offerDefault) return@SettingsRow
       FlowRow(
         horizontalArrangement = Arrangement.spacedBy(spacing.s2),
         verticalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -202,7 +202,7 @@ private fun FolderGroup(
             size = KetchButtonSize.Small,
           )
         }
-        if (chosen != null) {
+        if (offerDefault) {
           KetchButton(
             text = "Use the Downloads folder",
             onClick = { onChange(config.copy(defaultDirectory = null)) },

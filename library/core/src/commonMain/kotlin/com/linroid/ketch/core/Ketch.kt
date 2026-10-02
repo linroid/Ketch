@@ -217,7 +217,7 @@ class Ketch(
       revision = KetchApi.REVISION,
       uptime = startMark.elapsedNow().inWholeSeconds,
       config = config,
-      system = currentSystemInfo(config.defaultDirectory ?: defaultDownloadDirectory()),
+      system = currentSystemInfo(config.defaultDirectory),
     )
   }
 

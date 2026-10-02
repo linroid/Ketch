@@ -3,9 +3,10 @@ package com.linroid.ketch.core
 import com.linroid.ketch.api.SystemInfo
 import java.io.File
 
-internal actual fun currentSystemInfo(directory: String): SystemInfo {
+internal actual fun currentSystemInfo(directory: String?): SystemInfo {
   val runtime = Runtime.getRuntime()
-  val dir = File(directory)
+  val default = File(defaultDownloadDirectory())
+  val dir = directory?.let(::File) ?: default
   return SystemInfo(
     os = System.getProperty("os.name", "unknown"),
     arch = System.getProperty("os.arch", "unknown"),
@@ -16,6 +17,7 @@ internal actual fun currentSystemInfo(directory: String): SystemInfo {
     totalMemory = runtime.totalMemory(),
     freeMemory = runtime.freeMemory(),
     downloadDirectory = dir.absolutePath,
+    defaultDownloadDirectory = default.absolutePath,
     totalSpace = dir.totalSpace,
     freeSpace = dir.freeSpace,
     usableSpace = dir.usableSpace,

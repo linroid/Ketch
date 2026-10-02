@@ -201,8 +201,9 @@ DownloadConfig(
 ```
 
 The values shown are the defaults, except `speedLimit`. A `null` `defaultDirectory` resolves to
-`~/Downloads` on JVM, the app's external `Download` folder on Android and the app's Documents
-folder on iOS.
+`~/Downloads` on JVM, the app's external `Download` folder on Android and `Downloads` in the app's
+Documents folder on iOS. `status().system` reports the folder in use as `downloadDirectory` and
+this platform default as `defaultDownloadDirectory`.
 
 `ketch.updateConfig(config)` replaces the configuration at runtime. `speedLimit`,
 `maxConcurrentDownloads` and `maxConnectionsPerHost` apply immediately: raising a queue limit

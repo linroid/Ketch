@@ -18,6 +18,7 @@ import com.linroid.ketch.app.state.isDocumentTree
 import com.linroid.ketch.app.state.isSameFolder
 import com.linroid.ketch.app.state.newSpeedRule
 import com.linroid.ketch.app.state.normalizeRuleTime
+import com.linroid.ketch.app.state.offersDefaultFolder
 import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.state.parseSpeedLimit
 import com.linroid.ketch.app.state.portError
@@ -218,6 +219,29 @@ class SettingsChoicesTest {
     assertTrue(isSameFolder("C:\\Users\\alex\\Downloads\\", "C:\\Users\\alex\\Downloads"))
     assertFalse(isSameFolder("/Users/alex/Downloads", "/Users/alex/Movies"))
     assertFalse(isSameFolder("/Users/alex/Downloads", null))
+  }
+
+  @Test
+  fun offersDefaultFolder_chosenFolderBesideTheDefault_isOffered() {
+    assertTrue(offersDefaultFolder("/Users/alex/Movies", "/Users/alex/Downloads"))
+  }
+
+  @Test
+  fun offersDefaultFolder_defaultInUse_isNotOffered() {
+    assertFalse(offersDefaultFolder(null, "/Users/alex/Downloads"))
+    // The CLI daemon writes its default folder into the configuration.
+    assertFalse(offersDefaultFolder("/Users/alex/Downloads/", "/Users/alex/Downloads"))
+  }
+
+  @Test
+  fun offersDefaultFolder_unknownOrAppPrivateDefault_isNotOffered() {
+    assertFalse(offersDefaultFolder("/Users/alex/Movies", null))
+    assertFalse(
+      offersDefaultFolder(
+        "content://com.android.externalstorage.documents/tree/primary%3ADownload",
+        "/storage/emulated/0/Android/data/com.linroid.ketch/files/Download",
+      ),
+    )
   }
 
   @Test

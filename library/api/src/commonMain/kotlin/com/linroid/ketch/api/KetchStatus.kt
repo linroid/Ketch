@@ -34,7 +34,11 @@ data class KetchStatus(
  * @property maxMemory max heap / physical memory in bytes
  * @property totalMemory current heap size / physical memory in bytes
  * @property freeMemory free memory in bytes (0 when unavailable)
- * @property downloadDirectory resolved download directory path
+ * @property downloadDirectory folder downloads are saved to: [DownloadConfig.defaultDirectory],
+ *   or [defaultDownloadDirectory] when that is not set
+ * @property defaultDownloadDirectory the platform's default download folder, used when
+ *   [DownloadConfig.defaultDirectory] is not set; `null` from instances that do not report it,
+ *   such as older servers
  * @property totalSpace total disk space in bytes
  * @property freeSpace free disk space in bytes
  * @property usableSpace usable disk space in bytes
@@ -50,6 +54,7 @@ data class SystemInfo(
   val totalMemory: Long,
   val freeMemory: Long,
   val downloadDirectory: String,
+  val defaultDownloadDirectory: String? = null,
   val totalSpace: Long,
   val freeSpace: Long,
   val usableSpace: Long,

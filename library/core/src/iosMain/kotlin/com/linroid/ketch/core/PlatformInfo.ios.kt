@@ -11,10 +11,12 @@ import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
 
 @OptIn(ExperimentalForeignApi::class)
-internal actual fun currentSystemInfo(directory: String): SystemInfo {
+internal actual fun currentSystemInfo(directory: String?): SystemInfo {
   val info = NSProcessInfo.processInfo
+  val default = defaultDownloadDirectory()
+  val folder = directory ?: default
   val fm = NSFileManager.defaultManager
-  val attrs = fm.attributesOfFileSystemForPath(directory, null)
+  val attrs = fm.attributesOfFileSystemForPath(folder, null)
   val totalSpace = (attrs?.get(NSFileSystemSize) as? Number)
     ?.toLong() ?: 0L
   val freeSpace = (attrs?.get(NSFileSystemFreeSize) as? Number)
@@ -28,16 +30,20 @@ internal actual fun currentSystemInfo(directory: String): SystemInfo {
     maxMemory = info.physicalMemory.toLong(),
     totalMemory = info.physicalMemory.toLong(),
     freeMemory = 0L,
-    downloadDirectory = directory,
+    downloadDirectory = folder,
+    defaultDownloadDirectory = default,
     totalSpace = totalSpace,
     freeSpace = freeSpace,
     usableSpace = freeSpace,
   )
 }
 
-/** The app's Documents folder, which the Files app shows. */
+/**
+ * `Downloads` in the app's Documents folder, which the Files app shows as On My iPhone › <app> ›
+ * Downloads. It is created with the first download saved there.
+ */
 @Suppress("UNCHECKED_CAST")
 internal actual fun defaultDownloadDirectory(): String =
   (NSSearchPathForDirectoriesInDomains(
     NSDocumentDirectory, NSUserDomainMask, true,
-  ) as List<String>).first()
+  ) as List<String>).first() + "/Downloads"
