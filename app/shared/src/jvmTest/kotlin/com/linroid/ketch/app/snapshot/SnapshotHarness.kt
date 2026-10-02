@@ -40,6 +40,7 @@ import org.junit.Assume.assumeTrue
 import java.io.File
 import java.util.TimeZone
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -96,26 +97,39 @@ internal object SnapshotHarness {
     size: SnapshotSize,
     interact: suspend SnapshotScene.() -> Unit = {},
     content: @Composable () -> Unit,
-  ): File = runBlocking(ui) {
+  ): File = write(name, render(size.width, size.height, SCALE, interact, content))
+
+  /**
+   * Composes [content] in a [width] by [height] window at [scale] pixels per dp, settles it,
+   * runs [interact], settles again and returns the frame.
+   */
+  fun render(
+    width: Dp,
+    height: Dp,
+    scale: Float = SCALE,
+    interact: suspend SnapshotScene.() -> Unit = {},
+    content: @Composable () -> Unit,
+  ): Image = runBlocking(ui) {
     val scene = ImageComposeScene(
-      width = (size.width.value * SCALE).toInt(),
-      height = (size.height.value * SCALE).toInt(),
-      density = Density(SCALE),
+      width = (width.value * scale).roundToInt(),
+      height = (height.value * scale).roundToInt(),
+      density = Density(scale),
       coroutineContext = ui,
       content = content,
     )
     try {
-      val snapshotScene = SnapshotScene(scene)
+      val snapshotScene = SnapshotScene(scene, scale)
       snapshotScene.settle()
       snapshotScene.interact()
       snapshotScene.settle()
-      write(name, snapshotScene.renderFrame())
+      snapshotScene.renderFrame()
     } finally {
       scene.close()
     }
   }
 
-  private fun write(name: String, image: Image): File {
+  /** Writes [image] to `<name>.png` in [outputDir] and returns the file. */
+  fun write(name: String, image: Image): File {
     check(!image.isFlat()) { "Snapshot $name is a single color" }
     val data = checkNotNull(image.encodeToData(EncodedImageFormat.PNG)) { "Couldn't encode $name" }
     outputDir.mkdirs()
@@ -175,10 +189,13 @@ internal data class SnapshotSize(val width: Dp, val height: Dp, val density: Ket
 
 /**
  * A rendered scene a scenario can interact with before it is captured, such as pressing Tab to
- * show keyboard focus or hovering a row. Positions are in dp, half the PNG's pixels. Each
+ * show keyboard focus or hovering a row. Positions are in dp, [scale] pixels each. Each
  * interaction settles before it returns.
  */
-internal class SnapshotScene(private val scene: ImageComposeScene) {
+internal class SnapshotScene(
+  private val scene: ImageComposeScene,
+  private val scale: Float = SnapshotHarness.SCALE,
+) {
   private val start = TimeSource.Monotonic.markNow()
 
   /**
@@ -233,11 +250,50 @@ internal class SnapshotScene(private val scene: ImageComposeScene) {
     settle(minimum = INTERACTION_SETTLE)
   }
 
+  /**
+   * Drags with the primary button from [fromX], [fromY] to [toX], [toY] in [steps] moves, as a
+   * finger pulls a sheet up. With [release] unset the button stays down, so what follows the
+   * finger stays where it was dragged to instead of settling.
+   */
+  suspend fun drag(
+    fromX: Dp,
+    fromY: Dp,
+    toX: Dp,
+    toY: Dp,
+    steps: Int = DRAG_STEPS,
+    release: Boolean = true,
+  ) {
+    val from = offset(fromX, fromY)
+    val to = offset(toX, toY)
+    val pressed = PointerButtons(isPrimaryPressed = true)
+    scene.sendPointerEvent(PointerEventType.Move, from)
+    scene.sendPointerEvent(
+      eventType = PointerEventType.Press,
+      position = from,
+      buttons = pressed,
+      button = PointerButton.Primary,
+    )
+    for (step in 1..steps) {
+      delay(FRAME)
+      val position = from + (to - from) * (step.toFloat() / steps)
+      scene.sendPointerEvent(PointerEventType.Move, position, buttons = pressed)
+      renderFrame()
+    }
+    if (release) {
+      scene.sendPointerEvent(
+        eventType = PointerEventType.Release,
+        position = to,
+        buttons = PointerButtons(),
+        button = PointerButton.Primary,
+      )
+    }
+    settle(minimum = INTERACTION_SETTLE)
+  }
+
   /** Renders the current frame. */
   fun renderFrame(): Image = scene.render(start.elapsedNow().inWholeNanoseconds)
 
-  private fun offset(x: Dp, y: Dp): Offset =
-    Offset(x.value * SnapshotHarness.SCALE, y.value * SnapshotHarness.SCALE)
+  private fun offset(x: Dp, y: Dp): Offset = Offset(x.value * scale, y.value * scale)
 
   private companion object {
     val FRAME = 16.milliseconds
@@ -245,6 +301,7 @@ internal class SnapshotScene(private val scene: ImageComposeScene) {
     val MAXIMUM_SETTLE = 4.seconds
     val INTERACTION_SETTLE = 150.milliseconds
     const val QUIET_FRAMES = 6
+    const val DRAG_STEPS = 12
   }
 }
 

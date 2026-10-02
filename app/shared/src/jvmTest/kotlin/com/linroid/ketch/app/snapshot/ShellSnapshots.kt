@@ -1,25 +1,14 @@
 package com.linroid.ketch.app.snapshot
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.input.KeyboardPlatform
-import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.theme.KetchDensity
-import com.linroid.ketch.app.theme.LocalWindowChrome
-import com.linroid.ketch.app.theme.WindowChrome
 import com.linroid.ketch.app.ui.shell.PhoneBottomBar
 import com.linroid.ketch.app.ui.shell.ShortcutSheet
 import com.linroid.ketch.app.ui.shell.shortcutGroups
@@ -214,22 +203,3 @@ private fun macSnapshot(name: String, size: SnapshotSize, theme: SnapshotTheme):
     runBlocking(SnapshotHarness.ui) { environment.close() }
   }
 }
-
-@Composable
-private fun MacWindow(controller: AppController) {
-  CompositionLocalProvider(LocalWindowChrome provides WindowChrome(top = 28.dp, leading = 78.dp)) {
-    Box(Modifier.fillMaxSize()) {
-      App(controller)
-      Canvas(Modifier.size(78.dp, 28.dp)) {
-        val radius = 6.dp.toPx()
-        TrafficLights.forEachIndexed { index, color ->
-          val center = Offset((14 + index * 20).dp.toPx(), 14.dp.toPx())
-          drawCircle(color, radius, center)
-          drawCircle(Color.Black.copy(alpha = 0.12f), radius, center, style = Stroke(1f))
-        }
-      }
-    }
-  }
-}
-
-private val TrafficLights = listOf(Color(0xFFFF5F57), Color(0xFFFEBC2E), Color(0xFF28C840))

@@ -118,7 +118,7 @@ private val DesktopHooksShown = object : DesktopHooks {
 
 /** The main window on macOS: the app filling it, under the title bar's traffic lights. */
 @Composable
-private fun MacWindow(controller: AppController) {
+internal fun MacWindow(controller: AppController) {
   CompositionLocalProvider(
     LocalWindowChrome provides WindowChrome(top = 28.dp, leading = 78.dp),
     LocalIntegrationStatus provides SampleIntegration,
@@ -169,7 +169,8 @@ private fun TrafficLights() {
   }
 }
 
-private val TrafficLightColors = listOf(Color(0xFFFF5F57), Color(0xFFFEBC2E), Color(0xFF28C840))
+/** The macOS title bar's close, minimize and zoom buttons. */
+internal val TrafficLightColors = listOf(Color(0xFFFF5F57), Color(0xFFFEBC2E), Color(0xFF28C840))
 
 /**
  * Renders [content] over the app of [data], as [appSnapshot] renders the app root, to
