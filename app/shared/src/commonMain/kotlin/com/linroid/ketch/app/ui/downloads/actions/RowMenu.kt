@@ -118,7 +118,6 @@ internal fun RowMenuAnchor(menu: RowMenuState, key: TaskKey, runner: RowActionRu
   Box(Modifier.absoluteOffset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }) {
     // Cancels the menu's gap below its anchor, so its corner sits at the pointer.
     RowMenu(
-      expanded = true,
       onDismissRequest = menu::close,
       rows = request.rows,
       runner = runner,
@@ -136,14 +135,13 @@ internal fun RowMenuAnchor(menu: RowMenuState, key: TaskKey, runner: RowActionRu
  */
 @Composable
 internal fun RowMenu(
-  expanded: Boolean,
   onDismissRequest: () -> Unit,
   rows: List<TaskRow>,
   runner: RowActionRunner,
   modifier: Modifier = Modifier,
   offset: DpOffset = DpOffset.Zero,
 ) {
-  if (!expanded || rows.isEmpty()) return
+  if (rows.isEmpty()) return
   val single = rows.singleOrNull()
   LaunchedEffect(single?.key) { single?.let(runner::checkFile) }
   val instances by runner.state.instances.collectAsState()
