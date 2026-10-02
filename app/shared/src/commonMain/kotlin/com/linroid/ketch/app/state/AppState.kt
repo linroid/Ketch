@@ -34,6 +34,7 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
@@ -646,8 +647,11 @@ class AppState(
         return@launch
       }
       val defaults = appSettings.ui.intake[entry.deviceId] ?: IntakePreferences()
-      val destination = defaults.folder?.let { folderDestination(entry, it) }
+      val folder = defaults.folder?.let { folderDestination(entry, it) }
       val requests = urls.mapNotNull { url ->
+        // Torrents write their own files, which an Android content:// folder cannot take.
+        val torrent = LinkKind.of(url).let { it == LinkKind.Magnet || it == LinkKind.TorrentFile }
+        val destination = folder?.takeUnless { torrent && it.value.startsWith("content://") }
         try {
           DownloadRequest(
             url = url,
