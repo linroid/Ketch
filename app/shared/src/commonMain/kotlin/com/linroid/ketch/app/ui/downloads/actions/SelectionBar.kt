@@ -44,14 +44,12 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
-import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.list.rowDivider
 import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.formatBytes
-import kotlinx.datetime.TimeZone
 
 /** What a [BarVerb] does when clicked. */
 internal enum class BarVerbKind {
@@ -182,14 +180,7 @@ internal fun SelectionBar(
   val devices = remember(instances, rows, presence) { sendTargets(instances, rows, presence) }
   val batch = remember(rows) { runner.batch(rows) }
   val (bar, more) = barVerbs(batch, devices.isNotEmpty(), runner.files?.revealLabel)
-  val context = RowMenuContext(
-    revealLabel = runner.files?.revealLabel,
-    devices = devices,
-    now = LocalClock.current.now(),
-    zone = TimeZone.currentSystemDefault(),
-    urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
-    send = rememberSendMode(),
-  )
+  val context = rowMenuContext(rows, runner, devices)
   if (compact) {
     CompactSelectionBar(rows, bar + more, runner, context, onClear, onSelectAll, modifier)
   } else {

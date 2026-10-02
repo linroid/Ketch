@@ -148,14 +148,7 @@ internal fun RowMenu(
   LaunchedEffect(single?.key) { single?.let(runner::checkFile) }
   val instances by runner.state.instances.collectAsState()
   val presence by runner.state.instanceManager.presence.collectAsState()
-  val context = RowMenuContext(
-    revealLabel = runner.files?.revealLabel,
-    devices = sendTargets(instances, rows, presence),
-    now = LocalClock.current.now(),
-    zone = TimeZone.currentSystemDefault(),
-    urgentVictim = urgentVictim(rows, runner),
-    send = rememberSendMode(),
-  )
+  val context = rowMenuContext(rows, runner, sendTargets(instances, rows, presence))
   val title = single?.name ?: downloads(rows.size)
   KetchMenu(
     expanded = true,
@@ -193,6 +186,21 @@ internal data class RowMenuContext(
   val zone: TimeZone = TimeZone.currentSystemDefault(),
   val urgentVictim: String? = null,
   val send: SendMode = SendMode(),
+)
+
+/** The [RowMenuContext] of a menu of [rows] open now, which can send them to [devices]. */
+@Composable
+internal fun rowMenuContext(
+  rows: List<TaskRow>,
+  runner: RowActionRunner,
+  devices: List<SendTarget>,
+): RowMenuContext = RowMenuContext(
+  revealLabel = runner.files?.revealLabel,
+  devices = devices,
+  now = LocalClock.current.now(),
+  zone = TimeZone.currentSystemDefault(),
+  urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
+  send = rememberSendMode(),
 )
 
 /**
