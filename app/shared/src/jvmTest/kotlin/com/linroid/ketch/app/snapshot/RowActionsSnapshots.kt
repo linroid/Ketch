@@ -77,6 +77,7 @@ import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.EncodedImageFormat
@@ -654,8 +655,9 @@ private fun previewRows(data: SampleData): List<TaskRow> = runBlocking(SnapshotH
   val environment = SampleEnvironment(data, SnapshotTheme.Light, DensityMode.Compact)
   try {
     environment.start()
-    val rows = environment.controller.state.taskList.view.value.rows
-    listOf(PHOTOS, LINUX, PODCAST).map { name -> rows.first { it.name == name } }
+    // The view follows the rows that start() waits for a moment later.
+    val view = environment.controller.state.taskList.view.first { it.rows.size == data.tasks.size }
+    listOf(PHOTOS, LINUX, PODCAST).map { name -> view.rows.first { it.name == name } }
   } finally {
     environment.close()
   }
