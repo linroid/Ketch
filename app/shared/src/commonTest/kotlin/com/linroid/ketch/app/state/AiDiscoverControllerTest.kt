@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.app.FakeAiProvider
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
@@ -21,32 +22,6 @@ class AiDiscoverControllerTest {
     confidence = 0.9f,
     description = "",
   )
-
-  /**
-   * Answers every search with [candidates], or throws [failure], reporting [steps] first; waits
-   * for [gate].
-   */
-  private class FakeProvider(
-    private val steps: List<DiscoveryStep> = emptyList(),
-    private val candidates: List<AiCandidate> = emptyList(),
-    private val gate: CompletableDeferred<Unit>? = null,
-    private val failure: Exception? = null,
-  ) : AiDiscoveryProvider {
-    val requests = mutableListOf<AiDiscoverRequest>()
-
-    override suspend fun discover(
-      request: AiDiscoverRequest,
-      onStep: (DiscoveryStep) -> Unit,
-    ): AiDiscoverResponse {
-      requests += request
-      steps.forEach(onStep)
-      gate?.await()
-      failure?.let { throw it }
-      return AiDiscoverResponse(request.query, candidates)
-    }
-
-    override suspend fun verify(): String = "ok"
-  }
 
   private fun settingsWith(provider: AiDiscoveryProvider): AiSettingsController =
     AiSettingsController(factory = { provider }).apply { save(AiSettings(enabled = true)) }
@@ -104,7 +79,7 @@ class AiDiscoverControllerTest {
 
   @Test
   fun discover_request_fillsTheDraftAndSearches() = runTest {
-    val provider = FakeProvider(candidates = listOf(candidate("blender.dmg")))
+    val provider = FakeAiProvider(candidates = listOf(candidate("blender.dmg")))
     val controller = AiDiscoverController(settingsWith(provider), backgroundScope)
 
     controller.discover(DiscoverRequest("Blender for Apple silicon", listOf("blender.org")))
@@ -121,7 +96,7 @@ class AiDiscoverControllerTest {
     val gate = CompletableDeferred<Unit>()
     val steps = listOf(DiscoveryStep("Understanding"), DiscoveryStep("Plan", "Search twice"))
     val controller = AiDiscoverController(
-      settingsWith(FakeProvider(steps = steps, gate = gate)),
+      settingsWith(FakeAiProvider(steps = steps, gate = gate)),
       backgroundScope,
     )
 
@@ -138,7 +113,7 @@ class AiDiscoverControllerTest {
 
   @Test
   fun discover_notSetUp_waitsUntilSetUpThenRuns() = runTest {
-    val provider = FakeProvider(candidates = listOf(candidate("ubuntu.iso")))
+    val provider = FakeAiProvider(candidates = listOf(candidate("ubuntu.iso")))
     val settings = AiSettingsController(factory = { if (it.enabled) provider else null })
     val controller = AiDiscoverController(settings, backgroundScope)
 
@@ -160,7 +135,7 @@ class AiDiscoverControllerTest {
     val steps = listOf(DiscoveryStep("Searching"))
     val message = "The AI provider rejected the API token (HTTP 401)"
     val controller = AiDiscoverController(
-      settingsWith(FakeProvider(steps = steps, failure = IllegalStateException(message))),
+      settingsWith(FakeAiProvider(steps = steps, failure = IllegalStateException(message))),
       backgroundScope,
     )
 
@@ -185,7 +160,7 @@ class AiDiscoverControllerTest {
   fun stop_runningSearch_returnsToIdleAndKeepsTheSteps() = runTest {
     val steps = listOf(DiscoveryStep("Searching"))
     val controller = AiDiscoverController(
-      settingsWith(FakeProvider(steps = steps, gate = CompletableDeferred())),
+      settingsWith(FakeAiProvider(steps = steps, gate = CompletableDeferred())),
       backgroundScope,
     )
     controller.discover("blender", sites = "")
@@ -200,7 +175,7 @@ class AiDiscoverControllerTest {
 
   @Test
   fun retry_fieldClearedAfterTheSearch_runsTheSubmittedSearchAgain() = runTest {
-    val provider = FakeProvider()
+    val provider = FakeAiProvider()
     val controller = AiDiscoverController(settingsWith(provider), backgroundScope)
     controller.draft.query = "blender"
     controller.search()
@@ -216,7 +191,7 @@ class AiDiscoverControllerTest {
 
   @Test
   fun search_blankQuery_doesNothing() = runTest {
-    val provider = FakeProvider()
+    val provider = FakeAiProvider()
     val controller = AiDiscoverController(settingsWith(provider), backgroundScope)
     controller.draft.query = "   "
 

@@ -1,26 +1,21 @@
 package com.linroid.ketch.app.state
 
-import com.linroid.ketch.api.Destination
-import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadConfig
-import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.testStatus
+import com.linroid.ketch.app.testSystem
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -52,28 +47,11 @@ class PulseStateTest {
     DownloadState.Canceled
   )
 
-  private class FakeTask(
-    override val taskId: String,
+  private fun fakeTask(
+    id: String,
     state: DownloadState,
-    override val request: DownloadRequest = DownloadRequest(url = "https://example.com/$taskId"),
-  ) : DownloadTask {
-    override val requestState: StateFlow<DownloadRequest> = MutableStateFlow(request)
-    override val createdAt: Instant = Instant.fromEpochMilliseconds(0)
-    override val state = MutableStateFlow(state)
-    override val segments: StateFlow<List<Segment>> = MutableStateFlow(emptyList())
-
-    override suspend fun pause() {}
-    override suspend fun resume(destination: Destination?) {}
-    override suspend fun cancel() {}
-    override suspend fun setSpeedLimit(limit: SpeedLimit) {}
-    override suspend fun setPriority(priority: DownloadPriority) {}
-    override suspend fun setConnections(connections: Int) {}
-    override suspend fun reschedule(
-      schedule: DownloadSchedule,
-      conditions: List<DownloadCondition>,
-    ) {}
-    override suspend fun remove(deleteFiles: Boolean) {}
-  }
+    request: DownloadRequest = DownloadRequest(url = "https://example.com/$id"),
+  ) = ListTestTask(id, state, request, Instant.fromEpochMilliseconds(0))
 
   private class FakeDevice(
     val id: String,
@@ -93,22 +71,9 @@ class PulseStateTest {
       config = config,
       status = {
         statusCalls++
-        KetchStatus(
+        testStatus(
           name = id,
-          version = "test",
-          revision = "test",
-          uptime = 0,
-          config = DownloadConfig(),
-          system = SystemInfo(
-            os = "test",
-            arch = "test",
-            separator = "/",
-            javaVersion = "N/A",
-            availableProcessors = 1,
-            maxMemory = 0,
-            totalMemory = 0,
-            freeMemory = 0,
-            downloadDirectory = "/downloads",
+          system = testSystem(
             totalSpace = usableSpace * 2,
             freeSpace = usableSpace,
             usableSpace = usableSpace,
@@ -170,7 +135,7 @@ class PulseStateTest {
 
   @Test
   fun state_tasksInEveryState_countsMatchStatusFilter() = runTest {
-    val tasks = allStates.mapIndexed { index, state -> FakeTask("t$index", state) }
+    val tasks = allStates.mapIndexed { index, state -> fakeTask("t$index", state) }
     val model = model(FakeDevice("local", tasks))
 
     val counts = model.state.value.counts
@@ -182,7 +147,7 @@ class PulseStateTest {
 
   @Test
   fun state_stateChange_updatesCounts() = runTest {
-    val task = FakeTask("a", DownloadState.Queued)
+    val task = fakeTask("a", DownloadState.Queued)
     val model = model(FakeDevice("local", listOf(task)))
 
     task.state.value = downloading(0, 1000, 10)
@@ -194,8 +159,8 @@ class PulseStateTest {
 
   @Test
   fun state_downloadingTasks_sumsSpeedAcrossDevices() = runTest {
-    val local = FakeDevice("local", listOf(FakeTask("a", downloading(0, 1000, 100))))
-    val nas = FakeDevice("nas", listOf(FakeTask("b", downloading(0, 1000, 200))))
+    val local = FakeDevice("local", listOf(fakeTask("a", downloading(0, 1000, 100))))
+    val nas = FakeDevice("nas", listOf(fakeTask("b", downloading(0, 1000, 200))))
     nas.health.value = DeviceHealth.Live
     val model = model(local, nas)
 
@@ -205,7 +170,7 @@ class PulseStateTest {
 
   @Test
   fun state_offlineDevice_reportsNoSpeed() = runTest {
-    val nas = FakeDevice("nas", listOf(FakeTask("b", downloading(0, 1000, 200))))
+    val nas = FakeDevice("nas", listOf(fakeTask("b", downloading(0, 1000, 200))))
     nas.health.value = DeviceHealth.Offline()
     val model = model(nas)
 
@@ -215,8 +180,8 @@ class PulseStateTest {
 
   @Test
   fun state_deviceScope_onlySumsThatDevice() = runTest {
-    val local = FakeDevice("local", listOf(FakeTask("a", downloading(0, 1000, 100))))
-    val nas = FakeDevice("nas", listOf(FakeTask("b", downloading(0, 1000, 200))))
+    val local = FakeDevice("local", listOf(fakeTask("a", downloading(0, 1000, 100))))
+    val nas = FakeDevice("nas", listOf(fakeTask("b", downloading(0, 1000, 200))))
     val model = model(local, nas, scope = PulseScope.Device("nas"))
 
     assertEquals(listOf("nas"), model.state.value.devices.map { it.deviceId })
@@ -246,7 +211,7 @@ class PulseStateTest {
 
   @Test
   fun history_whileDownloading_keepsLastSixtySamples() = runTest {
-    val task = FakeTask("a", downloading(0, 1000, 100))
+    val task = fakeTask("a", downloading(0, 1000, 100))
     val model = model(FakeDevice("local", listOf(task)))
 
     advanceTimeBy(70.seconds)
@@ -259,7 +224,7 @@ class PulseStateTest {
 
   @Test
   fun history_idle_staysEmpty() = runTest {
-    val model = model(FakeDevice("local", listOf(FakeTask("a", DownloadState.Queued))))
+    val model = model(FakeDevice("local", listOf(fakeTask("a", DownloadState.Queued))))
 
     advanceTimeBy(10.seconds)
     runCurrent()
@@ -269,7 +234,7 @@ class PulseStateTest {
 
   @Test
   fun history_downloadsStop_recordsZeros() = runTest {
-    val task = FakeTask("a", downloading(0, 1000, 100))
+    val task = fakeTask("a", downloading(0, 1000, 100))
     val model = model(FakeDevice("local", listOf(task)))
     advanceTimeBy(3.seconds)
     runCurrent()
@@ -283,7 +248,7 @@ class PulseStateTest {
 
   @Test
   fun disk_polledAtStartPeriodicallyAndAfterCompletion() = runTest {
-    val task = FakeTask("a", downloading(0, 1000, 100))
+    val task = fakeTask("a", downloading(0, 1000, 100))
     val local = FakeDevice("local", listOf(task), usableSpace = 412 * gb)
     val model = model(local)
     assertEquals(1, local.statusCalls)
@@ -323,7 +288,7 @@ class PulseStateTest {
       maxSegments = 4,
     )
     val request = DownloadRequest(url = resolved.url, resolvedSource = resolved)
-    val local = FakeDevice("local", listOf(FakeTask("a", DownloadState.Queued, request)))
+    val local = FakeDevice("local", listOf(fakeTask("a", DownloadState.Queued, request)))
     val model = model(local)
 
     assertEquals(1, local.statusCalls)
@@ -334,8 +299,8 @@ class PulseStateTest {
 
   @Test
   fun devices_deviceScope_listsEveryDevice() = runTest {
-    val local = FakeDevice("local", listOf(FakeTask("a", downloading(0, 1000, 100))))
-    val nas = FakeDevice("nas", listOf(FakeTask("b", downloading(0, 1000, 200))))
+    val local = FakeDevice("local", listOf(fakeTask("a", downloading(0, 1000, 100))))
+    val nas = FakeDevice("nas", listOf(fakeTask("b", downloading(0, 1000, 200))))
     val model = model(local, nas, scope = PulseScope.Device("nas"))
 
     assertEquals(listOf("local", "nas"), model.devices.value.map { it.deviceId })
@@ -353,7 +318,7 @@ class PulseStateTest {
       maxSegments = 4,
     )
     val request = DownloadRequest(url = resolved.url, resolvedSource = resolved)
-    val task = FakeTask("a", DownloadState.Queued, request)
+    val task = fakeTask("a", DownloadState.Queued, request)
     val model = model(FakeDevice("local", listOf(task), usableSpace = gb))
 
     assertEquals(2 * gb, model.state.value.devices.single().pendingBytes)

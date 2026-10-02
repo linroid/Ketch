@@ -8,12 +8,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class FakeMdnsDiscoverer(
+private class FakeMdnsDiscoverer(
   private val results: List<DiscoveredServer> = emptyList(),
 ) : MdnsDiscoverer {
   var lastServiceType: String? = null
-    private set
-  var lastTimeoutMs: Long? = null
     private set
   var discoverCallCount = 0
     private set
@@ -24,12 +22,17 @@ class FakeMdnsDiscoverer(
   ): List<DiscoveredServer> {
     discoverCallCount++
     lastServiceType = serviceType
-    lastTimeoutMs = timeoutMs
     return results
   }
 }
 
 class LanServerDiscoveryTest {
+
+  private fun server(name: String, host: String, port: Int = 8642, tokenRequired: Boolean = false) =
+    DiscoveredServer(name, host, port, tokenRequired)
+
+  private suspend fun discover(vararg servers: DiscoveredServer): List<DiscoveredServer> =
+    LanServerDiscovery(FakeMdnsDiscoverer(servers.toList())).discover()
 
   @Test
   fun preferredAddress_linkLocalIpv6First_picksTheIpv4Address() {
@@ -52,8 +55,7 @@ class LanServerDiscoveryTest {
   @Test
   fun `empty discovery returns empty list`() = runTest {
     val fake = FakeMdnsDiscoverer()
-    val discovery = LanServerDiscovery(fake)
-    val result = discovery.discover()
+    val result = LanServerDiscovery(fake).discover()
     assertTrue(result.isEmpty())
     assertEquals(1, fake.discoverCallCount)
   }
@@ -61,163 +63,51 @@ class LanServerDiscoveryTest {
   @Test
   fun `passes correct service type`() = runTest {
     val fake = FakeMdnsDiscoverer()
-    val discovery = LanServerDiscovery(fake)
-    discovery.discover()
+    LanServerDiscovery(fake).discover()
     assertEquals(ServerConfig.MDNS_SERVICE_TYPE, fake.lastServiceType)
   }
 
   @Test
   fun `single server passes through`() = runTest {
-    val server = DiscoveredServer(
-      name = "Ketch",
-      host = "192.168.1.5",
-      port = 8642,
-      tokenRequired = false,
-    )
-    val fake = FakeMdnsDiscoverer(listOf(server))
-    val discovery = LanServerDiscovery(fake)
-    val result = discovery.discover()
-    assertEquals(1, result.size)
-    assertEquals(server, result[0])
+    val server = server("Ketch", "192.168.1.5")
+    assertEquals(listOf(server), discover(server))
   }
 
   @Test
-  fun `duplicates with same host and port are deduplicated`() =
-    runTest {
-      val servers = listOf(
-        DiscoveredServer(
-          name = "Ketch A",
-          host = "192.168.1.5",
-          port = 8642,
-          tokenRequired = false,
-        ),
-        DiscoveredServer(
-          name = "Ketch B",
-          host = "192.168.1.5",
-          port = 8642,
-          tokenRequired = true,
-        ),
-      )
-      val fake = FakeMdnsDiscoverer(servers)
-      val discovery = LanServerDiscovery(fake)
-      val result = discovery.discover()
-      assertEquals(1, result.size)
-    }
-
-  @Test
-  fun `different ports on same host are not deduplicated`() =
-    runTest {
-      val servers = listOf(
-        DiscoveredServer(
-          name = "Ketch A",
-          host = "192.168.1.5",
-          port = 8642,
-          tokenRequired = false,
-        ),
-        DiscoveredServer(
-          name = "Ketch B",
-          host = "192.168.1.5",
-          port = 9000,
-          tokenRequired = false,
-        ),
-      )
-      val fake = FakeMdnsDiscoverer(servers)
-      val discovery = LanServerDiscovery(fake)
-      val result = discovery.discover()
-      assertEquals(2, result.size)
-    }
+  fun `different ports on same host are not deduplicated`() = runTest {
+    val result = discover(server("Ketch A", "192.168.1.5"), server("Ketch B", "192.168.1.5", 9000))
+    assertEquals(2, result.size)
+  }
 
   @Test
   fun `results are sorted by host`() = runTest {
-    val servers = listOf(
-      DiscoveredServer(
-        name = "C",
-        host = "192.168.1.30",
-        port = 8642,
-        tokenRequired = false,
-      ),
-      DiscoveredServer(
-        name = "A",
-        host = "192.168.1.10",
-        port = 8642,
-        tokenRequired = false,
-      ),
-      DiscoveredServer(
-        name = "B",
-        host = "192.168.1.20",
-        port = 8642,
-        tokenRequired = false,
-      ),
+    val result = discover(
+      server("C", "192.168.1.30"),
+      server("A", "192.168.1.10"),
+      server("B", "192.168.1.20"),
     )
-    val fake = FakeMdnsDiscoverer(servers)
-    val discovery = LanServerDiscovery(fake)
-    val result = discovery.discover()
-    assertEquals(3, result.size)
-    assertEquals("192.168.1.10", result[0].host)
-    assertEquals("192.168.1.20", result[1].host)
-    assertEquals("192.168.1.30", result[2].host)
+    assertEquals(listOf("192.168.1.10", "192.168.1.20", "192.168.1.30"), result.map { it.host })
   }
 
   @Test
   fun `deduplication keeps first occurrence`() = runTest {
-    val servers = listOf(
-      DiscoveredServer(
-        name = "First",
-        host = "10.0.0.1",
-        port = 8642,
-        tokenRequired = false,
-      ),
-      DiscoveredServer(
-        name = "Second",
-        host = "10.0.0.1",
-        port = 8642,
-        tokenRequired = true,
-      ),
+    val result = discover(
+      server("First", "10.0.0.1"),
+      server("Second", "10.0.0.1", tokenRequired = true),
     )
-    val fake = FakeMdnsDiscoverer(servers)
-    val discovery = LanServerDiscovery(fake)
-    val result = discovery.discover()
-    assertEquals(1, result.size)
-    assertEquals("First", result[0].name)
+    assertEquals(listOf("First"), result.map { it.name })
   }
 
   @Test
   fun `mixed duplicates and unique servers`() = runTest {
-    val servers = listOf(
-      DiscoveredServer(
-        name = "A",
-        host = "10.0.0.2",
-        port = 8642,
-        tokenRequired = false,
-      ),
-      DiscoveredServer(
-        name = "B",
-        host = "10.0.0.1",
-        port = 8642,
-        tokenRequired = false,
-      ),
-      DiscoveredServer(
-        name = "A dup",
-        host = "10.0.0.2",
-        port = 8642,
-        tokenRequired = true,
-      ),
-      DiscoveredServer(
-        name = "C",
-        host = "10.0.0.3",
-        port = 9000,
-        tokenRequired = false,
-      ),
+    val result = discover(
+      server("A", "10.0.0.2"),
+      server("B", "10.0.0.1"),
+      server("A dup", "10.0.0.2", tokenRequired = true),
+      server("C", "10.0.0.3", 9000),
     )
-    val fake = FakeMdnsDiscoverer(servers)
-    val discovery = LanServerDiscovery(fake)
-    val result = discovery.discover()
-    assertEquals(3, result.size)
-    // Sorted by host
-    assertEquals("10.0.0.1", result[0].host)
-    assertEquals("10.0.0.2", result[1].host)
-    assertEquals("10.0.0.3", result[2].host)
-    // Dedup kept first occurrence
+    // Sorted by host, keeping the first of the duplicates.
+    assertEquals(listOf("10.0.0.1", "10.0.0.2", "10.0.0.3"), result.map { it.host })
     assertEquals("A", result[1].name)
   }
 }

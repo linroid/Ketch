@@ -1,11 +1,9 @@
 package com.linroid.ketch.app.ui.devices
 
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
@@ -15,6 +13,8 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
+import com.linroid.ketch.app.testStatus
+import com.linroid.ketch.app.testSystem
 import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ServerConfig
@@ -39,25 +39,16 @@ class DeviceTextTest {
   )
 
   private fun status(os: String = "Linux", arch: String = "amd64", uptime: Long = 3600) =
-    KetchStatus(
+    testStatus(
       name = "NAS-Basement",
       version = "0.0.1",
-      revision = "test",
       uptime = uptime,
-      config = DownloadConfig(),
-      system = SystemInfo(
+      system = testSystem(
         os = os,
         arch = arch,
-        separator = "/",
         javaVersion = "21",
         availableProcessors = 4,
-        maxMemory = 0,
-        totalMemory = 0,
-        freeMemory = 0,
         downloadDirectory = "/volume1/downloads",
-        totalSpace = 0,
-        freeSpace = 0,
-        usableSpace = 0,
       ),
     )
 

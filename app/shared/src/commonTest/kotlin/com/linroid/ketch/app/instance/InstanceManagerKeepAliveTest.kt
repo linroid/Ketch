@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.app.FakeInstanceFactory
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.FakeRemote
+import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListFixtures
@@ -30,13 +31,6 @@ import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InstanceManagerKeepAliveTest {
-
-  private class Store(var config: KetchConfig = KetchConfig()) : ConfigStore {
-    override fun load(): KetchConfig = config
-    override fun save(config: KetchConfig) {
-      this.config = config
-    }
-  }
 
   private class Engine : KetchApi by FakeKetchApi("Core") {
     var starts = 0
@@ -202,7 +196,7 @@ class InstanceManagerKeepAliveTest {
   @Test
   fun setWatched_offForInactiveDevice_disconnectsIt() = runTest {
     val fakes = FakeInstanceFactory()
-    val store = Store(KetchConfig(remotes = listOf(nas, den)))
+    val store = RecordingConfigStore(KetchConfig(remotes = listOf(nas, den)))
     val manager = manager(fakes, store = store)
     val client = manager.remote("den-pc").instance as FakeRemote
 
@@ -218,7 +212,7 @@ class InstanceManagerKeepAliveTest {
   @Test
   fun reconnectWith_newToken_startsFreshClientWithToken() = runTest {
     val fakes = FakeInstanceFactory()
-    val store = Store()
+    val store = RecordingConfigStore()
     val manager = manager(fakes, store = store)
     manager.switchTo(manager.remote("nas.local"))
     val old = manager.remote("nas.local")
@@ -274,7 +268,7 @@ class InstanceManagerKeepAliveTest {
   @Test
   fun connect_unnamedDevice_adoptsTheNameItAnnounces() = runTest {
     val fakes = FakeInstanceFactory().apply { announcedName = "NAS-Basement" }
-    val store = Store()
+    val store = RecordingConfigStore()
     val manager = manager(fakes, listOf(nas), store)
 
     assertEquals("NAS-Basement", manager.remote("nas.local").label)
@@ -320,7 +314,7 @@ class InstanceManagerKeepAliveTest {
   @Test
   fun init_lastDeviceSaved_showsItAgain() = runTest {
     val fakes = FakeInstanceFactory()
-    val store = Store(KetchConfig(ui = UiPreferences(lastDeviceId = "den-pc:8642")))
+    val store = RecordingConfigStore(KetchConfig(ui = UiPreferences(lastDeviceId = "den-pc:8642")))
 
     val manager = manager(fakes, store = store)
 

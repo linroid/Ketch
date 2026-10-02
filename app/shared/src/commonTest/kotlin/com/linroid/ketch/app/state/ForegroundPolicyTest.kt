@@ -1,16 +1,11 @@
 package com.linroid.ketch.app.state
 
-import com.linroid.ketch.api.Destination
-import com.linroid.ketch.api.DownloadCondition
-import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.Segment
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.config.ServerConfig
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -79,7 +74,7 @@ class ForegroundPolicyTest {
 
   @Test
   fun observe_lastTaskCompletes_releasesWithinOneSecond() = runTest {
-    val task = FakeTask(downloading)
+    val task = fakeTask(downloading)
     val emitted = observe(MutableStateFlow(listOf(task)), MutableStateFlow(stopped))
     advanceTimeBy(ForegroundPolicy.samplePeriod)
     runCurrent()
@@ -100,7 +95,7 @@ class ForegroundPolicyTest {
     runCurrent()
     assertFalse(emitted.last().isRequired)
 
-    val task = FakeTask(DownloadState.Queued)
+    val task = fakeTask(DownloadState.Queued)
     tasks.value = listOf(task)
     advanceTimeBy(ForegroundPolicy.samplePeriod)
     runCurrent()
@@ -114,7 +109,7 @@ class ForegroundPolicyTest {
 
   @Test
   fun observe_lastTaskRemoved_releases() = runTest {
-    val tasks = MutableStateFlow<List<DownloadTask>>(listOf(FakeTask(downloading)))
+    val tasks = MutableStateFlow<List<DownloadTask>>(listOf(fakeTask(downloading)))
     val emitted = observe(tasks, MutableStateFlow(stopped))
     advanceTimeBy(ForegroundPolicy.samplePeriod)
     runCurrent()
@@ -143,7 +138,7 @@ class ForegroundPolicyTest {
 
   @Test
   fun observe_rapidStateChanges_emitsAtMostOncePerPeriod() = runTest {
-    val task = FakeTask(DownloadState.Queued)
+    val task = fakeTask(DownloadState.Queued)
     val emitted = observe(MutableStateFlow(listOf(task)), MutableStateFlow(stopped))
     repeat(30) { step ->
       task.state.value = if (step % 2 == 0) downloading else DownloadState.Queued
@@ -165,25 +160,10 @@ class ForegroundPolicyTest {
     return emitted
   }
 
-  private class FakeTask(initial: DownloadState) : DownloadTask {
-    override val taskId = "task"
-    override val request = DownloadRequest(url = "https://example.com/file.iso")
-    override val requestState = MutableStateFlow(request)
-    override val createdAt = Instant.fromEpochMilliseconds(0)
-    override val state = MutableStateFlow(initial)
-    override val segments = MutableStateFlow(emptyList<Segment>())
-
-    override suspend fun pause() {}
-    override suspend fun resume(destination: Destination?) {}
-    override suspend fun cancel() {}
-    override suspend fun setSpeedLimit(limit: SpeedLimit) {}
-    override suspend fun setPriority(priority: DownloadPriority) {}
-    override suspend fun setConnections(connections: Int) {}
-    override suspend fun reschedule(
-      schedule: DownloadSchedule,
-      conditions: List<DownloadCondition>,
-    ) {}
-
-    override suspend fun remove(deleteFiles: Boolean) {}
-  }
+  private fun fakeTask(state: DownloadState) = ListTestTask(
+    "task",
+    state,
+    DownloadRequest(url = "https://example.com/file.iso"),
+    Instant.fromEpochMilliseconds(0)
+  )
 }

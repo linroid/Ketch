@@ -1,7 +1,7 @@
 package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.app.FakeKetchApi
-import com.linroid.ketch.config.ConfigStore
+import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.ServerConfig
 import kotlin.test.Test
@@ -9,13 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class InstanceManagerServerTest {
-
-  private class Store(var config: KetchConfig) : ConfigStore {
-    override fun load(): KetchConfig = config
-    override fun save(config: KetchConfig) {
-      this.config = config
-    }
-  }
 
   private fun manager(
     server: ServerConfig,
@@ -30,7 +23,7 @@ class InstanceManagerServerTest {
         }
       },
     ),
-    configStore = Store(KetchConfig(server = server)),
+    configStore = RecordingConfigStore(KetchConfig(server = server)),
   )
 
   @Test

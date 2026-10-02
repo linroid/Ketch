@@ -8,7 +8,6 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -17,6 +16,7 @@ import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.SpeedScheduler
+import com.linroid.ketch.app.testStatus
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedRule
@@ -49,18 +49,7 @@ class SpeedSettingsModelTest {
     override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
       throw UnsupportedOperationException()
 
-    override suspend fun status(): KetchStatus = KetchStatus(
-      name = backendLabel,
-      version = "test",
-      revision = "test",
-      uptime = 0,
-      config = config,
-      system = SystemInfo(
-        os = "test", arch = "test", separator = "/", javaVersion = "N/A",
-        availableProcessors = 1, maxMemory = 0, totalMemory = 0, freeMemory = 0,
-        downloadDirectory = "/downloads", totalSpace = 0, freeSpace = 0, usableSpace = 0,
-      ),
-    )
+    override suspend fun status(): KetchStatus = testStatus(backendLabel, config)
 
     override suspend fun updateConfig(config: DownloadConfig) {
       if (refuse) throw IllegalStateException("The engine said no")

@@ -7,7 +7,6 @@ import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.config.AccentColor
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.CloseAction
-import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.DesktopSettings
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.LlmProvider
@@ -20,16 +19,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-
-internal class RecordingConfigStore(
-  private var config: KetchConfig = KetchConfig(),
-) : ConfigStore {
-  override fun load(): KetchConfig = config
-
-  override fun save(config: KetchConfig) {
-    this.config = config
-  }
-}
 
 class AppSettingsControllerTest {
 
