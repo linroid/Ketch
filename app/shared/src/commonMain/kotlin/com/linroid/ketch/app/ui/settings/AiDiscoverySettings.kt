@@ -104,7 +104,7 @@ fun AiDiscoverySettings(
         SettingsRow(
           title = "API key",
           description = if (tokenFromEnvironment) {
-            "Using the key from the environment. Enter one here to override it."
+            "Using the key from the environment. One here overrides it."
           } else {
             "Stored as plain text in this device's config file."
           },
@@ -123,9 +123,9 @@ fun AiDiscoverySettings(
       SettingsRow(
         title = "Model",
         description = if (llm.provider.defaultModel.isBlank()) {
-          "Required. Use the id your endpoint expects; it must support tools."
+          "Required. Use a model with tool support."
         } else {
-          "Leave empty for ${llm.provider.defaultModel}. Any model with tool support works."
+          "Any model with tool support works."
         },
         enabled = supported,
       ) {
@@ -161,10 +161,11 @@ fun AiDiscoverySettings(
       }
       SettingsRow(
         title = if (llm.provider.requiresBaseUrl) "Endpoint" else "Endpoint (optional)",
+        // The field shows the default endpoint while it is empty.
         description = if (llm.provider.requiresBaseUrl) {
           "Any OpenAI-compatible endpoint, with or without /v1."
         } else {
-          "Leave empty for ${llm.provider.defaultBaseUrl}."
+          null
         },
         enabled = supported,
       ) {
@@ -212,8 +213,7 @@ fun AiDiscoverySettings(
 
     SettingsGroup(
       title = "Web search",
-      footer = "Without a search provider the agent can only read pages you point it " +
-        "at, so results stay thin.",
+      footer = "Without a search provider, Discover only reads the pages you give it.",
     ) {
       SettingsSelectRow(
         title = "Search provider",
@@ -269,11 +269,10 @@ private fun discoveryStatus(
   return when {
     !supported -> "Runs in the desktop and Android apps." to colors.textTertiary
     !effective.llm.isComplete ->
-      "Choose a provider and add its key below to use discovery." to colors.status.paused.color
+      "Choose a provider and add its key below." to colors.status.paused.color
     !effective.search.isComplete ->
       "Add the missing web search credentials." to colors.status.paused.color
-    !settings.enabled -> "Off. Discover finds downloads for you once this is on." to
-      colors.textSecondary
+    !settings.enabled -> "Lets Discover find downloads for you." to colors.textSecondary
     else -> "Ready · ${effective.llm.provider.label} · ${effective.llm.effectiveModel}" to
       colors.status.completed.color
   }
@@ -328,27 +327,17 @@ private fun tokenPlaceholder(provider: LlmProvider): String =
   }
 
 private fun providerHint(provider: LlmProvider): String = when (provider) {
-  LlmProvider.OpenAi ->
-    "Create a key under API keys at platform.openai.com."
-  LlmProvider.Anthropic ->
-    "Create a key under API keys at console.anthropic.com."
-  LlmProvider.Google ->
-    "Create a key in Google AI Studio at aistudio.google.com/apikey."
-  LlmProvider.Ollama ->
-    "No key needed. Run Ollama locally and pull a model first, " +
-      "for example: ollama pull ${LlmProvider.Ollama.defaultModel}."
-  LlmProvider.OpenAiCompatible ->
-    "For OpenRouter, DeepSeek, LM Studio, vLLM and similar servers — " +
-      "use their endpoint and key."
+  LlmProvider.OpenAi -> "Get a key at platform.openai.com."
+  LlmProvider.Anthropic -> "Get a key at console.anthropic.com."
+  LlmProvider.Google -> "Get a key at aistudio.google.com/apikey."
+  LlmProvider.Ollama -> "Pull a model first: ollama pull ${LlmProvider.Ollama.defaultModel}"
+  LlmProvider.OpenAiCompatible -> "OpenRouter, DeepSeek, LM Studio, vLLM and similar servers."
 }
 
 private fun searchProviderHint(provider: SearchProvider): String? = when (provider) {
   SearchProvider.None -> null
-  SearchProvider.Brave ->
-    "Create a subscription token at api-dashboard.search.brave.com."
-  SearchProvider.Google ->
-    "Google no longer accepts new Custom Search JSON API customers, " +
-      "and the API stops working on January 1, 2027."
+  SearchProvider.Brave -> "Get a token at api-dashboard.search.brave.com."
+  SearchProvider.Google -> "Closed to new customers; it stops working on January 1, 2027."
 }
 
 /**

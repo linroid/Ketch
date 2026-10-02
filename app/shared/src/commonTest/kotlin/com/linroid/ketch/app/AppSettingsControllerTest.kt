@@ -119,10 +119,10 @@ class AppSettingsControllerTest {
     val controller = AppSettingsController(store)
     assertEquals("nas.local:8642", controller.ui.lastDeviceId)
 
-    controller.saveUi { it.copy(inspectorOpen = false) }
+    controller.saveUi { it.copy(sidebarCollapsed = true) }
 
     val saved = store.load().ui
-    assertEquals(false, saved.inspectorOpen)
+    assertEquals(true, saved.sidebarCollapsed)
     assertEquals("nas.local:8642", saved.lastDeviceId)
     assertEquals(400, saved.inspectorWidth)
     assertEquals(saved, controller.ui)

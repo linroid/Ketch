@@ -439,7 +439,13 @@ class DesktopTrayModelTest {
   fun menuBar_noSelection_disablesTaskActions() {
     val downloads = menuBar(context()).menu("Downloads")
 
-    for (command in listOf(KetchCommands.Open, KetchCommands.CopyLink, KetchCommands.Remove)) {
+    val actions = listOf(
+      KetchCommands.Open,
+      KetchCommands.ShowDetails,
+      KetchCommands.CopyLink,
+      KetchCommands.Remove
+    )
+    for (command in actions) {
       assertFalse(downloads.item(command).enabled, command.id)
     }
   }
@@ -819,7 +825,6 @@ class DesktopTrayModelTest {
     activeDevice = activeDevice,
     selection = selection,
     undoLabel = undoLabel,
-    inspectorOpen = true,
     slowLane = slowLane,
     allDevices = allDevices,
     platform = KeyboardPlatform.Mac,

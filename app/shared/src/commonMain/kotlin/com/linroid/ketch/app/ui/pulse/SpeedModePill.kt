@@ -27,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -170,7 +169,8 @@ internal fun SpeedModePillContent(
   val shape = KetchTheme.shapes.full
   val limitedInk = colors.status.paused.color
   val fill by animateColorAsState(
-    targetValue = if (view.limited) colors.status.paused.soft else Color.Transparent,
+    // Fades by alpha alone: Color.Transparent is transparent black, which flashes grey.
+    targetValue = colors.status.paused.soft.copy(alpha = if (view.limited) 1f else 0f),
     animationSpec = tween(KetchTheme.motion.short),
   )
   val ink = if (view.limited) limitedInk else colors.textSecondary

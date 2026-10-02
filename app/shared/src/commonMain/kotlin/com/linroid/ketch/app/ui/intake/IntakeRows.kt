@@ -270,7 +270,7 @@ internal fun TorrentWaiting(actions: IntakeActions, entry: IntakeEntry) {
     )
     Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
       KetchButton(
-        text = "Add all files now",
+        text = "Download all files now",
         onClick = {
           entry.addAnyway = true
           actions.submit()

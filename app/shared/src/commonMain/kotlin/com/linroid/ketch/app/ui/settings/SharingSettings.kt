@@ -77,8 +77,7 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
   when {
     device !is EmbeddedInstance -> {
       SettingsNotice(
-        text = "Sharing of ${device.label} is set up on that device, in its own Ketch app or " +
-          "with ketch server.",
+        text = "Set up sharing on ${device.label} itself, in Ketch or with ketch server.",
         tone = NoticeTone.Info,
       )
       return
@@ -127,7 +126,7 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
     // Starting with Ketch only matters at launch, so it never calls for a restart.
     if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
       SettingsNotice(
-        text = "Restart sharing to apply your changes. Connected devices reconnect on their own.",
+        text = "Restart sharing to apply changes. Devices reconnect on their own.",
         tone = NoticeTone.Warning,
         action = {
           KetchButton(
@@ -278,18 +277,16 @@ private fun PairDetails(
         if (serverState is ServerState.Running && !serverState.config.isLoopbackOnly) {
           // Reachable from the network, but without an access code.
           SettingsNotice(
-            text = "Anyone on your network can control $noun now, since it has no access " +
-              "code. Allowing another device adds one.",
+            text = "Anyone on your network can control $noun. Allowing a device adds a code.",
             tone = NoticeTone.Warning,
           )
         } else {
           Text(
             text = if (serverState is ServerState.Running) {
-              "Only apps on $noun can connect now. Allowing another device shares it on your " +
-                "network, protected by a code."
+              "Only apps on $noun can connect. Allowing a device shares it on your network, " +
+                "with a code."
             } else {
-              "Ketch shares $noun on your network, protected by a code that only the " +
-                "devices you pair receive."
+              "Ketch shares $noun on your network, protected by a code."
             },
             style = type.bodyS,
             color = colors.textSecondary,
@@ -305,12 +302,10 @@ private fun PairDetails(
         Text(
           text = when {
             addresses == null -> "Looking for the network address of $noun…"
-            !addressesReadable -> "Ketch can't read the network address of $noun. Open " +
-              "http://<its address>:$port on the other device, then enter the access code " +
-              "from Advanced below."
+            !addressesReadable -> "Ketch can't read the address of $noun. On the other " +
+              "device, open http://<its address>:$port with the code from Advanced."
             else ->
-              "${localDeviceNoun()} has no network address right now. Connect it to Wi-Fi " +
-                "or Ethernet, then refresh."
+              "${localDeviceNoun()} has no network address. Connect to Wi-Fi or Ethernet."
           },
           style = type.bodyS,
           color = colors.textSecondary,
@@ -327,9 +322,9 @@ private fun PairDetails(
         Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
           Text(
             text = if (isMobilePlatform) {
-              "Scan the code with another device's camera, or open"
+              "Scan with another device's camera, or open"
             } else {
-              "Scan the code with your phone's camera, or open"
+              "Scan with your phone's camera, or open"
             },
             style = type.bodyS,
             color = colors.textSecondary,
@@ -393,7 +388,7 @@ private fun PairDetails(
           horizontalArrangement = Arrangement.spacedBy(spacing.s2),
         ) {
           Text(
-            text = "Anyone with this code can control $noun.",
+            text = "Anyone with it can control $noun.",
             style = type.caption,
             color = colors.textSecondary,
             modifier = Modifier.weight(1f, fill = false),
@@ -494,7 +489,7 @@ private fun AdvancedGroup(
     SettingsSwitchRow(
       title = "Reachable from other devices",
       description = if (lanOpen) {
-        "Devices that can reach this one over the network can connect with the code."
+        "Devices on your network can connect with the code."
       } else {
         "Only apps on this device can connect."
       },
@@ -506,7 +501,6 @@ private fun AdvancedGroup(
     )
     SettingsRow(
       title = "Port",
-      description = "Other devices connect to this port.",
       trailing = {
         SettingsTextInput(
           value = config.port.toString(),
@@ -522,10 +516,9 @@ private fun AdvancedGroup(
     SettingsRow(
       title = "Access code",
       description = when {
-        token.isNotEmpty() -> "Paired devices and the web app send this code with every request."
-        lanOpen -> "Without a code, anyone on your network can control your downloads, and " +
-          "the web app can't connect."
-        else -> "Needed for the web app. Optional while only this device can connect."
+        token.isNotEmpty() -> "Paired devices and the web app connect with it."
+        lanOpen -> "Without one, anyone on your network can control your downloads."
+        else -> "Needed for the web app."
       },
       descriptionColor = if (token.isEmpty() && lanOpen) {
         colors.status.paused.color
@@ -551,7 +544,7 @@ private fun AdvancedGroup(
     }
     SettingsSwitchRow(
       title = "Discoverable on the local network",
-      description = "Lets Ketch on other devices find this one without typing an address.",
+      description = "Other devices find this one without typing an address.",
       checked = config.mdnsEnabled && lanOpen,
       enabled = lanOpen,
       onCheckedChange = { onChange(config.copy(mdnsEnabled = it)) },
@@ -559,11 +552,9 @@ private fun AdvancedGroup(
     SettingsRow(
       title = "Websites allowed to connect",
       description = if (token.isEmpty()) {
-        "Needs an access code. Without one, only Ketch's own web app and browser extension " +
-          "can connect."
+        "Needs an access code."
       } else {
-        "Other websites that may use this device, such as app.example.com. Separate them " +
-          "with commas; * allows any."
+        "Such as app.example.com, separated by commas. * allows any."
       },
       enabled = token.isNotEmpty(),
     ) {

@@ -130,7 +130,6 @@ fun FrameWindowScope.KetchMenuBar(
       activeDevice = instances.indexOf(active).takeIf { it >= 0 },
       selection = selection,
       undoLabel = ops.lastOrNull()?.label,
-      inspectorOpen = state.inspectorOpen,
       slowLane = mode?.isSlowLane,
       allDevices = shown == DeviceScope.All,
       revealLabel = files?.revealLabel,
@@ -264,7 +263,6 @@ internal data class SelectedTask(val phase: TaskPhase, val local: Boolean)
  * @property activeDevice index of the active device in [devices], or `null`.
  * @property selection the selected tasks.
  * @property undoLabel label of the operation ⌘Z undoes, or `null` when there is none.
- * @property inspectorOpen whether the inspector is shown.
  * @property slowLane whether the slow lane is on; `null` when speed modes are unavailable.
  * @property allDevices whether the window shows every device rather than the active one.
  * @property revealLabel label of Reveal, such as "Show in Finder"; `null` keeps the command's.
@@ -277,7 +275,6 @@ internal data class MenuBarContext(
   val activeDevice: Int?,
   val selection: List<SelectedTask>,
   val undoLabel: String?,
-  val inspectorOpen: Boolean,
   val slowLane: Boolean?,
   val allDevices: Boolean = false,
   val revealLabel: String? = null,
@@ -345,7 +342,6 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
         }
         add(MenuEntry.Separator)
         add(item(KetchCommands.ToggleSidebar))
-        add(item(KetchCommands.ToggleInspector, checked = context.inspectorOpen))
         add(MenuEntry.Separator)
         add(item(KetchCommands.Discover))
         add(item(KetchCommands.Devices))
@@ -357,6 +353,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
       listOfNotNull(
         item(KetchCommands.TogglePause, label = togglePause, enabled = running + resumable > 0),
         item(KetchCommands.Open, enabled = selection.isNotEmpty()),
+        item(KetchCommands.ShowDetails, enabled = selection.isNotEmpty()),
         item(
           KetchCommands.Reveal,
           label = context.revealLabel ?: KetchCommands.Reveal.label,
@@ -613,7 +610,10 @@ internal class DesktopCommands(
       KetchCommands.ResumeAll -> state.resumeAll()
       KetchCommands.RetryFailed -> state.retryFailed()
       KetchCommands.SlowLane -> if (speedMode != null) state.toggleSlowLane()
-      KetchCommands.ToggleInspector -> state.updateInspectorOpen(!state.inspectorOpen)
+      KetchCommands.ShowDetails -> {
+        actions.showWindow()
+        state.showDetails()
+      }
       KetchCommands.Undo -> state.pendingOps.undoLast()
       KetchCommands.Shortcuts -> {
         actions.showWindow()

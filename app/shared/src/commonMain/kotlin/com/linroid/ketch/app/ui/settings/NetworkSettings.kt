@@ -38,8 +38,7 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
       networks == null -> SettingsLoading("Looking for networks on ${device.label}…")
       unread -> Unit
       !networks.supported -> SettingsNotice(
-        text = "${device.label} can't choose networks, so downloads use the connection its " +
-          "system picks.",
+        text = "${device.label} can't choose which networks downloads use.",
         tone = NoticeTone.Info,
       )
       else -> {
@@ -50,14 +49,7 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
           .map { NetworkInterfaceInfo(id = it, name = it, addresses = emptyList()) }
         SettingsGroup(
           title = "Networks",
-          footer = if (selected.isEmpty()) {
-            "Downloads use the connection the system picks. Pick networks to spread HTTP " +
-              "downloads across them; FTP and torrents keep the default. Resets when " +
-              "${device.label} restarts."
-          } else {
-            "Requests are spread across the selected networks; FTP and torrents use the " +
-              "default connection. Resets when ${device.label} restarts."
-          },
+          footer = "Resets when ${device.label} restarts.",
           action = {
             KetchButton(
               text = "Refresh",
@@ -73,7 +65,7 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
             description = if (networks.available.isEmpty() && missing.isEmpty()) {
               "No networks found. Connect to Wi-Fi or Ethernet, then refresh."
             } else {
-              null
+              "HTTP only. FTP and torrents use the system default."
             },
           ) {
             FlowRow(

@@ -27,6 +27,7 @@ import androidx.lifecycle.AndroidViewModel
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
+import com.linroid.ketch.app.platform.SystemAppearance
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.IncomingDownloads
@@ -108,6 +109,7 @@ private fun QuickAddSheet(controller: AppController, onClosed: () -> Unit) {
     ThemeMode.Light -> false
     ThemeMode.Dark -> true
   }
+  SystemAppearance(darkTheme.takeIf { settings.themeMode != ThemeMode.System })
   KetchTheme(
     darkTheme = darkTheme,
     accent = settings.accent,

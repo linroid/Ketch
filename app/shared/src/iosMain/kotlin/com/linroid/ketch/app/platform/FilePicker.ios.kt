@@ -39,8 +39,9 @@ private class IosFilePicker(private val viewController: UIViewController) : File
     initialFolder?.let { picker.directoryURL = NSURL.fileURLWithPath(it, isDirectory = true) }
     val url = pick(picker).firstOrNull() ?: return null
     // A folder outside Ketch's own is writable only with this access, which lasts until the app
-    // quits.
+    // quits; the bookmark opens it again on the next launch.
     url.startAccessingSecurityScopedResource()
+    FolderBookmarks().save(url)
     return url.path
   }
 

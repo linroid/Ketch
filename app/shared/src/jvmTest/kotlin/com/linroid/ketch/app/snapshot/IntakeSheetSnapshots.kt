@@ -1,35 +1,60 @@
 package com.linroid.ketch.app.snapshot
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.input.ShortcutMatcher
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.platform.SystemClipboard
+import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.IntakeSeed
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.theme.KetchDensity
+import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.downloads.ClipboardLink
+import com.linroid.ketch.app.ui.intake.IntakeActions
+import com.linroid.ketch.app.ui.intake.LocalIntakeClipboard
+import com.linroid.ketch.app.ui.intake.PasteArea
 import com.linroid.ketch.app.util.extractFilename
+import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.IntakePreferences
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
- * The add sheet over the app: a batch of links, every row state, a single link's preview, a
- * torrent's file picker, a magnet waiting for peers, Retry with options and the Advanced
- * headers; see [SnapshotHarness] for how to run it.
+ * The add sheet over the app: empty, with and without a link on the clipboard; a single link's
+ * preview, three links and a batch with every row state; a cURL command; changed options as
+ * chips and the Options popover; a torrent's file picker, a magnet waiting for peers, Retry with
+ * options, the Advanced headers, and the input lit up by a drag; see [SnapshotHarness] for how
+ * to run it.
  */
 class IntakeSheetSnapshots {
   @BeforeTest
@@ -124,7 +149,7 @@ class IntakeSheetSnapshots {
       state.openIntake(IntakeRequest(KERNEL))
       scene.settle()
       // The Save to pill of the single link's sheet.
-      scene.click(470.dp, 350.dp)
+      scene.click(470.dp, OPTIONS_PILL_Y)
     }
   }
 
@@ -133,16 +158,110 @@ class IntakeSheetSnapshots {
     intakeSnapshots("intake-empty", DESKTOP_AND_PHONE) { state.openIntake(IntakeRequest()) }
   }
 
+  @Test
+  fun empty_withClipboardLink_offersToPasteIt() {
+    intakeSnapshots(
+      "intake-empty-clipboard",
+      DESKTOP_AND_PHONE,
+      clipboard = LinkClipboard(CLIP),
+    ) {
+      state.appSettings.saveUi { it.copy(clipboardMode = ClipboardMode.Suggest) }
+      state.openIntake(IntakeRequest())
+    }
+  }
+
+  @Test
+  fun filledFromClipboard_desktop_saysWhereTheLinkCameFrom() {
+    intakeSnapshots("intake-from-clipboard", DESKTOP_ONLY, clipboard = LinkClipboard(CLIP)) {
+      state.appSettings.saveUi { it.copy(clipboardMode = ClipboardMode.Fill) }
+      state.openIntake(IntakeRequest())
+    }
+  }
+
+  @Test
+  fun threeLinks_desktopAndPhone_showRowsAndOneLineOfOptions() {
+    intakeSnapshots("intake-three", DESKTOP_AND_PHONE) {
+      state.openIntake(IntakeRequest(BATCH.lines().take(3).joinToString("\n")))
+    }
+  }
+
+  @Test
+  fun curl_desktopAndPhone_setsTheCommandInMonospace() {
+    intakeSnapshots("intake-curl", DESKTOP_AND_PHONE) {
+      state.openIntake(IntakeRequest(CURL))
+    }
+  }
+
+  @Test
+  fun changedOptions_desktopAndPhone_showRemovableChips() {
+    intakeSnapshots("intake-chips", DESKTOP_AND_PHONE) {
+      val session = state.intake.start(IntakeRequest(KERNEL))
+      session.priority = DownloadPriority.URGENT
+      session.schedule = DownloadSchedule.AtTime(Instant.parse("2026-10-01T23:00:00Z"))
+      session.speedLimit = SpeedLimit.mbps(5)
+      state.intake.resume(session)
+    }
+  }
+
+  @Test
+  fun optionsPopover_desktop_holdsTheFourControls() {
+    intakeSnapshots("intake-options-popover", DESKTOP_ONLY) {
+      state.openIntake(IntakeRequest(KERNEL))
+      scene.settle()
+      // The Options pill of the single link's sheet.
+      scene.click(OPTIONS_PILL_X, OPTIONS_PILL_Y)
+    }
+  }
+
+  @Test
+  fun dropping_desktop_lightsUpTheInput() {
+    val size = SnapshotSize(DROP_WIDTH, DROP_HEIGHT, KetchDensity.Compact)
+    for (theme in SnapshotTheme.entries) {
+      val environment = runBlocking(SnapshotHarness.ui) {
+        IntakeEnvironment(SampleData.downloads(), theme, DensityMode.Compact, ::readyResolve)
+      }
+      try {
+        val session = runBlocking(SnapshotHarness.ui) {
+          environment.controller.state.intake.start(IntakeRequest())
+        }
+        snapshot("intake-drop", size, theme) {
+          val scope = rememberCoroutineScope()
+          val actions = IntakeActions(
+            session = session,
+            clipboard = LinkClipboard(null),
+            picker = rememberFilePicker(),
+            fileActions = null,
+            scope = scope,
+            onClose = {},
+            onFinishInBackground = null,
+          )
+          Box(Modifier.padding(KetchTheme.spacing.s6)) {
+            PasteArea(
+              actions = actions,
+              matcher = remember { ShortcutMatcher() },
+              phone = false,
+              clipboardLink = ClipboardLink.None,
+              dropping = true,
+            )
+          }
+        }
+      } finally {
+        runBlocking(SnapshotHarness.ui) { environment.close() }
+      }
+    }
+  }
+
   /** Renders the app with the add sheet [setup] opens, at [sizes] in every theme. */
   private fun intakeSnapshots(
     name: String,
     sizes: List<SnapshotSize>,
     themes: List<SnapshotTheme> = SnapshotTheme.entries,
     resolve: suspend (String) -> ResolvedSource = ::readyResolve,
+    clipboard: SystemClipboard? = null,
     setup: suspend AppScenario.() -> Unit,
   ) {
     for (size in sizes) {
-      for (theme in themes) intakeSnapshot(name, size, theme, resolve, setup)
+      for (theme in themes) intakeSnapshot(name, size, theme, resolve, clipboard, setup)
     }
   }
 
@@ -151,6 +270,7 @@ class IntakeSheetSnapshots {
     size: SnapshotSize,
     theme: SnapshotTheme,
     resolve: suspend (String) -> ResolvedSource,
+    clipboard: SystemClipboard?,
     setup: suspend AppScenario.() -> Unit,
   ) {
     val data = SampleData.downloads()
@@ -172,7 +292,16 @@ class IntakeSheetSnapshots {
         size = size,
         interact = { AppScenario(environment.controller, data, this).setup() },
       ) {
-        App(environment.controller)
+        // The clipboard is only looked at while the window has the focus, which a scene
+        // without a window never gets.
+        val window = LocalWindowInfo.current
+        val focused = remember(window) { FocusedWindow(window) }
+        CompositionLocalProvider(
+          LocalIntakeClipboard provides clipboard,
+          LocalWindowInfo provides if (clipboard != null) focused else window,
+        ) {
+          App(environment.controller)
+        }
       }
     } finally {
       runBlocking(SnapshotHarness.ui) { environment.close() }
@@ -208,6 +337,23 @@ private class IntakeEnvironment(
   }
 }
 
+/** [window], focused. */
+private class FocusedWindow(window: WindowInfo) : WindowInfo by window {
+  override val isWindowFocused: Boolean = true
+}
+
+/** A clipboard holding [text], read without a notice as on Windows and Linux. */
+private class LinkClipboard(private val text: String?) : SystemClipboard {
+  override val readsSilently: Boolean = true
+  override val pasteEvents: Flow<String> = emptyFlow()
+
+  override suspend fun hasLink(): Boolean = text != null
+
+  override suspend fun readText(): String? = text
+
+  override suspend fun writeText(text: String) {}
+}
+
 /** [base] with its links checked by [check]. */
 private class ResolvingApi(
   private val base: KetchApi,
@@ -224,6 +370,22 @@ private val DESKTOP_ONLY = listOf(SnapshotSize.Desktop)
 private const val MAGNET =
   "magnet:?xt=urn:btih:3f2a91c0d4b5e6f708192a3b4c5d6e7f8091a2b3&dn=Big.Buck.Bunny"
 private const val KERNEL = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.tar.xz"
+private const val CLIP = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-macos11.pkg"
+
+private val CURL = """
+  curl 'https://files.example.com/reports/q4-board-deck.pdf' \
+    -H 'Referer: https://files.example.com/reports' \
+    -H 'Cookie: session=4f2a91c0d4b5; theme=dark' \
+    --compressed
+""".trimIndent()
+
+// The input alone, as a drag lights it up.
+private val DROP_WIDTH = 640.dp
+private val DROP_HEIGHT = 180.dp
+
+// Where the Options pill sits in the single link's sheet at 1280 × 800.
+private val OPTIONS_PILL_X = 700.dp
+private val OPTIONS_PILL_Y = 330.dp
 
 private val BATCH = listOf(
   "https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso",

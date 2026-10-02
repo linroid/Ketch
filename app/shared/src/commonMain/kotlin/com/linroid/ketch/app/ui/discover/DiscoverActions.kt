@@ -36,6 +36,7 @@ internal fun AppState.addDiscovered(candidates: List<AiCandidate>): Job? {
   val query = aiDiscover.draft.submittedQuery
   return launchCommand {
     val result = aiDiscover.add(target.instance, candidates, query)
+    announceAdded(result.added.map { TaskKey(target.deviceId, it.taskId) })
     val added = candidates - result.failed.map { it.first }.toSet()
     val draft = aiDiscover.draft
     draft.selected = draft.selected - added.map { it.url }.toSet()

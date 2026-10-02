@@ -73,13 +73,12 @@ private fun BrowserGroup() {
   }
   SettingsGroup(
     title = "Browser extension",
-    footer = "The extension sends your browser's downloads to Ketch with the site's cookies, " +
-      "so downloads that need you to be signed in work too. It opens Ketch when it needs it.",
+    footer = "Sends your browser's downloads to Ketch, with the site's cookies.",
   ) {
     if (status.browsers.isEmpty()) {
       SettingsRow(
         title = "No browser found yet",
-        description = "Works with Chrome, Edge, Brave, Firefox and other Chromium browsers.",
+        description = "For Chrome, Edge, Brave, Firefox and other Chromium browsers.",
         trailing = getExtension,
       )
     }
@@ -132,7 +131,6 @@ private fun DefaultAppsGroup(state: AppState) {
   SettingsGroup(title = "Default apps", footer = failure) {
     DefaultAppRow(
       title = "Open magnet links with Ketch",
-      description = "Magnet links you click in any app start a download here.",
       isDefault = status.magnetHandler || MAGNET_LINKS in registered,
       registering = registering == MAGNET_LINKS,
       onMakeDefault = {
@@ -141,7 +139,6 @@ private fun DefaultAppsGroup(state: AppState) {
     )
     DefaultAppRow(
       title = "Open .torrent files with Ketch",
-      description = "Opening a .torrent file shows it in Ketch, ready to add.",
       isDefault = status.torrentFileHandler || TORRENT_FILES in registered,
       registering = registering == TORRENT_FILES,
       onMakeDefault = {
@@ -157,14 +154,12 @@ private fun DefaultAppsGroup(state: AppState) {
 @Composable
 private fun DefaultAppRow(
   title: String,
-  description: String,
   isDefault: Boolean,
   registering: Boolean,
   onMakeDefault: () -> Unit,
 ) {
   SettingsRow(
     title = title,
-    description = description,
     trailing = {
       if (isDefault) {
         Confirmed("Ketch is the default")
@@ -191,10 +186,9 @@ private fun ClipboardGroup(appSettings: AppSettingsController) {
     SettingsRow(
       title = "Suggest links from the clipboard",
       description = when (mode) {
-        ClipboardMode.Fill -> "A copied link fills the add sheet when you open it."
-        ClipboardMode.Suggest -> "Ketch offers a copied link, and reads the clipboard only " +
-          "when you tap it."
-        ClipboardMode.Off -> "Ketch never looks at the clipboard."
+        ClipboardMode.Fill -> "A copied link fills the add sheet."
+        ClipboardMode.Suggest -> "Reads the clipboard only when you tap."
+        ClipboardMode.Off -> "Ketch never reads the clipboard."
       },
       trailing = {
         SettingsSegmented(
@@ -214,9 +208,9 @@ private fun ClipboardGroup(appSettings: AppSettingsController) {
     SettingsSwitchRow(
       title = "Add pasted links immediately",
       description = if (paste != null) {
-        "Pasting one link into the list with $paste adds it at once, with Undo."
+        "Pasting one link with $paste adds it at once, with Undo."
       } else {
-        "Pasting one link into the list adds it at once, with Undo."
+        "Pasting one link adds it at once, with Undo."
       },
       checked = quickAdd,
       onCheckedChange = { on -> appSettings.saveUi { it.copy(quickAdd = on) } },

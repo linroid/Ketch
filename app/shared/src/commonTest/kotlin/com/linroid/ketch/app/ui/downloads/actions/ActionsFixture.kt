@@ -110,6 +110,9 @@ internal class FakeFileActions(
   /** Paths [exists] reports as gone. */
   val missing = mutableSetOf<String>()
 
+  /** Paths [moveToTrash] refuses to move. */
+  val refused = mutableSetOf<String>()
+
   override val canShare: Boolean = false
 
   override suspend fun open(path: String) {
@@ -127,6 +130,7 @@ internal class FakeFileActions(
   override suspend fun exists(path: String): Boolean = path !in missing
 
   override suspend fun moveToTrash(path: String) {
+    check(path !in refused) { "The Trash refused $path" }
     calls += "trash $path"
   }
 }

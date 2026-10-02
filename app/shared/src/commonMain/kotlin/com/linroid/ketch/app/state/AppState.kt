@@ -38,6 +38,7 @@ import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.util.LinkKind
+import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
@@ -278,10 +279,6 @@ class AppState(
   var inspectedTask by mutableStateOf<TaskKey?>(null)
     private set
 
-  /** Whether the docked inspector is shown; remembered between launches. */
-  var inspectorOpen by mutableStateOf(appSettings.ui.inspectorOpen)
-    private set
-
   /** Selected rows of the task list. */
   var selectedKeys by mutableStateOf(emptySet<TaskKey>())
 
@@ -298,6 +295,19 @@ class AppState(
 
   /** Emits when the shell should show the Downloads list, such as after adding from Discover. */
   val downloadsRequests: SharedFlow<Unit> = showDownloadsRequests.asSharedFlow()
+
+  private val addedEvents = MutableSharedFlow<List<TaskKey>>(extraBufferCapacity = ADDED_BUFFER)
+
+  /**
+   * Emits the keys of the downloads each add from this window started, such as a quick add, a
+   * dropped link or the add sheet, so the Downloads page can point the new rows out.
+   */
+  val addedTasks: SharedFlow<List<TaskKey>> = addedEvents.asSharedFlow()
+
+  /** Reports that [keys] were just added from this window; see [addedTasks]. */
+  fun announceAdded(keys: List<TaskKey>) {
+    if (keys.isNotEmpty()) addedEvents.tryEmit(keys)
+  }
 
   private val settingsCache = mutableMapOf<InstanceEntry, InstanceSettingsController>()
 
@@ -576,10 +586,21 @@ class AppState(
     inspectedTask = key
   }
 
-  /** Shows or hides the docked inspector and remembers the choice. */
-  fun updateInspectorOpen(open: Boolean) {
-    inspectorOpen = open
-    appSettings.saveUi { it.copy(inspectorOpen = open) }
+  /**
+   * Shows the selected download in the inspector, which sums up two or more by itself, and asks
+   * the shell for the Downloads page on the tab shown. Returns whether anything is selected.
+   */
+  fun showDetails(): Boolean {
+    if (selectedKeys.isEmpty()) return false
+    selectedKeys.singleOrNull()?.let { inspectedTask = it }
+    showDownloadsRequests.tryEmit(Unit)
+    return true
+  }
+
+  /** Closes the inspector; a selection of several rows, which it sums up, is cleared. */
+  fun closeInspector() {
+    inspectedTask = null
+    if (selectedKeys.size >= 2) selectedKeys = emptySet()
   }
 
   /** Asks the search field to take focus. */
@@ -699,6 +720,7 @@ class AppState(
             destination = destination,
             priority = defaults.priority,
             connections = defaults.connections.coerceAtLeast(0),
+            properties = mapOf(TaskOrigin.PROPERTY to TaskOrigin.App.id),
           )
         } catch (e: IllegalArgumentException) {
           postError("Couldn't add $url", detail = e.message, cause = e)
@@ -1537,6 +1559,8 @@ class AppState(
     failed.forEach { (request, e) ->
       log.w { "Couldn't add ${redactUrl(request.url)}: ${e.describeCauses()}" }
     }
+    val deviceId = entry?.deviceId ?: activeInstance.value?.deviceId ?: LOCAL_DEVICE_ID
+    announceAdded(added.map { TaskKey(deviceId, it.taskId) })
     reportAdded(
       entry = entry,
       added = added,
@@ -1767,6 +1791,9 @@ internal fun credentialWarning(headers: List<Map<String, String>>, deviceName: S
 
 private const val COOKIE_HEADER = "Cookie"
 private const val AUTHORIZATION_HEADER = "Authorization"
+
+/** How many adds [AppState.addedTasks] holds for a Downloads page that is still busy. */
+private const val ADDED_BUFFER = 8
 
 /** Compose state that the models outside composition also read, through [flow]. */
 private class FlowState<T>(initial: T) {

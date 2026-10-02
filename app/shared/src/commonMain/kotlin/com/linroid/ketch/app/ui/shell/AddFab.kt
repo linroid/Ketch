@@ -8,29 +8,22 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -38,10 +31,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.app.components.KetchMenu
-import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
@@ -53,71 +43,6 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
-
-/** Sizes of an [AddButton]. */
-internal object AddButtonDefaults {
-  /** The sidebar's title zone. */
-  val TitleZone: Dp = 28.dp
-
-  /** The rail. */
-  val Rail: Dp = 48.dp
-}
-
-/**
- * The round ⊕ that opens the add sheet, on the soft accent: in the sidebar's title zone and at
- * the top of the rail. A right click offers to add the link on the clipboard at once.
- *
- * @param size one of the [AddButtonDefaults] sizes.
- */
-@Composable
-internal fun AddButton(
-  size: Dp,
-  onClick: () -> Unit,
-  onAddClipboardLink: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  val colors = KetchTheme.colors
-  val shape = KetchTheme.shapes.full
-  val interactions = remember { MutableInteractionSource() }
-  val overlay = rememberInteractionOverlay(interactions)
-  val scale = rememberPressScale(interactions)
-  val focus = rememberFocusVisibility()
-  var menuOpen by remember { mutableStateOf(false) }
-  val glyph = if (size >= AddButtonDefaults.Rail) GlyphLarge else KetchTheme.density.controlGlyph
-  Box(modifier) {
-    KetchTooltip(command = KetchCommands.Add) {
-      Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-          .focusRing(focus.visible, shape, colors.focusRing)
-          .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-          }
-          .size(size)
-          .clip(shape)
-          .background(colors.accentSoft)
-          .background(overlay)
-          // The soft accent is close to the wash it sits on; the outline keeps the button round.
-          .border(OutlineWidth, colors.accent.copy(alpha = OUTLINE_ALPHA), shape)
-          .onSecondaryPress { menuOpen = true }
-          .trackFocusVisibility(focus)
-          .semantics { contentDescription = KetchCommands.Add.label }
-          .clickable(
-            interactionSource = interactions,
-            indication = null,
-            role = Role.Button,
-            onClick = onClick,
-          ),
-      ) {
-        KetchIconImage(KetchIcon.Plus, size = glyph, tint = colors.accentText)
-      }
-    }
-    KetchMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-      item(KetchCommands.AddClipboardLink, onClick = onAddClipboardLink)
-    }
-  }
-}
 
 /**
  * The phone's Add button at the bottom end, which shrinks from "+ Add" to a round 56 dp button
@@ -195,8 +120,5 @@ internal fun Modifier.onSecondaryPress(onPress: () -> Unit): Modifier = composed
   }
 }
 
-private const val OUTLINE_ALPHA = 0.24f
-
-private val OutlineWidth = 1.dp
 private val FabSize = 56.dp
 private val GlyphLarge = 24.dp

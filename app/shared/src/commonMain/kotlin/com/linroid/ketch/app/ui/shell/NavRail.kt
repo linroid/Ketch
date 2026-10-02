@@ -36,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
@@ -81,9 +80,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * The 72 dp rail of medium windows, and of wide ones with the sidebar collapsed: the ⊕ add
- * button, the destinations with Downloads' downloading count, the device stack, and Settings at
- * the bottom. On macOS it starts below the traffic lights.
+ * The 72 dp rail of medium windows, and of wide ones with the sidebar collapsed: the
+ * [AppearanceToggle], the destinations with Downloads' downloading count, the device stack, and
+ * Settings at the bottom. On macOS it starts below the traffic lights.
  *
  * From two devices on, the stack starts with All devices, ringed by the progress of everything
  * downloading. Each device's pennant switches to it, opens its menu on a right click or a long
@@ -101,7 +100,6 @@ internal fun NavRail(
   onSelect: (AppDestination) -> Unit,
   onOpenSettings: () -> Unit,
   onToggleSidebar: () -> Unit,
-  onAddClipboardLink: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
@@ -127,12 +125,7 @@ internal fun NavRail(
         modifier = Modifier.padding(bottom = spacing.s2),
       )
     }
-    AddButton(
-      size = AddButtonDefaults.Rail,
-      onClick = { state.openIntake() },
-      onAddClipboardLink = onAddClipboardLink,
-      modifier = Modifier.padding(bottom = spacing.s4),
-    )
+    AppearanceToggle(state.appSettings, Modifier.padding(bottom = spacing.s4))
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(spacing.s1),
@@ -211,7 +204,8 @@ private fun RailItem(
     targetValue = when {
       selected -> colors.sidebarItemSelected
       hovered -> colors.sidebarItemHover
-      else -> Color.Transparent
+      // Fades by alpha alone: Color.Transparent is transparent black, which flashes grey.
+      else -> colors.sidebarItemHover.copy(alpha = 0f)
     },
     animationSpec = tween(KetchTheme.motion.micro),
   )
@@ -454,7 +448,8 @@ private fun RailCell(
       dropping && accepting -> colors.accentSoft
       selected -> colors.sidebarItemSelected
       hovered || dropping -> colors.sidebarItemHover
-      else -> Color.Transparent
+      // Fades by alpha alone: Color.Transparent is transparent black, which flashes grey.
+      else -> colors.sidebarItemHover.copy(alpha = 0f)
     },
     animationSpec = tween(KetchTheme.motion.micro),
   )

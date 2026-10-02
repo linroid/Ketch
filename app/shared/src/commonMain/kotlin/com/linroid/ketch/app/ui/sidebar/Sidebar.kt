@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,19 +46,17 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.devices.addDevice
-import com.linroid.ketch.app.ui.shell.AddButton
-import com.linroid.ketch.app.ui.shell.AddButtonDefaults
+import com.linroid.ketch.app.ui.shell.AppearanceToggle
 
 /**
  * The sidebar of wide windows, transparent over the canvas wash: the title zone with the
- * sidebar toggle and the ⊕ add button (beside the traffic lights on macOS, after the Ketch mark
- * on the web), the destinations, the DEVICES (All devices from two on, then each device with its
- * health and live line, its menu and its drops), and Settings at the bottom.
+ * sidebar toggle and the [AppearanceToggle] (beside the traffic lights on macOS, after the Ketch
+ * mark on the web), the destinations, the DEVICES (All devices from two on, then each device with
+ * its health and live line, its menu and its drops), and Settings at the bottom.
  *
  * @param destination the destination shown, which sits on the selected pill.
  * @param settingsSelected whether Settings shows, which then takes the pill instead.
  * @param onToggleSidebar collapses the sidebar to the rail.
- * @param onAddClipboardLink adds the link on the clipboard at once.
  */
 @Composable
 internal fun Sidebar(
@@ -68,7 +67,6 @@ internal fun Sidebar(
   onSelect: (AppDestination) -> Unit,
   onOpenSettings: () -> Unit,
   onToggleSidebar: () -> Unit,
-  onAddClipboardLink: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
@@ -77,11 +75,7 @@ internal fun Sidebar(
   val scope by state.deviceScope.collectAsState()
   val devices = rememberDevices(state)
   Column(modifier.width(spacing.sidebarWidth).fillMaxHeight()) {
-    TitleZone(
-      onToggleSidebar = onToggleSidebar,
-      onAdd = { state.openIntake() },
-      onAddClipboardLink = onAddClipboardLink,
-    )
+    TitleZone(state, onToggleSidebar = onToggleSidebar)
     for (entry in destinations) {
       val downloads = entry == AppDestination.Downloads
       KetchTooltip(text = entry.label, shortcut = entry.command.shortcutLabel()) {
@@ -181,19 +175,15 @@ private fun DownloadsMarks(downloading: Int, failed: Boolean) {
 
 /**
  * The top of the sidebar, as tall as the content card's inset and page header. On macOS the
- * traffic lights sit at its start and the buttons follow them on their row; on the web the Ketch
- * mark leads; elsewhere the buttons line up with the page header. Its empty space is the title
- * bar the desktop app lets the window be dragged by.
+ * traffic lights sit at its start, the sidebar toggle follows them on their row and the
+ * appearance toggle ends it; on the web the Ketch mark leads; elsewhere the buttons line up with
+ * the page header. Its empty space is the title bar the desktop app lets the window be dragged by.
  */
 @Composable
-private fun TitleZone(
-  onToggleSidebar: () -> Unit,
-  onAdd: () -> Unit,
-  onAddClipboardLink: () -> Unit,
-) {
+private fun TitleZone(state: AppState, onToggleSidebar: () -> Unit) {
   val spacing = KetchTheme.spacing
   val chrome = KetchTheme.windowChrome
-  val buttons = @Composable {
+  val toggle = @Composable {
     KetchIconButton(
       icon = KetchIcon.Sidebar,
       onClick = onToggleSidebar,
@@ -201,19 +191,21 @@ private fun TitleZone(
       contentDescription = "Hide sidebar",
       shortcut = KetchCommands.ToggleSidebar.shortcutLabel(),
     )
-    AddButton(
-      size = AddButtonDefaults.TitleZone,
-      onClick = onAdd,
-      onAddClipboardLink = onAddClipboardLink,
-    )
   }
+  val appearance = @Composable { AppearanceToggle(state.appSettings) }
   Box(Modifier.fillMaxWidth().height(spacing.cardInset + spacing.pageHeaderHeight)) {
     when {
       chrome.top > 0.dp -> Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.s0_5),
-        modifier = Modifier.height(chrome.top).padding(start = chrome.leading + spacing.s3),
-      ) { buttons() }
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(chrome.top)
+          .padding(start = chrome.leading, end = spacing.s2),
+      ) {
+        toggle()
+        Spacer(Modifier.weight(1f))
+        appearance()
+      }
       KeyboardPlatform.current.isWeb -> Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -230,16 +222,23 @@ private fun TitleZone(
           color = KetchTheme.colors.textPrimary,
           modifier = Modifier.padding(start = spacing.s2).weight(1f),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(spacing.s0_5)) { buttons() }
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
+          toggle()
+          appearance()
+        }
       }
       else -> Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.s0_5),
         modifier = Modifier
+          .fillMaxWidth()
           .padding(top = spacing.cardInset)
           .fillMaxHeight()
-          .padding(start = spacing.s3),
-      ) { buttons() }
+          .padding(start = spacing.s2, end = spacing.s2),
+      ) {
+        toggle()
+        Spacer(Modifier.weight(1f))
+        appearance()
+      }
     }
   }
 }

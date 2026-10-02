@@ -227,7 +227,7 @@ class SettingsDeviceSnapshots {
 
     /** The Advanced row of the Sharing page in [Pane], under the restart notice. */
     val AdvancedRowX = 300.dp
-    val AdvancedRowY = 486.dp
+    val AdvancedRowY = 465.dp
   }
 }
 

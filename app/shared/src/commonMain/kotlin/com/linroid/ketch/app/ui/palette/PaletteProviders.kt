@@ -507,7 +507,7 @@ private val COMMAND_ORDER: List<KetchCommand> = listOf(
   KetchCommands.SlowLane,
   KetchCommands.Undo,
   KetchCommands.Search,
-  KetchCommands.ToggleInspector,
+  KetchCommands.ShowDetails,
   KetchCommands.ToggleSidebar,
   KetchCommands.Activity,
   KetchCommands.SwitchDevice,

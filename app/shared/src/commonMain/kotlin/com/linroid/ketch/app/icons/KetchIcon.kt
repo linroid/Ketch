@@ -49,6 +49,15 @@ enum class KetchIcon(internal val data: IconData) {
     stroke = listOf(CIRCLE),
     fill = listOf("M10 3a7 7 0 0 1 0 14z"),
   )),
+  // A solid disc, so it never reads as the outlined Settings gear.
+  Sun(IconData.paths(
+    stroke = listOf(
+      "M10 3v1.6M10 15.4v1.6M3 10h1.6M15.4 10h1.6",
+      "M5.05 5.05l1.13 1.13M13.82 13.82l1.13 1.13M5.05 14.95l1.13-1.13M13.82 6.18l1.13-1.13"
+    ),
+    fill = listOf("M10 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"),
+  )),
+  Moon(IconData.strokes("M17 10.61A7 7 0 1 1 9.39 3 5.44 5.44 0 0 0 17 10.61z")),
 
   // Playback / actions
   Play(IconData.fills("M6 4l10 6-10 6V4z")),
@@ -72,6 +81,12 @@ enum class KetchIcon(internal val data: IconData) {
     "M4.5 7h7A1.5 1.5 0 0 1 13 8.5v7a1.5 1.5 0 0 1 -1.5 1.5h-7A1.5 1.5 0 0 1 3 15.5v-7" +
       "A1.5 1.5 0 0 1 4.5 7z",
     "M7 7V4.5A1.5 1.5 0 0 1 8.5 3h7A1.5 1.5 0 0 1 17 4.5v7a1.5 1.5 0 0 1 -1.5 1.5H13"
+  )),
+  Paste(IconData.strokes(
+    "M7 4.5H5.5A1.5 1.5 0 0 0 4 6v10a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 16 16V6" +
+      "a1.5 1.5 0 0 0 -1.5-1.5H13",
+    "M8 2.5h4a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1H8a1 1 0 0 1 -1-1v-1a1 1 0 0 1 1-1z",
+    "M7.5 10h5", "M7.5 13h3"
   )),
   Drop(IconData.strokes(
     "M3 6.5V4.5A1.5 1.5 0 0 1 4.5 3h2", "M13.5 3h2A1.5 1.5 0 0 1 17 4.5v2",

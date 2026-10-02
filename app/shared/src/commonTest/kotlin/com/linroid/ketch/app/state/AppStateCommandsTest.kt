@@ -14,6 +14,7 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.KetchConfig
@@ -450,6 +451,7 @@ class AppStateCommandsTest {
     assertEquals(Destination("/data/downloads/"), request.destination)
     assertEquals(DownloadPriority.HIGH, request.priority)
     assertEquals(4, request.connections)
+    assertEquals(TaskOrigin.App, TaskOrigin.of(request))
     val toast = controller.messages.active.value.last()
     assertEquals("Added ubuntu.iso → This Mac", toast.title)
     assertEquals(listOf("Options", "Undo"), toast.actions.map { it.label })

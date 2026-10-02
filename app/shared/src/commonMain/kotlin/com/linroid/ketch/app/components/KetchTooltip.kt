@@ -146,7 +146,13 @@ internal fun KetchTooltipBubble(text: String, shortcut: String?, modifier: Modif
       .ketchSurface(KetchElevationLevel.E3, KetchTheme.shapes.sm, colors.inverseSurface)
       .padding(horizontal = TooltipPaddingH, vertical = TooltipPaddingV),
   ) {
-    Text(text, style = type.caption, color = colors.inverseOnSurface)
+    // A long text wraps instead of squeezing the shortcut after it.
+    Text(
+      text = text,
+      style = type.caption,
+      color = colors.inverseOnSurface,
+      modifier = Modifier.weight(1f, fill = false),
+    )
     if (shortcut != null) {
       Spacer(Modifier.width(KetchTheme.spacing.s3))
       Text(

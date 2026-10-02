@@ -16,6 +16,7 @@ import com.linroid.ketch.app.feedback.reportActivity
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.FolderBookmarks
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -177,6 +178,8 @@ private class LocalSpeedMode(manager: InstanceManager) {
 
 private fun createInstanceManager(): InstanceManager {
   KetchLogger.setLogger(appLogger)
+  // Before any download resumes into a folder picked outside the app's container.
+  FolderBookmarks().restore()
   val docsDir = userDirectory(NSDocumentDirectory)
   // Internal state stays out of Documents, which the Files app shows.
   val supportDir = userDirectory(NSApplicationSupportDirectory)

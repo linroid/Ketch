@@ -44,7 +44,7 @@ import com.linroid.ketch.remote.ConnectionState
  * @property onAccent text on [accent], white or ink, whichever reads at 4.5:1.
  * @property dangerFill fill of destructive buttons and failure count badges, under white text.
  * @property brandEmber the two stops of the 135° ember gradient. Only the logo tile, the
- *   illustration and the completion sheen may use it.
+ *   illustration, the completion sheen and the Add button's hover and drop fills may use it.
  * @property status colors of each download state.
  * @property lanes eight opaque lane colors: the accent ramp over [surfaceSunken].
  * @property deviceHues hues a device pennant can get, picked by [deviceHue].

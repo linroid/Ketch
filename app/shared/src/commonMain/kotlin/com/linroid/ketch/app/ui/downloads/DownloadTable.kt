@@ -184,7 +184,7 @@ internal fun DownloadTable(
             height = rowHeight,
             onAddToken = onAddToken,
             pennant = namePennant,
-            modifier = placement(),
+            modifier = placement().addedRow(row.key),
           )
         },
       )

@@ -72,15 +72,7 @@ class SettingsSnapshots {
 
   @Test
   fun settingsWindow_eachPage_showsItBesideTheList() {
-    val pages = listOf(
-      SettingsTarget.Page.General,
-      SettingsTarget.Page.Notifications,
-      SettingsTarget.Page.Integration,
-      SettingsTarget.Page.Discover,
-      SettingsTarget.Page.About,
-      SettingsTarget.Page.Speed,
-    )
-    for (page in pages) {
+    for (page in SettingsTarget.Page.entries) {
       for (theme in SnapshotTheme.entries) {
         windowSnapshot("settings-${page.name.lowercase()}", WindowSize, theme, SettingsTarget(page))
       }
@@ -286,8 +278,8 @@ class SettingsSnapshots {
     val PhoneTall = SnapshotSize(390.dp, 1100.dp, KetchDensity.Comfortable)
 
     /** The device chip in the list of pages, at the window size. */
-    val DeviceChipX = 180.dp
-    val DeviceChipY = 338.dp
+    val DeviceChipX = 150.dp
+    val DeviceChipY = 298.dp
 
     const val NAS_ID = "nas.local:8642"
   }

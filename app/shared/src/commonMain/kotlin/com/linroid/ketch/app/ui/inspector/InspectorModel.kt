@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.inspector
 
 import androidx.compose.runtime.Immutable
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
@@ -363,68 +362,6 @@ internal val DownloadState.hasControls: Boolean
   }
 
 /**
- * What the nothing-selected overview reports about a device's [rows] under [config].
- *
- * @property running downloads running now.
- * @property slots how many may run at once; `null` while the config is unknown.
- * @property connections connections in flight across the [transfers].
- * @property transfers running HTTP and FTP downloads, whose connections are counted.
- * @property hosts sites with running downloads and how many each may run, busiest first; empty
- *   without a per-site limit.
- * @property upNext the first waiting downloads, in the order they would start.
- */
-@Immutable
-internal data class ScopeSummary(
-  val running: Int,
-  val slots: Int?,
-  val connections: Int,
-  val transfers: Int,
-  val hosts: List<HostLoad>,
-  val upNext: List<TaskRow>,
-)
-
-/**
- * Downloads running on one site, against the per-site limit.
- *
- * @property host the site.
- * @property running downloads running from it.
- * @property limit how many may, from `DownloadConfig.maxConnectionsPerHost`.
- */
-@Immutable
-internal data class HostLoad(val host: String, val running: Int, val limit: Int)
-
-/** The [ScopeSummary] of [rows] under [config]. */
-internal fun scopeSummary(rows: List<TaskRow>, config: DownloadConfig?): ScopeSummary {
-  val running = rows.filter { it.state is DownloadState.Downloading }
-  val perHost = config?.maxConnectionsPerHost?.takeIf { it > 0 }
-  val hosts = if (perHost == null) {
-    emptyList()
-  } else {
-    running.mapNotNull { it.host?.lowercase() }.groupingBy { it }.eachCount()
-      .map { (host, count) -> HostLoad(host, count, perHost) }
-      .sortedWith(compareBy({ -it.running }, { it.host }))
-  }
-  val queued = rows.filter { it.state is DownloadState.Queued }
-    .sortedWith(compareBy({ -it.request.priority.ordinal }, { it.createdAt }))
-  val scheduled = rows.filter { it.state is DownloadState.Scheduled }
-    .sortedBy { (it.state as DownloadState.Scheduled).startsAt() }
-  val transfers = running.filter { !it.isTorrent }
-  return ScopeSummary(
-    running = running.size,
-    slots = config?.maxConcurrentDownloads?.takeIf { it > 0 },
-    connections = transfers.sumOf { row -> row.segments.count { !it.isComplete } },
-    transfers = transfers.size,
-    hosts = hosts,
-    upNext = (queued + scheduled).take(UP_NEXT),
-  )
-}
-
-private fun DownloadState.Scheduled.startsAt(): Instant = when (val at = schedule) {
-  is DownloadSchedule.AtTime -> at.startAt
-  else -> Instant.DISTANT_FUTURE
-}
-
-/**
  * The summary line of several selected [rows]: "3 selected · 2.4 GB · 9.1 MB/s", the size of
  * those whose size is known and the speed of those downloading.
  */
@@ -439,7 +376,6 @@ internal fun selectionLine(rows: List<TaskRow>): String {
 }
 
 private const val PRESET_COUNT = 3
-private const val UP_NEXT = 5
 
 /** Round speeds the presets are taken from, slowest first. */
 private val PresetLadder: List<SpeedLimit> = listOf(

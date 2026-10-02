@@ -59,8 +59,8 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * The task inspector's content (W3-INSPECTOR) in its three containers, docked at 320 and 480 dp,
- * as an overlay card and in a phone's sheet, for each state of [SampleData], with nothing and
- * with several downloads selected, in light and dark; see [SnapshotHarness] for how to run it.
+ * as an overlay card and in a phone's sheet, for each state of [SampleData] and with several
+ * downloads selected, in light and dark; see [SnapshotHarness] for how to run it.
  *
  * The Downloads page owns the containers, so these scenarios draw stand-ins for them around
  * the content of [TaskInspector] over a live [SampleEnvironment], with files that exist.
@@ -93,13 +93,6 @@ class InspectorSnapshots {
       inspector("inspector-overlay", Overlay, theme, InspectorPlacement.Overlay) {
         inspect(FAILED)
       }
-    }
-  }
-
-  @Test
-  fun inspector_nothingSelected_showsTheDevice() {
-    for (theme in SnapshotTheme.entries) {
-      inspector("inspector-scope", Tall, theme) { null }
     }
   }
 

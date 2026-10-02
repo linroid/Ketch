@@ -21,7 +21,7 @@ class HostShortcutsTest {
       KetchCommands.RetryFailed,
       KetchCommands.SlowLane,
       KetchCommands.Search,
-      KetchCommands.ToggleInspector,
+      KetchCommands.ShowDetails,
       KetchCommands.ToggleSidebar,
       KetchCommands.Palette,
       KetchCommands.Discover,

@@ -125,6 +125,8 @@ private val BRAND_EMBER_FILES = setOf(
   "components/KetchLogoTile.kt",
   "components/SailLanesIllustration.kt",
   "components/LaneStrip.kt",
+  // The Add button's hover and drop fill, the one control the gradient may light.
+  "components/KetchAddButton.kt",
 )
 
 private val PATTERNS = linkedMapOf(

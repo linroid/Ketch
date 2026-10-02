@@ -67,6 +67,15 @@ class SettingsHostRenderTest {
     }
   }
 
+  @Test
+  fun settingsNav_pageItem_announcesItsSummaryAsItsState() {
+    runSettings { scene ->
+      val states = scene.stateDescriptions()
+      assertTrue("Light · Signal" in states, "The General item's state: $states")
+      assertTrue("light · signal" !in scene.texts(), "The summary shows: ${scene.texts()}")
+    }
+  }
+
   private fun runSettings(
     query: String = "",
     onClose: () -> Unit = {},
@@ -144,6 +153,11 @@ class SettingsHostRenderTest {
     .mapNotNull { it.config.getOrNull(SemanticsProperties.Text) }
     .flatten()
     .map { it.text.lowercase() }
+    .toSet()
+
+  /** Every state description screen readers announce. */
+  private fun ImageComposeScene.stateDescriptions(): Set<String> = nodes()
+    .mapNotNull { it.config.getOrNull(SemanticsProperties.StateDescription) }
     .toSet()
 
   /** The text of the field that has the keyboard, or `null` when no field has it. */

@@ -444,6 +444,85 @@ enum class IntakeMode {
   Edit,
 }
 
+/** An option the add sheet's Options pill sums up. */
+enum class IntakeOption {
+  /** Speed limit of each download. */
+  Speed,
+
+  /** Priority of each download. */
+  Priority,
+
+  /** When the downloads start. */
+  Start,
+
+  /** Connections of each download, or a torrent's peer limit. */
+  Connections,
+}
+
+/**
+ * How [option] reads: "Unlimited", "Normal", "Now" and "Auto" at their defaults, or "Max
+ * 2 MB/s", "⚡ Urgent", "Starts 23:00 tonight" and "8 connections" once [changed], which also
+ * shows it as a chip that puts the default back.
+ */
+data class IntakeOptionValue(val option: IntakeOption, val text: String, val changed: Boolean)
+
+/**
+ * The values the Options pill sums up, in order: speed, priority, start (left out when
+ * [schedule] is `null`) and connections, as a peer limit for [torrents]. A server that allows
+ * one connection reads "1 connection" without counting as a change.
+ */
+internal fun intakeOptionValues(
+  speedLimit: SpeedLimit,
+  priority: DownloadPriority,
+  schedule: DownloadSchedule?,
+  connections: Int,
+  torrents: Boolean,
+  singleConnection: Boolean,
+  now: Instant,
+  zone: TimeZone,
+): List<IntakeOptionValue> = buildList {
+  add(
+    IntakeOptionValue(
+      option = IntakeOption.Speed,
+      text = if (speedLimit.isUnlimited) "Unlimited" else "Max ${formatSpeedLimit(speedLimit)}",
+      changed = !speedLimit.isUnlimited,
+    ),
+  )
+  val priorityText = when (priority) {
+    DownloadPriority.NORMAL -> "Normal"
+    DownloadPriority.URGENT -> "⚡ Urgent"
+    else -> "${priorityLabel(priority)} priority"
+  }
+  add(IntakeOptionValue(IntakeOption.Priority, priorityText, priority != DownloadPriority.NORMAL))
+  if (schedule != null) {
+    // A time that has passed starts at once, like no time.
+    val startText = startTimeLabel(schedule, now, zone)
+    add(IntakeOptionValue(IntakeOption.Start, startText, startText != NOW_LABEL))
+  }
+  val connectionText = when {
+    torrents && connections > 0 -> if (connections == 1) "1 peer" else "$connections peers"
+    singleConnection || connections == 1 -> "1 connection"
+    connections > 0 -> "$connections connections"
+    else -> "Auto"
+  }
+  val connectionsChanged = connections > 0 && (torrents || !singleConnection)
+  add(IntakeOptionValue(IntakeOption.Connections, connectionText, connectionsChanged))
+}
+
+/** Whether a line of [text] starts a cURL command. */
+internal fun holdsCurl(text: String): Boolean = text.lineSequence().any(CurlParser::isCurl)
+
+/**
+ * [text] shortened to [max] characters by an ellipsis in the middle, which keeps the start and
+ * the end of a file name: "ubuntu-24.04-liv…server-amd64.iso".
+ */
+internal fun middleEllipsis(text: String, max: Int): String {
+  if (text.length <= max || max < 2) return text
+  val kept = max - 1
+  val head = (kept + 1) / 2
+  return text.take(head) + "…" + text.takeLast(kept - head)
+}
+
 /**
  * The add sheet's state for one [IntakeRequest]: the typed links, their checks on the target
  * device, the options that apply to all of them, and the submit.
@@ -480,6 +559,12 @@ class IntakeSession internal constructor(
   /** Whether [text] came from the clipboard, captioned "From clipboard". */
   var fromClipboard: Boolean by mutableStateOf(false)
     private set
+
+  // Hash of the clipboard text this sheet was filled from, which its chip no longer offers.
+  private var filledClip: String? by mutableStateOf(null)
+
+  /** Whether [text] holds a cURL command, which the input then sets in the monospace style. */
+  val isCurl: Boolean get() = holdsCurl(text.text)
 
   private var textEntries: List<IntakeEntry> by mutableStateOf(emptyList())
   private var fileEntries: List<IntakeEntry> by mutableStateOf(emptyList())
@@ -655,11 +740,14 @@ class IntakeSession internal constructor(
       return credentialWarning(entries.map(::effectiveHeaders), remote.label)
     }
 
-  /** What happens once the rows are added, such as "Starts now · 1 of 2 slots free". */
+  /**
+   * What happens once the rows are added, such as "Starts now · 1 of 2 slots free"; a scheduled
+   * start is left to the Start chip.
+   */
   val outcome: String?
     get() {
       if (mode == IntakeMode.Retry && startsOver) return startOverWarning()
-      if (mode != IntakeMode.Add) return null
+      if (mode != IntakeMode.Add || schedule != DownloadSchedule.Immediate) return null
       val adding = entries.filter { it.addable }
       return intakeOutcome(
         hosts = adding.flatMap { entry ->
@@ -684,23 +772,98 @@ class IntakeSession internal constructor(
       return entry.url != current.url || effectiveHeaders(entry) != boundHeaders
     }
 
-  /** Text of the main button. */
+  /**
+   * Whether the sheet shows its options and main button: once it holds a link or a torrent, and
+   * always while it retries or edits a task. An empty sheet is only its input.
+   */
+  val showsOptions: Boolean get() = mode != IntakeMode.Add || entries.isNotEmpty()
+
+  /**
+   * Text of the main button, which says what it does: "Download ubuntu-24.04.iso", "Download 3
+   * files · 1.2 GB", "Schedule 2 files", "Download 16 files · 9.3 GB" for a torrent's chosen
+   * files, "Retry", "Start over" or "Apply changes".
+   */
   val primaryLabel: String
-    get() = when {
-      mode == IntakeMode.Edit -> "Apply"
-      mode == IntakeMode.Retry -> if (startsOver) "Start over" else "Retry"
-      allFailed -> "Retry"
-      activeStage != null && entries.size == 1 -> {
-        val count = activeStage?.selectedFiles?.size ?: 0
-        if (count == 1) "Add 1 file" else "Add $count files"
-      }
-      single?.waitsForFiles == true && single?.addAnyway == false -> "Waiting for file list"
-      else -> {
-        val verb = if (schedule == DownloadSchedule.Immediate) "Add" else "Schedule"
-        val count = addableLinks
-        if (count <= 1) "$verb download" else "$verb $count downloads"
+    get() {
+      val stage = activeStage?.takeIf { entries.size == 1 }
+      return when {
+        mode == IntakeMode.Edit -> "Apply changes"
+        mode == IntakeMode.Retry -> if (startsOver) "Start over" else "Retry"
+        allFailed -> "Retry"
+        stage != null -> filesLabel(stage)
+        single?.waitsForFiles == true && single?.addAnyway == false -> "Waiting for file list"
+        else -> batchLabel()
       }
     }
+
+  /** What ↩ does, after "↩ to": "download", "schedule", "retry", "start over" or "apply". */
+  val submitVerb: String
+    get() = when {
+      mode == IntakeMode.Edit -> "apply"
+      mode == IntakeMode.Retry -> if (startsOver) "start over" else "retry"
+      allFailed -> "retry"
+      schedule != DownloadSchedule.Immediate -> "schedule"
+      else -> "download"
+    }
+
+  private val verb: String
+    get() = if (schedule == DownloadSchedule.Immediate) "Download" else "Schedule"
+
+  private fun filesLabel(stage: IntakeEntry): String {
+    val count = stage.selectedFiles?.size ?: 0
+    if (count == 0) return "No files chosen"
+    val files = if (count == 1) "1 file" else "$count files"
+    return withSize("$verb $files", stage.bytes)
+  }
+
+  private fun batchLabel(): String {
+    val adding = entries.filter { it.addable }
+    val count = adding.sumOf { it.linkCount }
+    val only = adding.singleOrNull()?.takeIf { it.linkCount == 1 }
+    return when {
+      count == 0 -> "Nothing to add"
+      only != null -> "$verb ${middleEllipsis(only.name, MAX_LABEL_NAME)}"
+      else -> {
+        // A torrent holds files of its own, so a batch with one counts items.
+        val noun = if (adding.any { it.isTorrent }) "items" else "files"
+        withSize("$verb $count $noun", adding.sumOf { it.bytes ?: 0 })
+      }
+    }
+  }
+
+  // Scheduling says when, not how much; adding now says how much.
+  private fun withSize(label: String, bytes: Long?): String =
+    if (schedule == DownloadSchedule.Immediate && bytes != null && bytes > 0) {
+      "$label · ${formatBytes(bytes)}"
+    } else {
+      label
+    }
+
+  /**
+   * Speed, priority, start and connections as the Options pill sums them up; a retry offers no
+   * start. Values changed from their defaults also show as chips that put them back.
+   */
+  val optionValues: List<IntakeOptionValue>
+    get() = intakeOptionValues(
+      speedLimit = speedLimit,
+      priority = priority,
+      schedule = schedule.takeIf { mode != IntakeMode.Retry },
+      connections = connections,
+      torrents = torrentsOnly,
+      singleConnection = !torrentsOnly && (maxConnections ?: MAX_CONNECTIONS) <= 1,
+      now = clock.now(),
+      zone = TimeZone.currentSystemDefault(),
+    )
+
+  /** Puts [option] back to its default: no limit, Normal, now or Auto. */
+  fun resetOption(option: IntakeOption) {
+    when (option) {
+      IntakeOption.Speed -> speedLimit = SpeedLimit.Unlimited
+      IntakeOption.Priority -> priority = DownloadPriority.NORMAL
+      IntakeOption.Start -> schedule = DownloadSchedule.Immediate
+      IntakeOption.Connections -> connections = 0
+    }
+  }
 
   /** Whether the main button can be pressed. */
   val canSubmit: Boolean
@@ -765,10 +928,38 @@ class IntakeSession internal constructor(
     val detector = duplicateDetector()
     if (links.all { detector.find(it.url) != null }) return false
     state.appSettings.saveUi { it.copy(lastClipHash = hash) }
+    filledClip = hash
     text = TextFieldValue(trimmed, TextRange(0, trimmed.length))
     fromClipboard = true
     reparse()
     return true
+  }
+
+  /**
+   * Puts [clip], which the user asked to paste from the clipboard, after the input. Unlike
+   * [offerClipboard] it takes a clip offered before.
+   */
+  fun pasteClipboard(clip: String) {
+    val trimmed = clip.trim()
+    if (trimmed.isEmpty() || mode != IntakeMode.Add) return
+    val hash = clipHash(trimmed)
+    state.appSettings.saveUi { it.copy(lastClipHash = hash) }
+    filledClip = hash
+    val current = text.text.trimEnd()
+    val updated = if (current.isEmpty()) trimmed else "$current\n$trimmed"
+    text = TextFieldValue(updated, TextRange(updated.length))
+    fromClipboard = current.isEmpty()
+    reparse()
+  }
+
+  /**
+   * Whether the empty sheet offers to paste the clipboard text whose hash is [hash], `null` when
+   * the platform cannot tell without reading it: not once the sheet was filled from that text,
+   * or from any when it is unknown.
+   */
+  fun offersClipboard(hash: String?): Boolean {
+    if (mode != IntakeMode.Add || text.text.isNotEmpty() || entries.isNotEmpty()) return false
+    return if (hash == null) filledClip == null else hash != filledClip
   }
 
   /** Reads the input now when a typed change is still waiting to be read. */
@@ -1145,6 +1336,7 @@ class IntakeSession internal constructor(
       return
     }
     if (shown) showNewRows()
+    state.announceAdded(added.map { TaskKey(target.deviceId, it.taskId) })
     val op = state.pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
       added.forEach { task ->
         catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
@@ -1222,10 +1414,11 @@ class IntakeSession internal constructor(
     val current = task.requestState.value
     val name = displayName(current, task.state.value)
     if (!startsOver) {
+      val newConnections = connectionsFor(current)
       state.runTaskCommand(task, "retry $name") {
         if (speedLimit != current.speedLimit) setSpeedLimit(speedLimit)
         if (priority != current.priority) setPriority(priority)
-        if (connections != current.connections) setConnections(connections)
+        newConnections?.let { setConnections(it) }
         resume()
       }
       onDone()
@@ -1265,18 +1458,30 @@ class IntakeSession internal constructor(
     val name = displayName(current, task.state.value)
     val speed = speedLimit
     val newPriority = priority
-    val newConnections = connections
+    val newConnections = connectionsFor(current)
     val newSchedule = schedule
     val wasScheduled = task.state.value as? DownloadState.Scheduled
     state.runTaskCommand(task, "change the options of $name") {
       if (speed != current.speedLimit) setSpeedLimit(speed)
       if (newPriority != current.priority) setPriority(newPriority)
-      if (newConnections != current.connections) setConnections(newConnections)
+      newConnections?.let { setConnections(it) }
       if (newSchedule != (wasScheduled?.schedule ?: DownloadSchedule.Immediate)) {
         reschedule(newSchedule)
       }
     }
     onDone()
+  }
+
+  /**
+   * Connections to set on the task downloading [current], or `null` to leave them. A task cannot
+   * go back to Auto, so Auto gives a task with its own count the target's default count; a
+   * torrent's peer limit, or a default not known yet, is left as it is.
+   */
+  private fun connectionsFor(current: DownloadRequest): Int? = when {
+    connections == current.connections -> null
+    connections > 0 -> connections
+    torrentsOnly -> null
+    else -> autoConnections?.takeIf { it != current.connections }
   }
 
   private fun bindTask() {
@@ -1556,12 +1761,13 @@ class IntakeSession internal constructor(
  * torrent was left to load in the background.
  *
  * @param scope runs the checks and submits; it outlives one sheet.
+ * @param clock the time of checks and start labels; the app's [AppState.clock] by default.
  */
 @Stable
 class IntakeController(
   private val state: AppState,
   private val scope: CoroutineScope,
-  private val clock: Clock = Clock.System,
+  private val clock: Clock = state.clock,
 ) {
   /** The session left to finish in the background, or `null`. */
   var background: IntakeSession? by mutableStateOf(null)
@@ -1866,6 +2072,12 @@ private const val TORRENT_SOURCE = "torrent"
 private const val MAX_RECENT_FOLDERS = 5
 private const val TINY_TEXT_BYTES = 1024L
 private const val HASH_RADIX = 36
+
+/** Longest file name the main button shows before shortening it in the middle. */
+private const val MAX_LABEL_NAME = 36
+
+/** How [startTimeLabel] reads a start that is not later. */
+private const val NOW_LABEL = "Now"
 
 /**
  * What to do with a link on the clipboard: the setting, else fill on desktop, else suggest, as

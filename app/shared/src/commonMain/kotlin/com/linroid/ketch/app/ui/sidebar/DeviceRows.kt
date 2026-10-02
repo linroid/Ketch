@@ -388,7 +388,8 @@ private fun SidebarRow(
     targetValue = when {
       dropping && accepting -> colors.accentSoft
       hovered || dropping -> colors.sidebarItemHover
-      else -> Color.Transparent
+      // Fades by alpha alone: Color.Transparent is transparent black, which flashes grey.
+      else -> colors.sidebarItemHover.copy(alpha = 0f)
     },
     animationSpec = tween(motion.micro),
   )

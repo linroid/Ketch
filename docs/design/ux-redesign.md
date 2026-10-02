@@ -90,7 +90,7 @@ Why this combination:
   It keeps **Downloads as home**, so no click is added to common jobs. Both judges rated it the
   best fit for Ketch's strengths.
 - **Helm** gives the parts a power user needs:
-  - a dense table as the default desktop view (36 dp rows, about 17 rows at 1280x800);
+  - a dense table as the default desktop view (40 dp rows, about 15 rows at 1280x800);
   - one `KetchCommands` registry that drives shortcuts, menus, the tray, `⌘K`, tooltips and the
     cheat sheet;
   - global status in a **Pulse bar inside the content card**, so it stays visible when the sidebar
@@ -403,10 +403,11 @@ Connection health shares one function, `healthColor(state)`, used by the device 
     in light.
   - Hues are not user-editable.
 - **Brand ember gradient:** `#FFB25B` → `#E0482B` at 135°. Allowed only on the logo tile, the
-  web splash, onboarding, About, and the completion sheen. Never on controls, status or
-  selection. `DesignTokenUsageTest` enforces this: `KetchColors.brandEmber` may be referenced
-  only from `components/KetchLogoTile.kt`, `components/SailLanesIllustration.kt` and
-  `components/LaneStrip.kt` (the sheen).
+  web splash, onboarding, About, the completion sheen and the Add button's hover and drop fills
+  (§4.7.1). Never on other controls, status or selection. `DesignTokenUsageTest` enforces this:
+  `KetchColors.brandEmber` may be referenced only from `components/KetchLogoTile.kt`,
+  `components/SailLanesIllustration.kt`, `components/LaneStrip.kt` (the sheen) and
+  `components/KetchAddButton.kt` (hover and drop fills only).
 
 #### 3.2.6 File-type hue tiles
 
@@ -526,7 +527,7 @@ The scale sits on a 4-pt grid: `s0_5 = 2`, `s1 = 4`, `s2 = 8`, `s3 = 12`, `s4 = 
 | Content card inset | 8 dp top, end and bottom (the sidebar side has no inset) |
 | Page header height / padding | 52 dp / 16 dp horizontal |
 | Tab row height | 40 dp (segmented control 32 dp inside) |
-| Table header / row / group header | 28 / 36 / 24 dp (Compact preference: row 32) |
+| Table header / row / group header | 28 / 40 / 28 dp (Compact preference: row 32) |
 | List row (pointer / touch) | 56 / 64 dp |
 | Pulse bar height | 32 dp |
 | Inspector width | 320 dp default, drag-resizable 280–480 |
@@ -549,8 +550,8 @@ Compact / Comfortable).
 | Icon button | 28 visual, 32 hit area, 16 glyph | 40 visual, 48 touch target, 20 glyph |
 | Input | 32 | 48 |
 | Chip, segmented control, tab | 28 | 32 (40 row) |
-| Sidebar item / device row | 32 / 36 | 40 / 48 |
-| Table row | 36 (32 with the "Compact rows" preference) | 44 |
+| Sidebar item / device row | 36 / 40 | 40 / 48 |
+| Table row | 40 (32 with the "Compact rows" preference) | 44 |
 | List row | 56 | 64 (72 with lanes) |
 | Menu item | 28 | 48 (as a bottom sheet) |
 | Glyph in nav / controls | 18 / 16 | 24 / 20 |
@@ -577,8 +578,8 @@ In dark, shadow alpha is multiplied by 3, and raised surfaces get a 1 dp top hig
    1 dp `hairline`) → flat rows. Rows are never cards.
 2. **No blur.** Haze or any backdrop blur is out of scope for Waves 1-6 (§8). Sticky headers, the
    Pulse bar and the selection bar use opaque `surface`/`surfaceSunken` with a hairline.
-3. **Windows below 840 dp:** card inset and radius drop to 0 (full-bleed surface). The wash shows
-   only behind the top bar.
+3. **Rail and sidebar:** the card keeps its 8 dp inset and r16 corners at every width; only the
+   phone shell (below 600 dp) goes full-bleed.
 4. **Phones:** full-bleed `surface`. The wash appears only as a 200 dp gradient fading out under
    the top bar.
 
@@ -590,7 +591,7 @@ In dark, shadow alpha is multiplied by 3, and raised surfaces get a 1 dp top hig
 | `short` | 150 ms | Toggles, segmented thumb, tab switch, chip → checkbox morph, tab row ↔ selection bar |
 | `medium` | 220 ms | Inspector slide, list placement, lane resize, banners |
 | `long` / `longExit` | 320 / 200 ms | Sheet and dialog enter / exit |
-| `xlong` | 480 ms | Onboarding |
+| `xlong` | 480 ms | Onboarding, the add lane flight |
 | `easeStandard` | `CubicBezier(0.2, 0, 0, 1)` | Default |
 | `easeDecelerate` (enter) | `CubicBezier(0.05, 0.7, 0.1, 1)` | Enter; also aliased as `easeEmphasized` |
 | `easeAccelerate` (exit) | `CubicBezier(0.3, 0, 0.8, 0.15)` | Exit |
@@ -598,6 +599,9 @@ In dark, shadow alpha is multiplied by 3, and raised surfaces get a 1 dp top hig
 | `placementSpring` | `spring(stiffness = 400f)` | `Modifier.animateItem(fadeInSpec = tween(150), placementSpec = placementSpring)` |
 | `headGlide` | `tween(200, LinearEasing)` | Write heads, matching the engine's 200 ms progress cadence |
 | `pulse` | 1600 ms infinite, alpha 0.28 → 0, radius r → r + 5 dp | Only Downloading dots and Connecting rings |
+| Copied-link sheen (`KetchAddButton`) | 720 ms, once per clip | The Add button turning into its split button (§4.7.1) |
+| Add lane flight (`AddFlight`) | `xlong` (480 ms), `easeStandard` | From the header's Add button to the first new row on screen (§4.9.1) |
+| Drop-target lanes (`KetchAddButton`) | 1.8 s loop | The Add button's lanes while a drag hovers the window |
 
 Motion tied to engine events:
 
@@ -628,7 +632,7 @@ illustration is static.
 |---|---|
 | `KetchButton` | **Primary:** accent fill, `onAccent` label, `full` radius, h32, padding 14, `label`, 16 dp icon, **at most one per surface**. **Secondary:** `surface` + 1 dp `borderStrong`. **Tonal:** `accentSoft` / `accentText`. **Ghost:** transparent, `surfaceHover` on hover. **Danger:** `dangerFill` + white, used for every destructive confirm. **States:** hover overlay 8% (`micro`); press scale .98 + overlay 12%; focus ring 2 dp accent at 50%, offset 2 dp (only on focus-visible); disabled 40% alpha. Loading replaces the icon with a 14 dp spinner, and the width stays fixed. |
 | `KetchIconButton` | 28 visual / 32 hit area, r8, 16 dp glyph; ghost by default. The tooltip is required and includes the shortcut. |
-| `KetchPillGroup` | Bordered `full` container with up to four 28 dp icon buttons and 1 dp internal dividers (e.g. `☰ \| ▦ \| ⓘ`). |
+| `KetchPillGroup` | Bordered `full` container with up to four 28 dp icon buttons and 1 dp internal dividers (e.g. `☰ \| ▦`). |
 | `KetchSegmented` | `surfaceSunken` track h32, 3 dp padding. The thumb is a `surface` pill at e2 and slides over 150 ms. Label `label`. Optional count `numeralS`. Replaces `SettingsSegmented` (`SettingsComponents.kt:327-355`) and the theme picker. |
 | `KetchChip` | h28 `full`, 1 dp `borderStrong`. Selected: `accentSoft` fill + 12 dp check + `accentText`. Count in `numeralS` `textTertiary`. Removable chips have a 14 dp ✕. Replaces M3 `FilterChip`. |
 | `KetchTextField` | `surfaceSunken` fill, `sm` radius, h32. Label **above** (`labelS`, `textSecondary`), never floating. On focus: 1 dp accent border plus a 3 dp accent ring at 20%. Error text below in `caption` failed. Optional leading glyph, trailing clear/paste buttons. A multi-line variant is used for intake. Replaces M3 `OutlinedTextField` (`AddDownloadDialog.kt:213,298,491,737,744`; `AddRemoteServerDialog.kt:88,96,112`) and `SettingsTextField`. |
@@ -704,7 +708,8 @@ horizontal stripes. The stripes read as download lanes. That **is** the motif.
 1. **`DesignTokenUsageTest`** in `app/shared/src/jvmTest/.../theme/DesignTokenUsageTest.kt` reads
    `commonMain` sources outside `theme/` and `components/`, and fails on:
    `RoundedCornerShape(<number>.dp`, `Color(0x`, `<number>.sp`, `MaterialTheme.`,
-   `androidx.compose.material.icons`, and `brandEmber` outside the three allowed files.
+   `androidx.compose.material.icons`, and `brandEmber` outside the four allowed files
+   (§3.2.5; `components/KetchAddButton.kt` for its hover and drop fills only).
    - The allowlist `app/shared/src/jvmTest/resources/design-token-allowlist.txt` lists
      `path:pattern:count` and starts with today's offenders.
    - The test also **fails when a count goes down** without the allowlist being updated, so the
@@ -755,8 +760,8 @@ and 1440 dp widths.
 
 ```
 ┌ canvas + wash (ember glow bottom-left) ─────────────────────────────────────────────────────────────────────┐
-│ ● ● ●   ◧  ⊕       ┌ content card r16 e1 ────────────────────────────────────────────────────────────────────┐ │
-│                    │ Downloads (2↓/14) [LM This Mac ▾]   [⌕ Search or paste a link   ⌘K] (☰│▦│ⓘ) ⋯ (+ Add) │ │ 52
+│ ● ● ●   ◧  ☾       ┌ content card r16 e1 ────────────────────────────────────────────────────────────────────┐ │
+│                    │ Downloads (2↓/14) [LM This Mac ▾]   [⌕ Search or paste a link   ⌘K] (☰│▦)   ⋯ (+ Add) │ │ 52
 │ ⤓ Downloads     2  │ (All 14|Downloading 2|Waiting 3|Paused 1|Done 7|Failed 1●)          Sort: Smart ▾       │ │ 40
 │ ✦ Discover         │─────────────────────────────────────────────────────────────┬────────────────────────────│ │
 │ ◇ Devices          │ ☐ NAME ▾                       SIZE       PROGRESS     SPEED │ ▣ ubuntu-24.04-desktop-…  ✕ │ │ 28
@@ -787,8 +792,13 @@ and 1440 dp widths.
   - The sidebar's top 52 dp is the **title zone**:
     - traffic lights at x 12–80;
     - `◧` (28 dp ghost, "Hide sidebar  ⌃⌘S") at x 92;
-    - `⊕` (28 dp `accentSoft` circle, "New download  ⌘N") at x 124. It is a drop target, and
-      right-clicking it offers "Download link from clipboard".
+    - the appearance toggle (28 dp ghost) at the zone's end: a moon in the light appearance
+      ("Switch to dark") and a sun in the dark one ("Switch to light"). A click that lands on
+      the system's own appearance goes back to following the system (`ThemeMode.System`);
+      otherwise it saves Light or Dark. Settings → General still offers all three. Android's
+      system bar icons and the iOS window's interface style follow the picked appearance.
+    - There is no add button here: the page header's `+ Add` (§4.7.1), `⌘N`, `⌘V` and drops
+      add downloads, so a second ⊕ beside it only competed with it.
   - Empty title-zone space and the page header's empty space are a `WindowDraggableArea`, and a
     double-click zooms the window.
   - `apple.awt.windowAppearance` follows `ThemeMode`.
@@ -798,9 +808,10 @@ and 1440 dp widths.
 - **Window title:** the status sentence (§4.4.3), e.g. "Ketch — 3 downloading · 45%", or
   "Ketch" when idle. Mission Control and the Window menu show it.
 - **Windows and Linux:** native frame, with the same wash, sidebar and card inside.
-  `◧` and `⊕` sit in the sidebar header row. A JBR custom title bar is out of scope (§8).
+  `◧` and the appearance toggle sit in the sidebar header row. A JBR custom title bar is out
+  of scope (§8).
 - **Web:** no title zone. The sidebar header is a 32 dp row with a 20 dp `KetchLogoTile`,
-  "Ketch", and `⊕` at the end.
+  "Ketch", `◧` and the appearance toggle at the end.
 - **The 80 dp wordmark header is deleted on every platform** (`SidebarNavigation.kt:65-75`).
 
 #### 4.2.2 Sidebar (Expanded, 220 dp, transparent over the wash)
@@ -830,9 +841,9 @@ The choice is persisted in `UiPreferences.sidebarCollapsed`.
 
 ```
 ┌──────┬────────────────────────────────────────────────────┐
-│● ● ● │ Downloads (2↓/14) [NB NAS ▾]  [⌕ ⌘K]  ⓘ  ⋯  (+)   │
+│● ● ● │ Downloads (2↓/14) [NB NAS ▾]  [⌕ ⌘K]     ⋯  (+)   │
 │  ◧   │ (All|Downloading 2|Waiting 3|Paused|Done|Failed 1●) │
-│ (⊕)  │ ▣ ubuntu-24.04-desktop.iso          6.4 MB/s · 2:10 │
+│  ☾   │ ▣ ubuntu-24.04-desktop.iso          6.4 MB/s · 2:10 │
 │ ⤓ 2  │   2.4 of 5.7 GB · 8 connections                     │
 │ ✦    │   ▰▰▱▰▰▱▰▰▱▰▰▰▱▱                                   │
 │ ◇    │ ▣ blender-4.2.dmg                ○ Waiting   ▷ Start │
@@ -845,7 +856,8 @@ The choice is persisted in `UiPreferences.sidebarCollapsed`.
 └──────┴────────────────────────────────────────────────────┘
 ```
 
-- Header area holds `◧` and a 48 dp `⊕` FAB. On macOS, content starts 40 dp below the top.
+- Header area holds `◧` (wide windows only) and the appearance toggle, as in the sidebar's
+  title zone. On macOS, content starts 40 dp below the top.
 - Destinations: 24 dp icons with 11 sp labels. Downloads carries a badge with the downloading
   count.
 - Device stack below them, 40 dp pennants:
@@ -1170,7 +1182,8 @@ Left to right:
 4. **Right side:**
    - The command field `⌕ Search or paste a link  ⌘K`: 32 dp tall, 240 dp wide, 320 dp on focus,
      collapsing to a `⌕` icon below 640 dp card width.
-   - `KetchPillGroup` (`☰` List | `▦` Table | `ⓘ` Inspector `⌘I`).
+   - `KetchPillGroup` (`☰` List | `▦` Table), where the table fits. The inspector has no toggle;
+     it follows the selection (§4.8).
    - `⋯` overflow, **always present**, with items disabled rather than hidden:
      - Pause all `⇧⌘P`
      - Resume all `⇧⌘R`
@@ -1180,7 +1193,17 @@ Left to right:
      - Copy all links
      - Columns…
      - Row density ▸ Compact / Default
-   - Primary `+ Add` (h32, `⌘N`).
+   - Primary `+ Add` (h36, `⌘N`, `KetchAddButton`). Width capped at 28% of the card
+     (180–300 dp). Static under reduce motion.
+     - Hover: the + splits into three lanes and the fill picks up an ember-to-accent gradient
+       (ember behind the glyph, accent by 55%).
+     - Where the clipboard reads silently (Windows, Linux; Android before 12) and holds a link
+       Ketch doesn't have: one sheen, then a split button "⤓ Add {name, shortened in the middle
+       to fit} | ▾". The main part quick-adds it and stops offering it; the caret opens the add
+       sheet. Tooltip "Download {name} from {host}" with ⇧⌘V.
+     - While a drag hovers the window: a dashed "Drop to download" target with filling lanes,
+       lit while the drag is over it. Drops add as on the window (the drop berths start below
+       the page header on Downloads).
 
 Nothing destructive sits next to Add. Pause all and Resume all no longer appear or disappear with
 state (`BatchActionBar.kt:27-35`). Chrome above the table is 52 + 40 + 28 = 120 dp, versus
@@ -1457,18 +1480,22 @@ while a magnet is still downloading needs `DownloadTask.fileName` (W5).
 
 | Tier | Placement |
 |---|---|
-| Card width ≥ 1040 | **Docked** right pane inside the card. 320 dp, drag-resizable 280–480 with a 6 dp handle; width and open state persist. 1 dp divider; the table reflows by auto-hiding columns. |
-| Card 600–1039, or Medium | **Overlay** card: `surfaceRaised`, `lg`, e3, inset 8, 340 dp. Slides in from x+24 dp over 220 ms with decelerate easing. Esc or a click on the table closes it. |
+| Card width ≥ 1040 | **Docked** right pane inside the card. 320 dp, drag-resizable 280–480 with a 6 dp handle; the width persists, capped so the table keeps its 720 dp minimum and a click never swaps it for list rows. It slides in from the card's edge, pushing the table aside. 1 dp divider; the table reflows by auto-hiding columns. |
+| Card 600–1039, or Medium | **Overlay** card: `surfaceRaised`, `lg`, e3, inset 8, 340 dp. Slides in from x+24 dp over 220 ms with decelerate easing. Esc or a click on empty space closes it. |
 | Compact | `ModalBottomSheet`. The 55% peek shows the header, actions, lanes and Controls; drag up for the tabs. |
 
 **State and opening:**
 - `AppState.inspectedTaskId` survives filter and search changes and clears when the task is
   removed.
-- A single click on a row selects and inspects it.
-- `⌘I` / `ⓘ` toggles. `→` moves focus into the inspector, `←` or Esc returns it.
-- With **nothing selected**, the docked pane shows the scope overview: 60 s speed chart,
-  connections in flight across tasks, "Slots 2 of 2 in use", per-host "github.com 6 of 8", free
-  space, network chips, and "Up next" (the first 5 waiting tasks, each with ▷ Start now).
+- There is no toggle: the inspector shows while a row is inspected or 2 or more are selected,
+  and goes away with the selection (Esc, a click on empty space) or its ✕.
+- A single click on a row selects and inspects it; the arrow keys and ⌘-clicks that leave one row
+  selected show that row.
+- `⌘I` (Show details) shows the selected row again after ✕ closed it. `→` moves focus into the
+  inspector, `←` or Esc returns it.
+- While it closes it keeps what it showed, so it never flashes another view on the way out.
+- With **nothing selected** there is no inspector. A device's numbers live on the Pulse bar and
+  on its card on the Devices page (speed, lane, counts, free space, networks, Start next).
 - With **2 or more selected**, it shows "3 selected · 2.4 GB · 9.1 MB/s", one stacked 4 dp map per
   task, and shared Controls ("—" where values differ).
 
@@ -1665,8 +1692,11 @@ links immediately" is on (default on desktop and web).
   - Undo = `remove(deleteFiles = true)`, available for 8 s.
   - Options opens the sheet bound to the new task and applies changes through `setSpeedLimit`,
     `setPriority` and `setConnections`.
-- The new row flashes (`rowSelected` fading to 0 over 1.2 s). If the current tab or search would
-  hide it, the view switches to All.
+- If another status tab is shown, the view switches to All.
+- Every add from this window (`AppState.addedTasks`: quick add, drops, the add sheet, Discover)
+  flies a lane from the header's Add button to the first new row on screen; that row and the
+  other new ones glow (`rowSelected`, 300 ms hold then 900 ms fade). Rows off screen glow when
+  they show within 20 s. No lane under reduce motion or without the header button (phones).
 - **Two or more links, a magnet, a `.torrent`, a cURL command, or plain text open the intake sheet
   prefilled instead.**
 
@@ -1674,39 +1704,52 @@ links immediately" is on (default on desktop and web).
 
 - Desktop and web: 640 dp wide (480–720), **anchored 72 dp below the window top** like a command
   palette, `xl`, e4, scrim. It grows to 80% of the window height.
-- Phones: full-height sheet with a sticky 56 dp primary button.
+- Phones: a bottom sheet as tall as its input while empty, then full height with a sticky 56 dp
+  primary button.
 
 ```
 ╭─ Add downloads ───────────────────────────────────────────── On: (LM) This Mac ▾ ─╮
-│ ┌──────────────────────────────────────────────────────────────────────────────┐ │
-│ │ https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso             │ │
-│ │ https://cdn.example.org/set/part[01-04].rar                                  │ │
-│ │ magnet:?xt=urn:btih:3f2a91c0…&dn=Big.Buck.Bunny                              │ │
-│ │ https://intranet.example.com/q3-report.pdf                                   │ │
-│ └────────────────────────────────────────────────────────── Open .torrent… ⌘O ─┘ │
-│ From clipboard ✕                                                                  │
-│ 7 links · 5 ready · 1 checking · 1 needs attention · 29.1 GB          (Expands ✓) │
+│ ╭───────────────────────────────────────────────────────────────────────────────╮ │
+│ │ https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso              │ │
+│ │ https://cdn.example.org/set/part[01-04].rar                                   │ │
+│ │ magnet:?xt=urn:btih:3f2a91c0…&dn=Big.Buck.Bunny                               │ │
+│ │ https://intranet.example.com/q3-report.pdf                                    │ │
+│ │ From clipboard ✕  7 links · 5 ready · … · 29.1 GB                    [📋][🧲] │ │
+│ ╰───────────────────────────────────────────────────────────────────────────────╯ │
 │ ▣ ubuntu-24.04-desktop-amd64.iso   5.7 GB · HTTPS · resumable · up to 16       ✕ │
 │ ▣ part01.rar … part04.rar          4 × 1.1 GB · expands to 4 links              ✕ │
 │ ◌ Big.Buck.Bunny                   Fetching file list from peers… 0:14 (Add all) ✕ │
 │ ! q3-report.pdf   The server refused access (403) (Paste as cURL)(Add headers)  ✕ │
 │ ▣ report.zip      Already in Ketch · finished 2 days ago   (Open)(Download again) │
-│ (⌂ Save to: Downloads · 412 GB free ▾) (Speed: Unlimited ▾) (Priority: Normal ▾)  │
-│ (Start: Now ▾) (Connections: Auto (4) ▾)                              ▸ Advanced  │
+│ (⌂ Save to: Downloads · 412 GB free ▾) (≡ Options ▾) (⚡ Urgent ✕)                │
 │ ⓘ 2 start now (2 of 2 slots free) · 4 queued · ≈ 12 min at current speed          │
-│ ↩ Add · ⇧↩ New line · ⌥↩ Discover · ⌘O .torrent            (Cancel) (Add 6 downloads) │
+│                             ↩ to download   (Cancel) (Download 6 items · 29.1 GB) │
 ╰───────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-**Input:**
-- A multi-line `KetchTextField` in `mono` 13/18, 1–8 lines, then it scrolls.
-- Placeholder: "Paste links, magnets or a cURL command, one per line".
-- Trailing ghost button: "Open .torrent… ⌘O".
+**Input** (`ui/intake/PasteArea.kt`):
+- One paste/drop area, `body` sans 14/20, 3 lines tall when empty, growing with its text to 8
+  lines (4 while the list shows), then scrolling. It switches to `mono` only when a line is a
+  `curl` command.
+- Placeholder: "Paste links or magnets — or drop a .torrent file" (phones: "Paste links or
+  magnets").
+- Inside the area, at its end: Paste (tooltip "Paste from clipboard ⌘V"; hidden when the
+  clipboard mode is Off) and Open .torrent file (tooltip "Open .torrent file ⌘O"). The area's
+  bottom line holds "From clipboard ✕" and, for a batch, the summary (or "cURL command").
+- While empty, a link on the clipboard (read silently; or system-detected on phones in Suggest
+  mode) shows the accent chip "Paste ubuntu-24.04.iso from clipboard" (phones: "Paste
+  ubuntu-24.04.iso", or "Paste copied link" when only detected); never after the sheet was filled
+  from that clip.
 - `⌘N` prefills it from the clipboard when the clipboard holds a link that is not in Ketch and was
   not offered before (a hash of the last offer is kept in `UiPreferences`). The text is selected,
-  with the caption "From clipboard ✕".
+  with "From clipboard ✕" on the area's bottom line.
+- A drag over the sheet gives the area an accent border, `accentSoft` fill and "Drop to add".
+- Everything below the input (rows, options, outcome, main button) appears only once a link or
+  torrent is in (expand + fade, `medium`; instant under reduce motion). Retry and edit sheets
+  show it at once.
 - Keys: `↩` submits once at least one item is ready; `⇧↩` adds a line; `⌥↩` sends the text to
-  Discover; Esc closes (asks first only when the user typed more than 1 line).
+  Discover; Esc closes (asks first only when the user typed more than 1 line). `⇧↩` shows as the
+  input's tooltip once it holds text.
 - A paste (the field grows by more than 8 characters at once) resolves immediately; typing keeps
   the 500 ms debounce.
 
@@ -1723,10 +1766,18 @@ links immediately" is on (default on desktop and web).
   - amber "Already in Ketch · finished 2 days ago" [Open] [Show] [Download again]. Duplicates are
     excluded by default.
 - **Single item:** a preview card replaces the list. It has a 40 dp chip and a 6 dp lanes preview
-  under Connections, "16 × 360 MB", redrawn as the stepper changes.
-- **Summary line:** "7 links · 5 ready · 1 checking · 1 needs attention · 29.1 GB". When the total
-  exceeds the target's `usableSpace`, an amber line reads "Needs 48.2 GB · only 31.0 GB free on
-  This Mac".
+  under Connections, "16 × 360 MB", redrawn as the stepper changes. The main button reads
+  "Download <name>" (middle ellipsis at 36 characters).
+- **Summary**, on the input's bottom line for a batch: "7 links · 5 ready · 1 checking · 1 needs
+  attention · 29.1 GB". When the total exceeds the target's `usableSpace`, an amber line reads
+  "Needs 48.2 GB · only 31.0 GB free on This Mac".
+
+**Footer:** one hint left of the buttons, "↩ to download / schedule / retry / start over /
+apply". The main button says what it does: "Download <name>", "Download 3 files · 1.2 GB"
+("items" when a torrent is in the batch), "Schedule 2 files", "Download 16 files · 9.3 GB" in the
+torrent stage, "Waiting for file list", "Retry", "Start over", "Apply changes". It is hidden, not
+greyed, while the sheet holds nothing to add. Cancel stays (phones close from the header's ✕).
+Phones: the empty sheet is as tall as its input.
 
 #### 4.9.3 Option pills
 
@@ -1737,17 +1788,21 @@ on phones, and applies to every item.
 | Pill | Menu |
 |---|---|
 | `⌂ Save to: Downloads · 412 GB free` | **Default** (`status().system.downloadDirectory`) · **Recent:** up to 5 parent folders of this device's `Completed.outputPath` and directory destinations (no new storage) · **Pinned** (`UiPreferences.favoriteFolders[deviceId]`, "+ Pin current") · **Choose folder…** (this device only; `FilePicker.pickFolder()`) · **Sort by type** (Video → Movies, Audio → Music, others → Downloads; remembers the last folder per `FileKind`). Remote targets and web: a path field with completion from recent folders, captioned "Folder on NAS-Basement". The destination is built as `folder + system.separator (+ name)`, using the target device's `separator`. An Android SAF tree URI is used as is (a directory `Destination`); a custom file name cannot be combined with it until the API gains a per-request file name, so the File name field is disabled for SAF folders with the caption "Uses the server's file name". Torrents cannot write to SAF folders (`docs/torrent.md`, "Storage and restart"), so for magnet and torrent items the pill falls back to the device's app folder and says so. Remote browsing needs W6 (`GET /api/fs/dirs`). |
-| `Speed: Unlimited` | `SpeedLimitPicker` |
-| `Priority: Normal` | Low "Runs when nothing else is waiting" · Normal "Default order" · High "Ahead of Normal and Low" · ⚡ Urgent "Jumps the queue; may pause a lower-priority download" |
-| `Start: Now` | `StartTimePicker`. When scheduled, the pill reads "Starts 01:00 tonight" and the primary button "Schedule 6 downloads". "Add paused" needs `DownloadSchedule.Manual` (W5). "Only on Wi-Fi" and "While charging" need serializable conditions (W5). |
-| `Connections: Auto (4)` | `ConnectionStepper`, range 1 to min(resolved.maxSegments, 32). Disabled with "This server allows 1 connection" when `maxSegments ≤ 1`. "Peer limit" for torrents. |
+| `≡ Options: Unlimited · Normal · Now · Auto` | One popover (a bottom sheet on touch) holding `SpeedLimitPicker`, the priority segmented control with its caption (Low "Runs when nothing else is waiting" · Normal "Default order" · High "Ahead of Normal and Low" · ⚡ Urgent "Jumps the queue; may pause a lower-priority download"), `StartTimePicker` (not for Retry) and `ConnectionStepper` (range 1 to min(resolved.maxSegments, 32), Auto reset; "Peer limit" for torrents; disabled with "This server allows 1 connection" when `maxSegments ≤ 1`), then "Advanced options…". When scheduled, the primary button reads "Schedule 6 files". "Add paused" needs `DownloadSchedule.Manual` (W5). "Only on Wi-Fi" and "While charging" need serializable conditions (W5). |
 | `On: (LM) This Mac` (header) | Only with 2 or more devices. Rows: pennant, health, "1.8 TB free · 2 active · Slow lane", `⌘⌥n`. Resolution re-runs on the new target. Remembered per kind for the session ("magnets → NAS"). Cookie warning when headers are present (§4.5.5). |
 
+- Values changed from their defaults leave the summary for removable chips after the pill
+  ("Max 5 MB/s ✕", "⚡ Urgent ✕", "High priority ✕", "Starts 23:00 tonight ✕", "8 connections ✕";
+  ✕ restores the default), and once anything changed the pill reads just "Options".
+- The row never wraps: it drops the "Save to" label, then the free space, then the summary, then
+  the "Options" label, then scrolls.
+- The sheet that edits a task shows the four controls in place.
 - **Sticky defaults** per device: folder, priority and connections. Speed and start reset each
   time.
-- **▸ Advanced** (open state remembered): File name (single item only), Referer, User-Agent
-  (Ketch / Chrome / Firefox / Safari / Custom), Cookie (masked, multi-line), Authorization,
-  "+ Add header", and [Paste cURL].
+- **Advanced** (opened from "Advanced options…"; an "ADVANCED · Hide" header; open state still
+  remembered): File name (single item only), Referer, User-Agent (Ketch / Chrome / Firefox /
+  Safari / Custom), Cookie (masked, multi-line), Authorization, "+ Add header", and [Paste cURL].
+  A "2 headers" chip after the pill opens it while it is closed.
   - Headers go to **both** `resolve(url, properties = headers)` (for HTTP sources the
     `properties` of `resolve` *are* request headers) and `DownloadRequest.headers`. Bookkeeping keys
     such as `ketch.origin` go only to `DownloadRequest.properties`, which Ketch never reads, and
@@ -1758,7 +1813,7 @@ on phones, and applies to every item.
   - "Queued · 3rd in line"
   - "⚡ Urgent: starts now and pauses debian-12.iso (Low)"
   - "Waits for github.com · 8 per server"
-  - "Starts 01:00 tonight"
+  - A scheduled start is left to the Start chip.
 
 #### 4.9.4 Submit
 
@@ -1768,7 +1823,8 @@ on phones, and applies to every item.
   - single item: "✓ Added ubuntu.iso → This Mac" [Show] [Undo];
   - batch: "Added 5 downloads · 1 failed" [Review] (reopens the sheet with the failed rows);
   - another device: "Added to NAS-Basement" [Show], where Show switches the device.
-- If the active tab or search hides the new rows, the view switches to All and scrolls to them.
+- If the active tab or search hides the new rows, the view switches to All and clears the
+  search; the new rows are pointed out as in §4.9.1.
 
 #### 4.9.5 Problems (`util/IntakeProblems.kt`)
 
@@ -1798,15 +1854,15 @@ when **every** item failed, with "Add anyway" as the secondary.
 │   ☑ ▤ S01E01.en.srt                                                     48 KB     │
 │ ☐ ▸ Extras/  (sample.mkv, info.nfo)                                    880 MB     │
 │ Skipped 3 extras · Undo        ▰▰▱▱▱▱▱▱  needs 4.2 GB · 1.8 TB free on NAS        │
-│                                                  (Add all files) (Add 3 files)    │
+│                                     (Download all) (Download 3 files · 4.2 GB)    │
 ╰───────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 **Before metadata arrives:**
 - "Fetching file list from peers… 0:14" with a 3 dp indeterminate bar.
-- [Add all files now] and [Finish in background]. Finish in background closes the sheet and puts a
-  "Resolving 1" chip in the page header; when metadata arrives, the sheet reopens, or a toast
-  appears if the user has moved on.
+- [Download all files now] and [Finish in background]. Finish in background closes the sheet and
+  puts a "Resolving 1" chip in the page header; when metadata arrives, the sheet reopens, or a
+  toast appears if the user has moved on.
 - The primary button is **disabled** and reads "Waiting for file list", so an early click can no
   longer grab 61 GB.
 
@@ -1872,17 +1928,17 @@ has no landing grid of category cards; the category list opens straight onto a p
 ╭ Settings ───────────────────────────────────────────────────────────────────────────────╮
 │ [⌕ Search settings  ⌘F]      │ Speed                                on (LM) This Mac ▾ │
 │ THIS APP                     │ MODE                                                     │
-│ (▣) General  Light · Signal  │ (Full speed | [Slow lane] | Auto)                        │
-│ (▣) Notifications  2 on      │ Full speed cap        (Unlimited ▾)                      │
-│ (▣) Integration  Chrome ✓    │ Slow lane speed       (1 MB/s ▾) · ≈ 3.1 MB/s suggested  │
-│ (▣) Discover  Claude         │ AUTO                                                     │
+│ (▣) General                  │ (Full speed | [Slow lane] | Auto)                        │
+│ (▣) Notifications            │ Full speed cap        (Unlimited ▾)                      │
+│ (▣) Integration              │ Slow lane speed       (1 MB/s ▾) · ≈ 3.1 MB/s suggested  │
+│ (▣) Discover                 │ AUTO                                                     │
 │ (▣) About                    │ Slow lane on (M)(T)(W)(T)(F) S S   09:00 – 18:00   ✕     │
 │ DEVICE  (LM) This Mac ▾      │ + Add rule                                               │
-│ (▣) Downloads ~/Downloads · 2│ On metered networks (Android)  (Slow lane ▾)             │
-│ (▣) Speed  Slow lane · Auto  │ PER DOWNLOAD                                             │
-│ (▣) Network  Wi-Fi+Ethernet  │ Connections per download     [−] 4 [+]                   │
-│ (▣) BitTorrent  3 trackers   │                                                          │
-│ (▣) Sharing  On · :8642      │                Changes apply as you make them.           │
+│ (▣) Downloads                │ On metered networks (Android)  (Slow lane ▾)             │
+│ (▣) Speed                    │ PER DOWNLOAD                                             │
+│ (▣) Network                  │ Connections per download     [−] 4 [+]                   │
+│ (▣) BitTorrent               │                                                          │
+│ (▣) Sharing                  │                Changes apply as you make them.           │
 ╰─────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1894,8 +1950,10 @@ has no landing grid of category cards; the category list opens straight onto a p
   (embedded device only; renamed from "Remote access").
   - The chip edits **any connected device** without switching the main window.
   - The same pages open from a device's menu or card ("Settings for NAS-Basement").
-- **Nav items** are 40 dp with a 32 dp `KetchHueTile` and a live summary in `caption`
-  `textTertiary`:
+- **Nav items** beside the open page are single-line sidebar items (32 dp in Compact, §3.7)
+  with a 24 dp `KetchHueTile` and the page name, like the app's sidebar. The phone's list of
+  pages adds a live summary in `caption` `textTertiary`, which the nav items give screen readers
+  as their state instead:
   - General: "Light · Signal"
   - Downloads: "~/Downloads · 2 at a time"
   - Speed: "Slow lane · 1 MB/s · Auto weekdays"
@@ -1903,6 +1961,9 @@ has no landing grid of category cards; the category list opens straight onto a p
   - BitTorrent: "3 trackers"
   - Sharing: "On · 192.168.1.20:8642"
   - Discover: "Claude · Brave search"
+- **Copy:** a row's helper text is one short line (about 60 characters at most) and only says
+  what its label does not. Caveats such as "after a restart" join that line, or a one-line note
+  under the group.
 - **Hue map:** General = Slate, Notifications = Amber, Integration = Indigo, Discover = Violet,
   About = Slate, Downloads = Blue, Speed = Orange, Network = Teal, BitTorrent = Jade,
   Sharing = Sky.
@@ -1970,8 +2031,8 @@ has no landing grid of category cards; the category list opens straight onto a p
     `updateConfig` for the embedded device while the app runs (the Android service keeps it alive).
     For remotes it works only while this client is connected; daemon-side rules are not scheduled
     (§8).
-- **Network:** interface chips with live state and the copy "Requests are spread across the
-  selected networks." Runtime-only notice kept.
+- **Network:** interface chips with live state and the copy "HTTP only. FTP and torrents use
+  the system default." The runtime-only note stays, as one line under the group.
 - **BitTorrent:** trackers editor (unchanged).
 - **Sharing:** the Pair a device card (§4.10.4), then **Advanced** (collapsed): port, token
   (masked, [Rotate]), discoverable (mDNS), CORS hosts, start with Ketch.
@@ -1992,7 +2053,7 @@ PAIR A DEVICE
 │ ▓▓ ▓ ▓▓▓ ▓ │  Scan with your phone's camera, or open http://192.168.1.20:8642
 │ ▓▓▓▓ ▓ ▓▓▓ │  Lins-MacBook-Pro · 192.168.1.20 · also 10.0.0.4
 ╰────────────╯  (⧉ Copy pairing link) (↗ Open web app)
-                Anyone with this code can control This Mac.   (New code)
+                Anyone with it can control This Mac.   (New code)
 ```
 
 - **QR** (180 dp, `qrose`) of
@@ -2163,7 +2224,7 @@ icon, scope, chord per platform, and whether it shows in menus. The registry dri
 | Global | `⇧⌘R` | Ctrl+Shift+R | Resume all in scope |
 | Global | `⌥⌘R` | Ctrl+Alt+R | Retry all failed in scope |
 | Global | `⇧⌘L` | Ctrl+Shift+L | Slow lane on/off |
-| Global | `⌘I` | Ctrl+I | Toggle inspector |
+| Global | `⌘I` | Ctrl+I | Show details of the selected download |
 | Global | `⌃⌘S` | Ctrl+Shift+S | Toggle sidebar / rail |
 | Global | `⌘J` | Ctrl+J | Activity popover |
 | Global | `⌘Z` | Ctrl+Z | Undo last remove / clear / pause / move |
@@ -2496,10 +2557,10 @@ PermissionDenied, Dns, Refused, Timeout, Tls) are W5.
     Device…, Close Window ⌘W.
   - **Edit:** Undo {action} ⌘Z, Cut, Copy, Paste, Select All, Find ⌘F, Command Palette ⌘K.
   - **View:** All…Failed ⌘1–6, Table/List, Group By ▸, Columns ▸, Density ▸, Toggle Sidebar ⌃⌘S,
-    Toggle Inspector ⌘I, Discover ⌘E, Devices ⌘0, Activity ⌘J.
-  - **Downloads:** Pause/Resume, Open ↩, Show in Finder ⌘↩, Copy Link ⌘C, Start Now, Speed
-    Limit ▸, Connections ▸, Priority ▸, Start Later ▸, Send To ▸, Retry ⌘R, Remove ⌫, Pause All,
-    Resume All, Retry Failed, Slow Lane ⇧⌘L.
+    Discover ⌘E, Devices ⌘0, Activity ⌘J.
+  - **Downloads:** Pause/Resume, Open ↩, Show Details ⌘I, Show in Finder ⌘↩, Copy Link ⌘C, Start Now,
+    Speed Limit ▸, Connections ▸, Priority ▸, Start Later ▸, Send To ▸, Retry ⌘R, Remove ⌫,
+    Pause All, Resume All, Retry Failed, Slow Lane ⇧⌘L.
   - **Device:** All Devices ⌘⌥0, one checkable item per device ⌘⌥1–9, Pair a Device…
   - **Window.**
   - **Help:** Keyboard Shortcuts ⌘/, Setup Checklist, Open Logs Folder, Report an Issue.
@@ -2887,7 +2948,7 @@ existing screens render unchanged.
   Options/Undo toast).
 - Intent APIs: `intakeRequest` + `openIntake(IntakeRequest)`, `settingsRequest` +
   `openSettings(SettingsTarget)`, `openDiscover(DiscoverRequest)`, `inspectedTask`,
-  `inspectorOpen`, `selectedKeys`, `focusSearchRequests`.
+  `selectedKeys`, `focusSearchRequests`.
 - `addDroppedFiles` routes link text to `openIntake` instead of the "Only .torrent files" error.
 - Move AI discovery orchestration into `AiDiscoverController` (AppState keeps thin forwarding
   methods, so `AiDiscoveryContent` compiles), and make "Download selected" add each candidate on its

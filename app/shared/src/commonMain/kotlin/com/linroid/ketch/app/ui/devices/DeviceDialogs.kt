@@ -94,10 +94,9 @@ internal fun RenameDeviceDialog(state: AppState, device: DevicePresence, onDismi
   ) {
     Text(
       text = if (remote != null) {
-        "Ketch shows it by this name. Leave it empty to use the name it announces."
+        "Leave it empty for the name it announces."
       } else {
-        "Your other devices see ${device.name} by this name. Leave it empty to use the " +
-          "system name. Applies after a restart."
+        "Your other devices see this name after a restart."
       },
       style = KetchTheme.typography.body,
       color = KetchTheme.colors.textSecondary,

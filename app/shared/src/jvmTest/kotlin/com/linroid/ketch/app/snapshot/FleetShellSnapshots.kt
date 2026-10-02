@@ -92,7 +92,7 @@ class FleetShellSnapshots {
   fun sidebar_keyboardFocus_ringsTheDeviceRow() {
     val light = listOf(SnapshotTheme.Light)
     fleetSnapshots("fleet-focus", listOf(SnapshotSize.Desktop), themes = light) {
-      // ◧, ⊕, Downloads, Devices, All devices, This Mac, then NAS-Basement.
+      // ◧, the appearance toggle, Downloads, Devices, All devices, This Mac, then NAS-Basement.
       repeat(FOCUS_STEPS) { scene.pressKey(Key.Tab) }
     }
   }

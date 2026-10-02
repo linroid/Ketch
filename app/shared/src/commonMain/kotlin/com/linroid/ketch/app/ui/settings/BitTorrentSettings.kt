@@ -41,8 +41,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
     if (torrent == null) {
       SettingsNotice(
-        text = "Extra trackers of ${device.label} can only be changed on that device, in " +
-          "Ketch's BitTorrent settings or under [torrent] in its config.toml.",
+        text = "Change the extra trackers on ${device.label} itself, or in its config.toml.",
         tone = NoticeTone.Info,
       )
       return@Column
@@ -72,9 +71,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
     }
     SettingsGroup(
       title = "Extra trackers",
-      footer = "Public torrents and magnet links announce to these as well as their own " +
-        "trackers, which helps when a network blocks those. Private torrents never use " +
-        "them. Torrents pick up changes when they start or resume." +
+      footer = "Public torrents also announce to these as they start; private ones never do." +
         if (trackers.size > MAX_EXTRA_TRACKERS) {
           " Only the first $MAX_EXTRA_TRACKERS are used."
         } else {
@@ -104,10 +101,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
         },
       )
       if (trackers.isEmpty()) {
-        SettingsRow(
-          title = "No extra trackers",
-          description = "Public torrents use only their own trackers.",
-        )
+        SettingsRow(title = "No extra trackers")
       }
       trackers.forEachIndexed { index, url ->
         val host = trackerHost(url)
@@ -152,7 +146,7 @@ private fun AddTrackersRow(onAdd: (String) -> List<RejectedTracker>) {
   }
   SettingsRow(
     title = "Add trackers",
-    description = "Paste one or more announce URLs starting with http://, https:// or udp://.",
+    description = "One or more http, https or udp announce URLs.",
   ) {
     Row(
       verticalAlignment = Alignment.Top,
