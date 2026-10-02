@@ -34,7 +34,9 @@ import kotlin.time.Instant
  * @property name name to show, such as "This Mac" or "NAS-Basement".
  * @property number its place in the list of devices, from 1, which `⌥⌘1`… switch to.
  * @property active whether the app shows it now.
- * @property line what it is doing, such as "2 downloading" or "Offline".
+ * @property line what it is doing, such as "2 active · 6.4 MB/s" or "Offline".
+ * @property reachable whether it can take a download now; an offline device, or one that needs
+ *   a token, cannot.
  */
 @Immutable
 internal data class PaletteDevice(
@@ -43,6 +45,7 @@ internal data class PaletteDevice(
   val number: Int,
   val active: Boolean,
   val line: String,
+  val reachable: Boolean = true,
 )
 
 /**
@@ -51,6 +54,7 @@ internal data class PaletteDevice(
  * @property modes whether it has speed modes, so the Slow lane can be set; only the embedded
  *   device has them.
  * @property slowLane whether the Slow lane is in effect.
+ * @property rules whether speed rules turn the Slow lane on and off.
  * @property slowLaneSpeed the Slow lane's speed, while the device has [modes].
  * @property cap its standing cap, which applies at full speed.
  */
@@ -58,6 +62,7 @@ internal data class PaletteDevice(
 internal data class PaletteSpeed(
   val modes: Boolean = false,
   val slowLane: Boolean = false,
+  val rules: Boolean = false,
   val slowLaneSpeed: SpeedLimit? = null,
   val cap: SpeedLimit = SpeedLimit.Unlimited,
 )
@@ -133,16 +138,18 @@ private fun linkItems(
   val single = urls.singleOrNull()
   val subject = single?.let(::linkName) ?: "${urls.size} links"
   val icon = single?.let { PaletteIcon.File(subject, it) } ?: PaletteIcon.Glyph(KetchIcon.Link)
-  val devices = source.devices.sortedBy { !it.active }
+  // The active device first, then the others that can take the links, then the rest.
+  val devices = source.devices.sortedWith(compareBy({ !it.active }, { !it.reachable }))
   val alternateKey = KetchCommands.PaletteAlternate.shortcutLabel(source.platform)
   return buildList {
     for (device in devices) {
+      val place = "on ${device.name}"
       add(
         PaletteItem(
           id = "",
           provider = PaletteProvider.Links,
           title = "Download $subject",
-          subtitle = "on ${device.name}",
+          subtitle = if (device.reachable) place else "$place · ${device.line}",
           icon = icon,
           action = PaletteAction.Download(query, urls, device.deviceId, now),
           alternate = PaletteAction.AddWithOptions(query, device.deviceId),
@@ -180,11 +187,16 @@ private fun speedItems(source: PaletteSource, query: String): List<PaletteItem> 
     direct = true,
   )
   if (!source.speed.modes) return listOf(cap)
+  val now = source.speed.slowLaneSpeed
   val slowLane = PaletteItem(
     id = "",
     provider = PaletteProvider.Speed,
     title = "Set Slow lane to $speed",
-    subtitle = if (source.speed.slowLane) "Slow lane is on" else "Turns the Slow lane on",
+    subtitle = when {
+      !source.speed.slowLane -> "Turns the Slow lane on"
+      now == null -> "Slow lane is on"
+      else -> "Now ${formatSpeedLimit(now)}"
+    },
     icon = PaletteIcon.Glyph(KetchIcon.SlowLane),
     action = PaletteAction.SlowLane(limit),
     direct = true,
@@ -199,7 +211,6 @@ private fun commandItems(source: PaletteSource): List<PaletteItem> {
       !it.isTabOrDevice()
   }
   val items = (COMMAND_ORDER.filter { it in bound } + others)
-    .filterNot { it == KetchCommands.PasteLinks && source.platform.isWeb }
     .filterNot { it == KetchCommands.SlowLane && !source.speed.modes }
     .map { commandItem(source, it, source.rows) }
     .toMutableList()
@@ -250,10 +261,12 @@ private fun commandItem(
   )
 }
 
+// Says what running it changes: the speed mode first, as [PaletteRunner] does, then the cap.
 private fun fullSpeedItem(source: PaletteSource): PaletteItem {
   val speed = source.speed
   val subtitle = when {
     speed.slowLane -> "Turns the Slow lane off"
+    speed.rules -> "Turns speed rules off"
     !speed.cap.isUnlimited -> "Lifts the ${formatSpeedLimit(speed.cap)} limit"
     else -> "Already at full speed"
   }
@@ -319,9 +332,10 @@ private fun primaryAction(source: PaletteSource, row: TaskRow): RowAction {
     is DownloadState.Completed -> offered(RowAction.Open)
     is DownloadState.Downloading, DownloadState.Queued -> offered(RowAction.Pause)
     is DownloadState.Paused -> offered(RowAction.Resume)
-    // The row's own fix comes first, such as Edit link for a link the server turned away.
+    // The row's own fix comes first, such as Edit link for a link the server turned away; a
+    // copy is no fix, so a gone file retries as Space does.
     is DownloadState.Failed, DownloadState.Canceled ->
-      row.content.primary?.takeIf { source.canRun(it, row) }
+      row.content.primary?.takeIf { it !in COPIES && source.canRun(it, row) }
         ?: offered(RowAction.Retry)
         ?: offered(RowAction.DownloadAgain)
     is DownloadState.Scheduled -> null
@@ -486,7 +500,6 @@ private fun downloads(count: Int): String = "$count ${noun(count)}"
 private val COMMAND_ORDER: List<KetchCommand> = listOf(
   KetchCommands.Add,
   KetchCommands.AddClipboardLink,
-  KetchCommands.PasteLinks,
   KetchCommands.OpenTorrent,
   KetchCommands.PauseAll,
   KetchCommands.ResumeAll,
@@ -510,12 +523,24 @@ private val SPEED_ANCHORS: Set<KetchCommand> = setOf(
   KetchCommands.SlowLane
 )
 
-/** Commands listed elsewhere, or that make no sense from the palette. */
+/**
+ * Commands listed elsewhere, or that make no sense from the palette, such as Paste links: in the
+ * palette `⌘V` pastes into its field, which offers the links.
+ */
 private val NOT_COMMANDS: Set<KetchCommand> = setOf(
   KetchCommands.Palette,
+  KetchCommands.PasteLinks,
   KetchCommands.Discover,
   KetchCommands.Devices,
   KetchCommands.AllDevices
+)
+
+/** Row actions that only copy something, which ↩ on a failed download never runs. */
+private val COPIES: Set<RowAction> = setOf(
+  RowAction.CopyLink,
+  RowAction.CopyPath,
+  RowAction.CopyError,
+  RowAction.CopyDetails
 )
 
 /** Kinds of link added without the add sheet, like a quick add. */

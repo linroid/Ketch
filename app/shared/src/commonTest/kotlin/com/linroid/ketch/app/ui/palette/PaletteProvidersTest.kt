@@ -75,6 +75,26 @@ class PaletteProvidersTest {
   }
 
   @Test
+  fun paletteItems_speedWhileTheSlowLaneIsOn_namesItsSpeedNow() {
+    val speed = PaletteSpeed(modes = true, slowLane = true, slowLaneSpeed = SpeedLimit.mbps(1))
+
+    val first = results(source("5m").copy(speed = speed)).first()
+
+    assertEquals("Set Slow lane to 5 MB/s", first.title)
+    assertEquals("Now 1 MB/s", first.subtitle)
+  }
+
+  @Test
+  fun paletteItems_fullUnderSpeedRules_saysItTurnsTheRulesOff() {
+    val speed = PaletteSpeed(modes = true, rules = true, cap = SpeedLimit.mbps(5))
+
+    val first = results(source("full").copy(speed = speed)).first()
+
+    assertEquals(PaletteAction.FullSpeed, first.action)
+    assertEquals("Turns speed rules off", first.subtitle)
+  }
+
+  @Test
   fun paletteItems_link_downloadsOnTheActiveDeviceFirstThenTheOthers() {
     val url = "https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso"
 
@@ -89,6 +109,29 @@ class PaletteProvidersTest {
     assertEquals("⌥⌘2", items[1].shortcut)
     assertEquals(PaletteAction.AddWithOptions(url, LOCAL_DEVICE_ID), items[2].action)
     assertTrue(items.none { it.action is PaletteAction.Discover })
+  }
+
+  @Test
+  fun paletteItems_linkWithAnOfflineDevice_namesItsStateAndListsItLast() {
+    val url = "https://example.com/ubuntu.iso"
+    val offline = nas.copy(number = 2, reachable = false)
+    val phone = PaletteDevice("phone.local:8642", "Pixel", 3, active = false, "Idle")
+
+    val items = results(source(url, devices = listOf(thisMac, offline, phone)))
+
+    val subtitles = items.filter { it.action is PaletteAction.Download }.map { it.subtitle }
+    assertEquals(listOf("on This Mac", "on Pixel", "on NAS-Basement · Offline"), subtitles)
+  }
+
+  @Test
+  fun paletteItems_failedDownloadWhoseFixIsACopy_retriesInstead() {
+    val gone = ListFixtures.row("gone", DownloadState.Failed(KetchError.Http(404)))
+    val source = source("gone").copy(rows = listOf(gone))
+
+    val item = results(source).first { it.provider == PaletteProvider.Downloads }
+
+    assertEquals(RowAction.CopyLink, gone.content.primary)
+    assertEquals(PaletteAction.Task(gone.key, RowAction.Retry), item.action)
   }
 
   @Test
@@ -107,6 +150,16 @@ class PaletteProvidersTest {
     assertTrue("Pause 1 download" in titles)
     assertTrue("Resume 1 paused" in titles)
     assertTrue("Retry 2 failed downloads" in titles)
+  }
+
+  @Test
+  fun paletteItems_commands_leavePastingToTheField() {
+    val commands = paletteItems(source("")).mapNotNull {
+      (it.action as? PaletteAction.Command)?.command
+    }
+
+    assertFalse(KetchCommands.PasteLinks in commands)
+    assertTrue(KetchCommands.AddClipboardLink in commands)
   }
 
   @Test
