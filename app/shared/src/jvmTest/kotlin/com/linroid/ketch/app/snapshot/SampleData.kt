@@ -11,6 +11,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -243,7 +244,8 @@ private fun sampleTasks(): List<ListTestTask> = listOf(
   ),
 )
 
-private fun task(
+/** A task of a snapshot device, saving to [dir], added [ago] before [SampleData.NOW]. */
+internal fun task(
   id: String,
   url: String,
   state: DownloadState,
@@ -252,12 +254,13 @@ private fun task(
   connections: Int = 0,
   priority: DownloadPriority = DownloadPriority.NORMAL,
   speedLimit: SpeedLimit = SpeedLimit.Unlimited,
+  dir: String = SampleData.DOWNLOAD_DIR,
 ): ListTestTask = ListTestTask(
   taskId = id,
   state = state,
   request = DownloadRequest(
     url = url,
-    destination = Destination("${SampleData.DOWNLOAD_DIR}/"),
+    destination = Destination("$dir/"),
     connections = connections,
     priority = priority,
     speedLimit = speedLimit,
@@ -267,7 +270,7 @@ private fun task(
 )
 
 /** A segmented HTTP download whose segment `i` is `lanes[i]` done. */
-private fun downloading(
+internal fun downloading(
   id: String,
   url: String,
   total: Long,
@@ -275,6 +278,7 @@ private fun downloading(
   lanes: List<Double>,
   ago: Duration,
   priority: DownloadPriority = DownloadPriority.NORMAL,
+  dir: String = SampleData.DOWNLOAD_DIR,
 ): ListTestTask {
   val segments = lanes(total, lanes)
   val progress = DownloadProgress(segments.sumOf { it.downloadedBytes }, total, speed)
@@ -286,23 +290,32 @@ private fun downloading(
     segments = segments,
     connections = lanes.size,
     priority = priority,
+    dir = dir,
   )
 }
 
-private fun completed(id: String, url: String, total: Long, time: Duration, ago: Duration) =
-  task(
-    id = id,
-    url = url,
-    state = DownloadState.Completed(
-      outputPath = "${SampleData.DOWNLOAD_DIR}/${extractFilename(url)}",
-      totalBytes = total,
-      downloadTime = time,
-    ),
-    ago = ago,
-  )
+/** A download of [total] bytes that took [time], saved in [dir]. */
+internal fun completed(
+  id: String,
+  url: String,
+  total: Long,
+  time: Duration,
+  ago: Duration,
+  dir: String = SampleData.DOWNLOAD_DIR,
+) = task(
+  id = id,
+  url = url,
+  state = DownloadState.Completed(
+    outputPath = "$dir/${extractFilename(url)}",
+    totalBytes = total,
+    downloadTime = time,
+  ),
+  ago = ago,
+  dir = dir,
+)
 
 /** [total] bytes split evenly into one segment per entry of [done], each that much done. */
-private fun lanes(total: Long, done: List<Double>): List<Segment> {
+internal fun lanes(total: Long, done: List<Double>): List<Segment> {
   val size = total / done.size
   return done.mapIndexed { index, fraction ->
     val start = index * size
@@ -311,12 +324,24 @@ private fun lanes(total: Long, done: List<Double>): List<Segment> {
   }
 }
 
-/** The embedded device of [SampleData]: its tasks, its settings and its disk. */
-internal class SampleKetchApi(private val data: SampleData) : KetchApi {
-  private val taskList = MutableStateFlow<List<DownloadTask>>(data.tasks)
-  private var config = data.downloadConfig
+/**
+ * A device of the snapshots named [name], on [os] with its downloads in [directory]: its tasks,
+ * starting from [initial], its settings and its disk.
+ */
+internal class SampleKetchApi(
+  private val name: String,
+  initial: List<DownloadTask>,
+  private var config: DownloadConfig,
+  private val os: String = "Mac OS X",
+  private val directory: String = SampleData.DOWNLOAD_DIR,
+  private val version: String = KetchApi.VERSION,
+) : KetchApi {
+  /** The embedded device of [data]. */
+  constructor(data: SampleData) : this(data.deviceName, data.tasks, data.downloadConfig)
 
-  override val backendLabel: String = data.deviceName
+  private val taskList = MutableStateFlow(initial)
+
+  override val backendLabel: String = name
   override val tasks: StateFlow<List<DownloadTask>> = taskList
 
   override suspend fun download(request: DownloadRequest): DownloadTask {
@@ -344,13 +369,13 @@ internal class SampleKetchApi(private val data: SampleData) : KetchApi {
     throw KetchError.Unsupported()
 
   override suspend fun status(): KetchStatus = KetchStatus(
-    name = data.deviceName,
-    version = KetchApi.VERSION,
+    name = name,
+    version = version,
     revision = KetchApi.REVISION,
     uptime = 3.days.inWholeSeconds,
     config = config,
     system = SystemInfo(
-      os = "Mac OS X",
+      os = os,
       arch = "aarch64",
       separator = "/",
       javaVersion = "21",
@@ -358,7 +383,7 @@ internal class SampleKetchApi(private val data: SampleData) : KetchApi {
       maxMemory = 4 * GIB,
       totalMemory = GIB,
       freeMemory = 512 * MIB,
-      downloadDirectory = SampleData.DOWNLOAD_DIR,
+      downloadDirectory = directory,
       totalSpace = 994_662_584_320,
       freeSpace = 412_316_860_416,
       usableSpace = 412_316_860_416,
@@ -373,6 +398,80 @@ internal class SampleKetchApi(private val data: SampleData) : KetchApi {
 
   override fun close() {}
 }
+
+/**
+ * A remote device of the snapshots that answers with [status] and lists [tasks]; it adds and
+ * checks links only through [download] and [resolve].
+ */
+internal class SampleDeviceApi(
+  private var status: KetchStatus,
+  tasks: List<DownloadTask>,
+  private val networks: NetworkInterfaces = NetworkInterfaces(),
+  private val download: ((DownloadRequest) -> DownloadTask)? = null,
+  private val resolve: (suspend (String) -> ResolvedSource)? = null,
+) : KetchApi {
+  override val backendLabel: String = status.name
+  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(tasks)
+
+  override suspend fun status(): KetchStatus = status
+
+  override suspend fun updateConfig(config: DownloadConfig) {
+    status = status.copy(config = config)
+  }
+
+  override suspend fun networkInterfaces(): NetworkInterfaces = networks
+
+  override suspend fun download(request: DownloadRequest): DownloadTask =
+    download?.invoke(request) ?: throw UnsupportedOperationException("Not in snapshots")
+
+  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+    resolve?.invoke(url) ?: throw UnsupportedOperationException("Not in snapshots")
+
+  override suspend fun start() {}
+
+  override fun close() {}
+}
+
+/** What a remote device of the snapshots named [name] reports, up for [uptime]. */
+internal fun sampleStatus(
+  name: String,
+  uptime: Duration,
+  config: DownloadConfig,
+  system: SystemInfo,
+): KetchStatus = KetchStatus(
+  name = name,
+  version = KetchApi.VERSION,
+  revision = KetchApi.REVISION,
+  uptime = uptime.inWholeSeconds,
+  config = config,
+  system = system,
+)
+
+/** A four-core system on [os] with [usable] of [total] bytes free in [directory]. */
+internal fun sampleSystem(
+  os: String,
+  directory: String,
+  total: Long,
+  usable: Long,
+  arch: String = "amd64",
+  separator: String = "/",
+  maxMemory: Long = 0,
+  totalMemory: Long = 0,
+  freeMemory: Long = 0,
+): SystemInfo = SystemInfo(
+  os = os,
+  arch = arch,
+  separator = separator,
+  javaVersion = "21",
+  availableProcessors = 4,
+  maxMemory = maxMemory,
+  totalMemory = totalMemory,
+  freeMemory = freeMemory,
+  downloadDirectory = directory,
+  totalSpace = total,
+  freeSpace = usable,
+  usableSpace = usable,
+)
 
 /**
  * The devices, config and controller behind one app snapshot, run on [SnapshotHarness.ui] with

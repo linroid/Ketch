@@ -15,9 +15,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
-import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -39,7 +37,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -319,12 +316,12 @@ private class DevicesPageEnvironment(
 
   private fun remote(config: RemoteConfig): RemoteInstance {
     val (api, state) = when (config.host) {
-      Nas.host -> DevicesPageRemoteApi(nasStatus(), nasTasks) to
+      Nas.host -> SampleDeviceApi(nasStatus(), nasTasks, RemoteNetworks) to
         MutableStateFlow<ConnectionState>(ConnectionState.Connected)
-      DenPc.host -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to denPc
-      GaragePi.host -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to
+      DenPc.host -> SampleDeviceApi(denPcStatus(), emptyList(), RemoteNetworks) to denPc
+      GaragePi.host -> SampleDeviceApi(denPcStatus(), emptyList(), RemoteNetworks) to
         MutableStateFlow<ConnectionState>(ConnectionState.Disconnected())
-      else -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to
+      else -> SampleDeviceApi(denPcStatus(), emptyList(), RemoteNetworks) to
         MutableStateFlow<ConnectionState>(ConnectionState.Unauthorized)
     }
     return RemoteInstance(instance = api, remoteConfig = config, connectionState = state)
@@ -361,43 +358,17 @@ private class DevicesPageLocalApi(private val sample: SampleKetchApi) : KetchApi
   )
 }
 
-/** A remote device that answers with [status] and lists [tasks]. */
-private class DevicesPageRemoteApi(
-  private var status: KetchStatus,
-  tasks: List<DownloadTask>,
-) : KetchApi {
-  override val backendLabel: String = status.name
-  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(tasks)
-
-  override suspend fun status(): KetchStatus = status
-
-  override suspend fun updateConfig(config: DownloadConfig) {
-    status = status.copy(config = config)
-  }
-
-  override suspend fun networkInterfaces(): NetworkInterfaces = NetworkInterfaces(
-    supported = true,
-    available = listOf(NetworkInterfaceInfo("eth0", "eth0", listOf("192.168.1.40"))),
-  )
-
-  override suspend fun download(request: DownloadRequest): DownloadTask =
-    throw UnsupportedOperationException("Not in snapshots")
-
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    throw UnsupportedOperationException("Not in snapshots")
-
-  override suspend fun start() {}
-
-  override fun close() {}
-}
+/** The one network a remote device downloads over. */
+private val RemoteNetworks = NetworkInterfaces(
+  supported = true,
+  available = listOf(NetworkInterfaceInfo("eth0", "eth0", listOf("192.168.1.40"))),
+)
 
 private const val GB = 1_000_000_000L
 
-private fun nasStatus(): KetchStatus = KetchStatus(
+private fun nasStatus(): KetchStatus = sampleStatus(
   name = "NAS-Basement",
-  version = KetchApi.VERSION,
-  revision = KetchApi.REVISION,
-  uptime = 12.days.inWholeSeconds,
+  uptime = 12.days,
   config = DownloadConfig(
     defaultDirectory = "/volume1/downloads",
     speedLimit = SpeedLimit.mbps(20),
@@ -411,11 +382,9 @@ private fun nasStatus(): KetchStatus = KetchStatus(
   ),
 )
 
-private fun denPcStatus(): KetchStatus = KetchStatus(
+private fun denPcStatus(): KetchStatus = sampleStatus(
   name = "Den-PC",
-  version = KetchApi.VERSION,
-  revision = KetchApi.REVISION,
-  uptime = 5.hours.inWholeSeconds,
+  uptime = 5.hours,
   config = DownloadConfig(),
   system = system(
     os = "Windows 11",
@@ -427,19 +396,13 @@ private fun denPcStatus(): KetchStatus = KetchStatus(
 )
 
 private fun system(os: String, arch: String, directory: String, total: Long, usable: Long) =
-  SystemInfo(
+  sampleSystem(
     os = os,
+    directory = directory,
+    total = total,
+    usable = usable,
     arch = arch,
     separator = if (os.startsWith("Windows")) "\\" else "/",
-    javaVersion = "21",
-    availableProcessors = 4,
-    maxMemory = 0,
-    totalMemory = 0,
-    freeMemory = 0,
-    downloadDirectory = directory,
-    totalSpace = total,
-    freeSpace = usable,
-    usableSpace = usable,
   )
 
 private fun sampleNasTasks(): List<DownloadTask> = listOf(

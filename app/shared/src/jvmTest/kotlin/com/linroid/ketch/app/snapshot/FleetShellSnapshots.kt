@@ -18,11 +18,8 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
-import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.components.KetchMenuPanel
@@ -51,7 +48,6 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.yield
 import java.io.File
@@ -329,12 +325,12 @@ private class FleetEnvironment(
       remoteFactory = { config ->
         if (config.host == Nas.host) {
           RemoteInstance(
-            instance = FleetRemoteApi(fleetStatus("NAS-Basement", "Linux"), nasTasks),
+            instance = SampleDeviceApi(fleetStatus("NAS-Basement", "Linux"), nasTasks),
             remoteConfig = config,
             connectionState = MutableStateFlow(ConnectionState.Connected),
           )
         } else {
-          val api = FleetRemoteApi(fleetStatus("Den-PC", "Windows 11"), emptyList())
+          val api = SampleDeviceApi(fleetStatus("Den-PC", "Windows 11"), emptyList())
           RemoteInstance(api, config, denPc)
         }
       },
@@ -393,51 +389,11 @@ private class FleetClock(@Volatile var now: Instant) : Clock {
   override fun now(): Instant = now
 }
 
-/** A remote device that answers with [status] and lists [tasks]. */
-private class FleetRemoteApi(
-  private var status: KetchStatus,
-  tasks: List<DownloadTask>,
-) : KetchApi {
-  override val backendLabel: String = status.name
-  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(tasks)
-
-  override suspend fun status(): KetchStatus = status
-
-  override suspend fun updateConfig(config: DownloadConfig) {
-    status = status.copy(config = config)
-  }
-
-  override suspend fun download(request: DownloadRequest): DownloadTask =
-    throw UnsupportedOperationException("Not in snapshots")
-
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    throw UnsupportedOperationException("Not in snapshots")
-
-  override suspend fun start() {}
-
-  override fun close() {}
-}
-
-private fun fleetStatus(name: String, os: String): KetchStatus = KetchStatus(
+private fun fleetStatus(name: String, os: String): KetchStatus = sampleStatus(
   name = name,
-  version = KetchApi.VERSION,
-  revision = KetchApi.REVISION,
-  uptime = 12.days.inWholeSeconds,
+  uptime = 12.days,
   config = DownloadConfig(defaultDirectory = "/volume1/downloads"),
-  system = SystemInfo(
-    os = os,
-    arch = "amd64",
-    separator = "/",
-    javaVersion = "21",
-    availableProcessors = 4,
-    maxMemory = 0,
-    totalMemory = 0,
-    freeMemory = 0,
-    downloadDirectory = "/volume1/downloads",
-    totalSpace = 4_000_787_030_016,
-    freeSpace = 1_979_120_929_996,
-    usableSpace = 1_979_120_929_996,
-  ),
+  system = sampleSystem(os, "/volume1/downloads", 4_000_787_030_016, 1_979_120_929_996),
 )
 
 private fun fleetNasTasks(): List<DownloadTask> = listOf(

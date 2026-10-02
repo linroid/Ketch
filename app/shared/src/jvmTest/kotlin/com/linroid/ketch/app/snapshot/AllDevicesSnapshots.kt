@@ -10,12 +10,9 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.KetchMenuPanel
@@ -42,7 +39,6 @@ import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -220,7 +216,7 @@ private class AllDevicesEnvironment(
     tasks = if (empty) emptyList() else SampleData.downloads().tasks,
     remotes = listOf(RemoteConfig(host = "nas.local", port = 8642, name = "NAS-Basement")),
   )
-  private val nas = AllDevicesNas(if (empty) emptyList() else allDevicesNasTasks())
+  private val nas = allDevicesNas(if (empty) emptyList() else allDevicesNasTasks())
 
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
@@ -289,17 +285,32 @@ private val SETTLE = 300.milliseconds
 private const val SLOW_MAGNET = "magnet:?xt=urn:btih:8a19577fb5f690970ca43a57ff1011ae202244b8" +
   "&dn=Big.Buck.Bunny.4K"
 
-/** NAS-Basement: a few downloads of its own and a bigger disk. */
-private class AllDevicesNas(initial: List<DownloadTask>) : KetchApi {
-  override val backendLabel: String = "NAS-Basement"
-  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(initial)
-
-  override suspend fun download(request: DownloadRequest): DownloadTask =
+/**
+ * NAS-Basement with [tasks] of its own and a bigger disk; it takes what is sent to it, and
+ * resolves links but no magnet.
+ */
+private fun allDevicesNas(tasks: List<DownloadTask>) = SampleDeviceApi(
+  status = sampleStatus(
+    name = "NAS-Basement",
+    uptime = 12.days,
+    config = DownloadConfig(defaultDirectory = NAS_DIR, maxConcurrentDownloads = 2),
+    system = sampleSystem(
+      os = "Linux",
+      directory = NAS_DIR,
+      total = 4_000_000_000_000,
+      usable = 1_800_000_000_000,
+      maxMemory = 2 * GIB,
+      totalMemory = GIB,
+      freeMemory = GIB / 2,
+    ),
+  ),
+  tasks = tasks,
+  download = { request ->
     ListTestTask("sent-${request.url.hashCode()}", DownloadState.Queued, request)
-
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource {
+  },
+  resolve = { url ->
     if (url.startsWith("magnet:")) awaitCancellation()
-    return ResolvedSource(
+    ResolvedSource(
       url = url,
       sourceType = "http",
       totalBytes = 2_684_354_560,
@@ -307,36 +318,8 @@ private class AllDevicesNas(initial: List<DownloadTask>) : KetchApi {
       suggestedFileName = url.substringAfterLast('/'),
       maxSegments = 8,
     )
-  }
-
-  override suspend fun status(): KetchStatus = KetchStatus(
-    name = "NAS-Basement",
-    version = KetchApi.VERSION,
-    revision = KetchApi.REVISION,
-    uptime = 12.days.inWholeSeconds,
-    config = DownloadConfig(defaultDirectory = NAS_DIR, maxConcurrentDownloads = 2),
-    system = SystemInfo(
-      os = "Linux",
-      arch = "amd64",
-      separator = "/",
-      javaVersion = "21",
-      availableProcessors = 4,
-      maxMemory = 2 * GIB,
-      totalMemory = GIB,
-      freeMemory = GIB / 2,
-      downloadDirectory = NAS_DIR,
-      totalSpace = 4_000_000_000_000,
-      freeSpace = 1_800_000_000_000,
-      usableSpace = 1_800_000_000_000,
-    ),
-  )
-
-  override suspend fun updateConfig(config: DownloadConfig) {}
-
-  override suspend fun start() {}
-
-  override fun close() {}
-}
+  },
+)
 
 private fun allDevicesNasTasks(): List<ListTestTask> {
   val total = 38 * GIB
