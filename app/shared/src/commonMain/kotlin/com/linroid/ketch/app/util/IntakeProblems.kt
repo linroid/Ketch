@@ -164,18 +164,3 @@ private fun embedCredentials(url: String, user: String, password: String): Strin
   val userInfo = percentEncode(user) + ":" + percentEncode(password) + "@"
   return url.substring(0, authority.start) + userInfo + url.substring(authority.hostStart)
 }
-
-private fun percentEncode(value: String): String = buildString {
-  for (byte in value.encodeToByteArray()) {
-    val code = byte.toInt() and 0xFF
-    val char = code.toChar()
-    val unreserved = char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9' || char in "-._~"
-    if (code < 0x80 && unreserved) {
-      append(char)
-    } else {
-      append('%').append(HEX_DIGITS[code shr 4]).append(HEX_DIGITS[code and 0x0F])
-    }
-  }
-}
-
-private const val HEX_DIGITS = "0123456789ABCDEF"

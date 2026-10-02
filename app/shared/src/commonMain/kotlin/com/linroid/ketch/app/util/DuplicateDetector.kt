@@ -67,9 +67,6 @@ internal fun normalizeUrl(url: String): String {
 }
 
 private const val INFO_HASH_METADATA = "infoHash"
-private const val HEX_UPPER = "0123456789ABCDEF"
-private const val HEX_LOWER = "0123456789abcdef"
-private const val BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 private const val RESERVED = ":/?#[]@!$&'()*+,;="
 
 // The multihash prefix of a SHA-256 digest (code 0x12, 32 bytes) in a `urn:btmh:` topic.
@@ -113,44 +110,12 @@ private fun infoHashKey(hash: String): String? = when {
   else -> null
 }
 
-private fun base32ToHex(value: String): String? {
-  val hex = StringBuilder()
-  var buffer = 0
-  var bits = 0
-  for (char in value.uppercase()) {
-    val digit = BASE32_ALPHABET.indexOf(char)
-    if (digit < 0) return null
-    buffer = ((buffer shl 5) or digit) and 0xFFF
-    bits += 5
-    if (bits >= 8) {
-      bits -= 8
-      val byte = (buffer shr bits) and 0xFF
-      hex.append(HEX_LOWER[byte shr 4]).append(HEX_LOWER[byte and 0x0F])
-    }
-  }
-  return hex.toString()
-}
-
-private fun hexValue(char: Char): Int = when (char) {
-  in '0'..'9' -> char - '0'
-  in 'a'..'f' -> char - 'a' + 10
-  in 'A'..'F' -> char - 'A' + 10
-  else -> -1
-}
-
-private fun isUnreserved(char: Char): Boolean = char in 'A'..'Z' || char in 'a'..'z' ||
-  char in '0'..'9' || char == '-' || char == '.' || char == '_' || char == '~'
-
 /** The escaped byte at [index] when it starts a `%XX` escape, else -1. */
 private fun escapedByte(value: String, index: Int): Int {
   if (value[index] != '%' || index + 2 >= value.length) return -1
   val high = hexValue(value[index + 1])
   val low = hexValue(value[index + 2])
   return if (high < 0 || low < 0) -1 else (high shl 4) or low
-}
-
-private fun StringBuilder.appendEscaped(byte: Int) {
-  append('%').append(HEX_UPPER[byte shr 4]).append(HEX_UPPER[byte and 0x0F])
 }
 
 /** Length of the character at [index], two for a surrogate pair. */

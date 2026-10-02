@@ -1,5 +1,8 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.app.util.isUnreserved
+import com.linroid.ketch.app.util.percentEncode
+
 /** Device id of the engine running inside the app. */
 const val LOCAL_DEVICE_ID: String = "local"
 
@@ -36,20 +39,6 @@ data class TaskKey(
 }
 
 private const val HEX_DIGITS = "0123456789ABCDEF"
-
-private fun isUnreserved(c: Char): Boolean =
-  c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9' || c == '-' || c == '.' || c == '_' || c == '~'
-
-private fun percentEncode(value: String): String = buildString {
-  for (byte in value.encodeToByteArray()) {
-    val b = byte.toInt() and 0xFF
-    if (b < 0x80 && isUnreserved(b.toChar())) {
-      append(b.toChar())
-    } else {
-      append('%').append(HEX_DIGITS[b shr 4]).append(HEX_DIGITS[b and 0x0F])
-    }
-  }
-}
 
 private fun percentDecode(value: String): String? {
   val bytes = ArrayList<Byte>(value.length)

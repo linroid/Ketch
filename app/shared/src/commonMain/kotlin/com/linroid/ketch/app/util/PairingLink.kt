@@ -178,18 +178,3 @@ private fun isPrivate(octets: List<Int>): Boolean = when (octets[0]) {
 private fun isLinkLocal(octets: List<Int>): Boolean = octets[0] == 169 && octets[1] == 254
 
 private const val LOOPBACK = 127
-
-private const val UNRESERVED = "-._~"
-private const val HEX = "0123456789ABCDEF"
-
-private fun percentEncode(text: String): String = buildString {
-  for (byte in text.encodeToByteArray()) {
-    val char = byte.toInt().toChar()
-    if (byte >= 0 && (char.isLetterOrDigit() || char in UNRESERVED)) {
-      append(char)
-    } else {
-      val value = byte.toInt() and 0xFF
-      append('%').append(HEX[value shr 4]).append(HEX[value and 0x0F])
-    }
-  }
-}
