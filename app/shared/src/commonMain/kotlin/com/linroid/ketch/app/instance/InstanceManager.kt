@@ -270,14 +270,11 @@ class InstanceManager(
   }
 
   /**
-   * Replace [old] with a new remote instance that uses
-   * [token] for authentication, then start the connection.
+   * Replaces [old] with a new remote instance that reaches it over HTTPS when [secure] or HTTP
+   * otherwise, with [token] when it brings one or the code it has, then starts the connection.
    */
-  suspend fun reconnectWithToken(
-    old: RemoteInstance,
-    token: String,
-  ) {
-    reconnect(old) { it.copy(apiToken = token) }
+  suspend fun reconnectWith(old: RemoteInstance, secure: Boolean, token: String? = null) {
+    reconnect(old) { it.copy(secure = secure, apiToken = token ?: it.apiToken) }
     persistRemotes()
   }
 

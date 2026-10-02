@@ -119,16 +119,16 @@ internal class DeviceConnector(
     return ConnectOutcome.Connected(device)
   }
 
-  // A device already added keeps its connection unless the code changed.
+  // A device already added keeps its connection unless the code or the scheme changed.
   private suspend fun save(link: PairingLink): RemoteInstance {
     val existing = remoteAt(link) ?: run {
       log.i { "Adding ${link.address}" }
       return manager.addRemote(link.toRemoteConfig())
     }
-    val token = link.token
-    if (token != null && token != existing.remoteConfig.apiToken) {
-      log.i { "Giving ${existing.deviceId} a new access code" }
-      manager.reconnectWithToken(existing, token)
+    val token = link.token?.takeIf { it != existing.remoteConfig.apiToken }
+    if (token != null || link.secure != existing.remoteConfig.secure) {
+      log.i { "Updating how ${existing.deviceId} is reached" }
+      manager.reconnectWith(existing, secure = link.secure, token = token)
     }
     val name = link.name
     val current = remoteAt(link) ?: existing

@@ -225,14 +225,14 @@ class InstanceManagerKeepAliveTest {
   }
 
   @Test
-  fun reconnectWithToken_activeDevice_startsFreshClientWithToken() = runTest {
+  fun reconnectWith_newToken_startsFreshClientWithToken() = runTest {
     val fakes = FakeInstanceFactory()
     val store = Store()
     val manager = manager(fakes, store = store)
     manager.switchTo(manager.remote("nas.local"))
     val old = manager.remote("nas.local")
 
-    manager.reconnectWithToken(old, "secret")
+    manager.reconnectWith(old, secure = old.remoteConfig.secure, token = "secret")
     runCurrent()
 
     val current = manager.remote("nas.local")
