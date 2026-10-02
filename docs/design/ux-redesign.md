@@ -632,7 +632,7 @@ illustration is static.
 |---|---|
 | `KetchButton` | **Primary:** accent fill, `onAccent` label, `full` radius, h32, padding 14, `label`, 16 dp icon, **at most one per surface**. **Secondary:** `surface` + 1 dp `borderStrong`. **Tonal:** `accentSoft` / `accentText`. **Ghost:** transparent, `surfaceHover` on hover. **Danger:** `dangerFill` + white, used for every destructive confirm. **States:** hover overlay 8% (`micro`); press scale .98 + overlay 12%; focus ring 2 dp accent at 50%, offset 2 dp (only on focus-visible); disabled 40% alpha. Loading replaces the icon with a 14 dp spinner, and the width stays fixed. |
 | `KetchIconButton` | 28 visual / 32 hit area, r8, 16 dp glyph; ghost by default. The tooltip is required and includes the shortcut. |
-| `KetchPillGroup` | Bordered `full` container with up to four 28 dp icon buttons and 1 dp internal dividers (e.g. `☰ \| ▦ \| ⓘ`). |
+| `KetchPillGroup` | Bordered `full` container with up to four 28 dp icon buttons and 1 dp internal dividers (e.g. `☰ \| ▦`). |
 | `KetchSegmented` | `surfaceSunken` track h32, 3 dp padding. The thumb is a `surface` pill at e2 and slides over 150 ms. Label `label`. Optional count `numeralS`. Replaces `SettingsSegmented` (`SettingsComponents.kt:327-355`) and the theme picker. |
 | `KetchChip` | h28 `full`, 1 dp `borderStrong`. Selected: `accentSoft` fill + 12 dp check + `accentText`. Count in `numeralS` `textTertiary`. Removable chips have a 14 dp ✕. Replaces M3 `FilterChip`. |
 | `KetchTextField` | `surfaceSunken` fill, `sm` radius, h32. Label **above** (`labelS`, `textSecondary`), never floating. On focus: 1 dp accent border plus a 3 dp accent ring at 20%. Error text below in `caption` failed. Optional leading glyph, trailing clear/paste buttons. A multi-line variant is used for intake. Replaces M3 `OutlinedTextField` (`AddDownloadDialog.kt:213,298,491,737,744`; `AddRemoteServerDialog.kt:88,96,112`) and `SettingsTextField`. |
@@ -760,8 +760,8 @@ and 1440 dp widths.
 
 ```
 ┌ canvas + wash (ember glow bottom-left) ─────────────────────────────────────────────────────────────────────┐
-│ ● ● ●   ◧  ⊕       ┌ content card r16 e1 ────────────────────────────────────────────────────────────────────┐ │
-│                    │ Downloads (2↓/14) [LM This Mac ▾]   [⌕ Search or paste a link   ⌘K] (☰│▦│ⓘ) ⋯ (+ Add) │ │ 52
+│ ● ● ●   ◧  ☾       ┌ content card r16 e1 ────────────────────────────────────────────────────────────────────┐ │
+│                    │ Downloads (2↓/14) [LM This Mac ▾]   [⌕ Search or paste a link   ⌘K] (☰│▦)   ⋯ (+ Add) │ │ 52
 │ ⤓ Downloads     2  │ (All 14|Downloading 2|Waiting 3|Paused 1|Done 7|Failed 1●)          Sort: Smart ▾       │ │ 40
 │ ✦ Discover         │─────────────────────────────────────────────────────────────┬────────────────────────────│ │
 │ ◇ Devices          │ ☐ NAME ▾                       SIZE       PROGRESS     SPEED │ ▣ ubuntu-24.04-desktop-…  ✕ │ │ 28
@@ -792,8 +792,12 @@ and 1440 dp widths.
   - The sidebar's top 52 dp is the **title zone**:
     - traffic lights at x 12–80;
     - `◧` (28 dp ghost, "Hide sidebar  ⌃⌘S") at x 92;
-    - `⊕` (28 dp `accentSoft` circle, "New download  ⌘N") at x 124. It is a drop target, and
-      right-clicking it offers "Download link from clipboard".
+    - the appearance toggle (28 dp ghost) at the zone's end: a moon in the light appearance
+      ("Switch to dark") and a sun in the dark one ("Switch to light"). A click that lands on
+      the system's own appearance goes back to following the system (`ThemeMode.System`);
+      otherwise it saves Light or Dark. Settings → General still offers all three.
+    - There is no add button here: the page header's `+ Add` (§4.7.1), `⌘N`, `⌘V` and drops
+      add downloads, so a second ⊕ beside it only competed with it.
   - Empty title-zone space and the page header's empty space are a `WindowDraggableArea`, and a
     double-click zooms the window.
   - `apple.awt.windowAppearance` follows `ThemeMode`.
@@ -803,9 +807,10 @@ and 1440 dp widths.
 - **Window title:** the status sentence (§4.4.3), e.g. "Ketch — 3 downloading · 45%", or
   "Ketch" when idle. Mission Control and the Window menu show it.
 - **Windows and Linux:** native frame, with the same wash, sidebar and card inside.
-  `◧` and `⊕` sit in the sidebar header row. A JBR custom title bar is out of scope (§8).
+  `◧` and the appearance toggle sit in the sidebar header row. A JBR custom title bar is out
+  of scope (§8).
 - **Web:** no title zone. The sidebar header is a 32 dp row with a 20 dp `KetchLogoTile`,
-  "Ketch", and `⊕` at the end.
+  "Ketch", `◧` and the appearance toggle at the end.
 - **The 80 dp wordmark header is deleted on every platform** (`SidebarNavigation.kt:65-75`).
 
 #### 4.2.2 Sidebar (Expanded, 220 dp, transparent over the wash)
@@ -835,9 +840,9 @@ The choice is persisted in `UiPreferences.sidebarCollapsed`.
 
 ```
 ┌──────┬────────────────────────────────────────────────────┐
-│● ● ● │ Downloads (2↓/14) [NB NAS ▾]  [⌕ ⌘K]  ⓘ  ⋯  (+)   │
+│● ● ● │ Downloads (2↓/14) [NB NAS ▾]  [⌕ ⌘K]     ⋯  (+)   │
 │  ◧   │ (All|Downloading 2|Waiting 3|Paused|Done|Failed 1●) │
-│ (⊕)  │ ▣ ubuntu-24.04-desktop.iso          6.4 MB/s · 2:10 │
+│  ☾   │ ▣ ubuntu-24.04-desktop.iso          6.4 MB/s · 2:10 │
 │ ⤓ 2  │   2.4 of 5.7 GB · 8 connections                     │
 │ ✦    │   ▰▰▱▰▰▱▰▰▱▰▰▰▱▱                                   │
 │ ◇    │ ▣ blender-4.2.dmg                ○ Waiting   ▷ Start │
@@ -850,7 +855,8 @@ The choice is persisted in `UiPreferences.sidebarCollapsed`.
 └──────┴────────────────────────────────────────────────────┘
 ```
 
-- Header area holds `◧` and a 48 dp `⊕` FAB. On macOS, content starts 40 dp below the top.
+- Header area holds `◧` (wide windows only) and the appearance toggle, as in the sidebar's
+  title zone. On macOS, content starts 40 dp below the top.
 - Destinations: 24 dp icons with 11 sp labels. Downloads carries a badge with the downloading
   count.
 - Device stack below them, 40 dp pennants:

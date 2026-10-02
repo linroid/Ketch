@@ -366,7 +366,6 @@ private fun WideShell(
           onSelect = { shell.show(it) },
           onOpenSettings = { appState.openSettings() },
           onToggleSidebar = { shell.toggleSidebar() },
-          onAddClipboardLink = { commands.run(KetchCommands.AddClipboardLink) },
         )
       } else {
         NavRail(
@@ -378,7 +377,6 @@ private fun WideShell(
           onSelect = { shell.show(it) },
           onOpenSettings = { appState.openSettings() },
           onToggleSidebar = { shell.toggleSidebar() },
-          onAddClipboardLink = { commands.run(KetchCommands.AddClipboardLink) },
         )
       }
     },

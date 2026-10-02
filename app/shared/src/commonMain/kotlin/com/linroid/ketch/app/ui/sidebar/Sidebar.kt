@@ -46,19 +46,17 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.devices.addDevice
-import com.linroid.ketch.app.ui.shell.AddButton
-import com.linroid.ketch.app.ui.shell.AddButtonDefaults
+import com.linroid.ketch.app.ui.shell.AppearanceToggle
 
 /**
  * The sidebar of wide windows, transparent over the canvas wash: the title zone with the
- * sidebar toggle and the ⊕ add button (beside the traffic lights on macOS, after the Ketch mark
- * on the web), the destinations, the DEVICES (All devices from two on, then each device with its
+ * sidebar toggle and the [AppearanceToggle] (beside the traffic lights on macOS, after the Ketch
+ * mark on the web), the destinations, the DEVICES (All devices from two on, then each device with its
  * health and live line, its menu and its drops), and Settings at the bottom.
  *
  * @param destination the destination shown, which sits on the selected pill.
  * @param settingsSelected whether Settings shows, which then takes the pill instead.
  * @param onToggleSidebar collapses the sidebar to the rail.
- * @param onAddClipboardLink adds the link on the clipboard at once.
  */
 @Composable
 internal fun Sidebar(
@@ -69,7 +67,6 @@ internal fun Sidebar(
   onSelect: (AppDestination) -> Unit,
   onOpenSettings: () -> Unit,
   onToggleSidebar: () -> Unit,
-  onAddClipboardLink: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
@@ -78,11 +75,7 @@ internal fun Sidebar(
   val scope by state.deviceScope.collectAsState()
   val devices = rememberDevices(state)
   Column(modifier.width(spacing.sidebarWidth).fillMaxHeight()) {
-    TitleZone(
-      onToggleSidebar = onToggleSidebar,
-      onAdd = { state.openIntake() },
-      onAddClipboardLink = onAddClipboardLink,
-    )
+    TitleZone(state, onToggleSidebar = onToggleSidebar)
     for (entry in destinations) {
       val downloads = entry == AppDestination.Downloads
       KetchTooltip(text = entry.label, shortcut = entry.command.shortcutLabel()) {
@@ -182,16 +175,12 @@ private fun DownloadsMarks(downloading: Int, failed: Boolean) {
 
 /**
  * The top of the sidebar, as tall as the content card's inset and page header. On macOS the
- * traffic lights sit at its start, the sidebar toggle follows them on their row and the add
- * button ends it; on the web the Ketch mark leads; elsewhere the buttons line up with the page
+ * traffic lights sit at its start, the sidebar toggle follows them on their row and the
+ * appearance toggle ends it; on the web the Ketch mark leads; elsewhere the buttons line up with the page
  * header. Its empty space is the title bar the desktop app lets the window be dragged by.
  */
 @Composable
-private fun TitleZone(
-  onToggleSidebar: () -> Unit,
-  onAdd: () -> Unit,
-  onAddClipboardLink: () -> Unit,
-) {
+private fun TitleZone(state: AppState, onToggleSidebar: () -> Unit) {
   val spacing = KetchTheme.spacing
   val chrome = KetchTheme.windowChrome
   val toggle = @Composable {
@@ -203,13 +192,7 @@ private fun TitleZone(
       shortcut = KetchCommands.ToggleSidebar.shortcutLabel(),
     )
   }
-  val add = @Composable {
-    AddButton(
-      size = AddButtonDefaults.TitleZone,
-      onClick = onAdd,
-      onAddClipboardLink = onAddClipboardLink,
-    )
-  }
+  val appearance = @Composable { AppearanceToggle(state.appSettings) }
   Box(Modifier.fillMaxWidth().height(spacing.cardInset + spacing.pageHeaderHeight)) {
     when {
       chrome.top > 0.dp -> Row(
@@ -221,7 +204,7 @@ private fun TitleZone(
       ) {
         toggle()
         Spacer(Modifier.weight(1f))
-        add()
+        appearance()
       }
       KeyboardPlatform.current.isWeb -> Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -241,7 +224,7 @@ private fun TitleZone(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
           toggle()
-          add()
+          appearance()
         }
       }
       else -> Row(
@@ -254,7 +237,7 @@ private fun TitleZone(
       ) {
         toggle()
         Spacer(Modifier.weight(1f))
-        add()
+        appearance()
       }
     }
   }

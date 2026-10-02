@@ -80,8 +80,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * The 72 dp rail of medium windows, and of wide ones with the sidebar collapsed: the ⊕ add
- * button, the destinations with Downloads' downloading count, the device stack, and Settings at
+ * The 72 dp rail of medium windows, and of wide ones with the sidebar collapsed: the
+ * [AppearanceToggle], the destinations with Downloads' downloading count, the device stack, and Settings at
  * the bottom. On macOS it starts below the traffic lights.
  *
  * From two devices on, the stack starts with All devices, ringed by the progress of everything
@@ -100,7 +100,6 @@ internal fun NavRail(
   onSelect: (AppDestination) -> Unit,
   onOpenSettings: () -> Unit,
   onToggleSidebar: () -> Unit,
-  onAddClipboardLink: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
@@ -126,12 +125,7 @@ internal fun NavRail(
         modifier = Modifier.padding(bottom = spacing.s2),
       )
     }
-    AddButton(
-      size = AddButtonDefaults.Rail,
-      onClick = { state.openIntake() },
-      onAddClipboardLink = onAddClipboardLink,
-      modifier = Modifier.padding(bottom = spacing.s4),
-    )
+    AppearanceToggle(state.appSettings, Modifier.padding(bottom = spacing.s4))
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(spacing.s1),

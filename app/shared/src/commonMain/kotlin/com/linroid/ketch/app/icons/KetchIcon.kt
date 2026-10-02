@@ -49,6 +49,15 @@ enum class KetchIcon(internal val data: IconData) {
     stroke = listOf(CIRCLE),
     fill = listOf("M10 3a7 7 0 0 1 0 14z"),
   )),
+  // A solid disc, so it never reads as the outlined Settings gear.
+  Sun(IconData.paths(
+    stroke = listOf(
+      "M10 3v1.6M10 15.4v1.6M3 10h1.6M15.4 10h1.6",
+      "M5.05 5.05l1.13 1.13M13.82 13.82l1.13 1.13M5.05 14.95l1.13-1.13M13.82 6.18l1.13-1.13"
+    ),
+    fill = listOf("M10 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"),
+  )),
+  Moon(IconData.strokes("M17 10.61A7 7 0 1 1 9.39 3 5.44 5.44 0 0 0 17 10.61z")),
 
   // Playback / actions
   Play(IconData.fills("M6 4l10 6-10 6V4z")),
