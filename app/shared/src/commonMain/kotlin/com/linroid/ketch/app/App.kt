@@ -83,9 +83,12 @@ fun App(
   }
   // The preference only adds to the system setting; off follows the system.
   val systemReducesMotion = rememberReduceMotion()
-  // Decided once, so "Show welcome again" in Settings waits for the next launch.
+  // Decided once, so "Show welcome again" in Settings waits for the next launch. A launch that
+  // opens a pairing link or a download goes straight to it and leaves the welcome for the next.
   var welcome by rememberSaveable {
-    mutableStateOf(needsWelcome(welcomePlatform, appSettings.ui))
+    mutableStateOf(
+      needsWelcome(welcomePlatform, appSettings.ui) && !controller.state.incoming.hasPending
+    )
   }
   KetchTheme(
     darkTheme = darkTheme,
