@@ -220,6 +220,39 @@ class AppStateSeamsTest {
   }
 
   @Test
+  fun report_addFromElsewhere_recordsItInTheHistory() = runTest {
+    val state = appState()
+    val key = TaskKey(LOCAL_DEVICE_ID, "t1")
+
+    state.report(ActivityEvent.Added(key, DownloadRequest(url = "https://example.com/a.iso")))
+
+    assertEquals(listOf("Added a.iso"), state.messages.history.value.map { it.title })
+  }
+
+  @Test
+  fun report_addThisWindowAnnounced_isLeftOut() = runTest {
+    val state = appState()
+    val key = TaskKey(LOCAL_DEVICE_ID, "t1")
+
+    state.announceAdded(listOf(key))
+    state.report(ActivityEvent.Added(key, DownloadRequest(url = "https://example.com/a.iso")))
+
+    assertEquals(emptyList(), state.messages.history.value)
+  }
+
+  @Test
+  fun announceAdded_afterTheMonitorReportedIt_withdrawsThatEntry() = runTest {
+    val state = appState()
+    val key = TaskKey(LOCAL_DEVICE_ID, "t1")
+    state.report(ActivityEvent.Added(key, DownloadRequest(url = "https://example.com/a.iso")))
+
+    state.announceAdded(listOf(key))
+
+    assertEquals(emptyList(), state.messages.history.value)
+    assertEquals(0, state.messages.unreadCount.value)
+  }
+
+  @Test
   fun showDetails_oneRowSelected_inspectsItOnTheDownloadsPage() = runTest {
     val state = appState()
     val key = TaskKey(LOCAL_DEVICE_ID, "a")

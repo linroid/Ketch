@@ -304,9 +304,32 @@ class AppState(
    */
   val addedTasks: SharedFlow<List<TaskKey>> = addedEvents.asSharedFlow()
 
-  /** Reports that [keys] were just added from this window; see [addedTasks]. */
+  /**
+   * Reports that [keys] were just added from this window; see [addedTasks]. Whatever added them
+   * reports them itself, so the activity monitor's report of them is left out ([claimAdds]).
+   */
   fun announceAdded(keys: List<TaskKey>) {
-    if (keys.isNotEmpty()) addedEvents.tryEmit(keys)
+    if (keys.isEmpty()) return
+    claimAdds(keys)
+    addedEvents.tryEmit(keys)
+  }
+
+  // The monitor reports an add after its task shows up on the device, which can be before or
+  // after the command that added it reports it, so either side may come second.
+  private val claimedAdds = LinkedHashSet<TaskKey>()
+  private val monitorAdds = LinkedHashMap<TaskKey, Long>()
+
+  /**
+   * Marks [keys] as tasks a command of this window added and reports itself, such as an add, a
+   * send or a restart, so one add shows once in the Activity history: the activity monitor's
+   * entry for them is withdrawn when it came first, and never posted when it comes later.
+   */
+  internal fun claimAdds(keys: Collection<TaskKey>) {
+    for (key in keys) {
+      monitorAdds.remove(key)?.let(messages::withdraw)
+      claimedAdds += key
+    }
+    while (claimedAdds.size > RECENT_ADDS_LIMIT) claimedAdds.remove(claimedAdds.first())
   }
 
   private val settingsCache = mutableMapOf<InstanceEntry, InstanceSettingsController>()
@@ -1204,6 +1227,7 @@ class AppState(
         }.awaitAll()
       }
       val sent = results.mapNotNull { (task, result) -> result.getOrNull()?.let { task to it } }
+      claimAdds(sent.map { TaskKey(target.deviceId, it.second.taskId) })
       val failures = results.mapNotNull { (task, result) ->
         result.exceptionOrNull()?.let { task to it }
       }
@@ -1275,13 +1299,18 @@ class AppState(
   /** Reports [event] from the host's activity monitor as a message. */
   fun report(event: ActivityEvent) {
     when (event) {
-      is ActivityEvent.Added -> messages.post(
-        level = MessageLevel.Info,
-        title = onDevice(event.taskKey.deviceId, "Added ${displayName(event.request)}"),
-        taskKey = event.taskKey,
-        deviceId = event.taskKey.deviceId,
-        toast = ToastMode.Silent,
-      )
+      is ActivityEvent.Added -> {
+        if (event.taskKey in claimedAdds) return
+        val message = messages.post(
+          level = MessageLevel.Info,
+          title = onDevice(event.taskKey.deviceId, "Added ${displayName(event.request)}"),
+          taskKey = event.taskKey,
+          deviceId = event.taskKey.deviceId,
+          toast = ToastMode.Silent,
+        )
+        monitorAdds[event.taskKey] = message.id
+        while (monitorAdds.size > RECENT_ADDS_LIMIT) monitorAdds.remove(monitorAdds.keys.first())
+      }
       is ActivityEvent.Completed -> messages.post(
         level = MessageLevel.Success,
         title = onDevice(event.taskKey.deviceId, "Download complete"),
@@ -1472,7 +1501,8 @@ class AppState(
     )
     task.remove(deleteFiles = task.state.value !is DownloadState.Completed)
     try {
-      entry.instance.download(request)
+      val copy = entry.instance.download(request)
+      claimAdds(listOf(TaskKey(entry.deviceId, copy.taskId)))
     } catch (e: CancellationException) {
       currentCoroutineContext().ensureActive()
       throw AddFailed(entry, request, e)
@@ -1794,6 +1824,12 @@ private const val AUTHORIZATION_HEADER = "Authorization"
 
 /** How many adds [AppState.addedTasks] holds for a Downloads page that is still busy. */
 private const val ADDED_BUFFER = 8
+
+/**
+ * How many recent adds [AppState] remembers to report each once; the two reports of an add
+ * arrive moments apart.
+ */
+private const val RECENT_ADDS_LIMIT = 256
 
 /** Compose state that the models outside composition also read, through [flow]. */
 private class FlowState<T>(initial: T) {

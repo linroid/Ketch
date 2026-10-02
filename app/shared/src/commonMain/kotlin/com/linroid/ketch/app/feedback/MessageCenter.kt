@@ -153,6 +153,19 @@ class MessageCenter(
     activeState.update { messages -> messages.filterNot { it.id == id } }
   }
 
+  /**
+   * Takes the message with [id] back, for one another message now reports: it leaves the
+   * screen and the history, and no longer counts as unread.
+   */
+  fun withdraw(id: Long) {
+    val index = historyState.value.indexOfFirst { it.id == id }
+    if (index >= 0) {
+      historyState.update { messages -> messages.filterNot { it.id == id } }
+      if (index < unreadState.value) unreadState.update { it - 1 }
+    }
+    dismiss(id)
+  }
+
   /** Resets [unreadCount]. */
   fun markAllRead() {
     unreadState.value = 0

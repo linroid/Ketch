@@ -53,6 +53,34 @@ class MessageCenterTest {
   }
 
   @Test
+  fun withdraw_unreadMessage_leavesTheHistoryAndTheUnreadCount() {
+    val center = MessageCenter()
+    val read = center.post(MessageLevel.Info, "Slow lane on")
+    center.markAllRead()
+    val withdrawn = center.post(MessageLevel.Info, "Added ubuntu.iso")
+    val kept = center.post(MessageLevel.Success, "Added ubuntu.iso → This Mac")
+
+    center.withdraw(withdrawn.id)
+
+    assertEquals(listOf(kept, read), center.history.value)
+    assertEquals(listOf(read, kept), center.active.value)
+    assertEquals(1, center.unreadCount.value)
+  }
+
+  @Test
+  fun withdraw_readMessage_keepsTheUnreadCount() {
+    val center = MessageCenter()
+    val withdrawn = center.post(MessageLevel.Info, "Added ubuntu.iso")
+    center.markAllRead()
+    center.post(MessageLevel.Info, "Slow lane on")
+
+    center.withdraw(withdrawn.id)
+
+    assertEquals(listOf("Slow lane on"), center.history.value.map { it.title })
+    assertEquals(1, center.unreadCount.value)
+  }
+
+  @Test
   fun post_banner_showsWithoutEnteringTheHistory() {
     val center = MessageCenter()
 
