@@ -214,11 +214,7 @@ private fun Segment(
       }
     }
   }
-  if (shortcut != null) {
-    KetchTooltip(text = text, shortcut = shortcut, modifier = modifier) { body(Modifier) }
-  } else {
-    body(modifier)
-  }
+  OptionalTooltip(text.takeIf { shortcut != null }, modifier, shortcut, body)
 }
 
 private val TrackGrowth = 4.dp

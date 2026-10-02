@@ -17,7 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchSpinner
-import com.linroid.ketch.app.components.KetchTooltip
+import com.linroid.ketch.app.components.OptionalTooltip
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.DiscoveryStep
@@ -97,11 +97,7 @@ private fun StepItem(title: String, detail: String, current: Boolean) {
       )
     }
   }
-  if (detail.isBlank()) {
-    item()
-  } else {
-    KetchTooltip(text = detail.oneLine().take(MAX_TOOLTIP)) { item() }
-  }
+  OptionalTooltip(if (detail.isBlank()) null else detail.oneLine().take(MAX_TOOLTIP)) { item() }
 }
 
 /** The step's title, cut to fit the line of steps. */

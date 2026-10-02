@@ -116,6 +116,24 @@ fun KetchTooltip(
   }
 }
 
+/**
+ * [content] under a [KetchTooltip] of [text], or on its own when [text] is `null`. [modifier]
+ * goes to the outermost of the two, and [content] receives what it should apply.
+ */
+@Composable
+internal fun OptionalTooltip(
+  text: String?,
+  modifier: Modifier = Modifier,
+  shortcut: String? = null,
+  content: @Composable (Modifier) -> Unit,
+) {
+  if (text == null) {
+    content(modifier)
+  } else {
+    KetchTooltip(text = text, modifier = modifier, shortcut = shortcut) { content(Modifier) }
+  }
+}
+
 /** The bubble of a [KetchTooltip], without the popup that positions it. */
 @Composable
 internal fun KetchTooltipBubble(text: String, shortcut: String?, modifier: Modifier = Modifier) {

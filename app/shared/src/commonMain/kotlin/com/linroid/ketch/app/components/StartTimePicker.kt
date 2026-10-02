@@ -168,11 +168,7 @@ fun StartTimePicker(
       )
     }
   }
-  if (!enabled && disabledReason != null) {
-    KetchTooltip(text = disabledReason, modifier = modifier) { chip(Modifier) }
-  } else {
-    chip(modifier)
-  }
+  OptionalTooltip(disabledReason.takeIf { !enabled }, modifier, content = chip)
 }
 
 /**

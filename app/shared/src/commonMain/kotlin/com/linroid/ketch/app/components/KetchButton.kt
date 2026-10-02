@@ -86,12 +86,8 @@ fun KetchButton(
   tooltip: String? = null,
   shortcut: String? = null,
 ) {
-  if (tooltip != null || shortcut != null) {
-    KetchTooltip(text = tooltip ?: text, shortcut = shortcut, modifier = modifier) {
-      ButtonBody(text, onClick, Modifier, variant, size, leadingIcon, enabled, loading)
-    }
-  } else {
-    ButtonBody(text, onClick, modifier, variant, size, leadingIcon, enabled, loading)
+  OptionalTooltip(tooltip ?: text.takeIf { shortcut != null }, modifier, shortcut) {
+    ButtonBody(text, onClick, it, variant, size, leadingIcon, enabled, loading)
   }
 }
 
