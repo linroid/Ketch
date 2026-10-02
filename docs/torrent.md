@@ -146,7 +146,8 @@ remote privacy commands and capability negotiation remain on the v2 roadmap.
 
 Use writable filesystem paths. Android's default directory is app-owned external Downloads
 (with an internal-files fallback); iOS uses the app sandbox. Arbitrary Android SAF content URIs
-and iOS security-scoped destinations are outside this version's scope.
+and iOS security-scoped destinations are outside this version's scope: when the configured default
+directory is a content URI, torrents use the platform default directory instead.
 
 Payload is verified before it is committed. Checkpoints include metainfo, selection and ownership;
 restart rehashes actual data rather than trusting a saved bitmap. File identities and an append-only
