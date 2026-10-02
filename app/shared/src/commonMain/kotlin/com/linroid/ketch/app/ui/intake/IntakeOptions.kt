@@ -64,7 +64,7 @@ import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.HeaderRow
 import com.linroid.ketch.app.state.IntakeMode
@@ -550,7 +550,7 @@ internal fun TargetChip(session: IntakeSession, instances: List<InstanceEntry>) 
       }
       DeviceOption(
         id = entry.deviceId,
-        name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label,
+        name = entry.displayName,
         health = health,
         pennantName = entry.label,
         summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId }, free),

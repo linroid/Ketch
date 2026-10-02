@@ -34,9 +34,9 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LanServerDiscovery
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
-import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.displayName
@@ -231,7 +231,8 @@ class AppState(
       frozenState.value = value
     }
 
-  var showAddDialog by mutableStateOf(false)
+  /** Whether the add sheet shows, which it does while [intakeRequest] is set. */
+  val showAddDialog: Boolean get() = intakeRequest != null
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
 
@@ -343,8 +344,7 @@ class AppState(
   )
     private set
   private var discoveryJob: Job? = null
-  var switchingInstance by
-    mutableStateOf<InstanceEntry?>(null)
+  private var switchingInstance by mutableStateOf<InstanceEntry?>(null)
   var unauthorizedInstance by
     mutableStateOf<RemoteInstance?>(null)
   var resolveState by mutableStateOf<ResolveState>(
@@ -352,12 +352,12 @@ class AppState(
   )
     private set
 
-  /** A dropped `.torrent` file added in place of a typed URL. */
+  /**
+   * A dropped `.torrent` file added in place of a typed URL; [resolveState] reflects its
+   * resolution.
+   */
   var droppedFile by mutableStateOf<DroppedFile?>(null)
     private set
-
-  /** The dropped file whose resolution [resolveState] reflects. */
-  private var resolving: DroppedFile? = null
 
   /** The device [droppedFile] is resolved on, whose result the add sheet can reuse. */
   internal var droppedFileApi: KetchApi? = null
@@ -542,21 +542,11 @@ class AppState(
     }
     if (request != intakeRequest) resetResolveState()
     intakeRequest = request
-    showAddDialog = true
-  }
-
-  /**
-   * Handle "New Task" action. If no backend is available,
-   * show the add-remote-server dialog instead.
-   */
-  fun requestAddDownload() {
-    openIntake()
   }
 
   /** Closes the add dialog; the next opened download or links, if any are waiting, then show. */
   fun closeAddDialog() {
     resetResolveState()
-    showAddDialog = false
     intakeRequest = null
     openedDownload?.let(incoming::complete)
     openedLinks?.let(incoming::complete)
@@ -646,7 +636,7 @@ class AppState(
       it.name.endsWith(".torrent", ignoreCase = true)
     }
     if (torrent != null) {
-      requestAddDownload()
+      openIntake()
       if (showAddDialog) resolveDroppedFile(torrent)
       return
     }
@@ -686,19 +676,18 @@ class AppState(
     val api = target?.instance ?: activeApi.value
     droppedFile = file
     droppedFileApi = api
-    resolving = file
     resolveState = ResolveState.Resolving
     scope.launch {
       runCatching {
         val content = file.readBytes(MAX_DROPPED_FILE_BYTES)
         api.resolveContent(content, file.name)
       }.onSuccess { result ->
-        if (resolving === file) {
+        if (droppedFile === file) {
           resolveState = ResolveState.Resolved(result)
         }
       }.onFailure { e ->
         if (e is CancellationException) throw e
-        if (resolving === file) {
+        if (droppedFile === file) {
           resolveState = ResolveState.Error(
             message = when (e) {
               is KetchError.SourceError -> "${file.name} is not a valid torrent file"
@@ -714,7 +703,6 @@ class AppState(
 
   /** Clears the resolved URL or dropped file. */
   fun resetResolveState() {
-    resolving = null
     droppedFile = null
     droppedFileApi = null
     resolveState = ResolveState.Idle
@@ -1103,8 +1091,7 @@ class AppState(
    * it resumes, or starts over when its progress cannot be reused or it was canceled.
    */
   internal suspend fun retryInBatch(task: DownloadTask) {
-    val entry = deviceOf(task) ?: return
-    retryOn(entry, task)
+    deviceOf(task)?.let { retryOn(it, task) }
   }
 
   /**
@@ -1412,7 +1399,7 @@ class AppState(
     return TaskListSource(
       deviceId = entry.deviceId,
       device = DeviceInfo(
-        name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label,
+        name = entry.displayName,
         capabilities = if (remote) {
           RowCapabilities.remote(canDiscover = canDiscover)
         } else {
@@ -1429,7 +1416,7 @@ class AppState(
     val settings = settingsFor(entry)
     return PulseSource(
       deviceId = entry.deviceId,
-      name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label,
+      name = entry.displayName,
       tasks = visibleTasksOf(entry),
       config = snapshotFlow { settings.download },
       status = entry.instance::status,
@@ -1572,14 +1559,13 @@ class AppState(
 
   /** Adds each of [requests] to [entry] on its own and reports the outcome. */
   private suspend fun addRequests(
-    entry: InstanceEntry?,
+    entry: InstanceEntry,
     requests: List<DownloadRequest>,
     offerOptions: Boolean = false,
   ) {
-    val api = entry?.instance ?: activeApi.value
     val results = supervisorScope {
       requests.map { request ->
-        async { request to catchingUnlessCancelled { api.download(request) } }
+        async { request to catchingUnlessCancelled { entry.instance.download(request) } }
       }.awaitAll()
     }
     val added = results.mapNotNull { it.second.getOrNull() }
@@ -1589,8 +1575,7 @@ class AppState(
     failed.forEach { (request, e) ->
       log.w { "Couldn't add ${redactUrl(request.url)}: ${e.describeCauses()}" }
     }
-    val deviceId = entry?.deviceId ?: activeInstance.value?.deviceId ?: LOCAL_DEVICE_ID
-    announceAdded(added.map { TaskKey(deviceId, it.taskId) })
+    announceAdded(added.map { TaskKey(entry.deviceId, it.taskId) })
     reportAdded(
       entry = entry,
       added = added,
@@ -1601,13 +1586,13 @@ class AppState(
   }
 
   private fun reportAdded(
-    entry: InstanceEntry?,
+    entry: InstanceEntry,
     added: List<DownloadTask>,
     failures: List<Pair<String, Throwable>>,
     offerOptions: Boolean = false,
     retry: (() -> Unit)? = null,
   ) {
-    val deviceName = nameOf(entry)
+    val deviceName = entry.label
     if (added.isEmpty()) {
       val (name, e) = failures.firstOrNull() ?: return
       postError(
@@ -1629,7 +1614,7 @@ class AppState(
         if (failures.isEmpty()) "" else " · ${failures.size} failed"
     }
     val actions = buildList {
-      if (single != null && offerOptions && entry != null) {
+      if (single != null && offerOptions) {
         add(
           MessageAction("Options") {
             openIntake(IntakeRequest(editTask = TaskKey(entry.deviceId, single.taskId)))
@@ -1642,8 +1627,8 @@ class AppState(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
       detail = failures.firstOrNull()?.first,
-      taskKey = single?.let { TaskKey(entry?.deviceId ?: LOCAL_DEVICE_ID, it.taskId) },
-      deviceId = entry?.deviceId,
+      taskKey = single?.let { TaskKey(entry.deviceId, it.taskId) },
+      deviceId = entry.deviceId,
       actions = actions,
       cause = failures.firstOrNull()?.second,
     )
@@ -1653,7 +1638,7 @@ class AppState(
     verb: String,
     command: String,
     results: List<Pair<DownloadTask, Throwable?>>,
-    devices: Int = 1,
+    devices: Int,
   ) {
     val done = results.count { it.second == null }
     val failures = results.mapNotNull { (task, error) -> error?.let { task to it } }

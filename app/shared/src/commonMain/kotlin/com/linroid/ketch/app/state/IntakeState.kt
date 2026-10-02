@@ -30,12 +30,11 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.isMobilePlatform
-import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.util.CurlParser
 import com.linroid.ketch.app.util.DuplicateDetector
 import com.linroid.ketch.app.util.IntakeItem
@@ -1216,10 +1215,7 @@ class IntakeSession internal constructor(
   }
 
   /** The device name downloads go to, as messages say it. */
-  fun targetName(): String {
-    val target = target ?: return "this device"
-    return if (target is EmbeddedInstance) localDeviceNoun() else target.label
-  }
+  fun targetName(): String = target?.displayName ?: "this device"
 
   private fun add(onDone: () -> Unit) {
     val target = target ?: return

@@ -35,10 +35,9 @@ import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
@@ -448,7 +447,7 @@ internal fun sendTargets(
       is RemoteInstance -> entry.connectionState.value.toDeviceHealth()
       else -> DeviceHealth.Local()
     }
-    val name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label
+    val name = entry.displayName
     val summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId })
     SendTarget(entry, DeviceOption(entry.deviceId, name, health, summary = summary))
   }

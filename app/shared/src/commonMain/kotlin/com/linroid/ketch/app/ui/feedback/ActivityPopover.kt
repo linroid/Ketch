@@ -44,9 +44,8 @@ import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.TaskKey
@@ -392,10 +391,8 @@ internal fun showsActions(message: AppMessage, onScreen: Boolean): Boolean =
     (onScreen || message.level == MessageLevel.Error || message.level == MessageLevel.Warning)
 
 /** How the app names the device [deviceId]: "This Mac" for the embedded one. */
-internal fun deviceName(instances: List<InstanceEntry>, deviceId: String): String {
-  val entry = instances.firstOrNull { it.deviceId == deviceId } ?: return deviceId
-  return if (entry is EmbeddedInstance) localDeviceNoun() else entry.label
-}
+internal fun deviceName(instances: List<InstanceEntry>, deviceId: String): String =
+  instances.firstOrNull { it.deviceId == deviceId }?.displayName ?: deviceId
 
 private fun clock(time: LocalDateTime): String =
   "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
