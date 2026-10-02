@@ -43,6 +43,7 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
+import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
@@ -62,9 +63,6 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.io.FilenameFilter
-
-private val isMac = System.getProperty("os.name").startsWith("Mac")
-private val isWindows = System.getProperty("os.name").startsWith("Windows")
 
 /**
  * What the tray and the menu bar ask of the host, which owns the main window and the app's
@@ -102,7 +100,7 @@ fun FrameWindowScope.KetchMenuBar(
   actions: DesktopActions,
   speedMode: SpeedModeController? = null,
 ) {
-  if (!isMac) return
+  if (DesktopOs.current != DesktopOs.MAC) return
   val state = controller.state
   val files = rememberFileActions()
   val clipboard = rememberSystemClipboard()
@@ -813,7 +811,7 @@ internal class DesktopCommands(
       isMultipleMode = true
       filenameFilter = FilenameFilter { _, name -> name.endsWith(".torrent", ignoreCase = true) }
       // Windows ignores the filter but matches the name pattern.
-      if (isWindows) file = "*.torrent"
+      if (DesktopOs.current == DesktopOs.WINDOWS) file = "*.torrent"
     }
     val picked = try {
       dialog.isVisible = true
@@ -910,11 +908,4 @@ internal class DesktopCommands(
   }
 
   private fun nameOf(task: DownloadTask): String = displayName(task.request, task.state.value)
-}
-
-/** Name of [mode] in sentence case, as menus and messages show it. */
-internal fun speedModeName(mode: SpeedLimitMode): String = when (mode) {
-  SpeedLimitMode.Full -> "Full speed"
-  SpeedLimitMode.SlowLane -> "Slow lane"
-  SpeedLimitMode.Auto -> "Auto"
 }
