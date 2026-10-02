@@ -96,13 +96,12 @@ internal fun searchSettings(
   query: String,
   categories: List<SettingsCategory>,
   features: Set<SettingsFeature>,
-  entries: List<SettingsEntry> = SettingsIndex,
 ): List<SettingsHit> {
   val phrase = query.trim().lowercase()
   val words = phrase.split(WHITESPACE).filter { it.isNotEmpty() }
   if (words.isEmpty()) return emptyList()
   val pages = categories.map { SettingsEntry(it, it.title, it.description, anchors = emptyList()) }
-  val candidates = pages + entries.filter { entry ->
+  val candidates = pages + SettingsIndex.filter { entry ->
     entry.category in categories && (entry.needs == null || entry.needs in features)
   }
   return candidates.mapNotNull { entry ->
@@ -305,333 +304,222 @@ private const val FLASH_OUT_MS = 600
  * Every setting search finds, page by page. Titles and anchors match the titles of the rows and
  * groups on the pages, so a search result can scroll to them.
  */
-internal val SettingsIndex: List<SettingsEntry> = listOf(
-  // General
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Device name",
-    description = "The name your other devices see",
-    keywords = listOf("hostname", "computer", "rename"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Theme",
-    description = "System, light or dark",
-    keywords = listOf("dark mode", "light mode", "appearance"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Accent color",
-    description = "Signal, Harbor, Fathom or Beacon",
-    keywords = listOf("colour", "appearance"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Density",
-    description = "Auto, compact or comfortable",
-    keywords = listOf("size", "spacing", "touch", "appearance"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Reduce motion",
-    description = "Fewer animations",
-    keywords = listOf("animation", "accessibility"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Language",
-    keywords = listOf("locale", "translation"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "When I close the window",
-    description = "Keep downloading in the background, or quit",
-    keywords = listOf("quit", "menu bar", "tray", "notification area", "exit"),
-    needs = SettingsFeature.Desktop,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Open Ketch at login",
-    keywords = listOf("startup", "launch", "boot", "login item"),
-    needs = SettingsFeature.Desktop,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Start hidden at login",
-    keywords = listOf("startup", "background", "menu bar", "tray"),
-    needs = SettingsFeature.Desktop,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "App icon badge",
-    description = "What the Dock or taskbar icon shows",
-    keywords = listOf("count", "dock", "taskbar"),
-    needs = SettingsFeature.Desktop,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.General,
-    title = "Keyboard shortcuts…",
-    description = "Every shortcut in Ketch",
-    keywords = listOf("keys", "hotkeys", "keybindings"),
-    needs = SettingsFeature.Keyboard,
-  ),
-  // Notifications
-  SettingsEntry(
-    category = SettingsCategory.Notifications,
-    title = "Download finished",
-    keywords = listOf("complete", "done", "alert"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Notifications,
-    title = "Download failed",
-    keywords = listOf("error", "alert"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Notifications,
-    title = "All downloads finished",
-    keywords = listOf("queue", "complete", "done"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Notifications,
-    title = "Devices going offline",
-    keywords = listOf("disconnected", "connection lost"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Notifications,
-    title = "Only when Ketch is in the background",
-    keywords = listOf("foreground", "toast"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Notifications,
-    title = "Notify me about these devices",
-    keywords = listOf("mute", "remote", "nas", "keep connected"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Notifications,
-    title = "Browser notifications",
-    description = "Let this browser show Ketch's notifications",
-    keywords = listOf("permission", "allow"),
-    needs = SettingsFeature.BrowserNotifications,
-  ),
-  // Integration
-  SettingsEntry(
-    category = SettingsCategory.Integration,
-    title = "Browser extension",
-    description = "Send browser downloads to Ketch",
-    keywords = listOf("chrome", "edge", "firefox", "brave", "arc", "vivaldi", "capture"),
-    needs = SettingsFeature.Desktop,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Integration,
-    title = "Open magnet links with Ketch",
-    keywords = listOf("default app", "handler", "protocol"),
-    needs = SettingsFeature.Desktop,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Integration,
-    title = "Open .torrent files with Ketch",
-    keywords = listOf("default app", "file type", "handler"),
-    needs = SettingsFeature.Desktop,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Integration,
-    title = "Suggest links from the clipboard",
-    keywords = listOf("paste", "copy"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Integration,
-    title = "Add pasted links immediately",
-    keywords = listOf("paste", "quick add", "clipboard"),
-  ),
-  // Discover
-  SettingsEntry(
-    category = SettingsCategory.Discover,
-    title = "AI discovery",
-    keywords = listOf("ai", "llm", "agent", "turn on"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Discover,
-    title = "Provider",
-    description = "OpenAI, Anthropic, Gemini, Ollama or your own",
-    keywords = listOf("claude", "gpt", "google", "openrouter", "llm", "model provider"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Discover,
-    title = "API key",
-    keywords = listOf("token", "secret", "credentials"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Discover,
-    title = "Model",
-    keywords = listOf("llm"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Discover,
-    title = "Endpoint",
-    keywords = listOf("base url", "server", "url"),
-    anchors = listOf("Endpoint", "Endpoint (optional)"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Discover,
-    title = "Test connection",
-    keywords = listOf("check", "verify"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Discover,
-    title = "Web search",
-    description = "Brave or Google search for the agent",
-    keywords = listOf("search provider", "search api key", "engine"),
-  ),
-  // About
-  SettingsEntry(
-    category = SettingsCategory.About,
-    title = "Version",
-    keywords = listOf("build", "revision", "update"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.About,
-    title = "Source code",
-    keywords = listOf("github", "project"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.About,
-    title = "Report a problem",
-    keywords = listOf("bug", "issue", "feedback", "help"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.About,
-    title = "Open-source licenses",
-    keywords = listOf("license", "notices", "fonts", "ofl"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.About,
-    title = "Log files",
-    description = "Open or share the logs for a bug report",
-    keywords = listOf("logs", "debug", "troubleshooting"),
-    anchors = listOf("Open log folder", "Share logs"),
-    needs = SettingsFeature.Logs,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.About,
-    title = "Show setup checklist",
-    keywords = listOf("getting started", "onboarding", "setup"),
-    needs = SettingsFeature.SetupChecklist,
-  ),
-  SettingsEntry(
-    category = SettingsCategory.About,
-    title = "Show welcome again",
-    keywords = listOf("onboarding", "first run", "intro"),
-    needs = SettingsFeature.Mobile,
-  ),
-  // Downloads
-  SettingsEntry(
-    category = SettingsCategory.Downloads,
-    title = "Save downloads to",
-    keywords = listOf("folder", "directory", "location", "path", "destination"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Downloads,
-    title = "Folders in the add sheet",
-    description = "Pinned and recent folders",
-    keywords = listOf("favorite", "pin", "recent"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Downloads,
-    title = "Run at once",
-    description = "Downloads that run together",
-    keywords = listOf("concurrent", "parallel", "simultaneous", "queue", "limit"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Downloads,
-    title = "Per server",
-    description = "Downloads from one website at a time",
-    keywords = listOf("host", "website", "queue", "limit"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Downloads,
-    title = "Retries",
-    keywords = listOf("retry", "attempts", "errors"),
-  ),
-  // Speed
-  SettingsEntry(
-    category = SettingsCategory.Speed,
-    title = "Speed mode",
-    description = "Full speed, Slow lane or Auto",
-    keywords = listOf("limit", "bandwidth", "throttle"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Speed,
-    title = "Full speed cap",
-    description = "The speed limit all downloads share",
-    keywords = listOf("speed limit", "bandwidth", "throttle", "maximum"),
-    anchors = listOf("Full speed cap", "Speed limit"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Speed,
-    title = "Slow lane speed",
-    keywords = listOf("limit", "bandwidth", "throttle"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Speed,
-    title = "Auto rules",
-    description = "Turn the Slow lane on at set times",
-    keywords = listOf("schedule", "work hours", "weekdays", "time"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Speed,
-    title = "Connections per download",
-    keywords = listOf("segments", "threads", "parallel", "split"),
-  ),
-  // Network
-  SettingsEntry(
-    category = SettingsCategory.Network,
-    title = "Spread downloads across",
-    description = "The networks downloads use",
-    keywords = listOf("wifi", "wi-fi", "ethernet", "interface", "vpn", "multiple networks"),
-    anchors = listOf("Networks", "Spread downloads across"),
-  ),
-  // BitTorrent
-  SettingsEntry(
-    category = SettingsCategory.BitTorrent,
-    title = "Extra trackers",
-    description = "Trackers added to public torrents",
-    keywords = listOf("announce", "udp", "magnet", "add trackers"),
-  ),
-  // Sharing
-  SettingsEntry(
-    category = SettingsCategory.Sharing,
-    title = "Pair a device",
-    description = "Control this device from a phone or browser",
-    keywords = listOf("qr code", "phone", "pairing", "remote", "web app", "connect"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Sharing,
-    title = "Reachable from other devices",
-    keywords = listOf("lan", "network", "remote access"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Sharing,
-    title = "Port",
-    keywords = listOf("server"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Sharing,
-    title = "Access code",
-    keywords = listOf("token", "password", "api token"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Sharing,
-    title = "Discoverable on the local network",
-    keywords = listOf("mdns", "bonjour", "find"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Sharing,
-    title = "Websites allowed to connect",
-    keywords = listOf("cors", "origin"),
-  ),
-  SettingsEntry(
-    category = SettingsCategory.Sharing,
-    title = "Start sharing when Ketch opens",
-    keywords = listOf("server", "startup", "auto start"),
-  ),
-)
+internal val SettingsIndex: List<SettingsEntry> = buildList {
+  fun SettingsCategory.entry(
+    title: String,
+    description: String = "",
+    keywords: List<String> = emptyList(),
+    anchors: List<String> = listOf(title),
+    needs: SettingsFeature? = null,
+  ) {
+    add(SettingsEntry(this, title, description, keywords, anchors, needs))
+  }
+
+  with(SettingsCategory.General) {
+    entry(
+      "Device name",
+      description = "The name your other devices see",
+      keywords = listOf("hostname", "computer", "rename"),
+    )
+    entry(
+      "Theme",
+      description = "System, light or dark",
+      keywords = listOf("dark mode", "light mode", "appearance"),
+    )
+    entry(
+      "Accent color",
+      description = "Signal, Harbor, Fathom or Beacon",
+      keywords = listOf("colour", "appearance"),
+    )
+    entry(
+      "Density",
+      description = "Auto, compact or comfortable",
+      keywords = listOf("size", "spacing", "touch", "appearance"),
+    )
+    entry(
+      "Reduce motion",
+      description = "Fewer animations",
+      keywords = listOf("animation", "accessibility"),
+    )
+    entry("Language", keywords = listOf("locale", "translation"))
+    entry(
+      "When I close the window",
+      description = "Keep downloading in the background, or quit",
+      keywords = listOf("quit", "menu bar", "tray", "notification area", "exit"),
+      needs = SettingsFeature.Desktop,
+    )
+    entry(
+      "Open Ketch at login",
+      keywords = listOf("startup", "launch", "boot", "login item"),
+      needs = SettingsFeature.Desktop,
+    )
+    entry(
+      "Start hidden at login",
+      keywords = listOf("startup", "background", "menu bar", "tray"),
+      needs = SettingsFeature.Desktop,
+    )
+    entry(
+      "App icon badge",
+      description = "What the Dock or taskbar icon shows",
+      keywords = listOf("count", "dock", "taskbar"),
+      needs = SettingsFeature.Desktop,
+    )
+    entry(
+      "Keyboard shortcuts…",
+      description = "Every shortcut in Ketch",
+      keywords = listOf("keys", "hotkeys", "keybindings"),
+      needs = SettingsFeature.Keyboard,
+    )
+  }
+  with(SettingsCategory.Notifications) {
+    entry("Download finished", keywords = listOf("complete", "done", "alert"))
+    entry("Download failed", keywords = listOf("error", "alert"))
+    entry("All downloads finished", keywords = listOf("queue", "complete", "done"))
+    entry("Devices going offline", keywords = listOf("disconnected", "connection lost"))
+    entry("Only when Ketch is in the background", keywords = listOf("foreground", "toast"))
+    entry(
+      "Notify me about these devices",
+      keywords = listOf("mute", "remote", "nas", "keep connected"),
+    )
+    entry(
+      "Browser notifications",
+      description = "Let this browser show Ketch's notifications",
+      keywords = listOf("permission", "allow"),
+      needs = SettingsFeature.BrowserNotifications,
+    )
+  }
+  with(SettingsCategory.Integration) {
+    entry(
+      "Browser extension",
+      description = "Send browser downloads to Ketch",
+      keywords = listOf("chrome", "edge", "firefox", "brave", "arc", "vivaldi", "capture"),
+      needs = SettingsFeature.Desktop,
+    )
+    entry(
+      "Open magnet links with Ketch",
+      keywords = listOf("default app", "handler", "protocol"),
+      needs = SettingsFeature.Desktop,
+    )
+    entry(
+      "Open .torrent files with Ketch",
+      keywords = listOf("default app", "file type", "handler"),
+      needs = SettingsFeature.Desktop,
+    )
+    entry("Suggest links from the clipboard", keywords = listOf("paste", "copy"))
+    entry("Add pasted links immediately", keywords = listOf("paste", "quick add", "clipboard"))
+  }
+  with(SettingsCategory.Discover) {
+    entry("AI discovery", keywords = listOf("ai", "llm", "agent", "turn on"))
+    entry(
+      "Provider",
+      description = "OpenAI, Anthropic, Gemini, Ollama or your own",
+      keywords = listOf("claude", "gpt", "google", "openrouter", "llm", "model provider"),
+    )
+    entry("API key", keywords = listOf("token", "secret", "credentials"))
+    entry("Model", keywords = listOf("llm"))
+    entry(
+      "Endpoint",
+      keywords = listOf("base url", "server", "url"),
+      anchors = listOf("Endpoint", "Endpoint (optional)"),
+    )
+    entry("Test connection", keywords = listOf("check", "verify"))
+    entry(
+      "Web search",
+      description = "Brave or Google search for the agent",
+      keywords = listOf("search provider", "search api key", "engine"),
+    )
+  }
+  with(SettingsCategory.About) {
+    entry("Version", keywords = listOf("build", "revision", "update"))
+    entry("Source code", keywords = listOf("github", "project"))
+    entry("Report a problem", keywords = listOf("bug", "issue", "feedback", "help"))
+    entry("Open-source licenses", keywords = listOf("license", "notices", "fonts", "ofl"))
+    entry(
+      "Log files",
+      description = "Open or share the logs for a bug report",
+      keywords = listOf("logs", "debug", "troubleshooting"),
+      anchors = listOf("Open log folder", "Share logs"),
+      needs = SettingsFeature.Logs,
+    )
+    entry(
+      "Show setup checklist",
+      keywords = listOf("getting started", "onboarding", "setup"),
+      needs = SettingsFeature.SetupChecklist,
+    )
+    entry(
+      "Show welcome again",
+      keywords = listOf("onboarding", "first run", "intro"),
+      needs = SettingsFeature.Mobile,
+    )
+  }
+  with(SettingsCategory.Downloads) {
+    entry(
+      "Save downloads to",
+      keywords = listOf("folder", "directory", "location", "path", "destination"),
+    )
+    entry(
+      "Folders in the add sheet",
+      description = "Pinned and recent folders",
+      keywords = listOf("favorite", "pin", "recent"),
+    )
+    entry(
+      "Run at once",
+      description = "Downloads that run together",
+      keywords = listOf("concurrent", "parallel", "simultaneous", "queue", "limit"),
+    )
+    entry(
+      "Per server",
+      description = "Downloads from one website at a time",
+      keywords = listOf("host", "website", "queue", "limit"),
+    )
+    entry("Retries", keywords = listOf("retry", "attempts", "errors"))
+  }
+  with(SettingsCategory.Speed) {
+    entry(
+      "Speed mode",
+      description = "Full speed, Slow lane or Auto",
+      keywords = listOf("limit", "bandwidth", "throttle"),
+    )
+    entry(
+      "Full speed cap",
+      description = "The speed limit all downloads share",
+      keywords = listOf("speed limit", "bandwidth", "throttle", "maximum"),
+      anchors = listOf("Full speed cap", "Speed limit"),
+    )
+    entry("Slow lane speed", keywords = listOf("limit", "bandwidth", "throttle"))
+    entry(
+      "Auto rules",
+      description = "Turn the Slow lane on at set times",
+      keywords = listOf("schedule", "work hours", "weekdays", "time"),
+    )
+    entry("Connections per download", keywords = listOf("segments", "threads", "parallel", "split"))
+  }
+  with(SettingsCategory.Network) {
+    entry(
+      "Spread downloads across",
+      description = "The networks downloads use",
+      keywords = listOf("wifi", "wi-fi", "ethernet", "interface", "vpn", "multiple networks"),
+      anchors = listOf("Networks", "Spread downloads across"),
+    )
+  }
+  with(SettingsCategory.BitTorrent) {
+    entry(
+      "Extra trackers",
+      description = "Trackers added to public torrents",
+      keywords = listOf("announce", "udp", "magnet", "add trackers"),
+    )
+  }
+  with(SettingsCategory.Sharing) {
+    entry(
+      "Pair a device",
+      description = "Control this device from a phone or browser",
+      keywords = listOf("qr code", "phone", "pairing", "remote", "web app", "connect"),
+    )
+    entry("Reachable from other devices", keywords = listOf("lan", "network", "remote access"))
+    entry("Port", keywords = listOf("server"))
+    entry("Access code", keywords = listOf("token", "password", "api token"))
+    entry("Discoverable on the local network", keywords = listOf("mdns", "bonjour", "find"))
+    entry("Websites allowed to connect", keywords = listOf("cors", "origin"))
+    entry("Start sharing when Ketch opens", keywords = listOf("server", "startup", "auto start"))
+  }
+}
