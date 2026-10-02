@@ -975,10 +975,7 @@ class AppState(
 
   private fun removeTasks(tasks: List<DownloadTask>, deleteFiles: (DownloadTask) -> Boolean) {
     if (tasks.isEmpty()) return
-    deferRemoval(tasks, deleteFiles, label = "Remove") { count ->
-      if (count == 1) "Removed ${tasks.single().displayName()}"
-      else "Removed ${downloads(count)}"
-    }
+    deferRemoval(tasks, deleteFiles, label = "Remove") { "Removed ${what(tasks)}" }
   }
 
   /**
@@ -997,11 +994,7 @@ class AppState(
       commit = { reportFailures("discard progress of", runEach(tasks) { it.cancel() }) },
       undo = { reportFailures("resume", runEach(paused) { it.resume() }) },
     )
-    val title = if (tasks.size == 1) {
-      "Discarded progress of ${tasks.single().displayName()}"
-    } else {
-      "Discarded progress of ${downloads(tasks.size)}"
-    }
+    val title = "Discarded progress of ${what(tasks)}"
     messages.post(MessageLevel.Success, title, actions = listOf(undoAction(op)))
   }
 
@@ -1048,7 +1041,7 @@ class AppState(
     }
     val title = buildString {
       append("Restarted ")
-      append(if (done.size == 1) done.single().displayName() else downloads(done.size))
+      append(what(done))
       if (failed.isNotEmpty()) append(" · ${failed.size} failed")
     }
     messages.post(
@@ -1138,8 +1131,7 @@ class AppState(
       })
     })
     val title = buildString {
-      val what = started.singleOrNull()?.task?.displayName() ?: downloads(started.size)
-      append("Started $what now")
+      append("Started ${what(started.map { it.task })} now")
       if (preempted.isNotEmpty()) {
         append(" · paused ${preempted.joinToString(", ") { it.displayName() }} to make room")
       }
@@ -1215,13 +1207,9 @@ class AppState(
         log.w { "Couldn't send taskId=${task.taskId} to $targetName: ${e.describeCauses()}" }
       }
       if (sent.isEmpty()) {
-        val (task, e) = failures.first()
+        val e = failures.first().second
         postError(
-          title = if (failures.size == 1) {
-            "Couldn't send ${task.displayName()} to $targetName"
-          } else {
-            "Couldn't send ${downloads(failures.size)} to $targetName"
-          },
+          title = "Couldn't send ${what(failures.map { it.first })} to $targetName",
           detail = e.message,
           cause = e,
           actions = listOf(
@@ -1230,8 +1218,6 @@ class AppState(
         )
         return@launch
       }
-      val what = if (sent.size == 1) sent.single().first.displayName()
-      else downloads(sent.size)
       val failedNote = if (failures.isEmpty()) "" else " · ${failures.size} failed"
       val sources = sent.map { it.first }
       if (move) {
@@ -1248,14 +1234,14 @@ class AppState(
         )
         messages.post(
           level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
-          title = "Moved $what to $targetName$failedNote",
+          title = "Moved ${what(sources)} to $targetName$failedNote",
           deviceId = target.deviceId,
           actions = listOf(undoAction(op)),
         )
       } else {
         messages.post(
           level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
-          title = "Sent $what to $targetName$failedNote",
+          title = "Sent ${what(sources)} to $targetName$failedNote",
           deviceId = target.deviceId,
           actions = listOf(
             MessageAction("Show") { showOn(target, sent.singleOrNull()?.second) },
@@ -1634,10 +1620,8 @@ class AppState(
     }
     val (task, e) = failures.first()
     val device = deviceOf(task)
-    val what = if (failures.size == 1) task.displayName()
-    else downloads(failures.size)
     postError(
-      title = "Couldn't $command $what on ${nameOf(device)}",
+      title = "Couldn't $command ${what(failures.map { it.first })} on ${nameOf(device)}",
       detail = e.message,
       cause = e,
       taskKey = TaskKey(device?.deviceId ?: LOCAL_DEVICE_ID, task.taskId),
@@ -1826,6 +1810,10 @@ private fun scheduledNote(schedules: List<DownloadSchedule>): String? {
 
 /** Name of this task for messages, from its current request and state. */
 private fun DownloadTask.displayName(): String = displayName(requestState.value, state.value)
+
+/** The name of the only one of [tasks], else how many they are, such as "3 downloads". */
+private fun what(tasks: List<DownloadTask>): String =
+  tasks.singleOrNull()?.displayName() ?: downloads(tasks.size)
 
 /**
  * Whether this task's file is unfinished, so removing the task once it was sent elsewhere takes
