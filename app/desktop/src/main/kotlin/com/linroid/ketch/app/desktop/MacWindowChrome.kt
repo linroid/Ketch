@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.desktop
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,11 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
-import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.WindowChrome
-import com.linroid.ketch.config.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,14 +73,6 @@ internal fun windowAppearance(darkTheme: Boolean): String =
 /** The main window's title: "Ketch — 3 downloading · 45%" while downloading, else "Ketch". */
 internal fun windowTitle(pulse: PulseState): String =
   pulse.shortSentence()?.let { "Ketch — $it" } ?: "Ketch"
-
-/** Whether the app shows its dark theme, as `App` decides it. */
-@Composable
-internal fun AppSettingsController.isDarkTheme(): Boolean = when (themeMode) {
-  ThemeMode.System -> isSystemInDarkTheme()
-  ThemeMode.Light -> false
-  ThemeMode.Dark -> true
-}
 
 /**
  * Sets up this window's macOS title bar: with [fullWindowContent] the content fills the window

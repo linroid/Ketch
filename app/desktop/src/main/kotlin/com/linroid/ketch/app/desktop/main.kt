@@ -64,6 +64,7 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.isPairingLink
 import com.linroid.ketch.app.theme.LocalWindowChrome
+import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.ConfigStore
@@ -418,7 +419,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       }
       val focused = LocalWindowInfo.current.isWindowFocused
       SideEffect { windowFocused = focused }
-      MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.isDarkTheme())
+      MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.themeMode.isDark())
       KetchMenuBar(controller, status, actions, speedMode)
       val shellSkips = remember(speedMode) {
         hostShortcuts(DesktopOs.current, slowLane = speedMode != null)

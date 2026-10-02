@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.desktop
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,8 +41,8 @@ import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.config.CloseAction
-import com.linroid.ketch.config.ThemeMode
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -338,11 +337,7 @@ internal class CloseBehavior(
 @Composable
 internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsController) {
   val dialog = behavior.dialog ?: return
-  val darkTheme = when (settings.themeMode) {
-    ThemeMode.System -> isSystemInDarkTheme()
-    ThemeMode.Light -> false
-    ThemeMode.Dark -> true
-  }
+  val darkTheme = settings.themeMode.isDark()
   val copy = dialogCopy(dialog, DesktopOs.current, behavior.traySupported)
   var dontAskAgain by remember(dialog) { mutableStateOf(false) }
   DialogWindow(
