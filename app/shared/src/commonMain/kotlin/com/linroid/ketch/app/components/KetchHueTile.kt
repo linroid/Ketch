@@ -22,7 +22,10 @@ import com.linroid.ketch.app.theme.KetchTheme
 
 /** Sizes of a [KetchHueTile]. */
 object KetchHueTileDefaults {
-  /** Settings navigation items. */
+  /** Single-line items, such as the list of Settings pages beside the open one. */
+  val XSmall: Dp = 24.dp
+
+  /** Two-line rows, such as the phone's list of Settings pages and search results. */
   val Small: Dp = 32.dp
 
   /** Device types and setting group headers. */
@@ -37,7 +40,8 @@ object KetchHueTileDefaults {
  * The tile fades from 18% to 6% of the hue toward its bottom-end corner, and in the light theme
  * catches a thin white highlight along its top edge.
  *
- * @param size one of the [KetchHueTileDefaults] sizes; the corners round at 28% of it.
+ * @param size one of the [KetchHueTileDefaults] sizes; the corners round at 28% of it, and the
+ *   glyph takes half of it, but never less than 14 dp, so it stays legible on small tiles.
  */
 @Composable
 fun KetchHueTile(
@@ -64,12 +68,15 @@ fun KetchHueTile(
       .background(fill)
       .then(if (dark) Modifier else Modifier.border(1.dp, highlight, shape)),
   ) {
-    KetchIconImage(icon, size = size * GLYPH_SHARE, tint = tint)
+    KetchIconImage(icon, size = (size * GLYPH_SHARE).coerceAtLeast(MinGlyph), tint = tint)
   }
 }
 
 private const val CORNER_SHARE = 0.28f
 private const val GLYPH_SHARE = 0.5f
+
+/** Smallest glyph a tile draws, which its strokes stay legible at. */
+private val MinGlyph = 14.dp
 private const val TOP_ALPHA = 0.18f
 private const val BOTTOM_ALPHA = 0.06f
 

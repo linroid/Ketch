@@ -1872,17 +1872,17 @@ has no landing grid of category cards; the category list opens straight onto a p
 ╭ Settings ───────────────────────────────────────────────────────────────────────────────╮
 │ [⌕ Search settings  ⌘F]      │ Speed                                on (LM) This Mac ▾ │
 │ THIS APP                     │ MODE                                                     │
-│ (▣) General  Light · Signal  │ (Full speed | [Slow lane] | Auto)                        │
-│ (▣) Notifications  2 on      │ Full speed cap        (Unlimited ▾)                      │
-│ (▣) Integration  Chrome ✓    │ Slow lane speed       (1 MB/s ▾) · ≈ 3.1 MB/s suggested  │
-│ (▣) Discover  Claude         │ AUTO                                                     │
+│ (▣) General                  │ (Full speed | [Slow lane] | Auto)                        │
+│ (▣) Notifications            │ Full speed cap        (Unlimited ▾)                      │
+│ (▣) Integration              │ Slow lane speed       (1 MB/s ▾) · ≈ 3.1 MB/s suggested  │
+│ (▣) Discover                 │ AUTO                                                     │
 │ (▣) About                    │ Slow lane on (M)(T)(W)(T)(F) S S   09:00 – 18:00   ✕     │
 │ DEVICE  (LM) This Mac ▾      │ + Add rule                                               │
-│ (▣) Downloads ~/Downloads · 2│ On metered networks (Android)  (Slow lane ▾)             │
-│ (▣) Speed  Slow lane · Auto  │ PER DOWNLOAD                                             │
-│ (▣) Network  Wi-Fi+Ethernet  │ Connections per download     [−] 4 [+]                   │
-│ (▣) BitTorrent  3 trackers   │                                                          │
-│ (▣) Sharing  On · :8642      │                Changes apply as you make them.           │
+│ (▣) Downloads                │ On metered networks (Android)  (Slow lane ▾)             │
+│ (▣) Speed                    │ PER DOWNLOAD                                             │
+│ (▣) Network                  │ Connections per download     [−] 4 [+]                   │
+│ (▣) BitTorrent               │                                                          │
+│ (▣) Sharing                  │                Changes apply as you make them.           │
 ╰─────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1894,8 +1894,10 @@ has no landing grid of category cards; the category list opens straight onto a p
   (embedded device only; renamed from "Remote access").
   - The chip edits **any connected device** without switching the main window.
   - The same pages open from a device's menu or card ("Settings for NAS-Basement").
-- **Nav items** are 40 dp with a 32 dp `KetchHueTile` and a live summary in `caption`
-  `textTertiary`:
+- **Nav items** beside the open page are single-line sidebar items (32 dp in Compact, §3.7)
+  with a 24 dp `KetchHueTile` and the page name, like the app's sidebar. The phone's list of
+  pages adds a live summary in `caption` `textTertiary`, which the nav items give screen readers
+  as their state instead:
   - General: "Light · Signal"
   - Downloads: "~/Downloads · 2 at a time"
   - Speed: "Slow lane · 1 MB/s · Auto weekdays"

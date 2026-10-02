@@ -43,6 +43,8 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -250,9 +252,10 @@ private class CoordinatesHolder {
 
 /**
  * The column of pages beside the open one, in two groups, with search at the top. While a query
- * is typed it lists what matches instead.
+ * is typed it lists what matches instead. Each page is one line, as in the app's sidebar.
  *
- * @param summaries the live one-line state of each page.
+ * @param summaries the live one-line state of each page, which screen readers announce as the
+ *   state of its item.
  * @param deviceChip the chip that picks the device the device pages edit; `null` hides it.
  * @param search the search field.
  * @param results the search results, shown in place of the pages while a query is typed.
@@ -336,7 +339,10 @@ private fun SectionHeader(
   }
 }
 
-/** One page in [SettingsNav]: its hue tile, its name and its live summary. */
+/**
+ * One page in [SettingsNav], as tall as a sidebar item: its hue tile and its name. Screen
+ * readers announce its [summary] as its state.
+ */
 @Composable
 private fun SettingsNavItem(
   category: SettingsCategory,
@@ -361,7 +367,7 @@ private fun SettingsNavItem(
     modifier = Modifier.fillMaxWidth()
       .padding(horizontal = spacing.s2, vertical = spacing.s0_5)
       .focusRing(focus.visible, shape, colors.focusRing)
-      .heightIn(min = KetchHueTileDefaults.Small + spacing.s2)
+      .heightIn(min = KetchTheme.density.sidebarItem)
       .background(fill, shape)
       .trackFocusVisibility(focus)
       .selectable(
@@ -371,28 +377,19 @@ private fun SettingsNavItem(
         role = Role.Tab,
         onClick = onClick,
       )
-      .padding(horizontal = spacing.s1, vertical = spacing.s1),
+      .semantics { if (!summary.isNullOrEmpty()) stateDescription = summary }
+      .padding(horizontal = spacing.s1),
   ) {
-    KetchHueTile(icon = category.icon, hue = category.hue, size = KetchHueTileDefaults.Small)
-    Column(Modifier.weight(1f)) {
-      Text(
-        text = category.title,
-        style = KetchTheme.typography.label,
-        fontWeight = if (selected) FontWeight.SemiBold else null,
-        color = colors.textPrimary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
-      if (!summary.isNullOrEmpty()) {
-        Text(
-          text = summary,
-          style = KetchTheme.typography.caption,
-          color = colors.textTertiary,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-      }
-    }
+    KetchHueTile(icon = category.icon, hue = category.hue, size = KetchHueTileDefaults.XSmall)
+    Text(
+      text = category.title,
+      style = KetchTheme.typography.label,
+      fontWeight = if (selected) FontWeight.SemiBold else null,
+      color = if (selected) colors.textPrimary else colors.textSecondary,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      modifier = Modifier.weight(1f),
+    )
   }
 }
 

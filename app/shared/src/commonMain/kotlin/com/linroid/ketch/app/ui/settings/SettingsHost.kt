@@ -256,7 +256,7 @@ internal fun SettingsContent(
           search = search,
           results = results,
           onSurface = !inWindow,
-          modifier = Modifier.width(KetchTheme.spacing.sidebarWidth + NavExtraWidth),
+          modifier = Modifier.width(KetchTheme.spacing.sidebarWidth),
         )
         val pane = if (inWindow) {
           Modifier.weight(1f).fillMaxHeight()
@@ -435,6 +435,3 @@ private val SearchPress = SearchChord.resolve(KeyboardPlatform.current)
 
 /** Narrowest Settings shows the pages beside the open one; narrower ones show one at a time. */
 private val TwoPaneMinWidth = 600.dp
-
-/** What the list of pages adds to the sidebar's width, for each page's summary. */
-private val NavExtraWidth = 20.dp
