@@ -49,7 +49,7 @@ data class KetchSpacing(
   val tabRowHeight: Dp = 40.dp,
   val tableHeaderHeight: Dp = 28.dp,
   val tableRowCompact: Dp = 32.dp,
-  val tableGroupHeaderHeight: Dp = 24.dp,
+  val tableGroupHeaderHeight: Dp = 28.dp,
   val pulseBarHeight: Dp = 32.dp,
   val inspectorWidth: Dp = 320.dp,
   val inspectorMinWidth: Dp = 280.dp,

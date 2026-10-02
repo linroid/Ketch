@@ -90,7 +90,7 @@ Why this combination:
   It keeps **Downloads as home**, so no click is added to common jobs. Both judges rated it the
   best fit for Ketch's strengths.
 - **Helm** gives the parts a power user needs:
-  - a dense table as the default desktop view (36 dp rows, about 17 rows at 1280x800);
+  - a dense table as the default desktop view (40 dp rows, about 15 rows at 1280x800);
   - one `KetchCommands` registry that drives shortcuts, menus, the tray, `⌘K`, tooltips and the
     cheat sheet;
   - global status in a **Pulse bar inside the content card**, so it stays visible when the sidebar
@@ -526,7 +526,7 @@ The scale sits on a 4-pt grid: `s0_5 = 2`, `s1 = 4`, `s2 = 8`, `s3 = 12`, `s4 = 
 | Content card inset | 8 dp top, end and bottom (the sidebar side has no inset) |
 | Page header height / padding | 52 dp / 16 dp horizontal |
 | Tab row height | 40 dp (segmented control 32 dp inside) |
-| Table header / row / group header | 28 / 36 / 24 dp (Compact preference: row 32) |
+| Table header / row / group header | 28 / 40 / 28 dp (Compact preference: row 32) |
 | List row (pointer / touch) | 56 / 64 dp |
 | Pulse bar height | 32 dp |
 | Inspector width | 320 dp default, drag-resizable 280–480 |
@@ -549,8 +549,8 @@ Compact / Comfortable).
 | Icon button | 28 visual, 32 hit area, 16 glyph | 40 visual, 48 touch target, 20 glyph |
 | Input | 32 | 48 |
 | Chip, segmented control, tab | 28 | 32 (40 row) |
-| Sidebar item / device row | 32 / 36 | 40 / 48 |
-| Table row | 36 (32 with the "Compact rows" preference) | 44 |
+| Sidebar item / device row | 36 / 40 | 40 / 48 |
+| Table row | 40 (32 with the "Compact rows" preference) | 44 |
 | List row | 56 | 64 (72 with lanes) |
 | Menu item | 28 | 48 (as a bottom sheet) |
 | Glyph in nav / controls | 18 / 16 | 24 / 20 |
