@@ -115,8 +115,8 @@ sealed class RowAction(val label: String, val destructive: Boolean = false) {
  * @property canReschedule whether its tasks can be rescheduled; remote ones cannot yet.
  * @property canOpenFiles whether this app can open and reveal its downloaded files.
  * @property canTrash whether removed files can go to the Trash instead of being deleted.
- * @property canDiscover whether AI discovery is usable here, to find another source for a link
- *   that no longer works.
+ * @property canDiscover whether AI discovery runs here, to find another source for a link that
+ *   no longer works; a search made before it is set up waits on its setup page.
  */
 data class RowCapabilities(
   val isRemote: Boolean,
