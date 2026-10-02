@@ -45,6 +45,7 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.RowGroup
 import com.linroid.ketch.app.state.SelectionState
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskListView
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchDensity
@@ -358,7 +359,7 @@ private fun WideDownloads(
   var draggedWidth by remember { mutableStateOf<Dp?>(null) }
   val inspectorWidth = (draggedWidth ?: ui.inspectorWidth.dp)
     .coerceIn(spacing.inspectorMinWidth, widest.coerceAtLeast(spacing.inspectorMinWidth))
-  val inspectorShown = state.inspectorShown && !firstRun
+  val inspectorShown = !firstRun && (shownTask(state) != null || state.selectedKeys.size >= 2)
   // The sidebar lists the devices; on narrow cards the search field needs the room more.
   val sidebar = layout.tier == LayoutTier.Expanded && !ui.sidebarCollapsed
   val showDevice = (instances.size >= 2 || !sidebar) && (!sidebar || cardWidth >= DeviceChipWidth)
@@ -621,10 +622,22 @@ private fun PhoneDownloads(page: DownloadsPage, view: TaskListView) {
       }
     }
   }
-  val inspected = state.inspectedTask
+  val inspected = shownTask(state)
   if (inspected != null && !selecting) {
     SheetInspector(state, inspected, onClose = { state.inspect(null) })
   }
+}
+
+/**
+ * The inspected task while the list has its row. One that is gone, or that its device has not
+ * sent yet, has nothing to show, so the inspector waits for it.
+ */
+@Composable
+private fun shownTask(state: AppState): TaskKey? {
+  val rows by state.taskList.rows.collectAsState()
+  val key = state.inspectedTask
+  val listed = remember(rows, key) { key != null && rows.any { it.key == key } }
+  return key.takeIf { listed }
 }
 
 /** Width of the 1 dp lines that frame the page's parts. */
