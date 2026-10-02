@@ -320,9 +320,8 @@ internal class AppScenario(
   /** State and commands of the app. */
   val state: AppState get() = controller.state
 
-  /** Shows the task named [name] in the inspector, and the inspector itself. */
+  /** Shows the task named [name] in the inspector. */
   fun inspect(name: String) {
-    state.updateInspectorOpen(true)
     state.inspect(data.keyOf(name))
   }
 
