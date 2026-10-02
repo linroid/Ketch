@@ -38,11 +38,13 @@ internal val RemoteDevice = DeviceInfo("NAS", RowCapabilities.remote())
  *
  * @param revealLabel what the platform calls Show in folder; `null` where files cannot be shown.
  * @param canTrash whether removed files can go to the Trash.
+ * @param openUri opens a web page, such as a download's source page.
  */
 internal class ActionsFixture(
   scope: TestScope,
   revealLabel: String? = "Show in Finder",
   canTrash: Boolean = false,
+  openUri: (String) -> Unit = {},
 ) {
   val api = RecordingKetchApi()
   val controller = AppController(
@@ -54,8 +56,8 @@ internal class ActionsFixture(
   val files = FakeFileActions(revealLabel, canTrash)
   val clipboard = FakeClipboard()
   val state: AppState get() = controller.state
-  val runner =
-    RowActionRunner(RowCommands(controller.state, files, clipboard, scope.backgroundScope) {})
+  val commands = RowCommands(controller.state, files, clipboard, scope.backgroundScope, openUri)
+  val runner = RowActionRunner(commands)
 
   /** Adds a task in [state] to the device. */
   fun add(
