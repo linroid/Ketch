@@ -256,10 +256,7 @@ private fun PageFrame(
             category = it,
             state = state,
             device = if (remote) instances.last() else instances.first(),
-            appSettings = state.appSettings,
-            aiSettings = state.aiSettings,
             systemDeviceName = environment.data.deviceName,
-            onTestAi = {},
           )
         },
       )

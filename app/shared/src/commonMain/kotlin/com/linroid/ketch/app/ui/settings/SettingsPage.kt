@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -77,12 +76,9 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.instance.detail
 import com.linroid.ketch.app.instance.displayName
-import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.IntegrationStatus
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
-import com.linroid.ketch.app.state.AiSettingsController
-import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.SettingsCategory
@@ -114,37 +110,22 @@ import com.linroid.ketch.config.ThemeMode
  * @param state the app, whose device pages edit [device].
  * @param device device whose download, speed, network, torrent and sharing settings are shown;
  *   `null` while none is connected.
- * @param appSettings this app's own config sections.
- * @param aiSettings AI discovery settings and provider.
  * @param systemDeviceName name this device goes by when none is set, or `null` when the app has
  *   no device of its own (the web app).
- * @param onTestAi calls the AI provider with the saved settings.
- * @param fileLogger the app's log files, offered under About; `null` when the app keeps none.
  */
 @Composable
 fun SettingsCategoryContent(
   category: SettingsCategory,
   state: AppState,
   device: InstanceEntry?,
-  appSettings: AppSettingsController,
-  aiSettings: AiSettingsController,
   systemDeviceName: String?,
-  onTestAi: () -> Unit,
-  fileLogger: FileLogger? = null,
 ) {
   when (category) {
-    SettingsCategory.General -> GeneralSettings(state, appSettings, systemDeviceName)
+    SettingsCategory.General -> GeneralSettings(state, systemDeviceName)
     SettingsCategory.Notifications -> NotificationSettingsPage(state)
     SettingsCategory.Integration -> IntegrationSettingsPage(state)
-    SettingsCategory.Discover -> AiDiscoverySettings(
-      settings = aiSettings.settings,
-      supported = aiSettings.supported,
-      resolveCredentials = aiSettings::withPlatformCredentials,
-      connectionTest = aiSettings.connectionTest,
-      onChange = { aiSettings.save(it) },
-      onTest = onTestAi,
-    )
-    SettingsCategory.About -> AboutSettings(state, fileLogger)
+    SettingsCategory.Discover -> AiDiscoverySettings(state)
+    SettingsCategory.About -> AboutSettings(state)
     SettingsCategory.Downloads -> device?.let { DownloadSettings(state, it) } ?: NoDeviceNotice()
     SettingsCategory.Speed -> device?.let { SpeedSettingsPage(state, it) } ?: NoDeviceNotice()
     SettingsCategory.Network -> device?.let { NetworkSettings(state, it) } ?: NoDeviceNotice()

@@ -61,11 +61,8 @@ private val log = KetchLogger("GeneralSettings")
  *   device of this app's own to name (the web app).
  */
 @Composable
-fun GeneralSettings(
-  state: AppState,
-  appSettings: AppSettingsController,
-  systemDeviceName: String?,
-) {
+fun GeneralSettings(state: AppState, systemDeviceName: String?) {
+  val appSettings = state.appSettings
   val ui = appSettings.ui
   if (systemDeviceName != null) {
     SettingsGroup(title = "This device") {

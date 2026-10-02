@@ -18,6 +18,7 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.state.AiConnectionTest
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
@@ -27,31 +28,21 @@ import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
- * Provider, credentials and web search for AI discovery. Every change
- * is saved as it is made and rebuilds the discovery engine.
- *
- * @param settings currently saved settings.
- * @param supported whether this platform can run discovery locally.
- * @param resolveCredentials fills the blank credentials the platform can
- *   supply (e.g. from the environment), so the form is judged the way
- *   the engine will see it.
- * @param connectionTest result of the last connection test.
- * @param onChange persist edited settings.
- * @param onTest call the provider with the saved settings.
+ * Provider, credentials and web search for AI discovery, from [state]'s AI settings. Every
+ * change is saved as it is made and rebuilds the discovery engine; Test calls the provider with
+ * the saved settings.
  */
 @Composable
-fun AiDiscoverySettings(
-  settings: AiSettings,
-  supported: Boolean,
-  resolveCredentials: (AiSettings) -> AiSettings,
-  connectionTest: AiConnectionTest,
-  onChange: (AiSettings) -> Unit,
-  onTest: () -> Unit,
-) {
+fun AiDiscoverySettings(state: AppState) {
+  val ai = state.aiSettings
+  val settings = ai.settings
+  val supported = ai.supported
+  val connectionTest = ai.connectionTest
+  val onChange = { changed: AiSettings -> ai.save(changed) }
   val focusManager = LocalFocusManager.current
   // What the engine will actually run with: a blank token may still be
-  // supplied by the environment.
-  val effective = resolveCredentials(settings)
+  // supplied by the environment, which the form is judged by.
+  val effective = ai.withPlatformCredentials(settings)
   val llm = settings.llm
   val search = settings.search
   val tokenFromEnvironment = llm.apiKey.isBlank() && effective.llm.apiKey.isNotBlank()
@@ -201,7 +192,7 @@ fun AiDiscoverySettings(
               focusManager.clearFocus()
               testStarted = TimeSource.Monotonic.markNow()
               testTook = null
-              onTest()
+              state.launchCommand { ai.testConnection(ai.settings) }
             },
             variant = KetchButtonVariant.Secondary,
             size = KetchButtonSize.Small,
