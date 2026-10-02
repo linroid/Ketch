@@ -38,9 +38,6 @@ import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.FilesTab
 import com.linroid.ketch.app.util.SegmentRate
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.TimeZone
 import kotlin.math.PI
 import kotlin.math.roundToLong
@@ -176,13 +173,8 @@ class InspectorTabsSnapshots {
   fun tabs_overApp_followTheStores() {
     val size = SnapshotSize(720.dp, 560.dp, KetchDensity.Compact)
     for (theme in SnapshotTheme.entries) {
-      val data = SampleData.downloads()
-      val environment = runBlocking(SnapshotHarness.ui) {
-        SampleEnvironment(data, theme, DensityMode.Compact)
-      }
-      try {
-        runBlocking(SnapshotHarness.ui) { withTimeout(5.seconds) { environment.start() } }
-        val state = environment.controller.state
+      withSample(theme) { env ->
+        val state = env.controller.state
         snapshot("inspector-tabs-live", size, theme) {
           val rows by state.taskList.rows.collectAsState()
           val row = rows.firstOrNull { it.name == "ubuntu-24.04-desktop-amd64.iso" }
@@ -196,8 +188,6 @@ class InspectorTabsSnapshots {
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }

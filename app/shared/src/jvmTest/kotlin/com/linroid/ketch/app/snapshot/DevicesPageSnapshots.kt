@@ -177,10 +177,7 @@ private fun devicesPageSnapshot(
   history: Int = HISTORY_SAMPLES,
   setup: suspend AppScenario.() -> Unit = {},
 ): File {
-  val density = when (size.density) {
-    KetchDensity.Compact -> DensityMode.Compact
-    KetchDensity.Comfortable -> DensityMode.Comfortable
-  }
+  val density = size.density.toMode()
   val environment = runBlocking(SnapshotHarness.ui) {
     DevicesPageEnvironment(fleet, theme, density)
   }

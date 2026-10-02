@@ -377,11 +377,11 @@ internal class SampleKetchApi(private val data: SampleData) : KetchApi {
  * @param aiProviderFactory AI discovery of this platform; `null` where it is not supported.
  */
 internal class SampleEnvironment(
-  private val data: SampleData,
+  override val data: SampleData,
   theme: SnapshotTheme,
   density: DensityMode,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
-) {
+) : SnapshotEnvironment {
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
       deviceName = data.deviceName,
@@ -391,8 +391,7 @@ internal class SampleEnvironment(
     configStore = RecordingConfigStore(data.config(theme, density)),
   )
 
-  /** The controller the app root shows. */
-  val controller: AppController = AppController(
+  override val controller: AppController = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = aiProviderFactory,
     context = SnapshotHarness.ui,
@@ -406,7 +405,7 @@ internal class SampleEnvironment(
    * The history takes no sample older than its newest one, so this runs before the store's own
    * sampling starts, which waits for the first rows.
    */
-  suspend fun start() {
+  override suspend fun start() {
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
     seedSpeedHistory()
@@ -435,8 +434,7 @@ internal class SampleEnvironment(
     }
   }
 
-  /** Closes the controller and the devices. */
-  fun close() {
+  override fun close() {
     controller.close()
     instanceManager.instances.value.filterIsInstance<RemoteInstance>()
       .forEach { it.instance.close() }

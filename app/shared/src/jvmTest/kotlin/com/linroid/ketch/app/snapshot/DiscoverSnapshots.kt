@@ -368,8 +368,3 @@ private val Candidates = listOf(
     description = "",
   ),
 )
-
-private fun KetchDensity.toMode(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
-}

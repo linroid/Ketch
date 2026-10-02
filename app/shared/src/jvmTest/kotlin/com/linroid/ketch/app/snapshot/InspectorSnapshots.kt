@@ -49,10 +49,8 @@ import com.linroid.ketch.app.ui.inspector.TaskHeader
 import com.linroid.ketch.app.ui.inspector.TaskInspector
 import com.linroid.ketch.app.ui.inspector.rememberDeviceLabel
 import com.linroid.ketch.app.ui.list.RowCommands
-import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
@@ -166,13 +164,8 @@ class InspectorSnapshots {
   @Test
   fun controls_remoteDevice_disableStart() {
     for (theme in SnapshotTheme.entries) {
-      val data = SampleData.downloads()
-      val environment = runBlocking(SnapshotHarness.ui) {
-        SampleEnvironment(data, theme, DensityMode.Compact)
-      }
-      try {
-        runBlocking(SnapshotHarness.ui) { withTimeout(START) { environment.start() } }
-        val state = environment.controller.state
+      withSample(theme) { env ->
+        val state = env.controller.state
         val tooltip: suspend SnapshotScene.() -> Unit = {
           hover(185.dp, 220.dp)
           settle(minimum = 1.seconds)
@@ -187,8 +180,6 @@ class InspectorSnapshots {
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }
@@ -196,13 +187,8 @@ class InspectorSnapshots {
   @Test
   fun header_remoteCompleted_offersCopyPath() {
     for (theme in SnapshotTheme.entries) {
-      val data = SampleData.downloads()
-      val environment = runBlocking(SnapshotHarness.ui) {
-        SampleEnvironment(data, theme, DensityMode.Compact)
-      }
-      try {
-        runBlocking(SnapshotHarness.ui) { withTimeout(START) { environment.start() } }
-        val state = environment.controller.state
+      withSample(theme) { env ->
+        val state = env.controller.state
         snapshot("inspector-header-remote", Small, theme) {
           CompositionLocalProvider(LocalAppState provides state) {
             Pane(DockedWidth, InspectorPlacement.Docked) {
@@ -229,8 +215,6 @@ class InspectorSnapshots {
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }
@@ -244,19 +228,9 @@ class InspectorSnapshots {
     interact: suspend SnapshotScene.() -> Unit = {},
     setup: Setup.() -> TaskKey?,
   ) {
-    val data = SampleData.downloads()
-    val density = if (size.density == KetchDensity.Compact) {
-      DensityMode.Compact
-    } else {
-      DensityMode.Comfortable
-    }
-    val environment = runBlocking(SnapshotHarness.ui) { SampleEnvironment(data, theme, density) }
-    try {
-      val key = runBlocking(SnapshotHarness.ui) {
-        withTimeout(START) { environment.start() }
-        Setup(environment.controller.state, data).setup()
-      }
-      val state = environment.controller.state
+    withSample(theme, size.density.toMode()) { env ->
+      val state = env.controller.state
+      val key = runBlocking(SnapshotHarness.ui) { Setup(state, env.data).setup() }
       snapshot(name, size, theme, interact) {
         CompositionLocalProvider(LocalAppState provides state) {
           val scope = rememberCoroutineScope()
@@ -269,8 +243,6 @@ class InspectorSnapshots {
           }
         }
       }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 

@@ -274,10 +274,7 @@ class IntakeSheetSnapshots {
     setup: suspend AppScenario.() -> Unit,
   ) {
     val data = SampleData.downloads()
-    val density = when (size.density) {
-      KetchDensity.Compact -> DensityMode.Compact
-      KetchDensity.Comfortable -> DensityMode.Comfortable
-    }
+    val density = size.density.toMode()
     val environment = runBlocking(SnapshotHarness.ui) {
       IntakeEnvironment(data, theme, density, resolve)
     }

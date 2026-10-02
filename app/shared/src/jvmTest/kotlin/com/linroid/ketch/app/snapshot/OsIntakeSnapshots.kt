@@ -11,12 +11,8 @@ import com.linroid.ketch.app.platform.droppedLinkList
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.DropOverlay
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * What links and files from other apps look like on the way in: the drop overlay over the app,
@@ -60,27 +56,16 @@ class OsIntakeSnapshots {
 
   /** The overlay over the real app, as it shows while a drag hovers the window. */
   private fun overlaySnapshot(size: SnapshotSize, theme: SnapshotTheme) {
-    val density = when (size.density) {
-      KetchDensity.Compact -> DensityMode.Compact
-      KetchDensity.Comfortable -> DensityMode.Comfortable
-    }
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SampleEnvironment(SampleData.downloads(), theme, density)
-    }
-    try {
-      runBlocking(SnapshotHarness.ui) {
-        withTimeoutOrNull(5.seconds) { environment.start() } ?: error("The sample never loaded")
-      }
+    val density = size.density.toMode()
+    withSample(theme, density) { env ->
       SnapshotHarness.capture("drop-overlay-${theme.id}-${size.id}", size) {
         Box(Modifier.fillMaxSize()) {
-          App(environment.controller)
+          App(env.controller)
           KetchTheme(darkTheme = theme == SnapshotTheme.Dark, density = density) {
             DropOverlay(compact = false)
           }
         }
       }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 }

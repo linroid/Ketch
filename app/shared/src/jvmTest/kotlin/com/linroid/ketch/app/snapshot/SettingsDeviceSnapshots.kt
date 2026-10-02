@@ -443,8 +443,3 @@ private class NetworkedApi(
     return networks
   }
 }
-
-private fun KetchDensity.toMode(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
-}

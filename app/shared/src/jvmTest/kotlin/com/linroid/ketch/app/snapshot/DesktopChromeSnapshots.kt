@@ -26,13 +26,9 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.LocalWindowChrome
 import com.linroid.ketch.app.theme.WindowChrome
 import com.linroid.ketch.app.ui.settings.SettingsHost
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * The desktop window chrome: the app under a transparent macOS title bar, with the traffic
@@ -183,21 +179,6 @@ private fun chromeSnapshot(
   theme: SnapshotTheme,
   data: SampleData = SampleData.downloads(),
   content: @Composable (AppController) -> Unit,
-): File {
-  val density = when (size.density) {
-    KetchDensity.Compact -> DensityMode.Compact
-    KetchDensity.Comfortable -> DensityMode.Comfortable
-  }
-  val environment = runBlocking(SnapshotHarness.ui) { SampleEnvironment(data, theme, density) }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(5.seconds) { environment.start() }
-        ?: error("The task list of $name never listed every sample task")
-    }
-    return SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) {
-      content(environment.controller)
-    }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
-  }
+): File = withSample(theme, size.density.toMode(), data) { env ->
+  SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) { content(env.controller) }
 }

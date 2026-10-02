@@ -223,7 +223,7 @@ private fun fleetSnapshots(
   setup: suspend AppScenario.() -> Unit = {},
 ): List<File> = sizes.flatMap { size ->
   themes.map { theme ->
-    withFleet(theme, size.density.fleetDensity(), collapsed) { environment ->
+    withFleet(theme, size.density.toMode(), collapsed) { environment ->
       SnapshotHarness.capture(
         name = "$name-${theme.id}-${size.id}",
         size = size,
@@ -253,7 +253,7 @@ private fun berthSnapshot(
   hovered: String? = null,
   single: Boolean = false,
 ) {
-  withFleet(theme, size.density.fleetDensity(), single = single) { environment ->
+  withFleet(theme, size.density.toMode(), single = single) { environment ->
     val hover = DropHoverState().apply {
       enter(Unit)
       hovered?.let { enter(BerthKey(it)) }
@@ -267,7 +267,7 @@ private fun berthSnapshot(
         App(environment.controller)
         KetchTheme(
           darkTheme = theme == SnapshotTheme.Dark,
-          density = size.density.fleetDensity(),
+          density = size.density.toMode(),
           reduceMotion = true,
         ) {
           CompositionLocalProvider(LocalClock provides SampleData.CLOCK) {
@@ -487,11 +487,6 @@ private fun fleetNasTask(id: String, url: String, state: DownloadState, ago: Dur
     request = DownloadRequest(url = url, destination = Destination("/volume1/downloads/")),
     createdAt = SampleData.NOW - ago,
   )
-
-private fun KetchDensity.fleetDensity(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
-}
 
 private const val NAS_ID = "nas.local:8642"
 private const val DEN_PC_ID = "den-pc.local:8642"

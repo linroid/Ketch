@@ -18,7 +18,6 @@ import com.linroid.ketch.app.ui.palette.CommandPalette
 import com.linroid.ketch.app.ui.palette.PaletteHistory
 import com.linroid.ketch.app.ui.shell.ShellCommands
 import com.linroid.ketch.app.ui.shell.ShellState
-import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -224,9 +223,4 @@ private fun PaletteOverlay(
       )
     }
   }
-}
-
-private fun KetchDensity.toMode(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
 }

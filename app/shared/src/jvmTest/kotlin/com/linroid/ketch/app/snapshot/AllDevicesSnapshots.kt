@@ -209,11 +209,7 @@ private fun allDevicesSnapshot(
   empty: Boolean,
   setup: suspend AppScenario.() -> Unit,
 ): File {
-  val density = if (size.density == KetchDensity.Compact) {
-    DensityMode.Compact
-  } else {
-    DensityMode.Comfortable
-  }
+  val density = size.density.toMode()
   val environment = runBlocking(SnapshotHarness.ui) {
     AllDevicesEnvironment(theme, density, empty)
   }

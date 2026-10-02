@@ -24,10 +24,10 @@ import com.linroid.ketch.app.platform.DetectedBrowser
 import com.linroid.ketch.app.platform.IntegrationStatus
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
-import com.linroid.ketch.app.state.AiDiscoveryProvider
-import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AiDiscoverRequest
 import com.linroid.ketch.app.state.AiDiscoverResponse
+import com.linroid.ketch.app.state.AiDiscoveryProvider
+import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.LocalAppState
@@ -440,9 +440,4 @@ private class TwoNetworks(private val sample: SampleKetchApi) : KetchApi by samp
     ),
     config = NetworkInterfaceConfig(listOf("en0", "en7")),
   )
-}
-
-private fun KetchDensity.toMode(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
 }

@@ -466,25 +466,8 @@ internal fun appSnapshot(
   data: SampleData = SampleData.downloads(),
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   setup: suspend AppScenario.() -> Unit = {},
-): File {
-  val environment = runBlocking(SnapshotHarness.ui) {
-    SampleEnvironment(data, theme, size.density.toMode(), aiProviderFactory)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(START_TIMEOUT) { environment.start() }
-        ?: error("The task list of $name never listed every sample task")
-    }
-    return SnapshotHarness.capture(
-      name = fileName(name, theme, size),
-      size = size,
-      interact = { AppScenario(environment.controller, data, this).setup() },
-    ) {
-      App(environment.controller)
-    }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
-  }
+): File = withSample(theme, size.density.toMode(), data, aiProviderFactory) {
+  captureApp(name, size, theme, it, setup)
 }
 
 /** Renders [appSnapshot] at each of [sizes] in each of [themes], over fresh [data] each time. */
@@ -499,12 +482,79 @@ internal fun appSnapshots(
   themes.map { theme -> appSnapshot(name, size, theme, data(), aiProviderFactory, setup) }
 }
 
+/**
+ * An app a snapshot renders: the controller its root shows and the devices and downloads it
+ * shows; see [withEnvironment].
+ */
+internal interface SnapshotEnvironment {
+  /** The controller the app root shows. */
+  val controller: AppController
+
+  /** The devices and downloads it shows. */
+  val data: SampleData
+
+  /** Gets the app ready to render, such as by waiting until it lists every sample task. */
+  suspend fun start() {}
+
+  /** Closes the controller and the devices. */
+  fun close()
+}
+
+/**
+ * Creates the environment [create] makes, starts it within [timeout], runs [block] with it and
+ * closes it; the environment is created, started and closed on [SnapshotHarness.ui].
+ */
+internal fun <E : SnapshotEnvironment, T> withEnvironment(
+  create: () -> E,
+  timeout: Duration = START_TIMEOUT,
+  block: (E) -> T,
+): T {
+  val environment = runBlocking(SnapshotHarness.ui) { create() }
+  try {
+    runBlocking(SnapshotHarness.ui) {
+      withTimeoutOrNull(timeout) { environment.start() }
+        ?: error("${environment::class.simpleName} never got ready")
+    }
+    return block(environment)
+  } finally {
+    runBlocking(SnapshotHarness.ui) { environment.close() }
+  }
+}
+
+/** Runs [block] over a started [SampleEnvironment] of [data]; see [withEnvironment]. */
+internal fun <T> withSample(
+  theme: SnapshotTheme,
+  density: DensityMode = DensityMode.Compact,
+  data: SampleData = SampleData.downloads(),
+  aiProviderFactory: AiDiscoveryProviderFactory? = null,
+  block: (SampleEnvironment) -> T,
+): T = withEnvironment({ SampleEnvironment(data, theme, density, aiProviderFactory) }, block = block)
+
+/**
+ * Renders the real [App] root of [environment] to `<name>-<theme>-<width>x<height>.png` and
+ * returns the file; [setup] runs once the app is composed, like [appSnapshot]'s.
+ */
+internal fun captureApp(
+  name: String,
+  size: SnapshotSize,
+  theme: SnapshotTheme,
+  environment: SnapshotEnvironment,
+  setup: suspend AppScenario.() -> Unit = {},
+): File = SnapshotHarness.capture(
+  name = fileName(name, theme, size),
+  size = size,
+  interact = { AppScenario(environment.controller, environment.data, this).setup() },
+) {
+  App(environment.controller)
+}
+
 private val START_TIMEOUT = 5.seconds
 
 private fun fileName(name: String, theme: SnapshotTheme, size: SnapshotSize): String =
   "$name-${theme.id}-${size.id}"
 
-private fun KetchDensity.toMode(): DensityMode = when (this) {
+/** The [DensityMode] the app's settings name [this] by. */
+internal fun KetchDensity.toMode(): DensityMode = when (this) {
   KetchDensity.Compact -> DensityMode.Compact
   KetchDensity.Comfortable -> DensityMode.Comfortable
 }

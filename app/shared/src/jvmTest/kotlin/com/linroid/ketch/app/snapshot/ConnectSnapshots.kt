@@ -12,7 +12,6 @@ import com.linroid.ketch.app.instance.MdnsDiscoverer
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LinkSource
-import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.ui.connect.AddDeviceDialog
 import com.linroid.ketch.app.ui.connect.ConnectForm
 import com.linroid.ketch.app.ui.connect.ConnectLandingContent
@@ -22,7 +21,6 @@ import com.linroid.ketch.app.ui.connect.PairingDialog
 import com.linroid.ketch.app.ui.connect.ProbeResult
 import com.linroid.ketch.app.ui.connect.codeForm
 import com.linroid.ketch.app.util.PairingLink
-import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.Dispatchers
@@ -296,11 +294,7 @@ private fun webSnapshot(
 ): File {
   val states = remotes.associate { (config, state) -> config.host to state }
   val data = SampleData(tasks = emptyList(), remotes = remotes.map { it.first })
-  val density = if (size.density == KetchDensity.Compact) {
-    DensityMode.Compact
-  } else {
-    DensityMode.Comfortable
-  }
+  val density = size.density.toMode()
   val (manager, controller) = runBlocking(SnapshotHarness.ui) {
     val manager = InstanceManager(
       factory = InstanceFactory(

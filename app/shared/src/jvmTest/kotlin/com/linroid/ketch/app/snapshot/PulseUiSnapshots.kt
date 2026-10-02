@@ -65,7 +65,6 @@ import com.linroid.ketch.app.ui.pulse.SpeedModeOptions
 import com.linroid.ketch.app.ui.pulse.SpeedModePillContent
 import com.linroid.ketch.app.ui.pulse.SpeedModeView
 import com.linroid.ketch.app.ui.pulse.totalHistory
-import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedSettings
 import kotlinx.coroutines.CoroutineScope
@@ -476,11 +475,7 @@ private fun withPulseApp(
   render: (AppState) -> Unit,
 ) {
   val data = SampleData.downloads()
-  val density = if (size.density == KetchDensity.Compact) {
-    DensityMode.Compact
-  } else {
-    DensityMode.Comfortable
-  }
+  val density = size.density.toMode()
   val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   val manager = runBlocking(SnapshotHarness.ui) {
     InstanceManager(

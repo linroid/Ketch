@@ -36,8 +36,6 @@ import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 import java.io.File
@@ -45,7 +43,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 /**
@@ -162,83 +159,59 @@ private fun addAppSnapshot(
   motion: Boolean = false,
   size: SnapshotSize = SnapshotSize.Desktop,
   setup: suspend AppScenario.() -> Unit = {},
-): File {
-  val data = SampleData.downloads()
-  val environment = runBlocking(SnapshotHarness.ui) {
-    SampleEnvironment(data, theme, DensityMode.Compact)
-  }
+): File = withSample(theme) { env ->
   val clipboard = CopiedLinkClipboard(clip)
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(5.seconds) { environment.start() }
-        ?: error("The task list of $name never listed every sample task")
-    }
-    return SnapshotHarness.capture(
-      name = "$name-${theme.id}-${size.id}",
-      size = size,
-      interact = {
-        val scenario = AppScenario(environment.controller, data, this)
-        scenario.state.appSettings.saveUi {
-          it.copy(
-            reduceMotion = !motion,
-            clipboardMode = if (clip != null) ClipboardMode.Suggest else it.clipboardMode,
-          )
-        }
-        scenario.setup()
-      },
-    ) {
-      CompositionLocalProvider(LocalPageClipboard provides clipboard) {
-        App(environment.controller)
+  SnapshotHarness.capture(
+    name = "$name-${theme.id}-${size.id}",
+    size = size,
+    interact = {
+      val scenario = AppScenario(env.controller, env.data, this)
+      scenario.state.appSettings.saveUi {
+        it.copy(
+          reduceMotion = !motion,
+          clipboardMode = if (clip != null) ClipboardMode.Suggest else it.clipboardMode,
+        )
       }
+      scenario.setup()
+    },
+  ) {
+    CompositionLocalProvider(LocalPageClipboard provides clipboard) {
+      App(env.controller)
     }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
   }
 }
 
 /** Renders the Downloads page alone in a card while a drag hovers the window. */
-private fun pageSnapshot(name: String, theme: SnapshotTheme): File {
+private fun pageSnapshot(name: String, theme: SnapshotTheme): File = withSample(theme) { env ->
   val size = SnapshotSize.Desktop
-  val data = SampleData.downloads()
-  val environment = runBlocking(SnapshotHarness.ui) {
-    SampleEnvironment(data, theme, DensityMode.Compact)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(5.seconds) { environment.start() }
-        ?: error("The task list of $name never listed every sample task")
-    }
-    return SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) {
-      val drop = remember { DropHoverState().apply { enter(Unit) } }
-      KetchTheme(
-        darkTheme = theme == SnapshotTheme.Dark,
-        density = DensityMode.Compact,
-        reduceMotion = true,
+  SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) {
+    val drop = remember { DropHoverState().apply { enter(Unit) } }
+    KetchTheme(
+      darkTheme = theme == SnapshotTheme.Dark,
+      density = DensityMode.Compact,
+      reduceMotion = true,
+    ) {
+      CompositionLocalProvider(
+        LocalClock provides SampleData.CLOCK,
+        LocalWindowDrop provides drop,
+        LocalPageClipboard provides CopiedLinkClipboard(null),
       ) {
-        CompositionLocalProvider(
-          LocalClock provides SampleData.CLOCK,
-          LocalWindowDrop provides drop,
-          LocalPageClipboard provides CopiedLinkClipboard(null),
-        ) {
-          Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas).padding(8.dp)) {
-            Box(
-              Modifier
-                .fillMaxSize()
-                .ketchSurface(
-                  level = KetchElevationLevel.E1,
-                  shape = KetchTheme.shapes.card,
-                  fill = KetchTheme.colors.surface,
-                  border = KetchTheme.colors.hairline,
-                ),
-            ) {
-              DownloadsScreen(environment.controller.state, KetchLayoutInfo.of(1264.dp))
-            }
+        Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas).padding(8.dp)) {
+          Box(
+            Modifier
+              .fillMaxSize()
+              .ketchSurface(
+                level = KetchElevationLevel.E1,
+                shape = KetchTheme.shapes.card,
+                fill = KetchTheme.colors.surface,
+                border = KetchTheme.colors.hairline,
+              ),
+          ) {
+            DownloadsScreen(env.controller.state, KetchLayoutInfo.of(1264.dp))
           }
         }
       }
     }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
   }
 }
 
