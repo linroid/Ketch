@@ -349,7 +349,10 @@ internal data class SharedSettings(
   }
 }
 
-/** Whether the inspector offers live controls for a task in this state. */
+/**
+ * Whether the inspector offers live controls for a task in this state, which can still download,
+ * so its speed cap and connections still apply.
+ */
 internal val DownloadState.hasControls: Boolean
   get() = when (this) {
     is DownloadState.Downloading,

@@ -59,10 +59,12 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.inspector.SERVER_LIMIT
+import com.linroid.ketch.app.ui.inspector.hasControls
+import com.linroid.ketch.app.ui.inspector.rememberServerLimited
+import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.util.LaneHealth
 import com.linroid.ketch.app.util.SegmentRate
-import com.linroid.ketch.app.util.SegmentRateTracker
-import kotlinx.coroutines.delay
 
 /**
  * The Connections tab of the inspector: where each connection of an HTTP or FTP download is in
@@ -87,7 +89,7 @@ fun ConnectionsTab(
 ) {
   val rates by state.speedHistory.rates.collectAsState()
   val pending by state.pending.collectAsState()
-  val label = "set the connections of ${row.name}"
+  val label = RowCommands.connectionsLabel(row)
   // Lanes, highlight and animations never carry over from another task.
   key(row.key) {
     ConnectionsTabContent(
@@ -133,17 +135,8 @@ internal fun ConnectionsTabContent(
   DisposableEffect(Unit) { onDispose { currentOnHighlight(null) } }
 
   val requested = row.request.connections
-  val single = downloading && requested > 1 && row.segments.size == 1
-  var singleConfirmed by remember { mutableStateOf(false) }
-  LaunchedEffect(single) {
-    singleConfirmed = false
-    if (single) {
-      delay(SegmentRateTracker.STALL_AFTER)
-      singleConfirmed = true
-    }
-  }
-  val serverLimited = row.request.resolvedSource?.maxSegments == 1 || singleConfirmed
-  val editable = onConnectionsChange != null && row.state.acceptsConnections()
+  val serverLimited = rememberServerLimited(row)
+  val editable = onConnectionsChange != null && row.state.hasControls
 
   Column(
     modifier = modifier.fillMaxWidth(),
@@ -555,22 +548,10 @@ private fun laneDescription(lane: ConnectionLane): String {
   return "Connection ${lane.number}, $range, $status"
 }
 
-/** Whether a new number of connections can be asked for in this state. */
-private fun DownloadState.acceptsConnections(): Boolean = when (this) {
-  is DownloadState.Downloading,
-  is DownloadState.Paused,
-  is DownloadState.Queued,
-  is DownloadState.Scheduled -> true
-  is DownloadState.Completed,
-  is DownloadState.Failed,
-  is DownloadState.Canceled -> false
-}
-
 /** This segment as a file of its own, starting at byte 0, for its lane. */
 private fun Segment.rebased(): Segment = Segment(index, 0, end - start, downloadedBytes)
 
 private val StalledOwnLane = setOf(0L)
-private const val SERVER_LIMIT = "This server allows only 1 connection"
 private const val TALL_LANES = 8
 private const val MEDIUM_LANES = 16
 private const val ANNOTATED_LANES = 3

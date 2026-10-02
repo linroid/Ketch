@@ -86,6 +86,7 @@ import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.RowFrameState
 import com.linroid.ketch.app.ui.downloads.actions.SelectionCheckbox
 import com.linroid.ketch.app.ui.downloads.actions.TaskRowFrame
+import com.linroid.ketch.app.ui.inspector.hasControls
 import com.linroid.ketch.app.ui.list.FileNameText
 import com.linroid.ketch.app.ui.list.GroupCollapse
 import com.linroid.ketch.app.ui.list.HoverOverlay
@@ -557,16 +558,11 @@ private fun NameCell(
     )
     PriorityGlyph(row.request.priority, Modifier.padding(start = spacing.s1))
     val limit = row.request.speedLimit
-    if (!limit.isUnlimited && row.state.isLive) {
+    if (!limit.isUnlimited && row.state.hasControls) {
       CapPill(formatSpeedLimit(limit), Modifier.padding(start = spacing.s1))
     }
   }
 }
-
-/** Whether a task in this state can still download, so a speed cap still applies to it. */
-private val DownloadState.isLive: Boolean
-  get() = this is DownloadState.Downloading || this is DownloadState.Paused ||
-    this is DownloadState.Queued || this is DownloadState.Scheduled
 
 /** A per-task speed cap after the name, such as "2 MB/s". */
 @Composable
