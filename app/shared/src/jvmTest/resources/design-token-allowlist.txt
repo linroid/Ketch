@@ -1,3 +1,0 @@
-ui/AiDiscoveryContent.kt:RoundedCornerShape(<number>.dp:2
-ui/dialog/AddRemoteServerDialog.kt:MaterialTheme.:9
-ui/dialog/AddRemoteServerDialog.kt:RoundedCornerShape(<number>.dp:2
