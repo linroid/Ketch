@@ -79,6 +79,7 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
+import kotlin.reflect.KProperty
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -202,35 +203,19 @@ class AppState(
   private val frozenState = FlowState(false)
 
   /** Status tab of the Downloads list. */
-  var statusFilter: StatusFilter
-    get() = filterState.value
-    set(value) {
-      filterState.value = value
-    }
+  var statusFilter: StatusFilter by filterState
 
   /** What is typed in the Downloads search field. */
-  var searchQuery: String
-    get() = searchState.value
-    set(value) {
-      searchState.value = value
-    }
+  var searchQuery: String by searchState
 
   /** Sort order and grouping of the Downloads list; newest first and ungrouped until changed. */
-  var listArrangement: ListArrangement
-    get() = arrangementState.value
-    set(value) {
-      arrangementState.value = value
-    }
+  var listArrangement: ListArrangement by arrangementState
 
   /**
    * Whether the pointer is over the Downloads list, a row has focus or a menu is open, which
    * holds the list's order still.
    */
-  var listFrozen: Boolean
-    get() = frozenState.value
-    set(value) {
-      frozenState.value = value
-    }
+  var listFrozen: Boolean by frozenState
 
   /** Whether the add sheet shows, which it does while [intakeRequest] is set. */
   val showAddDialog: Boolean get() = intakeRequest != null
@@ -1804,12 +1789,12 @@ private class FlowState<T>(initial: T) {
   /** The value as it changes. */
   val flow = MutableStateFlow(initial)
 
-  var value: T
-    get() = state
-    set(value) {
-      state = value
-      flow.value = value
-    }
+  operator fun getValue(thisRef: Any?, property: KProperty<*>): T = state
+
+  operator fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+    state = value
+    flow.value = value
+  }
 }
 
 /**
