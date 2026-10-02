@@ -37,7 +37,6 @@ import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -51,6 +50,7 @@ import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
+import com.linroid.ketch.app.ui.settings.Chevron
 import com.linroid.ketch.app.util.PairingLink
 
 /**
@@ -350,12 +350,7 @@ private fun NearbyRow(
       when {
         busy -> KetchSpinner(size = KetchTheme.density.controlGlyph, color = colors.accent)
         added -> Text("Added", style = type.labelS, color = colors.textTertiary)
-        else -> KetchIconImage(
-          icon = KetchIcon.Chevron,
-          size = KetchTheme.density.controlGlyph,
-          tint = colors.textTertiary,
-          modifier = Modifier.size(KetchTheme.density.controlGlyph),
-        )
+        else -> Chevron()
       }
     }
   }

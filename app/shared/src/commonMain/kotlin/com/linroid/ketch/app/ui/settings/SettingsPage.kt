@@ -450,13 +450,7 @@ internal fun SettingsList(
                 size = KetchHueTileDefaults.Small,
               )
             },
-            trailing = {
-              KetchIconImage(
-                icon = KetchIcon.Chevron,
-                size = KetchTheme.density.controlGlyph,
-                tint = colors.textTertiary,
-              )
-            },
+            trailing = { Chevron() },
           )
         }
       }

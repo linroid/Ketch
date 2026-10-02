@@ -72,6 +72,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.folderName
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.settings.Chevron
 import com.linroid.ketch.app.ui.shell.canvasWash
 import kotlinx.coroutines.launch
 
@@ -533,11 +534,7 @@ private fun ChoiceCard(
       Text(text = title, style = KetchTheme.typography.bodyStrong, color = colors.textPrimary)
       Text(text = detail, style = KetchTheme.typography.caption, color = colors.textSecondary)
     }
-    KetchIconImage(
-      KetchIcon.Chevron,
-      size = KetchTheme.density.controlGlyph,
-      tint = colors.textTertiary,
-    )
+    Chevron()
   }
 }
 

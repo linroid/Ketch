@@ -781,6 +781,16 @@ internal fun DeviceSettingsError(error: String?, loaded: Boolean, onRetry: () ->
   )
 }
 
+/** The chevron at the end of a row that opens something. */
+@Composable
+internal fun Chevron() {
+  KetchIconImage(
+    icon = KetchIcon.Chevron,
+    size = KetchTheme.density.controlGlyph,
+    tint = KetchTheme.colors.textTertiary,
+  )
+}
+
 private const val FIELD_RING_ALPHA = 0.2f
 private const val GLYPH_GRID = 20f
 private const val GLYPH_START = 4f

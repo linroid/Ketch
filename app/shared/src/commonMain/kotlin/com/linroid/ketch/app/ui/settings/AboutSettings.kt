@@ -233,16 +233,6 @@ private fun MonoValue(text: String) {
   Text(text = text, style = KetchTheme.typography.mono, color = KetchTheme.colors.textSecondary)
 }
 
-/** The chevron at the end of a row that opens something. */
-@Composable
-internal fun Chevron() {
-  KetchIconImage(
-    icon = KetchIcon.Chevron,
-    size = KetchTheme.density.controlGlyph,
-    tint = KetchTheme.colors.textTertiary,
-  )
-}
-
 @Composable
 private fun LinkRow(title: String, description: String, url: String) {
   val uriHandler = LocalUriHandler.current
