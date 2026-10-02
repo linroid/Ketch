@@ -73,8 +73,8 @@ import kotlinx.coroutines.launch
  *
  * With a pointer the line holds a metric at its end, such as the speed and time left, and the
  * row's hover actions fade in over it. On touch the metric joins the second line, the row's
- * primary action sits at its end, and swiping pauses or resumes it (start to end) or removes it
- * with Undo (end to start).
+ * primary action sits at its end, and swiping pauses or resumes it (start to end) or asks
+ * whether to remove it (end to start).
  */
 @Composable
 internal fun DownloadListRow(
@@ -378,8 +378,9 @@ internal fun rowFill(colors: KetchColors, frame: RowFrameState, listFocused: Boo
   }
 
 /**
- * Lets a touch row be swiped: start to end pauses or resumes it, end to start removes it with
- * Undo. The row springs back after a pause or resume.
+ * Lets a touch row be swiped: start to end pauses or resumes it, end to start opens the Remove
+ * dialog, whose box also deletes the file. Either way the row springs back. A swipe counts once
+ * it crosses [SWIPE_THRESHOLD] of the row's width, or as a fling.
  */
 @Composable
 private fun SwipeableRow(
@@ -392,7 +393,7 @@ private fun SwipeableRow(
   val menu = runner.menu(row)
   val toggle = listOf(RowAction.Pause, RowAction.Resume).firstOrNull { it in menu }
   val removable = RowAction.Remove in menu
-  val swipe = rememberSwipeToDismissBoxState()
+  val swipe = rememberSwipeToDismissBoxState(positionalThreshold = { it * SWIPE_THRESHOLD })
   val scope = rememberCoroutineScope()
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -404,7 +405,7 @@ private fun SwipeableRow(
     onDismiss = { direction ->
       when (direction) {
         SwipeToDismissBoxValue.StartToEnd -> toggle?.let { runner.run(it, listOf(row)) }
-        SwipeToDismissBoxValue.EndToStart -> runner.run(RowAction.Remove, listOf(row))
+        SwipeToDismissBoxValue.EndToStart -> runner.requestRemove(listOf(row), withFiles = false)
         SwipeToDismissBoxValue.Settled -> Unit
       }
       scope.launch { swipe.reset() }
@@ -436,6 +437,12 @@ private fun SwipeableRow(
     Box(Modifier.background(colors.surface)) { content() }
   }
 }
+
+/**
+ * Share of a touch row's width a slow swipe must cross to act. Material's 56 dp let a sideways
+ * drift while scrolling act on the row.
+ */
+private const val SWIPE_THRESHOLD = 0.4f
 
 private const val SEPARATOR = " · "
 private const val NO_BREAK_SPACE = '\u00A0'

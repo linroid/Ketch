@@ -1380,9 +1380,11 @@ while a magnet is still downloading needs `DownloadTask.fileName` (W5).
   Downloading or Paused.
 - Dividers are inset 60 dp.
 - Hover: `surfaceHover`, `md`, inset 4. Two 28 dp hover actions fade in over the metric in 120 ms.
-- Touch: a 44 dp trailing primary action. `SwipeToDismissBox`:
+- Touch: a 44 dp trailing primary action. `SwipeToDismissBox`, acting past 40% of the row's
+  width or on a fling, after which the row springs back:
   - start → end: Pause / Resume (`accentSoft`);
-  - end → start: Remove, with an Undo snackbar.
+  - end → start: the Remove dialog, its box to also delete the file unchecked; removing then
+    shows the Undo snackbar.
 - Long-press enters selection mode (§5.3).
 
 #### 4.7.8 Empty states and the launchpad
