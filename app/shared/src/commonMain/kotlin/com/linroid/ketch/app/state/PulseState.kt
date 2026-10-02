@@ -9,6 +9,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.util.clockLabel
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CancellationException
@@ -36,7 +37,6 @@ import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -635,14 +635,4 @@ internal fun formatSpace(bytes: Long): String {
 private fun tenths(bytes: Long, unit: Long): String {
   val tenths = (bytes * 10 + unit / 2) / unit
   return "${tenths / 10}.${tenths % 10}"
-}
-
-// "14:32" on the day of now, "Tue 09:00" on another day. Rounded to the nearest minute.
-private fun clockLabel(instant: Instant, now: Instant, timeZone: TimeZone): String {
-  val time = (instant + 30.seconds).toLocalDateTime(timeZone)
-  val clock = "${time.hour.toString().padStart(2, '0')}:" +
-    time.minute.toString().padStart(2, '0')
-  if (time.date == now.toLocalDateTime(timeZone).date) return clock
-  val day = time.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
-  return "$day $clock"
 }

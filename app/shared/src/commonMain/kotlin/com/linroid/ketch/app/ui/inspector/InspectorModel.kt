@@ -10,12 +10,12 @@ import com.linroid.ketch.app.components.startTimeLabel
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.formatSpeedLimit
-import com.linroid.ketch.app.ui.inspector.tabs.clockTime
 import com.linroid.ketch.app.ui.inspector.tabs.formatBytesOf
 import com.linroid.ketch.app.ui.inspector.tabs.formatSize
 import com.linroid.ketch.app.ui.inspector.tabs.formatSpeed
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.TaskOrigin
+import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.formatDuration
 import com.linroid.ketch.app.util.priorityLabel
 import com.linroid.ketch.app.util.urlHost

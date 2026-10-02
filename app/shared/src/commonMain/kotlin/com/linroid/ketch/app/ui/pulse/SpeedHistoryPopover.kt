@@ -29,8 +29,8 @@ import com.linroid.ketch.app.state.SpeedHistoryStore
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.util.clockTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
 import kotlin.time.Instant
 
@@ -96,7 +96,7 @@ internal fun SpeedHistoryContent(
         slots = SpeedHistoryStore.CAPACITY,
         timeLabel = { index ->
           val at = end?.minus(SpeedHistoryStore.INTERVAL * (SpeedHistoryStore.CAPACITY - 1 - index))
-          at?.let { secondsLabel(it, zone) }.orEmpty()
+          at?.let { clockTime(it, zone, seconds = true) }.orEmpty()
         },
         modifier = Modifier.fillMaxWidth().height(ChartHeight),
       )
@@ -175,12 +175,6 @@ internal fun totalHistory(histories: Collection<SpeedHistory>, now: Instant): To
     }
   }
   return TotalHistory(totals.toList(), end)
-}
-
-private fun secondsLabel(instant: Instant, zone: TimeZone): String {
-  val time = instant.toLocalDateTime(zone)
-  return listOf(time.hour, time.minute, time.second)
-    .joinToString(":") { it.toString().padStart(2, '0') }
 }
 
 private val PopoverWidth = 320.dp

@@ -39,6 +39,7 @@ import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.TaskOrigin
+import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
@@ -77,7 +78,6 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -1856,10 +1856,8 @@ private fun scheduledNote(schedules: List<DownloadSchedule>): String? {
   if (schedules.isEmpty()) return null
   val first = schedules.filterIsInstance<DownloadSchedule.AtTime>().minOfOrNull { it.startAt }
     ?: return "${schedules.size} scheduled still start on time"
-  val time = first.toLocalDateTime(TimeZone.currentSystemDefault()).time
-  val hh = time.hour.toString().padStart(2, '0')
-  val mm = time.minute.toString().padStart(2, '0')
-  return "${schedules.size} scheduled still start at $hh:$mm"
+  val time = clockTime(first, TimeZone.currentSystemDefault())
+  return "${schedules.size} scheduled still start at $time"
 }
 
 /** Name of this task for messages, from its current request and state. */

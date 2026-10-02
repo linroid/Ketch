@@ -1,7 +1,13 @@
 package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.DownloadPriority
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.Month
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 fun extractFilename(url: String): String {
   val path = url.trim()
@@ -68,3 +74,34 @@ fun averageSpeed(bytes: Long, duration: Duration): Long? {
   val millis = duration.inWholeMilliseconds
   return if (millis > 0) bytes * 1000 / millis else null
 }
+
+/** "09:05": [hour] and [minute] on a 24-hour clock. */
+internal fun clockText(hour: Int, minute: Int): String = "${hour.twoDigits()}:${minute.twoDigits()}"
+
+/** "09:05", or "09:05:07" with [seconds]: this time of day on a 24-hour clock. */
+internal fun LocalDateTime.clockText(seconds: Boolean = false): String {
+  val minutes = clockText(hour, minute)
+  return if (seconds) "$minutes:${second.twoDigits()}" else minutes
+}
+
+/** "14:22", or "14:22:08" with [seconds], in [zone]. */
+internal fun clockTime(at: Instant, zone: TimeZone, seconds: Boolean = false): String =
+  at.toLocalDateTime(zone).clockText(seconds)
+
+/** "14:32" on the day of [now], "Tue 09:00" on another day; rounded to the nearest minute. */
+internal fun clockLabel(instant: Instant, now: Instant, timeZone: TimeZone): String {
+  val time = (instant + 30.seconds).toLocalDateTime(timeZone)
+  val clock = time.clockText()
+  if (time.date == now.toLocalDateTime(timeZone).date) return clock
+  val day = time.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+  return "$day $clock"
+}
+
+/** "Jan" to "Dec". */
+internal val Month.shortName: String get() = MonthNames[ordinal]
+
+private fun Int.twoDigits(): String = toString().padStart(2, '0')
+
+private val MonthNames = listOf(
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+)

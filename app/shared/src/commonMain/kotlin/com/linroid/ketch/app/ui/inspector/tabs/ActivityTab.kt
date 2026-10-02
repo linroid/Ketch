@@ -39,6 +39,7 @@ import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.util.clockTime
 import kotlinx.datetime.TimeZone
 
 /**

@@ -11,11 +11,10 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.util.clockLabel
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.config.SpeedLimitMode
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -143,16 +142,6 @@ internal fun speedModeName(mode: SpeedLimitMode): String = when (mode) {
   SpeedLimitMode.Full -> "Full speed"
   SpeedLimitMode.SlowLane -> "Slow lane"
   SpeedLimitMode.Auto -> "Auto"
-}
-
-/** "14:32" on the day of [now], "Tue 09:00" on another day; rounded to the nearest minute. */
-internal fun clockLabel(instant: Instant, now: Instant, timeZone: TimeZone): String {
-  val time = (instant + 30.seconds).toLocalDateTime(timeZone)
-  val clock = "${time.hour.toString().padStart(2, '0')}:" +
-    time.minute.toString().padStart(2, '0')
-  if (time.date == now.toLocalDateTime(timeZone).date) return clock
-  val day = time.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
-  return "$day $clock"
 }
 
 internal const val SEPARATOR = " · "

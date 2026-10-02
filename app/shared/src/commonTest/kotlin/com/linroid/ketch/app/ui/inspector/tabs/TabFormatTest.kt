@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.inspector.tabs
 
+import com.linroid.ketch.app.util.clockTime
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals

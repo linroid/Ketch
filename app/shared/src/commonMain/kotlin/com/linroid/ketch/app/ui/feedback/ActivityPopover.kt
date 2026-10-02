@@ -54,8 +54,9 @@ import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
+import com.linroid.ketch.app.util.clockText
+import com.linroid.ketch.app.util.shortName
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
@@ -376,9 +377,9 @@ internal fun activityTime(at: Instant, now: Instant, timeZone: TimeZone): String
   val time = at.toLocalDateTime(timeZone)
   val today = now.toLocalDateTime(timeZone).date
   return when (time.date) {
-    today -> clock(time)
-    today.minus(1, DateTimeUnit.DAY) -> "Yesterday ${clock(time)}"
-    else -> "${MONTHS[time.month.ordinal]} ${time.day}"
+    today -> time.clockText()
+    today.minus(1, DateTimeUnit.DAY) -> "Yesterday ${time.clockText()}"
+    else -> "${time.month.shortName} ${time.day}"
   }
 }
 
@@ -393,9 +394,6 @@ internal fun showsActions(message: AppMessage, onScreen: Boolean): Boolean =
 /** How the app names the device [deviceId]: "This Mac" for the embedded one. */
 internal fun deviceName(instances: List<InstanceEntry>, deviceId: String): String =
   instances.firstOrNull { it.deviceId == deviceId }?.displayName ?: deviceId
-
-private fun clock(time: LocalDateTime): String =
-  "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
 
 internal val MessageLevel.icon: KetchIcon
   get() = when (this) {
@@ -412,8 +410,6 @@ internal fun MessageLevel.tint(colors: KetchColors): Color = when (this) {
   MessageLevel.Error -> colors.status.failed.color
 }
 
-private val MONTHS =
-  listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 private val UnreadDotSize = 6.dp
 private val PopoverWidth = 380.dp
 private val ListMaxHeight = 440.dp

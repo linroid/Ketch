@@ -11,7 +11,6 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.taskActions
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
@@ -212,7 +211,7 @@ fun formatAdded(createdAt: Instant, now: Instant, timeZone: TimeZone): String {
   val added = createdAt.toLocalDateTime(timeZone)
   val today = now.toLocalDateTime(timeZone).date
   return when (added.date) {
-    today -> "Today ${clockTime(added)}"
+    today -> "Today ${added.clockText()}"
     today.minus(1, DateTimeUnit.DAY) -> "Yesterday"
     else -> shortDate(added.date, today)
   }
@@ -340,7 +339,7 @@ private fun scheduleText(schedule: DownloadSchedule, now: Instant, timeZone: Tim
         today.plus(1, DateTimeUnit.DAY) -> "tomorrow"
         else -> shortDate(start.date, today)
       }
-      val startsAt = "Starts $day at ${clockTime(start)}"
+      val startsAt = "Starts $day at ${start.clockText()}"
       val remaining = schedule.startAt - now
       if (remaining > Duration.ZERO) "$startsAt · in ${formatSpan(remaining)}" else startsAt
     }
@@ -367,16 +366,10 @@ private fun formatSpan(duration: Duration): String {
   }
 }
 
-private fun clockTime(time: LocalDateTime): String =
-  "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
-
 private fun shortDate(date: LocalDate, today: LocalDate): String {
-  val day = "${MONTHS[date.month.ordinal]} ${date.day}"
+  val day = "${date.month.shortName} ${date.day}"
   return if (date.year == today.year) day else "$day, ${date.year}"
 }
 
 private const val SEPARATOR = " · "
 private const val UNKNOWN = "–"
-private val MONTHS = listOf(
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-)

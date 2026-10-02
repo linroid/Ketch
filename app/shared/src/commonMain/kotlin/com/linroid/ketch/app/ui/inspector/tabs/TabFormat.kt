@@ -1,10 +1,7 @@
 package com.linroid.ketch.app.ui.inspector.tabs
 
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToLong
 import kotlin.time.Duration
-import kotlin.time.Instant
 
 /** A size as compact as a column needs: "1.2 GB", "284 MB", "512 B". */
 internal fun formatSize(bytes: Long): String {
@@ -55,13 +52,6 @@ internal fun formatStall(stalledFor: Duration): String {
   return if (seconds < 60) "Stalled $seconds s" else "Stalled ${seconds / 60} min"
 }
 
-/** "14:22", or "14:22:08" with [seconds], in [zone]. */
-internal fun clockTime(at: Instant, zone: TimeZone, seconds: Boolean = false): String {
-  val time = at.toLocalDateTime(zone)
-  val minutes = "${time.hour.twoDigits()}:${time.minute.twoDigits()}"
-  return if (seconds) "$minutes:${time.second.twoDigits()}" else minutes
-}
-
 /** "1 file", "14 files". */
 internal fun plural(count: Int, one: String, many: String = "${one}s"): String =
   if (count == 1) "1 $one" else "$count $many"
@@ -91,8 +81,6 @@ private fun amount(bytes: Long, unit: Long): String {
 }
 
 private const val WHOLE_FROM_TENTHS = 1000L
-
-private fun Int.twoDigits(): String = toString().padStart(2, '0')
 
 private val ByteUnits = listOf(
   "B" to 1L,
