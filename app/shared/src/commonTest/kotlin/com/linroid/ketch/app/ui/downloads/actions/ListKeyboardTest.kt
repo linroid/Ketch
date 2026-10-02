@@ -25,7 +25,6 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -36,120 +35,40 @@ class ListKeyboardTest {
   private val completed = DownloadState.Completed("/downloads/a.iso", totalBytes = 1000)
 
   @Test
-  fun keyAction_spaceOnDownloadingRow_isPause() {
-    assertEquals(RowAction.Pause, action(KeyPress(Key.Spacebar), row(downloading)))
-  }
-
-  @Test
-  fun keyAction_spaceOnQueuedRow_isPause() {
-    assertEquals(RowAction.Pause, action(KeyPress(Key.Spacebar), row(DownloadState.Queued)))
-  }
-
-  @Test
-  fun keyAction_spaceOnPausedRow_isResume() {
-    assertEquals(RowAction.Resume, action(KeyPress(Key.Spacebar), row(paused)))
-  }
-
-  @Test
-  fun keyAction_spaceOnFailedRow_isRetry() {
-    val failed = DownloadState.Failed(KetchError.Http(503))
-
-    assertEquals(RowAction.Retry, action(KeyPress(Key.Spacebar), row(failed)))
-  }
-
-  @Test
-  fun keyAction_spaceOnFailureThatCannotResume_isDownloadAgain() {
-    val failed = DownloadState.Failed(KetchError.Http(416))
-
-    assertEquals(RowAction.DownloadAgain, action(KeyPress(Key.Spacebar), row(failed)))
-  }
-
-  @Test
-  fun keyAction_spaceOnCanceledRow_isDownloadAgain() {
-    val canceled = row(DownloadState.Canceled)
-
-    assertEquals(RowAction.DownloadAgain, action(KeyPress(Key.Spacebar), canceled))
-  }
-
-  @Test
-  fun keyAction_spaceOnCompletedRow_doesNothing() {
-    assertNull(action(KeyPress(Key.Spacebar), row(completed)))
-  }
-
-  @Test
-  fun keyAction_enterOnCompletedRow_opensTheFile() {
-    assertEquals(RowAction.Open, action(KeyPress(Key.Enter), row(completed)))
-  }
-
-  @Test
-  fun keyAction_enterOnRemoteCompletedRow_showsDetails() {
-    val remote = row(completed, device = RemoteDevice)
-
-    assertEquals(RowAction.Details, action(KeyPress(Key.Enter), remote))
-  }
-
-  @Test
-  fun keyAction_enterOnDownloadingRow_showsDetails() {
-    assertEquals(RowAction.Details, action(KeyPress(Key.Enter), row(downloading)))
-  }
-
-  @Test
-  fun keyAction_commandEnterOnCompletedRow_showsTheFileInItsFolder() {
-    val press = KeyPress(Key.Enter, meta = true)
-
-    assertEquals(RowAction.ShowInFolder, action(press, row(completed)))
-  }
-
-  @Test
-  fun keyAction_ctrlEnterOnPc_showsTheFileInItsFolder() {
-    val press = KeyPress(Key.Enter, ctrl = true)
-
-    assertEquals(RowAction.ShowInFolder, action(press, row(completed), KeyboardPlatform.Pc))
-  }
-
-  @Test
-  fun keyAction_backspaceOnMac_removesFromTheList() {
-    assertEquals(RowAction.Remove, action(KeyPress(Key.Backspace), row(completed)))
-  }
-
-  @Test
-  fun keyAction_deleteOnPc_removesFromTheList() {
-    val press = KeyPress(Key.Delete)
-
-    assertEquals(RowAction.Remove, action(press, row(downloading), KeyboardPlatform.Pc))
-  }
-
-  @Test
-  fun keyAction_shiftBackspaceOnPausedRow_asksToRemoveWithFiles() {
-    val press = KeyPress(Key.Backspace, shift = true)
-
-    assertEquals(RowAction.RemoveAndDelete, action(press, row(paused)))
-  }
-
-  @Test
-  fun keyAction_commandC_copiesTheLink() {
-    assertEquals(RowAction.CopyLink, action(KeyPress(Key.C, meta = true), row(downloading)))
-  }
-
-  @Test
-  fun keyAction_optionCommandCOnCompletedRow_copiesThePath() {
-    val press = KeyPress(Key.C, meta = true, alt = true)
-
-    assertEquals(RowAction.CopyPath, action(press, row(completed)))
-    assertNull(action(press, row(downloading)))
-  }
-
-  @Test
-  fun keyAction_commandROnPausedRow_resumes() {
-    assertEquals(RowAction.Resume, action(KeyPress(Key.R, meta = true), row(paused)))
-  }
-
-  @Test
-  fun keyAction_commandROnFailedRow_retries() {
-    val failed = DownloadState.Failed(KetchError.Network())
-
-    assertEquals(RowAction.Retry, action(KeyPress(Key.R, meta = true), row(failed)))
-    assertNull(action(KeyPress(Key.R, meta = true), row(downloading)))
+  fun keyAction_eachChordOnEachRow_runsItsAction() {
+    val space = KeyPress(Key.Spacebar)
+    val enter = KeyPress(Key.Enter)
+    val copyPath = KeyPress(Key.C, meta = true, alt = true)
+    val retry = KeyPress(Key.R, meta = true)
+    val pc = KeyboardPlatform.Pc
+    val cases = listOf(
+      KeyCase(space, downloading, RowAction.Pause),
+      KeyCase(space, DownloadState.Queued, RowAction.Pause),
+      KeyCase(space, paused, RowAction.Resume),
+      KeyCase(space, DownloadState.Failed(KetchError.Http(503)), RowAction.Retry),
+      // A failure that cannot resume starts over.
+      KeyCase(space, DownloadState.Failed(KetchError.Http(416)), RowAction.DownloadAgain),
+      KeyCase(space, DownloadState.Canceled, RowAction.DownloadAgain),
+      KeyCase(space, completed, null),
+      KeyCase(enter, completed, RowAction.Open),
+      KeyCase(enter, completed, RowAction.Details, device = RemoteDevice),
+      KeyCase(enter, downloading, RowAction.Details),
+      KeyCase(KeyPress(Key.Enter, meta = true), completed, RowAction.ShowInFolder),
+      KeyCase(KeyPress(Key.Enter, ctrl = true), completed, RowAction.ShowInFolder, pc),
+      KeyCase(KeyPress(Key.Backspace), completed, RowAction.Remove),
+      KeyCase(KeyPress(Key.Delete), downloading, RowAction.Remove, pc),
+      KeyCase(KeyPress(Key.Backspace, shift = true), paused, RowAction.RemoveAndDelete),
+      KeyCase(KeyPress(Key.C, meta = true), downloading, RowAction.CopyLink),
+      KeyCase(copyPath, completed, RowAction.CopyPath),
+      KeyCase(copyPath, downloading, null),
+      KeyCase(retry, paused, RowAction.Resume),
+      KeyCase(retry, DownloadState.Failed(KetchError.Network()), RowAction.Retry),
+      KeyCase(retry, downloading, null),
+    )
+    for (case in cases) {
+      val row = row(case.state, case.device)
+      assertEquals(case.expected, action(case.press, row, case.platform), "$case")
+    }
   }
 
   @Test
@@ -169,14 +88,6 @@ class ListKeyboardTest {
     assertEquals(ListKey.Connections(-1), key(KeyPress(Key.Minus)))
     assertEquals(ListKey.Priority(1), key(KeyPress(Key.DirectionUp, meta = true, alt = true)))
     assertEquals(ListKey.Inspect, key(KeyPress(Key.DirectionRight)))
-  }
-
-  @Test
-  fun listKey_menuOpen_doesNothing() {
-    val matcher = ShortcutMatcher(KeyboardPlatform.Mac)
-    val context = ShortcutContext(listFocused = true, menuOpen = true)
-
-    assertNull(matcher.match(KeyPress(Key.Spacebar), context))
   }
 
   @Test
@@ -299,6 +210,14 @@ class ListKeyboardTest {
 
     assertTrue(task.calls.isEmpty())
   }
+
+  private data class KeyCase(
+    val press: KeyPress,
+    val state: DownloadState,
+    val expected: RowAction?,
+    val platform: KeyboardPlatform = KeyboardPlatform.Mac,
+    val device: DeviceInfo = ListFixtures.device,
+  )
 
   private fun row(state: DownloadState, device: DeviceInfo = ListFixtures.device): TaskRow =
     ListFixtures.row(

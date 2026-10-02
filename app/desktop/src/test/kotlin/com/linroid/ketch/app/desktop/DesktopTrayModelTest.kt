@@ -340,29 +340,18 @@ class DesktopTrayModelTest {
 
   @Test
   fun menuShortcut_globalChords_belongToTheMenu() {
-    val mac = KeyboardPlatform.Mac
+    val owned = listOf(
+      KetchCommands.Add to KeyChord(Key.N, primary = true),
+      KetchCommands.AddClipboardLink to KeyChord(Key.V, primary = true, shift = true),
+      KetchCommands.PauseAll to KeyChord(Key.P, primary = true, shift = true),
+      KetchCommands.SlowLane to KeyChord(Key.L, primary = true, shift = true),
+      KetchCommands.tab(StatusFilter.All) to KeyChord(Key.One, primary = true),
+      KetchCommands.AllDevices to KeyChord(Key.Zero, primary = true, alt = true),
+    )
 
-    assertEquals(KeyChord(Key.N, primary = true), menuShortcut(KetchCommands.Add, mac))
-    assertEquals(
-      KeyChord(Key.V, primary = true, shift = true),
-      menuShortcut(KetchCommands.AddClipboardLink, mac),
-    )
-    assertEquals(
-      KeyChord(Key.P, primary = true, shift = true),
-      menuShortcut(KetchCommands.PauseAll, mac),
-    )
-    assertEquals(
-      KeyChord(Key.L, primary = true, shift = true),
-      menuShortcut(KetchCommands.SlowLane, mac),
-    )
-    assertEquals(
-      KeyChord(Key.One, primary = true),
-      menuShortcut(KetchCommands.tab(StatusFilter.All), mac),
-    )
-    assertEquals(
-      KeyChord(Key.Zero, primary = true, alt = true),
-      menuShortcut(KetchCommands.AllDevices, mac),
-    )
+    for ((command, chord) in owned) {
+      assertEquals(chord, menuShortcut(command, KeyboardPlatform.Mac), command.id)
+    }
   }
 
   @Test
