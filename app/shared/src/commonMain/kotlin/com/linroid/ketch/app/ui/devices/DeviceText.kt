@@ -98,7 +98,11 @@ internal fun deviceProblem(device: DevicePresence, now: Instant): DeviceProblem?
     !device.connected -> DeviceProblem(
       kind = ProblemKind.NotConnected,
       title = "Not connected",
-      detail = "Ketch connects to it while it shows, or while it stays connected.",
+      detail = if (device.watched) {
+        "Ketch keeps only a few devices connected at once. It connects to this one while it shows."
+      } else {
+        "Ketch connects to it while it shows, or while it stays connected."
+      },
     )
     health == DeviceHealth.Connecting && device.lastSeen == null -> DeviceProblem(
       kind = ProblemKind.Connecting,
@@ -113,6 +117,34 @@ internal fun deviceProblem(device: DevicePresence, now: Instant): DeviceProblem?
     )
   }
 }
+
+/** The button that fixes what keeps a remote device's card from showing what it is doing. */
+internal enum class ProblemFix(val label: String) {
+  /** Reconnects now rather than at the next scheduled attempt. */
+  RetryNow("Retry now"),
+
+  /** Asks for a new access token. */
+  EnterToken("Enter token"),
+
+  /** Keeps the device connected from now on. */
+  Connect("Connect"),
+
+  /** Switches to the device, which connects it. */
+  Show("Show downloads"),
+}
+
+/**
+ * The fix for [problem] of [device]; `null` while it is connecting. A device the app means to
+ * keep connected but does not, because more devices are kept connected than it allows, connects
+ * once it shows.
+ */
+internal fun problemFix(device: DevicePresence, problem: DeviceProblem): ProblemFix? =
+  when (problem.kind) {
+    ProblemKind.Offline -> ProblemFix.RetryNow
+    ProblemKind.Unauthorized -> ProblemFix.EnterToken
+    ProblemKind.NotConnected -> if (device.watched) ProblemFix.Show else ProblemFix.Connect
+    ProblemKind.Connecting -> null
+  }
 
 /** Free space as the card's storage line shows it: "412 GB free of 926 GB". */
 internal fun storageLabel(disk: DiskSpace): String =

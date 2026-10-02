@@ -30,8 +30,8 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
+import com.linroid.ketch.app.ui.pulse.SpeedModeOptions
 import com.linroid.ketch.app.ui.pulse.SpeedModePillContent
-import com.linroid.ketch.app.ui.pulse.SpeedModePopover
 import com.linroid.ketch.app.ui.pulse.SpeedModeView
 import com.linroid.ketch.app.ui.pulse.effectiveCap
 import com.linroid.ketch.app.ui.pulse.modeCaption
@@ -66,7 +66,7 @@ internal fun rememberDeviceSpeedView(state: AppState, device: DevicePresence): S
 /**
  * [device]'s speed mode pill on its card. Clicking it turns the Slow lane on or off where the
  * device has a speed mode, and otherwise opens its speed limit; the chevron opens the options.
- * The device the app shows gets the Pulse bar's own popover.
+ * The device the app shows gets the options of the Pulse bar's popover.
  */
 @Composable
 internal fun DeviceSpeedPill(
@@ -90,16 +90,17 @@ internal fun DeviceSpeedPill(
       },
       onOptions = { open = !open },
     )
-    if (active) {
-      SpeedModePopover(state = state, expanded = open, onDismissRequest = { open = false })
-    } else {
-      PulsePopover(
-        expanded = open,
-        onDismissRequest = { open = false },
-        width = PopoverWidth,
-        alignment = PopoverAlignment.End,
-        title = "Speed of ${device.name}",
-      ) {
+    // Lined up with the pill's end, which sits at the card's end, so it stays over the card.
+    PulsePopover(
+      expanded = open,
+      onDismissRequest = { open = false },
+      width = PopoverWidth,
+      alignment = PopoverAlignment.End,
+      title = "Speed of ${device.name}",
+    ) {
+      if (active) {
+        SpeedModeOptions(state, onOpenSettings = { open = false })
+      } else {
         DeviceSpeedOptions(state, device, view, onOpenSettings = { open = false })
       }
     }

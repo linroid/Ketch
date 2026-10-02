@@ -178,10 +178,42 @@ class DeviceTextTest {
 
   @Test
   fun deviceProblem_notKeptConnected_isNotAFailure() {
-    val problem = deviceProblem(device(health = DeviceHealth.Offline(), connected = false), now)
+    val device = device(health = DeviceHealth.Offline(), connected = false).copy(watched = false)
+
+    val problem = deviceProblem(device, now)
 
     assertEquals(ProblemKind.NotConnected, problem?.kind)
     assertEquals("Not connected", problem?.title)
+  }
+
+  @Test
+  fun deviceProblem_keptConnectedButPastTheLimit_saysWhy() {
+    val device = device(health = DeviceHealth.Offline(), connected = false)
+
+    val problem = deviceProblem(device, now)
+
+    assertEquals(ProblemKind.NotConnected, problem?.kind)
+    assertEquals(
+      "Ketch keeps only a few devices connected at once. It connects to this one while it shows.",
+      problem?.detail
+    )
+  }
+
+  @Test
+  fun problemFix_eachProblem_offersItsFix() {
+    val offline = device(health = DeviceHealth.Offline(), lastSeen = now - 1.hours)
+    val locked = device(health = DeviceHealth.Unauthorized, connected = false)
+    val unwatched = device(health = DeviceHealth.Offline(), connected = false).copy(watched = false)
+    val pastTheLimit = device(health = DeviceHealth.Offline(), connected = false)
+    val connecting = device(health = DeviceHealth.Connecting)
+
+    fun fixOf(device: DevicePresence) = problemFix(device, deviceProblem(device, now)!!)
+
+    assertEquals(ProblemFix.RetryNow, fixOf(offline))
+    assertEquals(ProblemFix.EnterToken, fixOf(locked))
+    assertEquals(ProblemFix.Connect, fixOf(unwatched))
+    assertEquals(ProblemFix.Show, fixOf(pastTheLimit))
+    assertNull(fixOf(connecting))
   }
 
   @Test

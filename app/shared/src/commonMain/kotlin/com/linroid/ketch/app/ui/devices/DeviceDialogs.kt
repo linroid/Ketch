@@ -79,7 +79,6 @@ internal fun RenameDeviceDialog(state: AppState, device: DevicePresence, onDismi
   val current = remote?.remoteConfig?.name ?: state.appSettings.config.name.orEmpty()
   var name by remember { mutableStateOf(current) }
   val focus = remember { FocusRequester() }
-  LaunchedEffect(Unit) { focus.requestFocus() }
   val save = {
     state.renameDevice(device.entry, name)
     onDismiss()
@@ -87,6 +86,7 @@ internal fun RenameDeviceDialog(state: AppState, device: DevicePresence, onDismi
   AdaptiveModal(
     onDismissRequest = onDismiss,
     title = { Text("Rename ${device.name}") },
+    dismissible = name == current,
     dismissButton = {
       KetchButton(text = "Cancel", variant = KetchButtonVariant.Secondary, onClick = onDismiss)
     },
@@ -111,6 +111,8 @@ internal fun RenameDeviceDialog(state: AppState, device: DevicePresence, onDismi
       keyboardActions = KeyboardActions(onDone = { save() }),
       modifier = Modifier.fillMaxWidth().focusRequester(focus),
     )
+    // Here, in the modal's own window, the field is attached by the time the effect runs.
+    LaunchedEffect(focus) { runCatching { focus.requestFocus() } }
   }
 }
 

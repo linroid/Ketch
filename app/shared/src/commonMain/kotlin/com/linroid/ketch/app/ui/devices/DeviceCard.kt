@@ -57,7 +57,6 @@ import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.pulse.healthLabel
 import com.linroid.ketch.app.ui.pulse.sparklineSamples
 import com.linroid.ketch.app.ui.pulse.speedText
-import com.linroid.ketch.app.ui.sidebar.pennantName
 
 /**
  * A device on the Devices page: who it is, how fast it downloads and in which speed mode, its
@@ -154,7 +153,7 @@ private fun CardHeader(
     ) {
       DevicePennant(
         deviceId = device.deviceId,
-        name = device.pennantName,
+        name = device.entry.label,
         size = DevicePennantDefaults.Large,
         icon = deviceIcon(device, localDeviceNoun()),
       )
@@ -264,9 +263,9 @@ private fun SpeedRow(state: AppState, device: DevicePresence, active: Boolean) {
   }
 }
 
-/** The line under a device that is not online: what is wrong and how to fix it. */
+/** What is wrong with a device that is not online, under its header, and how to fix it. */
 @Composable
-private fun ColumnScope.ProblemDetails(
+private fun ProblemDetails(
   state: AppState,
   device: DevicePresence,
   problem: DeviceProblem,
@@ -275,71 +274,68 @@ private fun ColumnScope.ProblemDetails(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val remote = device.entry as? RemoteInstance
-  Box(
-    contentAlignment = Alignment.CenterStart,
-    modifier = Modifier.weight(1f).fillMaxWidth().padding(top = spacing.s5),
+  Column(
+    verticalArrangement = Arrangement.spacedBy(spacing.s1),
+    modifier = Modifier.fillMaxWidth().padding(top = spacing.s4),
   ) {
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.s2),
-      ) {
-        when (problem.kind) {
-          ProblemKind.Connecting -> KetchSpinner(color = colors.textSecondary)
-          ProblemKind.NotConnected -> KetchIconImage(
-            icon = KetchIcon.Info,
-            size = KetchTheme.density.controlGlyph,
-            tint = colors.textTertiary,
-          )
-          else -> KetchIconImage(
-            icon = KetchIcon.Warning,
-            size = KetchTheme.density.controlGlyph,
-            tint = colors.status.failed.color,
-          )
-        }
-        Text(
-          text = problem.title,
-          style = KetchTheme.typography.bodyStrong,
-          color = colors.textPrimary,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+    ) {
+      when (problem.kind) {
+        ProblemKind.Connecting -> KetchSpinner(color = colors.textSecondary)
+        ProblemKind.NotConnected -> KetchIconImage(
+          icon = KetchIcon.Info,
+          size = KetchTheme.density.controlGlyph,
+          tint = colors.textTertiary,
+        )
+        else -> KetchIconImage(
+          icon = KetchIcon.Warning,
+          size = KetchTheme.density.controlGlyph,
+          tint = colors.status.failed.color,
         )
       }
-      problem.detail?.let { detail ->
-        Text(
-          text = detail,
-          style = KetchTheme.typography.caption,
-          color = colors.textSecondary,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-        )
-      }
-      if (remote != null) {
-        Spacer(Modifier.height(spacing.s2))
-        Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
-          val fix: Pair<String, () -> Unit>? = when (problem.kind) {
-            ProblemKind.Offline -> "Retry now" to { state.retryNow(remote) }
-            ProblemKind.Unauthorized -> "Enter token" to { state.askForToken(remote) }
-            ProblemKind.NotConnected -> "Connect" to {
-              state.instanceManager.setWatched(remote, true)
-            }
-            ProblemKind.Connecting -> null
-          }
-          fix?.let { (label, onClick) ->
-            KetchButton(
-              text = label,
-              onClick = onClick,
-              variant = KetchButtonVariant.Secondary,
-              size = KetchButtonSize.Small,
-            )
-          }
+      Text(
+        text = problem.title,
+        style = KetchTheme.typography.bodyStrong,
+        color = colors.textPrimary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
+    problem.detail?.let { detail ->
+      Text(
+        text = detail,
+        style = KetchTheme.typography.caption,
+        color = colors.textSecondary,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
+    if (remote != null) {
+      Spacer(Modifier.height(spacing.s2))
+      Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
+        problemFix(device, problem)?.let { fix ->
           KetchButton(
-            text = "Remove",
-            onClick = onRemove,
-            variant = KetchButtonVariant.Ghost,
+            text = fix.label,
+            onClick = {
+              when (fix) {
+                ProblemFix.RetryNow -> state.retryNow(remote)
+                ProblemFix.EnterToken -> state.askForToken(remote)
+                ProblemFix.Connect -> state.instanceManager.setWatched(remote, true)
+                ProblemFix.Show -> state.showDeviceTab(remote)
+              }
+            },
+            variant = KetchButtonVariant.Secondary,
             size = KetchButtonSize.Small,
           )
         }
+        KetchButton(
+          text = "Remove",
+          onClick = onRemove,
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+        )
       }
     }
   }
