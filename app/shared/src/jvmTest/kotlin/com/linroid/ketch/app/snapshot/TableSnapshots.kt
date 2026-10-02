@@ -210,6 +210,16 @@ class TableSnapshots {
   }
 
   @Test
+  fun launchpad_firstDownload_givesWayToTheTable() {
+    // The page swaps the launchpad for the table while it stays composed.
+    val desktop = listOf(SnapshotSize.Desktop)
+    appSnapshots("launchpad-first-download", desktop, data = SampleData::empty) {
+      val device = checkNotNull(state.activeInstance.value)
+      device.instance.download(DownloadRequest("https://example.com/files/first.iso"))
+    }
+  }
+
+  @Test
   fun launchpad_desktop_showsTheBrowserTileAndChecklist() {
     for (theme in SnapshotTheme.entries) {
       val environment = runBlocking(SnapshotHarness.ui) {

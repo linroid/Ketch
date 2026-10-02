@@ -15,7 +15,8 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 actual fun SystemAppearance(dark: Boolean?) {
   val activity = LocalContext.current.findActivity() as? ComponentActivity ?: return
-  val night = dark ?: isSystemInDarkTheme()
+  val system = isSystemInDarkTheme()
+  val night = dark ?: system
   DisposableEffect(activity, night) {
     // The bars enableEdgeToEdge draws by default, with icons for the app's appearance rather
     // than the system's.

@@ -359,7 +359,9 @@ private fun WideDownloads(
   var draggedWidth by remember { mutableStateOf<Dp?>(null) }
   val inspectorWidth = (draggedWidth ?: ui.inspectorWidth.dp)
     .coerceIn(spacing.inspectorMinWidth, widest.coerceAtLeast(spacing.inspectorMinWidth))
-  val inspectorShown = !firstRun && (shownTask(state) != null || state.selectedKeys.size >= 2)
+  // Called on every pass: a composable call behind && would come and go with firstRun.
+  val shownTask = shownTask(state)
+  val inspectorShown = !firstRun && (shownTask != null || state.selectedKeys.size >= 2)
   // The sidebar lists the devices; on narrow cards the search field needs the room more.
   val sidebar = layout.tier == LayoutTier.Expanded && !ui.sidebarCollapsed
   val showDevice = (instances.size >= 2 || !sidebar) && (!sidebar || cardWidth >= DeviceChipWidth)
