@@ -207,6 +207,39 @@ class RowActionRunnerTest {
   }
 
   @Test
+  fun remove_trashRefusesTheFile_keepsTheTask() = runTest {
+    val f = ActionsFixture(this, canTrash = true)
+    val task = f.add(completed)
+    f.files.refused += "/downloads/a.iso"
+
+    f.runner.remove(listOf(rowOf(task)), withFiles = true)
+    advanceTimeBy(7.seconds)
+    runCurrent()
+
+    assertTrue(task.calls.isEmpty())
+    val error = f.messages().last()
+    assertTrue(error.title.startsWith("Couldn't move "), error.title)
+    assertTrue(error.title.endsWith(" to the Trash"), error.title)
+    assertEquals("The download stays in the list", error.detail)
+    f.close()
+  }
+
+  @Test
+  fun remove_finishedFileAlreadyGone_removesTheTaskWithoutTrashing() = runTest {
+    val f = ActionsFixture(this, canTrash = true)
+    val task = f.add(completed)
+    f.files.missing += "/downloads/a.iso"
+
+    f.runner.remove(listOf(rowOf(task)), withFiles = true)
+    advanceTimeBy(7.seconds)
+    runCurrent()
+
+    assertEquals(listOf("remove deleteFiles=false"), task.calls)
+    assertTrue(f.files.calls.isEmpty())
+    f.close()
+  }
+
+  @Test
   fun remove_withFilesUndone_keepsTheTaskAndFile() = runTest {
     val f = ActionsFixture(this, canTrash = true)
     val task = f.add(completed)

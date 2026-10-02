@@ -389,8 +389,9 @@ internal class RowActionRunner(
     )
   }
 
-  // Each finished file goes to the Trash after its row is removed; the device that wrote a
-  // partial file deletes it, since only it knows where the file is.
+  // Each finished file goes to the Trash before its task is removed, so a move the system refuses
+  // leaves the row to try again from; the device that wrote a partial file deletes it, since only
+  // it knows where the file is.
   private fun removeToTrash(rows: List<TaskRow>) {
     val files = files ?: return
     val keys = rows.mapTo(mutableSetOf()) { it.key }
@@ -401,14 +402,7 @@ internal class RowActionRunner(
       hides = keys,
       commit = {
         val results = supervisorScope {
-          rows.map { row ->
-            async {
-              row to catchingUnlessCancelled {
-                row.task.remove(deleteFiles = row.state !is DownloadState.Completed)
-                row.outputFile?.let { files.moveToTrash(it) }
-              }.exceptionOrNull()
-            }
-          }.awaitAll()
+          rows.map { row -> async { trashAndRemove(row, files) } }.awaitAll()
         }
         reportTrash(results)
       },
@@ -424,30 +418,63 @@ internal class RowActionRunner(
     )
   }
 
-  private fun reportTrash(results: List<Pair<TaskRow, Throwable?>>) {
-    val failed = results.mapNotNull { (row, e) -> e?.let { row to it } }
-    failed.forEach { (row, e) ->
-      log.w { "Couldn't remove taskId=${row.key.taskId} with its file: ${e.describeCauses()}" }
+  private suspend fun trashAndRemove(row: TaskRow, files: FileActions): TrashResult {
+    val file = row.outputFile
+    // A file that is already gone has nothing to move; its task is still removed.
+    val trashing = file != null && catchingUnlessCancelled { files.exists(file) }.getOrDefault(true)
+    if (file != null && trashing) {
+      val refused = catchingUnlessCancelled { files.moveToTrash(file) }.exceptionOrNull()
+      if (refused != null) return TrashResult(row, trashed = false, trashError = refused)
     }
-    val moved = results.count { (row, e) -> e == null && row.outputFile != null }
+    val removeError = catchingUnlessCancelled {
+      row.task.remove(deleteFiles = row.state !is DownloadState.Completed)
+    }.exceptionOrNull()
+    return TrashResult(row, trashed = trashing, removeError = removeError)
+  }
+
+  private fun reportTrash(results: List<TrashResult>) {
+    results.forEach { result ->
+      val taskId = result.row.key.taskId
+      result.trashError?.let {
+        log.w { "Couldn't move the file of taskId=$taskId to the Trash: ${it.describeCauses()}" }
+      }
+      result.removeError?.let { log.w { "Couldn't remove taskId=$taskId: ${it.describeCauses()}" } }
+    }
+    val moved = results.count { it.trashed }
     if (moved > 0) {
       val what = if (moved == 1) "1 file" else "$moved files"
       state.messages.post(MessageLevel.Success, "Moved $what to the Trash")
     }
-    val (row, e) = failed.firstOrNull() ?: return
-    val trashing = failed.all { it.first.outputFile != null }
-    state.messages.post(
-      level = MessageLevel.Error,
-      title = when {
-        !trashing && failed.size == 1 -> "Couldn't remove ${row.name}"
-        !trashing -> "Couldn't remove ${downloads(failed.size)}"
-        failed.size == 1 -> "Couldn't move ${row.name} to the Trash"
-        else -> "Couldn't move ${failed.size} files to the Trash"
-      },
-      detail = e.message,
-      deviceId = row.key.deviceId,
-      cause = e,
-    )
+    val refused = results.filter { it.trashError != null }
+    refused.firstOrNull()?.let { first ->
+      state.messages.post(
+        level = MessageLevel.Error,
+        title = if (refused.size == 1) {
+          "Couldn't move ${first.row.name} to the Trash"
+        } else {
+          "Couldn't move ${refused.size} files to the Trash"
+        },
+        detail = if (refused.size == 1) "The download stays in the list" else {
+          "The downloads stay in the list"
+        },
+        deviceId = first.row.key.deviceId,
+        cause = first.trashError,
+      )
+    }
+    val unremoved = results.filter { it.removeError != null }
+    unremoved.firstOrNull()?.let { first ->
+      state.messages.post(
+        level = MessageLevel.Error,
+        title = if (unremoved.size == 1) {
+          "Couldn't remove ${first.row.name}"
+        } else {
+          "Couldn't remove ${downloads(unremoved.size)}"
+        },
+        detail = first.removeError?.message,
+        deviceId = first.row.key.deviceId,
+        cause = first.removeError,
+      )
+    }
   }
 
   private fun copy(lines: List<String>, what: String) {
@@ -504,6 +531,17 @@ internal fun rememberRowActionRunner(): RowActionRunner {
     RowActionRunner(state, commands, files, clipboard, scope)
   }
 }
+
+/**
+ * How removing [row] with its file went: whether its file reached the Trash, the error that kept
+ * it out (the task is then kept), or the error that kept the task from being removed.
+ */
+private class TrashResult(
+  val row: TaskRow,
+  val trashed: Boolean,
+  val trashError: Throwable? = null,
+  val removeError: Throwable? = null,
+)
 
 /** Path of the file a completed row saved, or `null`. */
 internal val TaskRow.outputFile: String?
