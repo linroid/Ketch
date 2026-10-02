@@ -88,6 +88,19 @@ class KetchUpdateConfigTest {
     withKetch(DownloadConfig(defaultDirectory = null)) { ketch, _ ->
       val expected = File(System.getProperty("user.home"), "Downloads").absolutePath
       assertEquals(expected, ketch.status().system.downloadDirectory)
+      assertEquals(expected, ketch.status().system.defaultDownloadDirectory)
+    }
+  }
+
+  @Test
+  fun status_chosenDirectory_reportsItBesideThePlatformDefault() = runTest {
+    withKetch(DownloadConfig(defaultDirectory = firstDir.path)) { ketch, _ ->
+      val system = ketch.status().system
+      assertEquals(firstDir.absolutePath, system.downloadDirectory)
+      assertEquals(
+        File(System.getProperty("user.home"), "Downloads").absolutePath,
+        system.defaultDownloadDirectory,
+      )
     }
   }
 

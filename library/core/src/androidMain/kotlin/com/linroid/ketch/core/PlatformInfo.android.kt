@@ -2,6 +2,7 @@
 
 package com.linroid.ketch.core
 
+import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
@@ -9,12 +10,20 @@ import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.core.file.isContentUri
 import java.io.File
 
-internal actual fun currentSystemInfo(directory: String): SystemInfo {
+internal actual fun currentSystemInfo(directory: String?): SystemInfo {
   val runtime = Runtime.getRuntime()
+  val folder = directory ?: defaultDownloadDirectory()
+  // The default needs the app's context, which a chosen folder does not; without one, as in host
+  // tests, it is unknown.
+  val default = if (directory == null) {
+    folder
+  } else {
+    AndroidContext.getOrNull()?.let(::downloadsFolder)
+  }
   // A folder picked through the system is a content:// tree, which File would turn into a
   // relative path; its space is that of the storage volume it lies on.
-  val tree = isContentUri(directory)
-  val dir = if (tree) treeVolume(directory) else File(directory)
+  val tree = isContentUri(folder)
+  val dir = if (tree) treeVolume(folder) else File(folder)
   return SystemInfo(
     os = "Android ${android.os.Build.VERSION.RELEASE}",
     arch = System.getProperty("os.arch", "unknown"),
@@ -24,15 +33,17 @@ internal actual fun currentSystemInfo(directory: String): SystemInfo {
     maxMemory = runtime.maxMemory(),
     totalMemory = runtime.totalMemory(),
     freeMemory = runtime.freeMemory(),
-    downloadDirectory = if (tree) directory else File(directory).absolutePath,
+    downloadDirectory = if (tree) folder else File(folder).absolutePath,
+    defaultDownloadDirectory = default,
     totalSpace = dir?.totalSpace ?: 0,
     freeSpace = dir?.freeSpace ?: 0,
     usableSpace = dir?.usableSpace ?: 0,
   )
 }
 
-internal actual fun defaultDownloadDirectory(): String {
-  val context = AndroidContext.get()
+internal actual fun defaultDownloadDirectory(): String = downloadsFolder(AndroidContext.get())
+
+private fun downloadsFolder(context: Context): String {
   val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
     ?: File(context.filesDir, "downloads")
   return dir.absolutePath

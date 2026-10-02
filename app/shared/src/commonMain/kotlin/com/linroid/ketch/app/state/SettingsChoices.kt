@@ -234,6 +234,15 @@ private fun parentFolder(path: String): String? {
   return if (end > 0) path.substring(0, end) else null
 }
 
+/**
+ * Whether Settings offers to save downloads to the device's [default] folder instead of the
+ * [chosen] one. A folder chosen by path can be the default itself; a default that is unknown,
+ * such as from an older server, or app-private storage, which Settings warns about, is not offered.
+ */
+fun offersDefaultFolder(chosen: String?, default: String?): Boolean =
+  chosen != null && default != null && !isSameFolder(chosen, default) &&
+    !isAppPrivateFolder(default)
+
 /** Whether [path] and [other] name the same folder, ignoring a trailing separator. */
 fun isSameFolder(path: String, other: String?): Boolean =
   other != null && folderKey(path) == folderKey(other)

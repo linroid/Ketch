@@ -236,9 +236,10 @@ private fun moveConfig(from: String, to: String) {
   }
 }
 
-// Downloads go to Documents/Downloads, which the Files app shows as On My iPhone › Ketch ›
-// Downloads. A saved folder that is gone, such as one in the app's container before an update
-// moved it, falls back there too.
+// Downloads go to Ketch's default folder, Documents/Downloads, which the Files app shows as On My
+// iPhone › Ketch › Downloads; it is created up front so it shows there before the first download.
+// A saved folder that is gone, such as one in the app's container before an update moved it,
+// falls back there too. The default stays unset, so Settings can tell it from a chosen folder.
 private fun DownloadConfig.inDownloadsFolder(folder: String): DownloadConfig {
   val fileSystem = FileSystem.SYSTEM
   val saved = defaultDirectory
@@ -247,7 +248,7 @@ private fun DownloadConfig.inDownloadsFolder(folder: String): DownloadConfig {
       return this
     }
     fileSystem.createDirectories(folder.toPath())
-    copy(defaultDirectory = folder)
+    copy(defaultDirectory = null)
   } catch (e: IOException) {
     log.w { "Could not create the Downloads folder: ${e.describeCauses()}" }
     this
