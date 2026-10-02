@@ -47,11 +47,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
@@ -90,13 +88,13 @@ import com.linroid.ketch.app.ui.downloads.actions.SelectionCheckbox
 import com.linroid.ketch.app.ui.downloads.actions.TaskRowFrame
 import com.linroid.ketch.app.ui.list.FileNameText
 import com.linroid.ketch.app.ui.list.GroupCollapse
-import com.linroid.ketch.app.ui.list.GroupHeader
 import com.linroid.ketch.app.ui.list.HoverOverlay
 import com.linroid.ketch.app.ui.list.TaskLazyList
-import com.linroid.ketch.app.ui.list.listEntries
+import com.linroid.ketch.app.ui.list.appendError
 import com.linroid.ketch.app.ui.list.placement
 import com.linroid.ketch.app.ui.list.rememberRowCompletion
 import com.linroid.ketch.app.ui.list.rememberStalledLanes
+import com.linroid.ketch.app.ui.list.rowDivider
 import com.linroid.ketch.app.ui.list.showsLanes
 import com.linroid.ketch.app.ui.list.withMissingFile
 import com.linroid.ketch.app.util.RowStatus
@@ -144,8 +142,6 @@ internal fun DownloadTable(
     val columns = shown.fit(maxWidth, TablePadding)
     val namePennant = TableColumn.Device in autoColumns &&
       columns.none { it.column == TableColumn.Device }
-    val groups = view.groups
-    val entries = listEntries(groups, collapse)
     Column(Modifier.fillMaxSize()) {
       TableHeader(
         view = view,
@@ -159,21 +155,14 @@ internal fun DownloadTable(
         onSort = onSort,
       )
       TaskLazyList(
-        entries = entries,
-        groups = groups,
+        groups = view.groups,
         actions = actions,
         collapse = collapse,
         listState = listState,
+        headerHeight = spacing.tableGroupHeaderHeight,
+        headerPadding = TablePadding + spacing.s2,
         modifier = Modifier.weight(1f).fillMaxWidth(),
-        header = { entry ->
-          GroupHeader(
-            entry = entry,
-            onToggle = { collapse.toggle(entry.group) },
-            height = spacing.tableGroupHeaderHeight,
-            padding = TablePadding + spacing.s2,
-            trailing = { groupAction(entry.group) },
-          )
-        },
+        groupAction = groupAction,
         row = { row ->
           TableRow(
             task = row,
@@ -215,7 +204,6 @@ private fun TableHeader(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   var chooserAt by remember { mutableStateOf<Offset?>(null) }
-  val hairline = colors.hairline
   Box {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -223,10 +211,7 @@ private fun TableHeader(
         .fillMaxWidth()
         .height(spacing.tableHeaderHeight)
         .background(colors.surfaceSunken)
-        .drawBehind {
-          val y = size.height - density / 2
-          drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = density)
-        }
+        .rowDivider(colors.hairline)
         .pointerInput(Unit) {
           awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -456,24 +441,13 @@ private fun TableRow(
   val row = withMissingFile(task, actions.runner.isFileMissing(task))
   val completion = rememberRowCompletion(row)
   val lanes = showsLanes(row, completion)
-  val divider = colors.divider
-  val dividerInset = TablePadding + TableColumn.StatusDotWidth + CellPadding
   TaskRowFrame(
     row = row,
     actions = actions,
     modifier = modifier
       .fillMaxWidth()
       .height(height)
-      .drawBehind {
-        val y = size.height - density / 2
-        val inset = dividerInset.toPx()
-        val (from, to) = if (layoutDirection == LayoutDirection.Ltr) {
-          inset to size.width
-        } else {
-          0f to size.width - inset
-        }
-        drawLine(divider, Offset(from, y), Offset(to, y), strokeWidth = density)
-      },
+      .rowDivider(colors.divider, TablePadding + TableColumn.StatusDotWidth + CellPadding),
   ) { frame ->
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -779,13 +753,7 @@ private fun ReasonCell(row: TaskRow, modifier: Modifier) {
 /** A row's reason: a failure's title in the failed color and its hint, else its detail. */
 internal fun reasonText(row: TaskRow, colors: KetchColors): AnnotatedString {
   val error = row.content.error ?: return AnnotatedString(row.content.detail)
-  return buildAnnotatedString {
-    withStyle(SpanStyle(color = colors.status.failed.color)) { append(error.title) }
-    error.shortHint?.let { hint ->
-      append(" · ")
-      append(hint)
-    }
-  }
+  return buildAnnotatedString { appendError(error, colors) }
 }
 
 @Composable

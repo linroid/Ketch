@@ -48,6 +48,7 @@ import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.list.rowDivider
 import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.formatBytes
 import kotlinx.datetime.TimeZone
@@ -216,10 +217,7 @@ private fun WideSelectionBar(
       .fillMaxWidth()
       .height(spacing.tabRowHeight)
       .background(colors.surfaceRaised)
-      .drawBehind {
-        val y = size.height - density / 2
-        drawLine(colors.hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = density)
-      }
+      .rowDivider(colors.hairline)
       .padding(horizontal = spacing.s2),
   ) { constraints ->
     val loose = constraints.copy(minWidth = 0, minHeight = 0)

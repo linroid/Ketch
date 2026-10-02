@@ -27,11 +27,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
@@ -101,26 +104,31 @@ internal fun listEntries(groups: List<RowGroup>, collapse: GroupCollapse): List<
   }
 
 /**
- * The scrolling part of the Downloads table and list: [entries] with sticky group headers, the
- * list keys of [actions], the rubber band with a pointer, and rows that glide to their new
- * places as the list re-sorts. A row the keyboard focuses inside a collapsed group opens it.
+ * The scrolling part of the Downloads table and list: [groups] under sticky [GroupHeader]s that
+ * [collapse] them, the list keys of [actions], the rubber band with a pointer, and rows that
+ * glide to their new places as the list re-sorts. A row the keyboard focuses inside a collapsed
+ * group opens it.
  *
- * @param header a group's header.
+ * @param headerHeight height of a group's header.
+ * @param headerPadding horizontal padding of a group's header, matching the rows below.
+ * @param groupAction a group header's own action, such as Retry all.
  * @param row a task's row.
  */
 @Composable
 internal fun TaskLazyList(
-  entries: List<ListEntry>,
   groups: List<RowGroup>,
   actions: ListActions,
   collapse: GroupCollapse,
   listState: LazyListState,
+  headerHeight: Dp,
+  headerPadding: Dp,
   modifier: Modifier = Modifier,
   contentPadding: PaddingValues = PaddingValues(),
-  header: @Composable (ListEntry.Header) -> Unit,
+  groupAction: @Composable RowScope.(RowGroup) -> Unit = {},
   row: @Composable LazyItemScope.(TaskRow) -> Unit,
 ) {
   val pointer = KetchTheme.density == KetchDensity.Compact
+  val entries = listEntries(groups, collapse)
   val currentEntries by rememberUpdatedState(entries)
   val focused = actions.selection.focusedKey
   LaunchedEffect(focused, groups) {
@@ -156,7 +164,13 @@ internal fun TaskLazyList(
     for (entry in entries) {
       when (entry) {
         is ListEntry.Header -> stickyHeader(key = entry.key, contentType = HEADER) {
-          header(entry)
+          GroupHeader(
+            entry = entry,
+            onToggle = { collapse.toggle(entry.group) },
+            height = headerHeight,
+            padding = headerPadding,
+            trailing = { groupAction(entry.group) },
+          )
         }
         is ListEntry.Row -> item(key = entry.key, contentType = ROW) { row(entry.row) }
       }
@@ -185,13 +199,12 @@ internal fun LazyItemScope.placement(): Modifier {
  * @param padding horizontal padding, matching the rows below.
  */
 @Composable
-internal fun GroupHeader(
+private fun GroupHeader(
   entry: ListEntry.Header,
   onToggle: () -> Unit,
   height: Dp,
   padding: Dp,
-  modifier: Modifier = Modifier,
-  trailing: @Composable RowScope.() -> Unit = {},
+  trailing: @Composable RowScope.() -> Unit,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -199,18 +212,14 @@ internal fun GroupHeader(
   val group = entry.group
   val focus = rememberFocusVisibility()
   val interactions = remember { MutableInteractionSource() }
-  val hairline = colors.hairline
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s1),
-    modifier = modifier
+    modifier = Modifier
       .fillMaxWidth()
       .height(height)
       .background(colors.surface)
-      .drawBehind {
-        val y = size.height - density / 2
-        drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = density)
-      }
+      .rowDivider(colors.hairline)
       .focusRing(focus.visible, KetchTheme.shapes.xs, colors.focusRing, gap = -spacing.s0_5)
       .ketchClickable(
         interactions = interactions,
@@ -245,6 +254,18 @@ internal fun GroupHeader(
     }
     trailing()
   }
+}
+
+/** Draws a hairline of [color] along the bottom edge, from [inset] at its start to its end. */
+internal fun Modifier.rowDivider(color: Color, inset: Dp = 0.dp): Modifier = drawBehind {
+  val y = size.height - density / 2
+  val start = inset.toPx()
+  val (from, to) = if (layoutDirection == LayoutDirection.Ltr) {
+    start to size.width
+  } else {
+    0f to size.width - start
+  }
+  drawLine(color, Offset(from, y), Offset(to, y), strokeWidth = density)
 }
 
 private fun indexOf(entries: List<ListEntry>, key: TaskKey): Int =
