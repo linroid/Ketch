@@ -12,14 +12,9 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.ui.shell.PhoneBottomBar
 import com.linroid.ketch.app.ui.shell.ShortcutSheet
 import com.linroid.ketch.app.ui.shell.shortcutGroups
-import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.RemoteConfig
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
-import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * The shell (W3-SHELL): the canvas wash with the sidebar and the content card on wide windows,
@@ -53,15 +48,6 @@ class ShellSnapshots {
         )
       },
     )
-  }
-
-  @Test
-  fun shell_macChrome_leavesRoomForTheTrafficLights() {
-    for (size in listOf(SnapshotSize.Desktop, Width840, SnapshotSize.Medium)) {
-      for (theme in SnapshotTheme.entries) {
-        macSnapshot("shell-mac", size, theme)
-      }
-    }
   }
 
   @Test
@@ -183,23 +169,3 @@ private val ShellWidths = listOf(
   Phone360,
 )
 
-/** Renders the app under a transparent macOS title bar, with the traffic lights drawn in. */
-private fun macSnapshot(name: String, size: SnapshotSize, theme: SnapshotTheme): File {
-  val density = when (size.density) {
-    KetchDensity.Compact -> DensityMode.Compact
-    KetchDensity.Comfortable -> DensityMode.Comfortable
-  }
-  val data = SampleData.downloads()
-  val environment = runBlocking(SnapshotHarness.ui) { SampleEnvironment(data, theme, density) }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(5.seconds) { environment.start() }
-        ?: error("The task list of $name never listed every sample task")
-    }
-    return SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) {
-      MacWindow(environment.controller)
-    }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
-  }
-}

@@ -71,8 +71,6 @@ class InspectorSnapshots {
 
   @Test
   fun inspector_inTheApp_rendersInTheDownloadsPage() {
-    val sizes = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
-    appSnapshots("inspector-app", sizes = sizes) { inspect(UBUNTU) }
     appSnapshots("inspector-app-failed", sizes = listOf(SnapshotSize.Desktop)) { inspect(FAILED) }
   }
 

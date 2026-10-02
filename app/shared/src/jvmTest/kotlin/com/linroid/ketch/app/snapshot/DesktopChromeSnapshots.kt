@@ -49,6 +49,7 @@ class DesktopChromeSnapshots {
     val sizes = listOf(
       SnapshotSize.Desktop,
       SnapshotSize.SmallDesktop,
+      SnapshotSize(840.dp, 720.dp, KetchDensity.Compact),
       SnapshotSize.Medium,
       MinMainWindowSize,
     )
