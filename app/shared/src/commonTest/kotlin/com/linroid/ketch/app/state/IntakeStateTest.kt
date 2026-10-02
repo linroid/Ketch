@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.state
 
+import androidx.compose.ui.text.input.TextFieldValue
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -19,6 +20,7 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.util.extractFilename
+import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
@@ -35,6 +37,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -50,13 +53,231 @@ class IntakeStateTest {
     assertEquals(5, session.summary.links)
     assertEquals(5, session.summary.ready)
     assertTrue(session.summary.text.startsWith("5 links · 5 ready · "))
-    assertEquals("Add 5 downloads", session.primaryLabel)
+    assertEquals("Download 5 files · ${formatBytes(5_000_000)}", session.primaryLabel)
     var closed = false
     session.submit { closed = true }
     runCurrent()
 
     assertTrue(closed)
     assertEquals(links, api.base.requests.map { it.url })
+  }
+
+  @Test
+  fun primaryLabel_oneLink_namesTheFile() = runTest {
+    val session = session(IntakeTestApi(), IntakeRequest(links.first()))
+
+    assertEquals("Download archive-1.zip", session.primaryLabel)
+    assertEquals("download", session.submitVerb)
+  }
+
+  @Test
+  fun primaryLabel_scheduled_saysScheduleWithoutTheSize() = runTest {
+    val session = session(IntakeTestApi(), IntakeRequest(links.take(2).joinToString("\n")))
+
+    session.schedule = DownloadSchedule.AtTime(Instant.parse("2030-01-01T01:00:00Z"))
+
+    assertEquals("Schedule 2 files", session.primaryLabel)
+    assertEquals("schedule", session.submitVerb)
+    // The Start chip says when, so the outcome line does not repeat it.
+    assertNull(session.outcome)
+  }
+
+  @Test
+  fun primaryLabel_batchWithATorrent_countsItems() = runTest {
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val api = IntakeTestApi(check = { url, _ -> if (url == magnet) torrent(url) else ready(url) })
+    val session = session(api, IntakeRequest("${links.first()}\n$magnet"))
+
+    assertTrue(session.primaryLabel.startsWith("Download 2 items · "), session.primaryLabel)
+  }
+
+  @Test
+  fun primaryLabel_onlyDuplicates_saysNothingToAdd() = runTest {
+    val api = IntakeTestApi()
+    api.base.add(DownloadState.Queued, DownloadRequest(links.first()))
+    val session = session(api, IntakeRequest(links.first()))
+
+    assertEquals("Nothing to add", session.primaryLabel)
+    assertFalse(session.canSubmit)
+  }
+
+  @Test
+  fun middleEllipsis_longName_keepsBothEnds() {
+    val name = "ubuntu-24.04.1-live-server-amd64-with-extras.iso"
+
+    val short = middleEllipsis(name, 20)
+
+    assertEquals(20, short.length)
+    assertEquals("ubuntu-24.…xtras.iso", short)
+    assertEquals("short.iso", middleEllipsis("short.iso", 20))
+  }
+
+  @Test
+  fun showsOptions_emptyOrTextWithoutLinks_staysHidden() = runTest {
+    val session = session(IntakeTestApi(), IntakeRequest())
+
+    assertFalse(session.showsOptions)
+    session.onTextChange(TextFieldValue("ubuntu desktop iso"))
+    advanceTimeBy(IntakeSession.TYPING_DEBOUNCE + 1.milliseconds)
+    runCurrent()
+    assertFalse(session.showsOptions)
+    session.onTextChange(TextFieldValue(links.first()))
+    runCurrent()
+
+    assertTrue(session.showsOptions)
+  }
+
+  @Test
+  fun showsOptions_editingATask_alwaysShows() = runTest {
+    val api = IntakeTestApi()
+    val task = api.base.add(DownloadState.Queued, DownloadRequest(links.first()))
+    val session = session(api, IntakeRequest(editTask = TaskKey(LOCAL_DEVICE_ID, task.taskId)))
+
+    assertTrue(session.showsOptions)
+    assertEquals("Apply changes", session.primaryLabel)
+    assertEquals("apply", session.submitVerb)
+  }
+
+  @Test
+  fun isCurl_curlCommand_switchesTheInputToMonospace() = runTest {
+    val session = session(IntakeTestApi(), IntakeRequest())
+
+    session.onTextChange(TextFieldValue(links.first()))
+    assertFalse(session.isCurl)
+    session.onTextChange(
+      TextFieldValue("curl '${links.first()}' -H 'Cookie: session=1' --compressed"),
+    )
+
+    assertTrue(session.isCurl)
+  }
+
+  @Test
+  fun optionValues_defaults_sumUpWithoutChanges() = runTest {
+    val session = session(IntakeTestApi(), IntakeRequest(links.first()))
+
+    val values = session.optionValues
+
+    assertEquals(listOf("Unlimited", "Normal", "Now", "Auto"), values.map { it.text })
+    assertTrue(values.none { it.changed })
+  }
+
+  @Test
+  fun intakeOptionValues_changedValues_readAsChips() {
+    val values = intakeOptionValues(
+      speedLimit = SpeedLimit.mbps(2),
+      priority = DownloadPriority.URGENT,
+      schedule = DownloadSchedule.AtTime(Instant.parse("2026-10-01T23:00:00Z")),
+      connections = 8,
+      torrents = false,
+      singleConnection = false,
+      now = NOW,
+      zone = TimeZone.UTC,
+    )
+
+    assertEquals(
+      listOf("Max 2 MB/s", "⚡ Urgent", "Starts 23:00 tonight", "8 connections"),
+      values.map { it.text },
+    )
+    assertTrue(values.all { it.changed })
+  }
+
+  @Test
+  fun intakeOptionValues_retryHighPriorityAndTorrentPeers_readTheirOwnWay() {
+    val values = intakeOptionValues(
+      speedLimit = SpeedLimit.Unlimited,
+      priority = DownloadPriority.HIGH,
+      schedule = null,
+      connections = 50,
+      torrents = true,
+      singleConnection = false,
+      now = NOW,
+      zone = TimeZone.UTC,
+    )
+
+    assertEquals(
+      listOf(IntakeOption.Speed, IntakeOption.Priority, IntakeOption.Connections),
+      values.map { it.option },
+    )
+    assertEquals(listOf("Unlimited", "High priority", "50 peers"), values.map { it.text })
+  }
+
+  @Test
+  fun intakeOptionValues_startThatPassed_isNotAChange() {
+    val values = intakeOptionValues(
+      speedLimit = SpeedLimit.Unlimited,
+      priority = DownloadPriority.NORMAL,
+      schedule = DownloadSchedule.AtTime(NOW - 1.milliseconds),
+      connections = 0,
+      torrents = false,
+      singleConnection = false,
+      now = NOW,
+      zone = TimeZone.UTC,
+    )
+
+    assertEquals(IntakeOptionValue(IntakeOption.Start, "Now", changed = false), values[2])
+  }
+
+  @Test
+  fun intakeOptionValues_serverWithOneConnection_isNotAChange() {
+    val values = intakeOptionValues(
+      speedLimit = SpeedLimit.Unlimited,
+      priority = DownloadPriority.NORMAL,
+      schedule = DownloadSchedule.Immediate,
+      connections = 4,
+      torrents = false,
+      singleConnection = true,
+      now = NOW,
+      zone = TimeZone.UTC,
+    )
+
+    val connections = values.single { it.option == IntakeOption.Connections }
+    assertEquals("1 connection", connections.text)
+    assertFalse(connections.changed)
+  }
+
+  @Test
+  fun resetOption_changedValues_goBackToTheirDefaults() = runTest {
+    val session = session(IntakeTestApi(), IntakeRequest(links.first()))
+    session.speedLimit = SpeedLimit.mbps(2)
+    session.priority = DownloadPriority.LOW
+    session.schedule = DownloadSchedule.AtTime(Instant.parse("2030-01-01T01:00:00Z"))
+    session.connections = 4
+
+    IntakeOption.entries.forEach(session::resetOption)
+
+    assertTrue(session.optionValues.none { it.changed })
+  }
+
+  @Test
+  fun offersClipboard_afterTheSheetWasFilledFromIt_stopsOffering() = runTest {
+    val session = session(IntakeTestApi(), IntakeRequest())
+    val clip = links.first()
+
+    assertTrue(session.offersClipboard(clipHash(clip)))
+    assertTrue(session.offersClipboard(null))
+    assertTrue(session.offerClipboard(clip))
+    assertFalse(session.offersClipboard(clipHash(clip)))
+    session.dismissClipboard()
+    runCurrent()
+
+    assertFalse(session.offersClipboard(clipHash(clip)))
+    assertFalse(session.offersClipboard(null))
+    assertTrue(session.offersClipboard(clipHash(links[1])))
+  }
+
+  @Test
+  fun pasteClipboard_clipOfferedBefore_stillFillsTheSheet() = runTest {
+    val clip = links.first()
+    val config = KetchConfig(ui = UiPreferences(lastClipHash = clipHash(clip)))
+    val session = stateAndSession(IntakeTestApi(), IntakeRequest(), config).second
+
+    assertFalse(session.offerClipboard(clip))
+    session.pasteClipboard(clip)
+    runCurrent()
+
+    assertEquals(clip, session.text.text)
+    assertTrue(session.fromClipboard)
+    assertEquals(1, session.entries.size)
   }
 
   @Test
@@ -102,7 +323,7 @@ class IntakeStateTest {
     val session = session(api, IntakeRequest(links.joinToString("\n")))
 
     assertEquals(1, session.summary.attention)
-    assertEquals("Add 4 downloads", session.primaryLabel)
+    assertEquals("Download 4 files · ${formatBytes(4_000_000)}", session.primaryLabel)
     session.submit {}
     runCurrent()
 
@@ -196,7 +417,7 @@ class IntakeStateTest {
     val entry = session.entries.single()
     assertEquals(entry, session.torrentStage)
     assertEquals(setOf("0", "1"), entry.selectedFiles)
-    assertEquals("Add 2 files", session.primaryLabel)
+    assertEquals("Download 2 files · ${formatBytes(2_000)}", session.primaryLabel)
   }
 
   @Test

@@ -1,6 +1,11 @@
 package com.linroid.ketch.app.ui.intake
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +30,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,12 +39,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -56,11 +57,9 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDialogDefaults
 import com.linroid.ketch.app.components.KetchIconButton
-import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.CommandScope
-import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
@@ -70,7 +69,6 @@ import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberFilePicker
-import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.IntakeEntry
 import com.linroid.ketch.app.state.IntakeMode
 import com.linroid.ketch.app.state.IntakeSession
@@ -78,11 +76,12 @@ import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.DropHoverState
 import com.linroid.ketch.app.ui.FileDropTarget
 import com.linroid.ketch.app.ui.common.ModalForm
 import com.linroid.ketch.app.ui.common.modalForm
+import com.linroid.ketch.app.ui.downloads.ClipboardLink
 import com.linroid.ketch.app.util.toCopy
-import com.linroid.ketch.config.ClipboardMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -102,11 +101,30 @@ internal object IntakeSheetDefaults {
   const val MIN_ROWS: Int = 2
 
   /** What the sheet holds besides the list, to size the list for the window. */
-  val FixedChrome: Dp = 440.dp
+  val FixedChrome: Dp = 400.dp
 
   /** Lines the input grows to before it scrolls, and while the list shows its links. */
   const val MAX_INPUT_LINES: Int = 8
   const val INPUT_LINES_WITH_ROWS: Int = 4
+
+  /** Lines the empty input is tall, so it reads as a place to paste and drop. */
+  const val EMPTY_INPUT_LINES: Int = 3
+
+  /** The input's focus ring: its width and its share of the accent. */
+  val FocusRingWidth: Dp = 3.dp
+  const val FOCUS_RING_ALPHA: Float = 0.2f
+
+  /** A focus ring drawn right at the edge. */
+  val NoGap: Dp = 0.dp
+
+  /** Width of the Options popover. */
+  val OptionsWidth: Dp = 320.dp
+
+  /** Space under the input's text beside its buttons, which centers one line on them. */
+  val LineInset: Dp = 6.dp
+
+  /** Widest the main button grows; a long file name ends in an ellipsis. */
+  val PrimaryMaxWidth: Dp = 360.dp
 
   /** Share of the window's height the sheet grows to. */
   const val MAX_HEIGHT_SHARE: Float = 0.8f
@@ -204,6 +222,14 @@ internal class IntakeActions(
     }
   }
 
+  /** Puts the clipboard in the empty input, as its chip offers. */
+  fun pasteClipboard() {
+    scope.launch {
+      val clip = catchingUnlessCancelled { clipboard.readText() }.getOrNull() ?: return@launch
+      session.pasteClipboard(clip)
+    }
+  }
+
   /** Puts a cURL command from the clipboard in place of [entry], or after the input. */
   fun pasteCurl(entry: IntakeEntry? = null) {
     scope.launch {
@@ -226,15 +252,20 @@ internal class IntakeActions(
 }
 
 /**
- * The add sheet: a multi-line input of links, a row per link with its check on the target
- * device, the options that apply to every row, and the button that adds them.
+ * The add sheet. Empty, it is one roomy area to paste links into or drop files on; once it holds
+ * a link it shows a row per link with its check on the target device, one line of options that
+ * apply to every row, and the button that says what it will do.
  *
  * On desktop and the web it hangs 72 dp below the top of the window, like a command palette; in
- * compact windows it is a full-height bottom sheet with its main button at the bottom.
+ * compact windows it is a bottom sheet, as tall as its input while empty and full height with its
+ * main button at the bottom once links are in.
+ *
+ * @param clipboardLink a link on the clipboard, offered as a chip while the sheet is empty.
  */
 @Composable
 internal fun IntakeSheet(
   session: IntakeSession,
+  clipboardLink: ClipboardLink,
   onClose: () -> Unit,
   onFinishInBackground: (() -> Unit)?,
 ) {
@@ -243,7 +274,7 @@ internal fun IntakeSheet(
   val width = with(density) { window.width.toDp() }
   val height = with(density) { window.height.toDp() }
   val phone = modalForm(width, isMobilePlatform) == ModalForm.Sheet
-  val clipboard = rememberSystemClipboard()
+  val clipboard = rememberIntakeClipboard()
   val picker = rememberFilePicker()
   val fileActions = rememberFileActions()
   val scope = rememberCoroutineScope()
@@ -275,9 +306,9 @@ internal fun IntakeSheet(
   )
   CompositionLocalProvider(LocalTreeHeight provides treeHeight) {
     if (phone) {
-      PhoneSheet(actions, height, listRows)
+      PhoneSheet(actions, clipboardLink, height, listRows)
     } else {
-      AnchoredSheet(actions, height, listRows)
+      AnchoredSheet(actions, clipboardLink, height, listRows)
     }
   }
 }
@@ -286,13 +317,22 @@ internal fun IntakeSheet(
 internal val LocalTreeHeight = staticCompositionLocalOf { IntakeSheetDefaults.PickerMaxHeight }
 
 @Composable
-private fun AnchoredSheet(actions: IntakeActions, windowHeight: Dp, listRows: Int) {
+private fun AnchoredSheet(
+  actions: IntakeActions,
+  clipboardLink: ClipboardLink,
+  windowHeight: Dp,
+  listRows: Int,
+) {
   val spacing = KetchTheme.spacing
+  val session = actions.session
   val properties = DialogProperties(
     dismissOnBackPress = true,
     dismissOnClickOutside = false,
     usePlatformDefaultWidth = false,
   )
+  val drop = remember { DropHoverState() }
+  // While the input shows, a drag lights it up; elsewhere the sheet shows the drop overlay.
+  val inputShown = session.mode == IntakeMode.Add && session.activeStage == null
   Dialog(onDismissRequest = actions::close, properties = properties) {
     // The content fills the window, so a click outside the sheet lands here.
     Box(
@@ -303,8 +343,9 @@ private fun AnchoredSheet(actions: IntakeActions, windowHeight: Dp, listRows: In
     ) {
       // The sheet is a layer of its own, above the window's drop target.
       FileDropTarget(
-        onDrop = actions.session::addFiles,
+        onDrop = session::addFiles,
         compact = true,
+        hover = drop.takeIf { inputShown },
         modifier = Modifier
           .padding(top = IntakeSheetDefaults.TopOffset, bottom = spacing.s6)
           .padding(horizontal = spacing.s4)
@@ -322,6 +363,8 @@ private fun AnchoredSheet(actions: IntakeActions, windowHeight: Dp, listRows: In
           actions = actions,
           phone = false,
           listRows = listRows,
+          clipboardLink = clipboardLink,
+          dropping = inputShown && drop.active,
           modifier = Modifier,
         )
       }
@@ -331,7 +374,12 @@ private fun AnchoredSheet(actions: IntakeActions, windowHeight: Dp, listRows: In
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PhoneSheet(actions: IntakeActions, windowHeight: Dp, listRows: Int) {
+private fun PhoneSheet(
+  actions: IntakeActions,
+  clipboardLink: ClipboardLink,
+  windowHeight: Dp,
+  listRows: Int,
+) {
   val colors = KetchTheme.colors
   val session = actions.session
   // The sheet state is keyed on this lambda, so it must stay the same one.
@@ -351,11 +399,19 @@ private fun PhoneSheet(actions: IntakeActions, windowHeight: Dp, listRows: Int) 
     contentColor = colors.textPrimary,
     scrimColor = colors.scrim,
   ) {
+    // Empty, the sheet is only as tall as its input; it takes the screen once links are in.
+    val full = session.showsOptions || session.confirmingClose
     IntakeContent(
       actions = actions,
       phone = true,
       listRows = listRows,
-      modifier = Modifier.fillMaxWidth().heightIn(max = windowHeight).fillMaxHeight().imePadding(),
+      clipboardLink = clipboardLink,
+      dropping = false,
+      modifier = Modifier
+        .fillMaxWidth()
+        .heightIn(max = windowHeight)
+        .then(if (full) Modifier.fillMaxHeight() else Modifier)
+        .imePadding(),
     )
   }
 }
@@ -365,6 +421,8 @@ private fun IntakeContent(
   actions: IntakeActions,
   phone: Boolean,
   listRows: Int,
+  clipboardLink: ClipboardLink,
+  dropping: Boolean,
   modifier: Modifier,
 ) {
   val session = actions.session
@@ -385,16 +443,17 @@ private fun IntakeContent(
     Column(
       verticalArrangement = Arrangement.spacedBy(spacing.s3),
       modifier = Modifier
-        .weight(1f, fill = phone)
+        .weight(1f, fill = phone && footerShown(session, phone))
         .verticalScroll(scroll)
         .padding(horizontal = padding)
         .padding(bottom = spacing.s1),
     ) {
       when (session.mode) {
         IntakeMode.Edit -> EditBody(actions)
-        else -> AddBody(actions, matcher, phone, listRows)
+        else -> AddBody(actions, matcher, phone, listRows, clipboardLink, dropping)
       }
     }
+    val footer = footerShown(session, phone)
     // A hairline under the body tells that it scrolls on.
     Box(
       Modifier
@@ -402,11 +461,17 @@ private fun IntakeContent(
         .height(IntakeSheetDefaults.Hairline)
         .background(if (scroll.canScrollForward) KetchTheme.colors.divider else Color.Transparent),
     )
-    IntakeFooter(
-      actions = actions,
-      phone = phone,
-      modifier = Modifier.padding(horizontal = padding).padding(top = spacing.s4, bottom = padding),
-    )
+    if (footer) {
+      IntakeFooter(
+        actions = actions,
+        phone = phone,
+        modifier = Modifier
+          .padding(horizontal = padding)
+          .padding(top = spacing.s4, bottom = padding),
+      )
+    } else {
+      Spacer(Modifier.height(if (phone) padding else spacing.s6))
+    }
   }
 }
 
@@ -457,6 +522,8 @@ private fun AddBody(
   matcher: ShortcutMatcher,
   phone: Boolean,
   listRows: Int,
+  clipboardLink: ClipboardLink,
+  dropping: Boolean,
 ) {
   val session = actions.session
   if (session.mode == IntakeMode.Retry) RetryProblem(session)
@@ -464,93 +531,46 @@ private fun AddBody(
   if (stage != null) {
     TorrentStage(actions, stage, onBack = { session.torrentStage = null })
   } else {
-    IntakeInput(actions, matcher, phone)
+    PasteArea(actions, matcher, phone, clipboardLink, dropping)
     session.notice?.let { NoticeLine(it, KetchIcon.Info) }
-    EntriesArea(actions, phone, listRows)
+    if (session.entries.isEmpty()) session.discoverQuery?.let { DiscoverOffer(actions, it) }
   }
-  OptionPills(actions)
-  AnimatedVisibility(visible = session.advancedOpen) { AdvancedSection(actions) }
-  session.spaceWarning?.let { NoticeLine(it, KetchIcon.Warning, warning = true) }
-  session.cookieWarning?.let { NoticeLine(it, KetchIcon.Warning, warning = true) }
-  session.outcome?.let { outcome ->
-    val warning = session.mode == IntakeMode.Retry && session.startsOver
-    NoticeLine(outcome, if (warning) KetchIcon.Warning else KetchIcon.Info, warning = warning)
+  // The options wait until there is something to add.
+  Disclosure(visible = session.showsOptions) {
+    Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s3)) {
+      if (stage == null) EntriesArea(actions, phone, listRows)
+      OptionsRow(actions)
+      AnimatedVisibility(
+        visible = session.advancedOpen,
+        enter = expandVertically(tween(KetchTheme.motion.medium)) +
+          fadeIn(tween(KetchTheme.motion.medium)),
+        exit = shrinkVertically(tween(KetchTheme.motion.short)) +
+          fadeOut(tween(KetchTheme.motion.short)),
+      ) {
+        AdvancedSection(actions)
+      }
+      session.spaceWarning?.let { NoticeLine(it, KetchIcon.Warning, warning = true) }
+      session.cookieWarning?.let { NoticeLine(it, KetchIcon.Warning, warning = true) }
+      session.outcome?.let { outcome ->
+        val warning = session.mode == IntakeMode.Retry && session.startsOver
+        NoticeLine(outcome, if (warning) KetchIcon.Warning else KetchIcon.Info, warning = warning)
+      }
+    }
   }
 }
 
+/** Shows [content] once [visible], sliding it open; still when motion is reduced. */
 @Composable
-private fun IntakeInput(actions: IntakeActions, matcher: ShortcutMatcher, phone: Boolean) {
-  val session = actions.session
-  val type = KetchTheme.typography
-  val colors = KetchTheme.colors
-  val spacing = KetchTheme.spacing
-  val focus = remember { FocusRequester() }
-  LaunchedEffect(session) {
-    // On phones a prefilled sheet keeps the keyboard down, so its rows stay in view.
-    val focusInput = session.mode == IntakeMode.Add && (!phone || session.text.text.isEmpty())
-    if (focusInput) catchingUnlessCancelled { focus.requestFocus() }
-  }
-  val suggest = session.clipboardMode == ClipboardMode.Suggest
-  Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
-    KetchTextField(
-      value = session.text,
-      onValueChange = session::onTextChange,
-      placeholder = if (phone) {
-        "Links, magnets or cURL"
-      } else {
-        "Paste links, magnets or a cURL command, one per line"
-      },
-      mono = true,
-      textStyle = type.mono.copy(
-        fontSize = type.bodyS.fontSize,
-        lineHeight = type.bodyS.lineHeight,
-      ),
-      maxLines = if (session.entries.size > 1) {
-        IntakeSheetDefaults.INPUT_LINES_WITH_ROWS
-      } else {
-        IntakeSheetDefaults.MAX_INPUT_LINES
-      },
-      onPaste = if (suggest) actions::paste else null,
-      modifier = Modifier
-        .fillMaxWidth()
-        .focusRequester(focus)
-        .onPreviewKeyEvent { event -> handleInputKey(event, matcher, actions) },
-    )
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      if (session.fromClipboard) {
-        Text("From clipboard", style = type.caption, color = colors.textSecondary)
-        KetchIconButton(
-          icon = KetchIcon.Close,
-          contentDescription = "Clear the text from the clipboard",
-          size = KetchButtonSize.Small,
-          onClick = session::dismissClipboard,
-        )
-      }
-      // The summary of a batch shares the line; a single link shows its own card.
-      if (session.entries.isNotEmpty() && session.single == null) {
-        SummaryLine(session, Modifier.weight(1f))
-      } else {
-        Spacer(Modifier.weight(1f))
-      }
-      if (session.mode != IntakeMode.Add) {
-        // A retry keeps its link; files are added from a new sheet.
-      } else if (phone && session.entries.isNotEmpty() && session.single == null) {
-        KetchIconButton(
-          command = KetchCommands.IntakeOpenTorrent,
-          onClick = actions::pickTorrents,
-          size = KetchButtonSize.Small,
-        )
-      } else {
-        KetchButton(
-          text = "Open .torrent…",
-          onClick = actions::pickTorrents,
-          variant = KetchButtonVariant.Ghost,
-          size = KetchButtonSize.Small,
-          leadingIcon = KetchIcon.FileTorrent,
-          shortcut = KetchCommands.IntakeOpenTorrent.shortcutLabel(),
-        )
-      }
-    }
+private fun Disclosure(visible: Boolean, content: @Composable () -> Unit) {
+  val motion = KetchTheme.motion
+  AnimatedVisibility(
+    visible = visible,
+    enter = expandVertically(tween(motion.medium, easing = motion.easeDecelerate)) +
+      fadeIn(tween(motion.medium)),
+    exit = shrinkVertically(tween(motion.short, easing = motion.easeAccelerate)) +
+      fadeOut(tween(motion.short)),
+  ) {
+    content()
   }
 }
 
@@ -560,23 +580,11 @@ private fun EntriesArea(actions: IntakeActions, phone: Boolean, listRows: Int) {
   val entries = session.entries
   val single = session.single
   when {
-    entries.isEmpty() -> session.discoverQuery?.let { DiscoverOffer(actions, it) }
+    entries.isEmpty() -> Unit
     single != null && single.waitsForFiles -> TorrentWaiting(actions, single)
     single != null -> PreviewCard(actions, single)
     else -> EntryList(actions, entries, phone, listRows)
   }
-}
-
-@Composable
-private fun SummaryLine(session: IntakeSession, modifier: Modifier) {
-  Text(
-    text = session.summary.text,
-    style = KetchTheme.typography.caption,
-    color = KetchTheme.colors.textSecondary,
-    maxLines = 1,
-    overflow = TextOverflow.Ellipsis,
-    modifier = modifier,
-  )
 }
 
 @Composable
@@ -636,8 +644,24 @@ private fun EditBody(actions: IntakeActions) {
     return
   }
   TaskPreview(task)
-  OptionPills(actions)
+  // Changing options is all this sheet does, so they show in place rather than in a popover.
+  OptionsPanel(
+    session = session,
+    modifier = Modifier
+      .fillMaxWidth()
+      .ketchSurface(
+        KetchElevationLevel.E0,
+        KetchTheme.shapes.lg,
+        KetchTheme.colors.surface,
+        KetchTheme.colors.hairline,
+      )
+      .padding(KetchTheme.spacing.s4),
+  )
 }
+
+/** Whether the sheet has a footer: an empty phone sheet has no button to show. */
+private fun footerShown(session: IntakeSession, phone: Boolean): Boolean =
+  !phone || session.confirmingClose || session.showsOptions
 
 @Composable
 private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modifier) {
@@ -650,18 +674,21 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
   val stage = session.activeStage
   val batchStage = stage != null && session.entries.size > 1
   val stageEntry = stage?.takeIf { !batchStage }
+  // An empty sheet has nothing to add yet; its button appears with the first link.
+  val primaryShown = session.showsOptions
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = modifier.fillMaxWidth(),
   ) {
     if (!phone) {
-      KeyHints(session, inStage = stage != null, modifier = Modifier.weight(1f))
+      Spacer(Modifier.weight(1f))
+      if (primaryShown && session.canSubmit && !batchStage) SubmitHint(session)
     }
     val secondary: Pair<String, () -> Unit>? = when {
       batchStage -> null
       session.mode == IntakeMode.Add && session.allFailed -> "Add anyway" to actions::addAnyway
-      stageEntry != null && session.mode == IntakeMode.Add -> "Add all files" to {
+      stageEntry != null && session.mode == IntakeMode.Add -> "Download all" to {
         stageEntry.selectedFiles = stageEntry.files.mapTo(LinkedHashSet()) { it.id }
         actions.submit()
       }
@@ -678,45 +705,34 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
         else Modifier,
       )
     }
-    KetchButton(
-      text = if (batchStage) "Done" else session.primaryLabel,
-      onClick = if (batchStage) ({ session.torrentStage = null }) else actions::submit,
-      enabled = batchStage || session.canSubmit,
-      loading = session.submitting,
-      size = if (phone) KetchButtonSize.Large else KetchButtonSize.Medium,
-      modifier = if (phone) {
-        Modifier.weight(1f).heightIn(min = IntakeSheetDefaults.PhoneButtonHeight)
-      } else {
-        Modifier
-      },
-    )
+    if (primaryShown || batchStage) {
+      KetchButton(
+        text = if (batchStage) "Done" else session.primaryLabel,
+        onClick = if (batchStage) ({ session.torrentStage = null }) else actions::submit,
+        enabled = batchStage || session.canSubmit,
+        loading = session.submitting,
+        size = if (phone) KetchButtonSize.Large else KetchButtonSize.Medium,
+        modifier = if (phone) {
+          Modifier.weight(1f).heightIn(min = IntakeSheetDefaults.PhoneButtonHeight)
+        } else {
+          Modifier.widthIn(max = IntakeSheetDefaults.PrimaryMaxWidth)
+        },
+      )
+    }
   }
 }
 
+/** "↩ to download": the one chord worth knowing, next to the button it presses. */
 @Composable
-private fun KeyHints(session: IntakeSession, inStage: Boolean, modifier: Modifier) {
-  val hints = buildList {
-    if (session.mode == IntakeMode.Edit) return@buildList
-    hint(KetchCommands.IntakeAdd, if (session.mode == IntakeMode.Retry) "Retry" else "Add")
-    // The file picker has no input to type in or send to Discover.
-    if (session.mode == IntakeMode.Add && !inStage) {
-      hint(KetchCommands.IntakeNewLine, "New line")
-      if (session.canDiscover) hint(KetchCommands.IntakeDiscover, "Discover")
-      hint(KetchCommands.IntakeOpenTorrent, ".torrent")
-    }
-  }
+private fun SubmitHint(session: IntakeSession) {
+  val chord = KetchCommands.IntakeAdd.shortcutLabel() ?: return
   Text(
-    text = hints.joinToString("  ·  "),
+    text = "$chord to ${session.submitVerb}",
     style = KetchTheme.typography.labelS,
     color = KetchTheme.colors.textTertiary,
     maxLines = 1,
-    overflow = TextOverflow.Ellipsis,
-    modifier = modifier,
+    modifier = Modifier.padding(end = KetchTheme.spacing.s1),
   )
-}
-
-private fun MutableList<String>.hint(command: KetchCommand, label: String) {
-  command.shortcutLabel()?.let { add("$it $label") }
 }
 
 @Composable
@@ -780,7 +796,7 @@ private fun handleSheetKey(
 private val SheetValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
 
 /** Handles ↩ and ⌥↩ in the input before the field types a line break; ⇧↩ types one. */
-private fun handleInputKey(
+internal fun handleInputKey(
   event: KeyEvent,
   matcher: ShortcutMatcher,
   actions: IntakeActions,

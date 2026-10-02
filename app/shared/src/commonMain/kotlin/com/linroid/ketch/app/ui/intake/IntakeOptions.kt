@@ -3,17 +3,18 @@ package com.linroid.ketch.app.ui.intake
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -29,13 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.app.components.ConnectionStepper
 import com.linroid.ketch.app.components.DISABLED_ALPHA
 import com.linroid.ketch.app.components.DeviceOption
@@ -47,16 +48,13 @@ import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.KetchTextField
-import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.PEER_LIMIT_STEP
 import com.linroid.ketch.app.components.PeerLimitRange
 import com.linroid.ketch.app.components.SpeedLimitPicker
-import com.linroid.ketch.app.components.StartTimeMenu
-import com.linroid.ketch.app.components.connectionLabel
+import com.linroid.ketch.app.components.StartTimePicker
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.startTimeLabel
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
@@ -69,40 +67,40 @@ import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.HeaderRow
 import com.linroid.ketch.app.state.IntakeMode
+import com.linroid.ketch.app.state.IntakeOptionValue
 import com.linroid.ketch.app.state.IntakeSession
 import com.linroid.ketch.app.state.IntakeSource
-import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.UserAgentChoice
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.folderLabel
 import com.linroid.ketch.app.state.formatSpace
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.inspector.FirstThatFits
 import com.linroid.ketch.app.util.priorityLabel
-import kotlinx.datetime.TimeZone
 
-/** The option pills under the rows: Save to, Speed, Priority, Start and Connections. */
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * The one line of options under the rows: where to save, and an Options pill that sums up the
+ * speed limit, priority, start and connections ("Unlimited · Normal · Now · Auto") and opens a
+ * popover holding all four. Values changed from their defaults show as chips after the pill
+ * instead, such as "⚡ Urgent ✕", whose ✕ puts the default back.
+ *
+ * The line never wraps: as the room shrinks, Save to drops its label and then the free space,
+ * the Options pill its summary and then its label, and last the line scrolls sideways.
+ */
 @Composable
-internal fun OptionPills(actions: IntakeActions) {
+internal fun OptionsRow(actions: IntakeActions) {
   val session = actions.session
-  val spacing = KetchTheme.spacing
-  FlowRow(
-    horizontalArrangement = Arrangement.spacedBy(spacing.s2),
-    verticalArrangement = Arrangement.spacedBy(spacing.s2),
-    itemVerticalAlignment = Alignment.CenterVertically,
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    if (session.mode == IntakeMode.Add) SaveToPill(actions)
-    SpeedPill(session)
-    PriorityPill(session)
-    if (session.mode != IntakeMode.Retry) StartPill(session)
-    ConnectionsPill(session)
-    if (session.mode != IntakeMode.Edit) AdvancedToggle(session)
+  val values = session.optionValues
+  // The box keeps the line at the start; the variant that fits is only as wide as it needs.
+  Box(Modifier.fillMaxWidth()) {
+    FirstThatFits(count = OPTION_LINE_VARIANTS) { variant ->
+      OptionsLine(actions, values, OptionLineStyle.entries[variant])
+    }
   }
   if (session.isSystemFolder && session.entries.any { it.isTorrent }) {
     NoticeLine(
@@ -112,9 +110,206 @@ internal fun OptionPills(actions: IntakeActions) {
   }
 }
 
+/** How much one variant of the [OptionsRow] spells out, from the fullest to the most compact. */
+private enum class OptionLineStyle(
+  val saveToLabel: Boolean = false,
+  val freeSpace: Boolean = false,
+  val summary: Boolean = false,
+  val optionsLabel: Boolean = true,
+  val scrolls: Boolean = false,
+) {
+  Full(saveToLabel = true, freeSpace = true, summary = true),
+  NoSaveToLabel(freeSpace = true, summary = true),
+  NoFreeSpace(summary = true),
+  NoSummary,
+  IconOnly(optionsLabel = false),
+  Scrolling(optionsLabel = false, scrolls = true),
+}
+
+private val OPTION_LINE_VARIANTS = OptionLineStyle.entries.size
+
+@Composable
+private fun OptionsLine(
+  actions: IntakeActions,
+  values: List<IntakeOptionValue>,
+  style: OptionLineStyle,
+) {
+  val session = actions.session
+  var optionsOpen by remember { mutableStateOf(false) }
+  val changed = values.filter { it.changed }
+  // The pill sums up only a sheet without changes; otherwise the chips say what changed.
+  val summary = if (style.summary && changed.isEmpty()) {
+    values.joinToString(SEPARATOR) { it.text }
+  } else {
+    ""
+  }
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+    modifier = if (style.scrolls) Modifier.horizontalScroll(rememberScrollState()) else Modifier,
+  ) {
+    if (session.mode == IntakeMode.Add) {
+      SaveToPill(actions = actions, label = style.saveToLabel, showFree = style.freeSpace)
+    }
+    Box {
+      OptionPill(
+        label = "Options".takeIf { style.optionsLabel },
+        value = summary,
+        icon = KetchIcon.Lanes,
+        description = "Options",
+        onClick = { optionsOpen = true },
+      )
+      OptionsMenu(session, expanded = optionsOpen, onDismiss = { optionsOpen = false })
+    }
+    for (value in changed) {
+      ValueChip(
+        text = value.text,
+        onClick = { optionsOpen = true },
+        onRemove = { session.resetOption(value.option) },
+        removeLabel = "Reset ${value.option.name.lowercase()}",
+      )
+    }
+    HeadersChip(session)
+  }
+}
+
+/** A quiet chip that tells headers are sent while the Advanced section is closed. */
+@Composable
+private fun HeadersChip(session: IntakeSession) {
+  if (session.mode == IntakeMode.Edit || session.advancedOpen) return
+  val count = session.headers.toMap().size
+  if (count == 0) return
+  ValueChip(
+    text = if (count == 1) "1 header" else "$count headers",
+    onClick = { session.updateAdvancedOpen(true) },
+    onRemove = null,
+  )
+}
+
+/**
+ * The Options popover: the four controls, and the Advanced section's switch, which a retry and
+ * an add offer. On touch it is a bottom sheet.
+ */
+@Composable
+private fun OptionsMenu(session: IntakeSession, expanded: Boolean, onDismiss: () -> Unit) {
+  KetchMenu(expanded = expanded, onDismissRequest = onDismiss, title = "Options") {
+    custom {
+      OptionsPanel(
+        session = session,
+        modifier = Modifier
+          .width(IntakeSheetDefaults.OptionsWidth)
+          .padding(horizontal = KetchTheme.spacing.s3, vertical = KetchTheme.spacing.s2),
+      )
+    }
+    if (session.mode != IntakeMode.Edit) {
+      divider()
+      item(
+        label = if (session.advancedOpen) "Hide advanced options" else "Advanced options…",
+        caption = "File name, referer, cookies and other headers",
+        icon = KetchIcon.Settings,
+        onClick = { session.updateAdvancedOpen(!session.advancedOpen) },
+      )
+    }
+  }
+}
+
+/**
+ * Speed limit, priority, start and connections of every download in the sheet. The Options
+ * popover holds it, and the sheet that edits a task shows it in place.
+ */
+@Composable
+internal fun OptionsPanel(session: IntakeSession, modifier: Modifier = Modifier) {
+  val spacing = KetchTheme.spacing
+  Column(verticalArrangement = Arrangement.spacedBy(spacing.s4), modifier = modifier) {
+    OptionField("Speed limit") {
+      SpeedLimitPicker(
+        value = session.speedLimit,
+        onCommit = { session.speedLimit = it },
+        modifier = Modifier.fillMaxWidth(),
+      )
+    }
+    OptionField("Priority", caption = priorityCaption(session.priority)) {
+      KetchSegmented(
+        options = PRIORITIES,
+        selected = session.priority,
+        onSelect = { session.priority = it },
+        label = ::priorityLabel,
+        icon = { priority -> KetchIcon.Bolt.takeIf { priority == DownloadPriority.URGENT } },
+      )
+    }
+    if (session.mode != IntakeMode.Retry) {
+      OptionField("Start") {
+        StartTimePicker(value = session.schedule, onSelect = { session.schedule = it })
+      }
+    }
+    ConnectionsField(session)
+  }
+}
+
+@Composable
+private fun ConnectionsField(session: IntakeSession) {
+  val torrents = session.torrentsOnly
+  val connections = session.connections
+  val max = session.maxConnections ?: IntakeSession.MAX_CONNECTIONS
+  val single = !torrents && max <= 1
+  val auto = if (torrents) null else session.autoConnections?.coerceAtMost(max)
+  val caption = when {
+    single -> "This server allows 1 connection"
+    torrents -> "Auto lets the device decide"
+    auto != null -> "Auto uses the device's setting: $auto"
+    else -> null
+  }
+  OptionField(if (torrents) "Peer limit" else "Connections", caption = caption) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+    ) {
+      ConnectionStepper(
+        value = if (single) 1 else connections,
+        onCommit = { session.connections = it },
+        autoValue = auto,
+        range = if (torrents) PeerLimitRange else 1..max,
+        step = if (torrents) PEER_LIMIT_STEP else 1,
+        enabled = !single,
+        noun = if (torrents) "peers" else "connections",
+        disabledReason = "This server allows 1 connection".takeIf { single },
+      )
+      if (connections != 0 && !single) {
+        KetchButton(
+          text = "Auto",
+          onClick = { session.connections = 0 },
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+        )
+      }
+    }
+  }
+}
+
+/** An eyebrow [label] over a control, with an optional [caption] under it. */
+@Composable
+private fun OptionField(
+  label: String,
+  caption: String? = null,
+  content: @Composable () -> Unit,
+) {
+  val colors = KetchTheme.colors
+  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2)) {
+    Text(
+      text = eyebrowText(label),
+      style = KetchTheme.typography.eyebrow,
+      color = colors.textTertiary,
+    )
+    content()
+    if (caption != null) {
+      Text(text = caption, style = KetchTheme.typography.caption, color = colors.textSecondary)
+    }
+  }
+}
+
 /**
  * A 28 dp pill that names an option and its value and opens a menu to change it. A value other
- * than the default is tinted with the accent.
+ * than the default is tinted with the accent. Without a [value] the [label] reads as one.
  */
 @Composable
 private fun OptionPill(
@@ -125,6 +320,7 @@ private fun OptionPill(
   icon: KetchIcon? = null,
   changed: Boolean = false,
   enabled: Boolean = true,
+  description: String? = null,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -133,6 +329,7 @@ private fun OptionPill(
   val overlay = rememberInteractionOverlay(interactions, enabled)
   val focus = rememberFocusVisibility()
   val ink = if (changed) colors.accentText else colors.textPrimary
+  val text = value.ifEmpty { label.orEmpty() }
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s1),
@@ -149,6 +346,7 @@ private fun OptionPill(
         shape = shape,
       )
       .trackFocusVisibility(focus)
+      .semantics { if (text.isEmpty() && description != null) contentDescription = description }
       .clickable(
         interactionSource = interactions,
         indication = null,
@@ -156,7 +354,7 @@ private fun OptionPill(
         role = Role.DropdownList,
         onClick = onClick,
       )
-      .padding(start = spacing.s3, end = spacing.s2),
+      .padding(start = if (text.isEmpty()) spacing.s2 else spacing.s3, end = spacing.s2),
   ) {
     if (icon != null) {
       KetchIconImage(
@@ -165,7 +363,7 @@ private fun OptionPill(
         tint = if (changed) colors.accentText else colors.textSecondary,
       )
     }
-    if (label != null) {
+    if (label != null && value.isNotEmpty()) {
       Text(
         text = "$label:",
         style = KetchTheme.typography.labelS,
@@ -173,20 +371,91 @@ private fun OptionPill(
         maxLines = 1,
       )
     }
-    Text(
-      text = value,
-      style = KetchTheme.typography.labelS,
-      fontWeight = FontWeight.SemiBold,
-      color = ink,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-    )
+    if (text.isNotEmpty()) {
+      Text(
+        text = text,
+        style = KetchTheme.typography.labelS,
+        fontWeight = FontWeight.SemiBold,
+        color = ink,
+        maxLines = 1,
+      )
+    }
     KetchIconImage(KetchIcon.ChevronDown, size = spacing.s3, tint = colors.textSecondary)
   }
 }
 
+/**
+ * A changed option after the Options pill, such as "⚡ Urgent", on the accent tint: a click
+ * opens the popover, and its ✕, when there is [onRemove], puts the default back.
+ */
 @Composable
-private fun SaveToPill(actions: IntakeActions) {
+private fun ValueChip(
+  text: String,
+  onClick: () -> Unit,
+  onRemove: (() -> Unit)?,
+  removeLabel: String = "Remove $text",
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val shape = KetchTheme.shapes.full
+  val interactions = remember { MutableInteractionSource() }
+  val overlay = rememberInteractionOverlay(interactions)
+  val focus = rememberFocusVisibility()
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(spacing.s1),
+    modifier = Modifier
+      .focusRing(focus.visible, shape, colors.focusRing)
+      .height(KetchTheme.density.chip)
+      .clip(shape)
+      .background(colors.accentSoft)
+      .background(overlay)
+      .trackFocusVisibility(focus)
+      .clickable(
+        interactionSource = interactions,
+        indication = null,
+        role = Role.Button,
+        onClick = onClick,
+      )
+      .padding(start = spacing.s3, end = if (onRemove != null) spacing.s1 else spacing.s3),
+  ) {
+    Text(
+      text = text,
+      style = KetchTheme.typography.labelS,
+      fontWeight = FontWeight.SemiBold,
+      color = colors.accentText,
+      maxLines = 1,
+    )
+    if (onRemove != null) {
+      val removeInteractions = remember { MutableInteractionSource() }
+      val removeOverlay = rememberInteractionOverlay(removeInteractions)
+      Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+          .size(spacing.s5)
+          .clip(shape)
+          .background(removeOverlay)
+          .semantics { contentDescription = removeLabel }
+          .clickable(
+            interactionSource = removeInteractions,
+            indication = null,
+            role = Role.Button,
+            onClick = onRemove,
+          ),
+      ) {
+        KetchIconImage(KetchIcon.Close, size = spacing.s3, tint = colors.accentText)
+      }
+    }
+  }
+}
+
+@Composable
+private fun SaveToPill(
+  actions: IntakeActions,
+  label: Boolean,
+  showFree: Boolean,
+  modifier: Modifier = Modifier,
+) {
   val session = actions.session
   var expanded by remember { mutableStateOf(false) }
   val folder = session.folder
@@ -194,10 +463,10 @@ private fun SaveToPill(actions: IntakeActions) {
   val free = session.targetStatus?.system?.usableSpace?.takeIf { folder == null && it > 0 }
   val name = folderLabel(folder ?: default ?: "Downloads")
   val local = session.target is EmbeddedInstance && actions.picker.canPickFolder
-  Box {
+  Box(modifier) {
     OptionPill(
-      label = "Save to",
-      value = name + (free?.let { " · ${freeSpace(it)} free" } ?: ""),
+      label = "Save to".takeIf { label },
+      value = name + (free?.takeIf { showFree }?.let { " · ${freeSpace(it)} free" } ?: ""),
       icon = KetchIcon.Folder,
       changed = folder != null,
       onClick = { expanded = true },
@@ -281,154 +550,6 @@ private fun FolderField(session: IntakeSession, dismiss: () -> Unit) {
   )
 }
 
-@Composable
-private fun SpeedPill(session: IntakeSession) {
-  var expanded by remember { mutableStateOf(false) }
-  val limit = session.speedLimit
-  Box {
-    OptionPill(
-      label = "Speed",
-      value = if (limit.isUnlimited) "Unlimited" else formatSpeedLimit(limit),
-      icon = KetchIcon.Speed,
-      changed = !limit.isUnlimited,
-      onClick = { expanded = true },
-    )
-    KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = "Speed limit") {
-      custom {
-        SpeedLimitPicker(
-          value = session.speedLimit,
-          onCommit = { session.speedLimit = it },
-          modifier = Modifier
-            .width(IntakeSheetDefaults.MenuFieldWidth)
-            .padding(KetchTheme.spacing.s2),
-        )
-      }
-    }
-  }
-}
-
-@Composable
-private fun PriorityPill(session: IntakeSession) {
-  var expanded by remember { mutableStateOf(false) }
-  val priority = session.priority
-  Box {
-    OptionPill(
-      label = "Priority",
-      value = (if (priority == DownloadPriority.URGENT) "⚡ " else "") + priorityLabel(priority),
-      changed = priority != DownloadPriority.NORMAL,
-      onClick = { expanded = true },
-    )
-    KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = "Priority") {
-      for (option in PRIORITIES) {
-        item(
-          label = priorityLabel(option),
-          caption = priorityCaption(option),
-          icon = if (option == DownloadPriority.URGENT) KetchIcon.Bolt else null,
-          checked = option == priority,
-          onClick = { session.priority = option },
-        )
-      }
-    }
-  }
-}
-
-@Composable
-private fun StartPill(session: IntakeSession) {
-  var expanded by remember { mutableStateOf(false) }
-  val schedule = session.schedule
-  val scheduled = schedule != DownloadSchedule.Immediate
-  Box {
-    OptionPill(
-      label = if (scheduled) null else "Start",
-      value = if (scheduled) {
-        startTimeLabel(schedule, LocalClock.current.now(), TimeZone.currentSystemDefault())
-      } else {
-        "Now"
-      },
-      icon = KetchIcon.Scheduled,
-      changed = scheduled,
-      onClick = { expanded = true },
-    )
-    StartTimeMenu(
-      expanded = expanded,
-      onDismissRequest = { expanded = false },
-      value = schedule,
-      onSelect = { session.schedule = it },
-    )
-  }
-}
-
-@Composable
-private fun ConnectionsPill(session: IntakeSession) {
-  var expanded by remember { mutableStateOf(false) }
-  val torrents = session.torrentsOnly
-  val connections = session.connections
-  val max = session.maxConnections ?: IntakeSession.MAX_CONNECTIONS
-  val single = !torrents && max <= 1
-  val auto = if (torrents) null else session.autoConnections?.coerceAtMost(max)
-  val pill = @Composable {
-    Box {
-      OptionPill(
-        label = if (torrents) "Peer limit" else "Connections",
-        value = if (single) "1" else connectionLabel(connections, auto),
-        icon = KetchIcon.Lanes,
-        changed = connections != 0,
-        enabled = !single,
-        onClick = { expanded = true },
-      )
-      KetchMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false },
-        title = if (torrents) "Peer limit" else "Connections",
-      ) {
-        item(
-          label = "Auto",
-          caption = auto?.let { "The device's setting: $it" },
-          checked = connections == 0,
-          onClick = { session.connections = 0 },
-        )
-        custom {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s3),
-            modifier = Modifier.padding(KetchTheme.spacing.s2),
-          ) {
-            Text(
-              text = if (torrents) "Peers" else "Connections",
-              style = KetchTheme.typography.label,
-              color = KetchTheme.colors.textSecondary,
-            )
-            ConnectionStepper(
-              value = connections,
-              onCommit = { session.connections = it },
-              autoValue = auto,
-              range = if (torrents) PeerLimitRange else 1..max,
-              step = if (torrents) PEER_LIMIT_STEP else 1,
-              noun = if (torrents) "peers" else "connections",
-            )
-          }
-        }
-      }
-    }
-  }
-  if (single) {
-    KetchTooltip(text = "This server allows 1 connection") { pill() }
-  } else {
-    pill()
-  }
-}
-
-@Composable
-private fun AdvancedToggle(session: IntakeSession) {
-  KetchButton(
-    text = "Advanced",
-    onClick = { session.updateAdvancedOpen(!session.advancedOpen) },
-    variant = KetchButtonVariant.Ghost,
-    size = KetchButtonSize.Small,
-    leadingIcon = if (session.advancedOpen) KetchIcon.ChevronDown else KetchIcon.Chevron,
-  )
-}
-
 /**
  * The pill that picks the device downloads go to; shown with two devices or more. Each device
  * in its menu says what it is doing, such as "1.8 TB free · 2 active · Slow lane", and the
@@ -486,6 +607,20 @@ internal fun AdvancedSection(actions: IntakeActions) {
       .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
       .padding(spacing.s3),
   ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(
+        text = eyebrowText("Advanced"),
+        style = KetchTheme.typography.eyebrow,
+        color = colors.textTertiary,
+        modifier = Modifier.weight(1f),
+      )
+      KetchButton(
+        text = "Hide",
+        onClick = { session.updateAdvancedOpen(false) },
+        variant = KetchButtonVariant.Ghost,
+        size = KetchButtonSize.Small,
+      )
+    }
     val single = session.single?.takeIf { it.source is IntakeSource.Link && !it.isTorrent }
     val own = (single?.source as? IntakeSource.Link)?.headers.orEmpty()
     if (own.isNotEmpty()) {
@@ -697,4 +832,5 @@ private val PRIORITIES = listOf(
 )
 
 private const val SECRET_LINES = 3
+private const val SEPARATOR = " · "
 private const val HEADER_NAME_WEIGHT = 0.4f
