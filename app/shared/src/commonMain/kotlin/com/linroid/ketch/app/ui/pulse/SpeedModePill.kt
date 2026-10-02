@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -85,15 +84,27 @@ internal data class SpeedModeView(
 internal fun rememberSpeedModeView(state: AppState): SpeedModeView {
   val pulse by state.pulse.state.collectAsState()
   val active by state.activeInstance.collectAsState()
-  val controller = state.speedMode.takeIf { active is EmbeddedInstance }
+  return speedModeView(state.speedMode.takeIf { active is EmbeddedInstance }, pulse.mode, pulse.cap)
+}
+
+/**
+ * The view of [controller]'s mode, kept current; [fallbackMode] and [cap] stand in for a device
+ * without a speed mode.
+ */
+@Composable
+internal fun speedModeView(
+  controller: SpeedModeController?,
+  fallbackMode: SpeedMode,
+  cap: SpeedLimit,
+): SpeedModeView {
   val settings = controller?.settings?.collectAsState()?.value
-  val mode = controller?.mode?.collectAsState()?.value ?: pulse.mode
+  val mode = controller?.mode?.collectAsState()?.value ?: fallbackMode
   // The suggested slow lane speed follows the observed peak.
   controller?.observedPeak?.collectAsState()?.value
   val limit = if (controller == null || settings == null) {
-    pulse.cap
+    cap
   } else {
-    effectiveCap(mode, pulse.cap, controller.slowLaneSpeed, settings.standard)
+    effectiveCap(mode, cap, controller.slowLaneSpeed, settings.standard)
   }
   val label = speedModeLabel(mode, limit, LocalClock.current.now(), TimeZone.currentSystemDefault())
   return SpeedModeView(mode, limit, label, controller)
