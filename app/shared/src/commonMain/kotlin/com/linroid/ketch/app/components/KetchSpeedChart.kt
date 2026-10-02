@@ -135,6 +135,16 @@ private fun SpeedChart(
         val dash = PathEffect.dashPathEffect(floatArrayOf(DashOn.toPx(), DashOff.toPx()))
         val labelGap = LabelGap.toPx()
         onDrawBehind {
+          // A labelled chart keeps its baseline, so it still reads as a chart before any data.
+          if (axisLabel != null) {
+            val y = size.height - LimitWidth.toPx() / 2
+            drawLine(
+              color = colors.hairline,
+              start = Offset(0f, y),
+              end = Offset(size.width, y),
+              strokeWidth = LimitWidth.toPx(),
+            )
+          }
           paths.forEachIndexed { i, (fill, line) ->
             val color = bands[i].color
             drawPath(fill, color, alpha = FILL_ALPHA)

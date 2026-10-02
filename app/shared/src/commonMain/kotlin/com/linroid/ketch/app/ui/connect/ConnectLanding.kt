@@ -203,7 +203,7 @@ internal fun ConnectLandingContent(
               append("On the computer that runs Ketch, open Settings › Sharing › Allow another ")
               append("device, then copy the pairing link. On a NAS or server, run ")
               withStyle(SpanStyle(fontFamily = type.mono.fontFamily, color = colors.textPrimary)) {
-                append("ketch server")
+                append("ketch\u00A0server")
               }
               append(".")
             },

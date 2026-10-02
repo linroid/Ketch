@@ -22,22 +22,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchMenu
@@ -54,6 +59,7 @@ import com.linroid.ketch.app.state.ListArrangement
 import com.linroid.ketch.app.state.SortKey
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
+import kotlinx.coroutines.flow.first
 
 /**
  * The status tabs with their counts, omitted at zero; the Failed count is drawn white on the
@@ -107,6 +113,7 @@ internal fun StatusChips(
 ) {
   val spacing = KetchTheme.spacing
   val scroll = rememberScrollState()
+  val margin = with(LocalDensity.current) { spacing.s4.toPx() }
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -119,16 +126,21 @@ internal fun StatusChips(
   ) {
     for (filter in StatusFilter.entries) {
       val reveal = remember { BringIntoViewRequester() }
+      var size by remember { mutableStateOf(IntSize.Zero) }
       if (filter == selected) {
-        // A tab picked elsewhere, such as from the menu, scrolls into view.
-        LaunchedEffect(selected) { reveal.bringIntoView() }
+        // A tab picked elsewhere, such as from the menu, scrolls into view with the row's
+        // margin, so the first and last chips do not end flush with the screen's edge.
+        LaunchedEffect(selected) {
+          val chip = snapshotFlow { size }.first { it != IntSize.Zero }
+          reveal.bringIntoView(Rect(-margin, 0f, chip.width + margin, chip.height.toFloat()))
+        }
       }
       KetchChip(
         label = filter.label,
         selected = filter == selected,
         onClick = { onSelect(filter) },
         count = counts[filter]?.takeIf { it > 0 },
-        modifier = Modifier.bringIntoViewRequester(reveal),
+        modifier = Modifier.bringIntoViewRequester(reveal).onSizeChanged { size = it },
       )
     }
   }
