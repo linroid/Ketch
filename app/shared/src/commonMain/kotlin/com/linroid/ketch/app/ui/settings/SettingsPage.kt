@@ -584,14 +584,15 @@ private fun SearchResult(
         onClick = onClick,
       )
       .padding(
-        horizontal = if (filled) spacing.s4 else spacing.s2,
+        horizontal = if (filled) spacing.s4 else spacing.s1,
         vertical = if (filled) spacing.s3 else spacing.s1,
       ),
   ) {
+    // Beside the open page the results line up with the list of pages they replace.
     KetchHueTile(
       icon = entry.category.icon,
       hue = entry.category.hue,
-      size = KetchHueTileDefaults.Small,
+      size = if (filled) KetchHueTileDefaults.Small else KetchHueTileDefaults.XSmall,
     )
     Column(Modifier.weight(1f)) {
       Text(

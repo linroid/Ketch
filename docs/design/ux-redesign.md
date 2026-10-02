@@ -1906,8 +1906,8 @@ has no landing grid of category cards; the category list opens straight onto a p
   - Sharing: "On · 192.168.1.20:8642"
   - Discover: "Claude · Brave search"
 - **Copy:** a row's helper text is one short line (about 60 characters at most) and only says
-  what its label does not. Caveats such as "Applies after a restart" sit at the end of the row
-  or in a one-line note under the group.
+  what its label does not. Caveats such as "after a restart" join that line, or a one-line note
+  under the group.
 - **Hue map:** General = Slate, Notifications = Amber, Integration = Indigo, Discover = Violet,
   About = Slate, Downloads = Blue, Speed = Orange, Network = Teal, BitTorrent = Jade,
   Sharing = Sky.
@@ -1997,7 +1997,7 @@ PAIR A DEVICE
 │ ▓▓ ▓ ▓▓▓ ▓ │  Scan with your phone's camera, or open http://192.168.1.20:8642
 │ ▓▓▓▓ ▓ ▓▓▓ │  Lins-MacBook-Pro · 192.168.1.20 · also 10.0.0.4
 ╰────────────╯  (⧉ Copy pairing link) (↗ Open web app)
-                Anyone with this code can control This Mac.   (New code)
+                Anyone with it can control This Mac.   (New code)
 ```
 
 - **QR** (180 dp, `qrose`) of

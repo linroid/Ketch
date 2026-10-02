@@ -22,10 +22,10 @@ import com.linroid.ketch.app.theme.KetchTheme
 
 /** Sizes of a [KetchHueTile]. */
 object KetchHueTileDefaults {
-  /** Single-line items, such as the list of Settings pages beside the open one. */
+  /** Items in a sidebar, such as the list of Settings pages beside the open one. */
   val XSmall: Dp = 24.dp
 
-  /** Two-line rows, such as the phone's list of Settings pages and search results. */
+  /** Rows of a full-width list, such as the phone's list of Settings pages. */
   val Small: Dp = 32.dp
 
   /** Device types and setting group headers. */

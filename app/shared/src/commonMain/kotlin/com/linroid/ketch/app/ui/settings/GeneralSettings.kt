@@ -71,8 +71,7 @@ fun GeneralSettings(
     SettingsGroup(title = "This device") {
       SettingsRow(
         title = "Device name",
-        description = "Your other devices see this name.",
-        trailing = { SettingsNote("Applies after a restart") },
+        description = "Your other devices see this name after a restart.",
       ) {
         SettingsTextInput(
           value = appSettings.config.name.orEmpty(),

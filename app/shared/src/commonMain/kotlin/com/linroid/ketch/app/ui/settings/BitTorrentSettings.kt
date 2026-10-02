@@ -146,7 +146,7 @@ private fun AddTrackersRow(onAdd: (String) -> List<RejectedTracker>) {
   }
   SettingsRow(
     title = "Add trackers",
-    description = "One or more announce URLs: http://, https:// or udp://.",
+    description = "One or more http, https or udp announce URLs.",
   ) {
     Row(
       verticalAlignment = Alignment.Top,

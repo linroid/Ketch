@@ -283,7 +283,8 @@ private fun PairDetails(
         } else {
           Text(
             text = if (serverState is ServerState.Running) {
-              "Only apps on $noun can connect now."
+              "Only apps on $noun can connect. Allowing a device shares it on your network, " +
+                "with a code."
             } else {
               "Ketch shares $noun on your network, protected by a code."
             },
@@ -387,7 +388,7 @@ private fun PairDetails(
           horizontalArrangement = Arrangement.spacedBy(spacing.s2),
         ) {
           Text(
-            text = "Anyone with this code can control $noun.",
+            text = "Anyone with it can control $noun.",
             style = type.caption,
             color = colors.textSecondary,
             modifier = Modifier.weight(1f, fill = false),

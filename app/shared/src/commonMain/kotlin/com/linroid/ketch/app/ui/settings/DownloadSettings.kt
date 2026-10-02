@@ -343,7 +343,8 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
   val unlimited = { count: Int -> if (count == 0) "Unlimited" else "$count" }
   SettingsGroup(
     title = "Queue",
-    footer = "Lowering a limit lets running downloads finish. Retries apply as downloads start.",
+    footer = "Lowering a limit lets running downloads finish. Retries apply as downloads start " +
+      "or resume.",
   ) {
     StepperRow(
       title = "Run at once",
