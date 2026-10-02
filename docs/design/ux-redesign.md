@@ -1644,7 +1644,9 @@ Changing connections re-splits the remaining bytes live.
 ▶ S01E02.1080p.mkv                 1.1 GB    42%  ▰▰▰▱▱
 ```
 
-- A virtualized `LazyColumn` of 28 dp rows, capped at 360 dp.
+- A virtualized `LazyColumn` of table-height rows (`density.tableRow`) that fills the inspector's
+  height: scrolling it scrolls the inspector's header away first, so the summary, sort and map
+  stay above the list. Shown outside the inspector, the tab is capped at 360 dp.
 - Names come from `resolvedSource.files` by id, else "File 12".
 - Sort: Incomplete first / Name / Size. The filter field appears above 20 files.
 - **Persisted names, and changing the selection after adding, need W5/W6.**

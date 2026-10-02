@@ -1,6 +1,8 @@
 package com.linroid.ketch.app.ui.inspector
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +21,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchSegmented
@@ -58,7 +66,8 @@ enum class InspectorPlacement {
 
 /**
  * The inspector's content; the docked, overlay and sheet containers belong to the Downloads
- * page, which places this inside them. It scrolls on its own.
+ * page, which places this inside them. It scrolls on its own, and the Files tab's list fills its
+ * height: scrolling the list scrolls the header away before the list moves.
  *
  * With two or more rows selected it sums them up and offers their shared Controls. Otherwise it
  * shows the task of [taskKey]: its header with the lane strip, metric and reason lines, the
@@ -122,21 +131,52 @@ internal fun InspectorContent(
     null -> null
   }
   key(shows) {
-    Column(
-      verticalArrangement = Arrangement.spacedBy(spacing.s4),
-      modifier = modifier
-        .fillMaxWidth()
-        .verticalScroll(rememberScrollState())
-        .padding(padding),
-    ) {
-      when (shown) {
-        is Shown.Selection -> SelectionSummary(state, shown.rows, runner, pending, onClose)
-        is Shown.Task -> TaskView(state, shown.row, runner, pending, tab, { tab = it }, onClose)
-        null -> Unit
+    val scroll = rememberScrollState()
+    val headerFirst = remember(scroll) { HeaderFirst(scroll) }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+      // The room inside the padding, which a tab with a long list fills once scrolled to.
+      val room = if (constraints.hasBoundedHeight) {
+        val inset = padding.calculateTopPadding() + padding.calculateBottomPadding()
+        (maxHeight - inset).coerceAtLeast(0.dp)
+      } else {
+        Dp.Unspecified
+      }
+      Column(
+        verticalArrangement = Arrangement.spacedBy(spacing.s4),
+        modifier = Modifier
+          .fillMaxWidth()
+          .verticalScroll(scroll)
+          .padding(padding),
+      ) {
+        when (shown) {
+          is Shown.Selection -> SelectionSummary(state, shown.rows, runner, pending, onClose)
+          is Shown.Task -> {
+            val tabFill = TabFill(room, Modifier.nestedScroll(headerFirst))
+            TaskView(state, shown.row, runner, pending, tab, { tab = it }, tabFill, onClose)
+          }
+          null -> Unit
+        }
       }
     }
   }
   RowActionDialogs(runner)
+}
+
+/**
+ * How a tab with a long list, such as Files, fills the inspector: at most [height] tall, and
+ * with [modifier] on it so scrolling the list scrolls the header away first.
+ */
+private class TabFill(val height: Dp, val modifier: Modifier)
+
+/**
+ * Scrolls the inspector forward before a list inside it, so the header goes away and the list
+ * fills the inspector before it scrolls itself; scrolling back, the list returns to its top first.
+ */
+private class HeaderFirst(private val scroll: ScrollState) : NestedScrollConnection {
+  override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+    if (available.y >= 0f) return Offset.Zero
+    return Offset(0f, -scroll.dispatchRawDelta(-available.y))
+  }
 }
 
 /** What the inspector shows. */
@@ -161,6 +201,7 @@ private fun TaskView(
   pending: Set<Pair<TaskKey, String>>,
   tab: InspectorTab,
   onTab: (InspectorTab) -> Unit,
+  tabFill: TabFill,
   onClose: () -> Unit,
 ) {
   val pulse by state.pulse.state.collectAsState()
@@ -205,7 +246,7 @@ private fun TaskView(
   when (shown) {
     InspectorTab.Overview -> Overview(state, row, device, runner, pending, copier)
     InspectorTab.Connections -> ConnectionsTab(state, row, onHighlight = { highlight = it })
-    InspectorTab.Files -> FilesTab(row)
+    InspectorTab.Files -> FilesTab(row, tabFill.modifier, maxHeight = tabFill.height)
     InspectorTab.Activity -> ActivityTab(state, row)
   }
 }

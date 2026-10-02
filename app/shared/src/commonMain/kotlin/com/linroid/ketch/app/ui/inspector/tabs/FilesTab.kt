@@ -28,6 +28,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.isSpecified
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.app.components.KetchChip
@@ -42,6 +43,7 @@ import com.linroid.ketch.app.components.LaneStripDefaults
 import com.linroid.ketch.app.components.lanePhase
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
 
@@ -50,22 +52,27 @@ import com.linroid.ketch.app.theme.KetchTheme
  * progress, under a map with one block per file sized by its bytes.
  *
  * Names come from the torrent's resolved file list, by id; a file it does not name is "File 12".
- * The list is virtualized and the whole tab is at most 360 dp tall, so a torrent of thousands of
- * files stays cheap. It sorts incomplete files first, by name or by size, and a filter field
- * appears once there are more than 20 files.
+ * The list is virtualized and the whole tab is at most [maxHeight] tall, so a torrent of
+ * thousands of files stays cheap; the summary, the sort and the map stay above it as it scrolls.
+ * It sorts incomplete files first, by name or by size, and a filter field appears once there are
+ * more than 20 files.
+ *
+ * @param maxHeight the tallest the tab may be, such as the inspector's height so the list fills
+ *   it; 360 dp when unspecified.
  */
 @Composable
-fun FilesTab(row: TaskRow, modifier: Modifier = Modifier) {
+fun FilesTab(row: TaskRow, modifier: Modifier = Modifier, maxHeight: Dp = Dp.Unspecified) {
   // The sort, the filter and the list's state never carry over from another torrent.
-  key(row.key) { TorrentFiles(row, modifier) }
+  key(row.key) { TorrentFiles(row, modifier, maxHeight) }
 }
 
 @Composable
-private fun TorrentFiles(row: TaskRow, modifier: Modifier) {
+private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
-  val metrics = remember(spacing) { FileMetrics(spacing) }
+  val density = KetchTheme.density
+  val metrics = remember(spacing, density) { FileMetrics(spacing, density) }
   val files = remember(row.segments, row.request, row.state) { torrentFiles(row) }
   val listed = row.request.resolvedSource?.files?.size ?: 0
   var sort by remember { mutableStateOf(FileSort.IncompleteFirst) }
@@ -74,7 +81,9 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier) {
   val phase = row.state.lanePhase()
 
   Column(
-    modifier = modifier.fillMaxWidth().heightIn(max = metrics.maxHeight),
+    modifier = modifier
+      .fillMaxWidth()
+      .heightIn(max = if (maxHeight.isSpecified) maxHeight else metrics.maxHeight),
     verticalArrangement = Arrangement.spacedBy(spacing.s3),
   ) {
     if (files.isEmpty()) {
@@ -259,11 +268,13 @@ private fun FileName(name: String, modifier: Modifier = Modifier) {
   }
 }
 
-/** Sizes of the Files tab, on the spacing scale. */
-private class FileMetrics(spacing: KetchSpacing) {
-  /** The whole tab: 360 dp. */
+/** Sizes of the Files tab, on the spacing scale and at the UI's [density]. */
+private class FileMetrics(spacing: KetchSpacing, density: KetchDensity) {
+  /** The whole tab when the caller gives no height: 360 dp. */
   val maxHeight: Dp = spacing.s16 * 5 + spacing.s10
-  val rowHeight: Dp = spacing.s6 + spacing.s1
+
+  /** A file's row, as tall as a table row. */
+  val rowHeight: Dp = density.tableRow
 
   /** Lists at least this wide (340 dp) show each file's type chip. */
   val chipsFrom: Dp = spacing.s16 * 5 + spacing.s5
