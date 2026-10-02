@@ -117,6 +117,11 @@ class IncomingDownloads {
   /** Pairing links waiting for the user to confirm them, oldest first. */
   val pendingPairings: StateFlow<List<IncomingDownload.Pairing>> = pairingState.asStateFlow()
 
+  /** Whether anything opened from outside the app waits for the user. */
+  val hasPending: Boolean
+    get() = pendingState.value.isNotEmpty() || linksState.value.isNotEmpty() ||
+      pairingState.value.isNotEmpty()
+
   /** Files that could not be read, each delivered once. Collect from one place only. */
   val failures: Flow<IncomingDownload.Failed> = failureChannel.receiveAsFlow()
 

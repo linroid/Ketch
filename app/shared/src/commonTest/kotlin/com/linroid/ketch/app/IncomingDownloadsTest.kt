@@ -244,6 +244,18 @@ class IncomingDownloadsTest {
   }
 
   @Test
+  fun hasPending_pairingLinkUntilCompleted_isTrue() {
+    val incoming = IncomingDownloads()
+    assertFalse(incoming.hasPending)
+
+    incoming.offerLink("ketch://pair?host=nas.local&port=8642#token=t", LinkSource.OpenUrl)
+
+    assertTrue(incoming.hasPending)
+    incoming.complete(incoming.pendingPairings.value.single())
+    assertFalse(incoming.hasPending)
+  }
+
+  @Test
   fun offerLink_unknownLink_offersNothing() {
     val incoming = IncomingDownloads()
 

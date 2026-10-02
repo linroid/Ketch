@@ -487,7 +487,7 @@ private fun IntakeStep(platform: WelcomePlatform, onDone: () -> Unit) {
         icon = KetchIcon.Bell,
         hue = FileTypeHue.Amber,
         title = "Hear when downloads finish",
-        detail = "After your first download, Ketch asks before it sends notifications.",
+        detail = "Ketch lets you know when a download finishes or fails; choose what in Settings.",
       )
     }
   }
