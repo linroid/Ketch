@@ -112,35 +112,50 @@ fun FrameWindowScope.KetchMenuBar(
     }
   }
   val instances by state.instances.collectAsState()
-  val active by state.activeInstance.collectAsState()
-  val shown by controller.instanceManager.deviceScope.collectAsState()
-  val ops by state.pendingOps.ops.collectAsState()
-  val mode = speedMode?.mode?.collectAsState()?.value
   val selectedKeys = state.selectedKeys
   val selection by remember(selectedKeys, instances) {
     selectionFlow(selectedKeys, instances)
   }.collectAsState(emptyList())
-  val platform = KeyboardPlatform.current
-  val menus = menuBar(
-    MenuBarContext(
-      counts = status.pulse.counts,
-      failures = status.pulse.failures,
-      filter = state.statusFilter,
-      devices = instances.map { it.displayName },
-      activeDevice = instances.indexOf(active).takeIf { it >= 0 },
-      selection = selection,
-      undoLabel = ops.lastOrNull()?.label,
-      slowLane = mode?.isSlowLane,
-      allDevices = shown == DeviceScope.All,
-      revealLabel = files?.revealLabel,
-      platform = platform,
-    ),
-  )
+  val context = menuBarContext(controller, status, speedMode, files, instances, selection)
+  val menus = menuBar(context)
   MenuBar {
     for (menu in menus) {
-      Menu(menu.title) { MenuEntries(menu.entries, platform, commands::perform) }
+      Menu(menu.title) { MenuEntries(menu.entries, context.platform, commands::perform) }
     }
   }
+}
+
+/**
+ * What the macOS menu bar reflects of [controller] now, with [instances], the devices, and the
+ * [selection].
+ */
+@Composable
+internal fun menuBarContext(
+  controller: AppController,
+  status: DesktopStatus,
+  speedMode: SpeedModeController?,
+  files: FileActions?,
+  instances: List<InstanceEntry>,
+  selection: List<SelectedTask> = emptyList(),
+): MenuBarContext {
+  val state = controller.state
+  val active by state.activeInstance.collectAsState()
+  val shown by state.deviceScope.collectAsState()
+  val ops by state.pendingOps.ops.collectAsState()
+  val mode = speedMode?.mode?.collectAsState()?.value
+  return MenuBarContext(
+    counts = status.pulse.counts,
+    failures = status.pulse.failures,
+    filter = state.statusFilter,
+    devices = instances.map { it.displayName },
+    activeDevice = instances.indexOf(active).takeIf { it >= 0 },
+    selection = selection,
+    undoLabel = ops.lastOrNull()?.label,
+    slowLane = mode?.isSlowLane,
+    allDevices = shown == DeviceScope.All,
+    revealLabel = files?.revealLabel,
+    platform = KeyboardPlatform.Mac,
+  )
 }
 
 /** One entry of a menu in the menu bar or the tray. */
