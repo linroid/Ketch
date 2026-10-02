@@ -404,9 +404,15 @@ private fun WideShell(
       }
     },
     cover = {
-      // Device cards take drops on the Devices page themselves.
+      // Device cards take drops on the Devices page themselves. On Downloads the page header
+      // stays uncovered, so its Add button can take the drop too.
       if (shell.destination != AppDestination.Devices || shell.settingsOpen) {
-        DropBerths(appState, windowDrop)
+        val header = shell.destination == AppDestination.Downloads && !shell.settingsOpen
+        DropBerths(
+          state = appState,
+          hover = windowDrop,
+          modifier = if (header) Modifier.padding(top = spacing.pageHeaderHeight) else Modifier,
+        )
       }
     },
   ) {
