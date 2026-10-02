@@ -2,6 +2,7 @@
 
 package com.linroid.ketch.core
 
+import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
@@ -11,8 +12,14 @@ import java.io.File
 
 internal actual fun currentSystemInfo(directory: String?): SystemInfo {
   val runtime = Runtime.getRuntime()
-  val default = defaultDownloadDirectory()
-  val folder = directory ?: default
+  val folder = directory ?: defaultDownloadDirectory()
+  // The default needs the app's context, which a chosen folder does not; without one, as in host
+  // tests, it is unknown.
+  val default = if (directory == null) {
+    folder
+  } else {
+    AndroidContext.getOrNull()?.let(::downloadsFolder)
+  }
   // A folder picked through the system is a content:// tree, which File would turn into a
   // relative path; its space is that of the storage volume it lies on.
   val tree = isContentUri(folder)
@@ -34,8 +41,9 @@ internal actual fun currentSystemInfo(directory: String?): SystemInfo {
   )
 }
 
-internal actual fun defaultDownloadDirectory(): String {
-  val context = AndroidContext.get()
+internal actual fun defaultDownloadDirectory(): String = downloadsFolder(AndroidContext.get())
+
+private fun downloadsFolder(context: Context): String {
   val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
     ?: File(context.filesDir, "downloads")
   return dir.absolutePath

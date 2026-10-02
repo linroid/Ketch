@@ -16,6 +16,9 @@ internal object AndroidContext {
     ctx = context.applicationContext
   }
 
+  /** The context, or `null` before it is set, such as in host tests. */
+  fun getOrNull(): Context? = ctx
+
   fun get(): Context = ctx
     ?: error(
       "Ketch Android context not initialized. " +

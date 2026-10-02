@@ -16,7 +16,9 @@ internal actual fun currentSystemInfo(directory: String?): SystemInfo {
   val default = defaultDownloadDirectory()
   val folder = directory ?: default
   val fm = NSFileManager.defaultManager
+  // The default folder is created with the first download; until then, ask its parent.
   val attrs = fm.attributesOfFileSystemForPath(folder, null)
+    ?: fm.attributesOfFileSystemForPath(folder.substringBeforeLast('/'), null)
   val totalSpace = (attrs?.get(NSFileSystemSize) as? Number)
     ?.toLong() ?: 0L
   val freeSpace = (attrs?.get(NSFileSystemFreeSize) as? Number)
