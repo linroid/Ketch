@@ -36,11 +36,23 @@ class MacWindowChromeTest {
   fun windowChrome_fullWindowContent_leavesRoomForTheTrafficLights() {
     assertEquals(
       WindowChrome(top = 28.dp, leading = 78.dp),
-      windowChrome(fullWindowContent = true, WindowPlacement.Floating),
+      windowChrome(fullWindowContent = true, WindowPlacement.Floating, macVersion = "15.5"),
     )
     assertEquals(
       WindowChrome(top = 28.dp, leading = 78.dp),
-      windowChrome(fullWindowContent = true, WindowPlacement.Maximized),
+      windowChrome(fullWindowContent = true, WindowPlacement.Maximized, macVersion = "15.5"),
+    )
+  }
+
+  @Test
+  fun windowChrome_macOs26OrLater_usesTheTallerTitleBar() {
+    assertEquals(
+      WindowChrome(top = 32.dp, leading = 78.dp),
+      windowChrome(fullWindowContent = true, WindowPlacement.Floating, macVersion = "26.0"),
+    )
+    assertEquals(
+      WindowChrome(top = 32.dp, leading = 78.dp),
+      windowChrome(fullWindowContent = true, WindowPlacement.Floating, macVersion = "27.0"),
     )
   }
 

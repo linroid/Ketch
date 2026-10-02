@@ -48,13 +48,26 @@ internal fun usesFullWindowContent(
 /**
  * Room the title bar takes inside a window whose content fills it: the row of the traffic lights
  * and the width they cover. Full screen hides the title bar, so it takes none there.
+ *
+ * @param macVersion the macOS version, such as "26.1", which decides how tall the row is.
  */
-internal fun windowChrome(fullWindowContent: Boolean, placement: WindowPlacement): WindowChrome =
+internal fun windowChrome(
+  fullWindowContent: Boolean,
+  placement: WindowPlacement,
+  macVersion: String = System.getProperty("os.version").orEmpty(),
+): WindowChrome =
   if (fullWindowContent && placement != WindowPlacement.Fullscreen) {
-    MacTitleBarChrome
+    WindowChrome(top = titleBarHeight(macVersion), leading = TrafficLightsWidth)
   } else {
     WindowChrome.None
   }
+
+// macOS 26 made the title bar taller, so its traffic lights sit lower; the buttons beside them
+// are centred on the same line.
+private fun titleBarHeight(macVersion: String): Dp {
+  val major = macVersion.substringBefore('.').toIntOrNull() ?: 0
+  return if (major >= 26) 32.dp else 28.dp
+}
 
 /** The `apple.awt.windowAppearance` that draws the title bar in the dark or the light theme. */
 internal fun windowAppearance(darkTheme: Boolean): String =
@@ -177,8 +190,8 @@ private suspend fun titleBarDoubleClicked(state: WindowState) {
   }
 }
 
-// The traffic lights' row, and the width they and their margin cover.
-private val MacTitleBarChrome = WindowChrome(top = 28.dp, leading = 78.dp)
+// The width the traffic lights and their margin cover.
+private val TrafficLightsWidth = 78.dp
 
 // The sidebar's title zone and, beside it, the page header below the content card's inset.
 private val TitleBarHeight: Dp = ketchSpacing().let { it.cardInset + it.pageHeaderHeight }
