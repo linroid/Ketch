@@ -146,7 +146,7 @@ internal fun emptyCopy(
  */
 internal fun fleetEmptyCopy(targetName: String): EmptyCopy = EmptyCopy(
   title = "No downloads on any device",
-  hint = "Downloads from every device you control show here together.",
+  hint = "Downloads from all your devices appear here.",
   icon = KetchIcon.Fleet,
   action = EmptyAction.Add,
   actionLabel = "Add a link to $targetName",

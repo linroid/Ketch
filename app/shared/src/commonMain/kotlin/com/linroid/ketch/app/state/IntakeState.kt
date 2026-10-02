@@ -1119,7 +1119,8 @@ class IntakeSession internal constructor(
     val added = results.mapNotNull { it.third.getOrNull() }
     val failed = results.filter { it.third.isFailure }
     val deviceName = targetName()
-    val onActive = target == state.activeInstance.value
+    // Under All devices the target may show already; switching to it would hide the others.
+    val shown = target in state.shownInstances.value
     val review = (failed.map { it.first } + skipped).distinct()
     val failedUrls = failed.mapTo(HashSet()) { it.second.url }
     val reviewAction = if (review.isEmpty()) {
@@ -1140,7 +1141,7 @@ class IntakeSession internal constructor(
       )
       return
     }
-    if (onActive) showNewRows()
+    if (shown) showNewRows()
     val op = state.pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
       added.forEach { task ->
         catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
@@ -1152,13 +1153,13 @@ class IntakeSession internal constructor(
     val single = added.singleOrNull()?.takeIf { review.isEmpty() }
     val key = single?.let { TaskKey(target.deviceId, it.taskId) }
     val show = MessageAction("Show") {
-      if (!onActive) state.switchInstance(target)
+      if (target !in state.shownInstances.value) state.switchInstance(target)
       state.showDownloads(StatusFilter.All)
       key?.let(state::inspect)
     }
     val what = if (single != null) displayName(single.request) else downloads(added.size)
     val title = buildString {
-      append(if (onActive) "Added $what → $deviceName" else "Added $what to $deviceName")
+      append(if (shown) "Added $what → $deviceName" else "Added $what to $deviceName")
       if (failed.isNotEmpty()) append(" · ${failed.size} failed")
       val left = skipped.sumOf { it.linkCount }
       if (left > 0) append(" · $left left out")
@@ -1352,10 +1353,11 @@ class IntakeSession internal constructor(
     next.take(EAGER_RESOLVES).forEach(::request)
   }
 
-  // Until a target is chosen, the rows go where the last add of their kind went.
+  // Until a target is chosen, the rows go where the last add of their kind went, else to the
+  // active device.
   private fun followKind() {
     if (targetChosen || mode != IntakeMode.Add || entries.isEmpty()) return
-    val wanted = state.lastTarget(kind) ?: return
+    val wanted = state.lastTarget(kind) ?: state.activeInstance.value ?: return
     retarget(wanted)
   }
 

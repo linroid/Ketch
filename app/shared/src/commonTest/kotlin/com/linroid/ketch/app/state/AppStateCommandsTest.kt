@@ -20,9 +20,10 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -48,7 +49,9 @@ class AppStateCommandsTest {
       factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
       configStore = configStore,
     ),
-    context = StandardTestDispatcher(testScheduler),
+    // A child of the background scope, so a failed assertion never leaves its loops running.
+    context = backgroundScope.coroutineContext +
+      SupervisorJob(backgroundScope.coroutineContext[Job]),
   )
 
   private fun AppController.errors(): List<AppMessage> =
@@ -380,7 +383,8 @@ class AppStateCommandsTest {
 
     advanceTimeBy(7.seconds)
     runCurrent()
-    assertEquals(listOf("remove deleteFiles=false"), task.calls)
+    // The paused source's partial file goes with it; the copy starts over on the NAS.
+    assertEquals(listOf("remove deleteFiles=true"), task.calls)
     controller.close()
   }
 

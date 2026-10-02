@@ -78,10 +78,21 @@ class AllDevicesSnapshots {
   }
 
   @Test
-  fun allDevices_hoveredRow_fadesItsLastCellUnderTheActions() {
+  fun allDevices_hoveredRows_keepTheirDeviceInView() {
     allDevicesSnapshots("all-devices-table-hover", listOf(SnapshotSize.Desktop)) {
       state.updateInspectorOpen(false)
-      scene.hover(x = 960.dp, y = 206.dp)
+      scene.hover(x = 960.dp, y = 278.dp)
+    }
+    allDevicesSnapshots("all-devices-table-hover-failed", listOf(SnapshotSize.Desktop)) {
+      state.updateInspectorOpen(false)
+      scene.hover(x = 960.dp, y = 602.dp)
+    }
+  }
+
+  @Test
+  fun allDevices_noDownloads_offersToAddOne() {
+    allDevicesSnapshots("all-devices-empty", listOf(SnapshotSize.Desktop), empty = true) {
+      state.updateInspectorOpen(false)
     }
   }
 
@@ -158,7 +169,10 @@ class AllDevicesSnapshots {
     val size = SnapshotSize(300.dp, 200.dp, KetchDensity.Compact)
     val modes = listOf(
       "all-devices-send-menu" to SendMode(hint = "Hold ⌥ to move instead"),
-      "all-devices-send-menu-move" to SendMode(move = true, hint = "Removes them here once sent"),
+      "all-devices-send-menu-move" to SendMode(
+        move = true,
+        hint = "Removed from the old device once sent",
+      ),
     )
     for (theme in SnapshotTheme.entries) {
       val environment = runBlocking(SnapshotHarness.ui) {
@@ -193,19 +207,24 @@ class AllDevicesSnapshots {
   }
 }
 
-/** Renders the app over [AllDevicesEnvironment] showing every device, at [sizes] in both themes. */
+/**
+ * Renders the app over [AllDevicesEnvironment] showing every device, at [sizes] in both themes;
+ * with [empty], neither device has downloads.
+ */
 private fun allDevicesSnapshots(
   name: String,
   sizes: List<SnapshotSize>,
+  empty: Boolean = false,
   setup: suspend AppScenario.() -> Unit,
 ): List<File> = sizes.flatMap { size ->
-  SnapshotTheme.entries.map { theme -> allDevicesSnapshot(name, size, theme, setup) }
+  SnapshotTheme.entries.map { theme -> allDevicesSnapshot(name, size, theme, empty, setup) }
 }
 
 private fun allDevicesSnapshot(
   name: String,
   size: SnapshotSize,
   theme: SnapshotTheme,
+  empty: Boolean,
   setup: suspend AppScenario.() -> Unit,
 ): File {
   val density = if (size.density == KetchDensity.Compact) {
@@ -213,7 +232,9 @@ private fun allDevicesSnapshot(
   } else {
     DensityMode.Comfortable
   }
-  val environment = runBlocking(SnapshotHarness.ui) { AllDevicesEnvironment(theme, density) }
+  val environment = runBlocking(SnapshotHarness.ui) {
+    AllDevicesEnvironment(theme, density, empty)
+  }
   try {
     runBlocking(SnapshotHarness.ui) {
       withTimeoutOrNull(START_TIMEOUT) { environment.start() }
@@ -237,12 +258,16 @@ private fun allDevicesSnapshot(
 }
 
 /** This Mac with the sample downloads, and a connected NAS-Basement with its own. */
-private class AllDevicesEnvironment(theme: SnapshotTheme, density: DensityMode) {
+private class AllDevicesEnvironment(
+  theme: SnapshotTheme,
+  density: DensityMode,
+  empty: Boolean = false,
+) {
   val data = SampleData(
-    tasks = SampleData.downloads().tasks,
+    tasks = if (empty) emptyList() else SampleData.downloads().tasks,
     remotes = listOf(RemoteConfig(host = "nas.local", port = 8642, name = "NAS-Basement")),
   )
-  private val nas = AllDevicesNas()
+  private val nas = AllDevicesNas(if (empty) emptyList() else allDevicesNasTasks())
 
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
@@ -313,9 +338,9 @@ private const val SLOW_MAGNET = "magnet:?xt=urn:btih:8a19577fb5f690970ca43a57ff1
   "&dn=Big.Buck.Bunny.4K"
 
 /** NAS-Basement: a few downloads of its own and a bigger disk. */
-private class AllDevicesNas : KetchApi {
+private class AllDevicesNas(initial: List<DownloadTask>) : KetchApi {
   override val backendLabel: String = "NAS-Basement"
-  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(allDevicesNasTasks())
+  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(initial)
 
   override suspend fun download(request: DownloadRequest): DownloadTask =
     ListTestTask("sent-${request.url.hashCode()}", DownloadState.Queued, request)

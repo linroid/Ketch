@@ -56,6 +56,7 @@ import com.linroid.ketch.app.ui.downloads.StackedPennants
 import com.linroid.ketch.app.ui.inspector.tabs.formatSize
 import com.linroid.ketch.app.ui.inspector.tabs.formatSpeed
 import com.linroid.ketch.app.ui.inspector.tabs.plural
+import com.linroid.ketch.app.ui.pulse.totalHistory
 
 /**
  * What the inspector shows with no download selected: the active device's speed over the last
@@ -271,17 +272,17 @@ private fun FleetOverview(state: AppState, onClose: () -> Unit) {
         style = type.numeralL,
         color = colors.textPrimary,
       )
+      val clock = LocalClock.current
+      // Every download of the last minute counts, finished ones too, each at the time it ran.
       val bands = remember(histories, rows, colors) {
-        rows.filter { it.state is DownloadState.Downloading }
-          .groupBy { it.key.deviceId }
-          .mapNotNull { (deviceId, running) ->
-            val samples = running.mapNotNull { row ->
-              histories[row.key]?.toList()?.takeLast(CHART_SECONDS)
-            }
-            if (samples.isEmpty()) return@mapNotNull null
-            val hue = colors.deviceHue(deviceId)
-            SpeedBand(sumAtEnd(samples), if (colors.isDark) hue.dark else hue.light)
-          }
+        val now = clock.now()
+        rows.groupBy { it.key.deviceId }.mapNotNull { (deviceId, own) ->
+          val total = totalHistory(own.mapNotNull { histories[it.key] }, now)
+          val samples = total.samples.takeLast(CHART_SECONDS)
+          if (samples.none { it > 0 }) return@mapNotNull null
+          val hue = colors.deviceHue(deviceId)
+          SpeedBand(samples, if (colors.isDark) hue.dark else hue.light)
+        }
       }
       KetchSpeedChart(
         bands = bands,
@@ -384,14 +385,6 @@ private fun DeviceLine(device: DevicePulse, pennantName: String, onClick: () -> 
     if (device.health.isOnline && device.speed > 0) {
       Text(text = formatSpeed(device.speed), style = type.numeral, color = colors.textPrimary)
     }
-  }
-}
-
-/** [series] added up sample by sample, lined up at their newest one. */
-internal fun sumAtEnd(series: List<List<Long>>): List<Long> {
-  val size = series.maxOfOrNull { it.size } ?: return emptyList()
-  return List(size) { index ->
-    series.sumOf { samples -> samples.getOrElse(index - size + samples.size) { 0 } }
   }
 }
 

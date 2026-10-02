@@ -31,6 +31,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.dialog.RemoveTasksDialog
+import com.linroid.ketch.app.util.displayName
 
 /**
  * Shows the dialog [runner] asks for, if any: Remove with its files, Stop and discard progress,
@@ -187,12 +188,16 @@ internal fun CustomSpeedDialog(
 @Composable
 internal fun SendConfirmationDialog(state: AppState) {
   val pending = state.sendConfirmation ?: return
-  val count = pending.tasks.size
   val verb = if (pending.move) "Move" else "Send"
-  val what = if (count == 1) "this download" else downloads(count)
+  val task = pending.tasks.singleOrNull()
+  val what = task?.let { displayName(it.requestState.value, it.state.value) }
+    ?: downloads(pending.tasks.size)
+  // A device name such as NAS-Basement reads as one word, never broken at its hyphen.
+  val device = pending.target.label
+  val whole = device.replace("-", "-$WORD_JOINER")
   AdaptiveModal(
     onDismissRequest = state::dismissSendConfirmation,
-    title = { Text("$verb $what to ${pending.target.label}?") },
+    title = { Text("$verb $what to $whole?") },
     dismissButton = {
       KetchButton(
         text = "Cancel",
@@ -203,7 +208,7 @@ internal fun SendConfirmationDialog(state: AppState) {
     confirmButton = { KetchButton(text = verb, onClick = state::confirmSend) },
   ) {
     Text(
-      text = pending.warning,
+      text = pending.warning.replace(device, whole),
       style = KetchTheme.typography.body,
       color = KetchTheme.colors.textSecondary,
     )
@@ -214,3 +219,5 @@ internal fun SendConfirmationDialog(state: AppState) {
     )
   }
 }
+
+private const val WORD_JOINER = "\u2060"

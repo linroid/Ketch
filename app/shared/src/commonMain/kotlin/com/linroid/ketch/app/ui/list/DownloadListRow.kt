@@ -305,8 +305,7 @@ private fun TrailingAction(row: TaskRow, actions: ListActions) {
 /**
  * A pointer row's hover actions at its end, over a fade into the row's hover fill so the metric
  * below never shows through. With [aboveLanes] they stop above the row's lane strip, which stays
- * in view. A [wideFade] lets a table cell's text under them fade out over a longer run instead
- * of ending in a cut.
+ * in view. [placement] moves and widens them, such as over a table row's Left and Added cells.
  */
 @Composable
 internal fun BoxScope.HoverOverlay(
@@ -314,12 +313,11 @@ internal fun BoxScope.HoverOverlay(
   actions: ListActions,
   frame: RowFrameState,
   aboveLanes: Boolean = false,
-  wideFade: Boolean = false,
+  placement: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val fill = rowFill(colors, frame, actions.keyboard.hasFocus)
-  val fade = if (wideFade) spacing.s16 else spacing.s6
   // The strip, the write heads reaching above it and the row's bottom padding.
   val lanes = LaneStripDefaults.RowHeight + spacing.s0_5 + spacing.s2
   Box(
@@ -328,7 +326,14 @@ internal fun BoxScope.HoverOverlay(
       .matchParentSize()
       .then(if (aboveLanes) Modifier.padding(bottom = lanes) else Modifier),
   ) {
-    HoverButtons(row, actions, frame, fill, fade)
+    HoverButtons(
+      row = row,
+      actions = actions,
+      frame = frame,
+      fill = fill,
+      fade = spacing.s6,
+      modifier = placement,
+    )
   }
 }
 
@@ -339,10 +344,12 @@ private fun HoverButtons(
   frame: RowFrameState,
   fill: Color,
   fade: Dp,
+  modifier: Modifier = Modifier,
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    modifier = Modifier
+    horizontalArrangement = Arrangement.End,
+    modifier = modifier
       .fillMaxHeight()
       .then(
         if (frame.hovered) {

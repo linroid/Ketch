@@ -9,8 +9,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -207,11 +209,13 @@ internal data class SendMode(val move: Boolean = false, val hint: String? = null
 @Composable
 internal fun rememberSendMode(): SendMode {
   if (KetchTheme.density == KetchDensity.Comfortable) return SendMode()
-  val move = LocalWindowInfo.current.keyboardModifiers.isAltPressed
+  val window = LocalWindowInfo.current
+  // Only ⌥ matters, so pressing ⇧ or ⌘ to select rows recomposes nothing.
+  val move by remember(window) { derivedStateOf { window.keyboardModifiers.isAltPressed } }
   val key = if (KeyboardPlatform.current.isApple) "⌥" else "Alt"
   return SendMode(
     move = move,
-    hint = if (move) "Removes them here once sent" else "Hold $key to move instead",
+    hint = if (move) "Removed from the old device once sent" else "Hold $key to move instead",
   )
 }
 
