@@ -480,7 +480,7 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun menuBar_editAndView_offerThePaletteAndTheDestinations() {
+  fun menuBar_editViewAndHelp_offerThePaletteDestinationsAndShortcuts() {
     val menus = menuBar(context())
 
     assertEquals(
@@ -490,6 +490,7 @@ class DesktopTrayModelTest {
     for (command in listOf(KetchCommands.Discover, KetchCommands.Devices, KetchCommands.Activity)) {
       assertTrue(menus.menu("View").any { it.runs(command) }, command.id)
     }
+    assertTrue(menus.menu("Help").any { it.runs(KetchCommands.Shortcuts) })
   }
 
   @Test
