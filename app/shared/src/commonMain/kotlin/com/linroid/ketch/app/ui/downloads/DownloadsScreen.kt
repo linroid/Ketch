@@ -473,7 +473,11 @@ private fun PageBody(
       },
     )
     PageContent.Launchpad -> Launchpad(state, phone)
-    PageContent.FleetEmpty -> EmptyMessage(fleetEmptyCopy(deviceName), onAction)
+    PageContent.FleetEmpty -> {
+      // The add sheet opens on the device links last went to, as quick add does.
+      val target = state.quickAddTarget()?.displayName ?: deviceName
+      EmptyMessage(fleetEmptyCopy(target), onAction)
+    }
     PageContent.RemoteEmpty -> EmptyMessage(remoteEmptyCopy(deviceName), onAction)
     PageContent.Offline -> {
       val connection by state.connectionState.collectAsState()

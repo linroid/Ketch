@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -521,8 +522,21 @@ private fun TableRow(
         index++
       }
     }
-    HoverOverlay(row, actions, frame, wideFade = true)
+    val placement = remember(columns) { hoverPlacement(columns) }
+    HoverOverlay(row, actions, frame, placement = placement)
   }
+}
+
+/**
+ * Where a row's hover actions go: over its Left and Added cells, so the name, speed, status and
+ * device stay readable; at the row's end when neither shows.
+ */
+private fun hoverPlacement(columns: List<ColumnSetting>): Modifier {
+  val spanned = columns.indices.filter { columns[it].column in HoverColumns }
+  if (spanned.isEmpty()) return Modifier
+  val after = columns.drop(spanned.last() + 1).fold(TablePadding) { sum, it -> sum + it.width }
+  val span = columns.slice(spanned.first()..spanned.last()).map { it.width }.reduce(Dp::plus)
+  return Modifier.padding(end = after).widthIn(min = span)
 }
 
 /**
@@ -829,6 +843,9 @@ private fun Modifier.altClick(onAltClick: () -> Unit): Modifier {
 
 /** Space between the table's edge and its first and last cells. */
 internal val TablePadding: Dp = 8.dp
+
+/** The cells a row's hover actions stand in for while the pointer is over it. */
+private val HoverColumns = setOf(TableColumn.Left, TableColumn.Added)
 
 /** Horizontal padding inside each cell, so neighbouring cells are 8 dp apart. */
 private val CellPadding: Dp = 4.dp

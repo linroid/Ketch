@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.state
 
+import androidx.compose.ui.text.input.TextFieldValue
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
@@ -36,6 +37,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 private const val NAS_ID = "nas.local:8642"
+private val UNDO_WINDOW_PASSED = 10.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AllDevicesTest {
@@ -280,6 +282,55 @@ class AllDevicesTest {
   }
 
   @Test
+  fun sendTo_move_removesTheOriginalsOnceTheUndoWindowEnds() = runTest {
+    val fleet = fleet()
+    val partial = fleet.mac.recording.add(DownloadState.Paused(RecordingTask.PROGRESS))
+    val finished = fleet.mac.recording.add(DownloadState.Completed("/downloads/a.iso"))
+
+    fleet.state.sendTo(listOf(partial, finished), fleet.remote, move = true)
+    runCurrent()
+    assertEquals("Moved 2 downloads to NAS", fleet.messages().first().title)
+    assertTrue(fleet.state.tasks.value.isEmpty())
+    advanceTimeBy(UNDO_WINDOW_PASSED)
+
+    assertEquals(listOf("remove deleteFiles=true"), partial.calls)
+    assertEquals(listOf("remove deleteFiles=false"), finished.calls)
+    assertEquals(2, fleet.nas.recording.requests.size)
+    fleet.controller.close()
+  }
+
+  @Test
+  fun sendTo_tasksAlreadyOnTheTarget_sendsNothing() = runTest {
+    val fleet = fleet()
+    val there = fleet.nas.recording.add(DownloadState.Paused(RecordingTask.PROGRESS))
+
+    fleet.state.sendTo(listOf(there), fleet.remote)
+    runCurrent()
+
+    assertTrue(fleet.nas.recording.requests.isEmpty())
+    assertTrue(fleet.messages().isEmpty())
+    fleet.controller.close()
+  }
+
+  @Test
+  fun sendTo_showUnderAllDevices_inspectsTheCopyWithoutLeavingAllDevices() = runTest {
+    val fleet = fleet()
+    val task = fleet.mac.recording.add(DownloadState.Paused(RecordingTask.PROGRESS))
+    fleet.state.showAllDevices()
+    runCurrent()
+
+    fleet.state.sendTo(listOf(task), fleet.remote)
+    runCurrent()
+    fleet.messages().first().actions.single { it.label == "Show" }.onClick()
+    runCurrent()
+
+    assertEquals(DeviceScope.All, fleet.state.deviceScope.value)
+    val copy = fleet.nas.recording.tasks.value.single()
+    assertEquals(TaskKey(NAS_ID, copy.taskId), fleet.state.inspectedTask)
+    fleet.controller.close()
+  }
+
+  @Test
   fun credentialWarning_signInOnly_namesTheSignIn() {
     assertEquals(
       "Sign-in details will be sent to NAS.",
@@ -323,6 +374,22 @@ class AllDevicesTest {
     assertEquals(fleet.local, links.target)
     fleet.state.intake.release(magnets)
     fleet.state.intake.release(links)
+    fleet.controller.close()
+  }
+
+  @Test
+  fun intake_linkAfterAMagnetSentToTheNas_goesBackToTheActiveDevice() = runTest {
+    val fleet = fleet()
+    fleet.state.rememberTarget(IntakeKind.Torrents, fleet.remote)
+    val session = fleet.state.intake.start(IntakeRequest(text = magnet))
+    runCurrent()
+    assertEquals(fleet.remote, session.target)
+
+    session.onTextChange(TextFieldValue("https://example.com/a.iso"))
+    advanceTimeBy(1.seconds)
+
+    assertEquals(fleet.local, session.target)
+    fleet.state.intake.release(session)
     fleet.controller.close()
   }
 

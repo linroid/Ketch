@@ -421,10 +421,17 @@ class AppState(
       activeInstance.drop(1).collect { lastTargets.clear() }
     }
     scope.launch {
-      // Every shown device's limits explain why its queued tasks wait.
-      deviceScope.collect { shown ->
-        if (shown != DeviceScope.All) return@collect
-        instances.value.filter { it != activeInstance.value }
+      // Every shown device's limits explain why its queued tasks wait, including devices added
+      // while every device shows.
+      val loaded = mutableSetOf<InstanceEntry>()
+      combine(deviceScope, instances) { shown, entries ->
+        entries.takeIf { shown == DeviceScope.All }
+      }.collect { entries ->
+        if (entries == null) {
+          loaded.clear()
+          return@collect
+        }
+        entries.filter { it != activeInstance.value && loaded.add(it) }
           .forEach { settingsFor(it).loadDownload() }
       }
     }
@@ -942,7 +949,7 @@ class AppState(
       visibleTasks(entry).filter { it.state.value is DownloadState.Completed }
     }
     if (tasks.isEmpty()) return
-    deferRemoval(tasks, deleteFiles = false, label = "Clear Finished") { count ->
+    deferRemoval(tasks, deleteFiles = { false }, label = "Clear Finished") { count ->
       "Cleared $count finished ${if (count == 1) "download" else "downloads"}"
     }
   }
@@ -952,6 +959,10 @@ class AppState(
    * once and are removed when the Undo window ends or the app closes.
    */
   fun remove(tasks: List<DownloadTask>, deleteFiles: Boolean = false) {
+    removeTasks(tasks) { deleteFiles }
+  }
+
+  private fun removeTasks(tasks: List<DownloadTask>, deleteFiles: (DownloadTask) -> Boolean) {
     if (tasks.isEmpty()) return
     deferRemoval(tasks, deleteFiles, label = "Remove") { count ->
       if (count == 1) "Removed ${tasks.single().displayName()}"
@@ -1135,8 +1146,9 @@ class AppState(
 
   /**
    * Adds [tasks] to [target] with the same headers, speed limit, priority and connections; they
-   * start over there. With [move], each task whose copy was added is removed here when the Undo
-   * window ends; Undo instead removes the copies.
+   * start over there. Tasks already on [target] are left alone. With [move], each task whose copy
+   * was added is removed here when the Undo window ends, with its partial file; Undo instead
+   * removes the copies.
    *
    * Tasks that carry cookies or a sign-in for a remote [target], which would keep them, first
    * wait in [sendConfirmation] until [confirmSend]; [confirmed] skips that.
@@ -1147,17 +1159,18 @@ class AppState(
     move: Boolean = false,
     confirmed: Boolean = false,
   ) {
-    if (tasks.isEmpty()) return
+    val outgoing = tasks.filter { deviceOf(it)?.instance !== target.instance }
+    if (outgoing.isEmpty()) return
     val warning = if (target is RemoteInstance) {
-      credentialWarning(tasks.map { it.requestState.value.headers }, nameOf(target))
+      credentialWarning(outgoing.map { it.requestState.value.headers }, nameOf(target))
     } else {
       null
     }
     if (warning != null && !confirmed) {
-      sendConfirmation = SendConfirmation(tasks, target, move, warning)
+      sendConfirmation = SendConfirmation(outgoing, target, move, warning)
       return
     }
-    send(tasks, target, move)
+    send(outgoing, target, move)
   }
 
   /** Sends what [sendConfirmation] waits for. */
@@ -1209,13 +1222,13 @@ class AppState(
       val what = if (sent.size == 1) sent.single().first.displayName()
       else downloads(sent.size)
       val failedNote = if (failures.isEmpty()) "" else " · ${failures.size} failed"
+      val sources = sent.map { it.first }
       if (move) {
-        val sources = sent.map { it.first }
         val op = pendingOps.register(
           label = "Move",
           hides = hide(sources),
           commit = {
-            reportFailures("remove", runEach(sources) { it.remove(deleteFiles = false) })
+            reportFailures("remove", runEach(sources) { it.remove(it.hasPartialFile) })
           },
           undo = {
             val copies = sent.map { it.second }
@@ -1234,12 +1247,22 @@ class AppState(
           title = "Sent $what to $targetName$failedNote",
           deviceId = target.deviceId,
           actions = listOf(
-            MessageAction("Show") { switchInstance(target) },
-            MessageAction("Remove here") { remove(sent.map { it.first }) },
+            MessageAction("Show") { showOn(target, sent.singleOrNull()?.second) },
+            MessageAction("Remove here") { removeTasks(sources) { it.hasPartialFile } },
           ),
         )
       }
     }
+
+  /**
+   * Shows the Downloads list with [task] of [target] inspected, switching to [target] only when
+   * it is not shown already, such as under All devices.
+   */
+  private fun showOn(target: InstanceEntry, task: DownloadTask?) {
+    if (target !in shownInstances.value) switchInstance(target)
+    showDownloads()
+    task?.let { inspect(TaskKey(target.deviceId, it.taskId)) }
+  }
 
   /** Starts the AI discovery search for [query], limited to the comma-separated [sites]. */
   fun aiDiscover(query: String, sites: String) {
@@ -1435,7 +1458,7 @@ class AppState(
 
   private fun deferRemoval(
     tasks: List<DownloadTask>,
-    deleteFiles: Boolean,
+    deleteFiles: (DownloadTask) -> Boolean,
     label: String,
     title: (Int) -> String,
   ) {
@@ -1443,7 +1466,7 @@ class AppState(
     val op = pendingOps.register(
       label = label,
       hides = keys,
-      commit = { reportFailures("remove", runEach(tasks) { it.remove(deleteFiles) }) },
+      commit = { reportFailures("remove", runEach(tasks) { it.remove(deleteFiles(it)) }) },
     )
     messages.post(MessageLevel.Success, title(tasks.size), actions = listOf(undoAction(op)))
   }
@@ -1834,6 +1857,13 @@ private fun scheduledNote(schedules: List<DownloadSchedule>): String? {
 
 /** Name of this task for messages, from its current request and state. */
 private fun DownloadTask.displayName(): String = displayName(requestState.value, state.value)
+
+/**
+ * Whether this task's file is unfinished, so removing the task once it was sent elsewhere takes
+ * the file too; a finished file is kept.
+ */
+private val DownloadTask.hasPartialFile: Boolean
+  get() = state.value !is DownloadState.Completed
 
 /**
  * This request as another device should run it: a folder or file path of this device is

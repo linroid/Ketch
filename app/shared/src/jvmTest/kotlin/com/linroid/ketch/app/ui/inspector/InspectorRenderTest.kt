@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.inspector
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ImageComposeScene
@@ -31,6 +32,7 @@ import com.linroid.ketch.app.snapshot.SampleEnvironment
 import com.linroid.ketch.app.snapshot.SnapshotHarness
 import com.linroid.ketch.app.snapshot.SnapshotTheme
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
@@ -236,8 +238,11 @@ class InspectorRenderTest {
         density = Density(1f),
         coroutineContext = SnapshotHarness.ui,
       ) {
-        KetchTheme(darkTheme = false, density = DensityMode.Compact, reduceMotion = true) {
-          content()
+        // The samples' clock, as the app root provides it, so times read the same on any day.
+        CompositionLocalProvider(LocalClock provides SampleData.CLOCK) {
+          KetchTheme(darkTheme = false, density = DensityMode.Compact, reduceMotion = true) {
+            content()
+          }
         }
       }
       try {
