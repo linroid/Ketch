@@ -2,6 +2,7 @@ package com.linroid.ketch.ai.agent
 
 import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.fetch.fakeDns
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,7 +24,7 @@ class AgentOutputParserTest {
   )
 
   @Test
-  fun parse_cleanJsonArray_returnsCandidates() {
+  fun parse_cleanJsonArray_returnsCandidates() = runTest {
     val output = """[
       {"name":"Test","url":"https://example.com/file.zip",
        "fileType":"zip","sourcePageUrl":"https://example.com",
@@ -36,7 +37,7 @@ class AgentOutputParserTest {
   }
 
   @Test
-  fun parse_markdownWrappedJson_returnsCandidates() {
+  fun parse_markdownWrappedJson_returnsCandidates() = runTest {
     val output = """
       Here are the results:
       ```json
@@ -51,19 +52,19 @@ class AgentOutputParserTest {
   }
 
   @Test
-  fun parse_noJson_returnsEmpty() {
+  fun parse_noJson_returnsEmpty() = runTest {
     val result = parser.parse("No results found.")
     assertTrue(result.isEmpty())
   }
 
   @Test
-  fun parse_invalidJson_returnsEmpty() {
+  fun parse_invalidJson_returnsEmpty() = runTest {
     val result = parser.parse("[{invalid json}]")
     assertTrue(result.isEmpty())
   }
 
   @Test
-  fun parse_blockedUrlFiltered() {
+  fun parse_blockedUrlFiltered() = runTest {
     val output = """[
       {"name":"Test","url":"file:///etc/passwd",
        "fileType":"txt","sourcePageUrl":"",
@@ -75,7 +76,7 @@ class AgentOutputParserTest {
   }
 
   @Test
-  fun parse_unsafeUrlFiltered() {
+  fun parse_unsafeUrlFiltered() = runTest {
     val output = """[
       {"name":"Crack","url":"https://bit.ly/crack123",
        "fileType":"zip","sourcePageUrl":"",
@@ -87,7 +88,7 @@ class AgentOutputParserTest {
   }
 
   @Test
-  fun parse_duplicateUrlsDeduped() {
+  fun parse_duplicateUrlsDeduped() = runTest {
     val output = """[
       {"name":"A","url":"https://example.com/file.zip",
        "fileType":"zip","sourcePageUrl":"https://example.com",
@@ -103,7 +104,7 @@ class AgentOutputParserTest {
   }
 
   @Test
-  fun parse_confidenceAdjustedBySafety() {
+  fun parse_confidenceAdjustedBySafety() = runTest {
     val output = """[
       {"name":"Test","url":"https://example.com/file.zip",
        "fileType":"zip","sourcePageUrl":"https://example.com",
@@ -118,7 +119,7 @@ class AgentOutputParserTest {
   }
 
   @Test
-  fun parse_allowlist_keepsOnlyCandidatesOnAllowedSites() {
+  fun parse_allowlist_keepsOnlyCandidatesOnAllowedSites() = runTest {
     // The source page is not checked: only where the file is served matters.
     val output = """[
       {"name":"ISO","url":"https://releases.ubuntu.com/24.04/ubuntu.iso",
@@ -133,7 +134,7 @@ class AgentOutputParserTest {
   }
 
   @Test
-  fun parse_emptyArray_returnsEmpty() {
+  fun parse_emptyArray_returnsEmpty() = runTest {
     val result = parser.parse("[]")
     assertTrue(result.isEmpty())
   }

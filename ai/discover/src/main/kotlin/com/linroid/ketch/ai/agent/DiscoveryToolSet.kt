@@ -274,7 +274,7 @@ internal class DiscoveryToolSet(
     "Validate a URL for safety (SSRF, scheme, allowed sites). " +
       "Returns JSON with ok boolean and reason.",
   )
-  fun validateUrl(
+  suspend fun validateUrl(
     @LLMDescription("URL to validate")
     url: String,
   ): String {

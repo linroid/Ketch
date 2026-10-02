@@ -1,5 +1,6 @@
 package com.linroid.ketch.ai.fetch
 
+import kotlinx.coroutines.test.runTest
 import java.net.InetAddress
 import java.net.UnknownHostException
 import kotlin.test.Test
@@ -18,7 +19,7 @@ class ValidatingDnsTest {
   }
 
   @Test
-  fun lookup_hostRebindsToLoopbackAfterValidation_isRefused() {
+  fun lookup_hostRebindsToLoopbackAfterValidation_isRefused() = runTest {
     val validator = UrlValidator(resolve = rebindingDns("93.184.215.14", "127.0.0.1"))
     val dns = ValidatingDns(validator)
 

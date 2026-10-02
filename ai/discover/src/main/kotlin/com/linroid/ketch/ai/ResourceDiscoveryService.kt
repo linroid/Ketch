@@ -20,6 +20,8 @@ import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.config.LlmSettings
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlin.time.TimeSource
 
@@ -63,6 +65,9 @@ class ResourceDiscoveryService internal constructor(
    * [DiscoveryConfig.allowedDomains]; see [DiscoverQuery] for what that
    * covers.
    *
+   * The agent runs on [Dispatchers.Default], so this may be called from
+   * a UI thread; the step listener is called from the agent's threads.
+   *
    * @throws IllegalArgumentException if the query text is blank, if
    *   [DiscoverQuery.sites] names no domain, or if none of its sites lie
    *   within [DiscoveryConfig.allowedDomains]
@@ -87,7 +92,9 @@ class ResourceDiscoveryService internal constructor(
     }
     // Every run builds its own LLM client, and the HTTP engine behind it
     // is only released by closing it.
-    return llm.executor.use { runAgent(query, allowlist, llm) }
+    return withContext(Dispatchers.Default) {
+      llm.executor.use { runAgent(query, allowlist, llm) }
+    }
   }
 
   private suspend fun runAgent(
