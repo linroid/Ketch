@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
@@ -46,12 +48,51 @@ import com.linroid.ketch.app.theme.KetchTheme
 import kotlinx.coroutines.launch
 
 /**
+ * Which drop targets of a window a drag from another app hovers now: the window's own
+ * [FileDropTarget] and the devices inside it, such as the drop berths. The window shows its drop
+ * overlay while any of them does, so it stays up as the drag moves from one to the next.
+ */
+@Stable
+internal class DropHoverState {
+  private var targets by mutableStateOf(emptySet<Any>())
+
+  /** Whether a drag from another app hovers the window. */
+  val active: Boolean get() = targets.isNotEmpty()
+
+  /** Whether the drag hovers [target]. */
+  fun isHovered(target: Any): Boolean = target in targets
+
+  /** Notes that the drag hovers [target]. */
+  fun enter(target: Any) {
+    if (target !in targets) targets = targets + target
+  }
+
+  /** Notes that the drag left [target]. */
+  fun exit(target: Any) {
+    if (target in targets) targets = targets - target
+  }
+
+  /** Forgets every target, as when the drag leaves the window. */
+  fun clear() {
+    targets = emptySet()
+  }
+}
+
+/**
+ * The [DropHoverState] of the window around this composition, which device drop targets report
+ * to; `null` outside the app shell.
+ */
+internal val LocalWindowDrop = staticCompositionLocalOf<DropHoverState?> { null }
+
+/**
  * Accepts files and text dragged in from other applications anywhere over [content], showing a
  * [DropOverlay] while a drag hovers. A [compact] overlay fits small areas such as a dialog body.
  *
  * @param onDrop receives dropped files, such as `.torrent` files and `.txt` lists of links.
  * @param onDropText receives dropped text, such as a link dragged from a browser or selected
  *   text; by default it reaches [onDrop] as a `.txt` list of links.
+ * @param hover where to report the drag instead of drawing the overlay here, for a window that
+ *   shows its own, such as the app shell's drop berths.
  */
 @Composable
 internal fun FileDropTarget(
@@ -59,29 +100,30 @@ internal fun FileDropTarget(
   modifier: Modifier = Modifier,
   compact: Boolean = false,
   onDropText: (String) -> Unit = { onDrop(listOf(droppedLinkList(it))) },
+  hover: DropHoverState? = null,
   content: @Composable BoxScope.() -> Unit,
 ) {
   val reader = rememberFileDropReader()
   val scope = rememberCoroutineScope()
   val currentOnDrop by rememberUpdatedState(onDrop)
   val currentOnDropText by rememberUpdatedState(onDropText)
-  var hovering by remember { mutableStateOf(false) }
-  val target = remember(reader, scope) {
+  val hovering = hover ?: remember { DropHoverState() }
+  val target = remember(reader, scope, hovering) {
     object : DragAndDropTarget {
       override fun onEntered(event: DragAndDropEvent) {
-        hovering = true
+        hovering.enter(this)
       }
 
       override fun onExited(event: DragAndDropEvent) {
-        hovering = false
+        hovering.exit(this)
       }
 
       override fun onEnded(event: DragAndDropEvent) {
-        hovering = false
+        hovering.clear()
       }
 
       override fun onDrop(event: DragAndDropEvent): Boolean {
-        hovering = false
+        hovering.clear()
         val files = reader.files(event)
         if (files.isNotEmpty()) {
           currentOnDrop(files)
@@ -96,7 +138,7 @@ internal fun FileDropTarget(
       }
     }
   }
-  DragExitEffect { hovering = false }
+  DragExitEffect { hovering.clear() }
   val fade = tween<Float>(KetchTheme.motion.short)
   Box(
     modifier = modifier.dragAndDropTarget(
@@ -106,7 +148,7 @@ internal fun FileDropTarget(
   ) {
     content()
     AnimatedVisibility(
-      visible = hovering,
+      visible = hover == null && hovering.active,
       enter = fadeIn(fade),
       exit = fadeOut(fade),
       modifier = Modifier.matchParentSize(),
@@ -131,7 +173,7 @@ internal fun DropOverlay(compact: Boolean, modifier: Modifier = Modifier) {
     contentAlignment = Alignment.Center,
     modifier = modifier
       .fillMaxSize()
-      .background(colors.surfaceRaised.copy(alpha = OVERLAY_ALPHA))
+      .background(colors.surfaceRaised.copy(alpha = DROP_OVERLAY_ALPHA))
       .padding(if (compact) spacing.s1 else spacing.s4),
   ) {
     Column(
@@ -175,7 +217,7 @@ internal fun DropOverlay(compact: Boolean, modifier: Modifier = Modifier) {
 }
 
 /** A dashed [color] line just inside the edge of [shape]. */
-private fun Modifier.dashedOutline(color: Color, shape: Shape): Modifier = drawWithCache {
+internal fun Modifier.dashedOutline(color: Color, shape: Shape): Modifier = drawWithCache {
   val width = OutlineWidth.toPx()
   val dash = OutlineDash.toPx()
   val dashes = PathEffect.dashPathEffect(floatArrayOf(dash, dash))
@@ -187,7 +229,7 @@ private fun Modifier.dashedOutline(color: Color, shape: Shape): Modifier = drawW
   }
 }
 
-/** The overlay lets the app show through faintly around the berth, so the drop keeps context. */
-private const val OVERLAY_ALPHA = 0.96f
+/** The overlay lets the app show through faintly around the berths, so the drop keeps context. */
+internal const val DROP_OVERLAY_ALPHA = 0.96f
 private val OutlineWidth = 1.5.dp
 private val OutlineDash = 6.dp
