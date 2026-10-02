@@ -71,7 +71,6 @@ import com.linroid.ketch.app.ui.downloads.actions.TaskRowFrame
 import com.linroid.ketch.app.ui.downloads.actions.drawDragPreview
 import com.linroid.ketch.app.ui.downloads.actions.listKeyboard
 import com.linroid.ketch.app.ui.downloads.actions.pageSizeOf
-import com.linroid.ketch.app.ui.downloads.actions.rememberDragPreviewStyle
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.downloads.actions.rubberBand
 import com.linroid.ketch.app.ui.list.RowCommands
@@ -236,16 +235,18 @@ class RowActionsSnapshots {
       val size = SnapshotSize(360.dp, 120.dp, KetchDensity.Compact)
       snapshot("row-actions-drag-preview", size, theme) {
         val measurer = rememberTextMeasurer()
-        val style = rememberDragPreviewStyle()
+        val colors = KetchTheme.colors
+        val spacing = KetchTheme.spacing
+        val type = KetchTheme.typography
         Column(
           Modifier.padding(16.dp),
           verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
           Canvas(Modifier.width(320.dp).height(36.dp)) {
-            drawDragPreview(rows.take(1), measurer, style)
+            drawDragPreview(rows.take(1), measurer, colors, spacing, type)
           }
           Canvas(Modifier.width(320.dp).height(36.dp)) {
-            drawDragPreview(rows, measurer, style)
+            drawDragPreview(rows, measurer, colors, spacing, type)
           }
         }
       }
