@@ -232,9 +232,6 @@ class AppState(
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
 
-  /** State of the current AI discovery search. */
-  val aiDiscoverState: AiDiscoverState get() = aiDiscover.state
-
   /** The opened file the add dialog shows, or null when the user types a URL. */
   var openedDownload by mutableStateOf<IncomingDownload.Ready?>(null)
     private set
@@ -739,19 +736,6 @@ class AppState(
     return lastTarget(IntakeKind.Links) ?: active
   }
 
-  fun addRemoteServer(
-    host: String,
-    port: Int,
-    token: String?,
-  ) {
-    try {
-      instanceManager.addRemote(host, port, token)
-    } catch (e: Exception) {
-      log.w { "Couldn't add $host:$port: ${e.describeCauses()}" }
-      postError("Couldn't add $host:$port", detail = e.message, cause = e)
-    }
-  }
-
   fun discoverRemoteServers(port: Int = 8642) {
     if (discoveryState is DiscoveryState.Discovering) return
     discoveryState = DiscoveryState.Discovering()
@@ -771,19 +755,6 @@ class AppState(
     }
   }
 
-  fun stopDiscovery() {
-    discoveryJob?.cancel()
-    discoveryJob = null
-    val current = discoveryState
-    discoveryState = DiscoveryState.Finished(
-      servers = if (current is DiscoveryState.Discovering) {
-        current.servers
-      } else {
-        emptyList()
-      }
-    )
-  }
-
   fun resetDiscovery() {
     discoveryJob?.cancel()
     discoveryJob = null
@@ -799,23 +770,6 @@ class AppState(
       } catch (e: Exception) {
         log.w { "Couldn't remove ${instance.label}: ${e.describeCauses()}" }
         postError("Couldn't remove ${instance.label}", detail = e.message, cause = e)
-      }
-    }
-  }
-
-  fun reconnectWithToken(
-    instance: RemoteInstance,
-    token: String,
-  ) {
-    unauthorizedInstance = null
-    scope.launch {
-      try {
-        instanceManager.reconnectWithToken(instance, token)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        log.w { "Couldn't reconnect to ${instance.label}: ${e.describeCauses()}" }
-        postError("Couldn't reconnect to ${instance.label}", detail = e.message, cause = e)
       }
     }
   }
@@ -1262,33 +1216,6 @@ class AppState(
     if (target !in shownInstances.value) switchInstance(target)
     showDownloads()
     task?.let { inspect(TaskKey(target.deviceId, it.taskId)) }
-  }
-
-  /** Starts the AI discovery search for [query], limited to the comma-separated [sites]. */
-  fun aiDiscover(query: String, sites: String) {
-    aiDiscover.discover(query, sites)
-  }
-
-  /** Adds [candidates] to the active device, each on its own, and closes the results. */
-  fun aiDownloadSelected(candidates: List<AiCandidate>) {
-    showAddDialog = false
-    intakeRequest = null
-    val entry = activeInstance.value
-    val api = activeApi.value
-    val query = aiDiscover.draft.submittedQuery
-    resetAiDiscover()
-    scope.launch {
-      val result = aiDiscover.add(api, candidates, query)
-      reportAdded(
-        entry = entry,
-        added = result.added,
-        failures = result.failed.map { (candidate, e) -> candidate.title to e },
-      )
-    }
-  }
-
-  fun resetAiDiscover() {
-    aiDiscover.reset()
   }
 
   /** Reports [event] from the host's activity monitor as a message. */

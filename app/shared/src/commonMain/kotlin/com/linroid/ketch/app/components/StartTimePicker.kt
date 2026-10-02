@@ -128,12 +128,6 @@ fun startTimeLabel(schedule: DownloadSchedule, now: Instant, zone: TimeZone): St
   }
 }
 
-/** "in 3h 12m" until [at], or `null` once it has passed. */
-fun startCountdown(at: Instant, now: Instant): String? {
-  val seconds = (at - now).inWholeSeconds
-  return if (seconds > 0) "in ${formatEta(seconds)}" else null
-}
-
 /**
  * A chip that shows when a download starts and opens [StartTimeMenu] to change it.
  *
