@@ -69,9 +69,11 @@ val ketch = Ketch(httpEngine = KtorHttpEngine.withNetworkInterfaces())
 JVM discovery lists active non-loopback interfaces with usable non-link-local addresses.
 Selection uses the first IPv4 address, or the first IPv6 address when no IPv4 address exists.
 Android discovery lists currently available networks with internet capability and requires
-`INTERNET` and `ACCESS_NETWORK_STATE`. Android network IDs change when networks reconnect;
-the app still owns requesting and retaining non-default networks. Custom transports can implement
-`NetworkInterfaceProvider` and supply it to `ConfigurableNetworkHttpEngine`.
+`INTERNET` and `ACCESS_NETWORK_STATE`. Networks are named by transport ("Wi-Fi", "Mobile data",
+"Ethernet", "VPN", "Bluetooth"), adding the interface when two share a name ("Wi-Fi (wlan1)").
+Android network IDs change when networks reconnect; the app still owns requesting and retaining
+non-default networks. Custom transports can implement `NetworkInterfaceProvider` and supply it to
+`ConfigurableNetworkHttpEngine`.
 
 The factories below are alternatives for fixed SDK configurations. A plain `KtorHttpEngine`
 or fixed `MultiNetworkHttpEngine` reports runtime interface selection as unsupported.
