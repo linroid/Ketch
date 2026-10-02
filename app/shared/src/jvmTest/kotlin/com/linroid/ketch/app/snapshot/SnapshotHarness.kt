@@ -294,9 +294,11 @@ internal class AppScenario(
     state.searchQuery = query
   }
 
-  /** Opens the device switcher. */
-  fun openDevices() {
+  /** Opens the device switcher, or the device sheet on phones, and lets it settle in. */
+  suspend fun openDevices() {
     state.showInstanceSelector = true
+    // A popup that fades in needs frames of its own before the capture settles.
+    scene.settle()
   }
 }
 

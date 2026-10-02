@@ -184,7 +184,7 @@ class SettingsDeviceSnapshots {
   private fun appPageSnapshots(
     name: String,
     sizes: List<SnapshotSize>,
-    open: AppScenario.() -> Unit,
+    open: suspend AppScenario.() -> Unit,
   ) {
     for (size in sizes) {
       for (theme in SnapshotTheme.entries) {
