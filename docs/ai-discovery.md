@@ -9,12 +9,13 @@ apps, and is persisted in `config.toml` so the CLI uses the same values.
 
 ## Settings page
 
-Open **Settings** from the sidebar (desktop) or the bottom bar
-(Android), then the **AI discovery** category. It holds:
+Open **Settings** (⌘, or Ctrl+, on desktop, the sidebar's Settings, or
+the ⋮ menu on phones), then **Discover** under *This app*. The Discover
+page's own setup links there too. It holds:
 
 | Field | Notes |
 |-------|-------|
-| AI discovery | Master switch. While discovery cannot run, the **Discover** tab is hidden from the sidebar and bottom bar — Settings is where you switch it on. |
+| AI discovery | Master switch. Picking a provider on the Discover page's setup switches it on. |
 | Provider | OpenAI, Anthropic, Google Gemini, Ollama, or any OpenAI-compatible endpoint. |
 | API key | Required for everything except Ollama. |
 | Model | Blank uses the provider default (see below). |
@@ -147,7 +148,7 @@ Rules:
   blanks.
 - **In the apps, the Enable switch decides.** An exported key fills in a
   blank token once you switch discovery on, but it never switches the
-  feature — or the Discover tab — on by itself.
+  feature on by itself.
 - **Web search follows the same rule.** Once you pick Brave or Google, a
   blank key (and Google's engine id) is filled from that provider's
   variables; saved values are kept and your choice is never switched to
@@ -185,13 +186,16 @@ Provider values are `openai`, `anthropic`, `google`, `ollama`,
 `openai-compatible`; search providers are `none`, `brave`, `google`. A
 config file without an `[ai]` section keeps the defaults (discovery off).
 
-## Where the tab goes
+## Where Discover shows
 
-The **Discover** tab only appears once discovery is switched on and
-complete, so the app never offers a tab that leads nowhere. An API key
-in the environment alone doesn't count — the switch has to be on. Turn
-discovery off and the tab disappears again; if you were on it, the app
-returns you to Downloads.
+The **Discover** destination shows in the sidebar, the rail and the
+phone's bottom bar wherever discovery can run (desktop and Android), set
+up or not. Until a provider is usable it shows a setup page with example
+searches and a button per provider, which opens the Discover settings. A
+search started meanwhile, from the add sheet with text that holds no
+link, the command palette or a failed download's **Find another source**,
+waits on that page and runs as soon as setup is done. The downloads
+launchpad offers Discover too (**Or describe what you want**, ⌘E).
 
 ## Platform support
 

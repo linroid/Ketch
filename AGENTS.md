@@ -107,7 +107,18 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
   `WebConfigStore` (WasmJs, localStorage), `ServerConfig`, `RemoteConfig`, `AiSettings`,
   `LlmSettings`, `LlmProvider`, `SearchSettings`, `SearchProvider`, `TorrentSettings`,
-  `AppearanceConfig`, `AccentColor`, `ThemeMode`
+  `AppearanceConfig`, `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`,
+  `UiPreferences`, `DesktopSettings`, `NotificationSettings`, `IntegrationSettings`
+
+### `app:shared` (`com.linroid.ketch.app`)
+- `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
+  `IntakeState`, `SpeedModeController`, `PendingOps`), `instance` (`InstanceManager`,
+  `DevicePresence`, `DeviceScope`), `theme` (`KetchTheme` tokens), `components` (the Ketch
+  controls), `icons` (`KetchIcon`), `input` (`KetchCommands`, `ShortcutMatcher`), `feedback`
+  (`MessageCenter`, `ActivityMonitor`) and `util`
+- `ui` -- `AppShell` and `shell` (layout, navigation, device switcher, drop berths), `sidebar`,
+  `downloads` and `list` (table, list rows, launchpad), `inspector`, `intake` (add sheet),
+  `palette`, `devices`, `connect`, `discover`, `settings`, `pulse`, `feedback`, `onboarding`
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
@@ -223,11 +234,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - LLM agent-driven discovery using Koog framework (v1.2.0)
 - Providers: OpenAI, Anthropic, Google Gemini, Ollama, any
   OpenAI-compatible endpoint (`LlmClientFactory` maps them to Koog clients)
-- Configured under Settings → AI discovery and persisted under `[ai]` in
+- Configured under Settings → Discover and persisted under `[ai]` in
   `config.toml`; blank credentials fall back to environment variables
-- The Discover destination is hidden until discovery is usable; in the
-  apps the Enable switch is authoritative (an env key fills a blank token
-  but never enables the feature — only the CLI auto-enables)
+- The Discover destination shows wherever discovery is supported; until it
+  is set up it shows a setup page, where searches from the add sheet, the
+  palette and Find another source wait. In the apps the Enable switch is
+  authoritative (an env key fills a blank token but never enables the
+  feature — only the CLI auto-enables)
 - Provider defaults track current models; unknown ids resolve as custom
   Koog models, and `temperature` is only sent to models that accept it
 - 7 agent tools: `searchWeb`, `searchSites`, `fetchPage`, `headUrl`,
@@ -248,28 +261,70 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### Configuration (`config/`)
 - TOML-based configuration via ktoml library
-- `KetchConfig` root with server, download, remotes, AI, appearance and torrent sections
+- `KetchConfig` root with server, download, remotes, AI, appearance, torrent, speed, UI,
+  desktop, notifications and integration sections
 - `AiSettings`: AI discovery provider, token, model, endpoint and search keys
 - `AppearanceConfig`: accent palette and light/dark `ThemeMode` (app-only;
   CLI and server ignore it)
 - `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`),
   edited on the embedded instance's BitTorrent settings page and applied to torrents as they
   start or resume; a remote instance's trackers are only editable on that device
-- Apps edit it on the Settings destination, split into `SettingsCategory`
-  pages (General, Downloads, Network, BitTorrent, Remote access, AI discovery, About).
-  Wide windows open it as an overlay dialog (also ⌘, / Ctrl+, on desktop),
-  narrow ones as a page. Changes apply as they are made; there are no Save
-  buttons
-- Downloads and Network settings belong to the active instance
-  (`InstanceSettingsController`): pushed live via `KetchApi.updateConfig` /
-  `updateNetworkInterfaces`. Downloads settings are saved to `config.toml` only for the
-  embedded instance; the network selection is runtime-only and never saved
+- `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
+  `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
+  state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults
+  and onboarding; `DesktopSettings`: close action, open at login, Dock badge;
+  `NotificationSettings` and `IntegrationSettings` (magnet and `.torrent` handlers)
+- Apps edit it in Settings, `SettingsCategory` pages in two groups: *This app* (General,
+  Notifications, Integration, Discover, About) and *Device* (Downloads, Speed, Network,
+  BitTorrent, Sharing). Desktop opens Settings in a window of its own (⌘, / Ctrl+,), wider
+  windows elsewhere show it in place of the content card and phones as a page. Changes apply as
+  they are made; there are no Save buttons
+- The Device pages edit the device chosen in Settings, by default the one shown, through its
+  `InstanceSettingsController` (`AppState.settingsFor`): pushed live via
+  `KetchApi.updateConfig` / `updateNetworkInterfaces`. Downloads settings are saved to
+  `config.toml` only for the embedded instance; the network selection is runtime-only and
+  never saved
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, mDNS, `autoStart`
   (apps start the server on launch)
 - `RemoteConfig`: pre-configured remote server connections
 - `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
   `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
   uses `WebConfigStore` (TOML in localStorage)
+
+### Apps (`app/`)
+- One Compose Multiplatform UI (`app:shared`) for Android, desktop, iOS and the web, laid out
+  by window width (`KetchLayout`): a 220 dp sidebar on wide windows (collapsible to the rail),
+  a 72 dp rail on medium ones, and on phones a top bar, the Add button and, with three
+  destinations or more, a bottom bar. Destinations: Downloads, Discover (where supported) and
+  Devices; the downloads list shows as a table or as list rows, with a task inspector
+- Devices are first class: the sidebar and rail list every device with its live line, health
+  and failures, plus All devices (`⌘⌥0`, `AppState.showAllDevices`), which lists every
+  device's tasks with a Device column. `⌘⌥1`-`9` switch, `⇧⌘D` opens the device switcher
+  (a sheet on phones); rows can be sent or moved to another device, and links dropped on a
+  device row, a rail pennant or a drop berth are added there. The Devices page shows a card per
+  device; the Add device sheet and the connect page (shown while no device is active, as on the
+  web) take a pairing link, an address or a device found on the network
+- Every keyboard command lives in `KetchCommands`; `ShortcutHost` runs the global chords,
+  `⌘K` opens the command palette and `⌘/` the shortcut sheet. Commands the window's shell
+  must run from outside it, such as the macOS menu bar's, go through `AppState.runInShell`
+- Toasts and banners go through `MessageCenter`; removals and other undoable operations wait in
+  `PendingOps` for their Undo window
+- Design tokens: feature code reads colors, type, spacing, shapes and motion from `KetchTheme`
+  and uses the controls in `components/` and `KetchIcon`. `DesignTokenUsageTest` fails when
+  code outside `theme/` and `components/` adds literal radii, colors or text sizes,
+  `MaterialTheme.` or Material icons; keep its allowlist (`design-token-allowlist.txt`) empty.
+  Composables read the time from `LocalClock`, never `Clock.System`
+- Desktop: closing the window follows `[desktop] closeAction` (asks the first time while
+  downloads run, then keeps Ketch in the menu bar or notification area; minimizes where there
+  is no tray). The tray lists every device with its own actions, and the macOS menu bar, the
+  tray and the Dock menu are generated from `KetchCommands` (`DesktopMenuBar`, `DesktopTray`,
+  `TaskbarFeedback` for the Dock and taskbar badge and progress)
+- Phones: a welcome flow on first launch (`ui/onboarding`); Android shows a splash while its
+  service binds, and iOS 26 keeps user-started downloads running in the background with
+  `BGContinuedProcessingTaskRequest`
+- UI snapshots: `./gradlew :app:shared:jvmTest -Psnapshots` renders the scenarios in
+  `app/shared/src/jvmTest/.../app/snapshot/` headlessly to `app/shared/build/snapshots/`; see
+  [testing](docs/development/testing.md#ui-snapshots)
 
 ### Daemon Server (`library:server`)
 - Ktor-based REST API (`library:endpoints`): create, list, pause, resume, cancel, remove tasks;
