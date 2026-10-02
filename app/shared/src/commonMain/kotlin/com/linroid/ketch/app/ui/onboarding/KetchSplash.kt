@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
+import com.linroid.ketch.app.platform.SystemAppearance
 import com.linroid.ketch.app.state.toKetchAccent
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.shell.canvasWash
@@ -31,6 +32,7 @@ fun KetchSplash(
     ThemeMode.Light -> false
     ThemeMode.Dark -> true
   }
+  SystemAppearance(dark.takeIf { appearance.theme != ThemeMode.System })
   KetchTheme(darkTheme = dark, accent = appearance.accent.toKetchAccent()) {
     Box(
       contentAlignment = Alignment.Center,

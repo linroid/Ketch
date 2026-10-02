@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.SystemAppearance
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
@@ -83,6 +84,7 @@ fun App(
     ThemeMode.Light -> false
     ThemeMode.Dark -> true
   }
+  SystemAppearance(darkTheme.takeIf { appSettings.themeMode != ThemeMode.System })
   // The preference only adds to the system setting; off follows the system.
   val systemReducesMotion = rememberReduceMotion()
   // Decided once, so "Show welcome again" in Settings waits for the next launch. A launch that
