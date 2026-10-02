@@ -24,7 +24,9 @@ import com.linroid.ketch.app.ui.onboarding.needsWelcome
 import com.linroid.ketch.app.ui.onboarding.welcomePlatform
 import com.linroid.ketch.config.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * Root of the Ketch app, shared by every platform, with an [AppController] that lives as long
@@ -89,6 +91,17 @@ fun App(
     mutableStateOf(
       needsWelcome(welcomePlatform, appSettings.ui) && !controller.state.incoming.hasPending
     )
+  }
+  if (welcome) {
+    // A link or file opened while the welcome shows goes first; the welcome waits for the next
+    // launch, as when the app starts with one.
+    val incoming = controller.state.incoming
+    LaunchedEffect(incoming) {
+      combine(incoming.pending, incoming.pendingLinks, incoming.pendingPairings) { a, b, c ->
+        a.isNotEmpty() || b.isNotEmpty() || c.isNotEmpty()
+      }.first { it }
+      welcome = false
+    }
   }
   KetchTheme(
     darkTheme = darkTheme,
