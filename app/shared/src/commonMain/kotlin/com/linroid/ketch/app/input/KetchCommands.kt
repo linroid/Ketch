@@ -16,7 +16,7 @@ import com.linroid.ketch.app.state.StatusFilter
  */
 object KetchCommands {
   /** Opens the add sheet, prefilled from the clipboard. */
-  val Add: KetchCommand = command(
+  val Add: KetchCommand = KetchCommand(
     id = "add",
     label = "New download…",
     icon = KetchIcon.Plus,
@@ -26,7 +26,7 @@ object KetchCommands {
   )
 
   /** Adds pasted links at once, or opens the add sheet with them. */
-  val PasteLinks: KetchCommand = command(
+  val PasteLinks: KetchCommand = KetchCommand(
     id = "add.paste",
     label = "Paste links",
     icon = KetchIcon.Link,
@@ -36,7 +36,7 @@ object KetchCommands {
   )
 
   /** Adds the link on the clipboard without opening the add sheet. */
-  val AddClipboardLink: KetchCommand = command(
+  val AddClipboardLink: KetchCommand = KetchCommand(
     id = "add.clipboard",
     label = "Download link from clipboard",
     icon = KetchIcon.Link,
@@ -45,7 +45,7 @@ object KetchCommands {
   )
 
   /** Picks .torrent files to add. */
-  val OpenTorrent: KetchCommand = command(
+  val OpenTorrent: KetchCommand = KetchCommand(
     id = "add.torrent",
     label = "Open torrent file…",
     icon = KetchIcon.FileTorrent,
@@ -54,7 +54,7 @@ object KetchCommands {
   )
 
   /** Opens the command palette. */
-  val Palette: KetchCommand = command(
+  val Palette: KetchCommand = KetchCommand(
     id = "palette",
     label = "Command palette",
     icon = KetchIcon.Command,
@@ -64,7 +64,7 @@ object KetchCommands {
   )
 
   /** Focuses the search field, switching to Downloads. */
-  val Search: KetchCommand = command(
+  val Search: KetchCommand = KetchCommand(
     id = "search",
     label = "Search downloads",
     icon = KetchIcon.Search,
@@ -75,7 +75,7 @@ object KetchCommands {
 
   private val tabs: List<KetchCommand> = StatusFilter.entries.map { filter ->
     val digit = digitKeys[filter.ordinal + 1]
-    command(
+    KetchCommand(
       id = "tab.${filter.name.lowercase()}",
       label = filter.label,
       icon = tabIcon(filter),
@@ -86,7 +86,7 @@ object KetchCommands {
   }
 
   /** Shows the Discover page. */
-  val Discover: KetchCommand = command(
+  val Discover: KetchCommand = KetchCommand(
     id = "discover",
     label = "Discover",
     icon = KetchIcon.Discover,
@@ -95,7 +95,7 @@ object KetchCommands {
   )
 
   /** Shows the Devices page. */
-  val Devices: KetchCommand = command(
+  val Devices: KetchCommand = KetchCommand(
     id = "devices",
     label = "Devices",
     icon = KetchIcon.Devices,
@@ -104,7 +104,7 @@ object KetchCommands {
   )
 
   private val devices: List<KetchCommand> = (1..9).map { number ->
-    command(
+    KetchCommand(
       id = "device.$number",
       label = "Switch to device $number",
       icon = null,
@@ -116,7 +116,7 @@ object KetchCommands {
   }
 
   /** Shows the downloads of every device at once. */
-  val AllDevices: KetchCommand = command(
+  val AllDevices: KetchCommand = KetchCommand(
     id = "device.all",
     label = "All devices",
     icon = KetchIcon.Fleet,
@@ -127,7 +127,7 @@ object KetchCommands {
   )
 
   /** Opens the device switcher. */
-  val SwitchDevice: KetchCommand = command(
+  val SwitchDevice: KetchCommand = KetchCommand(
     id = "device.switcher",
     label = "Switch device…",
     icon = KetchIcon.Devices,
@@ -135,7 +135,7 @@ object KetchCommands {
   )
 
   /** Pauses every task in scope, queued ones included. */
-  val PauseAll: KetchCommand = command(
+  val PauseAll: KetchCommand = KetchCommand(
     id = "pauseAll",
     label = "Pause all",
     icon = KetchIcon.Pause,
@@ -145,7 +145,7 @@ object KetchCommands {
   )
 
   /** Resumes every paused task in scope. */
-  val ResumeAll: KetchCommand = command(
+  val ResumeAll: KetchCommand = KetchCommand(
     id = "resumeAll",
     label = "Resume all",
     icon = KetchIcon.Play,
@@ -155,7 +155,7 @@ object KetchCommands {
   )
 
   /** Retries every failed task in scope. */
-  val RetryFailed: KetchCommand = command(
+  val RetryFailed: KetchCommand = KetchCommand(
     id = "retryFailed",
     label = "Retry all failed",
     icon = KetchIcon.Retry,
@@ -164,7 +164,7 @@ object KetchCommands {
   )
 
   /** Turns the Slow lane on or off. */
-  val SlowLane: KetchCommand = command(
+  val SlowLane: KetchCommand = KetchCommand(
     id = "slowLane",
     label = "Slow lane",
     icon = KetchIcon.SlowLane,
@@ -174,7 +174,7 @@ object KetchCommands {
   )
 
   /** Shows the selected download in the inspector. */
-  val ShowDetails: KetchCommand = command(
+  val ShowDetails: KetchCommand = KetchCommand(
     id = "inspector.show",
     label = "Show details",
     icon = KetchIcon.Info,
@@ -184,7 +184,7 @@ object KetchCommands {
   )
 
   /** Collapses the sidebar to the rail, or expands it. */
-  val ToggleSidebar: KetchCommand = command(
+  val ToggleSidebar: KetchCommand = KetchCommand(
     id = "sidebar.toggle",
     label = "Toggle sidebar",
     icon = KetchIcon.Sidebar,
@@ -194,7 +194,7 @@ object KetchCommands {
   )
 
   /** Opens the Activity popover. */
-  val Activity: KetchCommand = command(
+  val Activity: KetchCommand = KetchCommand(
     id = "activity",
     label = "Activity",
     icon = KetchIcon.Bell,
@@ -203,7 +203,7 @@ object KetchCommands {
   )
 
   /** Undoes the last remove, clear, pause or move. */
-  val Undo: KetchCommand = command(
+  val Undo: KetchCommand = KetchCommand(
     id = "undo",
     label = "Undo",
     icon = KetchIcon.Undo,
@@ -213,7 +213,7 @@ object KetchCommands {
   )
 
   /** Opens Settings. */
-  val Settings: KetchCommand = command(
+  val Settings: KetchCommand = KetchCommand(
     id = "settings",
     label = "Settings…",
     icon = KetchIcon.Settings,
@@ -222,7 +222,7 @@ object KetchCommands {
   )
 
   /** Shows the keyboard shortcut sheet. */
-  val Shortcuts: KetchCommand = command(
+  val Shortcuts: KetchCommand = KetchCommand(
     id = "shortcuts",
     label = "Keyboard shortcuts",
     icon = KetchIcon.Command,
@@ -232,7 +232,7 @@ object KetchCommands {
   )
 
   /** Closes the window; Ketch keeps running. */
-  val CloseWindow: KetchCommand = command(
+  val CloseWindow: KetchCommand = KetchCommand(
     id = "window.close",
     label = "Close window",
     icon = KetchIcon.Close,
@@ -242,7 +242,7 @@ object KetchCommands {
   )
 
   /** Minimizes the window. Windows and Linux have no chord for it. */
-  val Minimize: KetchCommand = command(
+  val Minimize: KetchCommand = KetchCommand(
     id = "window.minimize",
     label = "Minimize",
     icon = null,
@@ -253,7 +253,7 @@ object KetchCommands {
   )
 
   /** Quits Ketch, asking first while downloads are active. */
-  val Quit: KetchCommand = command(
+  val Quit: KetchCommand = KetchCommand(
     id = "quit",
     label = "Quit Ketch",
     icon = null,
@@ -263,7 +263,7 @@ object KetchCommands {
   )
 
   /** Moves the focused row up. */
-  val ListUp: KetchCommand = command(
+  val ListUp: KetchCommand = KetchCommand(
     id = "list.up",
     label = "Move up",
     icon = null,
@@ -272,7 +272,7 @@ object KetchCommands {
   )
 
   /** Moves the focused row down. */
-  val ListDown: KetchCommand = command(
+  val ListDown: KetchCommand = KetchCommand(
     id = "list.down",
     label = "Move down",
     icon = null,
@@ -281,7 +281,7 @@ object KetchCommands {
   )
 
   /** Extends the selection one row up. */
-  val ExtendSelectionUp: KetchCommand = command(
+  val ExtendSelectionUp: KetchCommand = KetchCommand(
     id = "list.extendUp",
     label = "Extend selection up",
     icon = null,
@@ -290,7 +290,7 @@ object KetchCommands {
   )
 
   /** Extends the selection one row down. */
-  val ExtendSelectionDown: KetchCommand = command(
+  val ExtendSelectionDown: KetchCommand = KetchCommand(
     id = "list.extendDown",
     label = "Extend selection down",
     icon = null,
@@ -299,7 +299,7 @@ object KetchCommands {
   )
 
   /** Jumps to the first row. */
-  val ListFirst: KetchCommand = command(
+  val ListFirst: KetchCommand = KetchCommand(
     id = "list.first",
     label = "Go to first",
     icon = null,
@@ -308,7 +308,7 @@ object KetchCommands {
   )
 
   /** Jumps to the last row. */
-  val ListLast: KetchCommand = command(
+  val ListLast: KetchCommand = KetchCommand(
     id = "list.last",
     label = "Go to last",
     icon = null,
@@ -317,7 +317,7 @@ object KetchCommands {
   )
 
   /** Jumps one page up. */
-  val ListPageUp: KetchCommand = command(
+  val ListPageUp: KetchCommand = KetchCommand(
     id = "list.pageUp",
     label = "Page up",
     icon = null,
@@ -326,7 +326,7 @@ object KetchCommands {
   )
 
   /** Jumps one page down. */
-  val ListPageDown: KetchCommand = command(
+  val ListPageDown: KetchCommand = KetchCommand(
     id = "list.pageDown",
     label = "Page down",
     icon = null,
@@ -335,7 +335,7 @@ object KetchCommands {
   )
 
   /** Selects every visible row, rows in collapsed groups included. */
-  val SelectAll: KetchCommand = command(
+  val SelectAll: KetchCommand = KetchCommand(
     id = "list.selectAll",
     label = "Select all",
     icon = KetchIcon.Check,
@@ -345,7 +345,7 @@ object KetchCommands {
   )
 
   /** Clears the selection; pressed again, moves to the search field. */
-  val ClearSelection: KetchCommand = command(
+  val ClearSelection: KetchCommand = KetchCommand(
     id = "list.clearSelection",
     label = "Clear selection",
     icon = null,
@@ -354,7 +354,7 @@ object KetchCommands {
   )
 
   /** Pauses or resumes; retries a failed task and downloads a canceled one again. */
-  val TogglePause: KetchCommand = command(
+  val TogglePause: KetchCommand = KetchCommand(
     id = "list.toggle",
     label = "Pause or resume",
     icon = KetchIcon.Pause,
@@ -364,7 +364,7 @@ object KetchCommands {
   )
 
   /** Opens a completed file, or the inspector of any other task. */
-  val Open: KetchCommand = command(
+  val Open: KetchCommand = KetchCommand(
     id = "list.open",
     label = "Open",
     icon = KetchIcon.Open,
@@ -374,7 +374,7 @@ object KetchCommands {
   )
 
   /** Shows the file in Finder, Explorer or the file manager. */
-  val Reveal: KetchCommand = command(
+  val Reveal: KetchCommand = KetchCommand(
     id = "list.reveal",
     label = "Show in folder",
     icon = KetchIcon.Reveal,
@@ -384,7 +384,7 @@ object KetchCommands {
   )
 
   /** Removes the selected tasks from the list, keeping their files, with Undo. */
-  val Remove: KetchCommand = command(
+  val Remove: KetchCommand = KetchCommand(
     id = "list.remove",
     label = "Remove from list",
     icon = KetchIcon.Trash,
@@ -395,7 +395,7 @@ object KetchCommands {
   )
 
   /** Asks to remove the selected tasks and move their files to the trash. */
-  val RemoveAndTrash: KetchCommand = command(
+  val RemoveAndTrash: KetchCommand = KetchCommand(
     id = "list.removeAndTrash",
     label = "Remove and trash files…",
     icon = KetchIcon.Trash,
@@ -405,7 +405,7 @@ object KetchCommands {
   )
 
   /** Copies the links of the selected tasks. */
-  val CopyLink: KetchCommand = command(
+  val CopyLink: KetchCommand = KetchCommand(
     id = "list.copyLink",
     label = "Copy link",
     icon = KetchIcon.Copy,
@@ -415,7 +415,7 @@ object KetchCommands {
   )
 
   /** Copies the file paths of the selected tasks. */
-  val CopyPath: KetchCommand = command(
+  val CopyPath: KetchCommand = KetchCommand(
     id = "list.copyPath",
     label = "Copy file path",
     icon = KetchIcon.Copy,
@@ -424,7 +424,7 @@ object KetchCommands {
   )
 
   /** Retries or resumes the selected tasks. */
-  val Retry: KetchCommand = command(
+  val Retry: KetchCommand = KetchCommand(
     id = "list.retry",
     label = "Retry",
     icon = KetchIcon.Retry,
@@ -435,7 +435,7 @@ object KetchCommands {
   )
 
   /** Adds one connection to the selected tasks. */
-  val MoreConnections: KetchCommand = command(
+  val MoreConnections: KetchCommand = KetchCommand(
     id = "list.connectionsUp",
     label = "More connections",
     icon = null,
@@ -444,7 +444,7 @@ object KetchCommands {
   )
 
   /** Removes one connection from the selected tasks. */
-  val FewerConnections: KetchCommand = command(
+  val FewerConnections: KetchCommand = KetchCommand(
     id = "list.connectionsDown",
     label = "Fewer connections",
     icon = null,
@@ -453,7 +453,7 @@ object KetchCommands {
   )
 
   /** Raises the priority one step, up to High; Urgent needs the menu or Start now. */
-  val RaisePriority: KetchCommand = command(
+  val RaisePriority: KetchCommand = KetchCommand(
     id = "list.priorityUp",
     label = "Raise priority",
     icon = KetchIcon.ChevronUp,
@@ -462,7 +462,7 @@ object KetchCommands {
   )
 
   /** Lowers the priority one step, down to Low. */
-  val LowerPriority: KetchCommand = command(
+  val LowerPriority: KetchCommand = KetchCommand(
     id = "list.priorityDown",
     label = "Lower priority",
     icon = KetchIcon.ChevronDown,
@@ -471,7 +471,7 @@ object KetchCommands {
   )
 
   /** Moves the focus into the inspector. */
-  val FocusInspector: KetchCommand = command(
+  val FocusInspector: KetchCommand = KetchCommand(
     id = "list.toInspector",
     label = "Focus inspector",
     icon = KetchIcon.Chevron,
@@ -480,7 +480,7 @@ object KetchCommands {
   )
 
   /** Moves the focus out of the inspector, back to the list. */
-  val FocusList: KetchCommand = command(
+  val FocusList: KetchCommand = KetchCommand(
     id = "list.fromInspector",
     label = "Back to the list",
     icon = KetchIcon.ChevronLeft,
@@ -489,7 +489,7 @@ object KetchCommands {
   )
 
   /** Adds what the add sheet holds. */
-  val IntakeAdd: KetchCommand = command(
+  val IntakeAdd: KetchCommand = KetchCommand(
     id = "intake.add",
     label = "Add",
     icon = KetchIcon.Plus,
@@ -498,7 +498,7 @@ object KetchCommands {
   )
 
   /** Starts a new line in the add sheet's input. */
-  val IntakeNewLine: KetchCommand = command(
+  val IntakeNewLine: KetchCommand = KetchCommand(
     id = "intake.newLine",
     label = "New line",
     icon = null,
@@ -507,7 +507,7 @@ object KetchCommands {
   )
 
   /** Searches Discover for the add sheet's text. */
-  val IntakeDiscover: KetchCommand = command(
+  val IntakeDiscover: KetchCommand = KetchCommand(
     id = "intake.discover",
     label = "Discover",
     icon = KetchIcon.Discover,
@@ -516,7 +516,7 @@ object KetchCommands {
   )
 
   /** Picks .torrent files from the add sheet. */
-  val IntakeOpenTorrent: KetchCommand = command(
+  val IntakeOpenTorrent: KetchCommand = KetchCommand(
     id = "intake.torrent",
     label = "Open torrent file…",
     icon = KetchIcon.FileTorrent,
@@ -525,7 +525,7 @@ object KetchCommands {
   )
 
   /** Closes the add sheet. */
-  val IntakeClose: KetchCommand = command(
+  val IntakeClose: KetchCommand = KetchCommand(
     id = "intake.close",
     label = "Close",
     icon = KetchIcon.Close,
@@ -534,7 +534,7 @@ object KetchCommands {
   )
 
   private val intakeTargets: List<KetchCommand> = (1..9).map { number ->
-    command(
+    KetchCommand(
       id = "intake.target.$number",
       label = "Add to device $number",
       icon = null,
@@ -546,7 +546,7 @@ object KetchCommands {
   }
 
   /** Moves the palette's highlight up. */
-  val PaletteUp: KetchCommand = command(
+  val PaletteUp: KetchCommand = KetchCommand(
     id = "palette.up",
     label = "Move up",
     icon = null,
@@ -555,7 +555,7 @@ object KetchCommands {
   )
 
   /** Moves the palette's highlight down. */
-  val PaletteDown: KetchCommand = command(
+  val PaletteDown: KetchCommand = KetchCommand(
     id = "palette.down",
     label = "Move down",
     icon = null,
@@ -564,7 +564,7 @@ object KetchCommands {
   )
 
   /** Runs the highlighted palette row. */
-  val PaletteRun: KetchCommand = command(
+  val PaletteRun: KetchCommand = KetchCommand(
     id = "palette.run",
     label = "Run",
     icon = null,
@@ -573,7 +573,7 @@ object KetchCommands {
   )
 
   /** Runs the alternate action of the highlighted palette row, such as Add with options. */
-  val PaletteAlternate: KetchCommand = command(
+  val PaletteAlternate: KetchCommand = KetchCommand(
     id = "palette.alternate",
     label = "Run alternate action",
     icon = null,
@@ -582,7 +582,7 @@ object KetchCommands {
   )
 
   /** Searches Discover for the palette's text. */
-  val PaletteDiscover: KetchCommand = command(
+  val PaletteDiscover: KetchCommand = KetchCommand(
     id = "palette.discover",
     label = "Discover",
     icon = KetchIcon.Discover,
@@ -591,7 +591,7 @@ object KetchCommands {
   )
 
   /** Closes the palette. */
-  val PaletteClose: KetchCommand = command(
+  val PaletteClose: KetchCommand = KetchCommand(
     id = "palette.close",
     label = "Close",
     icon = KetchIcon.Close,
@@ -634,30 +634,6 @@ object KetchCommands {
     return intakeTargets[number - 1]
   }
 }
-
-private fun command(
-  id: String,
-  label: String,
-  icon: KetchIcon?,
-  mac: KeyChord?,
-  pc: KeyChord? = mac,
-  web: List<KeyChord>? = null,
-  scope: CommandScope = CommandScope.Global,
-  inMenus: Boolean = false,
-  onWeb: Boolean = true,
-  yieldsToTextField: Boolean = false,
-): KetchCommand = KetchCommand(
-  id = id,
-  label = label,
-  icon = icon,
-  scope = scope,
-  mac = mac,
-  pc = pc,
-  web = web,
-  inMenus = inMenus,
-  onWeb = onWeb,
-  yieldsToTextField = yieldsToTextField,
-)
 
 private fun tabIcon(filter: StatusFilter): KetchIcon = when (filter) {
   StatusFilter.All -> KetchIcon.All
