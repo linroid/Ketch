@@ -334,6 +334,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
         item(KetchCommands.SelectAll, enabled = counts.count(context.filter) > 0),
         MenuEntry.Separator,
         item(KetchCommands.Search),
+        item(KetchCommands.Palette),
       ),
     ),
     MenuBarMenu(
@@ -343,7 +344,12 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
           add(item(KetchCommands.tab(filter), checked = filter == context.filter))
         }
         add(MenuEntry.Separator)
+        add(item(KetchCommands.ToggleSidebar))
         add(item(KetchCommands.ToggleInspector, checked = context.inspectorOpen))
+        add(MenuEntry.Separator)
+        add(item(KetchCommands.Discover))
+        add(item(KetchCommands.Devices))
+        add(item(KetchCommands.Activity))
       },
     ),
     MenuBarMenu(
@@ -438,6 +444,15 @@ private fun focusedChords(platform: KeyboardPlatform) = KetchCommands.all
   .toSet()
 
 private val TEXT_EDITING_KEYS = setOf(Key.A, Key.C, Key.V, Key.X, Key.Z)
+
+// Commands that need the window's shell, such as the palette, which only its content can open.
+private val SHELL_COMMANDS = setOf(
+  KetchCommands.Palette,
+  KetchCommands.Discover,
+  KetchCommands.Devices,
+  KetchCommands.ToggleSidebar,
+  KetchCommands.Activity,
+)
 private val TEXT_REDO_KEY = Key.Z
 private const val MAX_DEVICE_ITEMS = 9
 
@@ -511,7 +526,8 @@ private fun selectionFlow(
  * Runs the commands of the menu bar and the tray against the [AppState] of [controller].
  *
  * Commands that need the window show it first, so they also work from the tray while the window
- * is hidden.
+ * is hidden. Those only the window's shell can run, such as the palette, go to it through
+ * [AppState.runInShell].
  *
  * @param files opens and reveals downloaded files; `null` leaves those commands without effect.
  * @param clipboard reads links to add and takes copied links.
@@ -575,7 +591,11 @@ internal class DesktopCommands(
     when (command) {
       KetchCommands.AllDevices -> {
         actions.showWindow()
-        controller.instanceManager.showAllDevices()
+        state.showAllDevices()
+      }
+      in SHELL_COMMANDS -> {
+        actions.showWindow()
+        state.runInShell(command)
       }
       KetchCommands.Add -> {
         actions.showWindow()

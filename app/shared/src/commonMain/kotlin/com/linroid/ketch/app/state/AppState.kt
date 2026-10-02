@@ -25,6 +25,7 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.ToastMode
+import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -260,6 +261,13 @@ class AppState(
    * and clears this with [shortcutsShown].
    */
   var shortcutsRequested by mutableStateOf(false)
+    private set
+
+  /**
+   * A command only the window's shell runs, such as the command palette picked from the macOS
+   * menu bar; the shell runs it and clears this with [shellCommandHandled].
+   */
+  var shellCommand by mutableStateOf<KetchCommand?>(null)
     private set
 
   /** A Discover search the shell should navigate to, cleared with [discoverRequestHandled]. */
@@ -536,6 +544,16 @@ class AppState(
   /** Marks [shortcutsRequested] as shown. */
   fun shortcutsShown() {
     shortcutsRequested = false
+  }
+
+  /** Asks the window's shell to run [command], which needs the shell's own state. */
+  fun runInShell(command: KetchCommand) {
+    shellCommand = command
+  }
+
+  /** Marks [shellCommand] as run. */
+  fun shellCommandHandled() {
+    shellCommand = null
   }
 
   /** Fills Discover with [request], starts the search and asks the shell to show Discover. */

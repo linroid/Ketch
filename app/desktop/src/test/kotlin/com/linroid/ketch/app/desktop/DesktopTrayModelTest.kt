@@ -480,6 +480,19 @@ class DesktopTrayModelTest {
   }
 
   @Test
+  fun menuBar_editAndView_offerThePaletteAndTheDestinations() {
+    val menus = menuBar(context())
+
+    assertEquals(
+      KeyChord(Key.K, primary = true),
+      menus.menu("Edit").item(KetchCommands.Palette).shortcut,
+    )
+    for (command in listOf(KetchCommands.Discover, KetchCommands.Devices, KetchCommands.Activity)) {
+      assertTrue(menus.menu("View").any { it.runs(command) }, command.id)
+    }
+  }
+
+  @Test
   fun menuBar_fileMenu_addsADevice() {
     val file = menuBar(context()).menu("File")
 
