@@ -86,8 +86,7 @@ fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
     if (controller.isRemote) {
       SettingsNotice(
-        text = "Saved on ${device.label} until it restarts. Slow lane and Auto rules aren't " +
-          "available for it from here yet, so it gets a fixed speed limit.",
+        text = "Saved on ${device.label} until it restarts. No Slow lane or Auto for it yet.",
         tone = NoticeTone.Info,
       )
     }
@@ -105,7 +104,7 @@ fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
       SettingsGroup(title = "Limit") {
         SettingsRow(
           title = "Speed limit",
-          description = "Shared by all downloads. A download's own limit can only lower it.",
+          description = "All downloads share it; a download's own limit can go lower.",
         ) {
           SpeedLimitPicker(
             value = config.speedLimit,
@@ -141,10 +140,10 @@ private fun ModeGroup(
     SpeedMode.Full -> if (cap.isUnlimited) {
       "Downloads use all the speed they can get."
     } else {
-      "Downloads share up to ${formatSpeedLimit(cap)}, the full speed cap."
+      "Downloads share up to ${formatSpeedLimit(cap)}."
     }
-    SpeedMode.SlowLane -> "Downloads share at most ${formatSpeedLimit(slowLane)}, leaving room " +
-      "for calls and streaming."
+    SpeedMode.SlowLane ->
+      "Downloads share at most ${formatSpeedLimit(slowLane)}, leaving room for calls."
     is SpeedMode.Auto -> if (settings.rules.isEmpty()) {
       "Add a rule below to turn the Slow lane on by itself."
     } else {
@@ -215,9 +214,10 @@ private fun RulesGroup(settings: SpeedSettings, model: SpeedSettingsModel) {
   val canAdd = rules.size < SpeedSettings.MAX_RULES
   SettingsGroup(
     title = "Auto rules",
-    footer = buildString {
-      append("Auto turns the Slow lane on while a rule is in effect, by this device's clock.")
-      if (settings.mode != SpeedLimitMode.Auto) append(" Rules apply while the mode is Auto.")
+    footer = if (settings.mode == SpeedLimitMode.Auto) {
+      "Rules follow this device's clock."
+    } else {
+      "Rules apply in Auto mode, by this device's clock."
     },
     action = {
       KetchButton(
@@ -234,7 +234,7 @@ private fun RulesGroup(settings: SpeedSettings, model: SpeedSettingsModel) {
     if (rules.isEmpty()) {
       SettingsRow(
         title = "No rules yet",
-        description = "Add one to slow downloads down during work hours, for example.",
+        description = "For example, slow downloads down during work hours.",
       )
     }
     rules.forEachIndexed { index, rule ->
@@ -354,8 +354,7 @@ private fun PerDownloadGroup(config: DownloadConfig, model: SpeedSettingsModel) 
   SettingsGroup(title = "Per download") {
     SettingsRow(
       title = "Connections per download",
-      description = "Parallel connections for each file over HTTP or FTP. Torrents use peers " +
-        "instead. Applies as downloads start or resume.",
+      description = "For HTTP and FTP; applies as downloads start or resume.",
       trailing = {
         ConnectionStepper(
           value = config.maxConnectionsPerDownload.coerceIn(ConnectionRange),

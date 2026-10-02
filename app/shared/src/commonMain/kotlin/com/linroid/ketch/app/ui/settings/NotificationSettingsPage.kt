@@ -77,8 +77,7 @@ fun NotificationSettingsPage(state: AppState) {
     settings.failed == NotificationMode.Notify
   SettingsGroup(
     title = "Downloads",
-    footer = "Notify posts a system notification. In app only shows a message inside Ketch " +
-      "while it is open.",
+    footer = "Notify uses system notifications. In app only stays inside Ketch.",
   ) {
     SettingsRow(
       title = "Download finished",
@@ -101,9 +100,9 @@ fun NotificationSettingsPage(state: AppState) {
     SettingsSwitchRow(
       title = "All downloads finished",
       description = if (finishedOn) {
-        "One message when the queue is empty, with what it added up to."
+        "One message when the queue is empty."
       } else {
-        "Reported like finished downloads, which are off."
+        "Follows Download finished, which is off."
       },
       checked = finishedOn && settings.queueDrained,
       enabled = finishedOn,
@@ -113,8 +112,8 @@ fun NotificationSettingsPage(state: AppState) {
       title = "Only when Ketch is in the background",
       description = when {
         !notifies -> "Nothing is set to Notify."
-        settings.onlyInBackground -> "While Ketch is in front, events show inside it instead."
-        else -> "Notifications show even while Ketch is in front."
+        settings.onlyInBackground -> "While Ketch is in front, they show inside it."
+        else -> "Notifications also show while Ketch is in front."
       },
       checked = settings.onlyInBackground,
       enabled = notifies,
@@ -125,7 +124,7 @@ fun NotificationSettingsPage(state: AppState) {
   SettingsGroup(title = "Devices") {
     SettingsSwitchRow(
       title = "Devices going offline",
-      description = "A message inside Ketch when a device stops answering.",
+      description = "Shown as a message inside Ketch.",
       checked = settings.deviceOffline,
       onCheckedChange = { on -> save { it.copy(deviceOffline = on) } },
     )
@@ -147,13 +146,12 @@ private fun BrowserPermissionGroup(permission: NotificationPermission) {
     when (permission.state) {
       NotificationPermissionState.Granted -> SettingsRow(
         title = "Notifications are allowed",
-        description = "This browser shows Ketch's notifications while its tab is in the " +
-          "background.",
+        description = "Shown while the Ketch tab is in the background.",
         descriptionColor = colors.status.completed.color,
       )
       NotificationPermissionState.Undecided -> SettingsRow(
         title = "Allow notifications",
-        description = "Your browser asks once. Ketch only notifies about what you turn on below.",
+        description = "Your browser asks once. Ketch notifies only as set below.",
         trailing = {
           KetchButton(
             text = "Allow",
@@ -165,7 +163,7 @@ private fun BrowserPermissionGroup(permission: NotificationPermission) {
       )
       NotificationPermissionState.Denied -> SettingsRow(
         title = "Notifications are blocked",
-        description = "Allow them for this site in your browser's settings, then come back.",
+        description = "Allow them for this site in your browser's settings.",
         descriptionColor = colors.status.paused.color,
       )
     }

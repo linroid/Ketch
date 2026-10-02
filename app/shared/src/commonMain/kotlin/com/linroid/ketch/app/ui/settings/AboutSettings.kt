@@ -81,7 +81,6 @@ fun AboutSettings(state: AppState, fileLogger: FileLogger? = null) {
     )
     SettingsRow(
       title = "Open-source licenses",
-      description = "Ketch, its libraries and its fonts",
       modifier = Modifier.clickable(role = Role.Button) { showLicenses = true },
       trailing = { Chevron() },
     )
@@ -93,7 +92,7 @@ fun AboutSettings(state: AppState, fileLogger: FileLogger? = null) {
       SettingsRow(
         title = "Show setup checklist",
         description = if (checklistShown) {
-          "Done. It shows on the Downloads page while the list is empty."
+          "Done. It shows while the Downloads list is empty."
         } else {
           "The setup steps on an empty Downloads page."
         },
@@ -125,8 +124,7 @@ fun AboutSettings(state: AppState, fileLogger: FileLogger? = null) {
   if (logFiles != null) {
     SettingsGroup(
       title = "Troubleshooting",
-      footer = "Logs include the names and addresses of your downloads, with passwords " +
-        "masked. Check them before posting them publicly.",
+      footer = "Logs include download names and links. Check them before posting.",
     ) {
       LogFilesRow(logFiles)
     }

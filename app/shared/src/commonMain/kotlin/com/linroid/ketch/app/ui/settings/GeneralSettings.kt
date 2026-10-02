@@ -71,8 +71,8 @@ fun GeneralSettings(
     SettingsGroup(title = "This device") {
       SettingsRow(
         title = "Device name",
-        description = "Your other devices see this device by this name. Leave it empty to use " +
-          "the system name. Applies after a restart.",
+        description = "Your other devices see this name.",
+        trailing = { SettingsNote("Applies after a restart") },
       ) {
         SettingsTextInput(
           value = appSettings.config.name.orEmpty(),
@@ -103,11 +103,7 @@ fun GeneralSettings(
     )
     SettingsRow(
       title = "Density",
-      description = when (ui.density) {
-        DensityMode.Auto -> "Compact with a mouse or trackpad, roomier for touch."
-        DensityMode.Compact -> "Smaller rows and controls, to see more at once."
-        DensityMode.Comfortable -> "Larger rows and controls, easier to tap."
-      },
+      description = "Auto: compact with a mouse, roomier with touch.",
       trailing = {
         SettingsSegmented(
           value = ui.density,
@@ -121,7 +117,7 @@ fun GeneralSettings(
     SettingsRow(
       title = "Reduce motion",
       description = when {
-        ui.reduceMotion -> "Lanes, progress and panels change without animating."
+        ui.reduceMotion -> "Lanes and panels change without animating."
         systemReduces -> "Your system reduces motion, so Ketch does too."
         else -> "Auto follows your system's setting."
       },
@@ -134,7 +130,7 @@ fun GeneralSettings(
         )
       },
     )
-    SettingsRow(title = "Language", description = "Ketch is in English for now.")
+    SettingsRow(title = "Language", trailing = { SettingsValue("English") })
   }
 
   if (LocalDesktopHooks.current.isSupported) StartupGroup(state, appSettings)
@@ -144,9 +140,16 @@ fun GeneralSettings(
     SettingsGroup {
       SettingsRow(
         title = "Keyboard shortcuts…",
-        description = chord?.let { "Every shortcut in Ketch, also shown by $it." },
         modifier = Modifier.clickable(role = Role.Button) { state.showShortcuts() },
-        trailing = { Chevron() },
+        trailing = {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+          ) {
+            if (chord != null) SettingsValue(chord)
+            Chevron()
+          }
+        },
       )
     }
   }
@@ -184,9 +187,9 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
     SettingsSelectRow(
       title = "When I close the window",
       description = when (desktop.closeAction) {
-        CloseAction.Ask -> "Ketch asks the first time downloads are running."
-        CloseAction.Background -> "Downloads keep going. Quit from the $trayName icon."
-        CloseAction.Quit -> "Running downloads pause and resume next time you open Ketch."
+        CloseAction.Ask -> "Asks only while downloads are running."
+        CloseAction.Background -> "Quit from the $trayName icon."
+        CloseAction.Quit -> "Downloads pause until you open Ketch again."
       },
       value = desktop.closeAction,
       options = CloseAction.entries,
@@ -213,7 +216,7 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
     )
     SettingsSwitchRow(
       title = "Start hidden at login",
-      description = "Opens in the $trayName instead of showing a window.",
+      description = "Opens in the $trayName, without a window.",
       checked = desktop.startHidden,
       enabled = desktop.openAtLogin,
       onCheckedChange = { on ->
@@ -223,7 +226,6 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
     )
     SettingsSelectRow(
       title = "App icon badge",
-      description = if (apple) "What the Dock icon shows." else "What the taskbar icon shows.",
       value = desktop.dockBadge,
       options = DockBadgeMode.entries,
       label = { mode ->

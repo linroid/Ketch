@@ -114,19 +114,11 @@ private fun FolderGroup(
   }
 
   SettingsGroup(title = "Save to") {
+    // The folder shows below, so the row only explains what went wrong.
     SettingsRow(
       title = "Save downloads to",
-      description = when {
-        failure != null -> failure
-        chosen == null -> "The Downloads folder of ${device.label}."
-        local -> "A folder you chose on this device."
-        else -> "A folder on ${device.label}."
-      },
-      descriptionColor = if (failure != null) {
-        KetchTheme.colors.status.failed.color
-      } else {
-        KetchTheme.colors.textSecondary
-      },
+      description = failure,
+      descriptionColor = KetchTheme.colors.status.failed.color,
     ) {
       val free = system?.usableSpace?.takeIf { it > 0 }?.let { "${formatSpace(it)} free" }
       // Typing replaces the pill, so the folder shows once.
@@ -147,8 +139,7 @@ private fun FolderGroup(
       }
       if (local && folder != null && isAppPrivateFolder(folder)) {
         SettingsNotice(
-          text = "Only Ketch can see this folder. Choose a folder such as Download so other " +
-            "apps can open your files.",
+          text = "Only Ketch can see this folder. Choose one such as Download.",
           tone = NoticeTone.Warning,
           action = if (canPick) {
             {
@@ -166,8 +157,7 @@ private fun FolderGroup(
       }
       if (folder != null && isDocumentTree(folder)) {
         SettingsNotice(
-          text = "Torrents stay in Ketch's own folder, since they can't save to a folder " +
-            "chosen this way.",
+          text = "Torrents still save to Ketch's own folder.",
           tone = NoticeTone.Info,
         )
       }
@@ -286,7 +276,7 @@ private fun FolderShortcuts(state: AppState, device: InstanceEntry, config: Down
   }
   SettingsGroup(
     title = "Folders in the add sheet",
-    footer = "Pinned folders stay at the top of Save to when you add a download.",
+    footer = "Pinned folders come first when you add a download.",
   ) {
     pinned.forEach { path ->
       FolderShortcutRow(path = path, pinned = true, onToggle = { savePinned(pinned - path) })
@@ -353,12 +343,11 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
   val unlimited = { count: Int -> if (count == 0) "Unlimited" else "$count" }
   SettingsGroup(
     title = "Queue",
-    footer = "Queue limits apply right away; lowering one lets running downloads finish. " +
-      "Retries apply to downloads as they start or resume.",
+    footer = "Lowering a limit lets running downloads finish. Retries apply as downloads start.",
   ) {
     StepperRow(
       title = "Run at once",
-      description = "Downloads that run together. The rest wait in the queue, by priority.",
+      description = "The rest wait in the queue, by priority.",
       value = config.maxConcurrentDownloads,
       values = countChoices(RunAtOnceChoices, config.maxConcurrentDownloads),
       label = unlimited,
@@ -367,8 +356,7 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
     )
     StepperRow(
       title = "Per server",
-      description = "Downloads from one website or FTP server at a time. Magnet links " +
-        "aren't counted.",
+      description = "Downloads from one website or FTP server at once.",
       value = config.maxConnectionsPerHost,
       values = countChoices(PerServerChoices, config.maxConnectionsPerHost),
       label = unlimited,
@@ -377,7 +365,7 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
     )
     StepperRow(
       title = "Retries",
-      description = "For network errors and busy servers, keeping what's already downloaded.",
+      description = "For network errors and busy servers.",
       value = config.retryCount,
       values = (RetryChoices + config.retryCount).distinct().sorted(),
       label = { if (it == 0) "Never" else "$it" },

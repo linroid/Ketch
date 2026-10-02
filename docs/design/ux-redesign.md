@@ -1905,6 +1905,9 @@ has no landing grid of category cards; the category list opens straight onto a p
   - BitTorrent: "3 trackers"
   - Sharing: "On · 192.168.1.20:8642"
   - Discover: "Claude · Brave search"
+- **Copy:** a row's helper text is one short line (about 60 characters at most) and only says
+  what its label does not. Caveats such as "Applies after a restart" sit at the end of the row
+  or in a one-line note under the group.
 - **Hue map:** General = Slate, Notifications = Amber, Integration = Indigo, Discover = Violet,
   About = Slate, Downloads = Blue, Speed = Orange, Network = Teal, BitTorrent = Jade,
   Sharing = Sky.
@@ -1972,8 +1975,8 @@ has no landing grid of category cards; the category list opens straight onto a p
     `updateConfig` for the embedded device while the app runs (the Android service keeps it alive).
     For remotes it works only while this client is connected; daemon-side rules are not scheduled
     (§8).
-- **Network:** interface chips with live state and the copy "Requests are spread across the
-  selected networks." Runtime-only notice kept.
+- **Network:** interface chips with live state and the copy "HTTP only. FTP and torrents use
+  the system default." The runtime-only note stays, as one line under the group.
 - **BitTorrent:** trackers editor (unchanged).
 - **Sharing:** the Pair a device card (§4.10.4), then **Advanced** (collapsed): port, token
   (masked, [Rotate]), discoverable (mDNS), CORS hosts, start with Ketch.

@@ -249,6 +249,31 @@ private fun TitleLine(
   }
 }
 
+/**
+ * A short caveat at the end of a row's title line, such as "Applies after a restart", for a row
+ * whose end has no control.
+ */
+@Composable
+internal fun SettingsNote(text: String) {
+  Text(
+    text = text,
+    style = KetchTheme.typography.caption,
+    color = KetchTheme.colors.textTertiary,
+    maxLines = 1,
+  )
+}
+
+/** A value at the end of a row, such as "English" or a shortcut, for a row that has no control. */
+@Composable
+internal fun SettingsValue(text: String) {
+  Text(
+    text = text,
+    style = KetchTheme.typography.bodyS,
+    color = KetchTheme.colors.textSecondary,
+    maxLines = 1,
+  )
+}
+
 /** Row whose whole surface toggles a switch. */
 @Composable
 fun SettingsSwitchRow(
