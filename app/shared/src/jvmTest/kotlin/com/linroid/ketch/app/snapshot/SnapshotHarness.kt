@@ -29,6 +29,7 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -39,6 +40,7 @@ import org.jetbrains.skia.Image
 import org.junit.Assume.assumeTrue
 import java.io.File
 import java.util.TimeZone
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import kotlin.time.Duration
@@ -110,11 +112,14 @@ internal object SnapshotHarness {
     interact: suspend SnapshotScene.() -> Unit = {},
     content: @Composable () -> Unit,
   ): Image = runBlocking(ui) {
+    // Compose logs an exception thrown while recomposing and carries on, so a broken composition
+    // would still render a picture; the handler collects it to fail the capture instead.
+    val errors = ConcurrentLinkedQueue<Throwable>()
     val scene = ImageComposeScene(
       width = (width.value * scale).roundToInt(),
       height = (height.value * scale).roundToInt(),
       density = Density(scale),
-      coroutineContext = ui,
+      coroutineContext = ui + CoroutineExceptionHandler { _, error -> errors += error },
       content = content,
     )
     try {
@@ -122,7 +127,9 @@ internal object SnapshotHarness {
       snapshotScene.settle()
       snapshotScene.interact()
       snapshotScene.settle()
-      snapshotScene.renderFrame()
+      snapshotScene.renderFrame().also {
+        errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
+      }
     } finally {
       scene.close()
     }
