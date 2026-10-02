@@ -28,9 +28,7 @@ enum class KetchIcon(internal val data: IconData) {
   ChevronLeft(IconData.strokes("M13 5l-5 5 5 5")),
   ChevronUp(IconData.strokes("M5 12l5-5 5 5")),
   ChevronDown(IconData.strokes("M5 8l5 5 5-5")),
-  Search(IconData.paths(
-    stroke = listOf("M9 3a6 6 0 1 0 0 12A6 6 0 0 0 9 3z", "M13.5 13.5l3 3"),
-  )),
+  Search(IconData.strokes("M9 3a6 6 0 1 0 0 12A6 6 0 0 0 9 3z", "M13.5 13.5l3 3")),
   Filter(IconData.strokes("M3 5h14", "M6 10h8", "M9 15h2")),
   Link(IconData.strokes(
     "M8.23 11.77l3.54-3.54",
@@ -38,16 +36,10 @@ enum class KetchIcon(internal val data: IconData) {
     "M11.41 12.83l-2.82 2.83a3 3 0 0 1 -4.24 -4.24L5.76 10"
   )),
   Folder(IconData.strokes(FOLDER)),
-  Settings(IconData.paths(
-    stroke = listOf(
-      "M10 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
-      "M10 2v2M10 16v2M2 10h2M16 10h2",
-      "M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"
-    ),
-  )),
-  Appearance(IconData.paths(
-    stroke = listOf(CIRCLE),
-    fill = listOf("M10 3a7 7 0 0 1 0 14z"),
+  Settings(IconData.strokes(
+    "M10 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
+    "M10 2v2M10 16v2M2 10h2M16 10h2",
+    "M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"
   )),
   // A solid disc, so it never reads as the outlined Settings gear.
   Sun(IconData.paths(
@@ -101,22 +93,14 @@ enum class KetchIcon(internal val data: IconData) {
     "M10 2.5v10", "M6.5 9L10 12.5L13.5 9",
     "M3.5 13.5v2.5a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-2.5"
   )),
-  Queued(IconData.paths(
-    stroke = listOf(CIRCLE, "M10 6v4l3 2"),
+  Queued(IconData.strokes(CIRCLE, "M10 6v4l3 2")),
+  Scheduled(IconData.strokes(
+    "M3.5 5h13a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1 -1.5 1.5h-13A1.5 1.5 0 0 1 2 15.5v-9" +
+      "A1.5 1.5 0 0 1 3.5 5z",
+    "M2 8.5h16M7 3v3M13 3v3"
   )),
-  Scheduled(IconData.paths(
-    stroke = listOf(
-      "M3.5 5h13a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1 -1.5 1.5h-13A1.5 1.5 0 0 1 2 15.5v-9" +
-        "A1.5 1.5 0 0 1 3.5 5z",
-      "M2 8.5h16M7 3v3M13 3v3"
-    ),
-  )),
-  Done(IconData.paths(
-    stroke = listOf(CIRCLE, "M7 10l2 2 4-4"),
-  )),
-  Failed(IconData.paths(
-    stroke = listOf(CIRCLE, "M7.5 7.5l5 5", "M12.5 7.5l-5 5"),
-  )),
+  Done(IconData.strokes(CIRCLE, "M7 10l2 2 4-4")),
+  Failed(IconData.strokes(CIRCLE, "M7.5 7.5l5 5", "M12.5 7.5l-5 5")),
 
   // Navigation
   Discover(IconData.paths(
@@ -138,7 +122,6 @@ enum class KetchIcon(internal val data: IconData) {
       "h10a2.5 2.5 0 1 0 -2.5-2.5z"
   )),
   Columns(IconData.strokes(FRAME, "M7.5 3.5v13", "M12.5 3.5v13")),
-  Inspector(IconData.strokes(FRAME, "M12.5 3.5v13")),
   Sidebar(IconData.strokes(FRAME, "M7.5 3.5v13")),
   Pennant(IconData.strokes("M5.5 2.5v15", "M5.5 3.5L16 8 5.5 12.5")),
   QrCode(IconData.paths(
@@ -154,9 +137,7 @@ enum class KetchIcon(internal val data: IconData) {
   )),
 
   // Status
-  CheckCircle(IconData.paths(
-    stroke = listOf(CIRCLE, "M7 10l2 2 4-4"),
-  )),
+  CheckCircle(IconData.strokes(CIRCLE, "M7 10l2 2 4-4")),
   Warning(IconData.paths(
     stroke = listOf(
       "M8.7 3.8a1.5 1.5 0 0 1 2.6 0l6.3 11a1.5 1.5 0 0 1 -1.3 2.2H3.7a1.5 1.5 0 0 1 -1.3-2.2z",
@@ -215,17 +196,6 @@ enum class KetchIcon(internal val data: IconData) {
       "M6 6.5a0.7 0.7 0 1 0 0-1.4 0.7 0.7 0 0 0 0 1.4z",
       "M6 13.5a0.7 0.7 0 1 0 0-1.4 0.7 0.7 0 0 0 0 1.4z"
     ),
-  )),
-  Local(IconData.strokes(
-    "M3.5 4h13a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1 -1.5 1.5h-13A1.5 1.5 0 0 1 2 12.5v-7" +
-      "A1.5 1.5 0 0 1 3.5 4z",
-    "M7 17h6", "M8 14v3", "M12 14v3"
-  )),
-  Remote(IconData.strokes(
-    CIRCLE,
-    "M3 10h14",
-    "M10 3c3 4 3 10 0 14",
-    "M10 3c-3 4-3 10 0 14"
   )),
   Network(IconData.paths(
     stroke = listOf(
