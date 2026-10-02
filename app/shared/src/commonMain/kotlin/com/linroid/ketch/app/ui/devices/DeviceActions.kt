@@ -13,6 +13,7 @@ import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.MAX_LINK_LIST_BYTES
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
@@ -206,5 +207,3 @@ internal fun AppState.dropFiles(entry: InstanceEntry, files: List<DroppedFile>) 
     dropText(entry, text)
   }
 }
-
-private const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024

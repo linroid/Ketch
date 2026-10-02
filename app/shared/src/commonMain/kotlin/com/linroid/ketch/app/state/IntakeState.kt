@@ -44,6 +44,7 @@ import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.MAGNET_METADATA_TIMEOUT
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.displayName
+import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.links
@@ -373,8 +374,8 @@ class IntakeHeaders {
     header(REFERER, referer)
     val agent = if (userAgent == UserAgentChoice.Custom) customUserAgent else userAgent.value
     agent?.let { header(USER_AGENT, it) }
-    header(COOKIE, cookie.lines().joinToString("; ") { it.trim().removeSuffix(";") }.trim(';', ' '))
-    header(AUTHORIZATION, authorization)
+    header(COOKIE_HEADER, cookie.lines().joinToString("; ") { it.trim().removeSuffix(";") }.trim(';', ' '))
+    header(AUTHORIZATION_HEADER, authorization)
     for (row in extra) header(row.name, row.value)
   }
 
@@ -384,8 +385,8 @@ class IntakeHeaders {
     for ((name, value) in headers) {
       when (name.lowercase()) {
         REFERER.lowercase() -> referer = value
-        COOKIE.lowercase() -> cookie = value
-        AUTHORIZATION.lowercase() -> authorization = value
+        COOKIE_HEADER.lowercase() -> cookie = value
+        AUTHORIZATION_HEADER.lowercase() -> authorization = value
         USER_AGENT.lowercase() -> {
           val known = UserAgentChoice.entries.firstOrNull { it.value == value }
           userAgent = known ?: UserAgentChoice.Custom
@@ -399,8 +400,6 @@ class IntakeHeaders {
   private companion object {
     const val REFERER = "Referer"
     const val USER_AGENT = "User-Agent"
-    const val COOKIE = "Cookie"
-    const val AUTHORIZATION = "Authorization"
   }
 }
 
@@ -1640,7 +1639,7 @@ class IntakeSession internal constructor(
         }
       }
     }
-    return api.resolveContent(file.readBytes(MAX_TORRENT_FILE_BYTES), file.name)
+    return api.resolveContent(file.readBytes(MAX_DROPPED_FILE_BYTES), file.name)
   }
 
   private fun watch(target: InstanceEntry) {
@@ -1728,17 +1727,8 @@ class IntakeSession internal constructor(
     /** How long submitting waits for links still being checked before it adds them as they are. */
     val SUBMIT_CHECK_WAIT = 10.seconds
 
-    /** How long a new download can be undone, together with its file. */
-    val ADD_UNDO_WINDOW = 8.seconds
-
     /** Most connections the sheet offers. */
     const val MAX_CONNECTIONS = 32
-
-    /** Matches the daemon's upload limit; torrent metainfo is 4 MiB by default. */
-    const val MAX_TORRENT_FILE_BYTES = 16L * 1024 * 1024
-
-    /** Largest list of links read from a file. */
-    const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024
 
     /** Clipboard text searched for links. */
     const val MAX_CLIP_CHARS = 64 * 1024
@@ -2048,8 +2038,6 @@ private fun separatorIn(path: String, fallback: String = "/"): String = when {
   '/' in path -> "/"
   else -> fallback
 }
-
-private fun downloads(count: Int): String = if (count == 1) "1 download" else "$count downloads"
 
 private val WORD = Regex("\\S+")
 private val SPACES = Regex("[ \\t]{2,}")

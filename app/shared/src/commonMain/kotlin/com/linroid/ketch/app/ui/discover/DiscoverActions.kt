@@ -6,6 +6,7 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.state.ADD_UNDO_WINDOW
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.CandidateAddResult
@@ -13,8 +14,8 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.util.downloads
 import kotlinx.coroutines.Job
-import kotlin.time.Duration.Companion.seconds
 
 private val log = KetchLogger("DiscoverScreen")
 
@@ -115,7 +116,3 @@ private fun AppState.reportDiscovered(
 /** The name a result is saved under, as messages and rows show it. */
 internal fun candidateName(candidate: AiCandidate): String =
   candidate.fileName?.takeIf { it.isNotBlank() } ?: candidate.title.ifBlank { candidate.url }
-
-private fun downloads(count: Int): String = if (count == 1) "1 download" else "$count downloads"
-
-private val ADD_UNDO_WINDOW = 8.seconds

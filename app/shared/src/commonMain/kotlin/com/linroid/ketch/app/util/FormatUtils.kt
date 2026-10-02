@@ -75,6 +75,9 @@ fun averageSpeed(bytes: Long, duration: Duration): Long? {
   return if (millis > 0) bytes * 1000 / millis else null
 }
 
+/** "1 download" or "3 downloads". */
+internal fun downloads(count: Int): String = if (count == 1) "1 download" else "$count downloads"
+
 /** "09:05": [hour] and [minute] on a 24-hour clock. */
 internal fun clockText(hour: Int, minute: Int): String = "${hour.twoDigits()}:${minute.twoDigits()}"
 

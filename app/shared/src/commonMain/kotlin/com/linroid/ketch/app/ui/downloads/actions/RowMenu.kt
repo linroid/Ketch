@@ -49,6 +49,7 @@ import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.intake.targetSummary
+import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.priorityLabel
 import kotlin.math.roundToInt
 import kotlin.time.Clock

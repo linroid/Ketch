@@ -41,6 +41,7 @@ import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.displayName
+import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.toCopy
@@ -1723,20 +1724,11 @@ class AppState(
   }
 
   private companion object {
-    /** Matches the daemon's upload limit; torrent metainfo is 4 MiB by default. */
-    const val MAX_DROPPED_FILE_BYTES = 16L * 1024 * 1024
-
-    /** Largest link list read from a dropped file. */
-    const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024
-
     /** Dropped files read as text and handed to the add sheet. */
     val LINK_LIST_EXTENSIONS = setOf("txt", "csv", "url", "webloc")
 
     /** How long Start now waits for the task to start before naming what it preempted. */
     val START_TIMEOUT = 2.seconds
-
-    /** How long a new download can be undone, together with its file. */
-    val ADD_UNDO_WINDOW = 8.seconds
 
     /** Order of the Downloads list until it is changed: newest first, ungrouped. */
     val DEFAULT_ARRANGEMENT = ListArrangement(
@@ -1781,8 +1773,20 @@ internal fun credentialWarning(headers: List<Map<String, String>>, deviceName: S
   }
 }
 
-private const val COOKIE_HEADER = "Cookie"
-private const val AUTHORIZATION_HEADER = "Authorization"
+internal const val COOKIE_HEADER = "Cookie"
+internal const val AUTHORIZATION_HEADER = "Authorization"
+
+/**
+ * Largest dropped `.torrent` file read; matches the daemon's upload limit, while torrent metainfo
+ * is 4 MiB by default.
+ */
+internal const val MAX_DROPPED_FILE_BYTES = 16L * 1024 * 1024
+
+/** Largest link list read from a dropped file. */
+internal const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024
+
+/** How long a new download can be undone, together with its file. */
+internal val ADD_UNDO_WINDOW = 8.seconds
 
 /** How many adds [AppState.addedTasks] holds for a Downloads page that is still busy. */
 private const val ADDED_BUFFER = 8
@@ -1825,8 +1829,6 @@ internal suspend fun <R> catchingUnlessCancelled(block: suspend () -> R): Result
 
 /** Whether a failure leaves nothing to resume, so a retry has to start over. */
 private fun KetchError.needsFreshStart(): Boolean = toCopy().primary == RowAction.DownloadAgain
-
-private fun downloads(count: Int): String = if (count == 1) "1 download" else "$count downloads"
 
 /** "2 scheduled still start at 02:00" for the scheduled tasks a bulk pause leaves alone. */
 private fun scheduledNote(schedules: List<DownloadSchedule>): String? {

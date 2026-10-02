@@ -33,6 +33,7 @@ import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.taskActions
 import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.list.RowCommands
+import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.priorityLabel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -545,9 +546,6 @@ private class TrashResult(
 /** Path of the file a completed row saved, or `null`. */
 internal val TaskRow.outputFile: String?
   get() = (state as? DownloadState.Completed)?.outputPath?.ifBlank { null }
-
-/** "1 download" or "3 downloads". */
-internal fun downloads(count: Int): String = if (count == 1) "1 download" else "$count downloads"
 
 /**
  * Why a batch [command] left [skipped] rows alone, such as "1 already finished" or "2 already

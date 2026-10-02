@@ -23,6 +23,7 @@ import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.SearchQuery
 import com.linroid.ketch.app.util.displayName
+import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.links
 import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
@@ -493,8 +494,6 @@ private val BatchVerb.icon: KetchIcon
   }
 
 private fun noun(count: Int): String = if (count == 1) "download" else "downloads"
-
-private fun downloads(count: Int): String = "$count ${noun(count)}"
 
 /** Commands in the order the palette lists them; any other bound command follows. */
 private val COMMAND_ORDER: List<KetchCommand> = listOf(
