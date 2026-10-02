@@ -105,7 +105,7 @@ private fun desktopScreen(theme: SnapshotTheme): Image =
 private fun androidScreen(theme: SnapshotTheme): Image =
   withEnvironment(
     create = {
-      ShowcaseEnvironment(ShowcaseDevice.Phone, theme, DensityMode.Comfortable, ShowcaseDiscovery)
+      ShowcaseEnvironment(ShowcaseDevice.Phone, theme, DensityMode.Comfortable, IdleDiscovery)
     },
   ) { environment ->
     SnapshotHarness.render(

@@ -98,7 +98,7 @@ private val MinSettingsWindowSize = SnapshotSize(640.dp, 480.dp, KetchDensity.Co
 private val MinMainWindowSize = SnapshotSize(720.dp, 480.dp, KetchDensity.Compact)
 
 /** What the desktop app reports while the extension is set up in Chrome only. */
-private val SampleIntegration = IntegrationStatus(
+internal val SampleIntegration = IntegrationStatus(
   browsers = listOf(
     DetectedBrowser("Chrome", extensionConnected = true),
     DetectedBrowser("Edge"),
@@ -109,7 +109,7 @@ private val SampleIntegration = IntegrationStatus(
 )
 
 /** Desktop hooks that do nothing, so the pages show their desktop rows. */
-private val DesktopHooksShown = object : DesktopHooks {
+internal val DesktopHooksShown = object : DesktopHooks {
   override val isSupported: Boolean get() = true
 }
 

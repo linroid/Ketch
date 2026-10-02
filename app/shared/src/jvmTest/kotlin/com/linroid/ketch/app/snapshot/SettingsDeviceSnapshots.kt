@@ -6,15 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.NetworkInterfaceConfig
-import com.linroid.ketch.api.NetworkInterfaceInfo
-import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.ObservedPeak
@@ -312,11 +307,7 @@ private class DeviceEnvironment(
     factory = InstanceFactory(
       deviceName = data.deviceName,
       embeddedFactory = { api },
-      localServerFactory = {
-        object : LocalServerHandle {
-          override fun stop() {}
-        }
-      },
+      localServerFactory = PretendServer,
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
         RemoteInstance(
@@ -394,31 +385,3 @@ private class DeviceEnvironment(
   }
 }
 
-/**
- * [SampleKetchApi] with Wi-Fi, Ethernet and a VPN, the first two picked for downloads, or, when
- * it should [fail], no answer about them.
- */
-private class NetworkedApi(
-  private val sample: SampleKetchApi,
-  private val fail: Boolean = false,
-) : KetchApi by sample {
-  private var networks = NetworkInterfaces(
-    supported = true,
-    available = listOf(
-      NetworkInterfaceInfo("en0", "en0", listOf("fe80::1c2a:3bff:fe4d:5e6f", "192.168.1.20")),
-      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
-      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
-    ),
-    config = NetworkInterfaceConfig(listOf("en0", "en7")),
-  )
-
-  override suspend fun networkInterfaces(): NetworkInterfaces {
-    if (fail) throw IllegalStateException("The device didn't answer.")
-    return networks
-  }
-
-  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
-    networks = networks.copy(config = config)
-    return networks
-  }
-}

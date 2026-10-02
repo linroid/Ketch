@@ -50,7 +50,6 @@ import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.components.StatusDotDefaults
 import com.linroid.ketch.app.platform.FileActions
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
@@ -76,7 +75,6 @@ import com.linroid.ketch.app.ui.downloads.actions.rubberBand
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.skia.EncodedImageFormat
@@ -305,33 +303,6 @@ private class DemoScope(val actions: ListActions, val state: AppState) {
   }
 }
 
-/** Files that exist and can go to the Trash, without touching this machine. */
-private class SnapshotFiles(override val canTrash: Boolean = true) : FileActions {
-  override val revealLabel: String = "Show in Finder"
-  override val canShare: Boolean = false
-
-  override suspend fun open(path: String) {}
-
-  override suspend fun reveal(path: String) {}
-
-  override suspend fun share(path: String) {}
-
-  override suspend fun exists(path: String): Boolean = true
-
-  override suspend fun moveToTrash(path: String) {}
-}
-
-private object SnapshotClipboard : SystemClipboard {
-  override val readsSilently: Boolean = true
-  override val pasteEvents = emptyFlow<String>()
-
-  override suspend fun hasLink(): Boolean = false
-
-  override suspend fun readText(): String? = null
-
-  override suspend fun writeText(text: String) {}
-}
-
 /** The scene of an [actionsSnapshot] with the rows' positions, to hover them. */
 private class ActionsScene(val scene: SnapshotScene, private val controller: AppController) {
   suspend fun hoverRow(name: String, x: Dp = 600.dp) {
@@ -397,7 +368,7 @@ private fun StandInDownloads(
     val rows = view.rows
     val scope = rememberCoroutineScope()
     val runner = remember(state, files) {
-      val commands = RowCommands(state, files, SnapshotClipboard, scope) {}
+      val commands = RowCommands(state, files, SnapshotClipboard(), scope) {}
       RowActionRunner(commands)
     }
     val actions = rememberListActions(rows, state, runner)

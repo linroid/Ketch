@@ -27,8 +27,6 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.app.platform.FileActions
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.ListFixtures
@@ -49,7 +47,6 @@ import com.linroid.ketch.app.ui.inspector.TaskHeader
 import com.linroid.ketch.app.ui.inspector.TaskInspector
 import com.linroid.ketch.app.ui.inspector.rememberDeviceLabel
 import com.linroid.ketch.app.ui.list.RowCommands
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -235,7 +232,7 @@ class InspectorSnapshots {
         CompositionLocalProvider(LocalAppState provides state) {
           val scope = rememberCoroutineScope()
           val runner = remember(scope) {
-            val commands = RowCommands(state, InspectorFiles, InspectorClipboard, scope) {}
+            val commands = RowCommands(state, SnapshotFiles(), SnapshotClipboard(), scope) {}
             RowActionRunner(commands)
           }
           Pane(width, placement) {
@@ -331,35 +328,6 @@ private fun Pane(width: Dp, placement: InspectorPlacement, content: @Composable 
       ) { content() }
     }
   }
-}
-
-/** Files that exist, without touching this machine. */
-private object InspectorFiles : FileActions {
-  override val revealLabel: String = "Show in Finder"
-  override val canShare: Boolean = false
-  override val canTrash: Boolean = true
-
-  override suspend fun open(path: String) {}
-
-  override suspend fun reveal(path: String) {}
-
-  override suspend fun share(path: String) {}
-
-  override suspend fun exists(path: String): Boolean = true
-
-  override suspend fun moveToTrash(path: String) {}
-}
-
-/** A clipboard that keeps nothing. */
-private object InspectorClipboard : SystemClipboard {
-  override val readsSilently: Boolean = true
-  override val pasteEvents = emptyFlow<String>()
-
-  override suspend fun hasLink(): Boolean = false
-
-  override suspend fun readText(): String? = null
-
-  override suspend fun writeText(text: String) {}
 }
 
 /** A download that finished on a remote device, whose file is out of this one's reach. */

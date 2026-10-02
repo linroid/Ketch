@@ -9,10 +9,8 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
-import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
@@ -20,7 +18,6 @@ import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.ListTestTask
@@ -45,14 +42,12 @@ import kotlin.math.sin
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 /**
  * The Devices page (W4-DEVICES-PAGE): a card per device with its speed, lane, counts, storage,
@@ -219,7 +214,7 @@ private class DevicesPageEnvironment(
       emptyList()
     },
   )
-  private val clock = DevicesPageClock(SampleData.NOW - OFFLINE_FOR)
+  private val clock = MovableClock(SampleData.NOW - OFFLINE_FOR)
   private val nasTasks = if (fleet == DevicesPageFleet.Mixed) sampleNasTasks() else emptyList()
 
   // The downloading tasks of every device, in the states they start in.
@@ -227,17 +222,13 @@ private class DevicesPageEnvironment(
     .filter { it.state.value is DownloadState.Downloading }
     .associateWith { it.state.value as DownloadState.Downloading }
   private val denPc = MutableStateFlow<ConnectionState>(ConnectionState.Connected)
-  private val local = DevicesPageLocalApi(SampleKetchApi(data))
+  private val local = NetworkedApi(SampleKetchApi(data), en0 = listOf("192.168.1.20"))
   private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
       deviceName = data.deviceName,
       embeddedFactory = { local },
-      localServerFactory = {
-        object : LocalServerHandle {
-          override fun stop() {}
-        }
-      },
+      localServerFactory = PretendServer,
       remoteFactory = { config -> remote(config) },
     ),
     initialRemotes = data.remotes,
@@ -338,24 +329,6 @@ private class DevicesPageEnvironment(
     val WANDER_INTERVAL: Duration = 300.milliseconds
     const val WANDER_STEP = 0.45
   }
-}
-
-/** A clock whose time a scenario moves. */
-private class DevicesPageClock(@Volatile var now: Instant) : Clock {
-  override fun now(): Instant = now
-}
-
-/** [sample] downloading over Wi-Fi and Ethernet, with a VPN it does not use. */
-private class DevicesPageLocalApi(private val sample: SampleKetchApi) : KetchApi by sample {
-  override suspend fun networkInterfaces(): NetworkInterfaces = NetworkInterfaces(
-    supported = true,
-    available = listOf(
-      NetworkInterfaceInfo("en0", "en0", listOf("192.168.1.20")),
-      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
-      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12"))
-    ),
-    config = NetworkInterfaceConfig(listOf("en0", "en7")),
-  )
 }
 
 /** The one network a remote device downloads over. */

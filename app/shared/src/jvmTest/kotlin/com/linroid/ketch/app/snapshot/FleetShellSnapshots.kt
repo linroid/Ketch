@@ -26,7 +26,6 @@ import com.linroid.ketch.app.components.KetchMenuPanel
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -53,13 +52,11 @@ import kotlinx.coroutines.yield
 import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 /**
  * The fleet in the shell (W4-FLEET-SHELL): live device rows and All devices in the sidebar, the
@@ -309,7 +306,7 @@ private class FleetEnvironment(
     remotes = if (single) emptyList() else listOf(Nas, DenPc),
     ui = { it.copy(sidebarCollapsed = collapsed) },
   )
-  private val clock = FleetClock(SampleData.NOW - OFFLINE_FOR)
+  private val clock = MovableClock(SampleData.NOW - OFFLINE_FOR)
   private val nasTasks = fleetNasTasks()
   private val denPc = MutableStateFlow<ConnectionState>(ConnectionState.Connected)
   private val instanceManager = InstanceManager(
@@ -317,11 +314,7 @@ private class FleetEnvironment(
       deviceName = data.deviceName,
       embeddedFactory = { SampleKetchApi(data) },
       // This Mac can share its downloads, as on the desktop.
-      localServerFactory = {
-        object : LocalServerHandle {
-          override fun stop() {}
-        }
-      },
+      localServerFactory = PretendServer,
       remoteFactory = { config ->
         if (config.host == Nas.host) {
           RemoteInstance(
@@ -382,11 +375,6 @@ private class FleetEnvironment(
     val START_TIMEOUT: Duration = 10.seconds
     const val STARTUP_YIELDS = 3
   }
-}
-
-/** A clock whose time a scenario moves. */
-private class FleetClock(@Volatile var now: Instant) : Clock {
-  override fun now(): Instant = now
 }
 
 private fun fleetStatus(name: String, os: String): KetchStatus = sampleStatus(

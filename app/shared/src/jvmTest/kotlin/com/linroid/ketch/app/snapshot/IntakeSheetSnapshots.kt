@@ -34,8 +34,6 @@ import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.IntakePreferences
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -155,7 +153,7 @@ class IntakeSheetSnapshots {
     intakeSnapshots(
       "intake-empty-clipboard",
       DESKTOP_AND_PHONE,
-      clipboard = LinkClipboard(CLIP),
+      clipboard = SnapshotClipboard(CLIP),
     ) {
       state.appSettings.saveUi { it.copy(clipboardMode = ClipboardMode.Suggest) }
       state.openIntake(IntakeRequest())
@@ -164,7 +162,7 @@ class IntakeSheetSnapshots {
 
   @Test
   fun filledFromClipboard_desktop_saysWhereTheLinkCameFrom() {
-    intakeSnapshots("intake-from-clipboard", DESKTOP_ONLY, clipboard = LinkClipboard(CLIP)) {
+    intakeSnapshots("intake-from-clipboard", DESKTOP_ONLY, clipboard = SnapshotClipboard(CLIP)) {
       state.appSettings.saveUi { it.copy(clipboardMode = ClipboardMode.Fill) }
       state.openIntake(IntakeRequest())
     }
@@ -217,7 +215,7 @@ class IntakeSheetSnapshots {
           val scope = rememberCoroutineScope()
           val actions = IntakeActions(
             session = session,
-            clipboard = LinkClipboard(null),
+            clipboard = SnapshotClipboard(null),
             picker = rememberFilePicker(),
             fileActions = null,
             scope = scope,
@@ -297,18 +295,6 @@ private fun intakeEnvironment(
 /** [window], focused. */
 private class FocusedWindow(window: WindowInfo) : WindowInfo by window {
   override val isWindowFocused: Boolean = true
-}
-
-/** A clipboard holding [text], read without a notice as on Windows and Linux. */
-private class LinkClipboard(private val text: String?) : SystemClipboard {
-  override val readsSilently: Boolean = true
-  override val pasteEvents: Flow<String> = emptyFlow()
-
-  override suspend fun hasLink(): Boolean = text != null
-
-  override suspend fun readText(): String? = text
-
-  override suspend fun writeText(text: String) {}
 }
 
 /** [base] with its links checked by [check]. */

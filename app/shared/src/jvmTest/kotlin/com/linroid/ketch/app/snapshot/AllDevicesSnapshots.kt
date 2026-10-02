@@ -44,9 +44,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.io.File
-import kotlin.math.PI
-import kotlin.math.roundToLong
-import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -243,7 +240,9 @@ private class AllDevicesEnvironment(
   override suspend fun start() {
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
-    seedSpeedHistory()
+    val states = data.tasks.associate { TaskKey(LOCAL_DEVICE_ID, it.taskId) to it.state.value } +
+      nas.tasks.value.associate { TaskKey(NAS_ID, it.taskId) to it.state.value }
+    seedSpeedHistory(controller.speedHistory, states, Random(HISTORY_SEED))
     controller.state.taskList.allRows.first { it.size == data.tasks.size + nas.tasks.value.size }
     check(controller.state.showAllDevices()) { "Fewer than two devices" }
     controller.state.taskList.rows.first { it.size == data.tasks.size + nas.tasks.value.size }
@@ -253,21 +252,6 @@ private class AllDevicesEnvironment(
     controller.close()
     instanceManager.close()
   }
-
-  private fun seedSpeedHistory() {
-    val random = Random(HISTORY_SEED)
-    val states = data.tasks.associate { TaskKey(LOCAL_DEVICE_ID, it.taskId) to it.state.value } +
-      nas.tasks.value.associate { TaskKey(NAS_ID, it.taskId) to it.state.value }
-    for (second in HISTORY_SECONDS downTo 0) {
-      val speeds = states.mapValues { (_, state) ->
-        (state as? DownloadState.Downloading)?.progress?.bytesPerSecond?.let { speed ->
-          val wave = 0.8 + 0.15 * sin(second * PI / 23) + 0.1 * random.nextDouble()
-          (speed * wave).roundToLong()
-        }
-      }
-      controller.speedHistory.record(SampleData.NOW - second.seconds, speeds)
-    }
-  }
 }
 
 private val DesktopAndPhone = listOf(SnapshotSize.Desktop, SnapshotSize.Phone)
@@ -276,7 +260,6 @@ private const val NAS_DIR = "/volume1/downloads"
 private const val GIB = 1L shl 30
 private val START_TIMEOUT = 5.seconds
 private const val STARTUP_YIELDS = 3
-private const val HISTORY_SECONDS = 180
 private const val HISTORY_SEED = 7
 private val HISTORY_WAIT = 3.seconds
 private val SETTLE = 300.milliseconds

@@ -11,6 +11,8 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.NetworkInterfaceConfig
+import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
@@ -19,15 +21,24 @@ import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.platform.FileActions
+import com.linroid.ketch.app.platform.SystemClipboard
+import com.linroid.ketch.app.state.AiDiscoverRequest
+import com.linroid.ketch.app.state.AiDiscoverResponse
+import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
+import com.linroid.ketch.app.state.SpeedHistoryStore
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
+import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.AppearanceConfig
 import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.DensityMode
@@ -38,8 +49,10 @@ import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.yield
@@ -496,9 +509,7 @@ internal class SampleEnvironment(
   config: (KetchConfig) -> KetchConfig = { it },
   speedMode: ((KetchApi, CoroutineScope) -> SpeedModeController)? = null,
   private val seedHistory: Boolean = true,
-  private val wave: (second: Int, random: Random) -> Double = { second, random ->
-    0.8 + 0.15 * sin(second * PI / 23) + 0.1 * random.nextDouble()
-  },
+  private val wave: (second: Int, random: Random) -> Double = SampleWave,
 ) : SnapshotEnvironment {
   private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
@@ -538,7 +549,8 @@ internal class SampleEnvironment(
     }
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
-    seedSpeedHistory()
+    val states = data.tasks.associate { TaskKey(LOCAL_DEVICE_ID, it.taskId) to it.state.value }
+    seedSpeedHistory(controller.speedHistory, states, Random(SEED), wave)
     controller.taskList.rows.first { it.size == data.tasks.size }
     val downloading = data.tasks.filter { it.state.value is DownloadState.Downloading }
     check(downloading.all { history(it).size > HISTORY_SECONDS }) {
@@ -548,18 +560,6 @@ internal class SampleEnvironment(
 
   private fun history(task: ListTestTask) =
     checkNotNull(controller.speedHistory.history(TaskKey(LOCAL_DEVICE_ID, task.taskId)))
-
-  private fun seedSpeedHistory() {
-    val random = Random(SEED)
-    val keys = data.tasks.associate { TaskKey(LOCAL_DEVICE_ID, it.taskId) to it.state.value }
-    for (second in HISTORY_SECONDS downTo 0) {
-      val speeds = keys.mapValues { (_, state) ->
-        val speed = (state as? DownloadState.Downloading)?.progress?.bytesPerSecond
-        speed?.let { (it * wave(second, random)).roundToLong() }
-      }
-      controller.speedHistory.record(SampleData.NOW - second.seconds, speeds)
-    }
-  }
 
   override fun close() {
     controller.close()
@@ -571,7 +571,113 @@ internal class SampleEnvironment(
 
   private companion object {
     const val SEED = 42
-    const val HISTORY_SECONDS = 180
     const val STARTUP_YIELDS = 3
+  }
+}
+
+/** Seconds of speed history [seedSpeedHistory] records before [SampleData.NOW]. */
+internal const val HISTORY_SECONDS = 180
+
+/** A second of seeded history: 80 % of the speed, swinging 15 % with time and 10 % at random. */
+internal val SampleWave: (second: Int, random: Random) -> Double = { second, random ->
+  0.8 + 0.15 * sin(second * PI / 23) + 0.1 * random.nextDouble()
+}
+
+/**
+ * Records in [history] a sample a second for [HISTORY_SECONDS] up to [SampleData.NOW] of each
+ * downloading task in [states], [wave] of its speed, drawing from [random].
+ */
+internal fun seedSpeedHistory(
+  history: SpeedHistoryStore,
+  states: Map<TaskKey, DownloadState>,
+  random: Random,
+  wave: (second: Int, random: Random) -> Double = SampleWave,
+) {
+  for (second in HISTORY_SECONDS downTo 0) {
+    val speeds = states.mapValues { (_, state) ->
+      val speed = (state as? DownloadState.Downloading)?.progress?.bytesPerSecond
+      speed?.let { (it * wave(second, random)).roundToLong() }
+    }
+    history.record(SampleData.NOW - second.seconds, speeds)
+  }
+}
+
+/** A clipboard holding [text], read without a notice as on Windows and Linux; writes go nowhere. */
+internal class SnapshotClipboard(private val text: String? = null) : SystemClipboard {
+  override val readsSilently: Boolean = true
+  override val pasteEvents: Flow<String> = emptyFlow()
+
+  override suspend fun hasLink(): Boolean = text != null
+
+  override suspend fun readText(): String? = text
+
+  override suspend fun writeText(text: String) {}
+}
+
+/** Files that exist and, when [canTrash], can go to the Trash, without touching this machine. */
+internal class SnapshotFiles(override val canTrash: Boolean = true) : FileActions {
+  override val revealLabel: String = "Show in Finder"
+  override val canShare: Boolean = false
+
+  override suspend fun open(path: String) {}
+
+  override suspend fun reveal(path: String) {}
+
+  override suspend fun share(path: String) {}
+
+  override suspend fun exists(path: String): Boolean = true
+
+  override suspend fun moveToTrash(path: String) {}
+}
+
+/**
+ * [sample] on Wi-Fi at [en0], Ethernet and a VPN, with downloads spread over the first two, or,
+ * when it should [fail], no answer about them.
+ */
+internal class NetworkedApi(
+  private val sample: SampleKetchApi,
+  private val fail: Boolean = false,
+  en0: List<String> = listOf("fe80::1c2a:3bff:fe4d:5e6f", "192.168.1.20"),
+) : KetchApi by sample {
+  private var networks = NetworkInterfaces(
+    supported = true,
+    available = listOf(
+      NetworkInterfaceInfo("en0", "en0", en0),
+      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
+      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
+    ),
+    config = NetworkInterfaceConfig(listOf("en0", "en7")),
+  )
+
+  override suspend fun networkInterfaces(): NetworkInterfaces {
+    if (fail) throw IllegalStateException("The device didn't answer.")
+    return networks
+  }
+
+  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+    networks = networks.copy(config = config)
+    return networks
+  }
+}
+
+/** A clock whose time a scenario moves. */
+internal class MovableClock(@Volatile var now: Instant) : Clock {
+  override fun now(): Instant = now
+}
+
+/** Starts a sharing server that only pretends to listen. */
+internal val PretendServer: (KetchApi) -> LocalServerHandle = {
+  object : LocalServerHandle {
+    override fun stop() {}
+  }
+}
+
+/** Discovery that can run but is never asked, so the Discover page and tab show. */
+internal object IdleDiscovery : AiDiscoveryProviderFactory {
+  override fun create(settings: AiSettings): AiDiscoveryProvider = object : AiDiscoveryProvider {
+    override suspend fun discover(request: AiDiscoverRequest, onStep: (DiscoveryStep) -> Unit) =
+      AiDiscoverResponse(request.query, emptyList())
+
+    override suspend fun verify(): String = "OK"
   }
 }

@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.components.AddButtonMode
 import com.linroid.ketch.app.components.KetchAddButton
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
@@ -35,7 +34,6 @@ import com.linroid.ketch.app.ui.downloads.LocalPageClipboard
 import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 import java.io.File
@@ -160,7 +158,7 @@ private fun addAppSnapshot(
   size: SnapshotSize = SnapshotSize.Desktop,
   setup: suspend AppScenario.() -> Unit = {},
 ): File = withSample(theme) { env ->
-  val clipboard = CopiedLinkClipboard(clip)
+  val clipboard = SnapshotClipboard(clip)
   SnapshotHarness.capture(
     name = "$name-${theme.id}-${size.id}",
     size = size,
@@ -194,7 +192,7 @@ private fun pageSnapshot(name: String, theme: SnapshotTheme): File = withSample(
       CompositionLocalProvider(
         LocalClock provides SampleData.CLOCK,
         LocalWindowDrop provides drop,
-        LocalPageClipboard provides CopiedLinkClipboard(null),
+        LocalPageClipboard provides SnapshotClipboard(null),
       ) {
         Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas).padding(8.dp)) {
           Box(
@@ -302,14 +300,3 @@ private fun writeFrame(name: String, image: Image) {
   File(SnapshotHarness.outputDir, "$name.png").writeBytes(data.bytes)
 }
 
-/** A clipboard holding [text], read without a notice, as on Windows and Linux. */
-private class CopiedLinkClipboard(private val text: String?) : SystemClipboard {
-  override val readsSilently: Boolean = true
-  override val pasteEvents = emptyFlow<String>()
-
-  override suspend fun hasLink(): Boolean = text != null
-
-  override suspend fun readText(): String? = text
-
-  override suspend fun writeText(text: String) {}
-}

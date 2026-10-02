@@ -11,16 +11,11 @@ import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.state.AiDiscoverRequest
-import com.linroid.ketch.app.state.AiDiscoverResponse
-import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.TaskKey
-import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.UiPreferences
@@ -351,7 +346,12 @@ internal class ShowcaseEnvironment(
   override suspend fun start() {
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
-    seedSpeedHistory()
+    val states = studioTasks.associate { studioKey(it.taskId) to it.state.value } +
+      homeTasks.associate { TaskKey(ShowcaseData.HOME_ID, it.taskId) to it.state.value } +
+      laptopTasks.associate { TaskKey(laptopId, it.taskId) to it.state.value }
+    seedSpeedHistory(controller.speedHistory, states, Random(SEED)) { second, random ->
+      0.84 + 0.12 * sin(second * PI / 23) + 0.08 * random.nextDouble()
+    }
     controller.taskList.rows.first { it.size == studioTasks.size }
     instanceManager.presence.first { list -> list.all { it.disk != null } }
   }
@@ -393,26 +393,9 @@ internal class ShowcaseEnvironment(
     instanceManager.close()
   }
 
-  private fun seedSpeedHistory() {
-    val random = Random(SEED)
-    val states = studioTasks.associate { studioKey(it.taskId) to it.state.value } +
-      homeTasks.associate { TaskKey(ShowcaseData.HOME_ID, it.taskId) to it.state.value } +
-      laptopTasks.associate { TaskKey(laptopId, it.taskId) to it.state.value }
-    for (second in HISTORY_SECONDS downTo 0) {
-      val speeds = states.mapValues { (_, state) ->
-        (state as? DownloadState.Downloading)?.progress?.bytesPerSecond?.let { speed ->
-          val wave = 0.84 + 0.12 * sin(second * PI / 23) + 0.08 * random.nextDouble()
-          (speed * wave).roundToLong()
-        }
-      }
-      controller.speedHistory.record(SampleData.NOW - second.seconds, speeds)
-    }
-  }
-
   private companion object {
     const val PHONE_NAME = "Phone"
     const val SEED = 26
-    const val HISTORY_SECONDS = 180
     const val STARTUP_YIELDS = 3
     const val SWING_BASE = 0.76
     const val SWING_WAVE = 0.18
@@ -420,16 +403,6 @@ internal class ShowcaseEnvironment(
     const val SWING_STEP = 0.75
     const val SWING_PHASE = 2.1
     const val SETTLE_SAMPLES = 2
-  }
-}
-
-/** Discovery that can run but is never asked, so a phone shows its Discover tab. */
-internal object ShowcaseDiscovery : AiDiscoveryProviderFactory {
-  override fun create(settings: AiSettings): AiDiscoveryProvider = object : AiDiscoveryProvider {
-    override suspend fun discover(request: AiDiscoverRequest, onStep: (DiscoveryStep) -> Unit) =
-      AiDiscoverResponse(request.query, emptyList())
-
-    override suspend fun verify(): String = "OK"
   }
 }
 
