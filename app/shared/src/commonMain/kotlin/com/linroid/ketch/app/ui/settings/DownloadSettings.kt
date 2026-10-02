@@ -346,7 +346,7 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
     footer = "Lowering a limit lets running downloads finish. Retries apply as downloads start " +
       "or resume.",
   ) {
-    StepperRow(
+    SettingsStepperRow(
       title = "Run at once",
       description = "The rest wait in the queue, by priority.",
       value = config.maxConcurrentDownloads,
@@ -355,7 +355,7 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
       noun = "downloads at once",
       onChange = { onChange(config.copy(maxConcurrentDownloads = it)) },
     )
-    StepperRow(
+    SettingsStepperRow(
       title = "Per server",
       description = "Downloads from one website or FTP server at once.",
       value = config.maxConnectionsPerHost,
@@ -364,7 +364,7 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
       noun = "downloads per server",
       onChange = { onChange(config.copy(maxConnectionsPerHost = it)) },
     )
-    StepperRow(
+    SettingsStepperRow(
       title = "Retries",
       description = "For network errors and busy servers.",
       value = config.retryCount,
@@ -374,31 +374,6 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
       onChange = { onChange(config.copy(retryCount = it)) },
     )
   }
-}
-
-@Composable
-private fun StepperRow(
-  title: String,
-  description: String,
-  value: Int,
-  values: List<Int>,
-  label: (Int) -> String,
-  noun: String,
-  onChange: (Int) -> Unit,
-) {
-  SettingsRow(
-    title = title,
-    description = description,
-    trailing = {
-      SettingsStepper(
-        value = value,
-        values = values,
-        label = label,
-        onChange = onChange,
-        noun = noun,
-      )
-    },
-  )
 }
 
 private suspend fun readSystem(device: InstanceEntry): SystemInfo? = try {

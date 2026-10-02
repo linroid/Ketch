@@ -286,7 +286,10 @@ fun SettingsSwitchRow(
   )
 }
 
-/** Row with a drop-down of [options] on the right. */
+/**
+ * Row with a compact drop-down button on the right, which lists [options] in a menu with a check
+ * on [value].
+ */
 @Composable
 fun <T> SettingsSelectRow(
   title: String,
@@ -304,79 +307,60 @@ fun <T> SettingsSelectRow(
     enabled = enabled,
     modifier = modifier,
     trailing = {
-      SettingsSelect(
-        value = value,
-        options = options,
-        label = label,
-        onSelect = onSelect,
-        enabled = enabled,
-      )
+      val colors = KetchTheme.colors
+      val spacing = KetchTheme.spacing
+      val shape = KetchTheme.shapes.full
+      val interactions = remember { MutableInteractionSource() }
+      val overlay = rememberInteractionOverlay(interactions, enabled)
+      val focus = rememberFocusVisibility()
+      var expanded by remember { mutableStateOf(false) }
+      Box {
+        Row(
+          modifier = Modifier
+            .focusRing(focus.visible, shape, colors.focusRing)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
+            .height(KetchTheme.density.buttonMedium)
+            .widthIn(min = SelectMinWidth)
+            .background(colors.surface, shape)
+            .background(overlay, shape)
+            .border(HairlineWidth, colors.borderStrong, shape)
+            .ketchClickable(
+              interactions = interactions,
+              focus = focus,
+              enabled = enabled,
+              role = Role.DropdownList,
+              onClick = { expanded = true },
+            )
+            .padding(start = spacing.s3, end = spacing.s2),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.End),
+        ) {
+          Text(
+            text = label(value),
+            style = KetchTheme.typography.label,
+            color = colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+          )
+          KetchIconImage(
+            icon = KetchIcon.ChevronDown,
+            size = KetchTheme.density.controlGlyph,
+            tint = colors.textTertiary,
+          )
+        }
+        KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+          options.forEach { option ->
+            item(
+              label = label(option),
+              checked = option == value,
+              onClick = { if (option != value) onSelect(option) },
+            )
+          }
+        }
+      }
     },
   )
-}
-
-/** Compact drop-down button listing [options] in a menu, with a check on [value]. */
-@Composable
-fun <T> SettingsSelect(
-  value: T,
-  options: List<T>,
-  label: (T) -> String,
-  onSelect: (T) -> Unit,
-  modifier: Modifier = Modifier,
-  enabled: Boolean = true,
-) {
-  val colors = KetchTheme.colors
-  val spacing = KetchTheme.spacing
-  val shape = KetchTheme.shapes.full
-  val interactions = remember { MutableInteractionSource() }
-  val overlay = rememberInteractionOverlay(interactions, enabled)
-  val focus = rememberFocusVisibility()
-  var expanded by remember { mutableStateOf(false) }
-  Box(modifier) {
-    Row(
-      modifier = Modifier
-        .focusRing(focus.visible, shape, colors.focusRing)
-        .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-        .height(KetchTheme.density.buttonMedium)
-        .widthIn(min = SelectMinWidth)
-        .background(colors.surface, shape)
-        .background(overlay, shape)
-        .border(HairlineWidth, colors.borderStrong, shape)
-        .ketchClickable(
-          interactions = interactions,
-          focus = focus,
-          enabled = enabled,
-          role = Role.DropdownList,
-          onClick = { expanded = true },
-        )
-        .padding(start = spacing.s3, end = spacing.s2),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.End),
-    ) {
-      Text(
-        text = label(value),
-        style = KetchTheme.typography.label,
-        color = colors.textPrimary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f, fill = false),
-      )
-      KetchIconImage(
-        icon = KetchIcon.ChevronDown,
-        size = KetchTheme.density.controlGlyph,
-        tint = colors.textTertiary,
-      )
-    }
-    KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-      options.forEach { option ->
-        item(
-          label = label(option),
-          checked = option == value,
-          onClick = { if (option != value) onSelect(option) },
-        )
-      }
-    }
-  }
 }
 
 /** Mutually exclusive [options] on a sliding track, for two to four short choices. */
@@ -398,48 +382,55 @@ fun <T> SettingsSegmented(
 }
 
 /**
- * `[−] 3 [+]` for a count chosen from [values], in order; each press applies at once.
+ * Row with `[−] 3 [+]` on the right, for a count chosen from [values], in order; each press
+ * applies at once.
  *
  * @param label how a value reads, such as "Unlimited" for 0.
  * @param noun what is counted, for screen readers, such as "downloads at once".
  */
 @Composable
-internal fun SettingsStepper(
+internal fun SettingsStepperRow(
+  title: String,
+  description: String,
   value: Int,
   values: List<Int>,
   label: (Int) -> String,
-  onChange: (Int) -> Unit,
   noun: String,
-  modifier: Modifier = Modifier,
-  enabled: Boolean = true,
+  onChange: (Int) -> Unit,
 ) {
-  val index = values.indexOf(value)
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
-    modifier = modifier.semantics { stateDescription = "${label(value)} $noun" },
-  ) {
-    StepButton(
-      plus = false,
-      description = "Fewer $noun",
-      enabled = enabled && index > 0,
-      onClick = { values.getOrNull(index - 1)?.let(onChange) },
-    )
-    Text(
-      text = label(value),
-      style = KetchTheme.typography.numeral,
-      color = if (enabled) KetchTheme.colors.textPrimary else KetchTheme.colors.textDisabled,
-      textAlign = TextAlign.Center,
-      maxLines = 1,
-      modifier = Modifier.widthIn(min = StepperValueMinWidth),
-    )
-    StepButton(
-      plus = true,
-      description = "More $noun",
-      enabled = enabled && index in 0 until values.lastIndex,
-      onClick = { values.getOrNull(index + 1)?.let(onChange) },
-    )
-  }
+  SettingsRow(
+    title = title,
+    description = description,
+    trailing = {
+      val index = values.indexOf(value)
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
+        modifier = Modifier.semantics { stateDescription = "${label(value)} $noun" },
+      ) {
+        StepButton(
+          plus = false,
+          description = "Fewer $noun",
+          enabled = index > 0,
+          onClick = { values.getOrNull(index - 1)?.let(onChange) },
+        )
+        Text(
+          text = label(value),
+          style = KetchTheme.typography.numeral,
+          color = KetchTheme.colors.textPrimary,
+          textAlign = TextAlign.Center,
+          maxLines = 1,
+          modifier = Modifier.widthIn(min = StepperValueMinWidth),
+        )
+        StepButton(
+          plus = true,
+          description = "More $noun",
+          enabled = index in 0 until values.lastIndex,
+          onClick = { values.getOrNull(index + 1)?.let(onChange) },
+        )
+      }
+    },
+  )
 }
 
 @Composable
