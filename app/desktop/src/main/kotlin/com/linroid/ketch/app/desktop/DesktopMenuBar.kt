@@ -393,6 +393,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
       },
     ),
     MenuBarMenu("Window", listOf(item(KetchCommands.Minimize))),
+    MenuBarMenu("Help", listOf(item(KetchCommands.Shortcuts))),
   )
 }
 
@@ -614,6 +615,10 @@ internal class DesktopCommands(
       KetchCommands.SlowLane -> if (speedMode != null) state.toggleSlowLane()
       KetchCommands.ToggleInspector -> state.updateInspectorOpen(!state.inspectorOpen)
       KetchCommands.Undo -> state.pendingOps.undoLast()
+      KetchCommands.Shortcuts -> {
+        actions.showWindow()
+        state.showShortcuts()
+      }
       // Settings opens in a window of its own, so the main window can stay hidden.
       KetchCommands.Settings -> state.openSettings()
       KetchCommands.CloseWindow -> actions.closeWindow()

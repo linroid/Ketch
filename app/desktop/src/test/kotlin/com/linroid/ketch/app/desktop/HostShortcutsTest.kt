@@ -27,6 +27,7 @@ class HostShortcutsTest {
       KetchCommands.Discover,
       KetchCommands.Devices,
       KetchCommands.Activity,
+      KetchCommands.Shortcuts,
       KetchCommands.tab(StatusFilter.Failed),
       KetchCommands.CloseWindow,
       KetchCommands.Minimize,
@@ -46,7 +47,6 @@ class HostShortcutsTest {
       KetchCommands.OpenTorrent,
       KetchCommands.SwitchDevice,
       KetchCommands.Undo,
-      KetchCommands.Shortcuts,
       KetchCommands.device(1),
     )) {
       assertFalse(command in owned, "${command.id} is the shell's")

@@ -196,6 +196,17 @@ class DesktopCommandsTest {
     fleet.close()
   }
 
+  @Test
+  fun run_shortcuts_showsTheWindowWithTheShortcutSheet() = runTest {
+    val fleet = fleet()
+
+    fleet.commands.run(KetchCommands.Shortcuts)
+
+    assertTrue(fleet.controller.state.shortcutsRequested)
+    assertEquals(1, fleet.windowShown)
+    fleet.close()
+  }
+
   private fun TestScope.fleet(clipboard: String? = null, speedMode: Boolean = false): Fleet =
     Fleet(this, clipboard, speedMode).also {
       runCurrent()
