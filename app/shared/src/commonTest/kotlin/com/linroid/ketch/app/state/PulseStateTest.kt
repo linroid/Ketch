@@ -433,6 +433,28 @@ class PulseStateTest {
   }
 
   @Test
+  fun sentence_slowerSecondDevice_finishesWhenItDoes() {
+    val state = PulseState(
+      devices = listOf(
+        device(counts = PulseCounts(downloading = 2), speed = 5 * mb, sizeBytes = 300 * mb),
+        device(
+          name = "NAS-Basement",
+          health = DeviceHealth.Live,
+          counts = PulseCounts(downloading = 1),
+          speed = mb,
+          sizeBytes = 300 * mb,
+        )
+      ),
+      allDevices = true,
+    )
+
+    assertEquals(
+      "Downloading 3 files on 2 devices · all done ≈ 14:36",
+      state.sentenceAtNow()
+    )
+  }
+
+  @Test
   fun sentence_capBelowSpeed_estimatesWithCap() {
     val state = PulseState(
       listOf(

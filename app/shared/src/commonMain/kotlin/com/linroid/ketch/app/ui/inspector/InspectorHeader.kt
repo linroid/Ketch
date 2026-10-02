@@ -524,13 +524,25 @@ private val TaskRow.hasLanes: Boolean
   get() = segments.isNotEmpty() || state is DownloadState.Downloading ||
     state is DownloadState.Paused
 
-/** [text] with its " · "-separated parts kept whole, so it only wraps between them. */
+/**
+ * [text] with its short " · "-separated parts kept whole, so it wraps between them. A part
+ * longer than [MAX_JOINED_PART] characters may still wrap at its spaces, keeping each number
+ * with the word after it, so a narrow pane never breaks it inside a word.
+ */
 internal fun keepPartsTogether(text: String): String =
-  text.split(SEPARATOR).joinToString(SEPARATOR) { it.replace(' ', NO_BREAK) }
+  text.split(SEPARATOR).joinToString(SEPARATOR) { part ->
+    if (part.length > MAX_JOINED_PART) {
+      part.replace(NumberThenSpace) { "${it.groupValues[1]}$NO_BREAK" }
+    } else {
+      part.replace(' ', NO_BREAK)
+    }
+  }
 
 private const val NAME_LINES = 2
 private const val ZERO_WIDTH_SPACE = "\u200B"
 private val NameSeparator = Regex("[-_]")
 private const val SEPARATOR = " · "
 private const val NO_BREAK = '\u00A0'
+private const val MAX_JOINED_PART = 24
+private val NumberThenSpace = Regex("(\\d) ")
 private val CHECK_SHOWN = 1.2.seconds

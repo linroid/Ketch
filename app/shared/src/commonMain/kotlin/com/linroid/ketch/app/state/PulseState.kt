@@ -314,22 +314,22 @@ data class PulseState(
     return "$files · all done ≈ ${clockLabel(finish, now, timeZone)}"
   }
 
-  // Remaining bytes over the speed each device can reach under its cap.
+  // Each device's remaining bytes over the speed it can reach under its cap. Bandwidth never
+  // moves between devices, so the scope is done when its slowest device is.
   private fun finishTime(busy: List<DevicePulse>, now: Instant): Instant? {
-    var remaining = 0L
-    var speed = 0L
+    var latest = Duration.ZERO
     for (device in busy) {
-      remaining += device.remainingBytes ?: return null
-      speed += if (device.cap.isUnlimited) {
+      val remaining = device.remainingBytes ?: return null
+      val speed = if (device.cap.isUnlimited) {
         device.speed
       } else {
         minOf(device.speed, device.cap.bytesPerSecond)
       }
+      if (speed <= 0) return null
+      latest = maxOf(latest, (remaining / speed).seconds)
     }
-    if (speed <= 0) return null
-    val eta = (remaining / speed).seconds
-    if (eta > MAX_ETA) return null
-    return now + eta
+    if (latest > MAX_ETA) return null
+    return now + latest
   }
 
   private fun offlineSentence(device: DevicePulse): String = when (device.health) {

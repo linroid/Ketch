@@ -384,6 +384,16 @@ class InspectorModelTest {
     return row(id, state, request = DownloadRequest(url)).copy(segments = segments)
   }
 
+  @Test
+  fun keepPartsTogether_shortAndLongParts_joinsOnlyTheShortOnes() {
+    val text = keepPartsTogether("Downloading 4 files on 2 devices · all done ≈ 14:38")
+
+    assertEquals(
+      "Downloading 4\u00A0files on 2\u00A0devices · all\u00A0done\u00A0≈\u00A014:38",
+      text
+    )
+  }
+
   private companion object {
     const val MB = 1L shl 20
     const val GB = 1L shl 30
