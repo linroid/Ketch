@@ -51,8 +51,8 @@ import com.linroid.ketch.app.ui.shell.AppearanceToggle
 /**
  * The sidebar of wide windows, transparent over the canvas wash: the title zone with the
  * sidebar toggle and the [AppearanceToggle] (beside the traffic lights on macOS, after the Ketch
- * mark on the web), the destinations, the DEVICES (All devices from two on, then each device with its
- * health and live line, its menu and its drops), and Settings at the bottom.
+ * mark on the web), the destinations, the DEVICES (All devices from two on, then each device with
+ * its health and live line, its menu and its drops), and Settings at the bottom.
  *
  * @param destination the destination shown, which sits on the selected pill.
  * @param settingsSelected whether Settings shows, which then takes the pill instead.
@@ -176,8 +176,8 @@ private fun DownloadsMarks(downloading: Int, failed: Boolean) {
 /**
  * The top of the sidebar, as tall as the content card's inset and page header. On macOS the
  * traffic lights sit at its start, the sidebar toggle follows them on their row and the
- * appearance toggle ends it; on the web the Ketch mark leads; elsewhere the buttons line up with the page
- * header. Its empty space is the title bar the desktop app lets the window be dragged by.
+ * appearance toggle ends it; on the web the Ketch mark leads; elsewhere the buttons line up with
+ * the page header. Its empty space is the title bar the desktop app lets the window be dragged by.
  */
 @Composable
 private fun TitleZone(state: AppState, onToggleSidebar: () -> Unit) {

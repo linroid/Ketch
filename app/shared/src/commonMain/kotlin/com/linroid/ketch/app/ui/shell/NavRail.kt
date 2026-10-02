@@ -81,8 +81,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * The 72 dp rail of medium windows, and of wide ones with the sidebar collapsed: the
- * [AppearanceToggle], the destinations with Downloads' downloading count, the device stack, and Settings at
- * the bottom. On macOS it starts below the traffic lights.
+ * [AppearanceToggle], the destinations with Downloads' downloading count, the device stack, and
+ * Settings at the bottom. On macOS it starts below the traffic lights.
  *
  * From two devices on, the stack starts with All devices, ringed by the progress of everything
  * downloading. Each device's pennant switches to it, opens its menu on a right click or a long

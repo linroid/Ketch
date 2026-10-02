@@ -61,7 +61,7 @@ class KetchPillItem(
 
 /**
  * Up to four related icon buttons joined in one bordered pill with hairline dividers, such as
- * List | Table | Inspector.
+ * List | Table.
  */
 @Composable
 fun KetchPillGroup(

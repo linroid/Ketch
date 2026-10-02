@@ -795,7 +795,8 @@ and 1440 dp widths.
     - the appearance toggle (28 dp ghost) at the zone's end: a moon in the light appearance
       ("Switch to dark") and a sun in the dark one ("Switch to light"). A click that lands on
       the system's own appearance goes back to following the system (`ThemeMode.System`);
-      otherwise it saves Light or Dark. Settings → General still offers all three.
+      otherwise it saves Light or Dark. Settings → General still offers all three. Android's
+      system bar icons and the iOS window's interface style follow the picked appearance.
     - There is no add button here: the page header's `+ Add` (§4.7.1), `⌘N`, `⌘V` and drops
       add downloads, so a second ⊕ beside it only competed with it.
   - Empty title-zone space and the page header's empty space are a `WindowDraggableArea`, and a
@@ -2557,9 +2558,9 @@ PermissionDenied, Dns, Refused, Timeout, Tls) are W5.
   - **Edit:** Undo {action} ⌘Z, Cut, Copy, Paste, Select All, Find ⌘F, Command Palette ⌘K.
   - **View:** All…Failed ⌘1–6, Table/List, Group By ▸, Columns ▸, Density ▸, Toggle Sidebar ⌃⌘S,
     Discover ⌘E, Devices ⌘0, Activity ⌘J.
-  - **Downloads:** Pause/Resume, Open ↩, Show Details ⌘I, Show in Finder ⌘↩, Copy Link ⌘C, Start Now, Speed
-    Limit ▸, Connections ▸, Priority ▸, Start Later ▸, Send To ▸, Retry ⌘R, Remove ⌫, Pause All,
-    Resume All, Retry Failed, Slow Lane ⇧⌘L.
+  - **Downloads:** Pause/Resume, Open ↩, Show Details ⌘I, Show in Finder ⌘↩, Copy Link ⌘C, Start Now,
+    Speed Limit ▸, Connections ▸, Priority ▸, Start Later ▸, Send To ▸, Retry ⌘R, Remove ⌫,
+    Pause All, Resume All, Retry Failed, Slow Lane ⇧⌘L.
   - **Device:** All Devices ⌘⌥0, one checkable item per device ⌘⌥1–9, Pair a Device…
   - **Window.**
   - **Help:** Keyboard Shortcuts ⌘/, Setup Checklist, Open Logs Folder, Report an Issue.
