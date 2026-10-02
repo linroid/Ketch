@@ -9,10 +9,6 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -28,9 +24,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -39,14 +33,11 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchBottomSheet
@@ -126,29 +117,16 @@ private fun ResizeHandle(
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
-  val density = LocalDensity.current
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  var start by remember { mutableStateOf(width) }
-  var moved by remember { mutableStateOf(0f) }
   Box(
     modifier = modifier
       .width(InspectorHandleWidth)
       .fillMaxHeight()
-      .pointerHoverIcon(HorizontalResizePointerIcon)
-      .hoverable(interactions)
-      .draggable(
-        state = rememberDraggableState { delta ->
-          moved += if (rtl) delta else -delta
-          val next = start + with(density) { moved.toDp() }
-          onResize(next.coerceIn(spacing.inspectorMinWidth, spacing.inspectorMaxWidth))
-        },
-        orientation = Orientation.Horizontal,
-        interactionSource = interactions,
-        onDragStarted = {
-          start = width
-          moved = 0f
-        },
-        onDragStopped = { onResizeEnd() },
+      .widthDragHandle(
+        width = width,
+        hover = interactions,
+        onResize = { onResize(it.coerceIn(spacing.inspectorMinWidth, spacing.inspectorMaxWidth)) },
+        onResizeEnd = onResizeEnd,
+        dragInteractions = interactions,
       )
       .semantics { contentDescription = "Resize the inspector" },
   )

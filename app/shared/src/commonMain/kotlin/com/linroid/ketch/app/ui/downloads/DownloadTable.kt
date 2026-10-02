@@ -393,31 +393,14 @@ private fun ResizeHandle(
   modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
-  val pixels = LocalDensity.current
   val interactions = remember { MutableInteractionSource() }
   val hovered by interactions.collectIsHoveredAsState()
-  var start by remember { mutableStateOf(width) }
-  var moved by remember { mutableStateOf(0f) }
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   val line = if (hovered) colors.borderStrong else colors.hairline
   Box(
     modifier = modifier
       .width(ResizeHandleWidth)
       .fillMaxHeight()
-      .pointerHoverIcon(HorizontalResizePointerIcon)
-      .hoverable(interactions)
-      .draggable(
-        state = rememberDraggableState { delta ->
-          moved += if (rtl) delta else -delta
-          onResize(start + with(pixels) { moved.toDp() })
-        },
-        orientation = Orientation.Horizontal,
-        onDragStarted = {
-          start = width
-          moved = 0f
-        },
-        onDragStopped = { onResizeEnd() },
-      )
+      .widthDragHandle(width, interactions, onResize, onResizeEnd)
       .drawBehind {
         // On the boundary itself, as far from the labels on either side.
         val half = density / 2
@@ -426,6 +409,40 @@ private fun ResizeHandle(
         drawLine(line, Offset(x, inset), Offset(x, size.height - inset), strokeWidth = density)
       },
   )
+}
+
+/**
+ * Lets a pointer drag this handle sideways to resize a pane [width] wide, which dragging toward
+ * the start widens: [onResize] gets each new width and [onResizeEnd] the end of the drag. The
+ * handle reports its hover to [hover], and its drag to [dragInteractions] when given.
+ */
+@Composable
+internal fun Modifier.widthDragHandle(
+  width: Dp,
+  hover: MutableInteractionSource,
+  onResize: (Dp) -> Unit,
+  onResizeEnd: () -> Unit,
+  dragInteractions: MutableInteractionSource? = null,
+): Modifier {
+  val pixels = LocalDensity.current
+  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+  var start by remember { mutableStateOf(width) }
+  var moved by remember { mutableStateOf(0f) }
+  return pointerHoverIcon(HorizontalResizePointerIcon)
+    .hoverable(hover)
+    .draggable(
+      state = rememberDraggableState { delta ->
+        moved += if (rtl) delta else -delta
+        onResize(start + with(pixels) { moved.toDp() })
+      },
+      orientation = Orientation.Horizontal,
+      interactionSource = dragInteractions,
+      onDragStarted = {
+        start = width
+        moved = 0f
+      },
+      onDragStopped = { onResizeEnd() },
+    )
 }
 
 @Composable
