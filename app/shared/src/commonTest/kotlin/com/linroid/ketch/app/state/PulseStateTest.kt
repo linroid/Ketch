@@ -565,6 +565,16 @@ class PulseStateTest {
   }
 
   @Test
+  fun tabTitle_downloadingAndIdle_showsTheShareOrTheName() {
+    val downloading = PulseState(
+      listOf(device(counts = PulseCounts(downloading = 3), downloadedBytes = 45, sizeBytes = 100))
+    )
+
+    assertEquals("↓ 45% · Ketch", downloading.tabTitle())
+    assertEquals("Ketch", PulseState(listOf(device(counts = PulseCounts(done = 2)))).tabTitle())
+  }
+
+  @Test
   fun shortSentence_offlineDeviceDownloading_ignoresItsProgress() {
     val state = PulseState(
       devices = listOf(

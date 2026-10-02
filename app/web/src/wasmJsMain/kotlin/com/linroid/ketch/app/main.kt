@@ -9,13 +9,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.window.ComposeViewport
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.feedback.reportWebActivity
-import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.config.WebConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -24,9 +24,14 @@ import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
+import com.linroid.ketch.app.theme.darkKetchColors
+import com.linroid.ketch.app.theme.lightKetchColors
 import com.linroid.ketch.app.theme.rememberKetchFontsLoaded
 import com.linroid.ketch.app.ui.connect.connectTo
 import com.linroid.ketch.app.util.PairingLink
+import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.config.ThemeMode
+import com.linroid.ketch.config.WebConfigStore
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.delay
@@ -77,7 +82,21 @@ fun main() {
   val activityEvents = reportWebActivity(controller)
   // Removals and other undoable operations still pending commit when the tab closes.
   window.addEventListener("pagehide", { controller.state.pendingOps.flush() })
+  controller.scope.launch {
+    controller.pulse.state.collect { document.title = it.tabTitle() }
+  }
   ComposeViewport(body) {
+    // The installed app's title bar takes the canvas color of the theme the app shows.
+    val themeMode = controller.appSettings.themeMode
+    LaunchedEffect(themeMode) {
+      val light = lightKetchColors().canvas.toHex()
+      val dark = darkKetchColors().canvas.toHex()
+      when (themeMode) {
+        ThemeMode.System -> setThemeColors(light, dark)
+        ThemeMode.Light -> setThemeColors(light, light)
+        ThemeMode.Dark -> setThemeColors(dark, dark)
+      }
+    }
     // The splash in index.html stays until the fonts are cached, so text never flashes in a
     // fallback font. A font that fails to load must not keep the app hidden.
     var fontWaitOver by remember { mutableStateOf(false) }
@@ -96,6 +115,25 @@ fun main() {
 }
 
 private val FONT_WAIT_LIMIT = 5.seconds
+
+/** [this] as `#RRGGBB`. */
+private fun Color.toHex(): String = "#" + (toArgb() and RGB_MASK).toString(HEX).padStart(6, '0')
+
+private const val RGB_MASK = 0xFFFFFF
+private const val HEX = 16
+
+/**
+ * Sets the `theme-color` metas of index.html, which color the installed app's title bar: [light]
+ * where the system is light and [dark] where it is dark.
+ */
+private fun setThemeColors(light: String, dark: String): Unit = js(
+  """{
+  for (const meta of document.querySelectorAll("meta[name='theme-color']")) {
+    const isDark = (meta.getAttribute('media') || '').includes('dark');
+    meta.setAttribute('content', isDark ? dark : light);
+  }
+}"""
+)
 
 /**
  * Connects to the server of the [page] when the address carried its access code, or when
