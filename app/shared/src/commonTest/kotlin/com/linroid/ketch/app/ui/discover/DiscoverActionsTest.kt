@@ -3,14 +3,12 @@ package com.linroid.ketch.app.ui.discover
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.fixtureTest
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RecordingKetchApi
-import kotlinx.coroutines.test.StandardTestDispatcher
+import com.linroid.ketch.app.testController
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -20,12 +18,8 @@ import kotlin.test.assertTrue
 
 class DiscoverActionsTest {
 
-  private fun TestScope.controller(api: RecordingKetchApi): AppController = AppController(
-    instanceManager = InstanceManager(
-      factory = InstanceFactory(deviceName = "Lins-MacBook-Pro", embeddedFactory = { api }),
-    ),
-    context = StandardTestDispatcher(testScheduler),
-  )
+  private fun TestScope.controller(api: RecordingKetchApi): AppController =
+    testController(api, deviceName = "Lins-MacBook-Pro")
 
   private fun discoverTest(
     api: RecordingKetchApi = RecordingKetchApi(),

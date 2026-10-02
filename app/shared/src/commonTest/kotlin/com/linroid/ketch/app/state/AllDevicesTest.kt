@@ -13,15 +13,9 @@ import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.instance.DeviceScope
-import com.linroid.ketch.app.instance.InstanceEntry
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.app.ui.shell.Fleet
+import com.linroid.ketch.app.ui.shell.fleet
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -67,41 +61,12 @@ class AllDevicesTest {
     }
   }
 
-  /** This Mac and a connected NAS, with the app over them. */
-  private class Fleet(scope: TestScope) {
-    val mac = ResolvingApi(RecordingKetchApi("This Mac"))
-    val nas = ResolvingApi(RecordingKetchApi("NAS"))
-    val manager = InstanceManager(
-      factory = InstanceFactory(
-        deviceName = "This Mac",
-        embeddedFactory = { mac },
-        remoteFactory = { config ->
-          RemoteInstance(nas, config, MutableStateFlow(ConnectionState.Connected))
-        },
-      ),
-      initialRemotes = listOf(RemoteConfig(host = "nas.local", name = "NAS")),
-      context = scope.backgroundScope.coroutineContext,
-    )
-    // A child of the background scope, so a failed test never leaves its loops running.
-    val controller = AppController(
-      instanceManager = manager,
-      context = scope.backgroundScope.coroutineContext +
-        SupervisorJob(scope.backgroundScope.coroutineContext[Job]),
-      clock = ListFixtures.clock(scope),
-    )
-    val state: AppState get() = controller.state
-    val local: InstanceEntry get() = manager.instances.value.first()
-    val remote: InstanceEntry get() = manager.instances.value.last()
+  private fun TestScope.fleet() =
+    fleet(ResolvingApi(RecordingKetchApi("This Mac")), ResolvingApi(RecordingKetchApi("NAS")))
 
-    fun messages(): List<AppMessage> = controller.messages.history.value
-  }
+  private fun Fleet<*>.messages(): List<AppMessage> = controller.messages.history.value
 
-  private fun TestScope.fleet(): Fleet = Fleet(this).also {
-    runCurrent()
-    advanceTimeBy(1.seconds)
-  }
-
-  private fun fleetTest(block: suspend TestScope.(Fleet) -> Unit) =
+  private fun fleetTest(block: suspend TestScope.(Fleet<ResolvingApi>) -> Unit) =
     fixtureTest({ fleet() }, { it.controller.close() }, block)
 
   @Test

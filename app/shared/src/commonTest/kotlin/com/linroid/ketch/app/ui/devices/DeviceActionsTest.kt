@@ -5,10 +5,8 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.fixtureTest
-import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -18,12 +16,12 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
-import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -87,26 +85,6 @@ class DeviceActionsTest {
   private fun devicesTest(block: suspend TestScope.(Fixture) -> Unit) =
     fixtureTest({ fixture(RecordingKetchApi("NAS")) }, { it.controller.close() }, block)
 
-  private fun presence(entry: InstanceEntry) = DevicePresence(
-    entry = entry,
-    name = "This Mac",
-    detail = "MacBook Pro",
-    health = DeviceHealth.Local(),
-    connected = true,
-    watched = true,
-    status = null,
-    statusAt = null,
-    lastSeen = null,
-    speed = 0,
-    counts = PulseCounts(),
-    failures = 0,
-    unseenFailures = 0,
-    cap = SpeedLimit.Unlimited,
-    disk = null,
-    speedMode = SpeedMode.Full,
-    history = emptyList(),
-  )
-
   @Test
   fun showDeviceTab_failedCountOfTheNas_switchesToItsFailedTab() = runTest {
     val nas = RecordingKetchApi("NAS")
@@ -159,7 +137,7 @@ class DeviceActionsTest {
     runCurrent()
     val local = f.state.instances.value.first { it.deviceId == LOCAL_DEVICE_ID }
 
-    f.state.toggleSlowLane(presence(local))
+    f.state.toggleSlowLane(presence(local, "This Mac", "MacBook Pro", DeviceHealth.Local()))
     runCurrent()
 
     assertEquals(SpeedMode.SlowLane, f.speed.mode.value)

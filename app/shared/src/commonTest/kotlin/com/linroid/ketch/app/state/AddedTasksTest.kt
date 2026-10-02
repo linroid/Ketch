@@ -1,11 +1,9 @@
 package com.linroid.ketch.app.state
 
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.backgroundChild
 import com.linroid.ketch.app.fixtureTest
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
+import com.linroid.ketch.app.testController
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -17,14 +15,8 @@ import kotlin.test.assertTrue
 
 /** [AppState.addedTasks]: which adds the Downloads page hears about. */
 class AddedTasksTest {
-  private fun TestScope.controller(api: RecordingKetchApi): AppController = AppController(
-    instanceManager = InstanceManager(
-      factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
-      configStore = RecordingConfigStore(),
-    ),
-    context = backgroundScope.coroutineContext +
-      SupervisorJob(backgroundScope.coroutineContext[Job]),
-  )
+  private fun TestScope.controller(api: RecordingKetchApi): AppController =
+    testController(api, RecordingConfigStore(), context = backgroundChild())
 
   private fun addedTest(
     api: RecordingKetchApi = RecordingKetchApi(),

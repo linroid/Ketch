@@ -6,8 +6,6 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FilePicker
 import com.linroid.ketch.app.platform.SystemClipboard
@@ -15,13 +13,13 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.testController
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -69,14 +67,7 @@ class ShellCommandsTest {
   ): TestResult = fixtureTest(
     create = {
       val api = RecordingKetchApi()
-      val store = RecordingConfigStore(KetchConfig(ui = ui))
-      val controller = AppController(
-        instanceManager = InstanceManager(
-          factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
-          configStore = store,
-        ),
-        context = StandardTestDispatcher(testScheduler),
-      )
+      val controller = testController(api, RecordingConfigStore(KetchConfig(ui = ui)))
       val shell = ShellState(controller.state)
       val commands =
         ShellCommands(shell, backgroundScope, FakeClipboard(clipboard), NoFiles, platform)
@@ -241,6 +232,25 @@ class ShellCommandsTest {
     assertFalse(fixture.commands.run(KetchCommands.Search))
     assertTrue(fixture.shell.settingsOpen)
   }
+
+  @Test
+  fun run_paletteCommand_togglesThePaletteWithoutFocusingSearch() =
+    shellTest(ui = UiPreferences()) { fixture ->
+      val searchRequests = mutableListOf<Unit>()
+      backgroundScope.launch {
+        fixture.controller.state.focusSearchRequests.collect(searchRequests::add)
+      }
+      runCurrent()
+
+      assertTrue(fixture.commands.binds(KetchCommands.Palette))
+      assertTrue(fixture.commands.run(KetchCommands.Palette))
+      runCurrent()
+      assertTrue(fixture.shell.paletteOpen)
+      assertEquals(emptyList(), searchRequests)
+
+      fixture.commands.run(KetchCommands.Palette)
+      assertFalse(fixture.shell.paletteOpen)
+    }
 
   @Test
   fun run_shortcuts_opensAndClosesTheSheet() = shellTest { fixture ->

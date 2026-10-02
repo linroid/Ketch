@@ -14,10 +14,10 @@ import com.linroid.ketch.app.state.RecordingTask
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.TaskKey
+import com.linroid.ketch.app.state.rowOf
 import com.linroid.ketch.app.ui.downloads.actions.ActionsFixture
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.actionsTest
-import com.linroid.ketch.app.ui.downloads.actions.rowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy

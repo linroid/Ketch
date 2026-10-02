@@ -10,6 +10,7 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
+import com.linroid.ketch.app.state.rowOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job

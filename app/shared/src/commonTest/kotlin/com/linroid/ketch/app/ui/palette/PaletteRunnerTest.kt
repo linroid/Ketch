@@ -5,8 +5,6 @@ import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.IntakeRequest
@@ -15,10 +13,10 @@ import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RecordingTask
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.testController
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.config.KetchConfig
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
@@ -36,13 +34,7 @@ class PaletteRunnerTest {
 
   private fun TestScope.fixture(): Fixture {
     val api = RecordingKetchApi()
-    val controller = AppController(
-      instanceManager = InstanceManager(
-        factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
-        configStore = RecordingConfigStore(KetchConfig()),
-      ),
-      context = StandardTestDispatcher(testScheduler),
-    )
+    val controller = testController(api, RecordingConfigStore(KetchConfig()))
     val ran = mutableListOf<KetchCommand>()
     val rowCommands = RowCommands(controller.state, null, null, backgroundScope) {}
     val runner = PaletteRunner(controller.state, rowCommands) { ran += it; true }

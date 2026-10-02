@@ -9,12 +9,12 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.backgroundChild
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.instance.EmbeddedInstance
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.testController
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.IntakePreferences
@@ -22,8 +22,6 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -43,18 +41,8 @@ class AppStateCommandsTest {
   private val downloading = DownloadState.Downloading(RecordingTask.PROGRESS)
   private val paused = DownloadState.Paused(RecordingTask.PROGRESS)
 
-  private fun TestScope.controller(
-    api: KetchApi,
-    configStore: ConfigStore? = null,
-  ): AppController = AppController(
-    instanceManager = InstanceManager(
-      factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
-      configStore = configStore,
-    ),
-    // A child of the background scope, so a failed assertion never leaves its loops running.
-    context = backgroundScope.coroutineContext +
-      SupervisorJob(backgroundScope.coroutineContext[Job]),
-  )
+  private fun TestScope.controller(api: KetchApi, configStore: ConfigStore? = null) =
+    testController(api, configStore, context = backgroundChild())
 
   private fun commandsTest(
     api: RecordingKetchApi = RecordingKetchApi(),

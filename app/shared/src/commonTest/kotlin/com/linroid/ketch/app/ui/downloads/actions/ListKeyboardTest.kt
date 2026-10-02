@@ -17,6 +17,7 @@ import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.SelectionState
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.rowOf
 import com.linroid.ketch.app.state.taskActions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -299,7 +300,7 @@ class ListKeyboardTest {
     assertTrue(task.calls.isEmpty())
   }
 
-  private fun row(state: DownloadState, device: DeviceInfo = LocalDevice): TaskRow =
+  private fun row(state: DownloadState, device: DeviceInfo = ListFixtures.device): TaskRow =
     ListFixtures.row(
       id = "t",
       state = state,

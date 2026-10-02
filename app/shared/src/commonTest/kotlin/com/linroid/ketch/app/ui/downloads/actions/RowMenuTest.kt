@@ -12,6 +12,7 @@ import com.linroid.ketch.app.components.buildMenu
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.RowAction
+import com.linroid.ketch.app.state.rowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
