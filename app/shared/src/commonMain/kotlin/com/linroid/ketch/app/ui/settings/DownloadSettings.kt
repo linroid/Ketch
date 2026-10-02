@@ -64,24 +64,22 @@ fun DownloadSettings(state: AppState, device: InstanceEntry) {
   val controller = state.settingsFor(device)
   LaunchedEffect(controller) { controller.loadDownload() }
   val config = controller.download
-  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
-    if (controller.isRemote) {
-      SettingsNotice(text = "Saved on ${device.label} until it restarts.", tone = NoticeTone.Info)
-    }
-    DeviceSettingsError(controller.downloadError, loaded = config != null) {
-      controller.loadDownload()
-    }
-    if (config == null) {
-      if (controller.downloadError == null) {
-        SettingsLoading("Loading settings from ${device.label}…")
-      }
-      return@Column
-    }
-    val onChange = { updated: DownloadConfig -> controller.updateDownload(updated) }
-    FolderGroup(device, config, onChange)
-    FolderShortcuts(state, device, config)
-    QueueGroup(config, onChange)
+  if (controller.isRemote) {
+    SettingsNotice(text = "Saved on ${device.label} until it restarts.", tone = NoticeTone.Info)
   }
+  DeviceSettingsError(controller.downloadError, loaded = config != null) {
+    controller.loadDownload()
+  }
+  if (config == null) {
+    if (controller.downloadError == null) {
+      SettingsLoading("Loading settings from ${device.label}…")
+    }
+    return
+  }
+  val onChange = { updated: DownloadConfig -> controller.updateDownload(updated) }
+  FolderGroup(device, config, onChange)
+  FolderShortcuts(state, device, config)
+  QueueGroup(config, onChange)
 }
 
 /** Where [device] saves downloads, with the free space there and ways to change it. */
