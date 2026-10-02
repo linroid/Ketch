@@ -459,7 +459,6 @@ private fun StepButton(plus: Boolean, description: String, enabled: Boolean, onC
  * @param validate returns why the text cannot be saved, or `null`.
  * @param secret masks the text, with a Show/Hide toggle.
  * @param numeric accepts digits only.
- * @param decimal accepts digits and a decimal point.
  */
 @Composable
 fun SettingsTextInput(
@@ -471,7 +470,6 @@ fun SettingsTextInput(
   validate: (String) -> String? = { null },
   secret: Boolean = false,
   numeric: Boolean = false,
-  decimal: Boolean = false,
   mono: Boolean = false,
   enabled: Boolean = true,
   width: Dp? = null,
@@ -501,11 +499,7 @@ fun SettingsTextInput(
   SettingsTextField(
     value = text,
     onValueChange = { typed ->
-      text = when {
-        numeric -> typed.filter(Char::isDigit)
-        decimal -> typed.filter { it.isDigit() || it == '.' }
-        else -> typed
-      }
+      text = if (numeric) typed.filter(Char::isDigit) else typed
     },
     modifier = modifier,
     placeholder = placeholder,
@@ -517,7 +511,6 @@ fun SettingsTextInput(
     onFocusChange = { focused -> if (!focused) commit() },
     keyboardType = when {
       numeric -> KeyboardType.Number
-      decimal -> KeyboardType.Decimal
       secret -> KeyboardType.Password
       else -> KeyboardType.Text
     },

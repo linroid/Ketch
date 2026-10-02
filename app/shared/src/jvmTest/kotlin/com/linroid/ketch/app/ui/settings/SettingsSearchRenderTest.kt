@@ -94,14 +94,6 @@ class SettingsSearchRenderTest {
      * Settings that only show sometimes: the add sheet's folders once there are any, and the
      * Sharing rows under its collapsed Advanced section.
      */
-    val Conditional = setOf(
-      "Folders in the add sheet",
-      "Reachable from other devices",
-      "Port",
-      "Access code",
-      "Discoverable on the local network",
-      "Websites allowed to connect",
-      "Start sharing when Ketch opens",
-    )
+    val Conditional = AdvancedRows + "Folders in the add sheet"
   }
 }

@@ -898,11 +898,7 @@ internal val ThemeMode.label: String
   }
 
 /** Home folders of macOS and Linux, which summaries shorten to "~". */
-private object HomeFolder {
-  private val pattern = Regex("^/(Users|home)/[^/]+")
-
-  fun find(path: String): MatchResult? = pattern.find(path)
-}
+private val HomeFolder = Regex("^/(Users|home)/[^/]+")
 
 /** Widest the main pane of Settings lets its rows grow. */
 private val PageMaxWidth = 640.dp

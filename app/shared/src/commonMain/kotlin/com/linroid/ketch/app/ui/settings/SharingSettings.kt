@@ -580,7 +580,7 @@ private fun newToken(): String = Uuid.random().toHexString()
 private const val COPIED_MILLIS = 2_000L
 
 /** Titles of the rows the Advanced section holds. */
-private val AdvancedRows = setOf(
+internal val AdvancedRows = setOf(
   "Reachable from other devices",
   "Port",
   "Access code",
