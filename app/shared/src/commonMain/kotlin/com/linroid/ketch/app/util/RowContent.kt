@@ -78,8 +78,8 @@ data class RowContent(
   val statusText: String,
   val detail: String,
   val size: String,
-  val speed: String,
-  val time: String,
+  val speed: String = "",
+  val time: String = "",
   val added: String,
   val progress: Float? = null,
   val limited: Boolean = false,
@@ -151,8 +151,6 @@ fun rowContent(
         statusText = "Paused",
         detail = listOfNotNull("Paused", percent).joinToString(SEPARATOR),
         size = runningSize(state),
-        speed = "",
-        time = "",
         added = added,
         progress = fraction(progress),
       )
@@ -163,8 +161,6 @@ fun rowContent(
       detail = (context.config?.let { QueueReason.of(request, it, context.running) }
         ?: QueueReason.Next).text,
       size = knownSize(request),
-      speed = "",
-      time = "",
       added = added,
     )
     is DownloadState.Scheduled -> RowContent(
@@ -172,8 +168,6 @@ fun rowContent(
       statusText = "Scheduled",
       detail = scheduleText(state.schedule, context.now, context.timeZone),
       size = knownSize(request),
-      speed = "",
-      time = "",
       added = added,
     )
     is DownloadState.Completed -> completedContent(state, host, context.device, missing, added)
@@ -184,8 +178,6 @@ fun rowContent(
         statusText = "Failed",
         detail = listOfNotNull(copy.title, copy.shortHint).joinToString(SEPARATOR),
         size = knownSize(request),
-        speed = "",
-        time = "",
         added = added,
         error = copy,
       )
@@ -195,8 +187,6 @@ fun rowContent(
       statusText = "Canceled",
       detail = listOfNotNull("Canceled", host).joinToString(SEPARATOR),
       size = "",
-      speed = "",
-      time = "",
       added = added,
     )
   }
@@ -239,7 +229,6 @@ private fun completedContent(
     statusText = if (missing) "File missing" else "Done",
     detail = detail,
     size = size ?: UNKNOWN,
-    speed = "",
     time = state.downloadTime?.let { "took ${formatDuration(it)}" }.orEmpty(),
     added = added,
   )

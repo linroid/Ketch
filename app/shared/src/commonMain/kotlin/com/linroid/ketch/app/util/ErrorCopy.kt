@@ -21,7 +21,7 @@ import okio.IOException
  */
 data class ErrorCopy(
   val title: String,
-  val hint: String?,
+  val hint: String? = null,
   val primary: RowAction,
   val secondary: List<RowAction> = emptyList(),
   val details: String? = null,
@@ -77,7 +77,6 @@ fun Throwable.toCopy(): ErrorCopy {
     )
     else -> ErrorCopy(
       title = "Something went wrong",
-      hint = null,
       primary = RowAction.Retry,
       secondary = listOf(RowAction.CopyDetails),
       details = describeCauses(),
@@ -149,7 +148,6 @@ private fun copyOf(
     )
     is KetchError.Canceled -> ErrorCopy(
       title = "Canceled",
-      hint = null,
       primary = RowAction.DownloadAgain,
     )
     is KetchError.SourceError -> sourceCopy(error)
@@ -160,7 +158,6 @@ private fun copyOf(
     )
     is KetchError.Unknown -> ErrorCopy(
       title = "Something went wrong",
-      hint = null,
       primary = RowAction.Retry,
       secondary = listOf(RowAction.CopyDetails),
       details = error.errorMessage ?: error.cause?.describeCauses(),
