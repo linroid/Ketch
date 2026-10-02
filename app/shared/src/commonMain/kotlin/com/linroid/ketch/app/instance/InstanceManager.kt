@@ -423,8 +423,9 @@ class InstanceManager(
   private fun wanted(): Set<String> {
     val active = (_activeInstance.value as? RemoteInstance)?.deviceId
     if (backgroundExpired.value) return setOfNotNull(active)
+    // The active device stays connected anyway, so it takes none of the watched slots.
     val watched = _instances.value
-      .filter { it is RemoteInstance && it.remoteConfig.watch }
+      .filter { it is RemoteInstance && it.remoteConfig.watch && it.deviceId != active }
       .take(keepAlive.maxWatched)
       .map { it.deviceId }
     return setOfNotNull(active) + watched
