@@ -277,24 +277,32 @@ internal class BackgroundPauser(
     resumption?.cancel()
   }
 
-  // The ids are forgotten only once every task has been resumed.
+  // An id is forgotten once its task resumed, is no longer paused or is gone; the others are
+  // kept, with the notice that they are paused, for the next time the app comes to the front.
   private suspend fun resumeSaved() {
     val ids = saved.ids
     if (ids.isEmpty()) return
     // After a relaunch, the engine restores its tasks a moment after it starts.
-    withTimeoutOrNull(RESTORE_TIMEOUT) {
+    val restored = withTimeoutOrNull(RESTORE_TIMEOUT) {
       api.tasks.first { tasks -> tasks.any { it.taskId in ids } }
-    }
+    } != null
     val tasks = api.tasks.value.associateBy { it.taskId }
-    val resumed = ids.count { id ->
+    var resumed = 0
+    val left = ids.filter { id ->
       val task = tasks[id]
-      task != null && task.state.value is DownloadState.Paused && attempt("resume", task) {
-        task.resume()
+      when {
+        task == null -> !restored
+        task.state.value !is DownloadState.Paused -> false
+        attempt("resume", task) { task.resume() } -> {
+          resumed++
+          false
+        }
+        else -> true
       }
     }
-    saved.ids = emptyList()
-    onResumed()
-    log.i { "Resumed $resumed downloads paused for the background" }
+    saved.ids = left
+    if (left.isEmpty()) onResumed()
+    log.i { "Resumed $resumed downloads paused for the background, ${left.size} left" }
   }
 
   // Pauses the queued tasks before the downloading ones, so the queue cannot start a waiting
