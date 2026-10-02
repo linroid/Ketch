@@ -1433,7 +1433,8 @@ class IntakeSession internal constructor(
       }
       submitting = false
       onDone()
-      result.onSuccess {
+      result.onSuccess { copy ->
+        state.claimAdds(listOf(TaskKey(target.deviceId, copy.taskId)))
         state.messages.post(
           MessageLevel.Success,
           "Started ${displayName(request)} over",

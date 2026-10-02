@@ -253,32 +253,38 @@ private fun ActivityEntry(
       )
     }
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
-      Row(verticalAlignment = Alignment.Top) {
+      Row {
         Text(
           text = message.title,
           style = KetchTheme.typography.bodyS,
           color = colors.textPrimary,
           maxLines = 2,
           overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.weight(1f),
+          modifier = Modifier.weight(1f).alignByBaseline(),
         )
         Spacer(Modifier.size(spacing.s2))
-        if (unread) {
-          KetchDot(
-            color = colors.accent,
-            size = UnreadDotSize,
-            modifier = Modifier
-              .align(Alignment.CenterVertically)
-              .padding(end = spacing.s1)
-              .semantics { contentDescription = "Unread" },
+        // The dot and the time sit on the title's first line, however many lines it takes.
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.alignByBaseline(),
+        ) {
+          if (unread) {
+            KetchDot(
+              color = colors.accent,
+              size = UnreadDotSize,
+              modifier = Modifier
+                .padding(end = spacing.s1)
+                .semantics { contentDescription = "Unread" },
+            )
+          }
+          Text(
+            text = time,
+            // Tabular figures, so the times and their dots line up down the list.
+            style = KetchTheme.typography.caption.copy(fontFeatureSettings = "tnum"),
+            color = if (unread) colors.accentText else colors.textTertiary,
+            maxLines = 1,
           )
         }
-        Text(
-          text = time,
-          style = KetchTheme.typography.caption,
-          color = if (unread) colors.accentText else colors.textTertiary,
-          maxLines = 1,
-        )
       }
       val detail = toastDetail(message)
       if (detail != null) {

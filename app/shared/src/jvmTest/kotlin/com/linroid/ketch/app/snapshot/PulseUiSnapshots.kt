@@ -641,6 +641,13 @@ private object ActivitySamples {
 
   val history = listOf(
     message(6, MessageLevel.Success, "Slow lane on · 3 MB/s", minutesAgo = 1, actions = undo()),
+    // An unread title that wraps, to show the dot and the time staying on its first line.
+    message(
+      id = 7,
+      level = MessageLevel.Success,
+      title = "Added ubuntu-24.04.5-live-server-amd64.iso → This Mac",
+      minutesAgo = 4,
+    ),
     message(
       id = 5,
       level = MessageLevel.Error,
