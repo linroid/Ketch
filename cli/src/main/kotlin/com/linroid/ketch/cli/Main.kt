@@ -12,6 +12,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.ai.DiscoverQuery
+import com.linroid.ketch.ai.DiscoveryException
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
@@ -500,6 +501,9 @@ private fun runAiDiscover(args: List<String>) {
     val response = try {
       aiModule.discoveryService.discover(discoverQuery)
     } catch (e: IllegalArgumentException) {
+      println("Error: ${e.message}")
+      return@runBlocking
+    } catch (e: DiscoveryException) {
       println("Error: ${e.message}")
       return@runBlocking
     } finally {

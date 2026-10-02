@@ -57,6 +57,8 @@ class DiscoveryToolSetTest {
     budget: FetchBudget = FetchBudget(maxRequests = 25, maxBytes = 1024 * 1024),
     allowlist: SiteAllowlist = SiteAllowlist.Unrestricted,
     searchProvider: SearchProvider = DummySearchProvider(),
+    maxToolCalls: Int = 40,
+    stepListener: DiscoveryStepListener = DiscoveryStepListener.None,
   ): DiscoveryToolSet {
     val fetcher = SafeFetcher(
       httpClient = HttpClient(engine) { followRedirects = false },
@@ -71,7 +73,8 @@ class DiscoveryToolSetTest {
       linkExtractor = LinkExtractor(),
       siteProfiler = SiteProfiler(fetcher),
       budget = budget,
-      stepListener = DiscoveryStepListener.None,
+      maxToolCalls = maxToolCalls,
+      stepListener = stepListener,
       json = Json,
       allowlist = allowlist,
     )
@@ -294,6 +297,37 @@ class DiscoveryToolSetTest {
 
     assertFalse(offList.getValue("ok").jsonPrimitive.boolean)
     assertTrue(onList.getValue("ok").jsonPrimitive.boolean)
+  }
+
+  @Test
+  fun toolCallBudgetSpent_toolsAskForResults() = runTest {
+    val tools = toolSet(MockEngine { respond("") }, maxToolCalls = 1)
+
+    val first = parse(tools.validateUrl("https://example.com/app.zip"))
+    val search = parse(tools.searchWeb("app"))
+    val head = parse(tools.headUrl("https://example.com/app.zip"))
+
+    assertTrue(first.getValue("ok").jsonPrimitive.boolean)
+    assertTrue(assertNotNull(search.error()).contains("Tool call budget of 1"))
+    assertTrue(assertNotNull(head.error()).contains("Tool call budget of 1"))
+  }
+
+  @Test
+  fun toolCallBudgetSpent_emitStepStillShowsStep() {
+    val steps = mutableListOf<String>()
+    val listener = object : DiscoveryStepListener {
+      override fun onStep(title: String, details: String) {
+        steps += title
+      }
+    }
+    val tools = toolSet(MockEngine { respond("") }, maxToolCalls = 1, stepListener = listener)
+
+    val plan = tools.emitStep("Plan", "Search the release page")
+    val results = tools.emitStep("Filtering", "Kept one candidate")
+
+    assertEquals("ok", plan)
+    assertTrue(results.contains("Tool call budget of 1"))
+    assertEquals(listOf("Plan", "Filtering"), steps)
   }
 
   @Test

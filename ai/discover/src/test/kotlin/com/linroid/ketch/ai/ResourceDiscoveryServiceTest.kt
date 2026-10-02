@@ -1,12 +1,14 @@
 package com.linroid.ketch.ai
 
 import ai.koog.agents.core.tools.ToolDescriptor
+import ai.koog.http.client.KoogHttpClientException
 import ai.koog.prompt.Prompt
 import ai.koog.prompt.dsl.ModerationResult
 import ai.koog.prompt.executor.model.PromptExecutor
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
@@ -16,6 +18,8 @@ import com.linroid.ketch.ai.fetch.UrlValidator
 import com.linroid.ketch.ai.fetch.fakeDns
 import com.linroid.ketch.ai.search.DummySearchProvider
 import com.linroid.ketch.ai.site.SiteProfiler
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
@@ -31,8 +35,10 @@ import kotlin.test.assertTrue
 
 class ResourceDiscoveryServiceTest {
 
-  /** Answers every prompt with [reply], or fails when it is `null`. */
-  private class FakeExecutor(private val reply: String?) : PromptExecutor() {
+  /** Answers every prompt with what [respond] returns, or fails when it returns `null`. */
+  private class FakeExecutor(
+    private val respond: (Prompt) -> Message.Assistant?,
+  ) : PromptExecutor() {
     var closeCount = 0
       private set
 
@@ -42,7 +48,7 @@ class ResourceDiscoveryServiceTest {
       tools: List<ToolDescriptor>,
     ): Message.Assistant {
       check(closeCount == 0) { "Used after close" }
-      return Message.Assistant(reply ?: error("LLM unavailable"), ResponseMetaInfo.Empty)
+      return respond(prompt) ?: error("LLM unavailable")
     }
 
     override fun executeStreaming(
@@ -65,6 +71,16 @@ class ResourceDiscoveryServiceTest {
     executors: MutableList<FakeExecutor>,
     reply: String? = "[]",
     enabled: Boolean = true,
+  ): ResourceDiscoveryService = service(executors, enabled) { _ ->
+    reply?.let { Message.Assistant(it, ResponseMetaInfo.Empty) }
+  }
+
+  private fun service(
+    executors: MutableList<FakeExecutor>,
+    enabled: Boolean = true,
+    agent: AgentConfig = AgentConfig(),
+    steps: DiscoveryStepListener = DiscoveryStepListener.None,
+    respond: (Prompt) -> Message.Assistant?,
   ): ResourceDiscoveryService {
     val validator = UrlValidator(resolve = fakeDns("example.com" to "93.184.215.14"))
     val fetcher = SafeFetcher(
@@ -77,13 +93,57 @@ class ResourceDiscoveryServiceTest {
       urlValidator = validator,
       contentExtractor = ContentExtractor(),
       siteProfiler = SiteProfiler(fetcher),
-      config = AiConfig(settings = AiSettings(enabled = enabled, llm = ollama)),
-      stepListener = DiscoveryStepListener.None,
+      config = AiConfig(settings = AiSettings(enabled = enabled, llm = ollama), agent = agent),
+      stepListener = steps,
       resolveLlm = { settings ->
-        val executor = FakeExecutor(reply).also(executors::add)
+        val executor = FakeExecutor(respond).also(executors::add)
         ResolvedLlm(executor, LlmClientFactory.customModel(LLMProvider.Ollama, settings.model))
       },
     )
+  }
+
+  /** Records every log message, with the stack trace of any error logged with it. */
+  private fun recordingLogger(records: MutableList<String>) = object : Logger {
+    override fun v(message: String) {
+      records += message
+    }
+
+    override fun d(message: String) {
+      records += message
+    }
+
+    override fun i(message: String) {
+      records += message
+    }
+
+    override fun w(message: String, throwable: Throwable?) {
+      records += message + throwable?.stackTraceToString().orEmpty()
+    }
+
+    override fun e(message: String, throwable: Throwable?) {
+      records += message + throwable?.stackTraceToString().orEmpty()
+    }
+  }
+
+  private fun recordSteps(steps: MutableList<String>) = object : DiscoveryStepListener {
+    override fun onStep(title: String, details: String) {
+      steps += details
+    }
+  }
+
+  /**
+   * Calls `emitStep` until [spentReplies] tool results in [prompt] reported the tool budget
+   * spent, then returns `null`.
+   */
+  private fun stepUntilSpent(prompt: Prompt, spentReplies: Int): Message.Assistant? {
+    val results = prompt.messages.flatMap { it.parts }.filterIsInstance<MessagePart.Tool.Result>()
+    if (results.count { it.output != "ok" } >= spentReplies) return null
+    val call = MessagePart.Tool.Call(
+      id = "call-${results.size}",
+      tool = "emitStep",
+      args = """{"title": "Searching", "details": "step ${results.size}"}""",
+    )
+    return Message.Assistant(call, ResponseMetaInfo.Empty)
   }
 
   @Test
@@ -99,13 +159,70 @@ class ResourceDiscoveryServiceTest {
   }
 
   @Test
-  fun discover_agentFails_closesLlmClient() = runTest {
+  fun discover_agentAnswersAfterToolBudgetIsSpent_returnsItsCandidates() = runTest {
+    val executors = mutableListOf<FakeExecutor>()
+    val steps = mutableListOf<String>()
+    val reply = """[{"name": "Tool", "url": "https://example.com/tool.zip", "confidence": 0.9}]"""
+    // Reports steps until the budget is spent, reports one more as told, then answers
+    val service = service(executors, steps = recordSteps(steps)) { prompt ->
+      stepUntilSpent(prompt, spentReplies = 2) ?: Message.Assistant(reply, ResponseMetaInfo.Empty)
+    }
+
+    val result = service.discover(DiscoverQuery(query = "tool release"))
+
+    assertEquals(listOf("https://example.com/tool.zip"), result.candidates.map { it.url })
+    assertEquals(AgentConfig().maxToolCalls + 2, steps.size)
+  }
+
+  @Test
+  fun discover_agentIgnoresSpentToolBudget_failsOutOfSteps() = runTest {
+    val executors = mutableListOf<FakeExecutor>()
+    val service = service(executors, agent = AgentConfig(maxToolCalls = 2)) { prompt ->
+      stepUntilSpent(prompt, spentReplies = Int.MAX_VALUE)
+    }
+
+    val error = assertFailsWith<DiscoveryException> {
+      service.discover(DiscoverQuery(query = "tool release"))
+    }
+
+    assertTrue(error.message.startsWith("The agent ran out of steps"))
+    assertEquals(listOf(1), executors.map { it.closeCount })
+  }
+
+  @Test
+  fun discover_agentFails_throwsAndClosesLlmClient() = runTest {
     val executors = mutableListOf<FakeExecutor>()
 
-    val result = service(executors, reply = null).discover(DiscoverQuery(query = "ubuntu iso"))
+    val error = assertFailsWith<DiscoveryException> {
+      service(executors, reply = null).discover(DiscoverQuery(query = "ubuntu iso"))
+    }
 
-    assertTrue(result.candidates.isEmpty())
+    assertEquals("The AI request failed: LLM unavailable", error.message)
     assertEquals(listOf(1), executors.map { it.closeCount })
+  }
+
+  @Test
+  fun discoverAndVerify_providerError_reportsReasonButLogsNoBody() = runTest {
+    val records = mutableListOf<String>()
+    KetchLogger.setLogger(recordingLogger(records))
+    val body = """{"error": {"message": "Invalid token sk-live-secret"}}"""
+    val service = service(mutableListOf()) { _ ->
+      throw KoogHttpClientException(clientName = "OpenAI", statusCode = 401, errorBody = body)
+    }
+
+    val query = DiscoverQuery(query = "ubuntu iso")
+    val (search, check) = try {
+      assertFailsWith<DiscoveryException> { service.discover(query) } to
+        assertFailsWith<DiscoveryException> { service.verifyConnection() }
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+
+    val reported = "The AI provider rejected the API token (HTTP 401): Invalid token sk-live-secret"
+    assertEquals(reported, search.message)
+    assertEquals(reported, check.message)
+    assertTrue(records.any { "HTTP 401" in it })
+    assertTrue(records.none { "sk-live-secret" in it }, records.joinToString("\n"))
   }
 
   @Test
@@ -143,7 +260,7 @@ class ResourceDiscoveryServiceTest {
   fun verifyConnection_failure_closesLlmClient() = runTest {
     val executors = mutableListOf<FakeExecutor>()
 
-    assertFailsWith<IllegalStateException> {
+    assertFailsWith<DiscoveryException> {
       service(executors, reply = null).verifyConnection()
     }
 

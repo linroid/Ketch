@@ -22,11 +22,15 @@ class AiDiscoverControllerTest {
     description = "",
   )
 
-  /** Answers every search with [candidates], reporting [steps] first; waits for [gate]. */
+  /**
+   * Answers every search with [candidates], or throws [failure], reporting [steps] first; waits
+   * for [gate].
+   */
   private class FakeProvider(
     private val steps: List<DiscoveryStep> = emptyList(),
     private val candidates: List<AiCandidate> = emptyList(),
     private val gate: CompletableDeferred<Unit>? = null,
+    private val failure: Exception? = null,
   ) : AiDiscoveryProvider {
     val requests = mutableListOf<AiDiscoverRequest>()
 
@@ -37,6 +41,7 @@ class AiDiscoverControllerTest {
       requests += request
       steps.forEach(onStep)
       gate?.await()
+      failure?.let { throw it }
       return AiDiscoverResponse(request.query, candidates)
     }
 
@@ -148,6 +153,22 @@ class AiDiscoverControllerTest {
     assertNull(controller.pending)
     assertEquals("ubuntu server iso", provider.requests.single().query)
     assertIs<AiDiscoverState.Results>(controller.state)
+  }
+
+  @Test
+  fun discover_providerFails_reportsItsMessageAndKeepsTheSteps() = runTest {
+    val steps = listOf(DiscoveryStep("Searching"))
+    val message = "The AI provider rejected the API token (HTTP 401)"
+    val controller = AiDiscoverController(
+      settingsWith(FakeProvider(steps = steps, failure = IllegalStateException(message))),
+      backgroundScope,
+    )
+
+    controller.discover("blender", sites = "")
+    runCurrent()
+
+    assertEquals(AiDiscoverState.Error(message), controller.state)
+    assertEquals(steps, controller.steps)
   }
 
   @Test

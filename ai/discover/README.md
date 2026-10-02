@@ -70,9 +70,9 @@ that follows a structured 5-phase workflow:
 │     Create 3-6 search/fetch steps with budgets  │
 ├─────────────────────────────────────────────────┤
 │  3. DISCOVER (iterative loop)                   │
-│     searchWeb/searchSites → validateUrl →       │
-│     fetchPage → extractDownloads → headUrl      │
-│     Budget: 6 searches, 10 fetches, 15 HEADs   │
+│     searchWeb/searchSites → fetchPage →         │
+│     headUrl, independent calls in one turn      │
+│     Budget: 6 searches, 10 fetches, 15 HEADs    │
 ├─────────────────────────────────────────────────┤
 │  4. SCORE & FILTER                              │
 │     Relevance + device safety scoring           │
@@ -200,8 +200,12 @@ ResourceDiscoveryService.discover()
   robots.txt allows everything, and `Crawl-delay` is not applied.
   `headUrl` checks of candidate links are not subject to robots.txt
 - The system prompt also asks for at most 6 searches; that limit is
-  advisory, since search calls are not counted. `AgentConfig.maxIterations`
-  caps the agent's tool calls overall
+  advisory, since search calls are not counted on their own.
+  `AgentConfig.maxToolCalls` caps the agent's tool calls overall,
+  `emitStep` included: once it is spent, every tool answers with an error
+  asking for the results (`emitStep` still shows its step). Koog's
+  iteration cap is derived from it, since Koog counts two iterations per
+  round of tool calls, with room for three more rounds to answer
 - Prompt injection defense: fetched content treated as untrusted data
 
 ## Usage
@@ -233,6 +237,13 @@ for (candidate in result.candidates) {
 
 aiModule.close() // releases the module's HTTP clients
 ```
+
+`discover()` and `verifyConnection()` throw `DiscoveryException` when the
+LLM provider fails or the agent does not answer within its step limit.
+Its message is a short explanation for the user, such as
+`The AI provider rejected the API token (HTTP 401): Incorrect API key provided.`;
+the original error is its `cause`. A search that finds nothing returns
+an empty result instead.
 
 ### With Progress Listener
 
@@ -285,7 +296,7 @@ sections are engine tuning knobs.
 | `SearchSettings` | `provider` | `None` | `None`, `Brave`, `Google` |
 | | `apiKey` | `""` | Brave subscription token or Google API key |
 | | `cx` | `""` | Google Programmable Search engine id |
-| `AgentConfig` | `maxIterations` | `30` | Max agent tool-call iterations |
+| `AgentConfig` | `maxToolCalls` | `40` | Tool calls per discovery run, progress steps included |
 | | `temperature` | `0.2` | LLM sampling temperature |
 | `FetcherConfig` | `maxContentBytes` | `2 MB` | Max page body per fetch |
 | | `requestTimeoutMs` | `15000` | HTTP timeout for fetches and search |

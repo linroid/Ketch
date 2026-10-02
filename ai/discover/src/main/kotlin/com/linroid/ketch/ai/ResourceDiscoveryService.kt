@@ -19,6 +19,7 @@ import com.linroid.ketch.ai.search.SearchProvider
 import com.linroid.ketch.ai.site.SiteProfiler
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.config.LlmSettings
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlin.time.TimeSource
 
@@ -65,6 +66,8 @@ class ResourceDiscoveryService internal constructor(
    * @throws IllegalArgumentException if the query text is blank, if
    *   [DiscoverQuery.sites] names no domain, or if none of its sites lie
    *   within [DiscoveryConfig.allowedDomains]
+   * @throws DiscoveryException if the LLM provider fails or the agent
+   *   does not answer within its step limit
    */
   suspend fun discover(query: DiscoverQuery): DiscoverResult {
     require(query.query.isNotBlank()) { "Query must not be blank" }
@@ -106,6 +109,7 @@ class ResourceDiscoveryService internal constructor(
         maxRequests = config.fetcher.maxFetchesPerRequest,
         maxBytes = config.fetcher.maxTotalBytesPerRequest,
       ),
+      maxToolCalls = config.agent.maxToolCalls,
       stepListener = stepListener,
       json = json,
       allowlist = allowlist,
@@ -120,20 +124,18 @@ class ResourceDiscoveryService internal constructor(
       // so the temperature only goes out when the model advertises it.
       temperature = config.agent.temperature
         .takeIf { llm.model.supports(LLMCapability.Temperature) },
-      maxIterations = config.agent.maxIterations,
+      maxIterations = agentIterations(config.agent.maxToolCalls),
     )
 
     val userMessage = buildUserMessage(query, allowlist)
 
     val agentOutput = try {
       agent.run(userMessage)
+    } catch (e: CancellationException) {
+      throw e
     } catch (e: Exception) {
-      log.e(e) { "Agent execution failed" }
-      return DiscoverResult(
-        query = query.query,
-        candidates = emptyList(),
-        sources = toolSet.fetchedSources,
-      )
+      logFailure("Agent execution", e)
+      throw DiscoveryException(describeLlmFailure(e), e)
     }
 
     val candidates = outputParser.parse(agentOutput, allowlist)
@@ -158,21 +160,42 @@ class ResourceDiscoveryService internal constructor(
    *
    * @return the model's reply text
    * @throws IllegalStateException if the settings are incomplete
+   * @throws DiscoveryException if the provider fails
    */
   suspend fun verifyConnection(): String {
     val llm = checkNotNull(resolveLlm(config.llm)) {
       "AI discovery is not fully configured"
     }
     log.i { "Verifying ${config.llm.provider.label} connection" }
-    val reply = llm.executor.use { executor ->
-      executor.execute(
-        prompt = prompt("ketch-verify") {
-          user("Reply with the single word: OK")
-        },
-        model = llm.model,
-      )
+    val reply = try {
+      llm.executor.use { executor ->
+        executor.execute(
+          prompt = prompt("ketch-verify") {
+            user("Reply with the single word: OK")
+          },
+          model = llm.model,
+        )
+      }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      logFailure("Connection check", e)
+      throw DiscoveryException(describeLlmFailure(e), e)
     }
     return reply.textContent().trim()
+  }
+
+  /**
+   * Logs the failure of [action]. A provider's error quotes its response
+   * body, which may echo a token, so it is logged as its status alone;
+   * other failures keep their stack trace.
+   */
+  private fun logFailure(action: String, error: Exception) {
+    if (hasProviderResponse(error)) {
+      log.w { "$action failed: ${describeLlmFailure(error, withProviderReason = false)}" }
+    } else {
+      log.e(error) { "$action failed" }
+    }
   }
 
   private fun buildUserMessage(
@@ -192,10 +215,24 @@ class ResourceDiscoveryService internal constructor(
         )
       }
       appendLine("Return up to ${query.maxResults} candidates.")
+      appendLine("Tool budget: ${config.agent.maxToolCalls} tool calls, emitStep included.")
     }
   }
 
   companion object {
+    /** Rounds of tool calls the agent may make after its tool budget is spent. */
+    private const val WRAP_UP_ROUNDS = 3
+
+    /**
+     * Koog's iteration cap for an agent allowed [maxToolCalls] tool calls.
+     *
+     * Koog counts every node the agent passes: the start, the first request and the finish, and
+     * two per round of tool calls (running them and sending back their results). A round holds
+     * one call or more, and [WRAP_UP_ROUNDS] more let the agent answer once the budget is spent.
+     */
+    internal fun agentIterations(maxToolCalls: Int): Int =
+      3 + 2 * (maxToolCalls + WRAP_UP_ROUNDS)
+
     internal val SYSTEM_PROMPT = """
       |You are the Ketch Resource Finder agent. Your job is to discover
       |downloadable files from the internet matching the user's request.
@@ -216,18 +253,24 @@ class ResourceDiscoveryService internal constructor(
       |   subdomains): searches only cover them, fetchPage() and headUrl()
       |   refuse other domains, and candidates elsewhere are discarded.
       |   Do not try other domains. Redirects are followed for you.
-      |   For promising results:
-      |     a) validateUrl() — check safety
-      |     b) fetchPage() — read the page
-      |     c) extractDownloads() — find download links on the page
-      |     d) headUrl() — get metadata for candidate download URLs
+      |   For promising results, fetchPage() the page and headUrl() its
+      |   candidate download links. Both check the URL's safety, and
+      |   fetchPage() already returns the page's links, so do not call
+      |   validateUrl() or extractDownloads() for them.
+      |   Make independent calls in the same turn, such as headUrl() for
+      |   several links at once.
       |   Follow at most 2 internal links per domain.
-      |   Call emitStep() after each significant action.
+      |   Call emitStep() when you find candidates or change course, not
+      |   after every call.
       |   Budget: max 6 search calls, max 10 fetchPage, max 15 headUrl.
       |   Stop early when you have enough high-confidence candidates.
       |   fetchPage and headUrl share a hard budget; once either reports
       |   the budget is spent, stop fetching and go to SCORE & FILTER.
       |   Pages disallowed by the site's robots.txt cannot be fetched.
+      |   Every tool call, emitStep included, counts toward the tool
+      |   budget given in the request. Once a tool reports that budget is
+      |   spent, call no more tools except one last emitStep, then go to
+      |   OUTPUT.
       |
       |4. SCORE & FILTER
       |   Score each candidate on:

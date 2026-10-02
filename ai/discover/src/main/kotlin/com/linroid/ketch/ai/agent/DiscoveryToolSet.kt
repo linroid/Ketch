@@ -27,6 +27,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.net.URI
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Instant
 
 /**
@@ -39,6 +40,11 @@ import kotlin.time.Instant
  * One instance serves one discovery run: page fetches and HEAD
  * requests draw on [budget], and page fetches honor each site's
  * robots.txt, read once per origin for the run.
+ *
+ * Every tool call, `emitStep` included, takes one of [maxToolCalls].
+ * Once they are spent, the tools answer with an error asking the agent
+ * to return its results; `emitStep` still shows its step, so the agent
+ * can explain them.
  *
  * While [allowlist] is restricted, searches only cover the allowed
  * sites and `fetchPage`/`headUrl` refuse URLs on other hosts with an
@@ -54,12 +60,15 @@ internal class DiscoveryToolSet(
   private val linkExtractor: LinkExtractor,
   private val siteProfiler: SiteProfiler,
   private val budget: FetchBudget,
+  private val maxToolCalls: Int,
   private val stepListener: DiscoveryStepListener,
   private val json: Json,
   private val allowlist: SiteAllowlist,
 ) : ToolSet {
 
   private val log = KetchLogger("DiscoveryToolSet")
+
+  private val toolCalls = AtomicInteger()
 
   private val robotsMutex = Mutex()
   private val robotsByOrigin = mutableMapOf<String, RobotsTxtRules?>()
@@ -80,6 +89,7 @@ internal class DiscoveryToolSet(
     @LLMDescription("Maximum number of results (1-10)")
     maxResults: Int = 5,
   ): String {
+    if (!takeToolCall("searchWeb")) return errorJson(toolBudgetSpent())
     log.d { "searchWeb: query=\"$query\", max=$maxResults" }
     val results = searchProvider.search(
       query = query,
@@ -103,6 +113,7 @@ internal class DiscoveryToolSet(
     @LLMDescription("Maximum number of results (1-10)")
     maxResults: Int = 5,
   ): String {
+    if (!takeToolCall("searchSites")) return errorJson(toolBudgetSpent())
     val siteList = sites.split(",").map { SiteAllowlist.normalize(it) }
       .filter { it.isNotEmpty() }
     log.d { "searchSites: sites=$siteList, query=\"$query\"" }
@@ -128,6 +139,7 @@ internal class DiscoveryToolSet(
     @LLMDescription("URL to fetch")
     url: String,
   ): String {
+    if (!takeToolCall("fetchPage")) return errorJson(toolBudgetSpent())
     log.d { "fetchPage: ${redactUrl(url)}" }
     if (!allowlist.allows(url)) {
       log.d { "fetchPage refused: ${redactUrl(url)} outside allowed sites" }
@@ -201,6 +213,7 @@ internal class DiscoveryToolSet(
     @LLMDescription("URL to check")
     url: String,
   ): String {
+    if (!takeToolCall("headUrl")) return errorJson(toolBudgetSpent())
     log.d { "headUrl: ${redactUrl(url)}" }
     if (!allowlist.allows(url)) {
       log.d { "headUrl refused: ${redactUrl(url)} outside allowed sites" }
@@ -240,6 +253,7 @@ internal class DiscoveryToolSet(
     @LLMDescription("Base URL for resolving relative links")
     baseUrl: String,
   ): String {
+    if (!takeToolCall("extractDownloads")) return errorJson(toolBudgetSpent())
     val links = linkExtractor.extract(pageText, baseUrl)
     return buildJsonArray {
       for (l in links.take(MAX_LINKS)) {
@@ -264,6 +278,7 @@ internal class DiscoveryToolSet(
     @LLMDescription("URL to validate")
     url: String,
   ): String {
+    if (!takeToolCall("validateUrl")) return errorJson(toolBudgetSpent())
     val reason = if (!allowlist.allows(url)) {
       outsideAllowlistMessage(url)
     } else {
@@ -287,7 +302,14 @@ internal class DiscoveryToolSet(
     details: String,
   ): String {
     stepListener.onStep(title, details)
-    return "ok"
+    return if (takeToolCall("emitStep")) "ok" else toolBudgetSpent()
+  }
+
+  /** Takes one tool call from [maxToolCalls], or returns `false` once they are spent. */
+  private fun takeToolCall(tool: String): Boolean {
+    val spent = toolCalls.incrementAndGet() > maxToolCalls
+    if (spent) log.d { "$tool: tool call budget of $maxToolCalls spent" }
+    return !spent
   }
 
   /**
@@ -320,6 +342,10 @@ internal class DiscoveryToolSet(
   private fun requestBudgetSpent(): String =
     "Request budget of ${budget.maxRequests} page fetches and HEAD requests for this " +
       "discovery is spent. Stop fetching and return your results."
+
+  private fun toolBudgetSpent(): String =
+    "Tool call budget of $maxToolCalls for this discovery is spent. " +
+      "Call no more tools, except one last emitStep, and return your results."
 
   /** Why robots.txt forbids fetching [uri], or `null` when it allows it. */
   private suspend fun robotsRefusal(uri: URI): String? {
