@@ -433,13 +433,7 @@ private fun Part(
         .fillMaxHeight()
         .background(overlay)
         .ketchClickable(interactions, focus, onClick = onClick)
-        .then(
-          if (description == null) {
-            Modifier
-          } else {
-            Modifier.semantics { contentDescription = description }
-          }
-        )
+        .semantics { if (description != null) contentDescription = description }
         .padding(start = start, end = end),
       content = content,
     )
@@ -584,8 +578,6 @@ private val GlyphLanes = listOf(
 /** How far [value] is through the stretch from [from] to [to], from 0 to 1. */
 private fun stage(value: Float, from: Float, to: Float): Float =
   ((value - from) / (to - from)).coerceIn(0f, 1f)
-
-private fun between(from: Float, to: Float, fraction: Float): Float = from + (to - from) * fraction
 
 private const val GRID = 20f
 private const val STROKE = 1.7f

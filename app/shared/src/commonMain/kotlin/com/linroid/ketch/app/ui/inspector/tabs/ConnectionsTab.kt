@@ -329,7 +329,6 @@ private fun LaneRow(
       phase = phase,
       progress = null,
       height = LaneStripDefaults.LaneHeight,
-      heads = phase == LanePhase.Downloading,
       stalled = if (stalled) StalledOwnLane else emptySet(),
       modifier = Modifier.weight(1f).clearAndSetSemantics {},
     )
