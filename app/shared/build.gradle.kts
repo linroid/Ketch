@@ -66,6 +66,8 @@ kotlin {
       implementation(projects.library.remote)
 
       implementation(libs.kotlinx.coroutines.core)
+      implementation(libs.kotlinx.datetime)
+      implementation(libs.qrose)
       implementation(libs.compose.runtime)
       implementation(libs.compose.foundation)
       implementation(libs.compose.material3)
@@ -118,4 +120,19 @@ kotlin {
       implementation(libs.ktor.client.js)
     }
   }
+}
+
+// `-PupdateTokenAllowlist` makes the design token guard rewrite its allowlist instead of failing.
+tasks.named<Test>("jvmTest") {
+  val updateTokenAllowlist = providers.gradleProperty("updateTokenAllowlist")
+    .map { it != "false" }
+    .getOrElse(false)
+  inputs.property("updateTokenAllowlist", updateTokenAllowlist)
+  outputs.upToDateWhen { !updateTokenAllowlist }
+  outputs.cacheIf { !updateTokenAllowlist }
+  systemProperty("updateTokenAllowlist", updateTokenAllowlist.toString())
+  // The guard reads the source text itself, comments included, not the compiled classes.
+  inputs.dir("src/commonMain/kotlin")
+    .withPropertyName("tokenGuardSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
 }

@@ -2,21 +2,31 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.api.DownloadState
 
+/**
+ * Status tabs of the Downloads page. The Pulse bar, the tray and device rows count tasks with
+ * the same definitions.
+ *
+ * @property label name shown on the tab.
+ */
 enum class StatusFilter(val label: String) {
   All("All"),
-  Downloading("Active"),
-  Completed("Completed"),
+  Downloading("Downloading"),
+
+  /** Queued for a free slot, or scheduled to start later. */
+  Waiting("Waiting"),
   Paused("Paused"),
+  Done("Done"),
+
+  /** Failed or canceled. */
   Failed("Failed");
 
+  /** Whether a task in [state] belongs on this tab. */
   fun matches(state: DownloadState): Boolean = when (this) {
     All -> true
-    Downloading -> state is DownloadState.Downloading ||
-      state is DownloadState.Queued ||
-      state is DownloadState.Scheduled
+    Downloading -> state is DownloadState.Downloading
+    Waiting -> state is DownloadState.Queued || state is DownloadState.Scheduled
     Paused -> state is DownloadState.Paused
-    Completed -> state is DownloadState.Completed
-    Failed -> state is DownloadState.Failed ||
-      state is DownloadState.Canceled
+    Done -> state is DownloadState.Completed
+    Failed -> state is DownloadState.Failed || state is DownloadState.Canceled
   }
 }

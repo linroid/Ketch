@@ -13,6 +13,7 @@ import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.ThemeMode
+import com.linroid.ketch.config.UiPreferences
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -106,6 +107,23 @@ class AppSettingsControllerTest {
     controller.saveThemeMode(ThemeMode.Light)
     assertEquals(ThemeMode.Light, controller.themeMode)
     assertEquals(KetchAccent.Harbor, controller.accent)
+  }
+
+  @Test
+  fun saveUi_change_keepsTheOtherPreferences() {
+    val store = RecordingConfigStore(
+      KetchConfig(ui = UiPreferences(lastDeviceId = "nas.local:8642", inspectorWidth = 400)),
+    )
+    val controller = AppSettingsController(store)
+    assertEquals("nas.local:8642", controller.ui.lastDeviceId)
+
+    controller.saveUi { it.copy(inspectorOpen = false) }
+
+    val saved = store.load().ui
+    assertEquals(false, saved.inspectorOpen)
+    assertEquals("nas.local:8642", saved.lastDeviceId)
+    assertEquals(400, saved.inspectorWidth)
+    assertEquals(saved, controller.ui)
   }
 
   @Test

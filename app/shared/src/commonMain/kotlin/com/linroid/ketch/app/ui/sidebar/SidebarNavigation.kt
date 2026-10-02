@@ -238,7 +238,8 @@ private fun SectionLabel(text: String) {
 internal fun filterIcon(filter: StatusFilter): KetchIcon = when (filter) {
   StatusFilter.All -> KetchIcon.All
   StatusFilter.Downloading -> KetchIcon.Active
+  StatusFilter.Waiting -> KetchIcon.Queued
   StatusFilter.Paused -> KetchIcon.Pause
-  StatusFilter.Completed -> KetchIcon.Done
+  StatusFilter.Done -> KetchIcon.Done
   StatusFilter.Failed -> KetchIcon.Failed
 }

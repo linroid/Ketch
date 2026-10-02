@@ -129,14 +129,16 @@ private fun EmptyFilterState(
   val title = if (searching) "No matching downloads" else when (filter) {
     StatusFilter.All -> "No downloads yet"
     StatusFilter.Downloading -> "No active downloads"
-    StatusFilter.Completed -> "No completed downloads yet"
+    StatusFilter.Waiting -> "Nothing waiting"
+    StatusFilter.Done -> "No completed downloads yet"
     StatusFilter.Paused -> "No paused downloads"
     StatusFilter.Failed -> "No failed or canceled downloads"
   }
   val hint = if (searching) "Try a different file name or URL, or clear your search." else when (filter) {
     StatusFilter.All -> "Add a download to get started."
     StatusFilter.Downloading -> "Start a new download or resume a paused one."
-    StatusFilter.Completed -> "Finished downloads will appear here."
+    StatusFilter.Waiting -> "Queued and scheduled downloads will appear here."
+    StatusFilter.Done -> "Finished downloads will appear here."
     StatusFilter.Paused -> "Downloads you pause will appear here."
     StatusFilter.Failed -> "Downloads that fail or are canceled will appear here."
   }
@@ -152,7 +154,8 @@ private fun EmptyFilterState(
         icon = if (searching) KetchIcon.Search else when (filter) {
           StatusFilter.All -> KetchIcon.All
           StatusFilter.Downloading -> KetchIcon.Active
-          StatusFilter.Completed -> KetchIcon.Done
+          StatusFilter.Waiting -> KetchIcon.Queued
+          StatusFilter.Done -> KetchIcon.Done
           StatusFilter.Paused -> KetchIcon.Pause
           StatusFilter.Failed -> KetchIcon.Check
         },

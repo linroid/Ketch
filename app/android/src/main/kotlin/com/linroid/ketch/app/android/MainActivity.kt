@@ -1,10 +1,12 @@
 package com.linroid.ketch.app.android
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -12,10 +14,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.edit
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withStarted
 import com.linroid.ketch.app.App
+import com.linroid.ketch.app.instance.InstanceManager
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlin.time.Clock
 
 class MainActivity : ComponentActivity() {
 
@@ -27,17 +38,20 @@ class MainActivity : ComponentActivity() {
   private val requestExternalStoragePermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { }
-  private val requestNearbyWifiPermission = registerForActivityResult(
-    ActivityResultContracts.RequestPermission(),
-  ) { }
+  private val permissionPrefs by lazy { getSharedPreferences(PERMISSION_PREFS, MODE_PRIVATE) }
+  private var notificationOffer: Job? = null
+  private var notificationRationale: AlertDialog? = null
 
   private val connection = object : ServiceConnection {
     override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-      service = (binder as KetchService.LocalBinder).service
+      val connected = (binder as KetchService.LocalBinder).service
+      service = connected
+      offerNotificationsAfterFirstAdd(connected.instanceManager)
     }
 
     override fun onServiceDisconnected(name: ComponentName) {
       service = null
+      notificationOffer?.cancel()
     }
   }
 
@@ -45,8 +59,6 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     requestExternalStoragePermissionIfNeeded()
-    requestNotificationPermissionIfNeeded()
-    requestNearbyWifiPermissionIfNeeded()
     bindService(
       Intent(this, KetchService::class.java),
       connection,
@@ -86,41 +98,83 @@ class MainActivity : ComponentActivity() {
 
   override fun onDestroy() {
     super.onDestroy()
+    // Dismissed without an answer, the offer shows again in the recreated activity.
+    notificationRationale?.dismiss()
     unbindService(connection)
   }
 
-  private fun requestNotificationPermissionIfNeeded() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+  /**
+   * Offers notifications once, when the first task is added to this device, instead of at
+   * launch. Tasks restored from the previous run do not count. The offer stays due until it is
+   * answered, so a rotation or a restart while it shows brings it back.
+   */
+  private fun offerNotificationsAfterFirstAdd(manager: InstanceManager) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !shouldOfferNotifications()) {
       return
     }
-    if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-      return
+    val tasks = manager.embedded?.tasks ?: return
+    val since = Clock.System.now()
+    notificationOffer?.cancel()
+    notificationOffer = lifecycleScope.launch {
+      if (!permissionPrefs.getBoolean(KEY_NOTIFICATIONS_DUE, false)) {
+        tasks.first { list -> list.any { it.createdAt >= since } }
+        permissionPrefs.edit { putBoolean(KEY_NOTIFICATIONS_DUE, true) }
+      }
+      withStarted { showNotificationRationale() }
     }
-    requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
   }
 
-  private fun requestNearbyWifiPermissionIfNeeded() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-      return
+  @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+  private fun shouldOfferNotifications(): Boolean {
+    val permission = Manifest.permission.POST_NOTIFICATIONS
+    return checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED &&
+      !permissionPrefs.getBoolean(KEY_NOTIFICATIONS_OFFERED, false)
+  }
+
+  @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+  private fun showNotificationRationale() {
+    if (!shouldOfferNotifications()) return
+    val answered = {
+      permissionPrefs.edit {
+        putBoolean(KEY_NOTIFICATIONS_OFFERED, true)
+        remove(KEY_NOTIFICATIONS_DUE)
+      }
     }
-    if (checkSelfPermission(
-        Manifest.permission.NEARBY_WIFI_DEVICES
-      ) == PackageManager.PERMISSION_GRANTED
-    ) {
-      return
+    notificationRationale = AlertDialog.Builder(this, dialogTheme())
+      .setTitle("Get notified when downloads finish")
+      .setMessage("Ketch can tell you when a download finishes or fails while you use other apps.")
+      .setPositiveButton("Allow") { _, _ ->
+        answered()
+        requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+      }
+      .setNegativeButton("Not now") { _, _ -> answered() }
+      .setOnCancelListener { answered() }
+      .show()
+  }
+
+  private fun dialogTheme(): Int {
+    val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+    return if (nightMode == Configuration.UI_MODE_NIGHT_YES) {
+      android.R.style.Theme_DeviceDefault_Dialog_Alert
+    } else {
+      android.R.style.Theme_DeviceDefault_Light_Dialog_Alert
     }
-    requestNearbyWifiPermission.launch(
-      Manifest.permission.NEARBY_WIFI_DEVICES
-    )
   }
 
   private fun requestExternalStoragePermissionIfNeeded() {
     if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
       return
     }
-    if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+    val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+    if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
       return
     }
-    requestExternalStoragePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    requestExternalStoragePermission.launch(permission)
+  }
+
+  private companion object {
+    const val PERMISSION_PREFS = "permissions"
+    const val KEY_NOTIFICATIONS_OFFERED = "notifications_offered"
+    const val KEY_NOTIFICATIONS_DUE = "notifications_due"
   }
 }

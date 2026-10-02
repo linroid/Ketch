@@ -35,24 +35,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.instance.EmbeddedInstance
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.log.FileLogger
-import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppDestination
-import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.state.IncomingDownloads
-import com.linroid.ketch.app.state.InstanceSettingsController
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.StatusFilter
-import com.linroid.ketch.app.state.AiDiscoverDraft
 import com.linroid.ketch.app.ui.dialog.AddDownloadDialog
 import com.linroid.ketch.app.ui.dialog.AddRemoteServerDialog
 import com.linroid.ketch.app.ui.dialog.InstanceSelectorSheet
@@ -68,29 +64,32 @@ import com.linroid.ketch.app.ui.toolbar.BatchActionBar
 import com.linroid.ketch.app.ui.toolbar.KetchToolbar
 import com.linroid.ketch.app.ui.toolbar.countTasksByFilter
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 
+/**
+ * The app's window content: navigation, the download list, Settings and the dialogs, all driven
+ * by [appState].
+ *
+ * @param openSettingsRequests emits when the platform asks to open Settings.
+ * @param fileLogger the app's log files, offered on the About page; `null` when there are none.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppShell(
-  instanceManager: InstanceManager,
-  appSettings: AppSettingsController = remember { AppSettingsController() },
-  aiSettings: AiSettingsController = remember { AiSettingsController() },
+  appState: AppState,
   openSettingsRequests: Flow<Unit> = emptyFlow(),
-  incoming: IncomingDownloads? = null,
   fileLogger: FileLogger? = null,
 ) {
   val scope = rememberCoroutineScope()
-  val appState = remember(instanceManager, appSettings, aiSettings, incoming) {
-    AppState(
-      instanceManager = instanceManager,
-      scope = scope,
-      appSettings = appSettings,
-      aiSettings = aiSettings,
-      incoming = incoming ?: IncomingDownloads(),
-    )
-  }
+  val instanceManager = appState.instanceManager
+  val appSettings = appState.appSettings
+  val aiSettings = appState.aiSettings
+  // The error banner shows the newest error until toasts replace it.
+  @Suppress("DEPRECATION")
+  val errorMessage = appState.errorMessage
 
   val instances by appState.instances.collectAsState()
   // Auto-show add-remote-server dialog when no instances
@@ -195,20 +194,37 @@ fun AppShell(
   // windows and as a full page on narrow ones. One flag drives both, so
   // resizing across the breakpoint switches between them.
   var settingsOpen by rememberSaveable { mutableStateOf(false) }
+  val settingsRequest = appState.settingsRequest
+  LaunchedEffect(settingsRequest) {
+    if (settingsRequest != null) settingsOpen = true
+  }
   LaunchedEffect(openSettingsRequests) {
-    openSettingsRequests.collect { settingsOpen = true }
+    openSettingsRequests.collect { appState.openSettings() }
+  }
+  val closeSettings = {
+    settingsOpen = false
+    appState.closeSettings()
+  }
+  val discoverRequest = appState.discoverRequest
+  LaunchedEffect(discoverRequest) {
+    if (discoverRequest != null) {
+      destinationName = AppDestination.Discover.name
+      closeSettings()
+      appState.discoverRequestHandled()
+    }
+  }
+  // The device may have changed its settings while the app was in the background.
+  val windowInfo = LocalWindowInfo.current
+  LaunchedEffect(windowInfo, appState) {
+    snapshotFlow { windowInfo.isWindowFocused }
+      .drop(1)
+      .filter { it }
+      .collect { appState.onWindowFocused() }
   }
   val settingsCategories = SettingsCategory.visible(instanceManager.isLocalServerSupported)
   // Download, network and torrent settings belong to the active instance.
   val settingsInstance = activeInstance
-  val instanceSettings = remember(settingsInstance) {
-    InstanceSettingsController(
-      api = settingsInstance?.instance ?: appState.activeApi.value,
-      local = appSettings.takeIf { settingsInstance is EmbeddedInstance },
-      scope = scope,
-      applyTorrent = instanceManager::applyTorrentSettings,
-    )
-  }
+  val instanceSettings = appState.instanceSettings
   val settingsContent: @Composable (SettingsCategory) -> Unit = { category ->
     SettingsCategoryContent(
       category = category,
@@ -226,7 +242,7 @@ fun AppShell(
       fileLogger = fileLogger,
     )
   }
-  val aiDraft = remember { AiDiscoverDraft() }
+  val aiDraft = appState.aiDiscover.draft
   val adaptiveInfo = currentWindowAdaptiveInfo()
   val isExpanded = adaptiveInfo.windowSizeClass
     .isWidthAtLeastBreakpoint(
@@ -242,7 +258,7 @@ fun AppShell(
     onDrop = { files ->
       // Show the list the new task will appear in.
       destinationName = AppDestination.Downloads.name
-      settingsOpen = false
+      closeSettings()
       appState.addDroppedFiles(files)
     },
     modifier = Modifier.fillMaxSize(),
@@ -260,10 +276,10 @@ fun AppShell(
             selected = selected,
             onClick = {
               if (entry == AppDestination.Settings) {
-                settingsOpen = true
+                appState.openSettings()
               } else {
                 destinationName = entry.name
-                settingsOpen = false
+                closeSettings()
               }
             },
             icon = {
@@ -288,7 +304,7 @@ fun AppShell(
                 destination = destination,
                 showDiscovery = AppDestination.Discover in destinations,
                 onDestinationSelect = { destinationName = it.name },
-                onOpenSettings = { settingsOpen = true },
+                onOpenSettings = { appState.openSettings() },
                 taskCounts = taskCounts,
                 onFilterSelect = { selected ->
                   destinationName = AppDestination.Downloads.name
@@ -308,7 +324,7 @@ fun AppShell(
                 SettingsPage(
                   categories = settingsCategories,
                   content = settingsContent,
-                  onClose = { settingsOpen = false },
+                  onClose = closeSettings,
                 )
               } else if (destination == AppDestination.Discover) {
                 AiDiscoveryPage(
@@ -390,7 +406,7 @@ fun AppShell(
                 }
 
                 // Error banner
-                if (appState.errorMessage != null) {
+                if (errorMessage != null) {
                   KetchCard(
                     modifier = Modifier
                       .fillMaxWidth()
@@ -405,7 +421,7 @@ fun AppShell(
                         Arrangement.spacedBy(12.dp),
                     ) {
                       Text(
-                        text = appState.errorMessage ?: "",
+                        text = errorMessage,
                         style = KetchTheme.typography.bodySmall,
                         color = KetchTheme.colors.error,
                         modifier = Modifier.weight(1f),
@@ -427,7 +443,7 @@ fun AppShell(
                   tasks = filteredTasks,
                   onAddDownload = { appState.requestAddDownload() },
                   isEmpty = sortedTasks.isEmpty() &&
-                    appState.errorMessage == null,
+                    errorMessage == null,
                   isFilterEmpty = filteredTasks.isEmpty() &&
                     sortedTasks.isNotEmpty(),
                   selectedFilter = appState.statusFilter,
@@ -463,7 +479,7 @@ fun AppShell(
   if (settingsOpen && isExpanded) {
     SettingsDialog(
       categories = settingsCategories,
-      onDismiss = { settingsOpen = false },
+      onDismiss = closeSettings,
       content = settingsContent,
     )
   }

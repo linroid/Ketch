@@ -6,6 +6,7 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
+import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
 import com.linroid.ketch.app.state.ResolveState
 import com.linroid.ketch.app.state.torrentFileDownload
@@ -146,6 +147,67 @@ class IncomingDownloadsTest {
       assertFalse(state.showAddDialog)
       assertEquals("Couldn't open a.torrent: The file is empty", state.errorMessage)
     }
+  }
+
+  @Test
+  fun offerLinks_linksFromTheOs_stayPendingUntilCompleted() {
+    val incoming = IncomingDownloads()
+    incoming.offerLinks(listOf(" magnet:?xt=urn:btih:abc ", ""), LinkSource.OpenUrl)
+    incoming.offerLinks(listOf("https://a.org/1.iso", "https://a.org/2.iso"), LinkSource.Arguments)
+    // A second launch with the same link does not queue it twice.
+    incoming.offerLinks(listOf("magnet:?xt=urn:btih:abc"), LinkSource.OpenUrl)
+
+    val magnet = IncomingDownload.Links(listOf("magnet:?xt=urn:btih:abc"), LinkSource.OpenUrl)
+    val pair = IncomingDownload.Links(
+      listOf("https://a.org/1.iso", "https://a.org/2.iso"),
+      LinkSource.Arguments,
+    )
+    assertEquals(listOf(magnet, pair), incoming.pendingLinks.value)
+    assertEquals(emptyList(), incoming.pending.value)
+    assertEquals("magnet:?xt=urn:btih:abc", magnet.label)
+    assertEquals("2 links", pair.label)
+    incoming.complete(magnet)
+    assertEquals(listOf(pair), incoming.pendingLinks.value)
+  }
+
+  @Test
+  fun offerLinks_onlyBlankLinks_offersNothing() {
+    val incoming = IncomingDownloads()
+    incoming.offerLinks(listOf(" ", ""), LinkSource.Share)
+    incoming.offerLinks(emptyList(), LinkSource.Share)
+
+    assertEquals(emptyList(), incoming.pendingLinks.value)
+  }
+
+  @Test
+  fun offerText_sharedText_offersEveryLink() {
+    val incoming = IncomingDownloads()
+    val text = "Ubuntu: https://a.org/u.iso, parts at a.org/p[1-2].rar and " +
+      "3f2a91c0d4e5f60718293a4b5c6d7e8f90a1b2c3"
+
+    assertTrue(incoming.offerText(text, LinkSource.Share))
+    assertEquals(
+      listOf(
+        IncomingDownload.Links(
+          listOf(
+            "https://a.org/u.iso",
+            "https://a.org/p1.rar",
+            "https://a.org/p2.rar",
+            "magnet:?xt=urn:btih:3f2a91c0d4e5f60718293a4b5c6d7e8f90a1b2c3",
+          ),
+          LinkSource.Share,
+        ),
+      ),
+      incoming.pendingLinks.value,
+    )
+  }
+
+  @Test
+  fun offerText_textWithoutLinks_offersNothing() {
+    val incoming = IncomingDownloads()
+
+    assertFalse(incoming.offerText("ubuntu 24.04 iso", LinkSource.Share))
+    assertEquals(emptyList(), incoming.pendingLinks.value)
   }
 
   /** Runs [block] with an embedded [api], or in remote-only mode with none connected. */
