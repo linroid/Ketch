@@ -53,43 +53,34 @@ sealed interface PulseScope {
   data object AllDevices : PulseScope
 }
 
-/** How well the app is connected to a device. */
-sealed interface DeviceHealth {
-  /** Whether the device's tasks and speed are current. */
-  val isOnline: Boolean
-
+/**
+ * How well the app is connected to a device.
+ *
+ * @property isOnline whether the device's tasks and speed are current.
+ */
+sealed class DeviceHealth(val isOnline: Boolean) {
   /**
    * The engine inside the app.
    *
    * @property sharingPort port other devices reach it on; `null` when it is not shared.
    */
-  data class Local(val sharingPort: Int? = null) : DeviceHealth {
-    override val isOnline: Boolean get() = true
-  }
+  data class Local(val sharingPort: Int? = null) : DeviceHealth(isOnline = true)
 
   /** A remote device that is connected. */
-  data object Live : DeviceHealth {
-    override val isOnline: Boolean get() = true
-  }
+  data object Live : DeviceHealth(isOnline = true)
 
   /** A remote device the app is connecting to. */
-  data object Connecting : DeviceHealth {
-    override val isOnline: Boolean get() = false
-  }
+  data object Connecting : DeviceHealth(isOnline = false)
 
   /**
    * A remote device the app lost; it keeps retrying.
    *
    * @property reason why the connection failed, when known.
    */
-  data class Offline(val reason: String? = null) : DeviceHealth {
-    override val isOnline: Boolean get() = false
-  }
+  data class Offline(val reason: String? = null) : DeviceHealth(isOnline = false)
 
   /** A remote device that rejected the API token; the app stops retrying. */
-  data object Unauthorized : DeviceHealth {
-    override val isOnline: Boolean get() = false
-  }
+  data object Unauthorized : DeviceHealth(isOnline = false)
 }
 
 /** Health of a remote device whose client reports this connection state. */
@@ -254,7 +245,7 @@ data class PulseState(
    */
   val progress: Float?
     get() {
-      val online = devices.filter { it.health.isOnline }
+      val online = online
       val size = online.sumOf { it.sizeBytes }
       return if (size > 0) online.sumOf { it.downloadedBytes }.toFloat() / size else null
     }
@@ -270,7 +261,7 @@ data class PulseState(
     now: Instant = Clock.System.now(),
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
   ): String {
-    val online = devices.filter { it.health.isOnline }
+    val online = online
     val downloading = online.sumOf { it.counts.downloading }
     val offline = devices.firstOrNull { !it.health.isOnline }
     val base = when {
@@ -293,22 +284,33 @@ data class PulseState(
 
   /** Short form for a window title, such as "3 downloading · 45%"; `null` when idle. */
   fun shortSentence(): String? {
-    val online = devices.filter { it.health.isOnline }
-    val downloading = online.sumOf { it.counts.downloading }
-    if (downloading == 0) return null
-    val size = online.sumOf { it.sizeBytes }
-    if (size <= 0) return "$downloading downloading"
-    return "$downloading downloading · ${online.sumOf { it.downloadedBytes } * 100 / size}%"
+    val (downloading, percent) = downloadingNow()
+    return when {
+      downloading == 0 -> null
+      percent == null -> "$downloading downloading"
+      else -> "$downloading downloading · $percent%"
+    }
   }
 
   /** Title of the web app's tab: "↓ 45% · Ketch" while downloads run, otherwise "Ketch". */
   fun tabTitle(): String {
-    val online = devices.filter { it.health.isOnline }
-    val downloading = online.sumOf { it.counts.downloading }
-    if (downloading == 0) return APP_NAME
+    val (downloading, percent) = downloadingNow()
+    return when {
+      downloading == 0 -> APP_NAME
+      percent == null -> "↓ $downloading · $APP_NAME"
+      else -> "↓ $percent% · $APP_NAME"
+    }
+  }
+
+  private val online: List<DevicePulse> get() = devices.filter { it.health.isOnline }
+
+  // Tasks downloading on online devices, and the percent of their known size received; the
+  // percent is null when no size is known.
+  private fun downloadingNow(): Pair<Int, Long?> {
+    val online = online
     val size = online.sumOf { it.sizeBytes }
-    if (size <= 0) return "↓ $downloading · $APP_NAME"
-    return "↓ ${online.sumOf { it.downloadedBytes } * 100 / size}% · $APP_NAME"
+    val percent = if (size > 0) online.sumOf { it.downloadedBytes } * 100 / size else null
+    return online.sumOf { it.counts.downloading } to percent
   }
 
   private fun activeSentence(
