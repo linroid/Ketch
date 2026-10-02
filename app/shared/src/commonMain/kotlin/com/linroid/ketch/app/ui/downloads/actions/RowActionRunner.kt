@@ -73,10 +73,7 @@ internal sealed interface RowDialog {
  * @property action what runs.
  * @property rows the rows among the targets it applies to, in display order.
  */
-internal data class BatchAction(val action: RowAction, val rows: List<TaskRow>) {
-  /** How many rows it applies to. */
-  val count: Int get() = rows.size
-}
+internal data class BatchAction(val action: RowAction, val rows: List<TaskRow>)
 
 /**
  * Runs the [RowAction]s of the Downloads list on one row or on every selected row, and holds the

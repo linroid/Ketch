@@ -101,10 +101,6 @@ internal data class TableLayout(val columns: List<ColumnSetting> = defaultColumn
   fun withWidth(column: TableColumn, width: Dp): TableLayout =
     update(column) { it.copy(width = width.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth)) }
 
-  /** The width of [column]. */
-  fun widthOf(column: TableColumn): Dp =
-    columns.firstOrNull { it.column == column }?.width ?: column.width
-
   /**
    * The columns that fit a table [available] wide with [padding] on each side, after the status
    * dot column and Name at its minimum width. Columns hide in [TableColumn.HideOrder], optional

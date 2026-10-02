@@ -12,8 +12,7 @@ import kotlin.time.TimeSource
  * Live rate of one segment of a download.
  *
  * @property start first byte of the segment, which identifies its lane between snapshots.
- * @property bytesPerSecond smoothed rate; `0` for a finished segment or a task that is not
- *   downloading.
+ * @property bytesPerSecond smoothed rate; `0` for a finished segment.
  * @property stalledFor how long the segment has received no data while its task downloads, once
  *   that reaches [SegmentRateTracker.STALL_AFTER]; `null` while data arrives.
  */
@@ -69,11 +68,10 @@ class SegmentRateTracker(
   private val lanes = HashMap<Long, Lane>()
 
   /**
-   * Measures the rates of the latest [segments] of the task, given in any order; the result
-   * keeps that order. [downloading] tells whether the task is downloading, since segments of a
-   * paused or queued task neither move nor stall.
+   * Measures the rates of the latest [segments] of the downloading task, given in any order; the
+   * result keeps that order.
    */
-  fun update(segments: List<Segment>, downloading: Boolean): List<SegmentRate> {
+  fun update(segments: List<Segment>): List<SegmentRate> {
     val now = timeSource.markNow()
     lanes.keys.retainAll(segments.mapTo(HashSet()) { it.start })
     return segments.map { segment ->
@@ -82,31 +80,17 @@ class SegmentRateTracker(
         lanes[segment.start] = Lane(segment.downloadedBytes, now, now)
         SegmentRate(segment.start, 0)
       } else {
-        measure(lane, segment, now, downloading)
+        measure(lane, segment, now)
       }
     }
   }
 
-  /** Forgets every segment, as when the tracked task changes. */
-  fun reset() {
-    lanes.clear()
-  }
-
-  private fun measure(
-    lane: Lane,
-    segment: Segment,
-    now: ComparableTimeMark,
-    downloading: Boolean,
-  ): SegmentRate {
+  private fun measure(lane: Lane, segment: Segment, now: ComparableTimeMark): SegmentRate {
     val delta = segment.downloadedBytes - lane.bytes
     val elapsed = now - lane.measuredAt
     when {
-      !downloading -> {
-        lane.rate = null
-        lane.movedAt = now
-      }
       // Two snapshots at the same instant: wait for time to pass before measuring.
-      elapsed <= Duration.ZERO -> return rateOf(lane, segment, now, downloading)
+      elapsed <= Duration.ZERO -> return rateOf(lane, segment, now)
       delta >= 0 -> {
         val sample = delta / elapsed.toDouble(DurationUnit.SECONDS)
         lane.rate = lane.rate?.let { SMOOTHING * sample + (1 - SMOOTHING) * it } ?: sample
@@ -115,16 +99,11 @@ class SegmentRateTracker(
     }
     lane.bytes = segment.downloadedBytes
     lane.measuredAt = now
-    return rateOf(lane, segment, now, downloading)
+    return rateOf(lane, segment, now)
   }
 
-  private fun rateOf(
-    lane: Lane,
-    segment: Segment,
-    now: ComparableTimeMark,
-    downloading: Boolean,
-  ): SegmentRate {
-    if (segment.isComplete || !downloading) return SegmentRate(segment.start, 0)
+  private fun rateOf(lane: Lane, segment: Segment, now: ComparableTimeMark): SegmentRate {
+    if (segment.isComplete) return SegmentRate(segment.start, 0)
     val idle = now - lane.movedAt
     return SegmentRate(
       start = segment.start,

@@ -2,10 +2,8 @@ package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.SpeedLimit
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -63,49 +61,5 @@ class DownloadSummaryTest {
     val state = DownloadState.Downloading(DownloadProgress(0, 0))
 
     assertEquals(emptyList(), transferSummary(state))
-  }
-
-  @Test
-  fun speedSummary_downloading_showsSpeedAndTimeLeft() {
-    val state = DownloadState.Downloading(DownloadProgress(1024, 4096, 1024))
-
-    assertEquals(listOf("1.0 KB/s", "3s left"), speedSummary(state))
-  }
-
-  @Test
-  fun speedSummary_unknownTotal_omitsTimeLeft() {
-    val state = DownloadState.Downloading(DownloadProgress(1024, 0, 1024))
-
-    assertEquals(listOf("1.0 KB/s"), speedSummary(state))
-  }
-
-  @Test
-  fun speedSummary_noSpeedYet_showsPlaceholder() {
-    val state = DownloadState.Downloading(DownloadProgress(0, 4096, 0))
-
-    assertEquals(listOf("--"), speedSummary(state))
-  }
-
-  @Test
-  fun speedSummary_notDownloading_isEmpty() {
-    val state = DownloadState.Paused(DownloadProgress(1024, 4096, 1024))
-
-    assertEquals(emptyList(), speedSummary(state))
-  }
-
-  @Test
-  fun speedLimitLabel_limitedDownload_showsLimit() {
-    val state = DownloadState.Downloading(DownloadProgress(0, 4096, 1024))
-
-    assertEquals("limit 2.0 KB/s", speedLimitLabel(state, SpeedLimit.of(2048)))
-  }
-
-  @Test
-  fun speedLimitLabel_unlimitedOrNotRunning_isNull() {
-    val downloading = DownloadState.Downloading(DownloadProgress(0, 4096, 1024))
-    val paused = DownloadState.Paused(DownloadProgress(0, 4096))
-
-    assertNull(speedLimitLabel(downloading, SpeedLimit.Unlimited))
-    assertNull(speedLimitLabel(paused, SpeedLimit.of(2048)))
   }
 }

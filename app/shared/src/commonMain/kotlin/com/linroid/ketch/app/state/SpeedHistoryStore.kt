@@ -299,7 +299,7 @@ class SpeedHistoryStore(
     record(clock.now(), speeds, segments)
     trackers.keys.retainAll(segments.keys)
     rateState.value = segments.mapValues { (key, list) ->
-      trackers.getOrPut(key) { SegmentRateTracker(timeSource) }.update(list, downloading = true)
+      trackers.getOrPut(key) { SegmentRateTracker(timeSource) }.update(list)
     }
   }
 

@@ -39,7 +39,7 @@ class RowActionRunnerTest {
       f.add(DownloadState.Canceled),
     ).map { rowOf(it) }
 
-    val counts = f.runner.batch(rows).associate { it.action to it.count }
+    val counts = f.runner.batch(rows).associate { it.action to it.rows.size }
 
     assertEquals(2, counts[RowAction.Pause])
     assertEquals(2, counts[RowAction.Retry])
