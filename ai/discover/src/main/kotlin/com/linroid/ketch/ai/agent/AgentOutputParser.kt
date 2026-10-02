@@ -27,7 +27,7 @@ internal class AgentOutputParser(
    * Candidates whose URL lies outside [allowlist] are dropped; the page
    * they were found on is not checked.
    */
-  fun parse(
+  suspend fun parse(
     agentOutput: String,
     allowlist: SiteAllowlist = SiteAllowlist.Unrestricted,
   ): List<RankedCandidate> {
@@ -50,7 +50,7 @@ internal class AgentOutputParser(
       .sortedByDescending { it.confidence }
   }
 
-  private fun validateAndFilter(
+  private suspend fun validateAndFilter(
     c: AgentCandidate,
     allowlist: SiteAllowlist,
   ): RankedCandidate? {

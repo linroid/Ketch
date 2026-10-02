@@ -289,7 +289,7 @@ class DiscoveryToolSetTest {
   }
 
   @Test
-  fun validateUrl_urlOutsideAllowlist_isNotOk() {
+  fun validateUrl_urlOutsideAllowlist_isNotOk() = runTest {
     val tools = toolSet(MockEngine { respond("") }, allowlist = ubuntuOnly)
 
     val offList = parse(tools.validateUrl("https://evil.example/ubuntu.iso"))

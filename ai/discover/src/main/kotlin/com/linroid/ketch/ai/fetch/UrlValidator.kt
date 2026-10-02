@@ -1,5 +1,9 @@
 package com.linroid.ketch.ai.fetch
 
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.net.URI
 import java.net.UnknownHostException
@@ -14,11 +18,14 @@ import java.net.UnknownHostException
  * [resolve], so a name that answers the first lookup with a public
  * address and the second with a private one is still refused.
  *
- * @param resolve looks up every address of a host name
+ * @param resolve looks up every address of a host name; it blocks, so
+ *   [validate] calls it on [Dispatchers.IO]
  */
 internal class UrlValidator(
   private val resolve: (String) -> Array<InetAddress> = InetAddress::getAllByName,
 ) {
+
+  private val log = KetchLogger("UrlValidator")
 
   /**
    * Validates the given [url] for safety.
@@ -29,10 +36,13 @@ internal class UrlValidator(
    * 3. Hostname must not resolve to a private/local IP
    * 4. Hostname must not be an internal-looking name
    *
+   * The host is looked up on [Dispatchers.IO], so this is safe to call
+   * from a UI thread; Android refuses lookups on its main thread.
+   *
    * @return [ValidationResult.Valid] if the URL is safe to fetch,
    *   or [ValidationResult.Blocked] with a reason otherwise
    */
-  fun validate(url: String): ValidationResult {
+  suspend fun validate(url: String): ValidationResult {
     val uri = try {
       URI(url)
     } catch (_: Exception) {
@@ -51,7 +61,7 @@ internal class UrlValidator(
       ?: return ValidationResult.Blocked("Missing host in URL")
 
     try {
-      resolvePublicAddresses(host)
+      withContext(Dispatchers.IO) { resolvePublicAddresses(host) }
     } catch (e: BlockedHostException) {
       return ValidationResult.Blocked(e.reason)
     }
@@ -61,6 +71,7 @@ internal class UrlValidator(
   /**
    * Resolves [host] and returns its addresses, provided the name does
    * not look internal and none of the addresses is private or local.
+   * It blocks while the host is looked up.
    *
    * @throws BlockedHostException if the host fails either check or
    *   cannot be resolved
@@ -73,6 +84,7 @@ internal class UrlValidator(
     val addresses = try {
       resolve(host)
     } catch (e: Exception) {
+      log.d { "Lookup failed for $host: ${e.describeCauses()}" }
       throw BlockedHostException("DNS resolution failed for: $host", e)
     }
 
