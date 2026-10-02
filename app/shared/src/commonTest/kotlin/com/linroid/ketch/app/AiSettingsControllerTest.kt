@@ -320,16 +320,10 @@ class AiSettingsControllerTest {
   @Test
   fun chooseProvider_providerWithoutAKey_makesDiscoveryAvailable() {
     val controller = AiSettingsController(FakeConfigStore(), FakeFactory())
-    assertTrue(controller.needsSetup)
+    assertFalse(controller.available)
 
     controller.chooseProvider(LlmProvider.Ollama)
 
     assertTrue(controller.available)
-    assertFalse(controller.needsSetup)
-  }
-
-  @Test
-  fun needsSetup_withoutAFactory_isFalse() {
-    assertFalse(AiSettingsController(FakeConfigStore()).needsSetup)
   }
 }

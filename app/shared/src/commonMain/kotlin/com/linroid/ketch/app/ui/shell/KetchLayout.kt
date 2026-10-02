@@ -38,18 +38,6 @@ internal data class KetchLayout(
   val fullBleed: Boolean,
   val cardWidth: Dp,
 ) {
-  /** Whether the inspector docks beside the list rather than floating over it. */
-  val docksInspector: Boolean get() = cardWidth >= DockedInspectorWidth
-
-  /** Whether the sidebar is not shown, so pages name the device in their header instead. */
-  val navigationCollapsed: Boolean get() = navigation != ShellNavigation.Sidebar
-
-  /**
-   * Room a scrolling list leaves under its last row: on phones the Add button floats over the
-   * bottom end, so it never covers the last row's action.
-   */
-  val listBottomPadding: Dp get() = if (navigation == ShellNavigation.Phone) FabClearance else 0.dp
-
   /** The same layout as the Downloads page reads it. */
   val info: KetchLayoutInfo get() = KetchLayoutInfo.of(windowWidth)
 

@@ -56,9 +56,6 @@ class AiSettingsController(
   /** Whether discovery is ready to use. */
   val available: Boolean get() = provider != null
 
-  /** Whether this platform can run discovery but it is not set up yet. */
-  val needsSetup: Boolean get() = supported && !available
-
   /**
    * [settings] as the engine would see them, with the blank credentials
    * this platform can supply (e.g. from the environment) filled in.

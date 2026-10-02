@@ -16,7 +16,6 @@ class KetchLayoutTest {
     assertEquals(ShellNavigation.Phone, layout.navigation)
     assertTrue(layout.fullBleed)
     assertEquals(360.dp, layout.cardWidth)
-    assertEquals(KetchLayout.FabClearance, layout.listBottomPadding)
   }
 
   @Test
@@ -30,7 +29,6 @@ class KetchLayoutTest {
     assertEquals(ShellNavigation.Rail, wide.navigation)
     assertFalse(wide.fullBleed)
     assertEquals(760.dp, wide.cardWidth)
-    assertEquals(0.dp, wide.listBottomPadding)
   }
 
   @Test
@@ -40,17 +38,14 @@ class KetchLayoutTest {
     assertEquals(LayoutTier.Expanded, layout.tier)
     assertEquals(ShellNavigation.Sidebar, layout.navigation)
     assertEquals(1052.dp, layout.cardWidth)
-    assertTrue(layout.docksInspector)
-    assertFalse(layout.navigationCollapsed)
   }
 
   @Test
-  fun of_smallDesktopWindow_floatsTheInspector() {
+  fun of_smallDesktopWindow_keepsTheSidebar() {
     val layout = KetchLayout.of(1024.dp)
 
     assertEquals(ShellNavigation.Sidebar, layout.navigation)
     assertEquals(796.dp, layout.cardWidth)
-    assertFalse(layout.docksInspector)
   }
 
   @Test
@@ -59,7 +54,6 @@ class KetchLayoutTest {
 
     assertEquals(ShellNavigation.Rail, layout.navigation)
     assertEquals(1200.dp, layout.cardWidth)
-    assertTrue(layout.navigationCollapsed)
     assertEquals(ShellNavigation.Phone, KetchLayout.of(390.dp, sidebarCollapsed = true).navigation)
   }
 }

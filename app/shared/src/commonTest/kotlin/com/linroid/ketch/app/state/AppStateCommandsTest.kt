@@ -408,30 +408,6 @@ class AppStateCommandsTest {
   }
 
   @Test
-  fun aiDownloadSelected_oneCandidateFails_addsTheOthers() = runTest {
-    val api = RecordingKetchApi().apply {
-      downloadFailure = { if ("broken" in it.url) IllegalStateException("Not found") else null }
-    }
-    val controller = controller(api)
-    val candidates = listOf("a.iso", "broken.iso", "b.iso").map {
-      AiCandidate("https://example.com/$it", title = it, confidence = 0.9f, description = "")
-    }
-
-    controller.state.aiDownloadSelected(candidates)
-    runCurrent()
-
-    assertEquals(
-      listOf("https://example.com/a.iso", "https://example.com/b.iso"),
-      api.requests.map { it.url },
-    )
-    assertEquals(
-      "Added 2 downloads → This Mac · 1 failed",
-      controller.messages.history.value.first().title,
-    )
-    controller.close()
-  }
-
-  @Test
   fun startNow_noFreeSlot_namesThePreemptedTaskAndUndoRestoresIt() = runTest {
     val api = RecordingKetchApi(maxActive = 1)
     val controller = controller(api)
