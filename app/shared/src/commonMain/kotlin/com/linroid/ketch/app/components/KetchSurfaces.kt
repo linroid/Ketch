@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -22,6 +23,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -37,6 +40,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -344,6 +348,26 @@ internal fun Modifier.ketchClickable(
   .clickable(interactions, indication = null, enabled, onClickLabel, role, onClick)
 
 /**
+ * Fades a popup in while it grows from 96% of its size as it opens, and moves the keyboard focus
+ * to [focus] then.
+ */
+@Composable
+internal fun Modifier.popupAppear(focus: FocusRequester): Modifier {
+  val appear = remember { Animatable(0f) }
+  val motion = KetchTheme.motion
+  LaunchedEffect(Unit) {
+    focus.requestFocus()
+    appear.animateTo(1f, tween(motion.short, easing = motion.easeDecelerate))
+  }
+  return graphicsLayer {
+    alpha = appear.value
+    val scale = APPEAR_SCALE + (1f - APPEAR_SCALE) * appear.value
+    scaleX = scale
+    scaleY = scale
+  }
+}
+
+/**
  * Draws a ring of [width] around the shape, [gap] outside the bounds. Place it before any clip.
  */
 internal fun Modifier.focusRing(
@@ -368,6 +392,7 @@ internal fun Modifier.focusRing(
 internal const val HOVER_OVERLAY_ALPHA = 0.08f
 internal const val PRESS_OVERLAY_ALPHA = 0.12f
 internal const val PRESSED_SCALE = 0.98f
+private const val APPEAR_SCALE = 0.96f
 internal const val DISABLED_ALPHA = 0.4f
 internal const val FOCUS_RING_ALPHA = 0.5f
 internal val PendingSpinnerSize = 12.dp

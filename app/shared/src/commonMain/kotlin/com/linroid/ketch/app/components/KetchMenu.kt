@@ -1,7 +1,5 @@
 package com.linroid.ketch.app.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -42,7 +40,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -409,24 +406,13 @@ private fun MenuPopup(
     properties = PopupProperties(focusable = true),
   ) {
     val focus = remember { FocusRequester() }
-    val appear = remember { Animatable(0f) }
-    val motion = KetchTheme.motion
-    LaunchedEffect(Unit) {
-      focus.requestFocus()
-      appear.animateTo(1f, tween(motion.short, easing = motion.easeDecelerate))
-    }
     MenuPanel(
       entries = entries,
       level = root,
       focus = menuFocus,
       onDismiss = onDismiss,
       modifier = modifier
-        .graphicsLayer {
-          alpha = appear.value
-          val scale = APPEAR_SCALE + (1f - APPEAR_SCALE) * appear.value
-          scaleX = scale
-          scaleY = scale
-        }
+        .popupAppear(focus)
         .onPreviewKeyEvent { event ->
           if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
           val key = event.key.toMenuKey() ?: return@onPreviewKeyEvent false
@@ -827,7 +813,6 @@ private fun inWindow(position: Int, size: Int, window: Int, margin: Int): Int {
 }
 
 private const val SUBMENU_DELAY_MILLIS = 150L
-private const val APPEAR_SCALE = 0.96f
 private val MenuInset = 4.dp
 private val MenuGap = 4.dp
 private val MenuMinWidth = 180.dp
