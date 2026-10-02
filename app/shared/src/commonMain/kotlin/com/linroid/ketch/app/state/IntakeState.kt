@@ -778,8 +778,11 @@ class IntakeSession internal constructor(
     reparse()
   }
 
-  /** Whether Discover can search for text that holds no link. */
-  val canDiscover: Boolean get() = state.aiSettings.available
+  /**
+   * Whether Discover can search for text that holds no link; before it is set up, the search
+   * waits on its setup page.
+   */
+  val canDiscover: Boolean get() = state.aiSettings.supported
 
   /**
    * Closes the sheet and searches Discover for [query]: by default the text, when it holds no
@@ -1420,11 +1423,11 @@ class IntakeSession internal constructor(
     }
 
   /**
-   * Resolves a `.torrent` file's content. A file dropped on the window is already being resolved
-   * on the active device by [AppState.resolveDroppedFile], so that result is used when it fits.
+   * Resolves a `.torrent` file's content. A dropped file is already being resolved by
+   * [AppState.resolveDroppedFile], so that result is used when it is for the same device.
    */
   private suspend fun resolveFile(api: KetchApi, file: DroppedFile): ResolvedSource {
-    if (file === state.droppedFile && api === state.activeApi.value) {
+    if (file === state.droppedFile && api === state.droppedFileApi) {
       val (resolveState, current) = snapshotFlow { state.resolveState to state.droppedFile }
         .first { (resolveState, current) ->
           current !== file || resolveState is ResolveState.Resolved ||

@@ -325,6 +325,10 @@ class AppState(
   /** The dropped file whose resolution [resolveState] reflects. */
   private var resolving: DroppedFile? = null
 
+  /** The device [droppedFile] is resolved on, whose result the add sheet can reuse. */
+  internal var droppedFileApi: KetchApi? = null
+    private set
+
   /** Speed mode of the embedded device; full speed when the host keeps no [speedMode]. */
   private val localMode: StateFlow<SpeedMode> = speedMode?.mode ?: MutableStateFlow(SpeedMode.Full)
 
@@ -332,7 +336,7 @@ class AppState(
   // samples, histories and timelines. Built on the main thread, which owns the settings cache;
   // the models collect them elsewhere.
   private val listSources: StateFlow<List<TaskListSource>> =
-    combine(instances, snapshotFlow { aiSettings.available }) { entries, discover ->
+    combine(instances, snapshotFlow { aiSettings.supported }) { entries, discover ->
       entries.map { listSourceOf(it, discover) }
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -629,15 +633,20 @@ class AppState(
     if (trimmed.isNotEmpty()) openIntake(IntakeRequest(text = trimmed))
   }
 
-  /** Reads [file] and resolves its content; also retries a failed attempt. */
-  fun resolveDroppedFile(file: DroppedFile) {
+  /**
+   * Reads [file] and resolves its content on [target], by default the active device; also
+   * retries a failed attempt.
+   */
+  fun resolveDroppedFile(file: DroppedFile, target: InstanceEntry? = null) {
+    val api = target?.instance ?: activeApi.value
     droppedFile = file
+    droppedFileApi = api
     resolving = file
     resolveState = ResolveState.Resolving
     scope.launch {
       runCatching {
         val content = file.readBytes(MAX_DROPPED_FILE_BYTES)
-        activeApi.value.resolveContent(content, file.name)
+        api.resolveContent(content, file.name)
       }.onSuccess { result ->
         if (resolving === file) {
           resolveState = ResolveState.Resolved(result)
@@ -662,6 +671,7 @@ class AppState(
   fun resetResolveState() {
     resolving = null
     droppedFile = null
+    droppedFileApi = null
     resolveState = ResolveState.Idle
   }
 

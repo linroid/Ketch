@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.instance.DevicePresence
@@ -11,6 +12,7 @@ import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.IntakeRequest
@@ -32,6 +34,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -176,6 +179,30 @@ class DeviceActionsTest {
       IntakeRequest(text = "https://example.com/ubuntu.iso", targetDeviceId = f.nas.deviceId),
       f.state.intakeRequest
     )
+    f.controller.close()
+  }
+
+  @Test
+  fun dropFiles_torrentOnTheNasCard_resolvesItOnTheNas() = runTest {
+    val nas = FakeKetchApi().apply {
+      resolveContentResult = ResolvedSource(
+        url = "magnet:?xt=urn:btih:abc",
+        sourceType = "torrent",
+        totalBytes = 1_000,
+        supportsResume = true,
+        suggestedFileName = "ubuntu.iso",
+        maxSegments = 1,
+      )
+    }
+    val f = fixture(nas)
+    val file = DroppedFile("ubuntu.torrent") { byteArrayOf(1, 2, 3) }
+
+    f.state.dropFiles(f.nas, listOf(file))
+    runCurrent()
+
+    assertEquals(f.nas.deviceId, f.state.intakeRequest?.targetDeviceId)
+    assertEquals("ubuntu.torrent", nas.lastResolvedFileName)
+    assertSame(nas, f.state.droppedFileApi)
     f.controller.close()
   }
 
