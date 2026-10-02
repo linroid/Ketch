@@ -282,10 +282,6 @@ class AppState(
   /** Selected rows of the task list. */
   var selectedKeys by mutableStateOf(emptySet<TaskKey>())
 
-  /** Whether the inspector shows: while it has a task, or two or more rows are selected. */
-  val inspectorShown: Boolean
-    get() = inspectedTask != null || selectedKeys.size >= 2
-
   /** A Send to waiting for the user to accept that cookies go along; see [sendTo]. */
   var sendConfirmation by mutableStateOf<SendConfirmation?>(null)
     private set
@@ -591,12 +587,14 @@ class AppState(
   }
 
   /**
-   * Shows the selected download in the inspector, which sums up two or more by itself. Returns
-   * whether anything is selected.
+   * Shows the selected download in the inspector, which sums up two or more by itself, and asks
+   * the shell for the Downloads page on the tab shown. Returns whether anything is selected.
    */
   fun showDetails(): Boolean {
+    if (selectedKeys.isEmpty()) return false
     selectedKeys.singleOrNull()?.let { inspectedTask = it }
-    return selectedKeys.isNotEmpty()
+    showDownloadsRequests.tryEmit(Unit)
+    return true
   }
 
   /** Closes the inspector; a selection of several rows, which it sums up, is cleared. */

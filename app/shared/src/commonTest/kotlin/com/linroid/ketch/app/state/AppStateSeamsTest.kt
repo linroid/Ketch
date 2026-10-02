@@ -220,15 +220,21 @@ class AppStateSeamsTest {
   }
 
   @Test
-  fun showDetails_oneRowSelected_inspectsIt() = runTest {
+  fun showDetails_oneRowSelected_inspectsItOnTheDownloadsPage() = runTest {
     val state = appState()
     val key = TaskKey(LOCAL_DEVICE_ID, "a")
+    state.statusFilter = StatusFilter.Failed
     state.selectedKeys = setOf(key)
+    var requests = 0
+    backgroundScope.launch { state.downloadsRequests.collect { requests++ } }
+    runCurrent()
 
     assertTrue(state.showDetails())
+    runCurrent()
 
     assertEquals(key, state.inspectedTask)
-    assertTrue(state.inspectorShown)
+    assertEquals(1, requests)
+    assertEquals(StatusFilter.Failed, state.statusFilter)
   }
 
   @Test
@@ -237,7 +243,7 @@ class AppStateSeamsTest {
 
     assertFalse(state.showDetails())
 
-    assertFalse(state.inspectorShown)
+    assertEquals(null, state.inspectedTask)
   }
 
   @Test
@@ -251,7 +257,6 @@ class AppStateSeamsTest {
 
     assertEquals(emptySet(), state.selectedKeys)
     assertEquals(null, state.inspectedTask)
-    assertFalse(state.inspectorShown)
   }
 
   @Test
@@ -264,6 +269,6 @@ class AppStateSeamsTest {
     state.closeInspector()
 
     assertEquals(setOf(key), state.selectedKeys)
-    assertFalse(state.inspectorShown)
+    assertEquals(null, state.inspectedTask)
   }
 }
