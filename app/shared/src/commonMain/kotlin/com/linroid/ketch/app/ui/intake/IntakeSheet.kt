@@ -763,7 +763,7 @@ private fun handleSheetKey(
       true
     }
     else -> {
-      val number = (1..9).firstOrNull { command == KetchCommands.intakeTarget(it) }
+      val number = command?.let(KetchCommands::intakeTargetNumber)
       val target = number?.let { session.instances.value.getOrNull(it - 1) }
       if (target != null) session.selectTarget(target)
       target != null

@@ -311,7 +311,7 @@ private fun PalettePanel(
       KetchCommands.PaletteClose, KetchCommands.Palette -> onDismiss()
       else -> {
         // ⌥⌘n downloads a typed link on device n; any other global chord runs and closes.
-        val device = (1..MAX_DEVICE_CHORDS).firstOrNull { KetchCommands.device(it) == command }
+        val device = KetchCommands.deviceNumber(command)
         val target = device?.let { number -> source.devices.firstOrNull { it.number == number } }
         val download = target?.let { downloadOn(items, it.deviceId) }
         if (download != null) {
@@ -870,6 +870,5 @@ private object WindowOrigin : PopupPositionProvider {
   ): IntOffset = IntOffset.Zero
 }
 
-private const val MAX_DEVICE_CHORDS = 9
 private const val PLACEHOLDER = "Paste a link, search downloads, or type a command"
 private const val SHORT_PLACEHOLDER = "Paste a link, search, or type a command"

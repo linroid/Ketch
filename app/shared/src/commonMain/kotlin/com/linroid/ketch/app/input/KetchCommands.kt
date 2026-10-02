@@ -15,6 +15,9 @@ import com.linroid.ketch.app.state.StatusFilter
  * character never runs while a text field has focus.
  */
 object KetchCommands {
+  /** How many devices, the first to the ninth listed, have [device] and [intakeTarget] chords. */
+  const val NUMBERED_DEVICES: Int = 9
+
   /** Opens the add sheet, prefilled from the clipboard. */
   val Add: KetchCommand = KetchCommand(
     id = "add",
@@ -103,7 +106,7 @@ object KetchCommands {
     inMenus = true,
   )
 
-  private val devices: List<KetchCommand> = (1..9).map { number ->
+  private val devices: List<KetchCommand> = (1..NUMBERED_DEVICES).map { number ->
     KetchCommand(
       id = "device.$number",
       label = "Switch to device $number",
@@ -533,7 +536,7 @@ object KetchCommands {
     mac = KeyChord(Key.Escape),
   )
 
-  private val intakeTargets: List<KetchCommand> = (1..9).map { number ->
+  private val intakeTargets: List<KetchCommand> = (1..NUMBERED_DEVICES).map { number ->
     KetchCommand(
       id = "intake.target.$number",
       label = "Add to device $number",
@@ -622,17 +625,33 @@ object KetchCommands {
   /** The command that shows the [filter] tab: ⌘1 for All through ⌘6 for Failed. */
   fun tab(filter: StatusFilter): KetchCommand = tabs[filter.ordinal]
 
+  /** The filter whose tab [command] shows, or `null` when it is not a [tab] command. */
+  fun tabFilter(command: KetchCommand): StatusFilter? =
+    StatusFilter.entries.getOrNull(tabs.indexOf(command))
+
   /** The command that switches to the device listed [number]th, 1 to 9. */
   fun device(number: Int): KetchCommand {
-    require(number in 1..9) { "Device number must be 1 to 9, was $number" }
+    require(number in 1..NUMBERED_DEVICES) { "Device number must be 1 to 9, was $number" }
     return devices[number - 1]
   }
 
+  /** The [device] command of [number], or `null` for a device listed past the ninth. */
+  fun deviceOrNull(number: Int): KetchCommand? = devices.getOrNull(number - 1)
+
+  /** The number of the device [command] switches to, or `null` when it is not a [device]. */
+  fun deviceNumber(command: KetchCommand): Int? = numberOf(devices, command)
+
   /** The command that makes the device listed [number]th, 1 to 9, the add sheet's target. */
   fun intakeTarget(number: Int): KetchCommand {
-    require(number in 1..9) { "Device number must be 1 to 9, was $number" }
+    require(number in 1..NUMBERED_DEVICES) { "Device number must be 1 to 9, was $number" }
     return intakeTargets[number - 1]
   }
+
+  /** The number of the device [command] makes the target, or `null` for other commands. */
+  fun intakeTargetNumber(command: KetchCommand): Int? = numberOf(intakeTargets, command)
+
+  private fun numberOf(commands: List<KetchCommand>, command: KetchCommand): Int? =
+    (commands.indexOf(command) + 1).takeIf { it > 0 }
 }
 
 private fun tabIcon(filter: StatusFilter): KetchIcon = when (filter) {

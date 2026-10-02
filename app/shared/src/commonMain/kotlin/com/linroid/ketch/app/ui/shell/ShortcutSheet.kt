@@ -28,7 +28,6 @@ import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
-import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 
@@ -71,8 +70,8 @@ internal fun shortcutGroups(
   val global = KetchCommands.all.filter { it.scope == CommandScope.Global && runs(it) }
   val list = KetchCommands.all.filter { it.scope == CommandScope.List }
   val intake = KetchCommands.all.filter { it.scope == CommandScope.Intake }
-  val deviceCommands = (1..DEVICE_SHORTCUTS).map(KetchCommands::device)
-  val targetCommands = (1..DEVICE_SHORTCUTS).map(KetchCommands::intakeTarget)
+  val deviceCommands = (1..KetchCommands.NUMBERED_DEVICES).map(KetchCommands::device)
+  val targetCommands = (1..KetchCommands.NUMBERED_DEVICES).map(KetchCommands::intakeTarget)
   return listOf(
     ShortcutGroup("General", lines(global, deviceCommands, "Switch to device 1–9")),
     ShortcutGroup("Downloads list", lines(list, emptyList(), "")),
@@ -82,7 +81,7 @@ internal fun shortcutGroups(
 
 // A tab command is named after its tab alone, such as "Failed".
 private fun lineLabel(command: KetchCommand): String =
-  if (StatusFilter.entries.any { KetchCommands.tab(it) == command }) {
+  if (KetchCommands.tabFilter(command) != null) {
     "${command.label} tab"
   } else {
     command.label
@@ -167,8 +166,6 @@ internal fun KeyCap(text: String) {
     Text(text = text, style = KetchTheme.typography.labelS, color = colors.textSecondary)
   }
 }
-
-private const val DEVICE_SHORTCUTS = 9
 
 private val SheetMaxWidth: Dp = 720.dp
 private val SheetMaxHeight: Dp = 560.dp

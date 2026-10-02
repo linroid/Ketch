@@ -550,7 +550,7 @@ internal fun TargetChip(session: IntakeSession, instances: List<InstanceEntry>) 
         health = health,
         pennantName = entry.label,
         summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId }, free),
-        shortcut = (index + 1).takeIf { it <= MAX_TARGET_SHORTCUTS }
+        shortcut = (index + 1).takeIf { it <= KetchCommands.NUMBERED_DEVICES }
           ?.let { KetchCommands.intakeTarget(it).shortcutLabel() },
       )
     }
@@ -779,7 +779,6 @@ internal fun targetSummary(presence: DevicePresence?, free: Long? = null): Strin
   ).joinToString(" · ").ifEmpty { null }
 }
 
-private const val MAX_TARGET_SHORTCUTS = 9
 
 private fun priorityCaption(priority: DownloadPriority): String = when (priority) {
   DownloadPriority.LOW -> "Runs when nothing else is waiting"
