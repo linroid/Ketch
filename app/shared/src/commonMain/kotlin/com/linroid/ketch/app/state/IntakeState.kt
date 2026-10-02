@@ -1336,6 +1336,7 @@ class IntakeSession internal constructor(
       return
     }
     if (shown) showNewRows()
+    state.announceAdded(added.map { TaskKey(target.deviceId, it.taskId) })
     val op = state.pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
       added.forEach { task ->
         catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->

@@ -26,6 +26,7 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -60,6 +61,21 @@ class IntakeStateTest {
 
     assertTrue(closed)
     assertEquals(links, api.base.requests.map { it.url })
+  }
+
+  @Test
+  fun submit_links_announcesTheNewTasks() = runTest {
+    val api = IntakeTestApi()
+    val (state, session) = stateAndSession(api, IntakeRequest(links.take(2).joinToString("\n")))
+    val heard = mutableListOf<List<TaskKey>>()
+    backgroundScope.launch { state.addedTasks.collect { heard += it } }
+    runCurrent()
+
+    session.submit {}
+    runCurrent()
+
+    val keys = api.base.tasks.value.map { TaskKey(LOCAL_DEVICE_ID, it.taskId) }
+    assertEquals(listOf(keys.toSet()), heard.map { it.toSet() })
   }
 
   @Test
