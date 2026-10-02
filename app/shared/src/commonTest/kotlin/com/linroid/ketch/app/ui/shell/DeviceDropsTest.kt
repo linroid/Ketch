@@ -78,8 +78,15 @@ class DeviceDropsTest {
 
   @Test
   fun dropHint_rowsFromAnotherDevice_sendsOrMovesThem() {
-    assertEquals(DropHint("Send 2 here · ⌥ moves", true), dropHint(rows, nas(), move = false))
+    val send = dropHint(rows, nas(), move = false, moveKey = "Alt")
+
+    assertEquals(DropHint("Send 2 here · Alt moves", true), send)
     assertEquals(DropHint("Move 2 here", true), dropHint(rows, nas(), move = true))
+  }
+
+  @Test
+  fun dropHint_rowsWithoutAMoveKey_leavesTheKeyOut() {
+    assertEquals(DropHint("Send 2 here", true), dropHint(rows, nas(), move = false))
   }
 
   @Test

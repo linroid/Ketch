@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -64,6 +66,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.sidebar.DEVICE_MENU_LABEL
 import com.linroid.ketch.app.ui.sidebar.DeviceMenu
 import com.linroid.ketch.app.ui.sidebar.PennantCluster
 import com.linroid.ketch.app.ui.sidebar.allDevicesLine
@@ -74,8 +77,8 @@ import com.linroid.ketch.app.ui.sidebar.pennantHealth
 import com.linroid.ketch.app.ui.sidebar.pennantName
 import com.linroid.ketch.app.ui.sidebar.rememberAltHeld
 import com.linroid.ketch.app.ui.sidebar.rememberDevices
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 
 /**
  * The 72 dp rail of medium windows, and of wide ones with the sidebar collapsed: the ⊕ add
@@ -83,8 +86,8 @@ import kotlinx.coroutines.flow.map
  * the bottom. On macOS it starts below the traffic lights.
  *
  * From two devices on, the stack starts with All devices, ringed by the progress of everything
- * downloading. Each device's pennant switches to it, opens its menu on a right click, and takes
- * links, files and rows dragged onto it.
+ * downloading. Each device's pennant switches to it, opens its menu on a right click or a long
+ * press, and takes links, files and rows dragged onto it.
  *
  * @param showSidebarToggle whether the window is wide enough to expand the sidebar again.
  */
@@ -282,8 +285,8 @@ private fun RailBadge(count: Int, modifier: Modifier = Modifier) {
 
 /**
  * A device in the rail's stack: its pennant with the health ring and unseen failures. Tapping it
- * switches to the device, a right click opens its menu, and links, files and rows dragged onto
- * it are added or sent there.
+ * switches to the device, a right click or a long press opens its menu, and links, files and
+ * rows dragged onto it are added or sent there.
  *
  * @param number the device's place in the list, whose `⌥⌘` digit switches to it.
  */
@@ -332,7 +335,8 @@ private fun RailDeviceCell(
 
 /**
  * All devices at the top of the rail's stack: the devices' pennants clustered, ringed by the
- * progress of everything downloading on them. Tapping it shows every device's downloads.
+ * progress of everything downloading on the devices that can be reached. Tapping it shows every
+ * device's downloads.
  */
 @Composable
 private fun AllDevicesCell(
@@ -342,7 +346,8 @@ private fun AllDevicesCell(
   onClick: () -> Unit,
 ) {
   val progress by remember(state) {
-    state.taskList.allRows.map(::aggregateProgress).distinctUntilChanged()
+    combine(state.taskList.allRows, state.instanceManager.presence, ::aggregateProgress)
+      .distinctUntilChanged()
   }.collectAsState(null)
   val line = allDevicesLine(devices)
   val label = KetchCommands.AllDevices.label
@@ -403,12 +408,15 @@ private fun ProgressRing(progress: Float?, content: @Composable () -> Unit) {
 
 /**
  * How far everything downloading in [rows] has come: their downloaded bytes over their total
- * size, or `null` while nothing of known size downloads.
+ * size, or `null` while nothing of known size downloads. Rows of the [devices] that cannot be
+ * reached count for nothing, as their last known progress has stopped.
  */
-internal fun aggregateProgress(rows: List<TaskRow>): Float? {
+internal fun aggregateProgress(rows: List<TaskRow>, devices: List<DevicePresence>): Float? {
+  val reachable = devices.filter { it.connected && it.health.isOnline }.map { it.deviceId }.toSet()
   var done = 0L
   var total = 0L
   for (row in rows) {
+    if (row.key.deviceId !in reachable) continue
     val progress = (row.state as? DownloadState.Downloading)?.progress ?: continue
     if (progress.totalBytes <= 0) continue
     done += progress.downloadedBytes.coerceIn(0, progress.totalBytes)
@@ -467,11 +475,14 @@ private fun RailCell(
         .then(onSecondaryClick?.let { Modifier.onSecondaryPress(it).onMenuKey(it) } ?: Modifier)
         .semantics(mergeDescendants = true) { contentDescription = description }
         .trackFocusVisibility(focus)
-        .selectable(
-          selected = selected,
+        .semantics { this.selected = selected }
+        .combinedClickable(
           interactionSource = interactions,
           indication = null,
           role = Role.Tab,
+          onLongClickLabel = onSecondaryClick?.let { DEVICE_MENU_LABEL },
+          // A long press opens the menu where there is no right click.
+          onLongClick = onSecondaryClick,
           onClick = onClick,
         ),
       content = content,

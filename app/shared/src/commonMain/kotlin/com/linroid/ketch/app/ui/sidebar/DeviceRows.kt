@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,6 +40,8 @@ import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -53,10 +55,12 @@ import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
+import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.pulse.speedText
 import com.linroid.ketch.app.ui.shell.DeviceDrag
@@ -138,10 +142,21 @@ internal fun rememberAltHeld(): Boolean {
 }
 
 /**
+ * The key that makes a drop of rows on a device move them, as this keyboard names it: ⌥ on
+ * Apple keyboards, Alt elsewhere; `null` on touch screens.
+ */
+@Composable
+internal fun moveKeyLabel(): String? = when {
+  KetchTheme.density == KetchDensity.Comfortable -> null
+  KeyboardPlatform.current.isApple -> "⌥"
+  else -> "Alt"
+}
+
+/**
  * A device in the sidebar: its pennant with the health ring and unseen failures, its name and
- * its [live line][deviceLine]. Clicking it switches to the device, a right click opens its
- * [DeviceMenu], and links, files and rows dragged onto it are added or sent there; the row then
- * grows and says what a drop does. The [active] device's name is stronger.
+ * its [live line][deviceLine]. Clicking it switches to the device, a right click or a long
+ * press opens its [DeviceMenu], and links, files and rows dragged onto it are added or sent
+ * there; the row then grows and says what a drop does. The [active] device's name is stronger.
  *
  * @param number the device's place in the list, whose `⌥⌘` digit switches to it.
  */
@@ -156,11 +171,12 @@ internal fun SidebarDeviceRow(
   var drag by remember { mutableStateOf<DeviceDrag?>(null) }
   var menuOpen by remember { mutableStateOf(false) }
   val move = rememberAltHeld()
+  val moveKey = moveKeyLabel()
   Box(modifier) {
     DeviceRowContent(
       device = device,
       active = active,
-      hint = drag?.let { dropHint(it, device, move) },
+      hint = drag?.let { dropHint(it, device, move, moveKey) },
       shortcut = deviceShortcut(number),
       onClick = { state.switchInstance(device.entry) },
       onSecondaryClick = { menuOpen = true },
@@ -404,11 +420,14 @@ private fun SidebarRow(
         .then(outline)
         .then(onSecondaryClick?.let { Modifier.onSecondaryPress(it).onMenuKey(it) } ?: Modifier)
         .trackFocusVisibility(focus)
-        .selectable(
-          selected = selected,
+        .semantics { this.selected = selected }
+        .combinedClickable(
           interactionSource = interactions,
           indication = null,
           role = Role.Tab,
+          onLongClickLabel = onSecondaryClick?.let { DEVICE_MENU_LABEL },
+          // A long press opens the menu where there is no right click.
+          onLongClick = onSecondaryClick,
           onClick = onClick,
         )
         .padding(start = spacing.s0_5, end = spacing.s2),
@@ -431,6 +450,9 @@ internal fun deviceShortcut(number: Int): String? =
   if (number in 1..MAX_DEVICE_SHORTCUTS) KetchCommands.device(number).shortcutLabel() else null
 
 private const val MAX_DEVICE_SHORTCUTS = 9
+
+/** What a long press on a device opens, for screen readers. */
+internal const val DEVICE_MENU_LABEL = "Device menu"
 
 private const val MAX_CLUSTERED = 3
 

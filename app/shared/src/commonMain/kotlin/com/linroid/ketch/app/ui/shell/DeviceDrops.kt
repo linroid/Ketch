@@ -49,8 +49,16 @@ internal data class DropHint(val text: String, val accepts: Boolean)
 /**
  * What [device] does with [drag]: content adds there while it is reachable, and rows are sent
  * there from the other devices, or moved while [move] (⌥) is held.
+ *
+ * @param moveKey the key that moves rows, as the keyboard names it, which the hint mentions;
+ *   `null` leaves it out, as on touch.
  */
-internal fun dropHint(drag: DeviceDrag, device: DevicePresence, move: Boolean): DropHint {
+internal fun dropHint(
+  drag: DeviceDrag,
+  device: DevicePresence,
+  move: Boolean,
+  moveKey: String? = null,
+): DropHint {
   if (!device.connected || !device.health.isOnline) return DropHint("Not reachable now", false)
   return when (drag) {
     DeviceDrag.Content -> {
@@ -63,7 +71,8 @@ internal fun dropHint(drag: DeviceDrag, device: DevicePresence, move: Boolean): 
       when {
         outgoing == 0 -> DropHint("Already here", false)
         move -> DropHint("Move $what here", true)
-        else -> DropHint("Send $what here · ⌥ moves", true)
+        moveKey == null -> DropHint("Send $what here", true)
+        else -> DropHint("Send $what here · $moveKey moves", true)
       }
     }
   }

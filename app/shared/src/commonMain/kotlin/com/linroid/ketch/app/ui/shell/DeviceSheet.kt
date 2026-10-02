@@ -16,7 +16,10 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -50,6 +53,7 @@ internal fun DeviceSheet(
       SwitcherEntry.Action("Settings", KetchIcon.Settings) { state.openSettings() }
   }
   val entries = rememberSwitcherEntries(state, actions)
+  var highlighted by remember { mutableIntStateOf(-1) }
   ModalBottomSheet(
     onDismissRequest = onDismissRequest,
     sheetState = sheetState,
@@ -77,8 +81,8 @@ internal fun DeviceSheet(
       SwitcherRows(
         state = state,
         entries = entries,
-        highlighted = -1,
-        onHighlight = {},
+        highlighted = highlighted,
+        onHighlight = { highlighted = it },
         onPick = { entry ->
           onDismissRequest()
           entry.run()

@@ -26,9 +26,10 @@ import com.linroid.ketch.app.ui.pulse.slowLaneLimit
 import com.linroid.ketch.config.SpeedLimitMode
 
 /**
- * The menu of [device], opened by a right click on its sidebar row or rail pennant: switching
- * to it, its queue commands, its speed, its settings, renaming and, for a remote device,
- * whether the app stays connected and removing it. Rename and Remove ask in a dialog.
+ * The menu of [device], opened by a right click or a long press on its sidebar row or rail
+ * pennant, or the menu key while one has the focus: switching to it, its queue commands, its
+ * speed, its settings, renaming and, for a remote device, whether the app stays connected and
+ * removing it. Rename and Remove ask in a dialog.
  *
  * @param number the device's place in the list, whose `⌥⌘` digit switches to it.
  * @param shown whether the device shows alone already.
