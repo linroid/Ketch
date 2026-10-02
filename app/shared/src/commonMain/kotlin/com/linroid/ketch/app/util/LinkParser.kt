@@ -69,6 +69,9 @@ enum class LinkKind {
   /** A link of another kind, which the device that resolves it may not support. */
   Other;
 
+  /** Whether a torrent downloads it: a magnet or a `.torrent` file link. */
+  val isTorrent: Boolean get() = this == Magnet || this == TorrentFile
+
   companion object {
     /** The kind of [url], judged by its scheme and, for HTTP, its path. */
     fun of(url: String): LinkKind {

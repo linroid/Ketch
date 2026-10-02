@@ -723,7 +723,7 @@ class AppState(
       val folder = defaults.folder?.let { folderDestination(entry, it) }
       val requests = urls.mapNotNull { url ->
         // Torrents write their own files, which an Android content:// folder cannot take.
-        val torrent = LinkKind.of(url).let { it == LinkKind.Magnet || it == LinkKind.TorrentFile }
+        val torrent = LinkKind.of(url).isTorrent
         val destination = folder?.takeUnless { torrent && it.value.startsWith("content://") }
         try {
           DownloadRequest(
@@ -1392,7 +1392,7 @@ class AppState(
   }
 
   /** Tasks of [entry] as they change, without the ones a pending operation hides. */
-  private fun visibleTasksOf(entry: InstanceEntry): Flow<List<DownloadTask>> {
+  internal fun visibleTasksOf(entry: InstanceEntry): Flow<List<DownloadTask>> {
     val deviceId = entry.deviceId
     return combine(entry.instance.tasks, pendingOps.hidden) { tasks, hidden ->
       if (hidden.isEmpty()) tasks else tasks.filter { TaskKey(deviceId, it.taskId) !in hidden }

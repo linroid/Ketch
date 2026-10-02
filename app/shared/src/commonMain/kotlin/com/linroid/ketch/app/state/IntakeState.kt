@@ -61,7 +61,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -70,7 +69,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -182,8 +180,7 @@ class IntakeEntry internal constructor(source: IntakeSource) {
   val isTorrent: Boolean
     get() = when (val current = source) {
       is IntakeSource.File -> true
-      is IntakeSource.Link -> current.kind == LinkKind.Magnet ||
-        current.kind == LinkKind.TorrentFile || resolved?.sourceType == TORRENT_SOURCE
+      is IntakeSource.Link -> current.kind.isTorrent || resolved?.sourceType == TORRENT_SOURCE
       is IntakeSource.Range -> false
     }
 
@@ -422,11 +419,7 @@ enum class IntakeKind {
     /** [Torrents] when every one of [urls] and [files] is a torrent, else [Links]. */
     fun of(urls: List<String>, files: Int = 0): IntakeKind {
       if (urls.isEmpty() && files == 0) return Links
-      val torrents = urls.all { url ->
-        val kind = LinkKind.of(url)
-        kind == LinkKind.Magnet || kind == LinkKind.TorrentFile
-      }
-      return if (torrents) Torrents else Links
+      return if (urls.all { LinkKind.of(it).isTorrent }) Torrents else Links
     }
   }
 }
@@ -537,10 +530,10 @@ class IntakeSession internal constructor(
   val request: IntakeRequest,
   private val state: AppState,
   private val scope: CoroutineScope,
-  private val clock: Clock,
   private val carry: (IntakeRequest, List<DroppedFile>) -> Unit = { _, _ -> },
 ) {
   private val log = KetchLogger("Intake")
+  private val clock = state.clock
   private val limiter = Semaphore(PARALLEL_RESOLVES)
   private val seedsByUrl = mutableMapOf<String, IntakeSeed>()
   private var parseJob: Job? = null
@@ -708,8 +701,7 @@ class IntakeSession internal constructor(
     get() {
       val bound = boundRequest
       if (mode == IntakeMode.Edit && bound != null) {
-        val kind = LinkKind.of(bound.url)
-        return kind == LinkKind.Magnet || kind == LinkKind.TorrentFile ||
+        return LinkKind.of(bound.url).isTorrent ||
           bound.resolvedSource?.sourceType == TORRENT_SOURCE
       }
       return entries.isNotEmpty() && entries.all { it.isTorrent }
@@ -926,8 +918,7 @@ class IntakeSession internal constructor(
     if (links.isEmpty()) return false
     val detector = duplicateDetector()
     if (links.all { detector.find(it.url) != null }) return false
-    state.appSettings.saveUi { it.copy(lastClipHash = hash) }
-    filledClip = hash
+    rememberClip(hash)
     text = TextFieldValue(trimmed, TextRange(0, trimmed.length))
     fromClipboard = true
     reparse()
@@ -941,13 +932,21 @@ class IntakeSession internal constructor(
   fun pasteClipboard(clip: String) {
     val trimmed = clip.trim()
     if (trimmed.isEmpty() || mode != IntakeMode.Add) return
-    val hash = clipHash(trimmed)
+    rememberClip(clipHash(trimmed))
+    val current = text.text.trimEnd()
+    fromClipboard = current.isEmpty()
+    replaceText(if (current.isEmpty()) trimmed else "$current\n$trimmed")
+  }
+
+  // The clipboard text the sheet was filled from, which neither it nor the next sheet offers.
+  private fun rememberClip(hash: String) {
     state.appSettings.saveUi { it.copy(lastClipHash = hash) }
     filledClip = hash
-    val current = text.text.trimEnd()
-    val updated = if (current.isEmpty()) trimmed else "$current\n$trimmed"
+  }
+
+  // Puts updated in the input with the caret at its end, and reads it at once.
+  private fun replaceText(updated: String) {
     text = TextFieldValue(updated, TextRange(updated.length))
-    fromClipboard = current.isEmpty()
     reparse()
   }
 
@@ -1026,9 +1025,7 @@ class IntakeSession internal constructor(
     if (entry.source is IntakeSource.File) {
       fileEntries = fileEntries - entry
     } else {
-      val updated = replaceIntakeLink(text.text, entry.key, replacement = null)
-      text = TextFieldValue(updated, TextRange(updated.length))
-      reparse()
+      replaceText(replaceIntakeLink(text.text, entry.key, replacement = null))
     }
     if (torrentStage === entry) torrentStage = null
   }
@@ -1045,10 +1042,10 @@ class IntakeSession internal constructor(
       properties = seed?.properties.orEmpty(),
     )
     if (signed.url != link.url) {
-      val updated = replaceIntakeLink(text.text, link.url, signed.url)
-      text = TextFieldValue(updated, TextRange(updated.length))
+      replaceText(replaceIntakeLink(text.text, link.url, signed.url))
+    } else {
+      reparse()
     }
-    reparse()
     entries.firstOrNull { it.key == signed.url }?.let(::retry)
   }
 
@@ -1070,8 +1067,7 @@ class IntakeSession internal constructor(
     } else {
       listOf(current.trimEnd(), command).filter { it.isNotEmpty() }.joinToString("\n")
     }
-    text = TextFieldValue(updated, TextRange(updated.length))
-    reparse()
+    replaceText(updated)
     return true
   }
 
@@ -1107,8 +1103,7 @@ class IntakeSession internal constructor(
       }
       val updated = (listOf(text.text.trimEnd()) + links).filter { it.isNotEmpty() }
         .joinToString("\n")
-      text = TextFieldValue(updated, TextRange(updated.length))
-      reparse()
+      replaceText(updated)
     }
   }
 
@@ -1657,10 +1652,7 @@ class IntakeSession internal constructor(
           .onFailure { e -> log.d { "No status from ${target.label}: ${e.describeCauses()}" } }
           .getOrNull()
       }
-      val deviceId = target.deviceId
-      combine(target.instance.tasks, state.pendingOps.hidden) { tasks, hidden ->
-        if (hidden.isEmpty()) tasks else tasks.filter { TaskKey(deviceId, it.taskId) !in hidden }
-      }.collect { tasks ->
+      state.visibleTasksOf(target).collect { tasks ->
         targetTasks = tasks
         if (!submitting) refreshDuplicates()
       }
@@ -1758,13 +1750,11 @@ class IntakeSession internal constructor(
  * torrent was left to load in the background.
  *
  * @param scope runs the checks and submits; it outlives one sheet.
- * @param clock the time of checks and start labels; the app's [AppState.clock] by default.
  */
 @Stable
 class IntakeController(
   private val state: AppState,
   private val scope: CoroutineScope,
-  private val clock: Clock = state.clock,
 ) {
   /** The session left to finish in the background, or `null`. */
   var background: IntakeSession? by mutableStateOf(null)
@@ -1781,7 +1771,7 @@ class IntakeController(
       session.inBackground = false
       return session
     }
-    val session = IntakeSession(request, state, scope, clock) { next, files ->
+    val session = IntakeSession(request, state, scope) { next, files ->
       carriedFiles = next to files
     }
     session.start()
