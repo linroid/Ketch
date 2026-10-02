@@ -44,6 +44,7 @@ import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.util.plural
 import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.IntakePreferences
@@ -1294,7 +1295,7 @@ class AppState(
         level = MessageLevel.Success,
         title = onDevice(event.deviceId, "All downloads finished"),
         detail = listOfNotNull(
-          if (event.files == 1) "1 file" else "${event.files} files",
+          plural(event.files, "file"),
           formatBytes(event.bytes).takeIf { event.bytes > 0 },
         ).joinToString(" · "),
         deviceId = event.deviceId,

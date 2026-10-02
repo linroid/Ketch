@@ -46,6 +46,7 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.util.plural
 
 /**
  * The Files tab of the inspector for a torrent: every file it downloads, with its size and
@@ -197,7 +198,7 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
   val type = KetchTheme.typography
   val size = if (file.size >= 0) formatSize(file.size) else "–"
   val percent = file.percent
-  val row = @Composable {
+  KetchTooltip(text = file.path) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -246,7 +247,6 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
       }
     }
   }
-  KetchTooltip(text = file.path) { row() }
 }
 
 /**

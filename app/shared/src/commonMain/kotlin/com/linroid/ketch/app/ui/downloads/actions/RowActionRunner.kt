@@ -34,6 +34,7 @@ import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.ui.list.outputFile
 import com.linroid.ketch.app.util.downloads
+import com.linroid.ketch.app.util.plural
 import com.linroid.ketch.app.util.priorityLabel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -425,8 +426,7 @@ internal class RowActionRunner(
     }
     val moved = results.count { it.trashed }
     if (moved > 0) {
-      val what = if (moved == 1) "1 file" else "$moved files"
-      state.messages.post(MessageLevel.Success, "Moved $what to the Trash")
+      state.messages.post(MessageLevel.Success, "Moved ${plural(moved, "file")} to the Trash")
     }
     val refused = results.filter { it.trashError != null }
     refused.firstOrNull()?.let { first ->

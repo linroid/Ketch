@@ -245,14 +245,11 @@ private fun downloadingDetail(
     listOfNotNull(segments.size.takeIf { it > 1 }?.let { "$it files" })
   } else {
     val connections = segments.count { !it.isComplete }
-    listOfNotNull(connections.takeIf { it > 0 }?.let(::connectionsText))
+    listOfNotNull(connections.takeIf { it > 0 }?.let { plural(it, "connection") })
   }
   val detail = parts + listOfNotNull(host, "limited by Slow lane".takeIf { slowLane })
   return detail.joinToString(SEPARATOR).ifEmpty { "Downloading" }
 }
-
-private fun connectionsText(count: Int): String =
-  if (count == 1) "1 connection" else "$count connections"
 
 private fun runningSize(state: DownloadState): String {
   val progress = when (state) {
@@ -273,7 +270,7 @@ private fun runningSize(state: DownloadState): String {
  * " of " it reads as list rows show it: "2.41 of 5.69 GB".
  */
 fun formatSizeOf(downloaded: Long, total: Long, separator: String = "/"): String {
-  val unit = SIZE_UNITS.lastOrNull { total >= it.second } ?: SIZE_UNITS.first()
+  val unit = SizeUnits.lastOrNull { total >= it.second } ?: SizeUnits.first()
   fun number(bytes: Long): String {
     val value = bytes.coerceAtLeast(0).toDouble() / unit.second
     if (unit.second == 1L) return bytes.coerceAtLeast(0).toString()
@@ -287,7 +284,8 @@ fun formatSizeOf(downloaded: Long, total: Long, separator: String = "/"): String
   return "${number(downloaded.coerceAtMost(total))}$separator${number(total)} ${unit.first}"
 }
 
-private val SIZE_UNITS = listOf(
+/** Byte units from B to TB, each with its size in bytes. */
+internal val SizeUnits = listOf(
   "B" to 1L,
   "KB" to (1L shl 10),
   "MB" to (1L shl 20),

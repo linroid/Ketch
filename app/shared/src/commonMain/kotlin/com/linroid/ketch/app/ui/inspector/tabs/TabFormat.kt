@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.inspector.tabs
 
+import com.linroid.ketch.app.util.SizeUnits
 import kotlin.math.roundToLong
 import kotlin.time.Duration
 
@@ -52,22 +53,18 @@ internal fun formatStall(stalledFor: Duration): String {
   return if (seconds < 60) "Stalled $seconds s" else "Stalled ${seconds / 60} min"
 }
 
-/** "1 file", "14 files". */
-internal fun plural(count: Int, one: String, many: String = "${one}s"): String =
-  if (count == 1) "1 $one" else "$count $many"
-
 /**
  * The largest unit [bytes] has at least one of, as its name and size; an amount that would round
  * to 1024 of it, such as 1023.6 KB, takes the next unit instead.
  */
 private fun unitOf(bytes: Long): Pair<String, Long> {
-  val index = ByteUnits.indexOfLast { bytes >= it.second }.coerceAtLeast(0)
-  val next = ByteUnits.getOrNull(index + 1)
-  val rounded = (bytes.toDouble() / ByteUnits[index].second).roundToLong()
-  return if (next != null && rounded >= next.second / ByteUnits[index].second) {
+  val index = SizeUnits.indexOfLast { bytes >= it.second }.coerceAtLeast(0)
+  val next = SizeUnits.getOrNull(index + 1)
+  val rounded = (bytes.toDouble() / SizeUnits[index].second).roundToLong()
+  return if (next != null && rounded >= next.second / SizeUnits[index].second) {
     next
   } else {
-    ByteUnits[index]
+    SizeUnits[index]
   }
 }
 
@@ -81,11 +78,3 @@ private fun amount(bytes: Long, unit: Long): String {
 }
 
 private const val WHOLE_FROM_TENTHS = 1000L
-
-private val ByteUnits = listOf(
-  "B" to 1L,
-  "KB" to (1L shl 10),
-  "MB" to (1L shl 20),
-  "GB" to (1L shl 30),
-  "TB" to (1L shl 40)
-)

@@ -49,6 +49,7 @@ import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.links
 import com.linroid.ketch.app.util.percentDecode
+import com.linroid.ketch.app.util.plural
 import com.linroid.ketch.app.util.priorityLabel
 import com.linroid.ketch.app.util.toIntakeProblem
 import com.linroid.ketch.app.util.urlHost
@@ -278,7 +279,7 @@ data class IntakeSummary(
   /** "7 links · 5 ready · 1 checking · 1 needs attention · 29.1 GB". */
   val text: String
     get() = buildList {
-      add(if (links == 1) "1 link" else "$links links")
+      add(plural(links, "link"))
       add("$ready ready")
       if (checking > 0) add("$checking checking")
       if (attention == 1) add("1 needs attention")
@@ -491,7 +492,7 @@ internal fun intakeOptionValues(
     add(IntakeOptionValue(IntakeOption.Start, startText, startText != NOW_LABEL))
   }
   val connectionText = when {
-    torrents && connections > 0 -> if (connections == 1) "1 peer" else "$connections peers"
+    torrents && connections > 0 -> plural(connections, "peer")
     singleConnection || connections == 1 -> "1 connection"
     connections > 0 -> "$connections connections"
     else -> "Auto"
@@ -802,8 +803,7 @@ class IntakeSession internal constructor(
   private fun filesLabel(stage: IntakeEntry): String {
     val count = stage.selectedFiles?.size ?: 0
     if (count == 0) return "No files chosen"
-    val files = if (count == 1) "1 file" else "$count files"
-    return withSize("$verb $files", stage.bytes)
+    return withSize("$verb ${plural(count, "file")}", stage.bytes)
   }
 
   private fun batchLabel(): String {

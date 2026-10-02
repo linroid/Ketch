@@ -50,6 +50,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.list.rowDivider
 import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.util.plural
 
 /**
  * A verb of the selection bar. Clicking it runs its action on its rows, or opens the choices of
@@ -79,7 +80,7 @@ internal data class BarVerb(
   fun tooltip(total: Int): String = when {
     counted -> "$label $count of $total selected"
     asks -> "Remove ${downloads(count)}…"
-    action == RowAction.CopyLink -> if (count == 1) "Copy 1 link" else "Copy $count links"
+    action == RowAction.CopyLink -> "Copy ${plural(count, "link")}"
     count < total -> "$label · $count of $total selected"
     else -> label
   }

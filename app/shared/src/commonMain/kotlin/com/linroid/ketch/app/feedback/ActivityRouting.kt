@@ -11,6 +11,7 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.util.plural
 import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.NotificationMode
@@ -92,7 +93,7 @@ object ActivityRouting {
       is ActivityEvent.QueueDrained -> NotificationCopy(
         title = on("All downloads finished"),
         body = listOfNotNull(
-          if (event.files == 1) "1 file" else "${event.files} files",
+          plural(event.files, "file"),
           formatBytes(event.bytes).takeIf { event.bytes > 0 },
         ).joinToString(" · "),
       )
