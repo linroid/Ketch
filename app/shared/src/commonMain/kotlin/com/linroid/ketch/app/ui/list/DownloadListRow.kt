@@ -61,6 +61,7 @@ import com.linroid.ketch.app.ui.downloads.actions.SelectionCheckbox
 import com.linroid.ketch.app.ui.downloads.actions.TaskRowFrame
 import com.linroid.ketch.app.ui.downloads.actions.icon
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
+import com.linroid.ketch.app.ui.downloads.addedRow
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.formatSizeOf
 import kotlinx.coroutines.launch
@@ -112,6 +113,7 @@ private fun RowBody(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = spacing.s1)
+      .addedRow(task.key, KetchTheme.shapes.md)
       .drawBehind {
         val y = size.height - density / 2
         val inset = dividerInset.toPx()

@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -109,6 +110,26 @@ internal fun rememberClipboardLink(
   return link
 }
 
+/**
+ * The clipboard the Downloads page offers copied links from: the system's unless a preview or a
+ * snapshot provides another, which must never read this machine's.
+ */
+internal val LocalPageClipboard = staticCompositionLocalOf<SystemClipboard?> { null }
+
+/** The [LocalPageClipboard], or the system's. */
+@Composable
+internal fun rememberPageClipboard(): SystemClipboard =
+  LocalPageClipboard.current ?: rememberSystemClipboard()
+
+/**
+ * Adds the copied [link] at once and stops offering that clip, as the clipboard chip and the
+ * Add button's split part do.
+ */
+internal fun addClipboardLink(state: AppState, link: ClipboardLink.Found) {
+  state.appSettings.saveUi { it.copy(lastClipHash = link.hash) }
+  state.quickAdd(listOf(link.url))
+}
+
 /** "ubuntu-24.04.iso · releases.ubuntu.com" for a link on the clipboard. */
 internal fun linkLabel(url: String): String {
   val name = displayName(DownloadRequest(url = url))
@@ -132,7 +153,7 @@ internal fun addPasted(state: AppState, text: String) {
  */
 @Composable
 internal fun ClipboardChip(state: AppState, modifier: Modifier = Modifier) {
-  val clipboard = rememberSystemClipboard()
+  val clipboard = rememberPageClipboard()
   val scope = rememberCoroutineScope()
   val link = rememberClipboardLink(state, clipboard, skipOffered = true)
   var dismissed by remember(link) { mutableStateOf(false) }
@@ -142,10 +163,7 @@ internal fun ClipboardChip(state: AppState, modifier: Modifier = Modifier) {
     onClick = {
       dismissed = true
       when (link) {
-        is ClipboardLink.Found -> {
-          state.appSettings.saveUi { it.copy(lastClipHash = link.hash) }
-          state.quickAdd(listOf(link.url))
-        }
+        is ClipboardLink.Found -> addClipboardLink(state, link)
         else -> scope.launch {
           val text = catchingUnlessCancelled { clipboard.readText() }.getOrNull().orEmpty()
           state.appSettings.saveUi { it.copy(lastClipHash = clipHash(text.trim())) }

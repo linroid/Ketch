@@ -114,6 +114,9 @@ data class KetchLayoutInfo(
  * The inspector docks beside the table on cards from [KetchLayout.DockedInspectorWidth], floats
  * over the list on narrower ones and opens in a bottom sheet on phones. On phones the status
  * tabs are chips that scroll away with the top bar.
+ *
+ * Rows of downloads just added glow, after a lane flies to them from the Add button where there
+ * is one ([AddFlight]).
  */
 @Composable
 fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier = Modifier) {
@@ -122,13 +125,18 @@ fun DownloadsScreen(state: AppState, layout: KetchLayoutInfo, modifier: Modifier
     val actions = rememberListActions(view.rows, state)
     val page = remember(state, actions) { DownloadsPage(state, actions) }
     PageEffects(page, view)
-    CompositionLocalProvider(LocalShownDevices provides rememberShownDevices(state)) {
+    val flight = rememberAddFlight(state)
+    CompositionLocalProvider(
+      LocalShownDevices provides rememberShownDevices(state),
+      LocalAddFlight provides flight,
+    ) {
       BoxWithConstraints(modifier) {
         if (layout.tier == LayoutTier.Compact) {
           PhoneDownloads(page, view)
         } else {
           WideDownloads(page, view, layout, cardWidth = maxWidth)
         }
+        AddFlightOverlay(flight, Modifier.matchParentSize())
       }
     }
     RowActionDialogs(actions.runner)

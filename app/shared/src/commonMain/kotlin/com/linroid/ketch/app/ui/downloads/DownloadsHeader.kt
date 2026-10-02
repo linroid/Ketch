@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
-import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchPillGroup
@@ -73,7 +72,7 @@ import com.linroid.ketch.config.DownloadsLayout
 /**
  * The Downloads page header: the title with its count pill, the device chip when the sidebar
  * does not name the device, then the search field, the view and inspector toggles, the "⋯"
- * menu and Add. The search field shrinks to a button on cards narrower than
+ * menu and the [AddButton]. The search field shrinks to a button on cards narrower than
  * [SearchCollapseWidth], or [SearchWithDeviceWidth] next to the device chip; that button opens
  * it over the header. The list and table toggles show only where the table fits.
  *
@@ -145,13 +144,8 @@ internal fun DownloadsHeader(
     }
     if (hasRows) ViewToggles(page, tableFits, showsTable)
     OverflowMenu(page, showsTable)
-    KetchButton(
-      text = "Add",
-      onClick = { state.requestAddDownload() },
-      leadingIcon = KetchIcon.Plus,
-      tooltip = KetchCommands.Add.label,
-      shortcut = KetchCommands.Add.shortcutLabel(),
-    )
+    // A copied link's name gives way before the device chip and the search field do.
+    AddButton(state, Modifier.widthIn(max = addButtonMaxWidth(cardWidth)))
   }
 }
 
@@ -492,6 +486,10 @@ private fun copyLinks(page: DownloadsPage, rows: List<TaskRow>) {
   page.actions.runner.run(RowAction.CopyLink, rows)
 }
 
+/** Widest the Add button grows on a card [cardWidth] wide, as when it offers a copied link. */
+internal fun addButtonMaxWidth(cardWidth: Dp): Dp =
+  (cardWidth * ADD_BUTTON_SHARE).coerceIn(AddButtonMinWidth, AddButtonMaxWidth)
+
 /** Narrowest card whose header keeps the search field open. */
 internal val SearchCollapseWidth: Dp = 760.dp
 
@@ -501,6 +499,9 @@ internal val SearchWithDeviceWidth: Dp = 900.dp
 /** Narrowest card that shows the device chip while the sidebar names the device. */
 internal val DeviceChipWidth: Dp = 900.dp
 
+private const val ADD_BUTTON_SHARE = 0.28f
+private val AddButtonMinWidth: Dp = 180.dp
+private val AddButtonMaxWidth: Dp = 300.dp
 private val SearchWidth: Dp = 240.dp
 private val SearchFocusedWidth: Dp = 320.dp
 private val DeviceChipMaxWidth: Dp = 200.dp

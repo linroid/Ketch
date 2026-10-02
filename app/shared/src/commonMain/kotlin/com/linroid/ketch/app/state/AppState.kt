@@ -299,6 +299,19 @@ class AppState(
   /** Emits when the shell should show the Downloads list, such as after adding from Discover. */
   val downloadsRequests: SharedFlow<Unit> = showDownloadsRequests.asSharedFlow()
 
+  private val addedEvents = MutableSharedFlow<List<TaskKey>>(extraBufferCapacity = ADDED_BUFFER)
+
+  /**
+   * Emits the keys of the downloads each add from this window started, such as a quick add, a
+   * dropped link or the add sheet, so the Downloads page can point the new rows out.
+   */
+  val addedTasks: SharedFlow<List<TaskKey>> = addedEvents.asSharedFlow()
+
+  /** Reports that [keys] were just added from this window; see [addedTasks]. */
+  fun announceAdded(keys: List<TaskKey>) {
+    if (keys.isNotEmpty()) addedEvents.tryEmit(keys)
+  }
+
   private val settingsCache = mutableMapOf<InstanceEntry, InstanceSettingsController>()
 
   /** Download, network and torrent settings of the active device. */
@@ -1535,6 +1548,8 @@ class AppState(
     failed.forEach { (request, e) ->
       log.w { "Couldn't add ${redactUrl(request.url)}: ${e.describeCauses()}" }
     }
+    val deviceId = entry?.deviceId ?: activeInstance.value?.deviceId ?: LOCAL_DEVICE_ID
+    announceAdded(added.map { TaskKey(deviceId, it.taskId) })
     reportAdded(
       entry = entry,
       added = added,
@@ -1765,6 +1780,9 @@ internal fun credentialWarning(headers: List<Map<String, String>>, deviceName: S
 
 private const val COOKIE_HEADER = "Cookie"
 private const val AUTHORIZATION_HEADER = "Authorization"
+
+/** How many adds [AppState.addedTasks] holds for a Downloads page that is still busy. */
+private const val ADDED_BUFFER = 8
 
 /** Compose state that the models outside composition also read, through [flow]. */
 private class FlowState<T>(initial: T) {
