@@ -19,13 +19,13 @@ class KetchLayoutTest {
   }
 
   @Test
-  fun of_mediumWidths_useTheRailAndKeepTheCardFrom840() {
+  fun of_mediumWidths_useTheRailAndKeepTheCard() {
     val narrow = KetchLayout.of(600.dp)
     val wide = KetchLayout.of(840.dp)
 
     assertEquals(ShellNavigation.Rail, narrow.navigation)
-    assertTrue(narrow.fullBleed)
-    assertEquals(528.dp, narrow.cardWidth)
+    assertFalse(narrow.fullBleed)
+    assertEquals(520.dp, narrow.cardWidth)
     assertEquals(ShellNavigation.Rail, wide.navigation)
     assertFalse(wide.fullBleed)
     assertEquals(760.dp, wide.cardWidth)

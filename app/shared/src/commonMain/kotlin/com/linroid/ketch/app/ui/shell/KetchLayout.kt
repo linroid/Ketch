@@ -27,7 +27,7 @@ internal enum class ShellNavigation {
  * @property tier width tier of the window.
  * @property navigation how the destinations are offered.
  * @property fullBleed whether the content card fills its area without the inset, the rounded
- *   corners and the wash around it, as on windows narrower than [FullBleedWidth].
+ *   corners and the wash around it, as in the phone shell. The rail and the sidebar keep the card.
  * @property cardWidth width of the content card.
  */
 @Immutable
@@ -42,9 +42,6 @@ internal data class KetchLayout(
   val info: KetchLayoutInfo get() = KetchLayoutInfo.of(windowWidth)
 
   companion object {
-    /** Narrowest window whose content card keeps its inset and rounded corners. */
-    val FullBleedWidth: Dp = 840.dp
-
     /** Narrowest content card whose inspector docks beside the list. */
     val DockedInspectorWidth: Dp = 1040.dp
 
@@ -67,7 +64,7 @@ internal data class KetchLayout(
         tier == LayoutTier.Expanded && !sidebarCollapsed -> ShellNavigation.Sidebar
         else -> ShellNavigation.Rail
       }
-      val fullBleed = windowWidth < FullBleedWidth
+      val fullBleed = navigation == ShellNavigation.Phone
       val navigationWidth = when (navigation) {
         ShellNavigation.Sidebar -> spacing.sidebarWidth
         ShellNavigation.Rail -> spacing.railWidth

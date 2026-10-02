@@ -578,8 +578,8 @@ In dark, shadow alpha is multiplied by 3, and raised surfaces get a 1 dp top hig
    1 dp `hairline`) → flat rows. Rows are never cards.
 2. **No blur.** Haze or any backdrop blur is out of scope for Waves 1-6 (§8). Sticky headers, the
    Pulse bar and the selection bar use opaque `surface`/`surfaceSunken` with a hairline.
-3. **Windows below 840 dp:** card inset and radius drop to 0 (full-bleed surface). The wash shows
-   only behind the top bar.
+3. **Rail and sidebar:** the card keeps its 8 dp inset and r16 corners at every width; only the
+   phone shell (below 600 dp) goes full-bleed.
 4. **Phones:** full-bleed `surface`. The wash appears only as a 200 dp gradient fading out under
    the top bar.
 
