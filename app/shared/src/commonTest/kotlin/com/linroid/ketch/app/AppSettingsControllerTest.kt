@@ -3,14 +3,16 @@ package com.linroid.ketch.app
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppSettingsController
-import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.config.AccentColor
 import com.linroid.ketch.config.AiSettings
+import com.linroid.ketch.config.CloseAction
 import com.linroid.ketch.config.ConfigStore
+import com.linroid.ketch.config.DesktopSettings
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
+import com.linroid.ketch.config.NotificationMode
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.UiPreferences
@@ -127,6 +129,34 @@ class AppSettingsControllerTest {
   }
 
   @Test
+  fun saveNotifications_change_keepsTheOtherSections() {
+    val store = RecordingConfigStore(KetchConfig(desktop = DesktopSettings(openAtLogin = true)))
+    val controller = AppSettingsController(store)
+
+    controller.saveNotifications { it.copy(failed = NotificationMode.InApp) }
+    controller.saveIntegration { it.copy(magnetHandler = true) }
+
+    val saved = store.load()
+    assertEquals(NotificationMode.InApp, saved.notifications.failed)
+    assertTrue(saved.integration.magnetHandler)
+    assertTrue(saved.desktop.openAtLogin)
+    assertEquals(saved, controller.config)
+  }
+
+  @Test
+  fun reload_sectionSavedElsewhere_showsIt() {
+    val store = RecordingConfigStore()
+    val controller = AppSettingsController(store)
+    // The desktop app saves the close action straight to the file.
+    store.save(store.load().copy(desktop = DesktopSettings(closeAction = CloseAction.Quit)))
+    assertEquals(CloseAction.Ask, controller.config.desktop.closeAction)
+
+    controller.reload()
+
+    assertEquals(CloseAction.Quit, controller.config.desktop.closeAction)
+  }
+
+  @Test
   fun `accents survive a round trip through the persisted form`() {
     KetchAccent.entries.forEach { accent ->
       val controller = AppSettingsController(RecordingConfigStore())
@@ -141,7 +171,7 @@ class AppDestinationTest {
   @Test
   fun `discover is hidden until discovery works`() {
     assertEquals(
-      listOf(AppDestination.Downloads, AppDestination.Settings),
+      listOf(AppDestination.Downloads, AppDestination.Devices),
       AppDestination.visible(aiAvailable = false),
     )
   }
@@ -151,24 +181,6 @@ class AppDestinationTest {
     assertEquals(
       AppDestination.entries.toList(),
       AppDestination.visible(aiAvailable = true),
-    )
-  }
-}
-
-class SettingsCategoryTest {
-
-  @Test
-  fun `remote access is hidden where no local server can run`() {
-    val categories = SettingsCategory.visible(serverSupported = false)
-    assertTrue(SettingsCategory.RemoteAccess !in categories)
-    assertEquals(SettingsCategory.entries.size - 1, categories.size)
-  }
-
-  @Test
-  fun `every category is offered where the server can run`() {
-    assertEquals(
-      SettingsCategory.entries.toList(),
-      SettingsCategory.visible(serverSupported = true),
     )
   }
 }

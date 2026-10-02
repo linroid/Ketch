@@ -95,6 +95,25 @@ class InstanceSettingsControllerTest {
   }
 
   @Test
+  fun updateDownload_whileSlowLaneHoldsTheLimit_savesTheStandingCap() = runTest {
+    val store = RecordingConfigStore()
+    val api = SettingsKetchApi()
+    val controller = InstanceSettingsController(
+      api = api,
+      local = AppSettingsController(store),
+      scope = this,
+      savedSpeedLimit = { SpeedLimit.Unlimited },
+    )
+    val edited = DownloadConfig(maxConcurrentDownloads = 5, speedLimit = SpeedLimit.mbps(1))
+
+    controller.updateDownload(edited)
+    advanceUntilIdle()
+
+    assertEquals(edited.copy(speedLimit = SpeedLimit.Unlimited), store.load().download)
+    assertEquals(listOf(edited), api.applied)
+  }
+
+  @Test
   fun `embedded change the instance rejects is not saved`() = runTest {
     val store = RecordingConfigStore()
     val api = SettingsKetchApi().apply { failUpdates = true }

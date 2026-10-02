@@ -2,12 +2,9 @@ package com.linroid.ketch.app.ui.dialog
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -16,6 +13,11 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.theme.KetchTheme
 
+/**
+ * Sharing of the embedded device in the device picker: "Sharing on :8642" (or, while only apps
+ * on this device may connect, "Apps on this device · :8642") with a button that stops it, or a
+ * button that starts it with the saved settings. Pairing lives in Settings › Sharing.
+ */
 @Composable
 fun EmbeddedServerControls(
   serverState: ServerState,
@@ -25,32 +27,34 @@ fun EmbeddedServerControls(
   when (serverState) {
     is ServerState.Running -> {
       Row(
-        modifier = Modifier.padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
       ) {
         Text(
-          text = "Server on :${serverState.port}",
-          style = KetchTheme.typography.labelSmall,
-          color = KetchTheme.colors.primary,
+          text = if (serverState.config.isLoopbackOnly) {
+            "Apps on this device · :${serverState.port}"
+          } else {
+            "Sharing on :${serverState.port}"
+          },
+          style = KetchTheme.typography.caption,
+          color = KetchTheme.colors.status.completed.color,
         )
         KetchIconButton(
-          icon = KetchIcon.Close,
-          contentDescription = "Stop server",
+          icon = KetchIcon.Stop,
+          contentDescription = "Stop sharing",
           onClick = onStopServer,
           size = KetchButtonSize.Small,
-          tint = KetchTheme.colors.error,
         )
       }
     }
     is ServerState.Stopped, is ServerState.Failed -> {
       KetchButton(
-        text = if (serverState is ServerState.Failed) "Retry server" else "Start server",
+        text = if (serverState is ServerState.Failed) "Retry sharing" else "Share this device",
         onClick = onStartServer,
-        leadingIcon = KetchIcon.Local,
+        leadingIcon = if (serverState is ServerState.Failed) KetchIcon.Retry else KetchIcon.Server,
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
-        modifier = Modifier.padding(top = 2.dp),
+        tooltip = (serverState as? ServerState.Failed)?.let { "Couldn't share: ${it.message}" },
       )
     }
   }

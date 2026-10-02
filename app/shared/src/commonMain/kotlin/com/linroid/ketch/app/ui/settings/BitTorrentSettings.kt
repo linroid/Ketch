@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchBadge
 import com.linroid.ketch.app.components.KetchBadgeTone
 import com.linroid.ketch.app.components.KetchButton
@@ -18,34 +17,31 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.state.InstanceSettingsController
+import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.MAX_EXTRA_TRACKERS
 import com.linroid.ketch.app.state.RejectedTracker
 import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.trackerHost
+import com.linroid.ketch.app.theme.KetchTheme
 
 /** Rejected URLs listed under the add field; the rest are only counted. */
 private const val MAX_LISTED_REJECTIONS = 3
 
 /**
- * Extra trackers of the embedded instance, applied to torrents as they
- * start or resume. A remote instance's trackers can only be changed on
- * that device, so it gets a note instead.
- *
- * @param instanceLabel name of the instance the settings belong to.
+ * Extra trackers of [device], applied to torrents as they start or resume. Only the embedded
+ * device's trackers can be changed here; a remote device gets a note instead.
  */
 @Composable
-fun BitTorrentSettings(
-  controller: InstanceSettingsController,
-  instanceLabel: String,
-) {
+fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
+  val controller = state.settingsFor(device)
   val torrent = controller.torrent
   // Trackers taken away by "Remove all", offered back until restored.
   var removed by remember { mutableStateOf(emptyList<String>()) }
-  Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
     if (torrent == null) {
       SettingsNotice(
-        text = "Extra trackers of $instanceLabel can only be changed on that device, in " +
+        text = "Extra trackers of ${device.label} can only be changed on that device, in " +
           "Ketch's BitTorrent settings or under [torrent] in its config.toml.",
         tone = NoticeTone.Info,
       )
@@ -69,6 +65,7 @@ fun BitTorrentSettings(
             },
             variant = KetchButtonVariant.Secondary,
             size = KetchButtonSize.Small,
+            leadingIcon = KetchIcon.Undo,
           )
         },
       )
@@ -118,15 +115,20 @@ fun BitTorrentSettings(
           title = host,
           description = url,
           trailing = {
-            if (index >= MAX_EXTRA_TRACKERS) {
-              KetchBadge("Unused", KetchBadgeTone.Warning)
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+            ) {
+              if (index >= MAX_EXTRA_TRACKERS) {
+                KetchBadge("Unused", KetchBadgeTone.Warning)
+              }
+              KetchIconButton(
+                icon = KetchIcon.Close,
+                onClick = { save(trackers - url) },
+                size = KetchButtonSize.Small,
+                contentDescription = "Remove $host",
+              )
             }
-            KetchIconButton(
-              icon = KetchIcon.Close,
-              onClick = { save(trackers - url) },
-              size = KetchButtonSize.Small,
-              contentDescription = "Remove $host",
-            )
           },
         )
       }
@@ -154,7 +156,7 @@ private fun AddTrackersRow(onAdd: (String) -> List<RejectedTracker>) {
   ) {
     Row(
       verticalAlignment = Alignment.Top,
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
     ) {
       SettingsTextField(
         value = text,

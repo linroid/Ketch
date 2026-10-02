@@ -149,6 +149,14 @@ class SegmentRateTrackerTest {
     assertEquals(listOf(100L, 0L), back.map { it.bytesPerSecond })
   }
 
+  @Test
+  fun health_byStallLength_movesStallsThenSticks() {
+    assertEquals(LaneHealth.Moving, SegmentRate(0, 100).health)
+    assertEquals(LaneHealth.Stalled, SegmentRate(0, 0, stalledFor = 3.seconds).health)
+    assertEquals(LaneHealth.Stalled, SegmentRate(0, 0, stalledFor = 10.seconds).health)
+    assertEquals(LaneHealth.Stuck, SegmentRate(0, 0, stalledFor = 11.seconds).health)
+  }
+
   private fun segment(start: Long, end: Long, downloaded: Long) =
     Segment(index = 0, start = start, end = end, downloadedBytes = downloaded)
 }

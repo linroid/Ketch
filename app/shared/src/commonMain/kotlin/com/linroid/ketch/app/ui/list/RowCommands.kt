@@ -1,9 +1,5 @@
 package com.linroid.ketch.app.ui.list
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalUriHandler
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadSchedule
@@ -13,13 +9,10 @@ import com.linroid.ketch.api.isName
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.SystemClipboard
-import com.linroid.ketch.app.platform.rememberFileActions
-import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.IntakeSeed
-import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
@@ -215,19 +208,6 @@ internal class RowCommands(
       )
       return pending.any { (key, label) -> key == row.key && label !in settings }
     }
-  }
-}
-
-/** [RowCommands] of the app shown around this composition. */
-@Composable
-internal fun rememberRowCommands(): RowCommands {
-  val state = LocalAppState.current
-  val files = rememberFileActions()
-  val clipboard = rememberSystemClipboard()
-  val uriHandler = LocalUriHandler.current
-  val scope = rememberCoroutineScope()
-  return remember(state, files, clipboard, uriHandler, scope) {
-    RowCommands(state, files, clipboard, scope, uriHandler::openUri)
   }
 }
 

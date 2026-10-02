@@ -3,7 +3,7 @@ import KetchApp
 
 @main
 struct iOSApp: App {
-  // Holds files opened in Ketch until the Compose UI takes them.
+  // Holds files and links opened in Ketch until the Compose UI takes them.
   private let incoming = IncomingDownloads()
 
   init() {
@@ -14,9 +14,10 @@ struct iOSApp: App {
   var body: some Scene {
     WindowGroup {
       ContentView(incoming: incoming)
-        // Receives .torrent files opened from Files, AirDrop and other apps.
+        // Receives .torrent files opened from Files, AirDrop and other apps, magnet links and
+        // ketch://pair links from scanned pairing codes.
         .onOpenURL { url in
-          incoming.offerFile(url: url)
+          _ = incoming.offerUrl(url: url)
         }
     }
   }

@@ -67,10 +67,32 @@ describe('buildHeaders', () => {
 });
 
 describe('buildDownloadRequest', () => {
+  const properties = { 'ketch.origin': 'browser' };
+
   test('the browser file name becomes a bare-name destination', () => {
     assert.deepEqual(
       buildDownloadRequest({ url: 'https://a.com/get?id=1', fileName: '/tmp/Report.pdf' }),
-      { url: 'https://a.com/get?id=1', destination: 'Report.pdf' },
+      { url: 'https://a.com/get?id=1', destination: 'Report.pdf', properties },
+    );
+  });
+
+  test('tags every request with the browser origin, never as a header', () => {
+    const requests = [
+      buildDownloadRequest({ url: 'https://a.com/f', headers: { Cookie: 'a=1' } }),
+      buildDownloadRequest({ url: 'magnet:?xt=urn:btih:abc' }),
+      buildDownloadRequest({ url: 'torrent:abc', resolvedSource: { url: 'torrent:abc' } }),
+    ];
+    for (const request of requests) {
+      assert.deepEqual(request.properties, properties, request.url);
+      assert.equal(request.headers?.['ketch.origin'], undefined, request.url);
+    }
+  });
+
+  test('passes a resolved source through unchanged', () => {
+    const resolvedSource = { url: 'torrent:abc', sourceType: 'torrent' };
+    assert.deepEqual(
+      buildDownloadRequest({ url: 'torrent:abc', resolvedSource }),
+      { url: 'torrent:abc', resolvedSource, properties },
     );
   });
 
@@ -80,7 +102,10 @@ describe('buildDownloadRequest', () => {
   });
 
   test('includes headers only when there are some', () => {
-    assert.deepEqual(buildDownloadRequest({ url: 'https://a.com/f' }), { url: 'https://a.com/f' });
+    assert.deepEqual(
+      buildDownloadRequest({ url: 'https://a.com/f' }),
+      { url: 'https://a.com/f', properties },
+    );
     assert.deepEqual(
       buildDownloadRequest({ url: 'https://a.com/f', headers: { Cookie: 'a=1' } }).headers,
       { Cookie: 'a=1' },

@@ -17,6 +17,15 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 
 /**
+ * [DownloadRequest.properties] key naming the client a task was added from. Ketch never reads
+ * it; apps group and filter downloads by it.
+ */
+private const val ORIGIN_PROPERTY = "ketch.origin"
+
+/** Value of [ORIGIN_PROPERTY] on every download an agent starts through [KetchToolSet]. */
+private const val AGENT_ORIGIN = "agent"
+
+/**
  * Koog [ToolSet] exposing [KetchApi] download management capabilities
  * as MCP tools for AI agents.
  *
@@ -95,6 +104,7 @@ class KetchToolSet(
       connections = connections,
       priority = parsePriority(priority),
       speedLimit = parseSpeedLimit(speedLimit),
+      properties = mapOf(ORIGIN_PROPERTY to AGENT_ORIGIN),
     )
     val task = ketch.download(request)
     return json.encodeToString(taskToJson(task))

@@ -1,8 +1,6 @@
 package com.linroid.ketch.app.components
 
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -27,7 +25,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.formatBytes
@@ -75,36 +72,7 @@ fun KetchSpeedChart(
   showAxis: Boolean = true,
   timeLabel: ((index: Int) -> String)? = null,
 ) {
-  SpeedChart(bands, modifier, limits, slots, showAxis, timeLabel, ceiling = null)
-}
-
-/**
- * Speed sparkline: an area with a 1.5 dp line on top, scaled to its peak.
- *
- * @param normalize `false` when [samples] are already fractions of the chart's height.
- */
-@Deprecated("Use KetchSpeedChart with SpeedBand samples in bytes per second.")
-@Composable
-fun KetchSpeedChart(
-  samples: List<Float>,
-  modifier: Modifier = Modifier,
-  height: Dp = 80.dp,
-  lineColor: Color = KetchTheme.colors.accent,
-  normalize: Boolean = true,
-) {
-  val band = remember(samples, lineColor, normalize) {
-    val peak = if (normalize) samples.maxOrNull()?.takeIf { it > 0f } ?: 1f else 1f
-    SpeedBand(samples.map { (it / peak * NORMALIZED_SCALE).toLong() }, lineColor)
-  }
-  SpeedChart(
-    bands = listOf(band),
-    modifier = modifier.fillMaxWidth().height(height),
-    limits = emptyList(),
-    slots = samples.size,
-    showAxis = false,
-    timeLabel = null,
-    ceiling = NORMALIZED_SCALE,
-  )
+  SpeedChart(bands, modifier, limits, slots, showAxis, timeLabel)
 }
 
 @Composable
@@ -115,14 +83,13 @@ private fun SpeedChart(
   slots: Int,
   showAxis: Boolean,
   timeLabel: ((index: Int) -> String)?,
-  ceiling: Long?,
 ) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val measurer = rememberTextMeasurer()
   val totals = remember(bands, slots) { stackedTotals(bands, slots) }
   val peak = totals.maxOrNull() ?: 0L
-  val top = ceiling ?: remember(peak, limits) { speedChartCeiling(peak, limits) }
+  val top = remember(peak, limits) { speedChartCeiling(peak, limits) }
   val axisLabel = if (showAxis) {
     remember(top, type) { measurer.measure(formatSpeedCeiling(top), type.numeralS) }
   } else {
@@ -313,7 +280,6 @@ private fun bandPaths(
 
 private const val KIB = 1024L
 private val NICE_STEPS = longArrayOf(1, 2, 5, 10, 20, 50, 100, 200, 500)
-private const val NORMALIZED_SCALE = KIB * KIB
 private const val FILL_ALPHA = 0.12f
 private val TrailingZeros = Regex("""\.0+(?= )""")
 private val LineWidth = 1.5.dp

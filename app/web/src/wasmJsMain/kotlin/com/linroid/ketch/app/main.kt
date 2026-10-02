@@ -22,6 +22,7 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
+import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
 import com.linroid.ketch.app.theme.rememberKetchFontsLoaded
 import kotlinx.browser.document
@@ -39,9 +40,21 @@ fun main() {
   // No embedded Ketch installs a logger here, so the remote client's logs need one.
   KetchLogger.setLogger(Logger.console(LogLevel.INFO))
   val incoming = IncomingDownloads()
-  // The browser holds files opened before this runs, so the first launch is not lost.
-  consumeLaunchedFiles(
+  // Links the page was opened with, from the magnet protocol handler or the share target. They
+  // leave the address at once, so a reload does not add them again.
+  val launchUrl = window.location.href
+  incoming.offerLaunchLinks(launchUrl)
+  clearLaunchLinks()
+  var loadLaunch: String? = launchUrl
+  // The browser holds files and links opened before this runs, so the first launch is not lost.
+  consumeLaunches(
     limit = MAX_TORRENT_FILE_BYTES + 1,
+    onUrl = { url ->
+      // The launch that loaded the page is queued too; its links were read from the address.
+      val skip = url == loadLaunch
+      loadLaunch = null
+      if (!skip) incoming.offerLaunchLinks(url)
+    },
     onFile = { name, base64 -> incoming.offerTorrentFile(name, Base64.decode(base64)) },
     onError = { name, message -> incoming.offer(IncomingDownload.Failed(name, message)) },
   )
@@ -100,17 +113,49 @@ private fun connectOnLoad(
 }
 
 /**
- * Receives `.torrent` files opened with the installed web app, via the manifest's
- * `file_handlers` (Chromium browsers). Each file's first [limit] bytes reach [onFile] as base64.
+ * Offers the links [url] carries: `add` holds a link from the magnet protocol handler or a shared
+ * link, and `text` shared text with links in it (see the manifest's `share_target`).
  */
-private fun consumeLaunchedFiles(
+private fun IncomingDownloads.offerLaunchLinks(url: String) {
+  val links = queryValues(url, "add")
+  val shared = queryValues(url, "text")
+  val text = listOf(links, shared).filter { it.isNotBlank() }.joinToString("\n")
+  if (text.isEmpty()) return
+  offerText(text, if (shared.isBlank()) LinkSource.OpenUrl else LinkSource.Share)
+}
+
+/** Every value of the query parameter [name] in [url], one per line. */
+private fun queryValues(url: String, name: String): String =
+  js("""new URL(url).searchParams.getAll(name).join('\n')""")
+
+/** Removes the launch links' parameters from the address, keeping its history entry. */
+private fun clearLaunchLinks(): Unit = js(
+  """{
+  const url = new URL(window.location.href);
+  url.searchParams.delete('add');
+  url.searchParams.delete('text');
+  if (url.href !== window.location.href) {
+    window.history.replaceState(window.history.state, '', url.href);
+  }
+}"""
+)
+
+/**
+ * Receives launches of the installed web app while it runs or starts (Chromium browsers): the
+ * address of each one reaches [onUrl], which may carry links (see [offerLaunchLinks]), and
+ * `.torrent` files opened with it through the manifest's `file_handlers` reach [onFile], the
+ * first [limit] bytes of each as base64.
+ */
+private fun consumeLaunches(
   limit: Int,
+  onUrl: (url: String) -> Unit,
   onFile: (name: String, base64: String) -> Unit,
   onError: (name: String, message: String) -> Unit,
 ): Unit = js(
   """{
   if (!('launchQueue' in window)) return;
   window.launchQueue.setConsumer(async (params) => {
+    if (params.targetURL) onUrl(params.targetURL);
     for (const handle of params.files) {
       try {
         const file = await handle.getFile();

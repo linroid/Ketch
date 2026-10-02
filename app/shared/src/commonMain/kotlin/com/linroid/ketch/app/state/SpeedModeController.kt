@@ -71,8 +71,9 @@ data class ObservedPeak(
  * [DownloadConfig] and hands the result to [apply]. Outside full speed, including a slow lane
  * or Auto mode restored from [settings], the controller keeps the device at the limit of the
  * mode: it checks again whenever an Auto rule starts or ends, and at least every minute, so a
- * device that comes back online or lost its limit gets it again. Leaving full speed remembers
- * the device's current limit as the standing cap, so switching back restores it.
+ * device that comes back online or lost its limit gets it again. At full speed the device's
+ * current limit is the standing cap, however it was set, so leaving full speed or changing the
+ * slow lane or the rules keeps it, and switching back restores it.
  *
  * The owner saves [settings] and [observedPeak] when they change.
  *
@@ -183,7 +184,9 @@ class SpeedModeController(
       var next = normalize(transform(previous))
       if (next == previous) return
       val current = config()
-      if (previous.mode == SpeedLimitMode.Full && next.mode != SpeedLimitMode.Full) {
+      // At full speed the device's own limit is the standing cap, whoever set it.
+      val leavesCap = next.mode != SpeedLimitMode.Full || next.standard == previous.standard
+      if (previous.mode == SpeedLimitMode.Full && leavesCap) {
         next = next.copy(standard = current.speedLimit)
       }
       _settings.value = next

@@ -30,9 +30,16 @@ class OpenedFilesTest {
 
   @Test
   fun fileArguments_flagsBlanksAndOtherSchemes_leavesThemOut() {
-    val opened = fileArguments(listOf(BACKGROUND_FLAG, "", "ketch://pair?host=a", "mailto:x@y"))
+    val opened = fileArguments(listOf(BACKGROUND_FLAG, "", "ketch://open", "mailto:x@y"))
 
     assertEquals(OpenedArguments(), opened)
+  }
+
+  @Test
+  fun fileArguments_pairingLink_routesItToLinks() {
+    val opened = fileArguments(listOf("ketch://pair?host=a#token"))
+
+    assertEquals(listOf("ketch://pair?host=a#token"), opened.links)
   }
 
   @Test

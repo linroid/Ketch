@@ -53,7 +53,8 @@ private object BrowserFilePicker : FilePicker {
     }
 }
 
-private fun File.toDroppedFile(): DroppedFile = DroppedFile(name) { maxBytes ->
+/** [this] browser file as a [DroppedFile], read on demand with its size bounded. */
+internal fun File.toDroppedFile(): DroppedFile = DroppedFile(name) { maxBytes ->
   if (size.toDouble() > maxBytes) fileTooLarge(name, maxBytes)
   val buffer = suspendCancellableCoroutine { continuation ->
     val reader = FileReader()

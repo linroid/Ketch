@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalWasmJsInterop::class)
+
 package com.linroid.ketch.app.platform
 
 import androidx.compose.runtime.Composable
@@ -8,17 +10,10 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.domDataTransferOrNull
 import kotlinx.browser.window
-import kotlinx.coroutines.suspendCancellableCoroutine
-import org.khronos.webgl.ArrayBuffer
-import org.khronos.webgl.Int8Array
-import org.khronos.webgl.toByteArray
 import org.w3c.dom.DataTransfer
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.MouseEvent
-import org.w3c.files.File
-import org.w3c.files.FileReader
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.unsafeCast
 
 @Composable
@@ -38,34 +33,31 @@ internal actual fun DragExitEffect(onExit: () -> Unit) {
 }
 
 private object BrowserFileDropReader : FileDropReader {
-  override fun hasFiles(event: DragAndDropEvent): Boolean {
-    // File names are hidden until the drop; only the "Files" type is visible.
+  override fun accepts(event: DragAndDropEvent): Boolean {
+    // Names and content are hidden until the drop; only the types are visible.
     val types = event.dataTransfer?.types ?: return false
-    return (0 until types.length).any { types[it]?.toString() == "Files" }
+    return (0 until types.length).any { types[it]?.toString() in DROP_TYPES }
   }
 
   override fun files(event: DragAndDropEvent): List<DroppedFile> {
     val files = event.dataTransfer?.files ?: return emptyList()
-    return (0 until files.length).mapNotNull { files.item(it) }.map { file ->
-      DroppedFile(file.name) { maxBytes -> file.read(maxBytes) }
-    }
+    return (0 until files.length).mapNotNull { files.item(it) }.map { it.toDroppedFile() }
+  }
+
+  override fun text(event: DragAndDropEvent): (suspend () -> String)? {
+    val transfer = event.dataTransfer ?: return null
+    // A dragged link carries its address in the URI list and its title in the plain text.
+    val links = uriListEntries(transfer.getData(URI_LIST_TYPE)).joinToString("\n")
+    val text = links.ifEmpty { transfer.getData(TEXT_TYPE) }
+    return if (text.isBlank()) null else ({ text })
   }
 
   @OptIn(ExperimentalComposeUiApi::class)
   private val DragAndDropEvent.dataTransfer: DataTransfer?
     get() = transferData?.domDataTransferOrNull
-}
 
-private suspend fun File.read(maxBytes: Long): ByteArray {
-  if (size.toDouble() > maxBytes) fileTooLarge(name, maxBytes)
-  val buffer = suspendCancellableCoroutine { continuation ->
-    val reader = FileReader()
-    reader.onload = { continuation.resume(reader.result!!.unsafeCast<ArrayBuffer>()) }
-    reader.onerror = {
-      continuation.resumeWithException(IllegalStateException("Cannot read $name"))
-    }
-    continuation.invokeOnCancellation { reader.abort() }
-    reader.readAsArrayBuffer(this)
-  }
-  return Int8Array(buffer).toByteArray()
+  private const val FILES_TYPE = "Files"
+  private const val URI_LIST_TYPE = "text/uri-list"
+  private const val TEXT_TYPE = "text/plain"
+  private val DROP_TYPES = setOf(FILES_TYPE, URI_LIST_TYPE, TEXT_TYPE)
 }

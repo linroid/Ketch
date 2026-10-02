@@ -93,4 +93,23 @@ class DownloadArgsTest {
     assertEquals(Destination("/tmp/file.zip"), resolveDestination("/tmp/file.zip", noDirectories))
     assertEquals(Destination("new-dir/"), resolveDestination("new-dir/", noDirectories))
   }
+
+  @Test
+  fun toRequest_parsedArgs_tagsTheRequestWithTheCliOrigin() {
+    val args = DownloadArgs.Download(
+      url = "https://example.com/a.zip",
+      destination = "a.zip",
+      speedLimit = SpeedLimit.parse("1m")!!,
+      priority = DownloadPriority.HIGH,
+    )
+
+    val request = args.toRequest(Destination("./a.zip"))
+
+    assertEquals(mapOf("ketch.origin" to "cli"), request.properties)
+    assertEquals(emptyMap(), request.headers)
+    assertEquals("https://example.com/a.zip", request.url)
+    assertEquals(Destination("./a.zip"), request.destination)
+    assertEquals(SpeedLimit.parse("1m"), request.speedLimit)
+    assertEquals(DownloadPriority.HIGH, request.priority)
+  }
 }

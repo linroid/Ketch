@@ -65,24 +65,6 @@ data class KetchElevation(
     KetchElevationLevel.E3 -> e3
     KetchElevationLevel.E4 -> e4
   }
-
-  @Deprecated("Use e0.", ReplaceWith("e0"))
-  val level0: List<ShadowLayer> get() = e0
-
-  @Deprecated("Use e1.", ReplaceWith("e1"))
-  val level1: List<ShadowLayer> get() = e1
-
-  @Deprecated("Use e2.", ReplaceWith("e2"))
-  val level2: List<ShadowLayer> get() = e2
-
-  @Deprecated("Use e3.", ReplaceWith("e3"))
-  val level3: List<ShadowLayer> get() = e3
-
-  @Deprecated("Use e4.", ReplaceWith("e4"))
-  val level4: List<ShadowLayer> get() = e4
-
-  @Deprecated("Use e4.", ReplaceWith("e4"))
-  val level5: List<ShadowLayer> get() = e4
 }
 
 /** Elevation of the light or [dark] theme; dark shadows are three times as strong. */
@@ -104,11 +86,5 @@ fun ketchElevation(dark: Boolean): KetchElevation {
     isDark = dark,
   )
 }
-
-@Deprecated("Use ketchElevation(dark = false).", ReplaceWith("ketchElevation(dark = false)"))
-fun lightKetchElevation(): KetchElevation = ketchElevation(dark = false)
-
-@Deprecated("Use ketchElevation(dark = true).", ReplaceWith("ketchElevation(dark = true)"))
-fun darkKetchElevation(): KetchElevation = ketchElevation(dark = true)
 
 private val ShadowInk = Color(0xFF0F172A)

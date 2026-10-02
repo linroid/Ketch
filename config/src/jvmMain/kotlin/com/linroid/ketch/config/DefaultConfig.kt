@@ -42,12 +42,16 @@ maxConnectionsPerHost = 8
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
 
-# Pre-configured remote servers.
+# Pre-configured remote servers. The apps show `name` (or the name the server
+# announces) and stay connected to a device while another is shown unless
+# `watch` is false.
 # [[remotes]]
 # host = "192.168.1.100"
 # port = 8642
 # apiToken = "token"
 # secure = false
+# name = "NAS"
+# watch = true
 """
 
 /** Writes a default config file to [path]. */

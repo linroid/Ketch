@@ -151,5 +151,92 @@ class SelectionStateTest {
     assertSame(selection, selection.prune(visible.toSet()))
   }
 
+  @Test
+  fun click_plain_selectsOnlyTheRow() {
+    val selection = SelectionState().select(key("d1")).toggle(key("d2"))
+
+    assertEquals(SelectionState().select(key("w1")), selection.click(key("w1"), visible))
+  }
+
+  @Test
+  fun click_withToggle_addsTheRow() {
+    val selection = SelectionState().select(key("d1")).click(key("w1"), visible, toggle = true)
+
+    assertEquals(setOf(key("d1"), key("w1")), selection.selected)
+  }
+
+  @Test
+  fun click_withRange_selectsFromTheAnchor() {
+    val selection = SelectionState().select(key("d1")).click(key("w1"), visible, range = true)
+
+    assertEquals(setOf(key("d1"), key("d2"), key("w1")), selection.selected)
+  }
+
+  @Test
+  fun click_withToggleAndRange_addsTheRange() {
+    val selection = SelectionState().select(key("e5"))
+      .toggle(key("d1"))
+      .click(key("w1"), visible, toggle = true, range = true)
+
+    assertEquals(setOf(key("e5"), key("d1"), key("d2"), key("w1")), selection.selected)
+  }
+
+  @Test
+  fun contextClick_insideTheSelection_keepsIt() {
+    val selection = SelectionState().select(key("d1")).toggle(key("w1"))
+
+    val clicked = selection.contextClick(key("d1"))
+
+    assertEquals(selection.selected, clicked.selected)
+    assertEquals(key("d1"), clicked.focused)
+  }
+
+  @Test
+  fun contextClick_outsideTheSelection_selectsOnlyTheRow() {
+    val selection = SelectionState().select(key("d1")).toggle(key("w1"))
+
+    assertEquals(SelectionState().select(key("d2")), selection.contextClick(key("d2")))
+  }
+
+  @Test
+  fun targets_rowInTheSelection_isEverySelectedVisibleRowInOrder() {
+    val selection = SelectionState().select(key("w1")).toggle(key("d1")).toggle(key("gone"))
+
+    assertEquals(listOf(key("d1"), key("w1")), selection.targets(key("w1"), visible))
+  }
+
+  @Test
+  fun targets_rowOutsideTheSelection_isTheRowAlone() {
+    val selection = SelectionState().select(key("w1")).toggle(key("d1"))
+
+    assertEquals(listOf(key("d2")), selection.targets(key("d2"), visible))
+  }
+
+  @Test
+  fun band_coveredRows_replaceTheSelection() {
+    val selection = SelectionState().select(key("e1")).band(listOf(key("d2"), key("w1")))
+
+    assertEquals(setOf(key("d2"), key("w1")), selection.selected)
+    assertEquals(key("d2"), selection.anchor)
+    assertEquals(key("w1"), selection.focused)
+  }
+
+  @Test
+  fun band_withBase_addsToIt() {
+    val base = setOf(key("e1"))
+
+    val selection = SelectionState().select(key("e1")).band(listOf(key("d1")), base)
+
+    assertEquals(setOf(key("e1"), key("d1")), selection.selected)
+  }
+
+  @Test
+  fun band_nothingCovered_keepsOnlyTheBase() {
+    val selection = SelectionState().select(key("d1")).band(emptyList())
+
+    assertTrue(selection.selected.isEmpty())
+    assertEquals(key("d1"), selection.anchor)
+  }
+
   private fun key(id: String) = TaskKey(LOCAL_DEVICE_ID, id)
 }

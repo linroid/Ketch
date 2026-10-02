@@ -3,6 +3,7 @@ package com.linroid.ketch.app.android
 import android.Manifest
 import android.app.AlertDialog
 import android.content.ComponentName
+import android.content.ContentResolver
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
@@ -29,6 +30,7 @@ import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.rememberAppController
@@ -126,8 +128,8 @@ class MainActivity : ComponentActivity() {
   }
 
   /**
-   * Shows what a tapped notification is about, or hands a `.torrent` file opened with Ketch to
-   * the app, which keeps it until handled.
+   * Shows what a tapped notification is about, or hands what Ketch was opened with to the app,
+   * which keeps it until handled: a `.torrent` file, a `magnet:` link or a `ketch://pair` link.
    */
   private fun handleIntent(intent: Intent?) {
     val link = AndroidNotifier.linkOf(intent)
@@ -139,7 +141,10 @@ class MainActivity : ComponentActivity() {
     }
     if (intent?.action != Intent.ACTION_VIEW) return
     val uri = intent.data ?: return
-    ketchApplication.openFile(uri)
+    when (uri.scheme?.lowercase()) {
+      ContentResolver.SCHEME_CONTENT, ContentResolver.SCHEME_FILE -> ketchApplication.openFile(uri)
+      else -> ketchApplication.incoming.offerLink(uri.toString(), LinkSource.OpenUrl)
+    }
   }
 
   override fun onDestroy() {

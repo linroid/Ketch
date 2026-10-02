@@ -1,19 +1,17 @@
 package com.linroid.ketch.app.platform
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.ClipDescription
+import android.content.ContentResolver
 import android.content.Context
 import android.content.ContextWrapper
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 
 @Composable
 internal actual fun rememberFileDropReader(): FileDropReader {
@@ -25,64 +23,50 @@ internal actual fun rememberFileDropReader(): FileDropReader {
 @Composable
 internal actual fun DragExitEffect(onExit: () -> Unit) = Unit
 
-/** Reads content URIs dropped from other apps, e.g. in split screen or on ChromeOS. */
+/**
+ * Reads what other apps drop, e.g. in split screen or on ChromeOS: documents as content URIs, and
+ * links or selected text from a browser as text.
+ */
 private class AndroidFileDropReader(private val context: Context) : FileDropReader {
-  override fun hasFiles(event: DragAndDropEvent): Boolean {
-    val description = event.toAndroidDragEvent().clipDescription ?: return false
+  override fun accepts(event: DragAndDropEvent): Boolean {
+    val dragEvent = event.toAndroidDragEvent()
+    // Only drags that start in this app, such as rows dragged out of the list, carry local state.
+    if (dragEvent.localState != null) return false
+    val description = dragEvent.clipDescription ?: return false
     return (0 until description.mimeTypeCount).any {
-      description.getMimeType(it) !in TEXT_MIME_TYPES
+      description.getMimeType(it) != ClipDescription.MIMETYPE_TEXT_INTENT
     }
   }
 
   override fun files(event: DragAndDropEvent): List<DroppedFile> {
     val dragEvent = event.toAndroidDragEvent()
-    val clip = dragEvent.clipData ?: return emptyList()
+    val uris = dragEvent.clipData?.items().orEmpty().mapNotNull { item ->
+      item.uri?.takeIf { it.isDocument() }
+    }
+    if (uris.isEmpty()) return emptyList()
     // Content URIs from other apps are readable only after this grant.
     context.findActivity()?.requestDragAndDropPermissions(dragEvent)
-    return (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }.map { uri ->
-      val name = displayName(uri)
-      DroppedFile(name) { maxBytes -> withContext(Dispatchers.IO) { read(uri, name, maxBytes) } }
-    }
+    return uris.map { contentFile(context, it) }
   }
 
-  private fun displayName(uri: Uri): String {
-    val queried = runCatching {
-      context.contentResolver.query(
-        uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null,
-      )?.use { cursor ->
-        if (cursor.moveToFirst()) cursor.getString(0) else null
-      }
-    }.getOrNull()
-    return queried ?: uri.lastPathSegment ?: uri.toString()
+  override fun text(event: DragAndDropEvent): (suspend () -> String)? {
+    val items = event.toAndroidDragEvent().clipData?.items().orEmpty()
+    // A link dragged from a browser can arrive as an http URI rather than as text.
+    val text = items.mapNotNull { item ->
+      item.text?.toString() ?: item.uri?.takeUnless { it.isDocument() }?.toString()
+        ?: item.htmlText
+    }.joinToString("\n")
+    return if (text.isBlank()) null else ({ text })
   }
 
-  private fun read(uri: Uri, name: String, maxBytes: Long): ByteArray {
-    val input = context.contentResolver.openInputStream(uri)
-      ?: throw IllegalArgumentException("Cannot open $name")
-    return input.use { stream ->
-      val output = ByteArrayOutputStream()
-      val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-      while (true) {
-        val read = stream.read(buffer)
-        if (read < 0) break
-        output.write(buffer, 0, read)
-        if (output.size() > maxBytes) fileTooLarge(name, maxBytes)
-      }
-      output.toByteArray()
-    }
-  }
+  private fun ClipData.items(): List<ClipData.Item> = (0 until itemCount).map(::getItemAt)
+
+  private fun Uri.isDocument(): Boolean =
+    scheme == ContentResolver.SCHEME_CONTENT || scheme == ContentResolver.SCHEME_FILE
 
   private fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
-  }
-
-  private companion object {
-    val TEXT_MIME_TYPES = setOf(
-      ClipDescription.MIMETYPE_TEXT_PLAIN,
-      ClipDescription.MIMETYPE_TEXT_HTML,
-      ClipDescription.MIMETYPE_TEXT_INTENT,
-    )
   }
 }

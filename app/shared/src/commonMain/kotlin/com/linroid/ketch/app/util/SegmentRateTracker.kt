@@ -21,7 +21,27 @@ data class SegmentRate(
   val start: Long,
   val bytesPerSecond: Long,
   val stalledFor: Duration? = null,
-)
+) {
+  /** How the connection is doing, which colors its dot. */
+  val health: LaneHealth
+    get() = when {
+      stalledFor == null -> LaneHealth.Moving
+      stalledFor > SegmentRateTracker.STUCK_AFTER -> LaneHealth.Stuck
+      else -> LaneHealth.Stalled
+    }
+}
+
+/** How one connection of a downloading task is doing. */
+enum class LaneHealth {
+  /** Data arrives. */
+  Moving,
+
+  /** No data for [SegmentRateTracker.STALL_AFTER], up to [SegmentRateTracker.STUCK_AFTER]. */
+  Stalled,
+
+  /** No data for longer than [SegmentRateTracker.STUCK_AFTER]. */
+  Stuck,
+}
 
 /**
  * Per-segment rates of one task, measured from consecutive snapshots of its segments.
@@ -119,5 +139,8 @@ class SegmentRateTracker(
 
     /** A segment of a downloading task that receives no data for this long is stalled. */
     val STALL_AFTER: Duration = 3.seconds
+
+    /** A stalled segment that receives no data for longer than this is stuck. */
+    val STUCK_AFTER: Duration = 10.seconds
   }
 }

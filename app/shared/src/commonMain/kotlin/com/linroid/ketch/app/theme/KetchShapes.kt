@@ -57,9 +57,6 @@ data class KetchShapes(
   /** Bottom sheets, rounded at the top only. */
   val sheetTop: CornerBasedShape =
     xxl.copy(bottomEnd = ZeroCornerSize, bottomStart = ZeroCornerSize)
-
-  @Deprecated("Use full.", ReplaceWith("full"))
-  val round: CornerBasedShape get() = full
 }
 
 /** The radius scale at [density]. */

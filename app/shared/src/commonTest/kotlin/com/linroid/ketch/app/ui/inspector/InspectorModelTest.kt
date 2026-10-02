@@ -1,0 +1,391 @@
+package com.linroid.ketch.app.ui.inspector
+
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadProgress
+import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.state.DeviceInfo
+import com.linroid.ketch.app.state.ListFixtures
+import com.linroid.ketch.app.state.ListFixtures.row
+import com.linroid.ketch.app.state.RowCapabilities
+import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.util.RowContext
+import com.linroid.ketch.app.util.TaskOrigin
+import com.linroid.ketch.app.util.rowContent
+import kotlinx.datetime.TimeZone
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+
+class InspectorModelTest {
+  private val start = ListFixtures.START
+
+  @Test
+  fun inspectorReason_stalledDownload_offersReconnect() {
+    val reason = inspectorReason(stalled(), slowLane = false, globalCap = SpeedLimit.Unlimited)
+
+    assertEquals(ReasonAction.Reconnect, reason?.action)
+    assertTrue(reason!!.warning)
+    assertTrue(reason.text.startsWith("Stalled"))
+  }
+
+  @Test
+  fun inspectorReason_slowLaneBelowOwnLimit_offersFullSpeed() {
+    val row = downloading(SpeedLimit.mbps(8))
+
+    val reason = inspectorReason(row, slowLane = true, globalCap = SpeedLimit.mbps(1))
+
+    assertEquals(InspectorReason("Limited by Slow lane (1 MB/s)", ReasonAction.FullSpeed), reason)
+  }
+
+  @Test
+  fun inspectorReason_ownLimitLowerThanGlobal_offersRemoveLimit() {
+    val row = downloading(SpeedLimit.kbps(512))
+
+    val reason = inspectorReason(row, slowLane = true, globalCap = SpeedLimit.mbps(1))
+
+    assertEquals(InspectorReason("Limited to 512 KB/s", ReasonAction.RemoveLimit), reason)
+  }
+
+  @Test
+  fun inspectorReason_globalLimitWithoutSlowLane_opensSpeedSettings() {
+    val reason = inspectorReason(downloading(), slowLane = false, globalCap = SpeedLimit.mbps(5))
+
+    assertEquals(ReasonAction.SpeedSettings, reason?.action)
+    assertEquals("Limited by the global limit (5 MB/s)", reason?.text)
+  }
+
+  @Test
+  fun inspectorReason_unlimitedDownload_isNull() {
+    assertNull(inspectorReason(downloading(), slowLane = false, globalCap = SpeedLimit.Unlimited))
+  }
+
+  @Test
+  fun inspectorReason_queued_explainsTheWaitWithoutChip() {
+    val queued = row("q", DownloadState.Queued)
+
+    val reason = inspectorReason(queued, slowLane = false, globalCap = SpeedLimit.Unlimited)
+
+    assertEquals(queued.content.detail, reason?.text)
+    assertNull(reason?.action)
+  }
+
+  @Test
+  fun inspectorReason_pausedWithoutResumeSupport_saysItStartsOver() {
+    val source = ResolvedSource("https://example.com/a.bin", "http", 100, false, "a.bin", 1)
+    val paused = row(
+      id = "p",
+      state = DownloadState.Paused(DownloadProgress(40, 100)),
+      request = DownloadRequest("https://example.com/a.bin", resolvedSource = source),
+    )
+
+    val reason = inspectorReason(paused, slowLane = false, globalCap = SpeedLimit.Unlimited)
+
+    assertEquals("Paused · resuming starts over", reason?.text)
+  }
+
+  @Test
+  fun inspectorReason_completedFileMissing_warnsOnlyOnLocalDevices() {
+    val state = DownloadState.Completed("/tmp/a.bin", 100)
+    val local = row("a", state)
+    val remote = row("b", state, device = DeviceInfo("NAS", RowCapabilities.remote()))
+
+    val reason = inspectorReason(local, false, SpeedLimit.Unlimited, fileMissing = true)
+
+    assertEquals(InspectorReason("File moved or deleted", warning = true), reason)
+    assertNull(inspectorReason(remote, false, SpeedLimit.Unlimited, fileMissing = true))
+    assertNull(inspectorReason(local, false, SpeedLimit.Unlimited))
+  }
+
+  @Test
+  fun metricParts_downloading_listsShareBytesSpeedTimeLeftAndFinish() {
+    val row = row(
+      id = "a",
+      state = DownloadState.Downloading(DownloadProgress(42 * MB, 100 * MB, MB)),
+      speedSamples = listOf(MB),
+    )
+
+    val parts = metricParts(row, start, TimeZone.UTC)
+
+    assertEquals(listOf("42%", "42.0 of 100 MB", "1.0 MB/s", "58s left", "done ≈ 12:00"), parts)
+  }
+
+  @Test
+  fun metricParts_pausedBelowAUnitOfTheSize_writesBothUnits() {
+    val state = DownloadState.Paused(DownloadProgress(497_025_024, 1_342_177_280))
+
+    val parts = metricParts(row("p", state), start, TimeZone.UTC)
+
+    assertEquals(listOf("37%", "474 MB of 1.3 GB"), parts)
+  }
+
+  @Test
+  fun metricParts_completed_leavesTheSummaryToTheSublineAndDetails() {
+    val state = DownloadState.Completed("/tmp/a.bin", 100 * MB, downloadTime = 10.seconds)
+
+    assertEquals(emptyList(), metricParts(row("a", state), start, TimeZone.UTC))
+  }
+
+  @Test
+  fun metricParts_queuedWithoutKnownSize_isEmpty() {
+    assertEquals(emptyList(), metricParts(row("q", DownloadState.Queued), start, TimeZone.UTC))
+  }
+
+  @Test
+  fun addedDetail_earlierDay_addsTheTime() {
+    val today = row("t", DownloadState.Queued, createdAt = start - 2.hours)
+    val yesterday = row("y", DownloadState.Queued, createdAt = start - 18.hours)
+
+    assertEquals("Today 10:00", addedDetail(today, start, TimeZone.UTC))
+    assertEquals("Yesterday 18:00", addedDetail(yesterday, start, TimeZone.UTC))
+  }
+
+  @Test
+  fun sourceLabel_eachKindOfLink_namesProtocolAndHost() {
+    assertEquals(
+      "HTTPS · releases.ubuntu.com",
+      sourceLabel(DownloadRequest("https://releases.ubuntu.com/a.iso"), isTorrent = false)
+    )
+    assertEquals(
+      "FTP · ftp.example.org",
+      sourceLabel(DownloadRequest("ftp://user:pw@ftp.example.org/a.bin"), isTorrent = false)
+    )
+    assertEquals(
+      "BitTorrent · magnet",
+      sourceLabel(DownloadRequest("magnet:?xt=urn:btih:abc"), isTorrent = true)
+    )
+    assertEquals(
+      "BitTorrent · torrent file",
+      sourceLabel(DownloadRequest("https://example.com/a.torrent?x=1"), isTorrent = true)
+    )
+  }
+
+  @Test
+  fun linkParts_signedLink_keepsTheQueryApart() {
+    val parts = linkParts("https://cdn.example.com:8443/files/a.iso?X-Amz-Signature=abc#top")
+
+    assertEquals("cdn.example.com:8443", parts.host)
+    assertEquals("/files/a.iso", parts.path)
+    assertEquals("?X-Amz-Signature=abc#top", parts.query)
+  }
+
+  @Test
+  fun linkParts_credentials_neverShowThePassword() {
+    val parts = linkParts("ftp://alex:secret@ftp.example.org/pub/a.bin")
+
+    assertEquals("ftp.example.org", parts.host)
+    assertEquals("ftp://alex:***@ftp.example.org/pub/a.bin", parts.full)
+    assertNull(parts.query)
+  }
+
+  @Test
+  fun linkParts_magnet_keepsTheFirstParameterInView() {
+    val parts = linkParts("magnet:?xt=urn:btih:abc&dn=a.iso&tr=udp%3A%2F%2Ft")
+
+    assertNull(parts.host)
+    assertEquals("magnet:?xt=urn:btih:abc", parts.path)
+    assertEquals("&dn=a.iso&tr=udp%3A%2F%2Ft", parts.query)
+  }
+
+  @Test
+  fun capturedText_browserWithCookiesAndReferer_saysWhatCameAlong() {
+    val request = DownloadRequest(
+      url = "https://example.com/a.bin",
+      headers = mapOf("Cookie" to "s=1", "Referer" to "https://example.com/", "User-Agent" to "x"),
+      properties = mapOf(TaskOrigin.PROPERTY to "browser"),
+    )
+
+    assertEquals("From the browser, with cookies and referrer", capturedText(request))
+  }
+
+  @Test
+  fun capturedText_headersWithoutOrigin_startsWithThem() {
+    val request = DownloadRequest("https://example.com/a", headers = mapOf("referer" to "x"))
+
+    assertEquals("With referrer", capturedText(request))
+    assertNull(capturedText(DownloadRequest("https://example.com/a")))
+  }
+
+  @Test
+  fun speedPresets_eightMegabytesPerSecond_offersFiveTwoAndOne() {
+    assertEquals(
+      listOf(SpeedLimit.mbps(5), SpeedLimit.mbps(2), SpeedLimit.mbps(1)),
+      speedPresets(8_400 * 1024L)
+    )
+  }
+
+  @Test
+  fun speedPresets_slowerThanTheLadder_offersTheSlowestThree() {
+    assertEquals(
+      listOf(SpeedLimit.kbps(256), SpeedLimit.kbps(128), SpeedLimit.kbps(64)),
+      speedPresets(50 * 1024L)
+    )
+  }
+
+  @Test
+  fun speedPresets_unknownSpeed_offersFiveTwoAndOne() {
+    val expected = listOf(SpeedLimit.mbps(5), SpeedLimit.mbps(2), SpeedLimit.mbps(1))
+    assertEquals(expected, speedPresets(null))
+    assertEquals(expected, speedPresets(0))
+  }
+
+  @Test
+  fun preemptionVictim_freeSlot_isNull() {
+    assertNull(preemptionVictim(listOf(running("a", DownloadPriority.LOW)), slots = 2))
+  }
+
+  @Test
+  fun preemptionVictim_selectedRowRunning_takesASlotButIsNeverPaused() {
+    val selected = running("mine", DownloadPriority.LOW)
+    val other = running("other", DownloadPriority.NORMAL)
+
+    val starting = setOf(selected.key)
+
+    val victim = preemptionVictim(listOf(selected, other), slots = 2, starting = starting)
+
+    assertEquals("other.bin", victim?.name)
+  }
+
+  @Test
+  fun preemptionVictim_slotsTaken_firstWithTheLowestPriority() {
+    val running = listOf(
+      running("a", DownloadPriority.HIGH),
+      running("b", DownloadPriority.LOW),
+      running("c", DownloadPriority.LOW),
+      running("d", DownloadPriority.URGENT)
+    )
+
+    assertEquals("b.bin", preemptionVictim(running, slots = 4)?.name)
+    assertNull(preemptionVictim(listOf(running("u", DownloadPriority.URGENT)), slots = 1))
+  }
+
+  @Test
+  fun urgentNote_victim_namesItAndItsPriority() {
+    val victim = running("debian-12", DownloadPriority.LOW)
+
+    assertEquals("Starts now; may pause \"debian-12.bin\" (Low)", urgentNote(victim))
+    assertEquals("Starts 2 now; may pause \"debian-12.bin\" (Low)", urgentNote(victim, 2))
+  }
+
+  @Test
+  fun rescheduleNote_tonight_saysItPausesFirst() {
+    val at = DownloadSchedule.AtTime(start + 13.hours)
+
+    assertEquals("Pauses now and starts 01:00 tonight", rescheduleNote(at, start, TimeZone.UTC))
+  }
+
+  @Test
+  fun sharedSettings_differentValues_leaveThemOut() {
+    val a = row("a", DownloadState.Queued, request = DownloadRequest("https://e.com/a"))
+    val b = row(
+      id = "b",
+      state = DownloadState.Queued,
+      request = DownloadRequest("https://e.com/b", speedLimit = SpeedLimit.mbps(1)),
+    )
+
+    val shared = SharedSettings.of(listOf(a, b))
+
+    assertNull(shared.speedLimit)
+    assertEquals(DownloadPriority.NORMAL, shared.priority)
+    assertEquals(0, shared.connections)
+  }
+
+  @Test
+  fun sharedSettings_scheduledRow_showsTheTimeItWaitsFor() {
+    val at = DownloadSchedule.AtTime(start + 9.hours)
+    val scheduled = row("s", DownloadState.Scheduled(at))
+    val started = row(
+      id = "r",
+      state = DownloadState.Downloading(DownloadProgress(1, 10, 1)),
+      request = DownloadRequest("https://e.com/r", schedule = DownloadSchedule.AtTime(start)),
+    )
+
+    assertEquals(at, SharedSettings.of(listOf(scheduled)).schedule)
+    assertEquals(DownloadSchedule.Immediate, SharedSettings.of(listOf(started)).schedule)
+  }
+
+  @Test
+  fun scopeSummary_busyDevice_countsSlotsSitesConnectionsAndUpNext() {
+    val config = DownloadConfig(maxConcurrentDownloads = 3, maxConnectionsPerHost = 2)
+    val rows = listOf(
+      segmented("a", "https://one.example/a", unfinished = 4),
+      segmented("b", "https://one.example/b", unfinished = 2),
+      segmented("c", "https://two.example/c", unfinished = 1),
+      row("late", DownloadState.Queued, createdAt = start + 1.minutes),
+      row(
+        id = "high",
+        state = DownloadState.Queued,
+        createdAt = start + 2.minutes,
+        request = DownloadRequest("https://e.com/high", priority = DownloadPriority.HIGH),
+      ),
+      row("night", DownloadState.Scheduled(DownloadSchedule.AtTime(start + 9.hours))),
+      row("soon", DownloadState.Scheduled(DownloadSchedule.AtTime(start + 1.hours)))
+    )
+
+    val summary = scopeSummary(rows, config)
+
+    assertEquals(3, summary.running)
+    assertEquals(3, summary.slots)
+    assertEquals(7, summary.connections)
+    assertEquals(3, summary.transfers)
+    val hosts = listOf(HostLoad("one.example", 2, 2), HostLoad("two.example", 1, 2))
+    assertEquals(hosts, summary.hosts)
+    assertEquals(listOf("high", "late", "soon", "night"), summary.upNext.map { it.key.taskId })
+  }
+
+  @Test
+  fun selectionLine_mixedRows_sumsKnownSizesAndSpeeds() {
+    val rows = listOf(
+      row(
+        id = "a",
+        state = DownloadState.Downloading(DownloadProgress(0, 2 * GB, MB)),
+        speedSamples = listOf(MB),
+      ),
+      row("b", DownloadState.Completed("/tmp/b", GB)),
+      row("c", DownloadState.Queued)
+    )
+
+    assertEquals("3 selected · 3.0 GB · 1.0 MB/s", selectionLine(rows))
+  }
+
+  private fun downloading(limit: SpeedLimit = SpeedLimit.Unlimited): TaskRow = row(
+    id = "d",
+    state = DownloadState.Downloading(DownloadProgress(10, 100, 10)),
+    request = DownloadRequest("https://example.com/d.bin", speedLimit = limit),
+  )
+
+  private fun stalled(): TaskRow {
+    val base = downloading()
+    val context = RowContext(base.device, start, TimeZone.UTC)
+    val content = rowContent(base.request, base.state, start, context, stalledFor = 12.seconds)
+    return base.copy(content = content)
+  }
+
+  private fun running(id: String, priority: DownloadPriority): TaskRow = row(
+    id = id,
+    state = DownloadState.Downloading(DownloadProgress(1, 10, 1)),
+    request = DownloadRequest("https://example.com/$id.bin", priority = priority),
+  )
+
+  private fun segmented(id: String, url: String, unfinished: Int): TaskRow {
+    val segments = List(unfinished + 1) { index ->
+      Segment(index, index * 100L, index * 100L + 99, if (index == 0) 100 else 10)
+    }
+    val state = DownloadState.Downloading(DownloadProgress(0, 1000, 1))
+    return row(id, state, request = DownloadRequest(url)).copy(segments = segments)
+  }
+
+  private companion object {
+    const val MB = 1L shl 20
+    const val GB = 1L shl 30
+  }
+}

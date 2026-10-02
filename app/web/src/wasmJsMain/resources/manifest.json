@@ -17,6 +17,14 @@
       "purpose": "maskable"
     }
   ],
+  "protocol_handlers": [
+    { "protocol": "magnet", "url": "./?add=%s" }
+  ],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": { "url": "add", "text": "text" }
+  },
   "file_handlers": [
     {
       "action": "./",

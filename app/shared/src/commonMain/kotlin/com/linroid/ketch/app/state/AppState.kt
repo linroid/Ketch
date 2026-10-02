@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.state
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -20,7 +21,6 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.feedback.ActivityEvent
-import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
@@ -34,12 +34,14 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.IntakePreferences
+import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -72,6 +74,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 sealed interface DiscoveryState {
@@ -113,6 +116,7 @@ val InstanceEntry.deviceId: String
  * @param scope runs the commands; it should use a `SupervisorJob` and the main dispatcher.
  * @param speedMode speed mode of the embedded device, owned by the host, such as the service whose
  *   notification switches it; `null` when the host keeps none.
+ * @property clock current time of the task list, the speed history and the time labels.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppState(
@@ -123,6 +127,7 @@ class AppState(
   private val incoming: IncomingDownloads = IncomingDownloads(),
   val messages: MessageCenter = MessageCenter(),
   val speedMode: SpeedModeController? = null,
+  val clock: Clock = Clock.System,
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()
@@ -206,13 +211,6 @@ class AppState(
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
 
-  private var latestError by mutableStateOf<AppMessage?>(null)
-
-  /** The newest error on screen, as the error banner showed it before toasts replaced it. */
-  @Deprecated("Read the Error messages of messages instead.")
-  val errorMessage: String?
-    get() = latestError?.let { listOfNotNull(it.title, it.detail).joinToString(": ") }
-
   /** State of the current AI discovery search. */
   val aiDiscoverState: AiDiscoverState get() = aiDiscover.state
 
@@ -229,6 +227,20 @@ class AppState(
 
   /** Settings page to show, or `null` while Settings is closed. */
   var settingsRequest by mutableStateOf<SettingsTarget?>(null)
+    private set
+
+  /**
+   * Counts the Settings requests, so asking again for the page Settings opened at goes back to
+   * it after the user moved on, although the request is the same.
+   */
+  var settingsRequests by mutableIntStateOf(0)
+    private set
+
+  /**
+   * Whether the keyboard shortcut sheet was asked for, such as from Settings; the shell shows it
+   * and clears this with [shortcutsShown].
+   */
+  var shortcutsRequested by mutableStateOf(false)
     private set
 
   /** A Discover search the shell should navigate to, cleared with [discoverRequestHandled]. */
@@ -309,10 +321,17 @@ class AppState(
     query = searchState.flow,
     arrangement = arrangementState.flow,
     frozen = frozenState.flow,
+    clock = clock,
   )
 
   /** Speed of each task once a second, for the inspector's Activity chart. */
-  val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.rows, scope)
+  val speedHistory: SpeedHistoryStore = SpeedHistoryStore(taskList.rows, scope, clock)
+
+  /**
+   * The add sheet's sessions. They run in the app scope, so adding, or a torrent's file list
+   * left to load in the background, outlives the sheet and the screen that showed it.
+   */
+  val intake: IntakeController by lazy { IntakeController(this, scope) }
 
   /** Speed, counts, speed limit, free space and health of the active device. */
   val pulse: PulseModel = PulseModel(
@@ -357,23 +376,6 @@ class AppState(
       }
     }
     scope.launch {
-      connectionState.collect { state ->
-        if (state is ConnectionState.Unauthorized) {
-          val instance =
-            activeInstance.value as? RemoteInstance
-          if (instance != null) {
-            unauthorizedInstance = instance
-            showAddRemoteDialog = true
-          }
-        }
-      }
-    }
-    scope.launch {
-      messages.active.collect { active ->
-        latestError = active.lastOrNull { it.level == MessageLevel.Error }
-      }
-    }
-    scope.launch {
       activeInstance.collect {
         instanceSettings = settingsForActive()
         instanceSettings.loadDownload()
@@ -401,8 +403,16 @@ class AppState(
         local = appSettings.takeIf { entry is EmbeddedInstance },
         scope = scope,
         applyTorrent = instanceManager::applyTorrentSettings,
+        savedSpeedLimit = { config -> standingCap(config.speedLimit) },
       )
     }
+
+  // The embedded device's cap when the slow lane lets go: its live limit at full speed, else
+  // the one the speed mode keeps for then.
+  private fun standingCap(live: SpeedLimit): SpeedLimit {
+    val settings = speedMode?.settings?.value ?: return live
+    return if (settings.mode == SpeedLimitMode.Full) live else settings.standard
+  }
 
   private fun settingsForActive(): InstanceSettingsController =
     activeInstance.value?.let(::settingsFor)
@@ -447,11 +457,22 @@ class AppState(
   /** Opens Settings at [target]. */
   fun openSettings(target: SettingsTarget = SettingsTarget(SettingsTarget.Page.General)) {
     settingsRequest = target
+    settingsRequests++
   }
 
   /** Closes Settings. */
   fun closeSettings() {
     settingsRequest = null
+  }
+
+  /** Asks the shell to show the keyboard shortcut sheet, as `⌘/` does. */
+  fun showShortcuts() {
+    shortcutsRequested = true
+  }
+
+  /** Marks [shortcutsRequested] as shown. */
+  fun shortcutsShown() {
+    shortcutsRequested = false
   }
 
   /** Fills Discover with [request], starts the search and asks the shell to show Discover. */
@@ -626,8 +647,11 @@ class AppState(
         return@launch
       }
       val defaults = appSettings.ui.intake[entry.deviceId] ?: IntakePreferences()
-      val destination = defaults.folder?.let { folderDestination(entry, it) }
+      val folder = defaults.folder?.let { folderDestination(entry, it) }
       val requests = urls.mapNotNull { url ->
+        // Torrents write their own files, which an Android content:// folder cannot take.
+        val torrent = LinkKind.of(url).let { it == LinkKind.Magnet || it == LinkKind.TorrentFile }
+        val destination = folder?.takeUnless { torrent && it.value.startsWith("content://") }
         try {
           DownloadRequest(
             url = url,
@@ -746,6 +770,13 @@ class AppState(
       }
     }
   }
+
+  /**
+   * Runs [block] in the app scope, so closing the control that started it cancels neither the
+   * command nor the Undo it offers.
+   */
+  internal fun launchCommand(block: suspend CoroutineScope.() -> Unit): Job =
+    scope.launch(block = block)
 
   /**
    * Runs [block] on [task] in the app scope, so leaving the screen never cancels it.
@@ -1076,16 +1107,6 @@ class AppState(
 
   fun resetAiDiscover() {
     aiDiscover.reset()
-  }
-
-  /**
-   * Dismisses every error message still on screen, so the banner clears at once instead of
-   * showing the next older error.
-   */
-  fun dismissError() {
-    messages.active.value.filter { it.level == MessageLevel.Error }
-      .forEach { messages.dismiss(it.id) }
-    latestError = null
   }
 
   /** Reports [event] from the host's activity monitor as a message. */

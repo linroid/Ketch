@@ -24,7 +24,10 @@ import kotlinx.serialization.Serializable
  * @property headers custom HTTP headers to include in every request
  *   (HEAD and GET) for this download.
  * @property properties arbitrary key-value pairs for use by custom
- *   extensions. Ketch itself does not read these values.
+ *   extensions. The engine does not read these values. By convention
+ *   `ketch.origin` names where a download was added from (`browser`,
+ *   `discover`, `agent`, `app` or `cli`), which the apps show and filter
+ *   by. They never reach [KetchApi.resolve], whose properties are headers.
  * @property speedLimit per-task speed limit. Applies in addition to the
  *   global [DownloadConfig.speedLimit], so the download runs at no more
  *   than the lower of the two. It cannot raise a download above the

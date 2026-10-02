@@ -1,6 +1,7 @@
 package com.linroid.ketch.app
 
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppState
@@ -8,6 +9,7 @@ import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
+import com.linroid.ketch.app.state.isPairingLink
 import com.linroid.ketch.app.state.ResolveState
 import com.linroid.ketch.app.state.torrentFileDownload
 import kotlinx.coroutines.flow.first
@@ -145,7 +147,8 @@ class IncomingDownloadsTest {
       runCurrent()
 
       assertFalse(state.showAddDialog)
-      assertEquals("Couldn't open a.torrent: The file is empty", state.errorMessage)
+      val error = state.messages.active.value.single { it.level == MessageLevel.Error }
+      assertEquals("Couldn't open a.torrent" to "The file is empty", error.title to error.detail)
     }
   }
 
@@ -208,6 +211,69 @@ class IncomingDownloadsTest {
 
     assertFalse(incoming.offerText("ubuntu 24.04 iso", LinkSource.Share))
     assertEquals(emptyList(), incoming.pendingLinks.value)
+  }
+
+  @Test
+  fun offerLink_magnetLink_offersItAsLinks() {
+    val incoming = IncomingDownloads()
+
+    assertTrue(incoming.offerLink(" magnet:?xt=urn:btih:abc ", LinkSource.OpenUrl))
+    assertEquals(
+      listOf(IncomingDownload.Links(listOf("magnet:?xt=urn:btih:abc"), LinkSource.OpenUrl)),
+      incoming.pendingLinks.value,
+    )
+    assertEquals(emptyList(), incoming.pendingPairings.value)
+  }
+
+  @Test
+  fun offerLink_pairingLink_offersPairingWithoutShowingItsToken() {
+    val incoming = IncomingDownloads()
+    val link = "ketch://pair?host=192.168.1.20&port=8642&name=Lins-MacBook-Pro#token=s3cret"
+
+    assertTrue(incoming.offerLink(link, LinkSource.OpenUrl))
+    // Scanning the same code twice queues it once.
+    assertTrue(incoming.offerLink(link, LinkSource.OpenUrl))
+
+    val pairing = incoming.pendingPairings.value.single()
+    assertEquals(link, pairing.link)
+    assertEquals("ketch://pair?host=192.168.1.20&port=8642&name=Lins-MacBook-Pro", pairing.label)
+    assertFalse("s3cret" in pairing.toString())
+    assertEquals(emptyList(), incoming.pendingLinks.value)
+    incoming.complete(pairing)
+    assertEquals(emptyList(), incoming.pendingPairings.value)
+  }
+
+  @Test
+  fun offerLink_unknownLink_offersNothing() {
+    val incoming = IncomingDownloads()
+
+    assertFalse(incoming.offerLink("ketch://settings", LinkSource.OpenUrl))
+    assertFalse(incoming.offerLink("ketch://pairing?host=a", LinkSource.OpenUrl))
+    assertFalse(incoming.offerLink("mailto:someone@example.com", LinkSource.OpenUrl))
+    assertEquals(emptyList(), incoming.pendingLinks.value)
+    assertEquals(emptyList(), incoming.pendingPairings.value)
+  }
+
+  @Test
+  fun offerText_sharedPairingLink_offersPairing() {
+    val incoming = IncomingDownloads()
+    val link = "ketch://pair?host=nas.local&port=8642#token=t"
+
+    assertTrue(incoming.offerText("Pair with my NAS:\n$link", LinkSource.Share))
+    assertEquals(
+      listOf(IncomingDownload.Pairing(link)),
+      incoming.pendingPairings.value,
+    )
+    assertEquals(emptyList(), incoming.pendingLinks.value)
+  }
+
+  @Test
+  fun isPairingLink_links_matchOnlyThePairPath() {
+    assertTrue(isPairingLink("ketch://pair?host=a&port=1"))
+    assertTrue(isPairingLink(" KETCH://PAIR#token=t"))
+    assertTrue(isPairingLink("ketch://pair"))
+    assertFalse(isPairingLink("ketch://pairing"))
+    assertFalse(isPairingLink("https://ketch.app/pair"))
   }
 
   /** Runs [block] with an embedded [api], or in remote-only mode with none connected. */

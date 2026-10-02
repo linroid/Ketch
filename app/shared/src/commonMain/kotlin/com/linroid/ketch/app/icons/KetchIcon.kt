@@ -33,7 +33,9 @@ enum class KetchIcon(internal val data: IconData) {
   )),
   Filter(IconData.strokes("M3 5h14", "M6 10h8", "M9 15h2")),
   Link(IconData.strokes(
-    "M8 12l4-4", "M7 13l-2-2a3 3 0 0 1 4-4l1 1", "M13 7l2 2a3 3 0 0 1 -4 4l-1-1"
+    "M8.23 11.77l3.54-3.54",
+    "M8.59 7.17l2.82-2.83a3 3 0 0 1 4.24 4.24L14.24 10",
+    "M11.41 12.83l-2.82 2.83a3 3 0 0 1 -4.24 -4.24L5.76 10"
   )),
   Folder(IconData.strokes(FOLDER)),
   Settings(IconData.paths(

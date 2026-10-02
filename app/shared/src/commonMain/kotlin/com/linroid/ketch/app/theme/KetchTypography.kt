@@ -54,43 +54,7 @@ data class KetchTypography(
   val numeralS: TextStyle,
   val mono: TextStyle,
   val monoS: TextStyle,
-) {
-  @Deprecated("Use largeTitle.", ReplaceWith("largeTitle"))
-  val displayLarge: TextStyle get() = largeTitle
-
-  @Deprecated("Use pageTitle.", ReplaceWith("pageTitle"))
-  val displayMedium: TextStyle get() = pageTitle
-
-  @Deprecated("Use titleL.", ReplaceWith("titleL"))
-  val displaySmall: TextStyle get() = titleL
-
-  @Deprecated("Use body.", ReplaceWith("body"))
-  val bodyLarge: TextStyle get() = body
-
-  @Deprecated("Use bodyS.", ReplaceWith("bodyS"))
-  val bodyMedium: TextStyle get() = bodyS
-
-  @Deprecated("Use caption.", ReplaceWith("caption"))
-  val bodySmall: TextStyle get() = caption
-
-  @Deprecated("Use label.", ReplaceWith("label"))
-  val labelLarge: TextStyle get() = label
-
-  @Deprecated("Use labelS.", ReplaceWith("labelS"))
-  val labelMedium: TextStyle get() = labelS
-
-  @Deprecated("Use eyebrow.", ReplaceWith("eyebrow"))
-  val labelSmall: TextStyle get() = eyebrow
-
-  @Deprecated("Use numeral; speeds and sizes are never monospace.", ReplaceWith("numeral"))
-  val monoMedium: TextStyle get() = numeral
-
-  @Deprecated("Use mono.", ReplaceWith("mono"))
-  val monoSmall: TextStyle get() = mono
-
-  @Deprecated("Use monoS.", ReplaceWith("monoS"))
-  val monoXSmall: TextStyle get() = monoS
-}
+)
 
 /**
  * [text] as an eyebrow label shows it, in uppercase. Text styles cannot change case, so

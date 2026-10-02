@@ -58,40 +58,7 @@ data class KetchSpacing(
   val rowPadding: Dp = 12.dp,
   val cellPadding: Dp = 8.dp,
   val sectionGap: Dp = 24.dp,
-) {
-  @Deprecated("Use s0_5.", ReplaceWith("s0_5"))
-  val xxs: Dp get() = s0_5
-
-  @Deprecated("Use s1.", ReplaceWith("s1"))
-  val xs: Dp get() = s1
-
-  @Deprecated("Off the 4-point grid; use s1 or s2.")
-  val sm: Dp get() = 6.dp
-
-  @Deprecated("Use s2.", ReplaceWith("s2"))
-  val md: Dp get() = s2
-
-  @Deprecated("Use s3.", ReplaceWith("s3"))
-  val lg: Dp get() = s3
-
-  @Deprecated("Use s4.", ReplaceWith("s4"))
-  val xl: Dp get() = s4
-
-  @Deprecated("Use s5.", ReplaceWith("s5"))
-  val xxl: Dp get() = s5
-
-  @Deprecated("Use s6.", ReplaceWith("s6"))
-  val xxxl: Dp get() = s6
-
-  @Deprecated("Use s8.", ReplaceWith("s8"))
-  val x4l: Dp get() = s8
-
-  @Deprecated("Use s10.", ReplaceWith("s10"))
-  val x5l: Dp get() = s10
-
-  @Deprecated("Use s16.", ReplaceWith("s16"))
-  val x6l: Dp get() = s16
-}
+)
 
 /** The spacing scale. */
 fun ketchSpacing(): KetchSpacing = KetchSpacing()
