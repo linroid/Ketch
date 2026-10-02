@@ -24,6 +24,14 @@
 
 A full-featured Kotlin Multiplatform download manager — run locally, remotely, or embedded in your app. Supports Android, iOS, Desktop, and Web.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="art/showcase-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="art/showcase-light.png">
+    <img alt="Ketch on the desktop, Android, iOS and the command line: the downloads table with each download split into live connection lanes, the devices on Android, a download's connections on iOS, and ketch in a terminal" src="art/showcase-light.png" width="100%">
+  </picture>
+</p>
+
 - **Embed it** — Add downloads to your Android, iOS, or Desktop app with a simple API
 - **Run it as a daemon** — Self-hosted download server with REST API and real-time SSE events
 - **Control it remotely** — Manage a daemon from any client (desktop or mobile app, or the web UI)

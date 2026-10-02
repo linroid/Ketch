@@ -102,6 +102,16 @@ desktop, medium and phone sizes, in light and dark; `snapshot` renders any compo
 surfaces through `AppScenario` (`inspect`, `select`, `openAddSheet`, `openSettings`, `showTab`) and
 pressing keys or hovering through its `scene`.
 
+The README showcase (`art/showcase-light.png`, `art/showcase-dark.png`) is the
+`ShowcaseSnapshots` scenario: the desktop window, two phones and a terminal over brand-free
+`ShowcaseData`. `art/render-showcase.sh` renders it
+(`./gradlew :app:shared:jvmTest -Psnapshots --tests '*ShowcaseSnapshots*'`, about 2.5 minutes),
+copies `showcase-{light,dark}.png` from `app/shared/build/snapshots/` into `art/` and shrinks
+them losslessly with `oxipng` when it is installed. Do not palette-quantize them: that bands the
+background. The run also writes `-desktop`, `-android`, `-ios` and `-2x` files to review; only
+the two images are committed. Regenerate them when a release changes the UI, not on every UI
+commit.
+
 ## Other Suites
 
 - iOS simulator tests of `library:core`, `library:ftp` and `library:torrent` are skipped unless
