@@ -917,18 +917,8 @@ class AppState(
 
   /** Resumes every paused task on each of [targets], the shown devices by default. */
   fun resumeAll(targets: List<InstanceEntry> = shownInstances.value): Job =
-    scope.launch {
-      val tasks = targets.flatMap { entry ->
-        visibleTasks(entry).filter { it.state.value is DownloadState.Paused }.map { entry to it }
-      }
-      if (tasks.isEmpty()) return@launch
-      val results = runEach(tasks) { (_, task) -> task.resume() }
-      reportBatch(
-        verb = "Resumed",
-        command = "resume",
-        results = results.map { (pair, error) -> pair.second to error },
-        devices = tasks.distinctBy { it.first.deviceId }.size,
-      )
+    runOnAll(targets, { it is DownloadState.Paused }, "Resumed", "resume") { _, task ->
+      task.resume()
     }
 
   /**
@@ -937,19 +927,7 @@ class AppState(
    * refused to resume) start over.
    */
   fun retryFailed(targets: List<InstanceEntry> = shownInstances.value): Job =
-    scope.launch {
-      val tasks = targets.flatMap { entry ->
-        visibleTasks(entry).filter { it.state.value is DownloadState.Failed }.map { entry to it }
-      }
-      if (tasks.isEmpty()) return@launch
-      val results = runEach(tasks) { (entry, task) -> retryOn(entry, task) }
-      reportBatch(
-        verb = "Retrying",
-        command = "retry",
-        results = results.map { (pair, error) -> pair.second to error },
-        devices = tasks.distinctBy { it.first.deviceId }.size,
-      )
-    }
+    runOnAll(targets, { it is DownloadState.Failed }, "Retrying", "retry", ::retryOn)
 
   /**
    * Removes the finished tasks of each of [targets] (the shown devices by default) from the
@@ -1586,17 +1564,29 @@ class AppState(
     )
   }
 
-  private fun reportBatch(
+  /**
+   * Runs [action] on each task of [targets] whose state [matches], all at once, and reports them
+   * in one message, such as "Resumed 3 downloads on 2 devices".
+   */
+  private fun runOnAll(
+    targets: List<InstanceEntry>,
+    matches: (DownloadState) -> Boolean,
     verb: String,
     command: String,
-    results: List<Pair<DownloadTask, Throwable?>>,
-    devices: Int,
-  ) {
+    action: suspend (InstanceEntry, DownloadTask) -> Unit,
+  ): Job = scope.launch {
+    val tasks = targets.flatMap { entry ->
+      visibleTasks(entry).filter { matches(it.state.value) }.map { entry to it }
+    }
+    if (tasks.isEmpty()) return@launch
+    val results = runEach(tasks) { (entry, task) -> action(entry, task) }
+      .map { (pair, error) -> pair.second to error }
+    val devices = tasks.distinctBy { it.first.deviceId }.size
     val done = results.count { it.second == null }
     val failures = results.mapNotNull { (task, error) -> error?.let { task to it } }
     if (done == 0) {
       reportFailures(command, results)
-      return
+      return@launch
     }
     val title = buildString {
       append("$verb ${downloads(done)}")
