@@ -39,7 +39,6 @@ class InstanceManagerServerTest {
     val manager = manager(saved)
     manager.startServer()
     assertEquals(ServerState.Running(saved), manager.serverState.value)
-    assertEquals(9000, (manager.serverState.value as ServerState.Running).port)
     manager.close()
   }
 

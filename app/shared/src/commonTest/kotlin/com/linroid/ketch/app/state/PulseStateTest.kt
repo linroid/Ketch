@@ -169,15 +169,6 @@ class PulseStateTest {
   private fun PulseState.sentenceAtNow(): String = sentence(now, TimeZone.UTC)
 
   @Test
-  fun of_everyState_countsMatchStatusFilter() {
-    val counts = PulseCounts.of(allStates)
-
-    StatusFilter.entries.forEach { filter ->
-      assertEquals(allStates.count(filter::matches), counts.count(filter), "count of $filter")
-    }
-  }
-
-  @Test
   fun state_tasksInEveryState_countsMatchStatusFilter() = runTest {
     val tasks = allStates.mapIndexed { index, state -> FakeTask("t$index", state) }
     val model = model(FakeDevice("local", tasks))
