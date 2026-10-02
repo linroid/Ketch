@@ -20,3 +20,20 @@ internal object NoOpMdnsDiscoverer : MdnsDiscoverer {
 }
 
 internal expect fun createMdnsDiscoverer(): MdnsDiscoverer
+
+/**
+ * Which of the [addresses] a found server resolved to the app connects to: an IPv4 one first,
+ * since a link-local IPv6 address only works with an interface name, then any other one.
+ */
+internal fun preferredAddress(addresses: List<String>): String? =
+  addresses.firstOrNull(::isIpv4)
+    ?: addresses.firstOrNull { !it.startsWith(LINK_LOCAL_PREFIX, ignoreCase = true) }
+    ?: addresses.firstOrNull()
+
+private fun isIpv4(address: String): Boolean {
+  val parts = address.split('.')
+  return parts.size == 4 && parts.all { part -> part.toIntOrNull()?.let { it in 0..255 } == true }
+}
+
+private const val LINK_LOCAL_PREFIX = "fe80:"
+
