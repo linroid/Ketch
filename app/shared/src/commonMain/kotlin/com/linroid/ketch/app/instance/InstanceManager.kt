@@ -288,23 +288,13 @@ class InstanceManager(
   }
 
   /**
-   * Add a remote server to the instance list.
+   * Adds the remote device [config] describes to the instance list.
    * Does NOT activate it -- call [switchTo] afterward. A watched device connects at once.
    *
-   * @param name the device's name, such as the one a [DiscoveredServer] announces; generic and
-   *   blank names are dropped (see [deviceNameOrNull]).
-   * @return the new device, or the one already configured at [host] and [port].
-   */
-  fun addRemote(
-    host: String,
-    port: Int = 8642,
-    token: String? = null,
-    name: String? = null,
-  ): RemoteInstance =
-    addRemote(RemoteConfig(host = host, port = port, apiToken = token, name = name))
-
-  /**
-   * Adds the remote device [config] describes, like [addRemote] with its host and port.
+   * [RemoteConfig.name] is the device's name, such as the one a [DiscoveredServer] announces;
+   * generic and blank names are dropped (see [deviceNameOrNull]).
+   *
+   * @return the new device, or the one already configured at its host and port.
    */
   fun addRemote(config: RemoteConfig): RemoteInstance {
     val entry = add(config)

@@ -331,7 +331,7 @@ class SpeedHistoryStoreTest {
 
     assertEquals(
       listOf("Added", "Started", "Paused"),
-      store.timeline(a).map { it.text }
+      store.timelines.value[a].orEmpty().map { it.text }
     )
   }
 

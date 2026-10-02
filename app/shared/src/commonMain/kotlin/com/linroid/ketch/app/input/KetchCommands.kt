@@ -619,8 +619,6 @@ object KetchCommands {
     add(PaletteClose)
   }
 
-  private val commandsById: Map<String, KetchCommand> = all.associateBy { it.id }
-
   /** The command that shows the [filter] tab: ⌘1 for All through ⌘6 for Failed. */
   fun tab(filter: StatusFilter): KetchCommand = tabs[filter.ordinal]
 
@@ -635,9 +633,6 @@ object KetchCommands {
     require(number in 1..9) { "Device number must be 1 to 9, was $number" }
     return intakeTargets[number - 1]
   }
-
-  /** The command with [id], or `null` when there is none, such as a stale palette history id. */
-  fun byId(id: String): KetchCommand? = commandsById[id]
 }
 
 private fun command(

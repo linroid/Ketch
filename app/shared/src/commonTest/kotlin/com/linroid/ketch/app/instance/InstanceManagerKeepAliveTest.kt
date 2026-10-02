@@ -326,8 +326,8 @@ class InstanceManagerKeepAliveTest {
     val fakes = FakeInstanceFactory()
     val manager = manager(fakes, emptyList())
 
-    val added = manager.addRemote("10.0.0.5", name = "Den-PC")
-    val again = manager.addRemote("10.0.0.5")
+    val added = manager.addRemote(RemoteConfig("10.0.0.5", name = "Den-PC"))
+    val again = manager.addRemote(RemoteConfig("10.0.0.5"))
 
     assertEquals("Den-PC", added.label)
     assertSame(added, again)
