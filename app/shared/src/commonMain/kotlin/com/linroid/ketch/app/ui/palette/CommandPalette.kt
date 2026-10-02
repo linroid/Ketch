@@ -41,18 +41,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
@@ -107,6 +111,7 @@ import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.list.FileNameText
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
@@ -114,11 +119,12 @@ import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.ui.shell.shellShortcuts
 import com.linroid.ketch.app.util.formatBytes
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 
 /** Sizes of the command palette. */
 internal object PaletteDefaults {
-  /** Space between the top of the window and the palette, beside the phone's. */
+  /** Space between the top of the window and the palette, except on a phone. */
   val TopOffset: Dp = 72.dp
 
   /** Widest the palette grows. */
@@ -159,7 +165,8 @@ internal object PaletteDefaults {
  * filtering the list or searching Discover. ↑↓ move, ↩ runs, ⌘↩ runs the alternate action,
  * ⌥↩ searches Discover and Esc closes; ⌥⌘1… download a link on that device.
  *
- * It hangs below the top of the window over a scrim; clicking outside closes it.
+ * It hangs below the top of the window over a scrim; clicking outside closes it, and so does the
+ * add sheet opening.
  *
  * @param onCommand runs a global command as its shortcut does; returns whether it ran.
  * @param canRun whether the window runs a global command, so the palette offers it.
@@ -188,6 +195,11 @@ internal fun CommandPalette(
   LaunchedEffect(appear) {
     appear.animateTo(1f, tween(motion.short, easing = motion.easeDecelerate))
   }
+  LaunchedEffect(state) {
+    // The add sheet takes over, also when the menu bar opens it under the palette.
+    snapshotFlow { state.showAddDialog }.first { it }
+    dismiss()
+  }
   Popup(
     popupPositionProvider = WindowOrigin,
     onDismissRequest = { dismiss() },
@@ -215,7 +227,7 @@ internal fun CommandPalette(
         destinations = destinations,
         initialQuery = initialQuery,
         history = history,
-        footer = !compact,
+        wide = !compact,
         modifier = Modifier
           .padding(top = if (compact) spacing.s2 else PaletteDefaults.TopOffset)
           .padding(horizontal = spacing.s4)
@@ -233,7 +245,10 @@ internal fun CommandPalette(
   }
 }
 
-/** The palette's surface: the field, the rows and the key hints, without the popup around it. */
+/**
+ * The palette's surface: the field, the rows and the key hints, without the popup around it.
+ * Only [wide] palettes show key hints, and the whole placeholder.
+ */
 @Composable
 private fun PalettePanel(
   state: AppState,
@@ -244,13 +259,15 @@ private fun PalettePanel(
   modifier: Modifier = Modifier,
   initialQuery: String = "",
   history: PaletteHistory = PaletteHistory.Default,
-  footer: Boolean = true,
+  wide: Boolean = true,
 ) {
   val colors = KetchTheme.colors
   var query by remember {
     mutableStateOf(TextFieldValue(initialQuery, TextRange(0, initialQuery.length)))
   }
   var highlighted by remember { mutableIntStateOf(0) }
+  // Counts the moves of the highlight by key, each of which scrolls the row into view.
+  var keyMoves by remember { mutableIntStateOf(0) }
   val rowCommands = rememberRowCommands(state)
   val source = rememberPaletteSource(state, query.text, canRun, destinations, rowCommands)
   val results = remember(source, history.recent) {
@@ -274,12 +291,23 @@ private fun PalettePanel(
   }
 
   fun handleKey(event: KeyEvent): Boolean {
-    val context = ShortcutContext(overlay = CommandScope.Palette, textFieldFocused = true)
+    val context = ShortcutContext(
+      overlay = CommandScope.Palette,
+      textFieldFocused = true,
+      // ↩ and the arrows that pick an input method's candidate must not run or move a row.
+      composing = query.composition != null,
+    )
     val command = matcher.match(event, context) ?: return false
     val item = items.getOrNull(current)
     when (command) {
-      KetchCommands.PaletteUp -> highlighted = (current - 1).coerceAtLeast(0)
-      KetchCommands.PaletteDown -> highlighted = (current + 1).coerceAtMost(items.lastIndex)
+      KetchCommands.PaletteUp -> {
+        highlighted = (current - 1).coerceAtLeast(0)
+        keyMoves++
+      }
+      KetchCommands.PaletteDown -> {
+        highlighted = (current + 1).coerceIn(0, items.lastIndex.coerceAtLeast(0))
+        keyMoves++
+      }
       KetchCommands.PaletteRun -> item?.let { run(it, alternate = false) }
       KetchCommands.PaletteAlternate -> item?.let { run(it, alternate = true) }
       KetchCommands.PaletteDiscover -> {
@@ -306,7 +334,8 @@ private fun PalettePanel(
 
   LaunchedEffect(focus) { runCatching { focus.requestFocus() } }
   LaunchedEffect(query.text) { listState.scrollToItem(0) }
-  LaunchedEffect(current, results) { revealRow(listState, results, current) }
+  // Only keys scroll: rows that update as downloads run leave a list scrolled by hand alone.
+  LaunchedEffect(keyMoves) { if (keyMoves > 0) revealRow(listState, results, current) }
 
   Column(
     modifier = modifier.ketchSurface(
@@ -321,6 +350,7 @@ private fun PalettePanel(
         if (value.text != query.text) highlighted = 0
         query = value
       },
+      placeholder = if (wide) PLACEHOLDER else SHORT_PLACEHOLDER,
       link = items.firstOrNull()?.provider == PaletteProvider.Links,
       focus = focus,
       onKey = ::handleKey,
@@ -334,13 +364,13 @@ private fun PalettePanel(
         results = results,
         highlighted = current,
         listState = listState,
-        keys = footer,
+        keys = wide,
         onHover = { highlighted = it },
         onRun = { run(it, alternate = false) },
         modifier = Modifier.weight(1f, fill = false),
       )
     }
-    if (footer) {
+    if (wide) {
       Divider()
       // ⌥↩ searches Discover only for text Discover is offered for.
       val discoverable = query.text.isBlank() || items.any { it.action is PaletteAction.Discover }
@@ -381,6 +411,7 @@ private fun rememberPaletteSource(
       number = index + 1,
       active = entry == active,
       line = device?.let(::deviceLine).orEmpty(),
+      reachable = device == null || device.reachable,
     )
   }
   return PaletteSource(
@@ -397,6 +428,7 @@ private fun rememberPaletteSource(
     speed = PaletteSpeed(
       modes = controller != null,
       slowLane = mode.isSlowLane,
+      rules = mode is SpeedMode.Auto,
       slowLaneSpeed = controller?.slowLaneLimit,
       cap = state.instanceSettings.download?.speedLimit ?: SpeedLimit.Unlimited,
     ),
@@ -431,10 +463,16 @@ private fun deviceLine(device: DevicePresence): String = when {
   else -> "Idle"
 }
 
+// Offline or refused for want of a token, as [deviceLine] reads it; a device the app does not
+// keep connected may still take a download.
+private val DevicePresence.reachable: Boolean
+  get() = health != DeviceHealth.Unauthorized && !(connected && health is DeviceHealth.Offline)
+
 @Composable
 private fun PaletteInput(
   value: TextFieldValue,
   onValueChange: (TextFieldValue) -> Unit,
+  placeholder: String,
   link: Boolean,
   focus: FocusRequester,
   onKey: (KeyEvent) -> Boolean,
@@ -476,7 +514,7 @@ private fun PaletteInput(
         Box(contentAlignment = Alignment.CenterStart) {
           if (value.text.isEmpty()) {
             Text(
-              text = "Paste a link, search downloads, or type a command",
+              text = placeholder,
               style = style,
               color = colors.textTertiary,
               maxLines = 1,
@@ -511,10 +549,13 @@ private fun PaletteList(
 ) {
   val spacing = KetchTheme.spacing
   val rowHeight = paletteRowHeight()
+  val mouse = remember { MouseTracker() }
   LazyColumn(
     state = listState,
     contentPadding = PaddingValues(spacing.s2),
-    modifier = modifier.heightIn(max = rowHeight * PaletteDefaults.VISIBLE_ROWS + spacing.s4),
+    modifier = modifier
+      .heightIn(max = rowHeight * PaletteDefaults.VISIBLE_ROWS + spacing.s4)
+      .trackMouse(mouse),
   ) {
     itemsIndexed(results.entries, contentType = { _, entry -> entry::class }) { _, entry ->
       when (entry) {
@@ -524,6 +565,7 @@ private fun PaletteList(
           highlighted = entry.index == highlighted,
           keys = keys,
           height = rowHeight,
+          mouse = mouse,
           onHover = { onHover(entry.index) },
           onClick = { onRun(entry.item) },
         )
@@ -532,31 +574,63 @@ private fun PaletteList(
   }
 }
 
+/**
+ * Where the mouse is over the palette's list, in the list's own coordinates, which stay put
+ * while its rows scroll. Rows that scroll or change under a still pointer get a move at the
+ * same spot, which [moved] tells apart from the mouse moving; a finger is never tracked.
+ */
+private class MouseTracker {
+  var position: Offset? = null
+
+  /** Whether the pointer event being handled moved the mouse. */
+  var moved: Boolean = false
+}
+
+// Runs before the rows see each event, so they can read whether it moved the mouse.
+private fun Modifier.trackMouse(mouse: MouseTracker): Modifier = pointerInput(mouse) {
+  awaitPointerEventScope {
+    while (true) {
+      val event = awaitPointerEvent(PointerEventPass.Initial)
+      val change = event.changes.firstOrNull { it.type == PointerType.Mouse }
+      val position = change?.position?.takeIf { event.type != PointerEventType.Exit }
+      val last = mouse.position
+      mouse.moved = position != null && last != null && position != last
+      mouse.position = position
+    }
+  }
+}
+
 @Composable
 private fun paletteRowHeight(): Dp =
   maxOf(PaletteDefaults.RowHeight, KetchTheme.density.menuItem)
 
-// Scrolls the list just enough to show the highlighted row, and its heading above it.
+// Scrolls the list just enough to show the highlighted row, and its heading above it: a row
+// above the rows shown comes in at the top, one below them at the bottom.
 private suspend fun revealRow(listState: LazyListState, results: PaletteResults, row: Int) {
   val index = results.entryIndex(row)
   if (index < 0) return
   val top = if (index > 0 && results.entries[index - 1] is PaletteEntry.Header) index - 1 else index
-  val info = listState.layoutInfo
-  val visible = info.visibleItemsInfo
-  if (visible.isEmpty()) return
-  val first = visible.first().index
-  val firstOffset = visible.first().offset
-  if (top < first || top == first && firstOffset < info.viewportStartOffset) {
+  val visible = listState.layoutInfo.visibleItemsInfo
+  val first = visible.firstOrNull() ?: return
+  if (top < first.index || top == first.index && first.offset < 0) {
+    // The row, or its heading, is above the rows shown.
     listState.scrollToItem(top)
     return
   }
-  val item = visible.firstOrNull { it.index == index }
-  val bottom = info.viewportEndOffset - info.afterContentPadding
-  if (item == null || item.offset + item.size > bottom) {
-    val size = item?.size ?: visible.first().size
-    listState.scrollToItem(index)
-    listState.scrollBy(-(bottom - info.beforeContentPadding - size).toFloat())
+  // Offsets count from below the top padding, and rows end above the bottom padding.
+  val shown = visible.firstOrNull { it.index == index }
+  if (shown != null) {
+    val info = listState.layoutInfo
+    val hidden = shown.offset + shown.size - (info.viewportEndOffset - info.afterContentPadding)
+    if (hidden > 0) listState.scrollBy(hidden.toFloat())
+    return
   }
+  // A row not laid out yet goes to the top, as far as the list scrolls, then down to the bottom.
+  listState.scrollToItem(index)
+  val info = listState.layoutInfo
+  val placed = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+  val gap = info.viewportEndOffset - info.afterContentPadding - (placed.offset + placed.size)
+  if (gap > 0) listState.scrollBy(-gap.toFloat())
 }
 
 @Composable
@@ -584,6 +658,7 @@ private fun PaletteRow(
   highlighted: Boolean,
   keys: Boolean,
   height: Dp,
+  mouse: MouseTracker,
   onHover: () -> Unit,
   onClick: () -> Unit,
 ) {
@@ -595,14 +670,15 @@ private fun PaletteRow(
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
     modifier = Modifier
       .fillMaxWidth()
-      .height(height)
+      // Taller when large text needs it, as a stacked subtitle may.
+      .heightIn(min = height)
       .clip(KetchTheme.shapes.md)
       .background(if (highlighted) colors.accentSoft else Color.Transparent)
-      // Only a moving pointer highlights a row, not a row scrolling under a still one.
-      .pointerInput(Unit) {
+      // Only a mouse that moves highlights a row, not a row moving under a still one.
+      .pointerInput(mouse) {
         awaitPointerEventScope {
           while (true) {
-            if (awaitPointerEvent().type == PointerEventType.Move) hover()
+            if (awaitPointerEvent().type == PointerEventType.Move && mouse.moved) hover()
           }
         }
       }
@@ -620,6 +696,7 @@ private fun PaletteRow(
     TitleAndSubtitle(
       title = item.title,
       subtitle = item.subtitle,
+      fileName = item.icon is PaletteIcon.File,
       stack = !keys,
       modifier = Modifier.weight(1f),
     )
@@ -666,15 +743,17 @@ private fun RowIcon(icon: PaletteIcon, highlighted: Boolean) {
 }
 
 /**
- * [title] then [subtitle] on one line when both fit. Otherwise the subtitle goes under the
- * title when [stack] is set, as on a phone; else the title gives up width first, leaving the
- * subtitle at least [PaletteDefaults.SUBTITLE_SHARE] of it, so a device name or a count is
- * never cut off by a long file name.
+ * [title] with [subtitle] under it when [stack] is set, as on a phone. Otherwise both share
+ * one line, and when they do not fit the title gives up width first, leaving the subtitle at
+ * least [PaletteDefaults.SUBTITLE_SHARE] of it, so a device name or a count is never cut off by
+ * a long file name. A title that ends in a [fileName] loses characters from its middle, so the
+ * extension stays.
  */
 @Composable
 private fun TitleAndSubtitle(
   title: String,
   subtitle: String?,
+  fileName: Boolean,
   stack: Boolean,
   modifier: Modifier = Modifier,
 ) {
@@ -683,13 +762,17 @@ private fun TitleAndSubtitle(
   Layout(
     modifier = modifier,
     content = {
-      Text(
-        text = title,
-        style = KetchTheme.typography.body,
-        color = colors.textPrimary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
+      if (fileName) {
+        FileNameText(text = title, style = KetchTheme.typography.body, color = colors.textPrimary)
+      } else {
+        Text(
+          text = title,
+          style = KetchTheme.typography.body,
+          color = colors.textPrimary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
       if (subtitle != null) {
         Text(
           text = subtitle,
@@ -705,9 +788,7 @@ private fun TitleAndSubtitle(
     val gapPx = gap.roundToPx()
     val loose = constraints.copy(minWidth = 0, minHeight = 0)
     val subtitle = measurables.getOrNull(1)
-    val subtitleWants = subtitle?.maxIntrinsicWidth(constraints.maxHeight)?.plus(gapPx) ?: 0
-    val titleWants = measurables[0].maxIntrinsicWidth(constraints.maxHeight)
-    if (stack && subtitle != null && titleWants + subtitleWants > width) {
+    if (stack && subtitle != null) {
       val titlePlaceable = measurables[0].measure(loose)
       val subtitlePlaceable = subtitle.measure(loose)
       return@Layout layout(width, titlePlaceable.height + subtitlePlaceable.height) {
@@ -715,6 +796,7 @@ private fun TitleAndSubtitle(
         subtitlePlaceable.placeRelative(0, titlePlaceable.height)
       }
     }
+    val subtitleWants = subtitle?.maxIntrinsicWidth(constraints.maxHeight)?.plus(gapPx) ?: 0
     val subtitleKeeps = minOf(subtitleWants, (width * PaletteDefaults.SUBTITLE_SHARE).toInt())
     val titlePlaceable = measurables[0].measure(loose.copy(maxWidth = width - subtitleKeeps))
     val subtitleWidth = (width - titlePlaceable.width - gapPx).coerceAtLeast(0)
@@ -814,11 +896,11 @@ private fun Divider() {
   )
 }
 
-/** Places the popup over the whole window, whatever composed it. */
 /** The row that downloads the typed links on the device [deviceId], if there is one. */
 private fun downloadOn(items: List<PaletteItem>, deviceId: String): PaletteItem? =
   items.firstOrNull { (it.action as? PaletteAction.Download)?.deviceId == deviceId }
 
+/** Places the popup over the whole window, whatever composed it. */
 private object WindowOrigin : PopupPositionProvider {
   override fun calculatePosition(
     anchorBounds: IntRect,
@@ -829,3 +911,5 @@ private object WindowOrigin : PopupPositionProvider {
 }
 
 private const val MAX_DEVICE_CHORDS = 9
+private const val PLACEHOLDER = "Paste a link, search downloads, or type a command"
+private const val SHORT_PLACEHOLDER = "Paste a link, search, or type a command"

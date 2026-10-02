@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.platform.rememberSystemClipboard
@@ -25,8 +26,9 @@ import kotlin.test.Test
 /**
  * The command palette (`⌘K`) over the app: what it lists before anything is typed, a pasted
  * link with a row per device, a typed speed, a device command, downloads found by name and by
- * search token, the Discover fallback, no matches, and the highlight moved by the keyboard; see
- * [SnapshotHarness] for how to run it.
+ * search token, the Discover fallback, no matches, and the highlight moved by the keyboard, also
+ * under a resting pointer and to both ends of a scrolled list; see [SnapshotHarness] for how to
+ * run it.
  *
  * The app shows the sample's downloads on this Mac, with the NAS connected, the Slow lane on
  * and Discover set up ([SettingsEnvironment]).
@@ -105,6 +107,31 @@ class PaletteSnapshots {
   }
 
   @Test
+  fun hoverThenKeys_desktop_keepsTheHighlightWhereTheKeysPutIt() {
+    val name = "palette-hover-keys"
+    paletteSnapshot(name, SnapshotSize.Desktop, SnapshotTheme.Light, recent = RECENT) {
+      // The mouse moves onto the sixth row, "Download link from clipboard", and rests there
+      // while the keys move the highlight five rows down and scroll other rows under it.
+      hover(600.dp, 400.dp)
+      hover(640.dp, 404.dp)
+      repeat(KEY_PRESSES) { pressKey(Key.DirectionDown) }
+    }
+  }
+
+  @Test
+  fun keysPastTheEnd_desktop_showTheLastRowThenComeBack() {
+    paletteSnapshot("palette-keys-end", SnapshotSize.Desktop, SnapshotTheme.Light) {
+      // The highlight stops on the last row, which shows at the bottom of the list.
+      repeat(PAST_THE_END) { pressKey(Key.DirectionDown) }
+    }
+    paletteSnapshot("palette-keys-back", SnapshotSize.Desktop, SnapshotTheme.Dark) {
+      // Back up past the rows shown, the highlighted row shows at the top.
+      repeat(PAST_THE_END) { pressKey(Key.DirectionDown) }
+      repeat(BACK_UP) { pressKey(Key.DirectionUp) }
+    }
+  }
+
+  @Test
   fun settingsPage_desktop_jumpsWithASlash() {
     paletteSnapshot("palette-slash", SnapshotSize.SmallDesktop, SnapshotTheme.Light, query = "/s")
   }
@@ -144,6 +171,12 @@ class PaletteSnapshots {
 
   private companion object {
     val SIZES = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
+
+    const val KEY_PRESSES = 5
+
+    // More rows than the list holds with nothing typed, and more than it shows at once.
+    const val PAST_THE_END = 45
+    const val BACK_UP = 12
 
     const val LINK = "https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso"
 

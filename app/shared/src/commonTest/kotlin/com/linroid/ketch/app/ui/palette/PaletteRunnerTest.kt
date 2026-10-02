@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.palette
 
+import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
@@ -10,6 +11,7 @@ import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RecordingKetchApi
+import com.linroid.ketch.app.state.RecordingTask
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.ui.list.RowCommands
@@ -47,9 +49,19 @@ class PaletteRunnerTest {
     return Fixture(api, controller, runner, ran)
   }
 
-  @Test
-  fun run_downloadNow_addsTheLinkOnTheDevice() = runTest {
+  // Closes the controller even when an assertion fails, since its timers would otherwise keep
+  // the test's scheduler from ever going idle.
+  private fun paletteTest(block: suspend TestScope.(Fixture) -> Unit) = runTest {
     val fixture = fixture()
+    try {
+      block(fixture)
+    } finally {
+      fixture.controller.close()
+    }
+  }
+
+  @Test
+  fun run_downloadNow_addsTheLinkOnTheDevice() = paletteTest { fixture ->
     runCurrent()
     val url = "https://example.com/ubuntu.iso"
 
@@ -57,12 +69,10 @@ class PaletteRunnerTest {
     runCurrent()
 
     assertEquals(url, fixture.api.requests.single().url)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_downloadNeedingTheSheet_opensItForTheDevice() = runTest {
-    val fixture = fixture()
+  fun run_downloadNeedingTheSheet_opensItForTheDevice() = paletteTest { fixture ->
     runCurrent()
     val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
 
@@ -72,48 +82,48 @@ class PaletteRunnerTest {
     val expected = IntakeRequest(text = magnet, targetDeviceId = LOCAL_DEVICE_ID)
     assertEquals(expected, fixture.controller.state.intakeRequest)
     assertTrue(fixture.api.requests.isEmpty())
-    fixture.controller.close()
   }
 
   @Test
-  fun run_command_runsItAsItsShortcutDoes() = runTest {
-    val fixture = fixture()
+  fun run_deviceBatchPause_pausesTheTasksOfThatDevice() = paletteTest { fixture ->
+    runCurrent()
+    val task = fixture.api.add(DownloadState.Downloading(RecordingTask.PROGRESS))
+    runCurrent()
 
+    fixture.runner.run(PaletteAction.DeviceBatch(LOCAL_DEVICE_ID, BatchVerb.Pause))
+    runCurrent()
+
+    assertEquals(listOf("pause"), task.calls)
+  }
+
+  @Test
+  fun run_command_runsItAsItsShortcutDoes() = paletteTest { fixture ->
     fixture.runner.run(PaletteAction.Command(KetchCommands.PauseAll))
 
     assertEquals(listOf(KetchCommands.PauseAll), fixture.commands)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_settingsPage_opensSettingsThere() = runTest {
-    val fixture = fixture()
-
+  fun run_settingsPage_opensSettingsThere() = paletteTest { fixture ->
     fixture.runner.run(PaletteAction.Settings(SettingsTarget.Page.Speed))
 
     assertEquals(SettingsTarget.Page.Speed, fixture.controller.state.settingsRequest?.page)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_search_filtersTheDownloadsList() = runTest {
-    val fixture = fixture()
+  fun run_search_filtersTheDownloadsList() = paletteTest { fixture ->
     fixture.controller.state.statusFilter = StatusFilter.Paused
 
     fixture.runner.run(PaletteAction.Search("is:failed"))
 
     assertEquals("is:failed", fixture.controller.state.searchQuery)
     assertEquals(StatusFilter.All, fixture.controller.state.statusFilter)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_discover_asksForDiscover() = runTest {
-    val fixture = fixture()
-
+  fun run_discover_asksForDiscover() = paletteTest { fixture ->
     fixture.runner.run(PaletteAction.Discover("blender for mac"))
 
     assertEquals(DiscoverRequest("blender for mac"), fixture.controller.state.discoverRequest)
-    fixture.controller.close()
   }
 }
