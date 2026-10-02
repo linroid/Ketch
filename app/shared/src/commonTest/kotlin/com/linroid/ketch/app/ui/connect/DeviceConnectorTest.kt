@@ -144,6 +144,22 @@ class DeviceConnectorTest {
   }
 
   @Test
+  fun connect_deviceAddedOverAnotherScheme_switchesItToTheLinksScheme() = runTest {
+    val fakes = FakeInstanceFactory()
+    val saved = RemoteConfig(host = "192.168.1.20", apiToken = "secret", secure = false)
+    val manager = manager(fakes, listOf(saved))
+
+    connector(manager, Probe()).connect(link.copy(secure = true))
+    runCurrent()
+
+    val device = manager.remotes().single()
+    assertTrue(device.remoteConfig.secure)
+    assertEquals("secret", device.remoteConfig.apiToken)
+    assertTrue(fakes.clientsOf("192.168.1.20:8642").last().config.secure)
+    manager.close()
+  }
+
+  @Test
   fun connect_addressOfADeviceAddedWithItsCode_triesThatCode() = runTest {
     val saved = RemoteConfig(host = "192.168.1.20", apiToken = "saved", name = "Office")
     val manager = manager(remotes = listOf(saved))
