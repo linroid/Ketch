@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -50,7 +51,6 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
 import com.linroid.ketch.app.ui.shell.ShellNavigation
-import com.linroid.ketch.app.ui.sidebar.rememberDevices
 import kotlinx.datetime.TimeZone
 
 /**
@@ -61,7 +61,7 @@ import kotlinx.datetime.TimeZone
  */
 @Composable
 fun DevicesScreen(state: AppState) {
-  val devices = rememberDevices(state)
+  val devices by remember(state) { state.instanceManager.presence }.collectAsState()
   val instances by state.instances.collectAsState()
   val active by state.activeInstance.collectAsState()
   val work = rememberDeviceWork(remember(devices.map { it.entry }) { devices.map { it.entry } })
@@ -69,9 +69,10 @@ fun DevicesScreen(state: AppState) {
   val padding = KetchTheme.density.pagePadding
   val spacing = KetchTheme.spacing
   val actions = rememberPageActions(state)
-  // Presence lists a device once its first totals are in, a moment after launch.
+  // Presence lists a device once its first totals are in, a moment after launch. The add card
+  // follows the configured devices, so it does not flash while the others load.
   val loading = devices.isEmpty() && instances.isNotEmpty()
-  val addCard = !loading && (phone || devices.size <= 1)
+  val addCard = phone || instances.size <= 1
   var renaming by remember { mutableStateOf<DevicePresence?>(null) }
   var removing by remember { mutableStateOf<DevicePresence?>(null) }
   val sentence = fleetSentence(
@@ -170,6 +171,7 @@ private fun PageHeader(sentence: String, actions: PageActions?) {
         style = KetchTheme.typography.bodyS,
         color = colors.textSecondary,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
       )
     }
     if (actions != null) {

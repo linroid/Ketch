@@ -193,7 +193,13 @@ internal fun AppState.dropFiles(entry: InstanceEntry, files: List<DroppedFile>) 
     val text = lists.mapNotNull { file ->
       catchingUnlessCancelled { file.readBytes(MAX_LINK_LIST_BYTES).decodeToString() }
         .onFailure { e ->
-          messages.post(MessageLevel.Error, "Couldn't read ${file.name}", detail = e.message)
+          log.w { "Couldn't read a dropped link list: ${e.describeCauses()}" }
+          messages.post(
+            level = MessageLevel.Error,
+            title = "Couldn't read ${file.name}",
+            detail = e.message,
+            cause = e,
+          )
         }
         .getOrNull()
     }.joinToString("\n")

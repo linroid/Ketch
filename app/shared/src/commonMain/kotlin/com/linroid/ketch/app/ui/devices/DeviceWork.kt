@@ -134,7 +134,7 @@ internal sealed interface NextAction {
     override val label: String get() = "Retry $count failed"
   }
 
-  /** Pauses everything the device is downloading or has waiting. */
+  /** Pauses everything the device is downloading or has queued. */
   data object PauseAll : NextAction {
     override val label: String get() = "Pause all here"
   }
@@ -147,7 +147,8 @@ internal sealed interface NextAction {
 
 /**
  * The buttons of [device]'s card, in the order they show: Retry failed while downloads failed,
- * Pause all here while some download or wait, and Start the next waiting download now.
+ * Pause all here while some download (it also pauses those waiting in the queue), and Start the
+ * next waiting download now.
  */
 internal fun nextActions(device: DevicePresence, work: DeviceWork): List<NextAction> =
   buildList {

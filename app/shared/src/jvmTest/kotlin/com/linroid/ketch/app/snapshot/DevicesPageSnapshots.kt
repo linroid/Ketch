@@ -39,16 +39,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import kotlin.math.sin
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.math.sin
 import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -109,6 +109,16 @@ class DevicesPageSnapshots {
   }
 
   @Test
+  fun devicesPage_speedPill_opensThatDevicesSpeedOptions() {
+    devicesPageSnapshot("devices-page-speed-active", SnapshotSize.Desktop, SnapshotTheme.Light) {
+      scene.click(MacSpeedOptions.first, MacSpeedOptions.second)
+    }
+    devicesPageSnapshot("devices-page-speed-remote", SnapshotSize.Desktop, SnapshotTheme.Dark) {
+      scene.click(NasSpeedOptions.first, NasSpeedOptions.second)
+    }
+  }
+
+  @Test
   fun devicesPage_keyboardFocus_ringsTheControls() {
     devicesPageSnapshot("devices-page-focus", SnapshotSize.Desktop, SnapshotTheme.Light) {
       repeat(FOCUS_TABS) { scene.pressKey(Key.Tab) }
@@ -127,19 +137,25 @@ class DevicesPageSnapshots {
 
   private companion object {
     val Wide1440 = SnapshotSize(1440.dp, 900.dp, KetchDensity.Compact)
-    val PhoneTall = SnapshotSize(390.dp, 1720.dp, KetchDensity.Comfortable)
+    val PhoneTall = SnapshotSize(390.dp, 2160.dp, KetchDensity.Comfortable)
     const val FOCUS_TABS = 9
     const val NAS_NAME = "NAS-Basement"
 
-    // Where the Desktop snapshot draws the NAS card's ⋯ and its Failed count.
+    // Where the Desktop snapshot draws the NAS card's ⋯, its Failed count and the chevrons of
+    // the speed pills.
     val NasMenu: Pair<Dp, Dp> = 868.dp to 110.dp
     val NasFailed: Pair<Dp, Dp> = 848.dp to 252.dp
+    val MacSpeedOptions: Pair<Dp, Dp> = 533.dp to 189.dp
+    val NasSpeedOptions: Pair<Dp, Dp> = 873.dp to 189.dp
   }
 }
 
 /** Which devices a [devicesPageSnapshot] shows. */
 private enum class DevicesPageFleet {
-  /** This Mac downloading, the NAS downloading under a cap, Den-PC offline, a seedbox locked. */
+  /**
+   * This Mac downloading, the NAS downloading under a cap, Den-PC offline, a seedbox locked and
+   * a Garage-Pi the app does not keep connected.
+   */
   Mixed,
 
   /** This Mac alone, downloading. */
@@ -220,7 +236,11 @@ private class DevicesPageEnvironment(
 ) {
   val data = SampleData(
     tasks = if (fleet == DevicesPageFleet.Idle) emptyList() else SampleData.downloads().tasks,
-    remotes = if (fleet == DevicesPageFleet.Mixed) listOf(Nas, DenPc, Seedbox) else emptyList(),
+    remotes = if (fleet == DevicesPageFleet.Mixed) {
+      listOf(Nas, DenPc, Seedbox, GaragePi)
+    } else {
+      emptyList()
+    },
   )
   private val clock = DevicesPageClock(SampleData.NOW - OFFLINE_FOR)
   private val nasTasks = if (fleet == DevicesPageFleet.Mixed) sampleNasTasks() else emptyList()
@@ -323,6 +343,8 @@ private class DevicesPageEnvironment(
       Nas.host -> DevicesPageRemoteApi(nasStatus(), nasTasks) to
         MutableStateFlow<ConnectionState>(ConnectionState.Connected)
       DenPc.host -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to denPc
+      GaragePi.host -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to
+        MutableStateFlow<ConnectionState>(ConnectionState.Disconnected())
       else -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to
         MutableStateFlow<ConnectionState>(ConnectionState.Unauthorized)
     }
@@ -333,6 +355,7 @@ private class DevicesPageEnvironment(
     val Nas = RemoteConfig(host = "nas.local", name = "NAS-Basement")
     val DenPc = RemoteConfig(host = "den-pc.local", name = "Den-PC")
     val Seedbox = RemoteConfig(host = "seedbox.example.net", port = 443, secure = true)
+    val GaragePi = RemoteConfig(host = "garage-pi.local", name = "Garage-Pi", watch = false)
     const val DEN_PC_ID = "den-pc.local:8642"
     val OFFLINE_FOR: Duration = 2.hours
     val START_TIMEOUT: Duration = 10.seconds
