@@ -403,7 +403,8 @@ private fun itemFill(selected: Boolean, hovered: Boolean, onSurface: Boolean): C
   return when {
     selected -> if (onSurface) colors.surfacePressed else colors.sidebarItemSelected
     hovered -> if (onSurface) colors.surfaceHover else colors.sidebarItemHover
-    else -> Color.Transparent
+    // Fades by alpha alone: Color.Transparent is transparent black, which flashes grey.
+    else -> (if (onSurface) colors.surfaceHover else colors.sidebarItemHover).copy(alpha = 0f)
   }
 }
 

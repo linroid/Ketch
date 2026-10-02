@@ -179,7 +179,8 @@ fun KetchSidebarItem(
     targetValue = when {
       selected -> colors.sidebarItemSelected
       hovered -> colors.sidebarItemHover
-      else -> Color.Transparent
+      // Fades by alpha alone: Color.Transparent is transparent black, which flashes grey.
+      else -> colors.sidebarItemHover.copy(alpha = 0f)
     },
     animationSpec = tween(KetchTheme.motion.micro),
   )

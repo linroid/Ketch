@@ -21,7 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.onClick
@@ -194,7 +193,8 @@ internal fun TaskRowFrame(
       selected && keyboard.hasFocus -> colors.rowSelectedFocused
       selected -> colors.rowSelected
       hovered -> colors.surfaceHover
-      else -> Color.Transparent
+      // Fades by alpha alone: Color.Transparent is transparent black, which flashes grey.
+      else -> colors.surfaceHover.copy(alpha = 0f)
     },
     animationSpec = tween(motion.micro),
   )
