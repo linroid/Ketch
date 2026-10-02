@@ -245,7 +245,6 @@ internal class TorrentSwarm(
     }
   }
 
-  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
   private suspend fun peer(
     id: Int,
     endpoint: PeerEndpoint,
@@ -253,28 +252,51 @@ internal class TorrentSwarm(
     progressEvents: SendChannel<Unit>,
     pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
     accepted: TorrentConnection? = null,
-  ) =
-    supervisorScope {
-      val connection = accepted ?: network.connect(endpoint)
-      var uploadSlot = false
-      val uploadCache = TorrentUploadCache(store, budget)
+  ) {
+    val connection = accepted ?: network.connect(endpoint)
+    try {
+      PeerWorker(id, endpoint, connection, scheduler, progressEvents, pexEvents).run()
+    } finally {
+      connection.close()
+    }
+  }
+
+  /**
+   * One peer connection. Its state lives in fields and its loop is split into small functions:
+   * as one coroutine body, every suspension point saved every local, and the body grew past the
+   * size ART compiles, leaving the hot peer loop interpreted on Android.
+   */
+  private inner class PeerWorker(
+    private val id: Int,
+    private val endpoint: PeerEndpoint,
+    private val connection: TorrentConnection,
+    private val scheduler: TorrentPieceScheduler,
+    private val progressEvents: SendChannel<Unit>,
+    private val pexEvents: SendChannel<Pair<PeerEndpoint, PexUpdate>>,
+  ) {
+    private val uploadCache = TorrentUploadCache(store, budget)
+    private val wire = PeerWire(connection, store.metadata)
+    private val exchange = PeerExchange()
+    private val extensions = PeerExtensions()
+    private val state = PeerProtocolState(store.pieceCount, maxPending = 16)
+    private var extensionsNegotiated = false
+    private var uploadSlot = false
+    private var metadataServed = 0
+    private var metadataWindow = TimeSource.Monotonic.markNow()
+    private var advertised = BooleanArray(0)
+    private var version = -1L
+    private var claim: TorrentPieceScheduler.Claim? = null
+    private var received = BooleanArray(0)
+    private var requested = BooleanArray(0)
+    private var receivedBytes = 0
+    private var lastUsefulPayload = TimeSource.Monotonic.markNow()
+    private var lastBlock = TimeSource.Monotonic.markNow()
+    private var lastWrite = TimeSource.Monotonic.markNow()
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    suspend fun run() = supervisorScope {
       try {
-        val wire = PeerWire(connection, store.metadata)
-        val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true, false))
-        require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
-        connectedMutex.withLock { connected[id] = connection.remote }
-        val exchange = PeerExchange()
-        val extensions = PeerExtensions()
-        var metadataServed = 0
-        var metadataWindow = TimeSource.Monotonic.markNow()
-        if (handshake.extensions) {
-          wire.send(PeerExtensions.handshake(store.metadata, pex = !trackerRestricted))
-        }
-        val state = PeerProtocolState(store.pieceCount, maxPending = 16)
-        val advertised = store.verifiedPieces()
-        var version = -1L
-        wire.send(PeerMessage.Bitfield(pieceBitfield(advertised)))
-        wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+        open()
         val messages = Channel<PeerMessage>(1)
         val consumed = Channel<Unit>(1)
         val reader = launch {
@@ -289,13 +311,9 @@ internal class TorrentSwarm(
             messages.close(e)
           }
         }
-        var claim: TorrentPieceScheduler.Claim? = null
-        var received = BooleanArray(0)
-        var requested = BooleanArray(0)
-        var receivedBytes = 0
-        var lastUsefulPayload = TimeSource.Monotonic.markNow()
-        var lastBlock = TimeSource.Monotonic.markNow()
-        var lastWrite = TimeSource.Monotonic.markNow()
+        lastUsefulPayload = TimeSource.Monotonic.markNow()
+        lastBlock = TimeSource.Monotonic.markNow()
+        lastWrite = TimeSource.Monotonic.markNow()
         try {
           while (isActive) {
             val message = select<PeerMessage?> {
@@ -303,171 +321,10 @@ internal class TorrentSwarm(
               onTimeout(100) { null }
             }
             if (message != null) {
-              if (message is PeerMessage.Piece) {
-                val throttling = TimeSource.Monotonic.markNow()
-                downloadPayload(message.bytes.size)
-                val paused = throttling.elapsedNow()
-                lastBlock += paused
-                lastUsefulPayload += paused
-              }
-              val accepted = state.received(message)
-              when (message) {
-                // Only the one-time bitfield rebuilds availability; HAVE stays incremental so a
-                // peer cannot force a full snapshot and rarity scan per announcement.
-                is PeerMessage.Bitfield -> scheduler.availability(id, state.availabilitySnapshot())
-                is PeerMessage.Have -> scheduler.announce(id, message.index)
-                is PeerMessage.Control -> {
-                  if (message.signal == PeerMessage.Signal.CHOKE) {
-                    scheduler.release(id)
-                    claim = null
-                  }
-                  if (message.signal == PeerMessage.Signal.NOT_INTERESTED && uploadSlot) {
-                    uploadSlots.release()
-                    uploadSlot = false
-                    uploadCache.close()
-                    wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
-                  }
-                }
-                is PeerMessage.Piece -> if (accepted) {
-                  val current = checkNotNull(claim)
-                  check(message.index == current.index && message.begin % PeerWire.BLOCK_SIZE == 0)
-                  val block = message.begin / PeerWire.BLOCK_SIZE
-                  check(!received[block])
-                  message.bytes.copyInto(current.bytes, message.begin)
-                  received[block] = true
-                  receivedBytes += message.bytes.size
-                  lastBlock = TimeSource.Monotonic.markNow()
-                  lastUsefulPayload = TimeSource.Monotonic.markNow()
-                  if (receivedBytes == current.bytes.size) {
-                    val valid = storage { store.commit(current.index, current.bytes) }
-                    if (!valid) {
-                      log.w {
-                        "Piece ${current.index} of $logLabel from $endpoint failed its hash check"
-                      }
-                      throw CorruptPieceException()
-                    }
-                    scheduler.verified(current.index)
-                    scheduler.release(id)
-                    claim = null
-                    progressEvents.trySend(Unit)
-                  }
-                }
-                is PeerMessage.Request -> if (uploadSlot && state.interested &&
-                  scheduler.isVerified(message.index)) {
-                  val bytes = storage { uploadCache.read(message.index) }
-                  if (bytes != null) {
-                    uploadPayload(message.length)
-                    wire.send(PeerMessage.Piece(message.index, message.begin,
-                      bytes.copyOfRange(message.begin, message.begin + message.length)))
-                  } else {
-                    wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
-                    uploadSlots.release()
-                    uploadSlot = false
-                  }
-                }
-                is PeerMessage.Extended -> {
-                  require(handshake.extensions) { "Unnegotiated peer extension" }
-                  if (message.id == 0) extensions.receive(message.payload, 4 * 1024 * 1024)
-                  else if (message.id == PeerExtensions.METADATA) {
-                    val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE)
-                    if (header["msg_type"]?.integer == 0L) {
-                      val index = requireNotNull(header["piece"]?.integer)
-                      require(index in 0..Int.MAX_VALUE.toLong())
-                      val remoteId = extensions.id("ut_metadata")
-                      if (remoteId != 0) {
-                        if (metadataWindow.elapsedNow().inWholeSeconds >= 60) {
-                          metadataServed = 0
-                          metadataWindow = TimeSource.Monotonic.markNow()
-                        }
-                        val limit = (store.metadata.infoBytes.size / 16_384 + 1) * 3
-                        val response = if (metadataServed < limit) {
-                          metadataServed++
-                          TorrentMetadataExchange.response(remoteId, index.toInt(), store.metadata)
-                        } else TorrentMetadataExchange.metadataMessage(remoteId, 2, index.toInt())
-                        wire.send(response)
-                      }
-                    }
-                  } else if (message.id == PeerExtensions.PEX) {
-                    require(!trackerRestricted) {
-                      "Tracker-restricted peer exchange is forbidden"
-                    }
-                    val update = exchange.receive(message.payload)
-                    val added = update.added.filter { peer ->
-                      allowLocalDiscovery ||
-                        numericAddress(peer.host)?.let(::publicTorrentAddress) == true
-                    }
-                    pexEvents.send(connection.remote to update.copy(added = added))
-                  }
-                }
-                else -> Unit
-              }
+              receive(message)
+              consumed.trySend(Unit)
             }
-            if (message != null) consumed.trySend(Unit)
-            uploadCache.expire()
-            if (state.interested && !uploadSlot && uploadPolicy != TorrentUploadPolicy.DISABLED &&
-              uploadSlots.tryAcquire()) {
-              uploadSlot = true
-              wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
-            }
-            if (!trackerRestricted && extensions.id("ut_pex") != 0 && exchange.due()) {
-              val contacts = connectedMutex.withLock { connected.values.toSet() }
-                .filter { it != connection.remote && (allowLocalDiscovery ||
-                  numericAddress(it.host)?.let(::publicTorrentAddress) == true) }.toSet()
-              exchange.message(extensions.id("ut_pex"), contacts)?.let { wire.send(it) }
-            }
-            scheduler.snapshot(version)?.let { (nextVersion, pieces) ->
-              version = nextVersion
-              for (index in pieces.indices) {
-                if (pieces[index] && !advertised[index]) {
-                  wire.send(PeerMessage.Have(index))
-                  advertised[index] = true
-                }
-              }
-            }
-            val current = claim
-            if (current != null && scheduler.isVerified(current.index)) {
-              for (request in state.requests) {
-                state.cancel(request)
-                wire.send(PeerMessage.Cancel(request.index, request.begin, request.length))
-              }
-              scheduler.release(id)
-              claim = null
-            }
-            if (!store.completed() && lastUsefulPayload.elapsedNow().inWholeSeconds >= 90) {
-              throw IOException("Peer made no useful download progress")
-            }
-            if (state.requests.isNotEmpty() && lastBlock.elapsedNow().inWholeSeconds >= 20) {
-              error("Peer block deadline exceeded")
-            }
-            if (!state.choking && claim == null) {
-              claim = scheduler.claim(id)
-              claim?.let {
-                received = BooleanArray((it.bytes.size + PeerWire.BLOCK_SIZE - 1) /
-                  PeerWire.BLOCK_SIZE)
-                requested = BooleanArray(received.size)
-                receivedBytes = 0
-                lastBlock = TimeSource.Monotonic.markNow()
-              }
-            }
-            claim?.let { assigned ->
-              if (!state.choking) {
-                for (block in requested.indices) {
-                  if (state.requests.size >= 16) break
-                  if (requested[block]) continue
-                  val begin = block * PeerWire.BLOCK_SIZE
-                  val request = PeerMessage.Request(assigned.index, begin,
-                    minOf(PeerWire.BLOCK_SIZE, assigned.bytes.size - begin))
-                  state.requested(request)
-                  wire.send(request)
-                  requested[block] = true
-                  lastWrite = TimeSource.Monotonic.markNow()
-                }
-              }
-            }
-            if (lastWrite.elapsedNow().inWholeSeconds >= 30) {
-              wire.send(PeerMessage.KeepAlive)
-              lastWrite = TimeSource.Monotonic.markNow()
-            }
+            maintain()
           }
         } finally {
           withContext(NonCancellable) {
@@ -486,9 +343,199 @@ internal class TorrentSwarm(
       } finally {
         uploadCache.close()
         if (uploadSlot) uploadSlots.release()
-        connection.close()
       }
     }
+
+    private suspend fun open() {
+      val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true, false))
+      require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
+      connectedMutex.withLock { connected[id] = connection.remote }
+      extensionsNegotiated = handshake.extensions
+      metadataWindow = TimeSource.Monotonic.markNow()
+      if (extensionsNegotiated) {
+        wire.send(PeerExtensions.handshake(store.metadata, pex = !trackerRestricted))
+      }
+      advertised = store.verifiedPieces()
+      wire.send(PeerMessage.Bitfield(pieceBitfield(advertised)))
+      wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+    }
+
+    private suspend fun receive(message: PeerMessage) {
+      if (message is PeerMessage.Piece) {
+        val throttling = TimeSource.Monotonic.markNow()
+        downloadPayload(message.bytes.size)
+        val paused = throttling.elapsedNow()
+        lastBlock += paused
+        lastUsefulPayload += paused
+      }
+      val accepted = state.received(message)
+      when (message) {
+        // Only the one-time bitfield rebuilds availability; HAVE stays incremental so a
+        // peer cannot force a full snapshot and rarity scan per announcement.
+        is PeerMessage.Bitfield -> scheduler.availability(id, state.availabilitySnapshot())
+        is PeerMessage.Have -> scheduler.announce(id, message.index)
+        is PeerMessage.Control -> {
+          if (message.signal == PeerMessage.Signal.CHOKE) {
+            scheduler.release(id)
+            claim = null
+          }
+          if (message.signal == PeerMessage.Signal.NOT_INTERESTED && uploadSlot) {
+            uploadSlots.release()
+            uploadSlot = false
+            uploadCache.close()
+            wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
+          }
+        }
+        is PeerMessage.Piece -> if (accepted) receiveBlock(message)
+        is PeerMessage.Request -> if (uploadSlot && state.interested &&
+          scheduler.isVerified(message.index)) {
+          upload(message)
+        }
+        is PeerMessage.Extended -> receiveExtension(message)
+        else -> Unit
+      }
+    }
+
+    private suspend fun receiveBlock(message: PeerMessage.Piece) {
+      val current = checkNotNull(claim)
+      check(message.index == current.index && message.begin % PeerWire.BLOCK_SIZE == 0)
+      val block = message.begin / PeerWire.BLOCK_SIZE
+      check(!received[block])
+      message.bytes.copyInto(current.bytes, message.begin)
+      received[block] = true
+      receivedBytes += message.bytes.size
+      lastBlock = TimeSource.Monotonic.markNow()
+      lastUsefulPayload = TimeSource.Monotonic.markNow()
+      if (receivedBytes == current.bytes.size) {
+        val valid = storage { store.commit(current.index, current.bytes) }
+        if (!valid) {
+          log.w { "Piece ${current.index} of $logLabel from $endpoint failed its hash check" }
+          throw CorruptPieceException()
+        }
+        scheduler.verified(current.index)
+        scheduler.release(id)
+        claim = null
+        progressEvents.trySend(Unit)
+      }
+    }
+
+    private suspend fun upload(request: PeerMessage.Request) {
+      val bytes = storage { uploadCache.read(request.index) }
+      if (bytes != null) {
+        uploadPayload(request.length)
+        wire.send(PeerMessage.Piece(request.index, request.begin,
+          bytes.copyOfRange(request.begin, request.begin + request.length)))
+      } else {
+        wire.send(PeerMessage.Control(PeerMessage.Signal.CHOKE))
+        uploadSlots.release()
+        uploadSlot = false
+      }
+    }
+
+    private suspend fun receiveExtension(message: PeerMessage.Extended) {
+      require(extensionsNegotiated) { "Unnegotiated peer extension" }
+      if (message.id == 0) extensions.receive(message.payload, 4 * 1024 * 1024)
+      else if (message.id == PeerExtensions.METADATA) {
+        val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE)
+        if (header["msg_type"]?.integer == 0L) {
+          val index = requireNotNull(header["piece"]?.integer)
+          require(index in 0..Int.MAX_VALUE.toLong())
+          val remoteId = extensions.id("ut_metadata")
+          if (remoteId != 0) {
+            if (metadataWindow.elapsedNow().inWholeSeconds >= 60) {
+              metadataServed = 0
+              metadataWindow = TimeSource.Monotonic.markNow()
+            }
+            val limit = (store.metadata.infoBytes.size / 16_384 + 1) * 3
+            val response = if (metadataServed < limit) {
+              metadataServed++
+              TorrentMetadataExchange.response(remoteId, index.toInt(), store.metadata)
+            } else TorrentMetadataExchange.metadataMessage(remoteId, 2, index.toInt())
+            wire.send(response)
+          }
+        }
+      } else if (message.id == PeerExtensions.PEX) {
+        require(!trackerRestricted) {
+          "Tracker-restricted peer exchange is forbidden"
+        }
+        val update = exchange.receive(message.payload)
+        val added = update.added.filter { peer ->
+          allowLocalDiscovery ||
+            numericAddress(peer.host)?.let(::publicTorrentAddress) == true
+        }
+        pexEvents.send(connection.remote to update.copy(added = added))
+      }
+    }
+
+    /** Runs after every message and idle tick: upload slot, PEX, HAVEs, deadlines, requests. */
+    private suspend fun maintain() {
+      uploadCache.expire()
+      if (state.interested && !uploadSlot && uploadPolicy != TorrentUploadPolicy.DISABLED &&
+        uploadSlots.tryAcquire()) {
+        uploadSlot = true
+        wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+      }
+      if (!trackerRestricted && extensions.id("ut_pex") != 0 && exchange.due()) {
+        val contacts = connectedMutex.withLock { connected.values.toSet() }
+          .filter { it != connection.remote && (allowLocalDiscovery ||
+            numericAddress(it.host)?.let(::publicTorrentAddress) == true) }.toSet()
+        exchange.message(extensions.id("ut_pex"), contacts)?.let { wire.send(it) }
+      }
+      scheduler.snapshot(version)?.let { (nextVersion, pieces) ->
+        version = nextVersion
+        for (index in pieces.indices) {
+          if (pieces[index] && !advertised[index]) {
+            wire.send(PeerMessage.Have(index))
+            advertised[index] = true
+          }
+        }
+      }
+      val current = claim
+      if (current != null && scheduler.isVerified(current.index)) {
+        for (request in state.requests) {
+          state.cancel(request)
+          wire.send(PeerMessage.Cancel(request.index, request.begin, request.length))
+        }
+        scheduler.release(id)
+        claim = null
+      }
+      if (!store.completed() && lastUsefulPayload.elapsedNow().inWholeSeconds >= 90) {
+        throw IOException("Peer made no useful download progress")
+      }
+      if (state.requests.isNotEmpty() && lastBlock.elapsedNow().inWholeSeconds >= 20) {
+        error("Peer block deadline exceeded")
+      }
+      if (!state.choking && claim == null) {
+        claim = scheduler.claim(id)
+        claim?.let {
+          received = BooleanArray((it.bytes.size + PeerWire.BLOCK_SIZE - 1) /
+            PeerWire.BLOCK_SIZE)
+          requested = BooleanArray(received.size)
+          receivedBytes = 0
+          lastBlock = TimeSource.Monotonic.markNow()
+        }
+      }
+      claim?.let { assigned ->
+        if (!state.choking) {
+          for (block in requested.indices) {
+            if (state.requests.size >= 16) break
+            if (requested[block]) continue
+            val begin = block * PeerWire.BLOCK_SIZE
+            val request = PeerMessage.Request(assigned.index, begin,
+              minOf(PeerWire.BLOCK_SIZE, assigned.bytes.size - begin))
+            state.requested(request)
+            wire.send(request)
+            requested[block] = true
+            lastWrite = TimeSource.Monotonic.markNow()
+          }
+        }
+      }
+      if (lastWrite.elapsedNow().inWholeSeconds >= 30) {
+        wire.send(PeerMessage.KeepAlive)
+        lastWrite = TimeSource.Monotonic.markNow()
+      }
+    }
+  }
 }
 
 /** One maximal frame plus its decode copy; piece buffers are charged separately per claim. */
