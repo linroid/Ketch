@@ -148,9 +148,17 @@ fun KetchColors.healthColor(health: DeviceHealth): Color = when (health) {
 /**
  * Two letters standing for [name]: the initials of its first two words ("NAS-Basement" gives
  * "NB"), or of a single word its first letter and its next capital or second letter
- * ("MacBook" gives "MB").
+ * ("MacBook" gives "MB"). A device named by its address stands for its host's first label
+ * ("nas.local:8642" gives "NA") or, for an IPv4 address, the last digits of its last part
+ * ("192.168.1.42" gives "42").
  */
 internal fun monogram(name: String): String {
+  val address = Address.matchEntire(name.trim())
+  if (address != null) {
+    val host = address.groupValues[1]
+    if (Ipv4.matches(host)) return host.substringAfterLast('.').takeLast(2)
+    return monogram(host.substringBefore('.'))
+  }
   val words = name.split(WordBreak).filter { it.isNotEmpty() }
   val letters = when {
     words.isEmpty() -> return "?"
@@ -169,6 +177,9 @@ internal fun failureBadge(failures: Int): String =
   if (failures > MAX_BADGE_COUNT) "$MAX_BADGE_COUNT+" else failures.toString()
 
 private val WordBreak = Regex("""[^\p{L}\p{N}]+""")
+// A host with a dot or a port and nothing else, such as "nas.local:8642" or "192.168.1.42".
+private val Address = Regex("""([\w-]+(?:\.[\w-]+)+|[\w-]+(?=:\d+$))(?::\d+)?""")
+private val Ipv4 = Regex("""\d{1,3}(?:\.\d{1,3}){3}""")
 private const val MAX_BADGE_COUNT = 9
 private const val MONOGRAM_SHARE = 0.4f
 private const val ICON_SHARE = 0.55f
