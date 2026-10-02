@@ -52,6 +52,7 @@ import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.IntakeEntry
+import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.MenuLabel
 import com.linroid.ketch.app.util.formatBytes
@@ -363,7 +364,7 @@ private fun SpaceNeeded(needed: Long, free: Long?, device: String) {
     Text(
       text = buildString {
         append("needs ${formatBytes(needed)}")
-        if (free != null && free > 0) append(" · ${freeSpace(free)} free on $device")
+        if (free != null && free > 0) append(" · ${formatSpace(free)} free on $device")
       },
       style = KetchTheme.typography.caption,
       color = if (free != null && needed > free) {

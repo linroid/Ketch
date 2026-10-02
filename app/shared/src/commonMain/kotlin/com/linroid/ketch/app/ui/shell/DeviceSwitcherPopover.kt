@@ -227,11 +227,10 @@ internal fun SwitcherPanel(
   entries: List<SwitcherEntry>,
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
-  initialHighlight: Int = -1,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  var highlighted by remember { mutableIntStateOf(initialHighlight) }
+  var highlighted by remember { mutableIntStateOf(-1) }
   // Rows the keyboard moves to scroll into view; the ones the pointer rests on are in view.
   var fromKeyboard by remember { mutableStateOf(false) }
   val move = { step: Int ->

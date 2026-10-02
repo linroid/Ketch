@@ -137,8 +137,8 @@ internal fun speedModeLabel(
   }
 }
 
-/** Name of [mode] in sentence case, as the popover and messages show it. */
-internal fun speedModeName(mode: SpeedLimitMode): String = when (mode) {
+/** Name of [mode] in sentence case, as the popover, menus and messages show it. */
+fun speedModeName(mode: SpeedLimitMode): String = when (mode) {
   SpeedLimitMode.Full -> "Full speed"
   SpeedLimitMode.SlowLane -> "Slow lane"
   SpeedLimitMode.Auto -> "Auto"

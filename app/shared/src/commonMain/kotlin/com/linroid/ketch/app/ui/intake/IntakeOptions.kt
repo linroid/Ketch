@@ -96,7 +96,7 @@ internal fun OptionsRow(actions: IntakeActions) {
   val values = session.optionValues
   // The box keeps the line at the start; the variant that fits is only as wide as it needs.
   Box(Modifier.fillMaxWidth()) {
-    FirstThatFits(count = OPTION_LINE_VARIANTS) { variant ->
+    FirstThatFits(count = OptionLineStyle.entries.size) { variant ->
       OptionsLine(actions, values, OptionLineStyle.entries[variant])
     }
   }
@@ -123,8 +123,6 @@ private enum class OptionLineStyle(
   IconOnly(optionsLabel = false),
   Scrolling(optionsLabel = false, scrolls = true),
 }
-
-private val OPTION_LINE_VARIANTS = OptionLineStyle.entries.size
 
 @Composable
 private fun OptionsLine(
@@ -228,7 +226,7 @@ internal fun OptionsPanel(session: IntakeSession, modifier: Modifier = Modifier)
     }
     OptionField("Priority", caption = priorityCaption(session.priority)) {
       KetchSegmented(
-        options = PRIORITIES,
+        options = DownloadPriority.entries,
         selected = session.priority,
         onSelect = { session.priority = it },
         label = ::priorityLabel,
@@ -443,7 +441,7 @@ private fun SaveToPill(
   Box(modifier) {
     OptionPill(
       label = "Save to".takeIf { label },
-      value = name + (free?.takeIf { showFree }?.let { " · ${freeSpace(it)} free" } ?: ""),
+      value = name + (free?.takeIf { showFree }?.let { " · ${formatSpace(it)} free" } ?: ""),
       icon = KetchIcon.Folder,
       changed = folder != null,
       onClick = { expanded = true },
@@ -775,7 +773,7 @@ internal fun targetSummary(presence: DevicePresence?, free: Long? = null): Strin
   val usable = free ?: presence?.disk?.usableBytes?.takeIf { it > 0 }
   val active = presence?.counts?.downloading ?: 0
   return listOfNotNull(
-    usable?.let { "${freeSpace(it)} free" },
+    usable?.let { "${formatSpace(it)} free" },
     "$active active".takeIf { active > 0 },
     "Slow lane".takeIf { presence?.speedMode?.isSlowLane == true },
   ).joinToString(" · ").ifEmpty { null }
@@ -783,22 +781,12 @@ internal fun targetSummary(presence: DevicePresence?, free: Long? = null): Strin
 
 private const val MAX_TARGET_SHORTCUTS = 9
 
-/** Free space as the Pulse bar says it, such as "412 GB", "3.1 GB" or "1.6 TB". */
-internal fun freeSpace(bytes: Long): String = formatSpace(bytes)
-
 private fun priorityCaption(priority: DownloadPriority): String = when (priority) {
   DownloadPriority.LOW -> "Runs when nothing else is waiting"
   DownloadPriority.NORMAL -> "Default order"
   DownloadPriority.HIGH -> "Ahead of Normal and Low"
   DownloadPriority.URGENT -> "Jumps the queue; may pause a lower-priority download"
 }
-
-private val PRIORITIES = listOf(
-  DownloadPriority.LOW,
-  DownloadPriority.NORMAL,
-  DownloadPriority.HIGH,
-  DownloadPriority.URGENT,
-)
 
 private const val SECRET_LINES = 3
 private const val SEPARATOR = " · "

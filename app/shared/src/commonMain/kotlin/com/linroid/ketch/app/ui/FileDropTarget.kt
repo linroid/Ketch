@@ -206,7 +206,7 @@ internal fun DropOverlay(compact: Boolean, modifier: Modifier = Modifier) {
       )
       if (!compact) {
         Text(
-          text = "Links, magnets, .torrent files and lists of links",
+          text = DROP_KINDS,
           style = KetchTheme.typography.bodyS,
           color = colors.textSecondary,
           textAlign = TextAlign.Center,
@@ -228,6 +228,9 @@ internal fun Modifier.dashedOutline(color: Color, shape: Shape): Modifier = draw
     translate(width / 2, width / 2) { drawOutline(outline, color, style = stroke) }
   }
 }
+
+/** What can be dropped, under "Drop to download". */
+internal const val DROP_KINDS = "Links, magnets, .torrent files and lists of links"
 
 /** The overlay lets the app show through faintly around the berths, so the drop keeps context. */
 internal const val DROP_OVERLAY_ALPHA = 0.96f
