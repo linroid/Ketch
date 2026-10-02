@@ -3,7 +3,6 @@ package com.linroid.ketch.app.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -40,7 +39,7 @@ fun KetchLogoTile(
   size: Dp = KetchLogoTileDefaults.Onboarding,
 ) {
   val ember = KetchTheme.colors.brandEmber
-  val shape = remember(size) { RoundedCornerShape(size * CORNER_SHARE) }
+  val shape = rememberTileShape(size)
   val gradient = remember(ember) { Brush.linearGradient(ember) }
   Box(
     contentAlignment = Alignment.Center,
@@ -53,5 +52,4 @@ fun KetchLogoTile(
   }
 }
 
-private const val CORNER_SHARE = 0.28f
 private const val GLYPH_SHARE = 0.72f

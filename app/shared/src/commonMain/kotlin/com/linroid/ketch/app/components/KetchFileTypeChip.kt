@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -63,7 +62,7 @@ fun KetchFileTypeChip(
     targetValue = if (showCheck) colors.status.completed.color else hueColor,
     animationSpec = tween(motion.medium),
   )
-  val shape = remember(size) { RoundedCornerShape(size * CORNER_SHARE) }
+  val shape = rememberTileShape(size)
   Box(
     contentAlignment = Alignment.Center,
     modifier = modifier
@@ -129,5 +128,4 @@ private val FileKind.hue: FileTypeHue?
     FileKind.Unknown -> null
   }
 
-private const val CORNER_SHARE = 0.28f
 private const val GLYPH_SHARE = 0.56f

@@ -52,7 +52,7 @@ fun KetchHueTile(
 ) {
   val dark = KetchTheme.colors.isDark
   val tint = if (dark) hue.dark else hue.light
-  val shape = remember(size) { RoundedCornerShape(size * CORNER_SHARE) }
+  val shape = rememberTileShape(size)
   val fill = remember(tint) {
     Brush.linearGradient(listOf(tint.copy(alpha = TOP_ALPHA), tint.copy(alpha = BOTTOM_ALPHA)))
   }
@@ -72,7 +72,11 @@ fun KetchHueTile(
   }
 }
 
-private const val CORNER_SHARE = 0.28f
+/** The rounded square of a tile [size] wide, whose corners round at 28% of it. */
+@Composable
+internal fun rememberTileShape(size: Dp): RoundedCornerShape =
+  remember(size) { RoundedCornerShape(size * 0.28f) }
+
 private const val GLYPH_SHARE = 0.5f
 
 /** Smallest glyph a tile draws, which its strokes stay legible at. */
