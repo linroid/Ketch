@@ -301,19 +301,26 @@ private fun DiskReadout(label: String, used: Float, short: Boolean, tooltip: Str
       modifier = Modifier.padding(horizontal = KetchTheme.spacing.s1),
     ) {
       Text(label, style = KetchTheme.typography.caption, color = ink, maxLines = 1)
+      DiskBar(used, short, colors.borderStrong, Modifier.size(DiskBarWidth, DiskBarHeight))
+    }
+  }
+}
+
+/**
+ * The [used] share of a disk on a [track] sized by [modifier], amber while the space is [short];
+ * an unknown share shows the track alone.
+ */
+@Composable
+internal fun DiskBar(used: Float?, short: Boolean, track: Color, modifier: Modifier) {
+  val colors = KetchTheme.colors
+  Box(modifier.clip(KetchTheme.shapes.full).background(track)) {
+    if (used != null) {
       Box(
         Modifier
-          .size(DiskBarWidth, DiskBarHeight)
-          .clip(KetchTheme.shapes.full)
-          .background(colors.borderStrong)
-      ) {
-        Box(
-          Modifier
-            .fillMaxHeight()
-            .fillMaxWidth(used)
-            .background(if (short) colors.status.paused.color else colors.textTertiary)
-        )
-      }
+          .fillMaxHeight()
+          .fillMaxWidth(used)
+          .background(if (short) colors.status.paused.color else colors.textTertiary)
+      )
     }
   }
 }

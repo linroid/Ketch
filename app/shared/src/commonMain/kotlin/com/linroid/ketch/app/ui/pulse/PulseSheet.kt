@@ -3,12 +3,10 @@ package com.linroid.ketch.app.ui.pulse
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -187,22 +185,12 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
           style = KetchTheme.typography.caption,
           color = if (pulse.isDiskShort) colors.status.paused.color else colors.textSecondary,
         )
-        Box(
-          Modifier
-            .fillMaxWidth()
-            .height(DiskBarHeight)
-            .clip(KetchTheme.shapes.full)
-            .background(colors.surfaceSunken)
-        ) {
-          Box(
-            Modifier
-              .fillMaxHeight()
-              .fillMaxWidth(diskUsed(disk))
-              .background(
-                if (pulse.isDiskShort) colors.status.paused.color else colors.textTertiary
-              )
-          )
-        }
+        DiskBar(
+          used = diskUsed(disk),
+          short = pulse.isDiskShort,
+          track = colors.surfaceSunken,
+          modifier = Modifier.fillMaxWidth().height(DiskBarHeight),
+        )
       }
     }
   }

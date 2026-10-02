@@ -3,7 +3,6 @@ package com.linroid.ketch.app.ui.devices
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -51,6 +50,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.pulse.DiskBar
 import com.linroid.ketch.app.ui.pulse.diskUsed
 import com.linroid.ketch.app.util.formatBytes
 
@@ -190,22 +190,12 @@ internal fun Storage(device: DevicePresence, work: DeviceWork) {
   val ink = if (short) colors.status.paused.color else colors.textSecondary
   val folder = disk?.directory ?: device.status?.system?.downloadDirectory
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2)) {
-    Box(
-      Modifier
-        .fillMaxWidth()
-        .height(StorageBarHeight)
-        .clip(KetchTheme.shapes.full)
-        .background(colors.surfaceSunken)
-    ) {
-      if (disk != null) {
-        Box(
-          Modifier
-            .fillMaxHeight()
-            .fillMaxWidth(diskUsed(disk))
-            .background(if (short) colors.status.paused.color else colors.textTertiary)
-        )
-      }
-    }
+    DiskBar(
+      used = disk?.let(::diskUsed),
+      short = short,
+      track = colors.surfaceSunken,
+      modifier = Modifier.fillMaxWidth().height(StorageBarHeight),
+    )
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
         text = when {
