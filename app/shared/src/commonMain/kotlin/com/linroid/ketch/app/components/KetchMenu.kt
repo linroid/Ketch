@@ -72,7 +72,6 @@ import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -760,10 +759,8 @@ private fun MenuDivider(vertical: Dp) {
 /** A section label, such as "Recent", inset by [horizontal] on both sides and [top] above. */
 @Composable
 private fun MenuHeader(text: String, horizontal: Dp, top: Dp) {
-  Text(
-    text = eyebrowText(text),
-    style = KetchTheme.typography.eyebrow,
-    color = KetchTheme.colors.textTertiary,
+  KetchEyebrow(
+    text = text,
     modifier = Modifier.padding(
       start = horizontal,
       end = horizontal,

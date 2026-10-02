@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchCountBadge
 import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchLogoTile
 import com.linroid.ketch.app.components.KetchLogoTileDefaults
@@ -44,7 +45,6 @@ import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.shell.AppearanceToggle
 
@@ -143,12 +143,7 @@ private fun DevicesEyebrow(showShortcut: Boolean) {
       .fillMaxWidth()
       .padding(start = spacing.s4, end = spacing.s4, top = spacing.s6, bottom = spacing.s1),
   ) {
-    Text(
-      text = eyebrowText("Devices"),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textSecondary,
-      modifier = Modifier.weight(1f),
-    )
+    KetchEyebrow("Devices", Modifier.weight(1f), color = colors.textSecondary)
     val shortcut = KetchCommands.SwitchDevice.shortcutLabel()
     if (shortcut != null) {
       Text(

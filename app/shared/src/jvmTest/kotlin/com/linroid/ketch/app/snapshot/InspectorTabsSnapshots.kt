@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,6 +22,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TaskRow
@@ -31,7 +31,6 @@ import com.linroid.ketch.app.state.TimelineKind
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.inspector.tabs.ActivityTab
 import com.linroid.ketch.app.ui.inspector.tabs.ActivityTabContent
@@ -236,7 +235,7 @@ private fun TabCard(label: String, width: Dp, content: @Composable () -> Unit) {
       .ketchSurface(KetchElevationLevel.E1, KetchTheme.shapes.lg, colors.surface, colors.hairline)
       .padding(spacing.s3),
   ) {
-    Text(eyebrowText(label), style = KetchTheme.typography.eyebrow, color = colors.textTertiary)
+    KetchEyebrow(label)
     content()
   }
 }

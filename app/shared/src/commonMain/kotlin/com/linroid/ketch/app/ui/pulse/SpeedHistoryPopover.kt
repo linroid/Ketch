@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
@@ -28,7 +29,6 @@ import com.linroid.ketch.app.state.SpeedHistoryStore
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
@@ -88,11 +88,7 @@ internal fun SpeedHistoryContent(
   val spacing = KetchTheme.spacing
   val zone = remember { TimeZone.currentSystemDefault() }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-    Text(
-      text = eyebrowText("Last 5 minutes"),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow("Last 5 minutes")
     if (samples.any { it > 0 }) {
       KetchSpeedChart(
         bands = listOf(SpeedBand(samples, colors.accent)),

@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.sp
  * @property caption row meta, hints and reasons.
  * @property label buttons, sidebar items and tabs.
  * @property labelS chips, pills and menu shortcut hints.
- * @property eyebrow group headers, the table header and card labels; uppercase the text with
- *   [eyebrowText].
+ * @property eyebrow group headers, the table header and card labels, which `KetchEyebrow`
+ *   draws in capitals through [eyebrowText].
  * @property numeralXL device-card speed and the phone Pulse sheet.
  * @property numeralL inspector speed.
  * @property numeral row speed, size, ETA and percentage, and the Pulse bar speed.

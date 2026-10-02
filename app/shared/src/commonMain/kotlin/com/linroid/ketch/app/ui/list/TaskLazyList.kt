@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
@@ -42,7 +43,6 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.downloads.actions.FollowFocusedRow
 import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.listKeyboard
@@ -230,12 +230,7 @@ internal fun GroupHeader(
       size = spacing.s3,
       tint = colors.textTertiary,
     )
-    Text(
-      text = eyebrowText(group.title),
-      style = type.eyebrow,
-      color = colors.textSecondary,
-      maxLines = 1,
-    )
+    KetchEyebrow(group.title, color = colors.textSecondary, maxLines = 1)
     if (group.details.isNotEmpty()) {
       Text(
         text = group.details.joinToString(prefix = "· ", separator = " · "),

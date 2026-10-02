@@ -30,6 +30,7 @@ import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
@@ -49,7 +50,6 @@ import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.util.PairingLink
 
@@ -231,12 +231,7 @@ private fun NearbySection(
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       modifier = Modifier.fillMaxWidth().heightIn(min = KetchTheme.density.buttonSmall),
     ) {
-      Text(
-        text = eyebrowText("On your network"),
-        style = type.eyebrow,
-        color = colors.textSecondary,
-        modifier = Modifier.weight(1f),
-      )
+      KetchEyebrow("On your network", Modifier.weight(1f), color = colors.textSecondary)
       when {
         nearby.searching -> {
           KetchSpinner()

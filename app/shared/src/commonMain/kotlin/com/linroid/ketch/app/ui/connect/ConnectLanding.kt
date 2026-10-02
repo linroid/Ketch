@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
 import com.linroid.ketch.app.components.focusRing
@@ -56,7 +57,6 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.feedback.ToastHost
 import com.linroid.ketch.app.ui.shell.canvasWash
@@ -217,11 +217,7 @@ internal fun ConnectLandingContent(
 @Composable
 private fun LandingSection(title: String, content: @Composable () -> Unit) {
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2)) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textSecondary,
-    )
+    KetchEyebrow(title, color = KetchTheme.colors.textSecondary)
     content()
   }
 }

@@ -50,6 +50,7 @@ import com.linroid.ketch.app.components.KetchBadgeTone
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
@@ -68,7 +69,6 @@ import com.linroid.ketch.app.state.IntakeStatus
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.util.IntakeAction
 import com.linroid.ketch.app.util.displayName
@@ -214,12 +214,7 @@ private fun LanesPreview(actions: IntakeActions, entry: IntakeEntry) {
   }
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        text = eyebrowText("Connections"),
-        style = KetchTheme.typography.eyebrow,
-        color = KetchTheme.colors.textTertiary,
-        modifier = Modifier.weight(1f),
-      )
+      KetchEyebrow("Connections", Modifier.weight(1f))
       splitLabel(resolved.totalBytes, connections)?.let {
         Text(it, style = KetchTheme.typography.numeralS, color = KetchTheme.colors.textSecondary)
       }

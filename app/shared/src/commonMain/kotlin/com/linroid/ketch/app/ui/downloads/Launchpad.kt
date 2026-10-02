@@ -40,6 +40,7 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
@@ -64,7 +65,6 @@ import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.shell.KetchLayout
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.days
@@ -443,12 +443,7 @@ private fun SetupChecklist(state: AppState, hooks: DesktopHooks, modifier: Modif
   }
   Column(modifier.fillMaxWidth()) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        text = eyebrowText("Set up Ketch"),
-        style = KetchTheme.typography.eyebrow,
-        color = colors.textTertiary,
-        modifier = Modifier.weight(1f),
-      )
+      KetchEyebrow("Set up Ketch", Modifier.weight(1f))
       KetchIconButton(
         icon = KetchIcon.Close,
         contentDescription = "Close the setup checklist",

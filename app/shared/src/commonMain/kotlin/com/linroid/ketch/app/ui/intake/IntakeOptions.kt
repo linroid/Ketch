@@ -43,6 +43,7 @@ import com.linroid.ketch.app.components.DeviceTargetChip
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchSegmented
@@ -78,7 +79,6 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.inspector.FirstThatFits
 import com.linroid.ketch.app.util.priorityLabel
@@ -295,11 +295,7 @@ private fun OptionField(
 ) {
   val colors = KetchTheme.colors
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2)) {
-    Text(
-      text = eyebrowText(label),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow(label)
     content()
     if (caption != null) {
       Text(text = caption, style = KetchTheme.typography.caption, color = colors.textSecondary)
@@ -591,12 +587,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
       .padding(spacing.s3),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        text = eyebrowText("Advanced"),
-        style = KetchTheme.typography.eyebrow,
-        color = colors.textTertiary,
-        modifier = Modifier.weight(1f),
-      )
+      KetchEyebrow("Advanced", Modifier.weight(1f))
       KetchButton(
         text = "Hide",
         onClick = { session.updateAdvancedOpen(false) },

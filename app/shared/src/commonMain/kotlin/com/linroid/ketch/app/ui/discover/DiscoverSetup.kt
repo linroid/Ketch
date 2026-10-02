@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchHueTile
 import com.linroid.ketch.app.components.KetchHueTileDefaults
 import com.linroid.ketch.app.icons.KetchIcon
@@ -32,7 +33,6 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.config.LlmProvider
 
 /**
@@ -74,11 +74,7 @@ internal fun DiscoverSetup(state: AppState, phone: Boolean, modifier: Modifier =
     }
     if (!supported) return@DiscoverHero
     Spacer(Modifier.height(spacing.s8))
-    Text(
-      text = eyebrowText("Choose a model"),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow("Choose a model")
     Spacer(Modifier.height(spacing.s3))
     FlowRow(
       horizontalArrangement = Arrangement.spacedBy(spacing.s2, Alignment.CenterHorizontally),

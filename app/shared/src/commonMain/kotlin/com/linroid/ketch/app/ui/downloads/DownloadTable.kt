@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchMenu
@@ -83,7 +84,6 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.RowFrameState
 import com.linroid.ketch.app.ui.downloads.actions.SelectionCheckbox
@@ -380,13 +380,7 @@ private fun HeaderCell(
       .padding(horizontal = CellPadding),
   ) {
     if (numeric && active) SortChevron(arrangement.descending, ink)
-    Text(
-      text = eyebrowText(label),
-      style = KetchTheme.typography.eyebrow,
-      color = ink,
-      maxLines = 1,
-      overflow = TextOverflow.Clip,
-    )
+    KetchEyebrow(label, color = ink, maxLines = 1)
     if (!numeric && active) SortChevron(arrangement.descending, ink)
   }
 }

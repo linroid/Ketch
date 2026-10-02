@@ -83,6 +83,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
@@ -108,7 +109,6 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.list.FileNameText
 import com.linroid.ketch.app.ui.list.RowCommands
@@ -643,11 +643,7 @@ private fun SectionHeader(title: String) {
       .padding(horizontal = spacing.s3)
       .padding(bottom = spacing.s1),
   ) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textTertiary,
-    )
+    KetchEyebrow(title)
   }
 }
 

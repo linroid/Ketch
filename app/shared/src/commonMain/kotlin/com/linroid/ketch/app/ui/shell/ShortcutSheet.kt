@@ -23,13 +23,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 
 /**
@@ -120,12 +120,7 @@ private fun ShortcutGroupView(group: ShortcutGroup, columns: Int) {
   val spacing = KetchTheme.spacing
   val rows = remember(group, columns) { group.lines.chunked(columns) }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
-    Text(
-      text = eyebrowText(group.title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textTertiary,
-      modifier = Modifier.padding(bottom = spacing.s1),
-    )
+    KetchEyebrow(group.title, Modifier.padding(bottom = spacing.s1))
     for (row in rows) {
       Row(horizontalArrangement = Arrangement.spacedBy(spacing.s6)) {
         for (line in row) ShortcutLineView(line, Modifier.weight(1f))

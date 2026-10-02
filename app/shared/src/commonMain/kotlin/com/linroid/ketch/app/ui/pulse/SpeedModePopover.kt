@@ -21,6 +21,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchCheckbox
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.icons.KetchIcon
@@ -34,10 +35,9 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.config.SpeedLimitMode
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
+import kotlin.time.Instant
 
 /**
  * The speed mode popover of the Pulse bar, 280 dp wide above the [SpeedModePill], or a bottom
@@ -91,7 +91,7 @@ internal fun ColumnScope.SpeedModeOptions(
 
   if (controller != null) {
     val settings by controller.settings.collectAsState()
-    Eyebrow("Speed mode")
+    KetchEyebrow("Speed mode", Modifier.padding(bottom = spacing.s2))
     KetchSegmented(
       options = SpeedLimitMode.entries,
       selected = settings.mode,
@@ -118,7 +118,10 @@ internal fun ColumnScope.SpeedModeOptions(
     else -> state.instanceSettings.download?.speedLimit ?: view.limit
   }
   val error = state.instanceSettings.downloadError.takeIf { state.limitGoesToSettings(asSlowLane) }
-  Eyebrow(if (asSlowLane) "Slow lane speed" else "Speed limit")
+  KetchEyebrow(
+    text = if (asSlowLane) "Slow lane speed" else "Speed limit",
+    modifier = Modifier.padding(bottom = spacing.s2),
+  )
   SpeedLimitPicker(
     value = limit,
     onCommit = { command.track(state.setSpeedLimit(it, asSlowLane)) },
@@ -150,15 +153,6 @@ internal fun ColumnScope.SpeedModeOptions(
   )
 }
 
-@Composable
-private fun Eyebrow(text: String) {
-  Text(
-    text = eyebrowText(text),
-    style = KetchTheme.typography.eyebrow,
-    color = KetchTheme.colors.textTertiary,
-    modifier = Modifier.padding(bottom = KetchTheme.spacing.s2),
-  )
-}
 
 /** What the mode does now, under the mode control. */
 internal fun modeCaption(

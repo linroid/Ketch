@@ -8,13 +8,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.config.DensityMode
 
 /** The page of a preview gallery, in one theme and density, with motion reduced. */
@@ -43,11 +42,7 @@ internal fun PreviewGallery(
 internal fun PreviewSection(title: String, fill: Boolean = false, content: @Composable () -> Unit) {
   val spacing = KetchTheme.spacing
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textTertiary,
-    )
+    KetchEyebrow(title)
     if (fill) {
       Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) { content() }
     } else {

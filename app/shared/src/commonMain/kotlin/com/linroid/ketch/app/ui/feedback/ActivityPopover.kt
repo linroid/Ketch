@@ -35,6 +35,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
@@ -52,7 +53,6 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
 import kotlinx.datetime.DateTimeUnit
@@ -181,12 +181,7 @@ internal fun ActivityContent(
   LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = ListMaxHeight)) {
     groups.forEach { (title, messages) ->
       item(key = "group-$title") {
-        Text(
-          text = eyebrowText(title),
-          style = KetchTheme.typography.eyebrow,
-          color = colors.textTertiary,
-          modifier = Modifier.padding(top = spacing.s2, bottom = spacing.s1),
-        )
+        KetchEyebrow(title, Modifier.padding(top = spacing.s2, bottom = spacing.s1))
       }
       items(messages, key = { it.id }) { message ->
         val taskKey = message.taskKey?.takeIf { it.deviceId == activeDeviceId }

@@ -59,6 +59,7 @@ import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchHueTile
 import com.linroid.ketch.app.components.KetchHueTileDefaults
 import com.linroid.ketch.app.components.KetchIconButton
@@ -96,7 +97,6 @@ import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.util.pairingAddresses
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.ClipboardMode
@@ -328,12 +328,7 @@ private fun SectionHeader(
       .heightIn(min = KetchTheme.density.chip + spacing.s1)
       .padding(start = spacing.s3, end = spacing.s2, bottom = spacing.s1),
   ) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textSecondary,
-      maxLines = 1,
-    )
+    KetchEyebrow(title, color = KetchTheme.colors.textSecondary, maxLines = 1)
     if (trailing != null) {
       Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { trailing() }
     }

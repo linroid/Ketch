@@ -63,6 +63,7 @@ import com.linroid.ketch.app.components.DISABLED_ALPHA
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.KetchSpinner
@@ -76,7 +77,6 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.elideMiddle
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import kotlinx.coroutines.delay
 
@@ -116,13 +116,12 @@ fun SettingsGroup(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       ) {
-        Text(
-          text = eyebrowText(title.orEmpty()),
-          style = KetchTheme.typography.eyebrow,
+        KetchEyebrow(
+          text = title.orEmpty(),
+          modifier = Modifier.weight(1f),
           color = colors.textSecondary,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.weight(1f),
         )
         action?.invoke()
       }

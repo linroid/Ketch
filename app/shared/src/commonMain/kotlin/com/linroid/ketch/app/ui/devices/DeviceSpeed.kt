@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.icons.KetchIcon
@@ -27,7 +28,6 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
 import com.linroid.ketch.app.ui.pulse.SpeedModeOptions
@@ -124,7 +124,7 @@ private fun ColumnScope.DeviceSpeedOptions(
   val command = rememberPendingJob()
   if (controller != null) {
     val settings by controller.settings.collectAsState()
-    Eyebrow("Speed mode")
+    KetchEyebrow("Speed mode", Modifier.padding(bottom = spacing.s2))
     KetchSegmented(
       options = SpeedLimitMode.entries,
       selected = settings.mode,
@@ -139,7 +139,7 @@ private fun ColumnScope.DeviceSpeedOptions(
     )
   } else {
     val settings = state.settingsFor(device.entry)
-    Eyebrow("Speed limit")
+    KetchEyebrow("Speed limit", Modifier.padding(bottom = spacing.s2))
     SpeedLimitPicker(
       value = settings.download?.speedLimit ?: view.limit,
       onCommit = { state.setSpeedLimit(device.entry, it) },
@@ -161,14 +161,5 @@ private fun ColumnScope.DeviceSpeedOptions(
   )
 }
 
-@Composable
-private fun Eyebrow(text: String) {
-  Text(
-    text = eyebrowText(text),
-    style = KetchTheme.typography.eyebrow,
-    color = KetchTheme.colors.textTertiary,
-    modifier = Modifier.padding(bottom = KetchTheme.spacing.s2),
-  )
-}
 
 private val PopoverWidth: Dp = 280.dp

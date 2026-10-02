@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
@@ -44,7 +45,6 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 
 /**
  * The phone's summary line under the "Downloads" title, such as
@@ -176,11 +176,7 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
         )
       }
     }
-    Text(
-      text = eyebrowText("Last minute"),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow("Last minute")
     KetchSpeedChart(
       bands = listOf(SpeedBand(pulse.history, colors.accent)),
       limits = listOfNotNull(limit?.let { SpeedLimitLine(it) }),
