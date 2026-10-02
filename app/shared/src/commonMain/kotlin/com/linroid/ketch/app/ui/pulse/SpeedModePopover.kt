@@ -24,8 +24,7 @@ import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.instance.EmbeddedInstance
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
@@ -82,11 +81,7 @@ internal fun ColumnScope.SpeedModeOptions(
   val view = rememberSpeedModeView(state)
   val active by state.activeInstance.collectAsState()
   val controller = view.controller
-  val deviceName = when (val entry = active) {
-    null -> "this device"
-    is EmbeddedInstance -> localDeviceNoun()
-    else -> entry.label
-  }
+  val deviceName = active?.displayName ?: "this device"
   val command = rememberPendingJob()
   var asSlowLane by remember(controller) { mutableStateOf(view.mode.isSlowLane) }
 
