@@ -114,6 +114,7 @@ import com.linroid.ketch.app.ui.list.FileNameText
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
+import com.linroid.ketch.app.ui.shell.KeyCap
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.ui.shell.shellShortcuts
 import com.linroid.ketch.app.util.formatBytes
@@ -140,9 +141,6 @@ internal object PaletteDefaults {
 
   /** Height of the key hints at the bottom. */
   val FooterHeight: Dp = 28.dp
-
-  /** Height of a key cap. */
-  val KeyCapHeight: Dp = 20.dp
 
   /** Width of hairline dividers. */
   val Hairline: Dp = 1.dp
@@ -799,20 +797,6 @@ private fun TitleAndSubtitle(
         y = (height - subtitlePlaceable.height) / 2,
       )
     }
-  }
-}
-
-@Composable
-private fun KeyCap(text: String) {
-  val colors = KetchTheme.colors
-  Box(
-    contentAlignment = Alignment.Center,
-    modifier = Modifier
-      .heightIn(min = PaletteDefaults.KeyCapHeight)
-      .background(colors.surfaceSunken, KetchTheme.shapes.xs)
-      .padding(horizontal = KetchTheme.spacing.s2),
-  ) {
-    Text(text = text, style = KetchTheme.typography.labelS, color = colors.textSecondary)
   }
 }
 

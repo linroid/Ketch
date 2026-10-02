@@ -153,8 +153,9 @@ private fun ShortcutLineView(line: ShortcutLine, modifier: Modifier) {
   }
 }
 
+/** A key or chord on a sunken cap, such as "⌘K", in the shortcut sheet and the palette. */
 @Composable
-private fun KeyCap(text: String) {
+internal fun KeyCap(text: String) {
   val colors = KetchTheme.colors
   Box(
     contentAlignment = Alignment.Center,
