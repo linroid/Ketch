@@ -889,7 +889,13 @@ class AppState(
   fun pauseAll(targets: List<InstanceEntry> = shownInstances.value): Job =
     scope.launch {
       val results = supervisorScope {
-        targets.map { entry -> async { entry to pauseDevice(entry) } }.awaitAll()
+        targets.map { entry ->
+          async {
+            entry to pauseActiveTasks({ visibleTasks(entry) }) { group ->
+              runEach(group) { it.pause() }
+            }
+          }
+        }.awaitAll()
       }
       val paused = results.flatMap { (_, result) -> result.paused }
       val failures = results.flatMap { (_, result) -> result.failures }
@@ -1427,32 +1433,6 @@ class AppState(
     )
   }
 
-  private class PauseResult(
-    val paused: List<DownloadTask>,
-    val failures: List<Pair<DownloadTask, Throwable>>,
-  )
-
-  private suspend fun pauseDevice(entry: InstanceEntry): PauseResult {
-    val paused = mutableListOf<DownloadTask>()
-    val failures = mutableListOf<Pair<DownloadTask, Throwable>>()
-    val attempted = mutableSetOf<String>()
-    // A paused download frees its slot, and the queue may start a task that was not queued when
-    // the round began, such as one a preemption re-queued; later rounds catch those.
-    repeat(MAX_PAUSE_ROUNDS) {
-      val tasks = visibleTasks(entry).filter { it.taskId !in attempted }
-      val queued = tasks.filter { it.state.value is DownloadState.Queued }
-      val running = tasks.filter { it.state.value is DownloadState.Downloading }
-      if (queued.isEmpty() && running.isEmpty()) return PauseResult(paused, failures)
-      for (group in listOf(queued, running)) {
-        attempted += group.map { it.taskId }
-        runEach(group) { it.pause() }.forEach { (task, error) ->
-          if (error == null) paused += task else failures += task to error
-        }
-      }
-    }
-    return PauseResult(paused, failures)
-  }
-
   private fun deferRemoval(
     tasks: List<DownloadTask>,
     deleteFiles: (DownloadTask) -> Boolean,
@@ -1751,9 +1731,6 @@ class AppState(
 
     /** Dropped files read as text and handed to the add sheet. */
     val LINK_LIST_EXTENSIONS = setOf("txt", "csv", "url", "webloc")
-
-    /** Bulk pauses repeat until nothing is left to pause, at most this often. */
-    const val MAX_PAUSE_ROUNDS = 3
 
     /** How long Start now waits for the task to start before naming what it preempted. */
     val START_TIMEOUT = 2.seconds

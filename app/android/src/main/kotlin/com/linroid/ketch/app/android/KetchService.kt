@@ -344,7 +344,7 @@ class KetchService : Service() {
     val embedded = instanceManager.embedded ?: return
     scope.launch {
       log.i { "Pausing all downloads from the notification" }
-      pauseActiveTasks({ embedded.tasks.value }).forEach { (task, e) ->
+      pauseActiveTasks({ embedded.tasks.value }).failures.forEach { (task, e) ->
         log.w { "Couldn't pause taskId=${task.taskId}: ${e.describeCauses()}" }
       }
     }

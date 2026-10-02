@@ -67,7 +67,7 @@ class PauseActiveTasksTest {
       QueueTask("queued", DownloadState.Queued)
     )
 
-    val failures = pauseActiveTasks({ tasks })
+    val failures = pauseActiveTasks({ tasks }).failures
 
     assertEquals(listOf("queued", "running"), pauses)
     assertTrue(tasks.active().isEmpty())
@@ -92,7 +92,7 @@ class PauseActiveTasksTest {
     val stuck = QueueTask("stuck", downloading(), failure = error)
     val tasks = listOf(stuck, QueueTask("other", downloading()))
 
-    val failures = pauseActiveTasks({ tasks })
+    val failures = pauseActiveTasks({ tasks }).failures
 
     assertEquals(listOf(stuck to error), failures)
     assertEquals(listOf("stuck", "other"), pauses)
