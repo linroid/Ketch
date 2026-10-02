@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -50,6 +49,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchBottomSheet
 import com.linroid.ketch.app.platform.HorizontalResizePointerIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.TaskKey
@@ -206,15 +206,9 @@ internal fun BoxScope.OverlayInspector(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SheetInspector(state: AppState, taskKey: TaskKey, onClose: () -> Unit) {
-  val colors = KetchTheme.colors
-  val sheet = rememberBottomSheetState(initialValue = SheetValue.Hidden)
-  ModalBottomSheet(
+  KetchBottomSheet(
     onDismissRequest = onClose,
-    sheetState = sheet,
-    shape = KetchTheme.shapes.sheetTop,
-    containerColor = colors.surfaceRaised,
-    contentColor = colors.textPrimary,
-    scrimColor = colors.scrim,
+    sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden),
   ) {
     Box(Modifier.fillMaxSize()) {
       TaskInspector(state, taskKey, InspectorPlacement.Sheet, onClose)

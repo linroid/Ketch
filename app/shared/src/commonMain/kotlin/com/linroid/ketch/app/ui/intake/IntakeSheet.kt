@@ -24,10 +24,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
@@ -52,11 +50,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.components.KetchBottomSheet
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDialogDefaults
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.rememberKetchSheetState
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.CommandScope
@@ -380,24 +380,14 @@ private fun PhoneSheet(
   windowHeight: Dp,
   listRows: Int,
 ) {
-  val colors = KetchTheme.colors
   val session = actions.session
   // The sheet state is keyed on this lambda, so it must stay the same one.
   val confirmChange = remember(session) {
     { value: SheetValue -> value != SheetValue.Hidden || session.requestClose() }
   }
-  val sheetState = rememberBottomSheetState(
-    initialValue = SheetValue.Hidden,
-    enabledValues = SheetValues,
-    confirmValueChange = confirmChange,
-  )
-  ModalBottomSheet(
+  KetchBottomSheet(
     onDismissRequest = actions::discardAndClose,
-    sheetState = sheetState,
-    shape = KetchTheme.shapes.sheetTop,
-    containerColor = colors.surfaceRaised,
-    contentColor = colors.textPrimary,
-    scrimColor = colors.scrim,
+    sheetState = rememberKetchSheetState(confirmChange),
   ) {
     // Empty, the sheet is only as tall as its input; it takes the screen once links are in.
     val full = session.showsOptions || session.confirmingClose
@@ -791,9 +781,6 @@ private fun handleSheetKey(
     }
   }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-private val SheetValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
 
 /** Handles ↩ and ⌥↩ in the input before the field types a line break; ⇧↩ types one. */
 internal fun handleInputKey(

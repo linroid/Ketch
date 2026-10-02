@@ -23,10 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -615,10 +612,7 @@ private fun MenuSheet(
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  val sheetState = rememberBottomSheetState(
-    initialValue = SheetValue.Hidden,
-    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-  )
+  val sheetState = rememberKetchSheetState()
   val scope = rememberCoroutineScope()
   val close: () -> Unit = {
     scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
@@ -631,16 +625,7 @@ private fun MenuSheet(
     current = submenu.entries
     heading = submenu.label
   }
-  ModalBottomSheet(
-    onDismissRequest = onDismiss,
-    modifier = modifier,
-    sheetState = sheetState,
-    shape = KetchTheme.shapes.sheetTop,
-    containerColor = colors.surfaceRaised,
-    contentColor = colors.textPrimary,
-    tonalElevation = 0.dp,
-    scrimColor = colors.scrim,
-  ) {
+  KetchBottomSheet(onDismissRequest = onDismiss, modifier = modifier, sheetState = sheetState) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.s4)) {
       if (heading != null || path.isNotEmpty()) {
         Row(

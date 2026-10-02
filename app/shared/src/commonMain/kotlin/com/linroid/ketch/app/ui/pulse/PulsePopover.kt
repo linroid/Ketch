@@ -11,10 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -34,10 +31,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.linroid.ketch.app.components.KetchBottomSheet
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
@@ -70,19 +67,7 @@ internal fun PulsePopover(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   if (KetchTheme.density == KetchDensity.Comfortable) {
-    val sheetState = rememberBottomSheetState(
-      initialValue = SheetValue.Hidden,
-      enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-    )
-    ModalBottomSheet(
-      onDismissRequest = onDismissRequest,
-      sheetState = sheetState,
-      shape = KetchTheme.shapes.sheetTop,
-      containerColor = colors.surfaceRaised,
-      contentColor = colors.textPrimary,
-      tonalElevation = 0.dp,
-      scrimColor = colors.scrim,
-    ) {
+    KetchBottomSheet(onDismissRequest = onDismissRequest) {
       Column(
         modifier = modifier
           .fillMaxWidth()

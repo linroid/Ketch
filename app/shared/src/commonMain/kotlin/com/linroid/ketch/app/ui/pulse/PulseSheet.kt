@@ -14,10 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,6 +26,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchBottomSheet
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
@@ -106,20 +104,7 @@ internal fun pulseSubtitle(pulse: PulseState, modeLabel: String): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PulseSheet(state: AppState, onDismissRequest: () -> Unit) {
-  val colors = KetchTheme.colors
-  val sheetState = rememberBottomSheetState(
-    initialValue = SheetValue.Hidden,
-    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-  )
-  ModalBottomSheet(
-    onDismissRequest = onDismissRequest,
-    sheetState = sheetState,
-    shape = KetchTheme.shapes.sheetTop,
-    containerColor = colors.surfaceRaised,
-    contentColor = colors.textPrimary,
-    tonalElevation = 0.dp,
-    scrimColor = colors.scrim,
-  ) {
+  KetchBottomSheet(onDismissRequest = onDismissRequest) {
     val pulse by state.pulse.state.collectAsState()
     Column(
       modifier = Modifier
