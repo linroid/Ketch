@@ -43,15 +43,16 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
+import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
-import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppController
@@ -641,6 +642,7 @@ private fun defaultMenus(
   val state = controller.state
   val instances by state.instances.collectAsState()
   val active by state.activeInstance.collectAsState()
+  val shown by state.deviceScope.collectAsState()
   val ops by state.pendingOps.ops.collectAsState()
   val mode = speedMode?.mode?.collectAsState()?.value
   return menuBar(
@@ -648,12 +650,13 @@ private fun defaultMenus(
       counts = status.pulse.counts,
       failures = status.pulse.failures,
       filter = state.statusFilter,
-      devices = instances.map { if (it is EmbeddedInstance) localDeviceNoun() else it.label },
+      devices = instances.map { it.displayName },
       activeDevice = instances.indexOf(active).takeIf { it >= 0 },
       selection = emptyList(),
       undoLabel = ops.lastOrNull()?.label,
       inspectorOpen = state.inspectorOpen,
       slowLane = mode?.isSlowLane,
+      allDevices = shown == DeviceScope.All,
       revealLabel = files?.revealLabel,
       platform = KeyboardPlatform.Mac,
     ),

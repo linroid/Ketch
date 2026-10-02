@@ -185,6 +185,17 @@ class DesktopCommandsTest {
     fleet.close()
   }
 
+  @Test
+  fun run_palette_showsTheWindowAndAsksItsShell() = runTest {
+    val fleet = fleet()
+
+    fleet.commands.run(KetchCommands.Palette)
+
+    assertEquals(KetchCommands.Palette, fleet.controller.state.shellCommand)
+    assertEquals(1, fleet.windowShown)
+    fleet.close()
+  }
+
   private fun TestScope.fleet(clipboard: String? = null, speedMode: Boolean = false): Fleet =
     Fleet(this, clipboard, speedMode).also {
       runCurrent()

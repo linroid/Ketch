@@ -183,6 +183,14 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     // The web pastes through the browser's event, since a key press cannot read the clipboard.
     clipboard.pasteEvents.collect(commands::paste)
   }
+  val shellCommand = appState.shellCommand
+  LaunchedEffect(shellCommand, commands) {
+    // Asked for from outside the window's content, such as the macOS menu bar.
+    if (shellCommand != null) {
+      commands.run(shellCommand)
+      appState.shellCommandHandled()
+    }
+  }
   // A drop away from the berths and devices adds where a paste would.
   val windowDrop = remember { DropHoverState() }
   FileDropTarget(
