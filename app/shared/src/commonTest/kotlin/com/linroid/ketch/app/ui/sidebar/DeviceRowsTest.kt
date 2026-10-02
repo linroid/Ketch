@@ -78,6 +78,29 @@ class DeviceRowsTest {
   }
 
   @Test
+  fun allDevicesLine_downloading_sumsTheReachableDevices() {
+    val devices = listOf(
+      device(counts = PulseCounts(downloading = 2), speed = 6_710_886),
+      device(counts = PulseCounts(downloading = 1), speed = 2_831_155),
+      device(health = DeviceHealth.Offline(), counts = PulseCounts(downloading = 1), speed = 99)
+    )
+
+    assertEquals(DeviceLine("9.1 MB/s"), allDevicesLine(devices))
+  }
+
+  @Test
+  fun allDevicesLine_onlyWaiting_countsTheWaitingTasks() {
+    val devices = listOf(device(counts = PulseCounts(waiting = 2)), device())
+
+    assertEquals(DeviceLine("2 waiting"), allDevicesLine(devices))
+  }
+
+  @Test
+  fun deviceShortcut_pastTheNinthDevice_isNull() {
+    assertNull(deviceShortcut(10))
+  }
+
+  @Test
   fun deviceLine_notKeptConnected_isNotAProblem() {
     val idle = device(health = DeviceHealth.Offline(), connected = false)
 

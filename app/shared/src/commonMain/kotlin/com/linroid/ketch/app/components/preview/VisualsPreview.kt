@@ -48,11 +48,8 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
-import com.linroid.ketch.app.ui.common.ConnectionStatusChip
-import com.linroid.ketch.app.ui.common.ConnectionStatusDot
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.config.DensityMode
-import com.linroid.ketch.remote.ConnectionState
 
 @Preview
 @Composable
@@ -243,17 +240,6 @@ private fun Devices() {
       health = DeviceHealth.Live,
       icon = KetchIcon.Desktop,
     )
-  }
-  Section("Connections") {
-    val states = listOf(
-      ConnectionState.Connected,
-      ConnectionState.Connecting,
-      ConnectionState.Disconnected(),
-      ConnectionState.Unauthorized
-    )
-    states.forEach { ConnectionStatusDot(it) }
-    states.forEach { ConnectionStatusChip(it, isActive = true) }
-    ConnectionStatusChip(ConnectionState.Disconnected(), isActive = false)
   }
   Section("Device target") {
     val options = listOf(

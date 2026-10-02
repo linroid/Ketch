@@ -165,7 +165,15 @@ internal fun PhoneTopBar(
 ) {
   val state = shell.app
   if (shell.searchOpen) {
-    SearchBar(shell)
+    Box {
+      SearchBar(shell)
+      // ⌘J reaches Activity while the search shows too.
+      ActivityPopover(
+        state = state,
+        expanded = shell.pulseBar.activityOpen,
+        onDismissRequest = { shell.pulseBar.activityOpen = false },
+      )
+    }
     return
   }
   val spacing = KetchTheme.spacing

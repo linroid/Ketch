@@ -65,9 +65,17 @@ internal fun clipboardLinksAction(text: String?): ClipboardAdd {
 }
 
 /**
- * Runs the global [KetchCommands] in the window: adding, the tabs and destinations, the speed
- * and queue commands, the sidebar, the inspector, Activity, Undo, Settings, the shortcut sheet
- * and the command palette (`⌘K`). While Settings shows, `⌘F` is left to Settings' own search.
+ * Whether one plain link pasted or dropped is added without the sheet: as the user chose, and by
+ * default on desktop and web.
+ */
+internal val AppState.quickAddsLinks: Boolean
+  get() = appSettings.ui.quickAdd ?: !isMobilePlatform
+
+/**
+ * Runs the global [KetchCommands] in the window: adding, the tabs and destinations, the devices
+ * and their switcher, the speed and queue commands, the sidebar, the inspector, Activity, Undo,
+ * Settings, the shortcut sheet and the command palette (`⌘K`). While Settings shows, `⌘F` is
+ * left to Settings' own search.
  *
  * @param clipboard where pasted and added links come from.
  * @param files picks `.torrent` files to open.
@@ -82,9 +90,7 @@ internal class ShellCommands(
   private val log = KetchLogger("ShellCommands")
   private val state: AppState get() = shell.app
 
-  /** Whether one plain pasted link is added without the sheet, by default on desktop and web. */
-  private val quickAdd: Boolean
-    get() = state.appSettings.ui.quickAdd ?: !isMobilePlatform
+  private val quickAdd: Boolean get() = state.quickAddsLinks
 
   /** Whether [run] does anything for [command]. */
   fun binds(command: KetchCommand): Boolean =
@@ -122,6 +128,8 @@ internal class ShellCommands(
       }
       KetchCommands.Discover -> return shell.show(AppDestination.Discover)
       KetchCommands.Devices -> return shell.show(AppDestination.Devices)
+      KetchCommands.AllDevices -> return state.showAllDevices()
+      KetchCommands.SwitchDevice -> state.showInstanceSelector = !state.showInstanceSelector
       KetchCommands.PauseAll -> state.pauseAll()
       KetchCommands.ResumeAll -> state.resumeAll()
       KetchCommands.RetryFailed -> state.retryFailed()
@@ -208,6 +216,8 @@ internal class ShellCommands(
       KetchCommands.Search,
       KetchCommands.Discover,
       KetchCommands.Devices,
+      KetchCommands.AllDevices,
+      KetchCommands.SwitchDevice,
       KetchCommands.PauseAll,
       KetchCommands.ResumeAll,
       KetchCommands.RetryFailed,
