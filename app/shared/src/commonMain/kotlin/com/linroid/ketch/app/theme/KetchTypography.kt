@@ -93,11 +93,7 @@ fun ketchTypography(
     largeTitle = style(display, FontWeight.Bold, 28, 34, (-0.5).sp),
     titleL = style(sans, FontWeight.SemiBold, 20, 26, (-0.3).sp),
     titleM = style(sans, FontWeight.SemiBold, 15, 20, (-0.1).sp),
-    bodyStrong = if (comfortable) {
-      style(sans, FontWeight.Medium, 15, 20)
-    } else {
-      style(sans, FontWeight.Medium, 14, 20)
-    },
+    bodyStrong = style(sans, FontWeight.Medium, if (comfortable) 15 else 14, 20),
     body = style(sans, FontWeight.Normal, 14, 20),
     bodyS = style(sans, FontWeight.Normal, 13, 18),
     cell = style(sans, FontWeight.Normal, 13, 18),

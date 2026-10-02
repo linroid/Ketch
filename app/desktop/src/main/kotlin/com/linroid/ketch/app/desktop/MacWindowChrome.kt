@@ -22,8 +22,8 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.PulseState
+import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.WindowChrome
-import com.linroid.ketch.app.theme.ketchSpacing
 import com.linroid.ketch.config.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -194,4 +194,4 @@ private suspend fun titleBarDoubleClicked(state: WindowState) {
 private val TrafficLightsWidth = 78.dp
 
 // The sidebar's title zone and, beside it, the page header below the content card's inset.
-private val TitleBarHeight: Dp = ketchSpacing().let { it.cardInset + it.pageHeaderHeight }
+private val TitleBarHeight: Dp = KetchSpacing().let { it.cardInset + it.pageHeaderHeight }

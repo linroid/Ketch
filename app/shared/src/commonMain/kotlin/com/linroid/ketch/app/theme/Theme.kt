@@ -7,6 +7,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -14,29 +15,21 @@ import androidx.compose.ui.graphics.Color
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.config.DensityMode
 
-val LocalKetchColors = staticCompositionLocalOf<KetchColors> {
-  error("KetchColors not provided. Wrap your UI in KetchTheme { … }.")
-}
+val LocalKetchColors = tokenLocal<KetchColors>("KetchColors")
 
-val LocalKetchTypography = staticCompositionLocalOf<KetchTypography> {
-  error("KetchTypography not provided. Wrap your UI in KetchTheme { … }.")
-}
+val LocalKetchTypography = tokenLocal<KetchTypography>("KetchTypography")
 
-val LocalKetchShapes = staticCompositionLocalOf<KetchShapes> {
-  error("KetchShapes not provided. Wrap your UI in KetchTheme { … }.")
-}
+val LocalKetchShapes = tokenLocal<KetchShapes>("KetchShapes")
 
-val LocalKetchSpacing = staticCompositionLocalOf<KetchSpacing> {
-  error("KetchSpacing not provided. Wrap your UI in KetchTheme { … }.")
-}
+val LocalKetchSpacing = tokenLocal<KetchSpacing>("KetchSpacing")
 
-val LocalKetchElevation = staticCompositionLocalOf<KetchElevation> {
-  error("KetchElevation not provided. Wrap your UI in KetchTheme { … }.")
-}
+val LocalKetchElevation = tokenLocal<KetchElevation>("KetchElevation")
 
-val LocalKetchMotion = staticCompositionLocalOf<KetchMotion> {
-  error("KetchMotion not provided. Wrap your UI in KetchTheme { … }.")
-}
+val LocalKetchMotion = tokenLocal<KetchMotion>("KetchMotion")
+
+/** A local for the [name] tokens, which only `KetchTheme` provides. */
+private fun <T> tokenLocal(name: String): ProvidableCompositionLocal<T> =
+  staticCompositionLocalOf { error("$name not provided. Wrap your UI in KetchTheme { … }.") }
 
 /**
  * Provides the Ketch design tokens, and a Material theme mapped onto them, to [content].
