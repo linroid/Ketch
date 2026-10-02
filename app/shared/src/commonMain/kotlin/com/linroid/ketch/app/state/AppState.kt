@@ -37,6 +37,7 @@ import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.formatBytes
@@ -695,6 +696,7 @@ class AppState(
             destination = destination,
             priority = defaults.priority,
             connections = defaults.connections.coerceAtLeast(0),
+            properties = mapOf(TaskOrigin.PROPERTY to TaskOrigin.App.id),
           )
         } catch (e: IllegalArgumentException) {
           postError("Couldn't add $url", detail = e.message, cause = e)
