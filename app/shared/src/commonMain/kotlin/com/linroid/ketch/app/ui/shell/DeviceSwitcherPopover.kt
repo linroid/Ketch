@@ -41,6 +41,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -251,6 +252,12 @@ internal fun SwitcherPanel(
           Key.Escape -> {
             onDismissRequest()
             true
+          }
+          Key.D -> {
+            // ⇧⌘D closes the switcher it opened.
+            val chord = event.isShiftPressed && (event.isMetaPressed || event.isCtrlPressed)
+            if (chord) onDismissRequest()
+            chord
           }
           else -> digitPick(event, entries)?.let(pick) != null
         }
