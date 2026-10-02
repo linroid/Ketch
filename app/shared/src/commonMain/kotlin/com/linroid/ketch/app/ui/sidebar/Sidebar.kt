@@ -44,6 +44,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.eyebrowText
+import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.shell.AddButton
 import com.linroid.ketch.app.ui.shell.AddButtonDefaults
 
@@ -123,7 +124,7 @@ internal fun Sidebar(
           }
         }
       }
-      AddDeviceRow(onClick = { state.showAddRemoteDialog = true })
+      AddDeviceRow(onClick = { state.addDevice() })
     }
     KetchTooltip(text = "Settings", shortcut = KetchCommands.Settings.shortcutLabel()) {
       KetchSidebarItem(

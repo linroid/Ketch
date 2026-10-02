@@ -51,7 +51,7 @@ import com.linroid.ketch.app.ui.sidebar.rememberDevices
  * What a drag of links, magnets or `.torrent` files from another app shows over the content
  * card while [hover] is active: one berth per device, each adding what is dropped on it there,
  * up to four in a row and more in two rows. Devices that cannot be reached show a dimmed berth
- * that turns the drop down. With a single device there is one berth for the whole window.
+ * that turns the drop down. With a single device there is one berth over the whole card.
  *
  * The berths stay laid out, unseen, while nothing is dragged: a drop target only takes part in a
  * drag that starts while it is on screen.

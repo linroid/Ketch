@@ -21,6 +21,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -28,12 +32,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -46,6 +52,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -143,7 +150,7 @@ internal fun rememberSwitcherEntries(
 
 /**
  * Add device…, Find on network where the platform can search it, and, with [share], sharing
- * this device when the app runs one.
+ * this device where it can share its downloads.
  */
 @Composable
 internal fun rememberDeviceActions(
@@ -152,7 +159,8 @@ internal fun rememberDeviceActions(
 ): List<SwitcherEntry.Action> {
   val canSearch = remember { LanServerDiscovery().supported }
   val instances by state.instances.collectAsState()
-  val shares = share && instances.any { it is EmbeddedInstance }
+  val shares = share && state.instanceManager.isLocalServerSupported &&
+    instances.any { it is EmbeddedInstance }
   val noun = localDeviceNoun().replaceFirstChar { it.lowercase() }
   return remember(state, canSearch, shares, noun) {
     listOfNotNull(
@@ -175,8 +183,8 @@ internal fun AppState.findOnNetwork() {
  * The device switcher (`⇧⌘D`, the page header's device chip), opening below where it is placed:
  * All devices, every device with what it is doing and its `⌥⌘` digit, and the ways to add one.
  *
- * Picking a row switches to it and closes the switcher. ↑ and ↓ move through the rows, ↩
- * picks one, a digit or its `⌥⌘` chord picks that device (0 for All devices), and Esc closes.
+ * Picking a row switches to it and closes the switcher. ↑ and ↓ (or Tab) move through the rows,
+ * ↩ picks one, a digit or its `⌥⌘` chord picks that device (0 for All devices), and Esc closes.
  *
  * @param offset where it opens from the top-start corner of where it is placed.
  */
@@ -187,8 +195,16 @@ internal fun DeviceSwitcherPopover(
   offset: IntOffset = IntOffset.Zero,
 ) {
   val entries = rememberSwitcherEntries(state, rememberDeviceActions(state))
+  val margin = KetchTheme.spacing.s2
+  val density = LocalDensity.current
+  val marginPx = with(density) { margin.roundToPx() }
+  val windowHeight = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
+  // A short window scrolls the rows rather than pushing the panel past its edges.
+  val maxHeight = (windowHeight - margin * 2).coerceAtLeast(margin)
   Popup(
-    popupPositionProvider = remember(offset) { BelowStartPositionProvider(offset) },
+    popupPositionProvider = remember(offset, marginPx) {
+      BelowStartPositionProvider(offset, marginPx)
+    },
     onDismissRequest = onDismissRequest,
     properties = PopupProperties(focusable = true),
   ) {
@@ -204,6 +220,7 @@ internal fun DeviceSwitcherPopover(
       entries = entries,
       onDismissRequest = onDismissRequest,
       modifier = Modifier
+        .heightIn(max = maxHeight)
         .graphicsLayer {
           alpha = appear.value
           val scale = APPEAR_SCALE + (1f - APPEAR_SCALE) * appear.value
@@ -228,6 +245,12 @@ internal fun SwitcherPanel(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   var highlighted by remember { mutableIntStateOf(initialHighlight) }
+  // Rows the keyboard moves to scroll into view; the ones the pointer rests on are in view.
+  var fromKeyboard by remember { mutableStateOf(false) }
+  val move = { step: Int ->
+    highlighted = (highlighted + step).coerceIn(0, entries.lastIndex)
+    fromKeyboard = true
+  }
   val pick = { entry: SwitcherEntry ->
     onDismissRequest()
     entry.run()
@@ -238,11 +261,16 @@ internal fun SwitcherPanel(
         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when (event.key) {
           Key.DirectionDown -> {
-            highlighted = (highlighted + 1).coerceAtMost(entries.lastIndex)
+            move(1)
             true
           }
           Key.DirectionUp -> {
-            highlighted = (highlighted - 1).coerceAtLeast(0)
+            move(-1)
+            true
+          }
+          Key.Tab -> {
+            // Tab moves the highlight too, so the focus stays here and ↩ picks the row it shows.
+            move(if (event.isShiftPressed) -1 else 1)
             true
           }
           Key.Enter, Key.NumPadEnter, Key.Spacebar -> {
@@ -269,14 +297,19 @@ internal fun SwitcherPanel(
         fill = colors.surfaceRaised,
         border = colors.hairline,
       )
+      .verticalScroll(rememberScrollState())
       .padding(vertical = spacing.s1),
   ) {
     SwitcherRows(
       state = state,
       entries = entries,
       highlighted = highlighted,
-      onHighlight = { highlighted = it },
+      onHighlight = {
+        highlighted = it
+        fromKeyboard = false
+      },
       onPick = pick,
+      revealHighlight = fromKeyboard,
     )
   }
 }
@@ -286,6 +319,7 @@ internal fun SwitcherPanel(
  * the switcher and the phone's device sheet.
  *
  * @param highlighted index of the row the keyboard or the pointer is on.
+ * @param revealHighlight whether the [highlighted] row scrolls into view.
  */
 @Composable
 internal fun ColumnScope.SwitcherRows(
@@ -294,6 +328,7 @@ internal fun ColumnScope.SwitcherRows(
   highlighted: Int,
   onHighlight: (Int) -> Unit,
   onPick: (SwitcherEntry) -> Unit,
+  revealHighlight: Boolean = false,
 ) {
   val devices = rememberDevices(state)
   val active by state.activeInstance.collectAsState()
@@ -302,7 +337,11 @@ internal fun ColumnScope.SwitcherRows(
   entries.forEachIndexed { index, entry ->
     val previous = entries.getOrNull(index - 1)
     if (previous != null && previous::class != entry::class) SwitcherDivider()
-    val rowModifier = Modifier.highlightOnHover { onHighlight(index) }
+    // A row that takes the keyboard focus, as in the device sheet, shows it as the highlight.
+    val rowModifier = Modifier
+      .highlightOnHover { onHighlight(index) }
+      .onFocusChanged { if (it.isFocused) onHighlight(index) }
+      .revealWhen(revealHighlight && index == highlighted)
     when (entry) {
       is SwitcherEntry.All -> SwitcherRow(
         leading = { PennantCluster(devices, ring = KetchTheme.colors.surfaceRaised) },
@@ -501,6 +540,14 @@ private fun SwitcherDivider() {
   )
 }
 
+/** Scrolls this row into view of the scrolling list around it whenever [reveal] turns on. */
+@Composable
+private fun Modifier.revealWhen(reveal: Boolean): Modifier {
+  val requester = remember { BringIntoViewRequester() }
+  LaunchedEffect(reveal) { if (reveal) requester.bringIntoView() }
+  return bringIntoViewRequester(requester)
+}
+
 /** Moves the highlight here while the pointer rests on this row. */
 @Composable
 private fun Modifier.highlightOnHover(onHover: () -> Unit): Modifier {
@@ -569,8 +616,14 @@ internal fun allDevicesDetail(devices: List<DevicePresence>): String {
   return listOfNotNull(activity, reachable).joinToString(" · ")
 }
 
-/** Opens below the anchor's top-start corner moved by [offset], kept inside the window. */
-private class BelowStartPositionProvider(private val offset: IntOffset) : PopupPositionProvider {
+/**
+ * Opens below the anchor's top-start corner moved by [offset], kept [margin] pixels inside the
+ * window.
+ */
+private class BelowStartPositionProvider(
+  private val offset: IntOffset,
+  private val margin: Int,
+) : PopupPositionProvider {
   override fun calculatePosition(
     anchorBounds: IntRect,
     windowSize: IntSize,
@@ -582,9 +635,10 @@ private class BelowStartPositionProvider(private val offset: IntOffset) : PopupP
     } else {
       anchorBounds.right - offset.x - popupContentSize.width
     }
-    val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-    val maxY = (windowSize.height - popupContentSize.height).coerceAtLeast(0)
-    return IntOffset(x.coerceIn(0, maxX), (anchorBounds.top + offset.y).coerceIn(0, maxY))
+    val maxX = (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)
+    val maxY = (windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin)
+    val y = anchorBounds.top + offset.y
+    return IntOffset(x.coerceIn(margin, maxX), y.coerceIn(margin, maxY))
   }
 }
 

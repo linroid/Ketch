@@ -29,6 +29,7 @@ import com.linroid.ketch.app.components.KetchMenuPanel
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -113,6 +114,22 @@ class FleetShellSnapshots {
   }
 
   @Test
+  fun switcher_shortWindow_scrollsTheKeyboardHighlightIntoView() {
+    val short = SnapshotSize(1024.dp, 400.dp, KetchDensity.Compact)
+    fleetSnapshots("fleet-switcher-short", listOf(short), themes = listOf(SnapshotTheme.Light)) {
+      state.showInstanceSelector = true
+      scene.settle()
+      // Tab moves like ↓: All devices, the three devices, then the ways to add one.
+      repeat(SWITCHER_ENTRIES) { scene.pressKey(Key.Tab) }
+    }
+  }
+
+  @Test
+  fun deviceButton_phoneAllDevices_showsEveryPennant() {
+    fleetSnapshots("fleet-phone-all", listOf(SnapshotSize.Phone)) { state.showAllDevices() }
+  }
+
+  @Test
   fun deviceSheet_phone_listsTheDevicesAndWaysToAddOne() {
     fleetSnapshots("fleet-device-sheet", listOf(SnapshotSize.Phone)) {
       state.showInstanceSelector = true
@@ -150,7 +167,7 @@ class FleetShellSnapshots {
         val cases = listOf(
           "Idle" to (nas to null),
           "Links" to (nas to dropHint(DeviceDrag.Content, nas, move = false)),
-          "Rows" to (nas to dropHint(rows, nas, move = false)),
+          "Rows" to (nas to dropHint(rows, nas, move = false, moveKey = "⌥")),
           "Rows with ⌥" to (nas to dropHint(rows, nas, move = true)),
           "Rows on their own device" to (mac to dropHint(rows, mac, move = false)),
           "Offline" to (den to dropHint(DeviceDrag.Content, den, move = false))
@@ -214,7 +231,8 @@ private fun fleetSnapshots(
           // The All devices ring and the sidebar's lines follow the first readings.
           delay(READINGS_WAIT)
           AppScenario(environment.controller, environment.data, this).setup()
-          hover(size.width - 2.dp, size.height / 2)
+          // The pointer rests in the window's corner, away from rows it would light up.
+          hover(size.width - 2.dp, 2.dp)
         },
       ) {
         App(environment.controller)
@@ -319,6 +337,12 @@ private class FleetEnvironment(
     factory = InstanceFactory(
       deviceName = data.deviceName,
       embeddedFactory = { SampleKetchApi(data) },
+      // This Mac can share its downloads, as on the desktop.
+      localServerFactory = {
+        object : LocalServerHandle {
+          override fun stop() {}
+        }
+      },
       remoteFactory = { config ->
         if (config.host == Nas.host) {
           RemoteInstance(
@@ -473,6 +497,7 @@ private const val NAS_ID = "nas.local:8642"
 private const val DEN_PC_ID = "den-pc.local:8642"
 private val READINGS_WAIT = 2.seconds
 private const val FOCUS_STEPS = 7
+private const val SWITCHER_ENTRIES = 7
 
 private val SidebarWidth: Dp = 220.dp
 private val RailWidth: Dp = 72.dp
