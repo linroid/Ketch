@@ -7,6 +7,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -83,6 +84,9 @@ class DeviceActionsTest {
     return Fixture(controller, manager.instances.value.first { it is RemoteInstance }, speed)
   }
 
+  private fun devicesTest(block: suspend TestScope.(Fixture) -> Unit) =
+    fixtureTest({ fixture(RecordingKetchApi("NAS")) }, { it.controller.close() }, block)
+
   private fun presence(entry: InstanceEntry) = DevicePresence(
     entry = entry,
     name = "This Mac",
@@ -150,8 +154,7 @@ class DeviceActionsTest {
   }
 
   @Test
-  fun toggleSlowLane_thisMacWhileTheNasShows_switchesItsModeWithUndo() = runTest {
-    val f = fixture(RecordingKetchApi("NAS"))
+  fun toggleSlowLane_thisMacWhileTheNasShows_switchesItsModeWithUndo() = devicesTest { f ->
     f.state.switchInstance(f.nas)
     runCurrent()
     val local = f.state.instances.value.first { it.deviceId == LOCAL_DEVICE_ID }
@@ -165,13 +168,10 @@ class DeviceActionsTest {
     message.actions.single { it.label == "Undo" }.onClick()
     runCurrent()
     assertEquals(SpeedMode.Full, f.speed.mode.value)
-    f.controller.close()
   }
 
   @Test
-  fun dropText_onTheNasCard_opensTheAddSheetForTheNas() = runTest {
-    val f = fixture(RecordingKetchApi("NAS"))
-
+  fun dropText_onTheNasCard_opensTheAddSheetForTheNas() = devicesTest { f ->
     f.state.dropText(f.nas, "  https://example.com/ubuntu.iso\n")
 
     assertTrue(f.state.showAddDialog)
@@ -179,7 +179,6 @@ class DeviceActionsTest {
       IntakeRequest(text = "https://example.com/ubuntu.iso", targetDeviceId = f.nas.deviceId),
       f.state.intakeRequest
     )
-    f.controller.close()
   }
 
   @Test
@@ -207,12 +206,9 @@ class DeviceActionsTest {
   }
 
   @Test
-  fun renameDevice_nas_renamesItAtOnce() = runTest {
-    val f = fixture(RecordingKetchApi("NAS"))
-
+  fun renameDevice_nas_renamesItAtOnce() = devicesTest { f ->
     f.state.renameDevice(f.nas, "Basement")
 
     assertEquals("Basement", f.state.instances.value.first { it is RemoteInstance }.label)
-    f.controller.close()
   }
 }

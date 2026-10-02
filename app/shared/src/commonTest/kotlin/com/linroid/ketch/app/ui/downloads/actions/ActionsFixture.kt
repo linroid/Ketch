@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.app.feedback.AppMessage
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.platform.FileActions
@@ -23,6 +24,7 @@ import com.linroid.ketch.app.util.rowContent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
@@ -72,6 +74,15 @@ internal class ActionsFixture(
     controller.close()
   }
 }
+
+/** Runs [block] over a new [ActionsFixture], closing it even when an assertion fails. */
+internal fun actionsTest(
+  revealLabel: String? = "Show in Finder",
+  canTrash: Boolean = false,
+  openUri: (String) -> Unit = {},
+  block: suspend TestScope.(ActionsFixture) -> Unit,
+): TestResult =
+  fixtureTest({ ActionsFixture(this, revealLabel, canTrash, openUri) }, { it.close() }, block)
 
 /** The row of [task] on [device], built like the task list builds one. */
 internal fun rowOf(

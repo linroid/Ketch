@@ -54,8 +54,7 @@ class DesktopCommandsTest {
   private val downloading = DownloadState.Downloading(DownloadProgress(10, 100, 50))
 
   @Test
-  fun perform_pauseAllOnTheNas_pausesItsTasksWithoutShowingTheWindow() = runTest {
-    val fleet = fleet()
+  fun perform_pauseAllOnTheNas_pausesItsTasksWithoutShowingTheWindow() = fleetTest { fleet ->
     val here = fleet.mac.add(downloading)
     val there = fleet.nas.add(downloading)
 
@@ -65,153 +64,132 @@ class DesktopCommandsTest {
     assertIs<DownloadState.Paused>(there.state.value)
     assertIs<DownloadState.Downloading>(here.state.value)
     assertEquals(0, fleet.windowShown)
-    fleet.close()
   }
 
   @Test
-  fun perform_addClipboardLinkOnTheNas_addsItThereAndKeepsThisComputerShown() = runTest {
-    val fleet = fleet(clipboard = "https://example.com/ubuntu.iso")
+  fun perform_addClipboardLinkOnTheNas_addsItThereAndKeepsThisComputerShown() =
+    fleetTest(clipboard = "https://example.com/ubuntu.iso") { fleet ->
+      fleet.commands.perform(MenuAction.AddClipboardLink(NAS_ID))
+      runCurrent()
 
-    fleet.commands.perform(MenuAction.AddClipboardLink(NAS_ID))
-    runCurrent()
-
-    assertEquals(listOf("https://example.com/ubuntu.iso"), fleet.nas.requests.map { it.url })
-    assertTrue(fleet.mac.requests.isEmpty())
-    assertEquals(LOCAL_ID, fleet.manager.activeInstance.value?.deviceId)
-    assertEquals(0, fleet.windowShown)
-    fleet.close()
-  }
+      assertEquals(listOf("https://example.com/ubuntu.iso"), fleet.nas.requests.map { it.url })
+      assertTrue(fleet.mac.requests.isEmpty())
+      assertEquals(LOCAL_ID, fleet.manager.activeInstance.value?.deviceId)
+      assertEquals(0, fleet.windowShown)
+    }
 
   @Test
-  fun perform_showDevice_showsTheWindowOnThatDevice() = runTest {
-    val fleet = fleet()
-
+  fun perform_showDevice_showsTheWindowOnThatDevice() = fleetTest { fleet ->
     fleet.commands.perform(MenuAction.ShowDevice(NAS_ID))
     runCurrent()
 
     assertEquals(NAS_ID, fleet.manager.activeInstance.value?.deviceId)
     assertEquals(1, fleet.windowShown)
-    fleet.close()
   }
 
   @Test
-  fun perform_stayConnectedOff_stopsWatchingTheNas() = runTest {
-    val fleet = fleet()
-
+  fun perform_stayConnectedOff_stopsWatchingTheNas() = fleetTest { fleet ->
     fleet.commands.perform(MenuAction.StayConnected(NAS_ID, watch = false))
     runCurrent()
 
     val nas = fleet.manager.instances.value.single { it.deviceId == NAS_ID } as RemoteInstance
     assertEquals(false, nas.remoteConfig.watch)
-    fleet.close()
   }
 
   @Test
-  fun perform_retryNow_connectsTheNasWithAFreshClient() = runTest {
-    val fleet = fleet()
+  fun perform_retryNow_connectsTheNasWithAFreshClient() = fleetTest { fleet ->
     val clients = fleet.nasClients
 
     fleet.commands.perform(MenuAction.Reconnect(NAS_ID))
     runCurrent()
 
     assertEquals(clients + 1, fleet.nasClients)
-    fleet.close()
   }
 
   @Test
-  fun perform_enterToken_opensTheAddDeviceSheetForTheNas() = runTest {
-    val fleet = fleet()
-
+  fun perform_enterToken_opensTheAddDeviceSheetForTheNas() = fleetTest { fleet ->
     fleet.commands.perform(MenuAction.EnterToken(NAS_ID))
 
     assertEquals(NAS_ID, fleet.controller.state.unauthorizedInstance?.deviceId)
     assertTrue(fleet.controller.state.showAddRemoteDialog)
     assertEquals(1, fleet.windowShown)
-    fleet.close()
   }
 
   @Test
-  fun perform_setSpeedLimitOnTheNas_appliesItAsItsDownloadSetting() = runTest {
-    val fleet = fleet()
-
+  fun perform_setSpeedLimitOnTheNas_appliesItAsItsDownloadSetting() = fleetTest { fleet ->
     fleet.commands.perform(MenuAction.SetSpeedLimit(NAS_ID, SpeedLimit.mbps(2)))
     runCurrent()
 
     assertEquals(SpeedLimit.mbps(2), fleet.nas.configs.last().speedLimit)
     assertTrue(fleet.mac.configs.isEmpty())
-    fleet.close()
   }
 
   @Test
-  fun perform_slowLaneOnThisComputerWhileTheNasShows_switchesItWithUndo() = runTest {
-    val fleet = fleet(speedMode = true)
-    val speedMode = checkNotNull(fleet.controller.speedMode)
-    fleet.controller.state.switchInstance(fleet.manager.instances.value.last())
-    runCurrent()
+  fun perform_slowLaneOnThisComputerWhileTheNasShows_switchesItWithUndo() =
+    fleetTest(speedMode = true) { fleet ->
+      val speedMode = checkNotNull(fleet.controller.speedMode)
+      fleet.controller.state.switchInstance(fleet.manager.instances.value.last())
+      runCurrent()
 
-    fleet.commands.perform(MenuAction.SetSpeedMode(SpeedLimitMode.SlowLane))
-    runCurrent()
+      fleet.commands.perform(MenuAction.SetSpeedMode(SpeedLimitMode.SlowLane))
+      runCurrent()
 
-    assertEquals(SpeedLimitMode.SlowLane, speedMode.settings.value.mode)
-    val message = fleet.messages().last()
-    val speed = formatSpeedLimit(speedMode.slowLaneSpeed)
-    assertEquals("Slow lane on for ${localDeviceNoun()} · $speed", message.title)
-    message.actions.single { it.label == "Undo" }.onClick()
-    runCurrent()
-    assertEquals(SpeedLimitMode.Full, speedMode.settings.value.mode)
-    fleet.close()
-  }
+      assertEquals(SpeedLimitMode.SlowLane, speedMode.settings.value.mode)
+      val message = fleet.messages().last()
+      val speed = formatSpeedLimit(speedMode.slowLaneSpeed)
+      assertEquals("Slow lane on for ${localDeviceNoun()} · $speed", message.title)
+      message.actions.single { it.label == "Undo" }.onClick()
+      runCurrent()
+      assertEquals(SpeedLimitMode.Full, speedMode.settings.value.mode)
+    }
 
   @Test
-  fun run_deviceCommand_showsTheWindowOnThatDevice() = runTest {
-    val fleet = fleet()
-
+  fun run_deviceCommand_showsTheWindowOnThatDevice() = fleetTest { fleet ->
     fleet.commands.run(KetchCommands.device(2))
     runCurrent()
 
     assertEquals(NAS_ID, fleet.manager.activeInstance.value?.deviceId)
     assertEquals(1, fleet.windowShown)
-    fleet.close()
   }
 
   @Test
-  fun run_allDevices_showsTheWindowWithEveryDevice() = runTest {
-    val fleet = fleet()
-
+  fun run_allDevices_showsTheWindowWithEveryDevice() = fleetTest { fleet ->
     fleet.commands.run(KetchCommands.AllDevices)
 
     assertEquals(DeviceScope.All, fleet.manager.deviceScope.value)
     assertEquals(1, fleet.windowShown)
-    fleet.close()
   }
 
   @Test
-  fun run_palette_showsTheWindowAndAsksItsShell() = runTest {
-    val fleet = fleet()
-
+  fun run_palette_showsTheWindowAndAsksItsShell() = fleetTest { fleet ->
     fleet.commands.run(KetchCommands.Palette)
 
     assertEquals(KetchCommands.Palette, fleet.controller.state.shellCommand)
     assertEquals(1, fleet.windowShown)
-    fleet.close()
   }
 
   @Test
-  fun run_shortcuts_showsTheWindowWithTheShortcutSheet() = runTest {
-    val fleet = fleet()
-
+  fun run_shortcuts_showsTheWindowWithTheShortcutSheet() = fleetTest { fleet ->
     fleet.commands.run(KetchCommands.Shortcuts)
 
     assertTrue(fleet.controller.state.shortcutsRequested)
     assertEquals(1, fleet.windowShown)
-    fleet.close()
   }
 
-  private fun TestScope.fleet(clipboard: String? = null, speedMode: Boolean = false): Fleet =
-    Fleet(this, clipboard, speedMode).also {
+  private fun fleetTest(
+    clipboard: String? = null,
+    speedMode: Boolean = false,
+    block: suspend TestScope.(Fleet) -> Unit,
+  ) = runTest {
+    val fleet = Fleet(this, clipboard, speedMode)
+    try {
       runCurrent()
       advanceTimeBy(1.seconds)
+      block(fleet)
+    } finally {
+      fleet.close()
     }
+  }
 
   /** This computer and a connected NAS, with the app and the menu commands over them. */
   private class Fleet(scope: TestScope, clipboard: String?, speedMode: Boolean) {

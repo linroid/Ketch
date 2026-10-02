@@ -16,6 +16,7 @@ import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.ui.downloads.actions.ActionsFixture
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
+import com.linroid.ketch.app.ui.downloads.actions.actionsTest
 import com.linroid.ketch.app.ui.downloads.actions.rowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -39,8 +40,7 @@ class RowCommandsTest {
     messages().filter { it.level == MessageLevel.Error }
 
   @Test
-  fun run_downloadAgainOnCanceledRow_addsANewTaskAndRemovesTheOld() = runTest {
-    val f = ActionsFixture(this)
+  fun run_downloadAgainOnCanceledRow_addsANewTaskAndRemovesTheOld() = actionsTest { f ->
     val task = f.api.add(DownloadState.Canceled)
 
     f.commands.run(RowAction.DownloadAgain, rowOf(task))
@@ -49,12 +49,10 @@ class RowCommandsTest {
     assertEquals(listOf(task.request.url), f.api.requests.map { it.url })
     assertFalse(task in f.api.tasks.value)
     assertEquals(1, f.api.tasks.value.size)
-    f.close()
   }
 
   @Test
-  fun run_pauseFails_postsOneErrorNamingTheTaskAndDevice() = runTest {
-    val f = ActionsFixture(this)
+  fun run_pauseFails_postsOneErrorNamingTheTaskAndDevice() = actionsTest { f ->
     val task = f.api.add(downloading).apply { failure = IllegalStateException("Connection lost") }
 
     f.commands.run(RowAction.Pause, rowOf(task))
@@ -62,24 +60,20 @@ class RowCommandsTest {
 
     val error = f.errors().single()
     assertEquals("Couldn't pause ${rowOf(task).name} on This Mac", error.title)
-    f.close()
   }
 
   @Test
-  fun run_retryWithOneConnection_lowersConnectionsThenResumes() = runTest {
-    val f = ActionsFixture(this)
+  fun run_retryWithOneConnection_lowersConnectionsThenResumes() = actionsTest { f ->
     val task = f.api.add(DownloadState.Failed(KetchError.Http(429)))
 
     f.commands.run(RowAction.RetryWithConnections(1), rowOf(task))
     runCurrent()
 
     assertEquals(listOf("connections 1", "resume"), task.calls)
-    f.close()
   }
 
   @Test
-  fun run_remove_hidesTheRowUntilTheUndoWindowEnds() = runTest {
-    val f = ActionsFixture(this)
+  fun run_remove_hidesTheRowUntilTheUndoWindowEnds() = actionsTest { f ->
     val task = f.api.add(DownloadState.Completed("/downloads/a.iso", totalBytes = 10))
     backgroundScope.launch { f.controller.state.tasks.collect {} }
     runCurrent()
@@ -94,24 +88,20 @@ class RowCommandsTest {
     advanceTimeBy(7.seconds)
     runCurrent()
     assertEquals(listOf("remove deleteFiles=false"), task.calls)
-    f.close()
   }
 
   @Test
-  fun run_open_opensTheSavedFile() = runTest {
-    val f = ActionsFixture(this)
+  fun run_open_opensTheSavedFile() = actionsTest { f ->
     val task = f.api.add(DownloadState.Completed("/downloads/a.iso", totalBytes = 10))
 
     f.commands.run(RowAction.Open, rowOf(task))
     runCurrent()
 
     assertEquals(listOf("open /downloads/a.iso"), f.files.calls)
-    f.close()
   }
 
   @Test
-  fun run_copyLink_putsTheLinkOnTheClipboardAndConfirms() = runTest {
-    val f = ActionsFixture(this)
+  fun run_copyLink_putsTheLinkOnTheClipboardAndConfirms() = actionsTest { f ->
     val task = f.api.add(downloading)
 
     f.commands.run(RowAction.CopyLink, rowOf(task))
@@ -119,12 +109,10 @@ class RowCommandsTest {
 
     assertEquals(listOf(task.request.url), f.clipboard.written)
     assertEquals("Copied link", f.controller.messages.history.value.first().title)
-    f.close()
   }
 
   @Test
-  fun run_editLink_opensTheAddSheetToRetryTheTask() = runTest {
-    val f = ActionsFixture(this)
+  fun run_editLink_opensTheAddSheetToRetryTheTask() = actionsTest { f ->
     val task = f.api.add(DownloadState.Failed(KetchError.Http(403)))
     runCurrent()
 
@@ -133,7 +121,6 @@ class RowCommandsTest {
     val request = assertNotNull(f.controller.state.intakeRequest)
     assertEquals(task.request.url, request.seeds.single().url)
     assertEquals(TaskKey(LOCAL_DEVICE_ID, task.taskId), request.retryOf)
-    f.close()
   }
 
   @Test
@@ -149,19 +136,17 @@ class RowCommandsTest {
   }
 
   @Test
-  fun run_openSourcePageThrows_postsAnErrorInsteadOfCrashing() = runTest {
-    val f = ActionsFixture(this, openUri = { throw IllegalArgumentException("No browser") })
-    val task = f.api.add(DownloadState.Failed(KetchError.Http(403)), capturedOn(PAGE))
+  fun run_openSourcePageThrows_postsAnErrorInsteadOfCrashing() =
+    actionsTest(openUri = { throw IllegalArgumentException("No browser") }) { f ->
+      val task = f.api.add(DownloadState.Failed(KetchError.Http(403)), capturedOn(PAGE))
 
-    f.commands.run(RowAction.OpenSourcePage, rowOf(task))
+      f.commands.run(RowAction.OpenSourcePage, rowOf(task))
 
-    assertEquals("Couldn't open the source page", f.errors().single().title)
-    f.close()
-  }
+      assertEquals("Couldn't open the source page", f.errors().single().title)
+    }
 
   @Test
-  fun canRun_refererOfAnotherScheme_refusesToOpenIt() = runTest {
-    val f = ActionsFixture(this)
+  fun canRun_refererOfAnotherScheme_refusesToOpenIt() = actionsTest { f ->
     val task = f.api.add(
       DownloadState.Failed(KetchError.Http(403)),
       capturedOn("android-app://com.example.app"),
@@ -169,12 +154,10 @@ class RowCommandsTest {
 
     assertFalse(f.commands.canRun(RowAction.OpenSourcePage, rowOf(task)))
     assertFalse(RowAction.OpenSourcePage in RowActionRunner(f.commands).menu(rowOf(task)))
-    f.close()
   }
 
   @Test
-  fun setSpeedLimit_valueTypedKeyByKey_sendsOneSetSpeedLimit() = runTest {
-    val f = ActionsFixture(this)
+  fun setSpeedLimit_valueTypedKeyByKey_sendsOneSetSpeedLimit() = actionsTest { f ->
     val task = f.api.add(downloading)
     val row = rowOf(task)
     // The list's speed field debounces what is typed the way SpeedLimitPicker does.
@@ -191,18 +174,15 @@ class RowCommandsTest {
 
     assertEquals(listOf("speed"), task.calls)
     assertEquals(SpeedLimit.kbps(500), task.request.speedLimit)
-    f.close()
   }
 
   @Test
-  fun canRun_withoutAClipboard_refusesCopies() = runTest {
-    val f = ActionsFixture(this)
+  fun canRun_withoutAClipboard_refusesCopies() = actionsTest { f ->
     val commands = RowCommands(f.controller.state, f.files, null, backgroundScope) {}
     val task = f.api.add(downloading)
 
     assertFalse(commands.canRun(RowAction.CopyLink, rowOf(task)))
     assertNull(RowActionRunner(commands).menu(rowOf(task)).firstOrNull { it == RowAction.CopyLink })
-    f.close()
   }
 
   @Test

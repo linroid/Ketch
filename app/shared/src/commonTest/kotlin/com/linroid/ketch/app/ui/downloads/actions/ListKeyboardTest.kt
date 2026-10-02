@@ -22,7 +22,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -194,8 +193,7 @@ class ListKeyboardTest {
   }
 
   @Test
-  fun apply_spaceOnSelectionWithRunningRows_pausesThemAndNamesTheRest() = runTest {
-    val f = ActionsFixture(this)
+  fun apply_spaceOnSelectionWithRunningRows_pausesThemAndNamesTheRest() = actionsTest { f ->
     val one = f.add(downloading)
     val two = f.add(downloading)
     val three = f.add(paused)
@@ -211,12 +209,10 @@ class ListKeyboardTest {
     assertEquals(listOf("pause"), two.calls)
     assertTrue(three.calls.isEmpty())
     assertEquals("Paused 2 downloads · 1 already paused", f.messages().last().title)
-    f.close()
   }
 
   @Test
-  fun apply_shiftDeleteOnPausedRow_opensRemoveWithTheBoxChecked() = runTest {
-    val f = ActionsFixture(this)
+  fun apply_shiftDeleteOnPausedRow_opensRemoveWithTheBoxChecked() = actionsTest { f ->
     val rows = listOf(rowOf(f.add(paused)))
     val selection = ListSelection(f.state)
     selection.update(SelectionState().select(rows.single().key))
@@ -225,12 +221,10 @@ class ListKeyboardTest {
     keyboard.apply(ListKey.Rows(KetchCommands.RemoveAndTrash), rows)
 
     assertEquals(RowDialog.Remove(rows, withFiles = true), f.runner.dialog)
-    f.close()
   }
 
   @Test
-  fun apply_moveWithShift_extendsTheSelectionFromTheAnchor() = runTest {
-    val f = ActionsFixture(this)
+  fun apply_moveWithShift_extendsTheSelectionFromTheAnchor() = actionsTest { f ->
     val rows = List(4) { rowOf(f.add(downloading)) }
     val selection = ListSelection(f.state)
     selection.update(SelectionState().select(rows[1].key))
@@ -241,12 +235,10 @@ class ListKeyboardTest {
 
     assertEquals(rows.drop(1).map { it.key }.toSet(), f.state.selectedKeys)
     assertEquals(rows[3].key, selection.focusedKey)
-    f.close()
   }
 
   @Test
-  fun apply_escapeWithNothingSelected_focusesSearch() = runTest {
-    val f = ActionsFixture(this)
+  fun apply_escapeWithNothingSelected_focusesSearch() = actionsTest { f ->
     val requests = mutableListOf<Unit>()
     backgroundScope.launch { f.state.focusSearchRequests.collect { requests += it } }
     runCurrent()
@@ -256,12 +248,10 @@ class ListKeyboardTest {
     runCurrent()
 
     assertEquals(1, requests.size)
-    f.close()
   }
 
   @Test
-  fun apply_connectionsPressedThreeTimes_commitsOnceAfterThePause() = runTest {
-    val f = ActionsFixture(this)
+  fun apply_connectionsPressedThreeTimes_commitsOnceAfterThePause() = actionsTest { f ->
     val task = f.add(downloading, DownloadRequest("https://example.com/a.iso", connections = 4))
     val rows = listOf(rowOf(task))
     val selection = ListSelection(f.state)
@@ -276,12 +266,10 @@ class ListKeyboardTest {
     runCurrent()
 
     assertEquals(listOf("connections 7"), task.calls)
-    f.close()
   }
 
   @Test
-  fun apply_connectionsOnAutoRow_stepsFromTheConnectionsItOpened() = runTest {
-    val f = ActionsFixture(this)
+  fun apply_connectionsOnAutoRow_stepsFromTheConnectionsItOpened() = actionsTest { f ->
     val task = f.add(downloading, DownloadRequest("https://example.com/a.iso"))
     task.segments.value = List(4) { Segment(it, it * 100L, it * 100L + 99) }
     val rows = listOf(rowOf(task))
@@ -294,12 +282,10 @@ class ListKeyboardTest {
     runCurrent()
 
     assertEquals(listOf("connections 5"), task.calls)
-    f.close()
   }
 
   @Test
-  fun apply_connectionsOnAutoTorrent_leavesThePeerLimitAlone() = runTest {
-    val f = ActionsFixture(this)
+  fun apply_connectionsOnAutoTorrent_leavesThePeerLimitAlone() = actionsTest { f ->
     val task = f.add(downloading, DownloadRequest("magnet:?xt=urn:btih:abc"))
     val rows = listOf(rowOf(task))
     val selection = ListSelection(f.state)
@@ -311,7 +297,6 @@ class ListKeyboardTest {
     runCurrent()
 
     assertTrue(task.calls.isEmpty())
-    f.close()
   }
 
   private fun row(state: DownloadState, device: DeviceInfo = LocalDevice): TaskRow =

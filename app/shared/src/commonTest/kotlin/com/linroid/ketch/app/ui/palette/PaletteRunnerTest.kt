@@ -2,6 +2,7 @@ package com.linroid.ketch.app.ui.palette
 
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -20,7 +21,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -49,16 +49,8 @@ class PaletteRunnerTest {
     return Fixture(api, controller, runner, ran)
   }
 
-  // Closes the controller even when an assertion fails, since its timers would otherwise keep
-  // the test's scheduler from ever going idle.
-  private fun paletteTest(block: suspend TestScope.(Fixture) -> Unit) = runTest {
-    val fixture = fixture()
-    try {
-      block(fixture)
-    } finally {
-      fixture.controller.close()
-    }
-  }
+  private fun paletteTest(block: suspend TestScope.(Fixture) -> Unit) =
+    fixtureTest({ fixture() }, { it.controller.close() }, block)
 
   @Test
   fun run_downloadNow_addsTheLinkOnTheDevice() = paletteTest { fixture ->
