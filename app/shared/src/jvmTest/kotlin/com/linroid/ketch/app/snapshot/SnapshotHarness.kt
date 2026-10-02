@@ -15,6 +15,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -111,28 +112,17 @@ internal object SnapshotHarness {
     scale: Float = SCALE,
     interact: suspend SnapshotScene.() -> Unit = {},
     content: @Composable () -> Unit,
-  ): Image = runBlocking(ui) {
-    // Compose logs an exception thrown while recomposing and carries on, so a broken composition
-    // would still render a picture; the handler collects it to fail the capture instead.
-    val errors = ConcurrentLinkedQueue<Throwable>()
-    val scene = ImageComposeScene(
-      width = (width.value * scale).roundToInt(),
-      height = (height.value * scale).roundToInt(),
-      density = Density(scale),
-      coroutineContext = ui + CoroutineExceptionHandler { _, error -> errors += error },
-      content = content,
-    )
-    try {
-      val snapshotScene = SnapshotScene(scene, scale)
-      snapshotScene.settle()
-      snapshotScene.interact()
-      snapshotScene.settle()
-      snapshotScene.renderFrame().also {
-        errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
-      }
-    } finally {
-      scene.close()
-    }
+  ): Image = withScene(
+    width = (width.value * scale).roundToInt(),
+    height = (height.value * scale).roundToInt(),
+    density = Density(scale),
+    content = content,
+  ) {
+    val snapshotScene = SnapshotScene(this, scale)
+    snapshotScene.settle()
+    snapshotScene.interact()
+    snapshotScene.settle()
+    snapshotScene.renderFrame()
   }
 
   /** Writes [image] to `<name>.png` in [outputDir] and returns the file. */
@@ -157,6 +147,78 @@ internal object SnapshotHarness {
 
   private const val FLAT_GRID = 16
 }
+
+/**
+ * Composes [content] in a [width] by [height] pixel scene at [density] on [SnapshotHarness.ui],
+ * runs [test] on it and closes it.
+ */
+internal fun <T> withScene(
+  width: Int,
+  height: Int,
+  density: Density = Density(1f),
+  content: @Composable () -> Unit,
+  test: suspend ImageComposeScene.() -> T,
+): T = runBlocking(SnapshotHarness.ui) {
+  // Compose logs an exception thrown while recomposing and carries on, so a broken composition
+  // would still render a picture; the handler collects it to fail the scene instead.
+  val errors = ConcurrentLinkedQueue<Throwable>()
+  val scene = ImageComposeScene(
+    width = width,
+    height = height,
+    density = density,
+    coroutineContext = SnapshotHarness.ui +
+      CoroutineExceptionHandler { _, error -> errors += error },
+    content = content,
+  )
+  try {
+    scene.test().also {
+      errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
+    }
+  } finally {
+    scene.close()
+  }
+}
+
+/** Renders [count] frames 16 ms apart, each at the time [clock] gives for its index. */
+internal suspend fun ImageComposeScene.frames(
+  count: Int,
+  clock: (Int) -> Long = { System.nanoTime() },
+) {
+  repeat(count) { frame ->
+    render(clock(frame))
+    delay(16.milliseconds)
+  }
+}
+
+/** Presses and releases [key] with the modifiers that are set. */
+@OptIn(InternalComposeUiApi::class)
+internal fun ImageComposeScene.sendKey(
+  key: Key,
+  meta: Boolean = false,
+  ctrl: Boolean = false,
+  alt: Boolean = false,
+  shift: Boolean = false,
+) {
+  // Compose has no public way to make a key event without a window.
+  for (type in listOf(KeyEventType.KeyDown, KeyEventType.KeyUp)) {
+    val event = KeyEvent(
+      key = key,
+      type = type,
+      isMetaPressed = meta,
+      isCtrlPressed = ctrl,
+      isAltPressed = alt,
+      isShiftPressed = shift,
+    )
+    sendKeyEvent(event)
+  }
+}
+
+/** Every semantics node of the scene, unmerged, parents before their children. */
+internal fun ImageComposeScene.nodes(): List<SemanticsNode> =
+  semanticsOwners.flatMap { it.unmergedRootSemanticsNode.withDescendants() }
+
+private fun SemanticsNode.withDescendants(): List<SemanticsNode> =
+  listOf(this) + children.flatMap { it.withDescendants() }
 
 /** Light or dark colors of a snapshot, and its name in file names. */
 internal enum class SnapshotTheme(val id: String) {
@@ -223,12 +285,8 @@ internal class SnapshotScene(
   }
 
   /** Presses and releases [key], with Shift held when [shift] is set. */
-  @OptIn(InternalComposeUiApi::class)
   suspend fun pressKey(key: Key, shift: Boolean = false) {
-    // Compose has no public way to make a key event without a window.
-    for (type in listOf(KeyEventType.KeyDown, KeyEventType.KeyUp)) {
-      scene.sendKeyEvent(KeyEvent(key = key, type = type, isShiftPressed = shift))
-    }
+    scene.sendKey(key, shift = shift)
     settle(minimum = INTERACTION_SETTLE)
   }
 

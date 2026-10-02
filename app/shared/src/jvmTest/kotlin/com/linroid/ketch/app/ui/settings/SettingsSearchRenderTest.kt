@@ -1,23 +1,21 @@
 package com.linroid.ketch.app.ui.settings
 
-import androidx.compose.ui.ImageComposeScene
-import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.unit.Density
 import com.linroid.ketch.app.snapshot.SettingsEnvironment
 import com.linroid.ketch.app.snapshot.SettingsFrame
 import com.linroid.ketch.app.snapshot.SnapshotHarness
 import com.linroid.ketch.app.snapshot.SnapshotTheme
+import com.linroid.ketch.app.snapshot.frames
+import com.linroid.ketch.app.snapshot.nodes
+import com.linroid.ketch.app.snapshot.withScene
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Search jumps to rows and groups by their titles, so each page is rendered as the desktop shows
@@ -43,13 +41,10 @@ class SettingsSearchRenderTest {
       SettingsEnvironment(SnapshotTheme.Light, DensityMode.Compact)
     }
     try {
-      return runBlocking(SnapshotHarness.ui) {
-        val scene = ImageComposeScene(
-          width = WIDTH,
-          height = HEIGHT,
-          density = Density(1f),
-          coroutineContext = SnapshotHarness.ui,
-        ) {
+      return withScene(
+        width = WIDTH,
+        height = HEIGHT,
+        content = {
           SettingsFrame(environment, SnapshotTheme.Light, KetchDensity.Compact, desktop = true) {
             SettingsContent(
               state = environment.controller.state,
@@ -57,35 +52,24 @@ class SettingsSearchRenderTest {
               onClose = {},
             )
           }
-        }
-        try {
-          repeat(FRAMES) {
-            scene.render(System.nanoTime())
-            delay(FRAME)
-          }
-          scene.semanticsOwners
-            .flatMap { it.unmergedRootSemanticsNode.all() }
-            .mapNotNull { it.config.getOrNull(SemanticsProperties.Text) }
-            .flatten()
-            .map { it.text.lowercase() }
-            .toSet()
-        } finally {
-          scene.close()
-        }
+        },
+      ) {
+        frames(FRAMES)
+        nodes()
+          .mapNotNull { it.config.getOrNull(SemanticsProperties.Text) }
+          .flatten()
+          .map { it.text.lowercase() }
+          .toSet()
       }
     } finally {
       runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 
-  private fun SemanticsNode.all(): List<SemanticsNode> =
-    listOf(this) + children.flatMap { it.all() }
-
   private companion object {
     const val WIDTH = 860
     const val HEIGHT = 4000
     const val FRAMES = 30
-    val FRAME = 16.milliseconds
 
     /** What the desktop app offers; the web's and phones' entries are not on its pages. */
     val Shown = setOf(null, SettingsFeature.Desktop, SettingsFeature.SetupChecklist)
