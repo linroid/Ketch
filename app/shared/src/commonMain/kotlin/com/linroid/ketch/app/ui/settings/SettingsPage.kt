@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -217,14 +218,11 @@ internal fun SettingsCategoryPage(
       }
     }
     val margin = with(LocalDensity.current) { spacing.s4.toPx() }
-    SettingsJumpEffect(
-      jump = settingsJump,
-      request = jump,
-      scroll = scroll,
-      content = { scrolled.value },
-      margin = margin,
-      animate = !KetchTheme.reduceMotion,
-    )
+    val animate = !KetchTheme.reduceMotion
+    // Runs the request once the page is laid out; see SettingsJump.jump.
+    LaunchedEffect(settingsJump, jump) {
+      if (jump != null) settingsJump.jump(jump.anchors, scroll, { scrolled.value }, margin, animate)
+    }
   }
 }
 
