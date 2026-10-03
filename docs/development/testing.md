@@ -87,11 +87,11 @@ coverage of completed segment progress.
 
 `HttpDownloadIntegrationTest` uses a loopback HTTP server, real Ktor connections, temporary
 output files, and SQLite task storage. It covers empty and small files, uneven segments,
-servers without range support (including resuming from zero), invalid range responses,
-interrupted transfers, HTTP retries, pause/resume, cancellation cleanup, live connection
-changes, changed server identity, SQLite restart/resume, truncated local files, and UTF-8
-server filenames. Each case has a bounded timeout and closes its clients, server, database, and
-temporary files.
+servers without range support (including resuming from zero), chunked responses of unknown
+size, invalid range responses, interrupted transfers, HTTP retries, pause/resume, cancellation
+cleanup, live connection changes, changed server identity, SQLite restart/resume, truncated
+local files, and UTF-8 server filenames. Each case has a bounded timeout and closes its clients,
+server, database, and temporary files.
 
 Common tests also check response validation without sockets and regression cases for segment
 progress snapshots, cancellation, and resegmentation. Keep fault-injection tests local so they

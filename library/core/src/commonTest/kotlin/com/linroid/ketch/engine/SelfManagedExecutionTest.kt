@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
@@ -23,6 +24,7 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -94,6 +96,44 @@ class SelfManagedExecutionTest {
     job.cancelAndJoin()
     assertEquals(1, calls)
     assertEquals("final", handle.record.value.sourceResumeState?.data)
+  }
+
+  @Test
+  fun execute_unknownSize_failsWithoutCallingSource() = runTest {
+    var downloads = 0
+    val source = object : DownloadSource {
+      override val type = "fixture"
+      override val managesOwnFileIo = true
+      override fun canHandle(url: String) = true
+      override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
+        url = url, sourceType = type, totalBytes = -1, supportsResume = false,
+        suggestedFileName = "fixture", maxSegments = 1,
+      )
+      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
+        SourceResumeState(type, "")
+      override suspend fun download(context: DownloadContext) { downloads++ }
+      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
+    }
+    val now = Clock.System.now()
+    val request = DownloadRequest("fixture:input",
+      destination = Destination("/tmp/ketch-self-managed-unknown"))
+    val handle = object : TaskHandle {
+      override val taskId = "self-managed-unknown"
+      override val request = request
+      override val createdAt = now
+      override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
+      override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
+      override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
+        createdAt = now, updatedAt = now)) {}
+    }
+    val execution = DownloadExecution(handle, SourceResolver(listOf(source)),
+      DefaultFileNameResolver(), DownloadConfig.Default, SpeedLimiter.Unlimited,
+      KetchDispatchers(main = Dispatchers.Default, network = Dispatchers.Default,
+        io = Dispatchers.Default))
+
+    assertFailsWith<KetchError.SourceError> { execution.execute() }
+    assertEquals(0, downloads)
   }
 
   @Test

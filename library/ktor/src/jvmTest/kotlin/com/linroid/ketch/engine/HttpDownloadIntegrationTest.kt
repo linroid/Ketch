@@ -72,6 +72,30 @@ class HttpDownloadIntegrationTest {
   }
 
   @Test
+  fun download_unknownSize_streamsAndRecordsSize() = runTest(timeout = 20.seconds) {
+    withFixture(65539, Mode.STREAMED) { fixture ->
+      val state = assertIs<DownloadState.Completed>(fixture.download(connections = 4))
+      assertContentEquals(fixture.content, File(state.outputPath).readBytes())
+      assertEquals(65539L, state.totalBytes)
+      assertEquals(listOf("none"), fixture.requests.toList())
+    }
+  }
+
+  @Test
+  fun resume_unknownSize_restartsFromZero() = runTest(timeout = 20.seconds) {
+    withFixture(65539, Mode.STREAMED_PAUSE_FIRST) { fixture ->
+      val task = fixture.start(connections = 4)
+      fixture.firstChunk.await()
+      task.pause()
+      task.resume()
+      val state = assertIs<DownloadState.Completed>(task.state.first { it.isTerminal })
+      assertContentEquals(fixture.content, File(state.outputPath).readBytes())
+      assertEquals(65539L, state.totalBytes)
+      assertEquals(listOf("none", "none"), fixture.requests.toList())
+    }
+  }
+
+  @Test
   fun download_ignoredRange_failsInsteadOfCorruptingFile() = runTest(timeout = 20.seconds) {
     withFixture(65539, Mode.IGNORE_RANGES) { fixture ->
       val state = assertIs<DownloadState.Failed>(fixture.download(connections = 4))
@@ -258,7 +282,10 @@ class HttpDownloadIntegrationTest {
 
   private enum class Mode {
     NORMAL, NO_RANGES, NO_RANGES_PAUSE_FIRST, IGNORE_RANGES, WRONG_RANGE, FAIL_FIRST,
-    TRUNCATE_FIRST, PAUSE_FIRST, HEAD_FAIL_FIRST, NOT_FOUND, UNICODE_NAME
+    TRUNCATE_FIRST, PAUSE_FIRST, HEAD_FAIL_FIRST, NOT_FOUND, UNICODE_NAME,
+
+    /** No size and no ranges: the body is sent chunked, like a generated archive. */
+    STREAMED, STREAMED_PAUSE_FIRST,
   }
 
   private class Fixture(size: Int, private val mode: Mode) {
@@ -268,8 +295,11 @@ class HttpDownloadIntegrationTest {
     val etag = AtomicReference("fixture-v1")
     val headAttempts = AtomicInteger()
     private val attempts = AtomicInteger()
-    private val supportsRanges = mode != Mode.NO_RANGES && mode != Mode.NO_RANGES_PAUSE_FIRST
-    private val pauseFirst = mode == Mode.PAUSE_FIRST || mode == Mode.NO_RANGES_PAUSE_FIRST
+    private val streamed = mode == Mode.STREAMED || mode == Mode.STREAMED_PAUSE_FIRST
+    private val supportsRanges =
+      !streamed && mode != Mode.NO_RANGES && mode != Mode.NO_RANGES_PAUSE_FIRST
+    private val pauseFirst = mode == Mode.PAUSE_FIRST || mode == Mode.NO_RANGES_PAUSE_FIRST ||
+      mode == Mode.STREAMED_PAUSE_FIRST
     private val directory = Files.createTempDirectory("ketch-http-integration-").toFile()
     val output = File(directory, "download.bin")
     private val executor = Executors.newCachedThreadPool()
@@ -328,7 +358,7 @@ class HttpDownloadIntegrationTest {
                 it.sendResponseHeaders(if (mode == Mode.NOT_FOUND) 404 else 503, -1)
                 return@use
               }
-              it.responseHeaders.add("Content-Length", content.size.toString())
+              if (!streamed) it.responseHeaders.add("Content-Length", content.size.toString())
               it.sendResponseHeaders(200, -1)
               return@use
             }
@@ -352,7 +382,8 @@ class HttpDownloadIntegrationTest {
               )
             }
             val status = if (range == null || ignore) 200 else 206
-            it.sendResponseHeaders(status, (end - start + 1).toLong())
+            // A zero length makes the server send the body chunked, without a Content-Length.
+            it.sendResponseHeaders(status, if (streamed) 0 else (end - start + 1).toLong())
             if (mode == Mode.TRUNCATE_FIRST && attempt == 1) {
               it.responseBody.write(content, start, 16384)
               it.responseBody.flush()

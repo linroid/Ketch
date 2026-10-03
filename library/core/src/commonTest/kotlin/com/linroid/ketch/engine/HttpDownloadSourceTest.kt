@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -83,6 +84,53 @@ class HttpDownloadSourceTest {
   }
 
   @Test
+  fun download_unknownSize_streamsWholeResponse() = runTest {
+    val engine = FakeHttpEngine(serverInfo = UNKNOWN_SIZE)
+    val file = MemoryFile()
+    val progress = mutableListOf<Pair<Long, Long>>()
+    val context = context(fileAccessor = file, onProgress = { downloaded, total ->
+      progress += downloaded to total
+    })
+
+    HttpDownloadSource(engine).download(context)
+
+    assertContentEquals(engine.content, file.bytes)
+    assertEquals(1, engine.downloadCallCount)
+    assertTrue(context.segments.value.isEmpty())
+    assertEquals(1000L to 1000L, progress.last())
+  }
+
+  @Test
+  fun download_unknownSizeRetry_restartsInEmptiedFile() = runTest {
+    val engine = FakeHttpEngine(serverInfo = UNKNOWN_SIZE, failAfterBytes = 300)
+    val file = MemoryFile()
+    val context = context(fileAccessor = file)
+    val source = HttpDownloadSource(engine)
+    assertFailsWith<KetchError.Network> { source.download(context) }
+
+    // A generated archive can come back different, here shorter, on the next request.
+    engine.failAfterBytes = -1
+    engine.content = ByteArray(200) { 7 }
+    source.download(context)
+
+    assertContentEquals(engine.content, file.bytes)
+  }
+
+  @Test
+  fun resume_unknownSize_restartsWithoutCheckingServerIdentity() = runTest {
+    val engine = FakeHttpEngine(serverInfo = UNKNOWN_SIZE.copy(etag = "\"new\""))
+    val file = MemoryFile(ByteArray(1500) { 9 })
+    val state = HttpDownloadSource.buildResumeState(
+      etag = "\"old\"", lastModified = null, totalBytes = -1,
+    )
+
+    HttpDownloadSource(engine).resume(context(fileAccessor = file), state)
+
+    assertContentEquals(engine.content, file.bytes)
+    assertEquals(0, engine.headCallCount)
+  }
+
+  @Test
   fun resolve_withConfig_reportsDefaultConnectionsAsMaxSegments() = runTest {
     val source = HttpDownloadSource(FakeHttpEngine())
 
@@ -98,20 +146,44 @@ class HttpDownloadSourceTest {
     connections: MutableStateFlow<Int> = MutableStateFlow(0),
     throttle: suspend (Int) -> Unit = {},
     fileAccessor: FileAccessor = NoOpFileAccessor,
+    onProgress: suspend (Long, Long) -> Unit = { _, _ -> },
   ): DownloadContext = DownloadContext(
     taskId = "http-source",
     url = "https://example.com/file",
     request = DownloadRequest("https://example.com/file"),
     fileAccessor = fileAccessor,
     segments = MutableStateFlow(emptyList()),
-    onProgress = { _, _ -> },
+    onProgress = onProgress,
     throttle = throttle,
     headers = emptyMap(),
     maxConnections = connections,
     config = config,
   )
 
+  /** A file kept in memory; [preallocate] resizes it. */
+  private class MemoryFile(
+    var bytes: ByteArray = ByteArray(0),
+  ) : FileAccessor by NoOpFileAccessor {
+    override suspend fun writeAt(offset: Long, data: ByteArray) {
+      val end = offset.toInt() + data.size
+      if (end > bytes.size) bytes = bytes.copyOf(end)
+      data.copyInto(bytes, offset.toInt())
+    }
+
+    override suspend fun size(): Long = bytes.size.toLong()
+
+    override suspend fun preallocate(size: Long) {
+      bytes = bytes.copyOf(size.toInt())
+    }
+  }
+
   private companion object {
+    val UNKNOWN_SIZE = ServerInfo(
+      contentLength = null,
+      acceptRanges = false,
+      etag = null,
+      lastModified = null,
+    )
     val NO_RANGES = ServerInfo(
       contentLength = 1000,
       acceptRanges = false,

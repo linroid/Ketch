@@ -128,16 +128,17 @@ private fun runDownload(args: DownloadArgs.Download) {
             println("[Queued] Waiting for download slot...")
           is DownloadState.Downloading -> {
             val progress = state.progress
-            val pct = (progress.percent * 100).toInt()
             val downloaded = formatBytes(progress.downloadedBytes)
-            val total = formatBytes(progress.totalBytes)
+            val amount = if (progress.totalBytes > 0) {
+              val pct = (progress.percent * 100).toInt()
+              "$pct%  $downloaded / ${formatBytes(progress.totalBytes)}"
+            } else {
+              downloaded
+            }
             val speed = if (progress.bytesPerSecond > 0) {
               "  ${formatBytes(progress.bytesPerSecond)}/s"
             } else ""
-            print(
-              "\r[Downloading] $pct%  $downloaded" +
-                " / $total$speed$limitLabel    "
-            )
+            print("\r[Downloading] $amount$speed$limitLabel    ")
           }
           is DownloadState.Paused ->
             println("\n[Paused] Download paused.")
