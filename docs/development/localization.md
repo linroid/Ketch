@@ -10,6 +10,7 @@ prompts AI discovery sends to the model and the bug report "Copy details" puts o
 | Language | Shared UI and desktop | Android | iOS | Browser extension |
 | --- | --- | --- | --- | --- |
 | English (source) | `values` | `values` | `en.lproj` | `en` |
+| Spanish | `values-es` | `values-es` | `es.lproj` | `es` |
 
 [The glossary](translation-glossary.md) fixes how each language names the app's features and
 units; keep translations to it.

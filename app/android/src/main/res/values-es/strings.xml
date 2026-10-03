@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="process_text_label">Descargar con Ketch</string>
+  <string name="quick_add_no_link">No hay ningún enlace que descargar</string>
+
+  <string name="notifications_offer_title">Recibe un aviso cuando terminen las descargas</string>
+  <string name="notifications_offer_message">Ketch puede avisarte cuando una descarga termine o falle mientras usas otras apps.</string>
+  <string name="notifications_offer_allow">Permitir</string>
+  <string name="notifications_offer_not_now">Ahora no</string>
+</resources>
