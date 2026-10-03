@@ -410,8 +410,15 @@ private fun runServer(args: Array<String>) {
   }
   println()
 
-  // Listen before restoring the tasks saved by earlier runs, so a daemon that cannot start,
-  // e.g. because another one uses the port, never resumes downloads into the same files
+  serveDaemon(server, ketch)
+}
+
+/**
+ * Serves [ketch] through [server] until the server stops. It listens before restoring the
+ * tasks saved by earlier runs, so a daemon that cannot start, e.g. because another one uses
+ * the port, never resumes downloads into the same files.
+ */
+internal fun serveDaemon(server: KetchServer, ketch: KetchApi) {
   server.start(wait = false)
   runBlocking { ketch.start() }
   server.awaitStop()
