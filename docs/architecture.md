@@ -177,7 +177,11 @@ DownloadRequest
 - Structured concurrency ensures cleanup on cancel/pause.
 - `DownloadQueue` enforces the concurrent-download limit and the per-host download limit.
   Its mutex also guards the queue positions: every queue change republishes them before it
-  releases the lock, so positions are always those of one queue state.
+  releases the lock, so two changes never interleave. Each task's position is a separate flow
+  set one at a time, though, so a reader that does not hold the lock (a task list snapshot, a
+  UI collector, a stream of SSE frames) can briefly see positions from two queue states, such
+  as two tasks at the same position. `RemoteKetch` takes positions from the event stream over
+  a command's response when an event arrived while the command was in flight.
 
 ## Error Classification
 
