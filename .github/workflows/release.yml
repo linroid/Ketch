@@ -194,18 +194,21 @@ jobs:
             os: linux
             arch: arm64
             ext: deb
+          # Windows also ships the portable app, the app folder in a .zip.
           - name: Windows-x64
             runner: windows-latest
             task: packageReleaseMsi
             os: windows
             arch: x64
             ext: msi
+            portable: true
           - name: Windows-arm64
             runner: windows-11-arm
             task: packageReleaseMsi
             os: windows
             arch: arm64
             ext: msi
+            portable: true
     steps:
       - uses: actions/checkout@v6
 
@@ -217,7 +220,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Build desktop package
-        run: ./gradlew :app:desktop:${{ matrix.task }} -PVERSION_NAME=${KETCH_VERSION#v}
+        run: >
+          ./gradlew :app:desktop:${{ matrix.task }}
+          ${{ matrix.portable && ':app:desktop:packageReleasePortableZip' || '' }}
+          -PVERSION_NAME=${KETCH_VERSION#v}
 
       - name: Rename artifact
         run: |
@@ -229,11 +235,18 @@ jobs:
           else
             cp "$SRC" "$DEST"
           fi
+          # The in-app updater finds the portable app by this name (ReleaseProduct.PortableDesktop).
+          if [ "${{ matrix.portable }}" = true ]; then
+            cp app/desktop/build/compose/binaries/main-release/portable/Ketch-portable.zip \
+              "app/desktop/build/ketch-desktop-${KETCH_VERSION#v}-${{ matrix.os }}-${{ matrix.arch }}-portable.zip"
+          fi
 
       - uses: actions/upload-artifact@v7
         with:
           name: ketch-desktop-${{ matrix.name }}
-          path: app/desktop/build/ketch-desktop-*.${{ matrix.ext }}
+          path: |
+            app/desktop/build/ketch-desktop-*.${{ matrix.ext }}
+            app/desktop/build/ketch-desktop-*-portable.zip
 
   build-web:
     name: Web (WasmJs)

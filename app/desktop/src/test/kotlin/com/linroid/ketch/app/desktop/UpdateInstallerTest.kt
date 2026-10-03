@@ -1,11 +1,16 @@
 package com.linroid.ketch.app.desktop
 
+import com.linroid.ketch.updater.ReleaseProduct
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -18,6 +23,7 @@ class UpdateInstallerTest {
 
   @AfterTest
   fun cleanUp() {
+    dir.walk().forEach { it.setWritable(true) }
     dir.deleteRecursively()
   }
 
@@ -43,6 +49,72 @@ class UpdateInstallerTest {
       UpdateInstaller.forThisApp(dir, File(dir, "log"), launcher.path, DesktopOs.WINDOWS)
 
     assertIs<UpdateInstaller.WindowsMsi>(installer)
+  }
+
+  @Test
+  fun forThisApp_portableCopy_replacesItsFiles() {
+    val launcher = File(dir, "Ketch/Ketch.exe")
+    File(launcher.parentFile, PortableApp.DATA_DIR).mkdirs()
+    val installer =
+      UpdateInstaller.forThisApp(dir, File(dir, "log"), launcher.path, DesktopOs.WINDOWS)
+
+    assertIs<UpdateInstaller.WindowsPortable>(installer)
+    assertEquals(ReleaseProduct.PortableDesktop, installer.product)
+    assertTrue(installer.restarts)
+  }
+
+  @Test
+  fun forThisApp_portableCopyInAReadOnlyFolder_opensTheArchive() {
+    val launcher = File(dir, "Ketch/Ketch.exe")
+    File(launcher.parentFile, PortableApp.DATA_DIR).mkdirs()
+    // Windows ignores the flag on folders, and root writes anyway.
+    val folder = launcher.parentFile
+    if (!folder.setWritable(false) || Files.isWritable(folder.toPath())) return
+    val installer =
+      UpdateInstaller.forThisApp(dir, File(dir, "log"), launcher.path, DesktopOs.WINDOWS)
+
+    assertIs<UpdateInstaller.OpenInstaller>(installer)
+    assertEquals(ReleaseProduct.PortableDesktop, installer.product)
+    assertFalse(installer.restarts)
+  }
+
+  @Test
+  fun forThisApp_portableCopyWithAReadOnlyDataFolder_opensTheArchive() {
+    val launcher = File(dir, "Ketch/Ketch.exe")
+    val data = File(launcher.parentFile, PortableApp.DATA_DIR).apply { mkdirs() }
+    // The data then stays in the user's profile, often on another drive, where the update would
+    // be unpacked and could not be renamed into the app's folder.
+    if (!data.setWritable(false) || Files.isWritable(data.toPath())) return
+    val installer =
+      UpdateInstaller.forThisApp(dir, File(dir, "log"), launcher.path, DesktopOs.WINDOWS)
+
+    assertIs<UpdateInstaller.OpenInstaller>(installer)
+    assertEquals(ReleaseProduct.PortableDesktop, installer.product)
+  }
+
+  @Test
+  fun windowsPortablePrepare_releaseArchive_unpacksTheAppFolder() {
+    val download = zip(
+      "ketch-desktop-0.0.2-windows-x64-portable.zip",
+      "Ketch/Ketch.exe", "Ketch/app/Ketch.cfg", "Ketch/runtime/release", "Ketch/data/",
+    )
+
+    val prepared = portableInstaller().prepare(download)
+
+    assertEquals(File(dir, "work/unpacked/Ketch"), prepared)
+    assertTrue(File(prepared, "app/Ketch.cfg").isFile)
+    assertTrue(File(prepared, "runtime/release").isFile)
+    assertFalse(download.exists())
+  }
+
+  @Test
+  fun windowsPortablePrepare_archiveWithoutTheLauncher_fails() {
+    val download = zip(
+      "ketch-desktop-0.0.2-windows-x64-portable.zip",
+      "Ketch/app/Ketch.cfg", "Ketch/runtime/release",
+    )
+
+    assertFailsWith<IOException> { portableInstaller().prepare(download) }
   }
 
   @Test
@@ -110,6 +182,23 @@ class UpdateInstallerTest {
       .start()
     assertTrue(process.waitFor(30, TimeUnit.SECONDS), "$name did not finish")
     assertFalse(running.isAlive, "$name did not wait for the app")
+  }
+
+  private fun portableInstaller(): UpdateInstaller.WindowsPortable {
+    val folder = File(dir, "Portable/Ketch")
+    val app = PortableApp(folder, File(folder, "Ketch.exe"))
+    return UpdateInstaller.WindowsPortable(app, File(dir, "work"), File(dir, "log"))
+  }
+
+  /** Writes the archive [name] holding [entries]; a name ending in `/` is a folder. */
+  private fun zip(name: String, vararg entries: String): File = File(dir, name).also { file ->
+    ZipOutputStream(file.outputStream()).use { zip ->
+      entries.forEach { entry ->
+        zip.putNextEntry(ZipEntry(entry))
+        if (!entry.endsWith("/")) zip.write(entry.toByteArray())
+        zip.closeEntry()
+      }
+    }
   }
 
   private fun bundle(path: String, version: String): File = File(dir, path).apply {

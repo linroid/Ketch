@@ -9,6 +9,7 @@ import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.segment.SegmentCalculator
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
 import kotlinx.coroutines.CancellationException
@@ -85,8 +86,8 @@ class FtpDownloadSource : DownloadSource {
       val fileSize = client.size(ftpUrl.path)
       val supportsRest = client.supportsRest()
       val mdtm = client.mdtm(ftpUrl.path)
-      val fileName = ftpUrl.path.substringAfterLast('/')
-        .ifEmpty { null }
+      // The path is percent-decoded, so its last segment may still hold a `\`.
+      val fileName = sanitizeFileName(ftpUrl.path)
 
       return ResolvedSource(
         url = url,

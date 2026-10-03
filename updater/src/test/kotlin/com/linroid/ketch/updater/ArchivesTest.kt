@@ -1,4 +1,4 @@
-package com.linroid.ketch.cli
+package com.linroid.ketch.updater
 
 import java.io.ByteArrayOutputStream
 import java.io.File

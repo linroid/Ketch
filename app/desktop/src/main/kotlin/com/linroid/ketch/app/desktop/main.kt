@@ -139,7 +139,9 @@ import kotlin.time.TimeSource
 private val log = KetchLogger("DesktopApp")
 
 fun main(args: Array<String>) {
-  val configDir = File(defaultConfigDir())
+  // A portable copy keeps its data in its own folder, and so does its browser extension host.
+  val portable = PortableApp.detect()
+  val configDir = portable?.writableDataDir() ?: File(defaultConfigDir())
   if (args.firstOrNull() == NativeMessagingHost.FLAG) {
     // Started by a browser for the Ketch extension, not by the user.
     runNativeMessagingHost(configDir)
@@ -201,6 +203,13 @@ fun main(args: Array<String>) {
   // Failures nothing catches, on any thread, go to logs/ketch.log for bug reports.
   Thread.setDefaultUncaughtExceptionHandler { thread, e ->
     log.e(e) { "Uncaught exception in thread ${thread.name}: ${e.describeCauses()}" }
+  }
+  if (portable != null) {
+    if (configDir == portable.dataDir) {
+      log.i { "Portable copy: data is kept in $configDir" }
+    } else {
+      log.w { "Portable copy: can't write to ${portable.dataDir}, so data is kept in $configDir" }
+    }
   }
   installOpenFileHandler { files ->
     open(OpenedArguments(files = files), LinkSource.Arguments)

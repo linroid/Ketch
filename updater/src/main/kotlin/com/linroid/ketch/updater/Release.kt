@@ -42,8 +42,14 @@ enum class ReleaseProduct {
   /** The native `ketch` command: `ketch-cli-<version>-<os>-<arch>.tar.gz`, `.zip` on Windows. */
   Cli,
 
-  /** The desktop app: `ketch-desktop-<version>-<os>-<arch>.dmg`, `.msi` or `.deb`. */
+  /** The installed desktop app: `ketch-desktop-<version>-<os>-<arch>.dmg`, `.msi` or `.deb`. */
   Desktop,
+
+  /**
+   * The portable desktop app, Windows only: `ketch-desktop-<version>-windows-<arch>-portable.zip`,
+   * the app's folder to unpack and run anywhere.
+   */
+  PortableDesktop,
   ;
 
   /** Names of this product's file for [platform] in [version], the preferred one first. */
@@ -64,6 +70,11 @@ enum class ReleaseProduct {
           ReleaseOs.Linux -> "deb"
         }
         listOf("ketch-desktop-$version-$os-${platform.arch.id}.$extension")
+      }
+      PortableDesktop -> if (platform.os == ReleaseOs.Windows) {
+        listOf("ketch-desktop-$version-$os-${platform.arch.id}-portable.zip")
+      } else {
+        emptyList()
       }
     }
   }
