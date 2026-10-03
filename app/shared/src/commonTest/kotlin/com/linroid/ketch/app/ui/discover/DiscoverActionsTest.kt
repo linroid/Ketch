@@ -36,7 +36,7 @@ class DiscoverActionsTest {
     description = "",
   )
 
-  private fun AppController.lastMessage(): AppMessage = messages.history.value.last()
+  private fun AppController.lastMessage(): AppMessage = messages.active.value.last()
 
   private suspend fun AppController.click(label: String) {
     lastMessage().actions.first { it.label.load() == label }.onClick()

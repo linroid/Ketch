@@ -75,7 +75,7 @@ class AllDevicesTest {
   private fun TestScope.fleet() =
     fleet(ResolvingApi(RecordingKetchApi("This Mac")), ResolvingApi(RecordingKetchApi("NAS")))
 
-  private fun Fleet<*>.messages(): List<AppMessage> = controller.messages.history.value
+  private fun Fleet<*>.messages(): List<AppMessage> = controller.messages.active.value.reversed()
 
   private fun fleetTest(block: suspend TestScope.(Fleet<ResolvingApi>) -> Unit) =
     fixtureTest({ fleet() }, { it.controller.close() }, block)

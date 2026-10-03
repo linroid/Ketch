@@ -87,7 +87,7 @@ internal class PaletteRunner(
     // At full speed the device's own limit is the only cap left.
     val cap = state.instanceSettings.download?.speedLimit
     if (cap == null || cap.isUnlimited) {
-      state.messages.post(MessageLevel.Info, Res.string.palette_full_speed_already.text())
+      state.messages.postFeedback(MessageLevel.Info, Res.string.palette_full_speed_already.text())
       return
     }
     state.setSpeedLimit(SpeedLimit.Unlimited, asSlowLane = false)

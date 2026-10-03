@@ -804,7 +804,7 @@ internal class DesktopCommands(
       val undo = MessageAction(Res.string.message_undo.text()) {
         switchSpeedMode(previous, undoable = false)
       }
-      state.messages.post(
+      state.messages.postFeedback(
         level = MessageLevel.Success,
         title = title,
         actions = if (undoable) listOf(undo) else emptyList(),
@@ -978,7 +978,10 @@ internal class DesktopCommands(
         )
         return@launch
       }
-      state.messages.post(MessageLevel.Success, Res.plurals.message_links_copied.text(urls.size))
+      state.messages.postFeedback(
+        level = MessageLevel.Success,
+        title = Res.plurals.message_links_copied.text(urls.size),
+      )
     }
   }
 

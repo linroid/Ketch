@@ -232,7 +232,7 @@ private fun TaskView(
     onReason = { action -> runReason(state, row, runner, action) },
     onCopyName = {
       copier.copy(row.name, Res.string.inspector_copy_failed_name.text()) {
-        state.messages.post(MessageLevel.Success, Res.string.inspector_copied_name.text())
+        state.messages.postFeedback(MessageLevel.Success, Res.string.inspector_copied_name.text())
       }
     },
     onClose = onClose,

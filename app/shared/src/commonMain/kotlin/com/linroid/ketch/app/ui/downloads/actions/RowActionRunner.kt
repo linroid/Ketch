@@ -428,7 +428,7 @@ internal class RowActionRunner(
       skipped,
       Res.plurals.downloads_batch_failed.text(failed.size).takeIf { failed.isNotEmpty() },
     ).joinText()
-    state.messages.post(
+    state.messages.postFeedback(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
       detail = failed.firstOrNull()?.second?.message?.let(::verbatim),
@@ -457,7 +457,7 @@ internal class RowActionRunner(
     )
     val single = rows.singleOrNull()
     val what = if (single != null) verbatim(single.name) else downloadsText(rows.size)
-    state.messages.post(
+    state.messages.postFeedback(
       level = MessageLevel.Success,
       title = Res.string.downloads_trash_removed.text(what),
       detail = if (single != null) {
@@ -495,7 +495,10 @@ internal class RowActionRunner(
     }
     val moved = results.count { it.trashed }
     if (moved > 0) {
-      state.messages.post(MessageLevel.Success, Res.plurals.downloads_trash_moved.text(moved))
+      state.messages.postFeedback(
+        level = MessageLevel.Success,
+        title = Res.plurals.downloads_trash_moved.text(moved),
+      )
     }
     val refused = results.filter { it.trashError != null }
     refused.firstOrNull()?.let { first ->

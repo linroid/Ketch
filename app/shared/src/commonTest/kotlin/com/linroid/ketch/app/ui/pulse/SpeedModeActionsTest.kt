@@ -73,7 +73,7 @@ class SpeedModeActionsTest {
 
     assertEquals(SpeedMode.SlowLane, f.speed?.mode?.value)
     assertEquals(SpeedLimit.mbps(1), f.engine.config.speedLimit)
-    val message = f.state.messages.history.value.first()
+    val message = f.state.messages.active.value.last()
     assertEquals("Slow lane on · 1 MB/s", message.title.load())
     assertEquals(listOf("Undo"), message.actions.map { it.label }.load())
   }
@@ -84,12 +84,12 @@ class SpeedModeActionsTest {
     f.state.toggleSlowLane()
     runCurrent()
 
-    f.state.messages.history.value.first().actions.single().onClick()
+    f.state.messages.active.value.last().actions.single().onClick()
     runCurrent()
 
     assertEquals(SpeedMode.Full, f.speed?.mode?.value)
     assertEquals(SpeedLimit.Unlimited, f.engine.config.speedLimit)
-    val message = f.state.messages.history.value.first()
+    val message = f.state.messages.active.value.last()
     assertEquals("Slow lane off", message.title.load())
     assertTrue(message.actions.isEmpty())
   }
@@ -111,7 +111,7 @@ class SpeedModeActionsTest {
     runCurrent()
 
     assertEquals(SpeedMode.Full, f.speed?.mode?.value)
-    val message = f.state.messages.history.value.first()
+    val message = f.state.messages.active.value.last()
     assertEquals(MessageLevel.Error, message.level)
     assertEquals("Couldn't switch to Slow lane", message.title.load())
     assertEquals(listOf("Try again"), message.actions.map { it.label }.load())

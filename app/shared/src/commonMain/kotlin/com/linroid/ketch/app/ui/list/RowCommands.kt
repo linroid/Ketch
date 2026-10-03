@@ -240,7 +240,7 @@ internal class RowCommands(
       val text = lines()
       if (text.isEmpty()) return@launch
       catchingUnlessCancelled { clipboard.writeText(text.joinToString("\n")) }
-        .onSuccess { state.messages.post(MessageLevel.Success, what.copied(text.size)) }
+        .onSuccess { state.messages.postFeedback(MessageLevel.Success, what.copied(text.size)) }
         .onFailure { e ->
           state.messages.post(MessageLevel.Error, what.failed(text.size), cause = e)
         }

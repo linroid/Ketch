@@ -30,6 +30,47 @@ class MessageCenterTest {
   }
 
   @Test
+  fun postFeedback_success_keepsUndoWithoutCreatingANotification() {
+    val center = MessageCenter()
+    var undone = false
+    val message = center.postFeedback(
+      level = MessageLevel.Success,
+      title = verbatim("Removed download"),
+      actions = listOf(MessageAction(verbatim("Undo")) { undone = true }),
+    )
+
+    assertEquals(listOf(message), center.active.value)
+    assertEquals(emptyList(), center.history.value)
+    assertEquals(0, center.unreadCount.value)
+    center.active.value.single().actions.single().onClick()
+    assertEquals(true, undone)
+    center.dismiss(message.id)
+    assertEquals(emptyList(), center.active.value)
+  }
+
+  @Test
+  fun postFeedback_info_doesNotAddToExistingUnreadActivity() {
+    val center = MessageCenter()
+    val completed = center.post(MessageLevel.Success, verbatim("Download complete"))
+
+    center.postFeedback(MessageLevel.Info, verbatim("Nothing to pause"))
+
+    assertEquals(listOf(completed), center.history.value)
+    assertEquals(1, center.unreadCount.value)
+  }
+
+  @Test
+  fun postFeedback_failures_remainInHistory() {
+    val center = MessageCenter()
+    val partial = center.postFeedback(MessageLevel.Warning, verbatim("Paused 2 · 1 failed"))
+    val failed = center.postFeedback(MessageLevel.Error, verbatim("Couldn't pause"))
+
+    assertEquals(listOf(partial, failed), center.active.value)
+    assertEquals(listOf(failed, partial), center.history.value)
+    assertEquals(2, center.unreadCount.value)
+  }
+
+  @Test
   fun post_threeActions_keepsTwo() = runTest {
     val center = MessageCenter()
 

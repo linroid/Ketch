@@ -228,7 +228,7 @@ class DesktopCommandsTest {
       clipboard = FakeClipboard(clipboard),
     )
 
-    fun messages(): List<AppMessage> = controller.messages.history.value
+    fun messages(): List<AppMessage> = controller.messages.active.value.reversed()
 
     fun close() {
       controller.close()

@@ -110,7 +110,9 @@ class RowCommandsTest {
     runCurrent()
 
     assertEquals(listOf(task.request.url), f.clipboard.written)
-    assertEquals("Copied link", f.controller.messages.history.value.first().title.load())
+    assertEquals("Copied link", f.controller.messages.active.value.last().title.load())
+    assertTrue(f.controller.messages.history.value.isEmpty())
+    assertEquals(0, f.controller.messages.unreadCount.value)
   }
 
   @Test
@@ -126,7 +128,7 @@ class RowCommandsTest {
       listOf("File not found (404)\nThe server no longer has this file."),
       f.clipboard.written,
     )
-    assertEquals("Copied error", f.controller.messages.history.value.first().title.load())
+    assertEquals("Copied error", f.controller.messages.active.value.last().title.load())
   }
 
   @Test
