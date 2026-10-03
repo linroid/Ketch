@@ -136,8 +136,7 @@ class KetchService : Service() {
     val config = configStore.load()
     notifier.accent = config.appearance.accent.toKetchAccent()
     val taskStore = createSqliteTaskStore(DriverFactory(this))
-    val instanceName = config.name
-      ?: android.os.Build.MODEL
+    val instanceName = config.name ?: deviceName()
     val torrentSource = TorrentDownloadSource(
       TorrentConfig(
         stateDirectory = filesDir.resolve("torrent-state").absolutePath,

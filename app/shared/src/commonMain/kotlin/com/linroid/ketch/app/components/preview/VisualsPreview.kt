@@ -21,6 +21,7 @@ import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.DeviceTargetChip
+import com.linroid.ketch.app.components.DeviceType
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchHueTile
@@ -211,13 +212,15 @@ private fun Devices() {
     healths.forEachIndexed { i, health ->
       DevicePennant("device-$i", "Lins-MacBook-Pro", health = health, failures = i % 3 * 6)
     }
-    DevicePennant(
-      deviceId = "den",
-      name = "Den-PC",
-      size = DevicePennantDefaults.Large,
-      health = DeviceHealth.Live,
-      icon = KetchIcon.Desktop,
-    )
+    DeviceType.entries.forEach { type ->
+      DevicePennant(
+        deviceId = type.name,
+        name = type.name,
+        size = DevicePennantDefaults.Large,
+        health = DeviceHealth.Live,
+        fallbackType = type,
+      )
+    }
   }
   PreviewSection("Device target") {
     val options = listOf(

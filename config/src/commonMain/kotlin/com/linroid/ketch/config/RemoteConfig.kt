@@ -13,6 +13,8 @@ import kotlinx.serialization.Serializable
  *   user names it or the apps learn the name it announces, and `host:port` is shown meanwhile.
  * @property watch whether the apps stay connected to the device while another one is shown, so
  *   switching to it is instant and its speed and failures stay current.
+ * @property os operating system the device last reported, such as "Linux" or "Android 15", which
+ *   tells the apps what kind of device it is while it is offline; `null` until it connects.
  */
 @Serializable
 data class RemoteConfig(
@@ -22,4 +24,5 @@ data class RemoteConfig(
   val secure: Boolean = false,
   val name: String? = null,
   val watch: Boolean = true,
+  val os: String? = null,
 )

@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import com.linroid.ketch.app.components.LocalDeviceTypes
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
@@ -54,6 +55,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.connect.ConnectHost
 import com.linroid.ketch.app.ui.connect.ConnectLanding
 import com.linroid.ketch.app.ui.devices.DevicesScreen
+import com.linroid.ketch.app.ui.devices.rememberDeviceTypes
 import com.linroid.ketch.app.ui.discover.DiscoverScreen
 import com.linroid.ketch.app.ui.downloads.DownloadsScreen
 import com.linroid.ketch.app.ui.downloads.LayoutTier
@@ -117,6 +119,7 @@ fun AppShell(
     LocalAppState provides appState,
     LocalClock provides appState.clock,
     LocalFileLogger provides fileLogger,
+    LocalDeviceTypes provides rememberDeviceTypes(appState),
   ) {
     ShellContent(appState, openSettingsRequests)
   }

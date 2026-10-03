@@ -148,15 +148,21 @@ private val PhonePointer = SnapshotSize(390.dp, 844.dp, KetchDensity.Compact)
 private val Short1024 = SnapshotSize(1024.dp, 480.dp, KetchDensity.Compact)
 private val Short760 = SnapshotSize(760.dp, 480.dp, KetchDensity.Compact)
 
-// More devices than the sidebar shows at once, one of them with a long name.
+// More devices than the sidebar shows at once, one of them with a long name and one the app
+// has never reached, so its kind is unknown.
 private val ManyRemotes = listOf(
   SampleData.NAS,
-  RemoteConfig(host = "den-pc.local", name = "Den-PC", watch = false),
-  RemoteConfig(host = "media.local", name = "Living room media server upstairs", watch = false),
+  RemoteConfig(host = "den-pc.local", name = "Den-PC", watch = false, os = "Windows 11"),
+  RemoteConfig(
+    host = "media.local",
+    name = "Living room media server upstairs",
+    watch = false,
+    os = "Linux",
+  ),
   RemoteConfig(host = "seedbox.example.net", port = 443, secure = true, watch = false),
-  RemoteConfig(host = "office.local", name = "Office", watch = false),
-  RemoteConfig(host = "pi.local", name = "Raspberry Pi", watch = false),
-  RemoteConfig(host = "laptop.local", name = "Travel laptop", watch = false),
+  RemoteConfig(host = "office.local", name = "Office", watch = false, os = "Windows 11"),
+  RemoteConfig(host = "pi.local", name = "Raspberry Pi", watch = false, os = "Android 15"),
+  RemoteConfig(host = "laptop.local", name = "Travel laptop", watch = false, os = "Mac OS X"),
 )
 
 private val ShellWidths = listOf(
