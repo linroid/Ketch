@@ -103,7 +103,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `com.linroid.ketch.endpoints` -- `Api` (Ktor `@Resource` definitions for REST API)
 - `com.linroid.ketch.endpoints.model` -- `TaskSnapshot`, `TasksResponse`, `TaskEvent`,
   `TaskEventType`, `ErrorResponse`, `ResolveUrlRequest`, `SpeedLimitRequest`,
-  `PriorityRequest`, `ConnectionsRequest`
+  `PriorityRequest`, `ConnectionsRequest`, `PairingRequest`, `PairingTicket`, `PairingStatus`,
+  `PairingState`
 
 ### `updater` (JVM only)
 - `com.linroid.ketch.updater` -- `ReleaseVersion`, `Release`, `ReleaseAsset`, `ReleaseProduct`,
@@ -119,20 +120,20 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
   `IntakeState`, `SpeedModeController`, `PendingOps`), `instance` (`InstanceManager`,
-  `DevicePresence`, `DeviceScope`), `theme` (`KetchTheme` tokens), `components` (the Ketch
-  controls), `icons` (`KetchIcon`), `input` (`KetchCommands`, `ShortcutMatcher`), `feedback`
-  (`MessageCenter`, `ActivityMonitor`) and `util`
+  `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme` tokens),
+  `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
+  `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`) and `util`
 - `ui` -- `AppShell` and `shell` (layout, navigation, device switcher, drop berths), `sidebar`,
   `downloads` and `list` (table, list rows, launchpad), `inspector`, `intake` (add sheet),
   `palette`, `devices`, `connect`, `discover`, `settings`, `pulse`, `feedback`, `onboarding`
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
-  `ConnectionState`
+  `ConnectionState`, `RemotePairing`, `PairingResult`
 
 ### `library:server`, `library:mcp` (JVM only)
-- `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`; `server.api` holds the routes and
-  `server.mdns` the `MdnsRegistrar` implementations
+- `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`, `PairingApprover`; `server.api`
+  holds the routes and `server.mdns` the `MdnsRegistrar` implementations
 - `com.linroid.ketch.mcp` -- `KetchMcpServer`, `KetchToolSet`, `asDeclaredTools()`
 
 ### `ai:discover` (JVM/Android only)
@@ -310,7 +311,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   (a sheet on phones); rows can be sent or moved to another device, and links dropped on a
   device row, a rail pennant or a drop berth are added there. The Devices page shows a card per
   device; the Add device sheet and the connect page (shown while no device is active, as on the
-  web) take a pairing link, an address or a device found on the network
+  web) take a pairing link, an address or a device found on the network. A found device that
+  advertises `pairing=1` is asked instead of typing its code (`ConnectForm.pair`,
+  `RemotePairing`): both devices show the same four digits, and the shared device asks its
+  owner in `PairingApprovalHost`, from the tray (desktop) or with Allow and Don't allow
+  notification buttons (Android, `AndroidNotifier.CHANNEL_PAIRING`) while it is not in front
 - Every keyboard command lives in `KetchCommands`; `ShortcutHost` runs the global chords,
   `⌘K` opens the command palette and `⌘/` the shortcut sheet. Commands the window's shell
   must run from outside it, such as the macOS menu bar's, go through `AppState.runInShell`
@@ -364,6 +369,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   non-browser clients pass. With a token, `corsAllowedHosts` grants CORS (`host[:port]` for
   both schemes, `scheme://host[:port]`, or `*`), and the apps default it to `*` so the hosted
   web app can connect
+- Pairing: with a token and a `PairingApprover`, `POST /api/pairing` (no token) asks the owner
+  for the token and `GET /api/pairing/{id}` returns it once allowed; requests expire after two
+  minutes, one per address and four in all wait, and web pages (`Origin` http/https/null) are
+  refused because CORS may admit them with a token. mDNS TXT adds `pairing=1`. The apps pass
+  an approver backed by `PairingRequests`; the CLI passes none
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE
 - Auto-reconnection with exponential backoff
 - `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
@@ -514,9 +524,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "RemoteKetch", "RemoteTask", "TokenBucket", "SqliteStore", "SqliteDriver",
-  "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes", "McpStdio", "GitHubReleases";
-  `ai:discover`, mDNS
+  "TorrentTracker", "RemoteKetch", "RemoteTask", "RemotePairing", "TokenBucket", "SqliteStore",
+  "SqliteDriver", "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes", "Pairing",
+  "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable

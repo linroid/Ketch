@@ -157,6 +157,14 @@
   <string name="connect_nearby_failed_hint">%1$s. Pega un enlace de vinculación en su lugar.</string>
   <string name="connect_none_found">No se encontraron dispositivos. En el otro dispositivo, abre Ajustes › Compartir y activa Permitir otro dispositivo.</string>
   <string name="connect_asks_for_code">%1$s · pide un código</string>
+  <string name="connect_asks_for_approval">%1$s · pide permiso</string>
+  <string name="connect_approval_waiting">Esperando a %1$s…</string>
+  <string name="connect_approval_check">En %1$s, comprueba que aparece este código y permite este dispositivo.</string>
+  <string name="connect_approval_enter_code">Introducir su código de acceso</string>
+  <string name="connect_approval_denied">%1$s no ha permitido este dispositivo. Vuelve a pedirlo o introduce su código de acceso.</string>
+  <string name="connect_approval_expired">Nadie respondió en %1$s. Vuelve a pedirlo o introduce su código de acceso.</string>
+  <string name="connect_approval_busy">%1$s aún está decidiendo sobre otra solicitud de este dispositivo. Vuelve a pedirlo en un momento o introduce su código de acceso.</string>
+  <string name="connect_approval_ask_again">Volver a pedir</string>
   <string name="connect_added_badge">Añadido</string>
   <string name="connect_share_instead">¿Quieres controlar %1$s desde otro dispositivo?</string>
   <string name="connect_show_pairing_code">Mostrar su código de vinculación</string>
@@ -176,6 +184,11 @@
   <string name="connect_pairing_known">Ya añadiste %1$s. Al conectar, se mostrará.</string>
   <string name="connect_pairing_known_code">Ya añadiste %1$s. Al conectar, se mostrará y recibirá el código de este enlace.</string>
   <string name="connect_pairing_has_code">El enlace incluye su código de acceso.</string>
+  <string name="pairing_request_title">¿Permitir que %1$s controle %2$s?</string>
+  <string name="pairing_request_check">Permítelo solo si %1$s muestra este código:</string>
+  <string name="pairing_request_note">Podrá añadir, pausar y eliminar descargas aquí. Para retirarle el acceso más adelante, elige Código nuevo en Ajustes › Compartir.</string>
+  <string name="pairing_request_allow">Permitir</string>
+  <string name="pairing_request_deny">No permitir</string>
 
   <string name="device_pick_torrents">Abrir archivos torrent</string>
   <string name="device_pick_folder">Elegir una carpeta de descargas</string>

@@ -34,6 +34,7 @@ import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.isMobilePlatform
@@ -44,11 +45,16 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.settings.NoticeTone
 import com.linroid.ketch.app.ui.settings.SettingsNotice
+import com.linroid.ketch.remote.PairingResult
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.connect_add_anyway
 import ketch.app.shared.generated.resources.connect_add_failed
 import ketch.app.shared.generated.resources.connect_added
 import ketch.app.shared.generated.resources.connect_added_detail
+import ketch.app.shared.generated.resources.connect_approval_ask_again
+import ketch.app.shared.generated.resources.connect_approval_busy
+import ketch.app.shared.generated.resources.connect_approval_denied
+import ketch.app.shared.generated.resources.connect_approval_expired
 import ketch.app.shared.generated.resources.connect_code_label
 import ketch.app.shared.generated.resources.connect_code_link_rejected
 import ketch.app.shared.generated.resources.connect_code_placeholder
@@ -252,14 +258,16 @@ internal fun ManualDetails(
 
 /**
  * Why the last attempt of a form failed, other than a missing code, which [AccessCodeField]
- * explains: nothing answered, with [onAddAnyway] when the device may be added all the same, or
- * it could not be added.
+ * explains: nothing answered, with [onAddAnyway] when the device may be added all the same, it
+ * could not be added, or its owner did not let this device in, with [onAskAgain] to ask once
+ * more.
  */
 @Composable
 internal fun ConnectProblemNotice(
   problem: ConnectProblem?,
   modifier: Modifier = Modifier,
   onAddAnyway: (() -> Unit)? = null,
+  onAskAgain: ((DiscoveredServer) -> Unit)? = null,
 ) {
   when (problem) {
     is ConnectProblem.Unreachable -> SettingsNotice(
@@ -281,6 +289,28 @@ internal fun ConnectProblemNotice(
       text = Res.string.connect_add_failed.text(problem.message).resolve(),
       tone = NoticeTone.Error,
       modifier = modifier,
+    )
+    is ConnectProblem.NotPaired -> SettingsNotice(
+      text = stringResource(
+        when (problem.reason) {
+          PairingResult.Busy -> Res.string.connect_approval_busy
+          PairingResult.Expired -> Res.string.connect_approval_expired
+          else -> Res.string.connect_approval_denied
+        },
+        problem.name,
+      ),
+      tone = NoticeTone.Warning,
+      modifier = modifier,
+      action = onAskAgain?.let { ask ->
+        {
+          KetchButton(
+            text = stringResource(Res.string.connect_approval_ask_again),
+            onClick = { ask(problem.server) },
+            variant = KetchButtonVariant.Ghost,
+            size = KetchButtonSize.Small,
+          )
+        }
+      },
     )
     is ConnectProblem.NeedsCode, null -> Unit
   }

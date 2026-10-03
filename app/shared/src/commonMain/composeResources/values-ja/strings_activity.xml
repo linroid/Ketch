@@ -13,6 +13,9 @@
   <string name="notify_channel_active">実行中のダウンロード</string>
   <string name="notify_channel_done">完了したダウンロード</string>
   <string name="notify_channel_failed">失敗したダウンロード</string>
+  <string name="notify_channel_pairing">ペアリングリクエスト</string>
+  <string name="notify_pairing_title">%1$sが%2$sの操作を求めています</string>
+  <string name="notify_pairing_body">%1$sと表示されている場合のみ許可してください。</string>
   <string name="notify_finished_group">完了したダウンロード</string>
   <string name="notify_sharing_device">このデバイスを共有中</string>
   <string name="notify_server_on_port">ポート%1$dでサーバーを実行中</string>

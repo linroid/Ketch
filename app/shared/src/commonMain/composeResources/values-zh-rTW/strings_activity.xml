@@ -13,6 +13,9 @@
   <string name="notify_channel_active">進行中的下載</string>
   <string name="notify_channel_done">已完成的下載</string>
   <string name="notify_channel_failed">失敗的下載</string>
+  <string name="notify_channel_pairing">配對要求</string>
+  <string name="notify_pairing_title">%1$s 想要控制%2$s</string>
+  <string name="notify_pairing_body">只有在它顯示 %1$s 時才允許。</string>
   <string name="notify_finished_group">已完成的下載</string>
   <string name="notify_sharing_device">正在共享此裝置</string>
   <string name="notify_server_on_port">伺服器執行於連接埠 %1$d</string>

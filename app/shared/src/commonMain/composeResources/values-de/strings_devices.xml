@@ -157,6 +157,14 @@
   <string name="connect_nearby_failed_hint">%1$s. Füge stattdessen einen Kopplungslink ein.</string>
   <string name="connect_none_found">Keine Geräte gefunden. Öffne auf dem anderen Gerät Einstellungen › Freigabe und lass ein weiteres Gerät zu.</string>
   <string name="connect_asks_for_code">%1$s · fragt nach einem Code</string>
+  <string name="connect_asks_for_approval">%1$s · fragt nach Erlaubnis</string>
+  <string name="connect_approval_waiting">Warten auf %1$s…</string>
+  <string name="connect_approval_check">Prüfe auf %1$s, ob dieser Code angezeigt wird, und erlaube dann dieses Gerät.</string>
+  <string name="connect_approval_enter_code">Stattdessen Zugriffscode eingeben</string>
+  <string name="connect_approval_denied">%1$s hat dieses Gerät nicht erlaubt. Frag erneut oder gib den Zugriffscode ein.</string>
+  <string name="connect_approval_expired">Auf %1$s hat niemand geantwortet. Frag erneut oder gib den Zugriffscode ein.</string>
+  <string name="connect_approval_busy">%1$s entscheidet noch über eine andere Anfrage von diesem Gerät. Frag gleich erneut oder gib den Zugriffscode ein.</string>
+  <string name="connect_approval_ask_again">Erneut fragen</string>
   <string name="connect_added_badge">Hinzugefügt</string>
   <string name="connect_share_instead">Möchtest du %1$s von einem anderen Gerät aus steuern?</string>
   <string name="connect_show_pairing_code">Kopplungscode anzeigen</string>
@@ -176,6 +184,11 @@
   <string name="connect_pairing_known">Du hast %1$s bereits hinzugefügt. Beim Verbinden wird es angezeigt.</string>
   <string name="connect_pairing_known_code">Du hast %1$s bereits hinzugefügt. Beim Verbinden wird es angezeigt und erhält den Code dieses Links.</string>
   <string name="connect_pairing_has_code">Der Link enthält den Zugriffscode.</string>
+  <string name="pairing_request_title">%1$s erlauben, %2$s zu steuern?</string>
+  <string name="pairing_request_check">Erlaube es nur, wenn %1$s diesen Code anzeigt:</string>
+  <string name="pairing_request_note">Es kann dann hier Downloads hinzufügen, anhalten und entfernen. Um es später wieder auszuschließen, wähle „Neuer Code“ unter Einstellungen › Freigabe.</string>
+  <string name="pairing_request_allow">Erlauben</string>
+  <string name="pairing_request_deny">Nicht erlauben</string>
 
   <string name="device_pick_torrents">Torrent-Dateien öffnen</string>
   <string name="device_pick_folder">Downloadordner wählen</string>
