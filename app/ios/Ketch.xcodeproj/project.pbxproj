@@ -27,6 +27,7 @@
 		B010 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B011 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		B012 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B013 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -126,6 +127,7 @@
 				es,
 				"pt-BR",
 				de,
+				fr,
 			);
 			mainGroup = D001;
 			productRefGroup = D003 /* Products */;
@@ -201,6 +203,7 @@
 				B010 /* es */,
 				B011 /* pt-BR */,
 				B012 /* de */,
+				B013 /* fr */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";

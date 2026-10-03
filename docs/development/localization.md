@@ -17,6 +17,7 @@ prompts AI discovery sends to the model and the bug report "Copy details" puts o
 | Spanish | `values-es` | `values-es` | `es.lproj` | `es` |
 | Portuguese (Brazil) | `values-pt` | `values-pt` | `pt-BR.lproj` | `pt_BR` |
 | German | `values-de` | `values-de` | `de.lproj` | `de` |
+| French | `values-fr` | `values-fr` | `fr.lproj` | `fr` |
 
 [The glossary](translation-glossary.md) fixes how each language names the app's features and
 units; keep translations to it.

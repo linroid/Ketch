@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="discover_title">Découvrir</string>
+  <string name="discover_settings">Réglages de Découvrir</string>
+  <string name="discover_hero_title">Décrivez-le. Ketch trouve le téléchargement.</string>
+  <string name="discover_intro_body">Découvrir demande à %1$s de chercher sur le web et de lire les pages trouvées, puis liste les fichiers jugés fiables. Rien n'est téléchargé tant que vous ne l'ajoutez pas.</string>
+  <string name="discover_example_blender">Blender pour Apple silicon</string>
+  <string name="discover_example_ubuntu">ISO Ubuntu Server 24.04</string>
+  <string name="discover_example_footage">Vidéos de nature 4K du domaine public</string>
+  <string name="discover_example_quoted">« %1$s »</string>
+
+  <string name="discover_setup_body">Découvrir demande à un modèle d'IA de chercher sur le web et de lire les pages trouvées, puis liste les fichiers jugés fiables. Vos recherches sont envoyées au fournisseur que vous choisissez.</string>
+  <string name="discover_setup_unsupported">Découvrir fonctionne dans l'app Ketch sur un ordinateur ou un téléphone Android.</string>
+  <string name="discover_setup_pending">Votre recherche « %1$s » sera lancée dès que Découvrir sera configuré.</string>
+  <string name="discover_setup_choose_model">Choisir un modèle</string>
+  <string name="discover_setup_local_provider">%1$s · en local, sans clé</string>
+  <string name="discover_setup_finish">Terminer la configuration de %1$s</string>
+  <string name="discover_setup_in_settings">Configurer dans les Réglages</string>
+  <string name="discover_provider_openai_compatible">Compatible OpenAI</string>
+
+  <string name="discover_query_placeholder">Décrivez ce que vous voulez télécharger</string>
+  <string name="discover_find">Rechercher</string>
+  <string name="discover_stop">Arrêter</string>
+  <string name="discover_sites_limit">Limiter à des sites web</string>
+  <plurals name="discover_sites_count">
+    <item quantity="one">%1$d site web</item>
+    <item quantity="other">%1$d sites web</item>
+  </plurals>
+  <string name="discover_sites_hint">Recherche uniquement sur ces sites et leurs sous-domaines. Séparez-les par des virgules.</string>
+
+  <plurals name="discover_steps_earlier">
+    <item quantity="one">%1$d étape précédente</item>
+    <item quantity="other">%1$d étapes précédentes</item>
+  </plurals>
+  <string name="discover_step_starting">Lancement de la recherche</string>
+
+  <string name="discover_select_all">Tout sélectionner</string>
+  <string name="discover_clear_selection">Tout désélectionner</string>
+  <plurals name="discover_results">
+    <item quantity="one">%1$d téléchargement</item>
+    <item quantity="other">%1$d téléchargements</item>
+  </plurals>
+  <string name="discover_results_for">pour « %1$s »</string>
+  <string name="discover_match">%1$s de correspondance</string>
+  <string name="discover_match_tooltip">Degré de correspondance avec votre recherche</string>
+  <string name="discover_not_encrypted">Non chiffré</string>
+  <string name="discover_error_title">Découvrir n'a pas pu terminer cette recherche</string>
+  <string name="discover_failed">La recherche a échoué</string>
+  <string name="discover_unavailable">La découverte par IA n'est pas disponible sur cet appareil.</string>
+  <string name="discover_none_title">Aucun téléchargement trouvé</string>
+  <string name="discover_none_body">Découvrir ne liste que les fichiers de sources fiables. Essayez de préciser la version ou la plateforme, ou le site qui le publie.</string>
+  <string name="discover_search_everywhere">Rechercher sur tout le web</string>
+
+  <string name="discover_select_to_add">Sélectionnez les téléchargements à ajouter</string>
+  <plurals name="discover_selected">
+    <item quantity="one">%1$d sélectionné</item>
+    <item quantity="other">%1$d sélectionnés</item>
+  </plurals>
+  <string name="discover_add_now">Ajouter maintenant</string>
+  <string name="discover_review_add">Vérifier et ajouter</string>
+  <string name="discover_review_add_count">Vérifier et ajouter %1$d</string>
+</resources>

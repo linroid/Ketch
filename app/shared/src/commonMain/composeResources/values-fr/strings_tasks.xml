@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="status_tab_all">Tous</string>
+  <string name="status_tab_downloading">En cours</string>
+  <string name="status_tab_waiting">En attente</string>
+  <string name="status_tab_paused">En pause</string>
+  <string name="status_tab_done">Terminés</string>
+  <string name="status_tab_failed">Échecs</string>
+
+  <string name="row_status_downloading">En cours</string>
+  <string name="row_status_stalled">Bloqué</string>
+  <string name="row_status_paused">En pause</string>
+  <string name="row_status_queued">En file d'attente</string>
+  <string name="row_status_scheduled">Planifié</string>
+  <string name="row_status_done">Terminé</string>
+  <string name="row_status_file_missing">Fichier manquant</string>
+  <string name="row_status_failed">Échec</string>
+  <string name="row_status_canceled">Annulé</string>
+
+  <string name="row_stalled_for">Bloqué · aucune donnée depuis %1$s</string>
+  <string name="row_paused">En pause</string>
+  <string name="row_canceled">Annulé</string>
+  <string name="row_saved_on">Enregistré sur %1$s</string>
+  <string name="row_missing_file">Fichier déplacé ou supprimé</string>
+  <string name="row_completed">Terminé</string>
+  <string name="row_took">en %1$s</string>
+  <plurals name="row_files">
+    <item quantity="one">%1$d fichier</item>
+    <item quantity="other">%1$d fichiers</item>
+  </plurals>
+  <plurals name="row_connections">
+    <item quantity="one">%1$d connexion</item>
+    <item quantity="other">%1$d connexions</item>
+  </plurals>
+  <string name="row_speed_limit">limite %1$s</string>
+  <string name="row_limited_by_slow_lane">limité par la Voie lente</string>
+  <string name="row_starts_today">Démarre aujourd'hui à %1$s</string>
+  <string name="row_starts_tomorrow">Démarre demain à %1$s</string>
+  <string name="row_starts_on">Démarre le %1$s à %2$s</string>
+  <string name="row_starts_in">dans %1$s</string>
+  <string name="row_starts_after">Démarre dans %1$s</string>
+  <string name="row_waiting_for_conditions">En attente des conditions</string>
+
+  <string name="summary_size_of_total">%1$s / %2$s</string>
+  <string name="summary_average_speed">moy. %1$s</string>
+
+  <string name="sort_smart">Intelligent</string>
+  <string name="sort_name">Nom</string>
+  <string name="sort_size">Taille</string>
+  <string name="sort_progress">Progression</string>
+  <string name="sort_speed">Vitesse</string>
+  <string name="sort_time_left">Restant</string>
+  <string name="sort_added">Ajouté</string>
+  <string name="sort_status">État</string>
+  <string name="sort_connections">Connexions</string>
+  <string name="sort_source">Source</string>
+  <string name="sort_origin">Origine</string>
+  <string name="sort_priority">Priorité</string>
+  <string name="sort_device">Appareil</string>
+  <string name="group_smart">Intelligent</string>
+  <string name="group_status">État</string>
+  <string name="group_day">Jour</string>
+  <string name="group_device">Appareil</string>
+  <string name="group_site">Site</string>
+  <string name="group_type">Type</string>
+  <string name="group_none">Aucun</string>
+  <string name="group_title_downloading">En cours</string>
+  <string name="group_title_waiting">En attente</string>
+  <string name="group_title_paused">En pause</string>
+  <string name="group_title_attention">Attention requise</string>
+  <string name="group_title_other_site">Autres</string>
+  <string name="group_title_today">Ajoutés aujourd'hui</string>
+  <string name="group_title_yesterday">Ajoutés hier</string>
+  <string name="group_title_week">Ajoutés cette semaine</string>
+  <string name="group_title_earlier">Ajoutés plus tôt</string>
+  <string name="group_all_done_at">tout terminé ≈ %1$s</string>
+  <string name="group_in_start_order">dans l'ordre de démarrage</string>
+
+  <string name="origin_browser">Navigateur</string>
+  <string name="origin_discover">Découvrir</string>
+  <string name="origin_agent">Agent</string>
+  <string name="origin_app">App</string>
+  <string name="origin_cli">CLI</string>
+  <string name="file_type_video">Vidéo</string>
+  <string name="file_type_audio">Audio</string>
+  <string name="file_type_image">Images</string>
+  <string name="file_type_doc">Documents</string>
+  <string name="file_type_archive">Archives</string>
+  <string name="file_type_app">Apps</string>
+  <string name="file_type_torrent">Torrents</string>
+  <string name="file_type_other">Autres</string>
+
+  <string name="queue_waiting_slot">En attente d'un emplacement libre (%1$d sur %2$d utilisés)</string>
+  <string name="queue_waiting_host">En attente de %1$s (%2$d par site)</string>
+  <string name="queue_waiting_start">En attente de démarrage</string>
+
+  <string name="action_row_pause">Mettre en pause</string>
+  <string name="action_row_resume">Reprendre</string>
+  <string name="action_row_reconnect">Reconnecter</string>
+  <string name="action_row_start_now">Démarrer maintenant</string>
+  <string name="action_row_speed_limit">Limite de vitesse</string>
+  <string name="action_row_connections">Connexions</string>
+  <string name="action_row_priority">Priorité</string>
+  <string name="action_row_start_later">Démarrer plus tard</string>
+  <string name="action_row_send_to">Envoyer à</string>
+  <string name="action_row_copy_link">Copier le lien</string>
+  <string name="action_row_details">Détails</string>
+  <string name="action_row_open">Ouvrir</string>
+  <string name="action_row_show_in_folder">Afficher dans le dossier</string>
+  <string name="action_row_copy_path">Copier le chemin du fichier</string>
+  <string name="action_row_download_again">Retélécharger</string>
+  <string name="action_row_retry">Réessayer</string>
+  <string name="action_row_retry_with_options">Réessayer avec des options…</string>
+  <string name="action_row_edit_link">Modifier le lien…</string>
+  <string name="action_row_enter_credentials">Saisir les identifiants…</string>
+  <string name="action_row_find_another_source">Trouver une autre source</string>
+  <string name="action_row_open_source_page">Ouvrir la page source</string>
+  <string name="action_row_copy_error">Copier l'erreur</string>
+  <string name="action_row_copy_details">Copier les détails</string>
+  <string name="action_row_stop_and_discard">Arrêter et abandonner la progression…</string>
+  <string name="action_row_remove">Retirer de la liste</string>
+  <string name="action_row_remove_and_trash">Retirer et mettre le fichier à la corbeille…</string>
+  <string name="action_row_remove_and_delete">Retirer et supprimer les fichiers…</string>
+  <plurals name="batch_pause">
+    <item quantity="one">Mettre en pause %1$d téléchargement</item>
+    <item quantity="other">Mettre en pause %1$d téléchargements</item>
+  </plurals>
+  <plurals name="batch_resume">
+    <item quantity="one">Reprendre %1$d téléchargement</item>
+    <item quantity="other">Reprendre %1$d téléchargements</item>
+  </plurals>
+  <plurals name="batch_start_now">
+    <item quantity="one">Démarrer %1$d téléchargement maintenant</item>
+    <item quantity="other">Démarrer %1$d téléchargements maintenant</item>
+  </plurals>
+  <plurals name="batch_retry">
+    <item quantity="one">Réessayer %1$d téléchargement</item>
+    <item quantity="other">Réessayer %1$d téléchargements</item>
+  </plurals>
+  <plurals name="batch_open">
+    <item quantity="one">Ouvrir %1$d fichier</item>
+    <item quantity="other">Ouvrir %1$d fichiers</item>
+  </plurals>
+  <string name="batch_show_in_folder">%1$s (%2$d)</string>
+  <plurals name="batch_copy_link">
+    <item quantity="one">Copier %1$d lien</item>
+    <item quantity="other">Copier %1$d liens</item>
+  </plurals>
+  <plurals name="batch_copy_path">
+    <item quantity="one">Copier %1$d chemin de fichier</item>
+    <item quantity="other">Copier %1$d chemins de fichier</item>
+  </plurals>
+  <plurals name="batch_download_again">
+    <item quantity="one">Retélécharger %1$d fichier</item>
+    <item quantity="other">Retélécharger %1$d fichiers</item>
+  </plurals>
+  <plurals name="batch_discard">
+    <item quantity="one">Abandonner la progression de %1$d téléchargement…</item>
+    <item quantity="other">Abandonner la progression de %1$d téléchargements…</item>
+  </plurals>
+  <plurals name="batch_remove">
+    <item quantity="one">Retirer %1$d téléchargement de la liste</item>
+    <item quantity="other">Retirer %1$d téléchargements de la liste</item>
+  </plurals>
+  <plurals name="batch_remove_files">
+    <item quantity="one">Retirer %1$d téléchargement et son fichier…</item>
+    <item quantity="other">Retirer %1$d téléchargements et leurs fichiers…</item>
+  </plurals>
+  <string name="bar_speed">Vitesse</string>
+  <string name="bar_copy_links">Copier les liens</string>
+  <string name="bar_remove">Retirer…</string>
+  <string name="bar_copy_paths">Copier les chemins des fichiers</string>
+  <string name="bar_discard">Abandonner la progression…</string>
+  <string name="bar_label_count">%1$s (%2$d)</string>
+  <string name="bar_label_number">%1$s %2$d</string>
+  <string name="bar_tooltip_counted">%1$s %2$d sur %3$d sélectionnés</string>
+  <string name="bar_tooltip_partial">%1$s · %2$d sur %3$d sélectionnés</string>
+  <plurals name="bar_tooltip_remove">
+    <item quantity="one">Retirer %1$d téléchargement…</item>
+    <item quantity="other">Retirer %1$d téléchargements…</item>
+  </plurals>
+  <string name="row_menu_peer_limit">Limite de pairs</string>
+  <string name="send_move_to">Déplacer vers %1$s</string>
+  <string name="reveal_in_finder">Afficher dans le Finder</string>
+  <string name="reveal_in_explorer">Afficher dans l'Explorateur de fichiers</string>
+  <string name="reveal_in_folder">Afficher dans le dossier</string>
+  <string name="reveal_in_files">Afficher dans Fichiers</string>
+  <plurals name="action_row_retry_with_connections">
+    <item quantity="one">Réessayer avec %1$d connexion</item>
+    <item quantity="other">Réessayer avec %1$d connexions</item>
+  </plurals>
+</resources>

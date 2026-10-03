@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="intake_space_needed">%1$s nécessaires</string>
+  <string name="intake_space_free_on">%1$s libres sur %2$s</string>
+  <string name="intake_space_warning">Nécessite %1$s · seulement %2$s libres sur %3$s</string>
+  <string name="intake_added_here">Ajouté : %1$s → %2$s</string>
+  <string name="intake_added_to">Ajouté à %2$s : %1$s</string>
+  <plurals name="intake_added_failed">
+    <item quantity="one">%1$d en échec</item>
+    <item quantity="other">%1$d en échec</item>
+  </plurals>
+  <plurals name="intake_added_left_out">
+    <item quantity="one">%1$d exclu</item>
+    <item quantity="other">%1$d exclus</item>
+  </plurals>
+  <string name="intake_add_failed">Impossible d'ajouter %1$s</string>
+  <string name="intake_restart_failed">Impossible de recommencer %1$s sur %2$s</string>
+  <string name="intake_restarted">%1$s recommencé depuis le début</string>
+  <string name="intake_retry_failed">Impossible de réessayer %1$s sur %2$s</string>
+  <string name="intake_apply_failed">Impossible de modifier les options de %1$s sur %2$s</string>
+  <string name="intake_file_list_ready">La liste des fichiers de %1$s est prête</string>
+  <string name="intake_file_list_ready_unnamed">La liste des fichiers du torrent est prête</string>
+  <string name="intake_file_list_failed">Impossible d'obtenir la liste des fichiers de %1$s</string>
+  <string name="intake_file_list_failed_unnamed">Impossible d'obtenir la liste des fichiers du torrent</string>
+  <string name="intake_choose_files">Choisir les fichiers</string>
+
+  <string name="intake_title_add">Ajouter des téléchargements</string>
+  <string name="intake_title_retry">Réessayer avec des options</string>
+  <string name="intake_title_edit">Options du téléchargement</string>
+
+  <string name="intake_drop_to_add">Déposer pour ajouter</string>
+  <string name="intake_paste_hint_short">Collez des liens ou des magnets</string>
+  <string name="intake_paste_hint">Collez des liens ou des magnets — ou déposez un fichier .torrent</string>
+  <string name="intake_curl_command">Commande cURL</string>
+  <string name="intake_paste_clipboard">Coller depuis le presse-papiers</string>
+  <string name="intake_open_torrent">Ouvrir un fichier .torrent</string>
+  <string name="intake_from_clipboard">Depuis le presse-papiers</string>
+  <string name="intake_clear_clipboard">Effacer le texte du presse-papiers</string>
+  <string name="intake_offer_paste">Coller %1$s</string>
+  <string name="intake_offer_paste_clipboard">Coller %1$s depuis le presse-papiers</string>
+  <string name="intake_offer_paste_copied">Coller le lien copié</string>
+  <string name="intake_discover_offer">Aucun lien ici. Rechercher « %1$s » avec Découvrir ?</string>
+  <string name="intake_no_links">Aucun lien ici. Collez un lien, un magnet ou une commande cURL.</string>
+  <string name="intake_discover">Découvrir</string>
+
+  <string name="intake_notice_no_curl">Le presse-papiers ne contient aucune commande cURL. Dans le panneau Réseau du navigateur, faites un clic droit sur la requête et choisissez Copier en tant que cURL.</string>
+  <string name="intake_notice_close_first">Fermez ce panneau pour ajouter d'autres téléchargements</string>
+  <string name="intake_notice_unsupported_files">Seuls les fichiers .torrent et les listes de liens peuvent être ajoutés</string>
+  <string name="intake_notice_read_failed">Impossible de lire %1$s</string>
+  <string name="intake_notice_read_failed_reason">Impossible de lire %1$s : %2$s</string>
+  <string name="intake_notice_no_links">Aucun lien trouvé dans ce qui a été déposé</string>
+  <plurals name="intake_notice_first_links">
+    <item quantity="one">Affichage de %1$d premier lien</item>
+    <item quantity="other">Affichage des %1$d premiers liens</item>
+  </plurals>
+  <plurals name="intake_range_truncated">
+    <item quantity="one">Limité à %1$d premier lien</item>
+    <item quantity="other">Limité aux %1$d premiers liens</item>
+  </plurals>
+
+  <plurals name="intake_summary_links">
+    <item quantity="one">%1$d lien</item>
+    <item quantity="other">%1$d liens</item>
+  </plurals>
+  <plurals name="intake_summary_ready">
+    <item quantity="one">%1$d prêt</item>
+    <item quantity="other">%1$d prêts</item>
+  </plurals>
+  <plurals name="intake_summary_checking">
+    <item quantity="one">%1$d en vérification</item>
+    <item quantity="other">%1$d en vérification</item>
+  </plurals>
+  <plurals name="intake_summary_attention">
+    <item quantity="one">%1$d à traiter</item>
+    <item quantity="other">%1$d à traiter</item>
+  </plurals>
+  <plurals name="intake_summary_duplicates">
+    <item quantity="one">%1$d déjà dans Ketch</item>
+    <item quantity="other">%1$d déjà dans Ketch</item>
+  </plurals>
+
+  <string name="intake_status_waiting">En attente de vérification…</string>
+  <string name="intake_status_fetching">Récupération de la liste des fichiers auprès des pairs… %1$s</string>
+  <string name="intake_status_reading_torrent">Lecture du fichier torrent…</string>
+  <string name="intake_status_checking">Vérification…</string>
+  <string name="intake_status_downloads_again">Sera retéléchargé · %1$s</string>
+  <plurals name="intake_status_files_chosen">
+    <item quantity="one">%1$d sur %2$d fichier</item>
+    <item quantity="other">%1$d sur %2$d fichiers</item>
+  </plurals>
+  <string name="intake_split">%1$d × %2$s</string>
+  <plurals name="intake_status_expands">
+    <item quantity="one">génère %1$d lien</item>
+    <item quantity="other">génère %1$d liens</item>
+  </plurals>
+  <plurals name="intake_status_expands_first">
+    <item quantity="one">génère %1$d lien (le premier)</item>
+    <item quantity="other">génère %1$d liens (les %1$d premiers)</item>
+  </plurals>
+  <string name="intake_status_unknown_size">Taille inconnue</string>
+  <string name="intake_scheme_torrent">Torrent</string>
+  <string name="intake_status_resumable">reprise possible</string>
+  <plurals name="intake_status_up_to_connections">
+    <item quantity="one">jusqu'à %1$d connexion</item>
+    <item quantity="other">jusqu'à %1$d connexions</item>
+  </plurals>
+  <string name="intake_badge_duplicate">Déjà dans Ketch</string>
+  <string name="intake_badge_no_resume">Sans reprise</string>
+  <string name="intake_duplicate_finished">terminé %1$s</string>
+  <string name="intake_duplicate_downloading">téléchargement en cours · %1$s</string>
+  <string name="intake_duplicate_paused">en pause à %1$s</string>
+  <string name="intake_duplicate_waiting">en attente de démarrage</string>
+  <string name="intake_duplicate_failed">en échec</string>
+  <string name="intake_duplicate_canceled">annulé</string>
+  <string name="intake_age_just_now">à l'instant</string>
+  <plurals name="intake_age_minutes">
+    <item quantity="one">il y a %1$d min</item>
+    <item quantity="other">il y a %1$d min</item>
+  </plurals>
+  <plurals name="intake_age_hours">
+    <item quantity="one">il y a %1$d h</item>
+    <item quantity="other">il y a %1$d h</item>
+  </plurals>
+  <string name="intake_age_yesterday">hier</string>
+  <plurals name="intake_age_days">
+    <item quantity="one">il y a %1$d jour</item>
+    <item quantity="other">il y a %1$d jours</item>
+  </plurals>
+
+  <plurals name="intake_problem_magnet_timeout">
+    <item quantity="one">Aucun pair n'a envoyé la liste des fichiers en %1$d min</item>
+    <item quantity="other">Aucun pair n'a envoyé la liste des fichiers en %1$d min</item>
+  </plurals>
+  <string name="intake_problem_unsupported">Ketch ne peut pas télécharger ce type de lien</string>
+  <string name="intake_problem_unsupported_detail">il prend en charge http(s), ftp(s), magnet et .torrent</string>
+  <string name="intake_problem_forbidden">Le serveur a refusé l'accès (403)</string>
+  <string name="intake_problem_forbidden_detail">les liens copiés depuis une page où vous êtes connecté nécessitent souvent ses cookies</string>
+  <string name="intake_problem_not_found">Introuvable</string>
+  <string name="intake_problem_not_found_detail">le lien a peut-être expiré</string>
+  <string name="intake_problem_busy">Serveur occupé (%1$d)</string>
+  <string name="intake_problem_busy_detail">Ketch réessaiera automatiquement</string>
+  <string name="intake_problem_http">Le serveur a répondu %1$d</string>
+  <string name="intake_problem_no_peers">Aucun pair joignable</string>
+  <string name="intake_problem_unreachable">Impossible de joindre %1$s</string>
+  <string name="intake_problem_unreachable_server">Impossible de joindre le serveur</string>
+  <string name="intake_problem_torrent">Impossible de lire ce torrent</string>
+  <string name="intake_problem_ftp">Le serveur FTP a signalé une erreur</string>
+  <string name="intake_problem_check_failed">Impossible de vérifier ce lien</string>
+  <string name="intake_problem_sign_in">Connexion requise</string>
+  <string name="intake_action_sign_in">Se connecter</string>
+  <string name="intake_action_paste_curl">Coller en tant que cURL</string>
+  <string name="intake_action_add_headers">Ajouter des en-têtes</string>
+  <string name="intake_action_find_mirror">Trouver un miroir qui fonctionne</string>
+  <string name="intake_action_keep_waiting">Continuer d'attendre</string>
+  <string name="intake_action_add_anyway">Ajouter quand même</string>
+
+  <string name="intake_download_all_now">Télécharger tous les fichiers maintenant</string>
+  <string name="intake_finish_background">Terminer en arrière-plan</string>
+  <string name="intake_rename">Renommer</string>
+  <string name="intake_keep_out">Exclure</string>
+  <string name="intake_download_again">Retélécharger</string>
+  <string name="intake_add_all">Tout ajouter</string>
+  <string name="intake_remove_named">Retirer %1$s</string>
+  <string name="intake_user_name">Nom d'utilisateur</string>
+  <string name="intake_password">Mot de passe</string>
+  <string name="intake_connections">Connexions</string>
+
+  <string name="intake_options">Options</string>
+  <string name="intake_pill_label">%1$s :</string>
+  <string name="intake_reset_speed">Réinitialiser la vitesse</string>
+  <string name="intake_reset_priority">Réinitialiser la priorité</string>
+  <string name="intake_reset_start">Réinitialiser le démarrage</string>
+  <string name="intake_reset_connections">Réinitialiser les connexions</string>
+  <plurals name="intake_headers_count">
+    <item quantity="one">%1$d en-tête</item>
+    <item quantity="other">%1$d en-têtes</item>
+  </plurals>
+  <string name="intake_advanced_hide">Masquer les options avancées</string>
+  <string name="intake_advanced_show">Options avancées…</string>
+  <string name="intake_advanced_caption">Nom du fichier, référent, cookies et autres en-têtes</string>
+  <string name="intake_speed_limit">Limite de vitesse</string>
+  <string name="intake_priority">Priorité</string>
+  <string name="intake_start">Démarrage</string>
+  <string name="intake_peer_limit">Limite de pairs</string>
+  <string name="intake_single_connection">Ce serveur n'autorise qu'une connexion</string>
+  <string name="intake_auto_device">Auto laisse l'appareil décider</string>
+  <string name="intake_auto_setting">Auto utilise le réglage de l'appareil : %1$d</string>
+  <string name="intake_priority_low_caption">S'exécute quand rien d'autre n'attend</string>
+  <string name="intake_priority_normal_caption">Ordre par défaut</string>
+  <string name="intake_priority_high_caption">Passe avant Normale et Basse</string>
+  <string name="intake_priority_urgent_caption">Passe devant la file ; peut mettre en pause un téléchargement moins prioritaire</string>
+  <string name="intake_option_unlimited">Illimité</string>
+  <string name="intake_option_max_speed">Max %1$s</string>
+  <string name="intake_option_urgent">⚡ Urgente</string>
+  <string name="intake_option_priority_low">Priorité basse</string>
+  <string name="intake_option_priority_high">Priorité haute</string>
+  <plurals name="intake_option_peers">
+    <item quantity="one">%1$d pair</item>
+    <item quantity="other">%1$d pairs</item>
+  </plurals>
+  <plurals name="intake_option_connections">
+    <item quantity="one">%1$d connexion</item>
+    <item quantity="other">%1$d connexions</item>
+  </plurals>
+  <string name="intake_option_auto">Auto</string>
+
+  <string name="intake_save_to">Enregistrer dans</string>
+  <string name="intake_folder_downloads">Téléchargements</string>
+  <string name="intake_default_folder">Dossier par défaut</string>
+  <string name="intake_recent">Récents</string>
+  <string name="intake_pinned">Épinglés</string>
+  <string name="intake_unpin">Désépingler %1$s</string>
+  <string name="intake_pin">Épingler %1$s</string>
+  <string name="intake_choose_folder">Choisir un dossier…</string>
+  <string name="intake_folder_on">Dossier sur %1$s</string>
+  <string name="intake_torrents_app_folder">Les torrents sont enregistrés dans le dossier de l'app : les dossiers choisis dans Fichiers ne servent qu'aux liens</string>
+
+  <string name="intake_advanced">Avancé</string>
+  <string name="intake_hide">Masquer</string>
+  <string name="intake_also_sent">Également envoyés avec ce lien : %1$s</string>
+  <string name="intake_file_name">Nom du fichier</string>
+  <string name="intake_server_file_name">Utilise le nom de fichier du serveur</string>
+  <string name="intake_user_agent_custom">Personnalisé</string>
+  <string name="intake_add_header">Ajouter un en-tête</string>
+  <string name="intake_paste_curl">Coller une commande cURL</string>
+  <string name="intake_headers_saved">Les en-têtes sont enregistrés avec la tâche et visibles par les appareils connectés à celui-ci.</string>
+  <string name="intake_header_name">En-tête</string>
+  <string name="intake_header_value">Valeur</string>
+  <string name="intake_remove_header">Retirer l'en-tête</string>
+
+  <string name="intake_submit_download_name">Télécharger %1$s</string>
+  <string name="intake_submit_schedule_name">Planifier %1$s</string>
+  <plurals name="intake_submit_download_files">
+    <item quantity="one">Télécharger %1$d fichier</item>
+    <item quantity="other">Télécharger %1$d fichiers</item>
+  </plurals>
+  <plurals name="intake_submit_download_files_size">
+    <item quantity="one">Télécharger %1$d fichier · %2$s</item>
+    <item quantity="other">Télécharger %1$d fichiers · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_download_items">
+    <item quantity="one">Télécharger %1$d élément</item>
+    <item quantity="other">Télécharger %1$d éléments</item>
+  </plurals>
+  <plurals name="intake_submit_download_items_size">
+    <item quantity="one">Télécharger %1$d élément · %2$s</item>
+    <item quantity="other">Télécharger %1$d éléments · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_files">
+    <item quantity="one">Planifier %1$d fichier</item>
+    <item quantity="other">Planifier %1$d fichiers</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_items">
+    <item quantity="one">Planifier %1$d élément</item>
+    <item quantity="other">Planifier %1$d éléments</item>
+  </plurals>
+  <string name="intake_submit_apply">Appliquer les modifications</string>
+  <string name="intake_submit_start_over">Recommencer</string>
+  <string name="intake_submit_waiting_files">En attente de la liste des fichiers</string>
+  <string name="intake_submit_no_files">Aucun fichier choisi</string>
+  <string name="intake_submit_nothing">Rien à ajouter</string>
+  <string name="intake_hint_download">%1$s pour télécharger</string>
+  <string name="intake_hint_schedule">%1$s pour planifier</string>
+  <string name="intake_hint_retry">%1$s pour réessayer</string>
+  <string name="intake_hint_start_over">%1$s pour recommencer</string>
+  <string name="intake_hint_apply">%1$s pour appliquer</string>
+  <string name="intake_download_all">Tout télécharger</string>
+  <string name="intake_task_gone">Ce téléchargement ne figure plus dans la liste.</string>
+  <string name="intake_confirm_close">Fermer et abandonner votre saisie ?</string>
+  <string name="intake_keep_editing">Continuer la saisie</string>
+  <string name="intake_discard">Abandonner</string>
+
+  <string name="intake_outcome_starts_now">Démarre maintenant</string>
+  <plurals name="intake_outcome_slots_free">
+    <item quantity="one">%1$d sur %2$d emplacement libre</item>
+    <item quantity="other">%1$d sur %2$d emplacements libres</item>
+  </plurals>
+  <string name="intake_outcome_eta">≈ %1$s à la vitesse actuelle</string>
+  <string name="intake_outcome_eta_soon">moins d'une minute à la vitesse actuelle</string>
+  <string name="intake_outcome_urgent">⚡ Urgente : démarre maintenant et met en pause %1$s (%2$s)</string>
+  <string name="intake_outcome_waits_for_host">Attend %1$s · %2$d par serveur</string>
+  <string name="intake_outcome_queued_next">En file d'attente · le prochain</string>
+  <plurals name="intake_outcome_queued_behind">
+    <item quantity="one">En file d'attente · %1$d devant</item>
+    <item quantity="other">En file d'attente · %1$d devant</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now">
+    <item quantity="one">%1$d démarre maintenant</item>
+    <item quantity="other">%1$d démarrent maintenant</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now_slots">
+    <item quantity="one">%1$d démarre maintenant (%2$s)</item>
+    <item quantity="other">%1$d démarrent maintenant (%2$s)</item>
+  </plurals>
+  <plurals name="intake_outcome_queued_count">
+    <item quantity="one">%1$d en file d'attente</item>
+    <item quantity="other">%1$d en file d'attente</item>
+  </plurals>
+  <string name="intake_time_hours">%1$d h</string>
+  <string name="intake_time_hours_minutes">%1$d h %2$d min</string>
+  <string name="intake_start_over_discard">Recommence depuis le début · les %1$s déjà téléchargés seront abandonnés.</string>
+  <string name="intake_start_over_new">Recommence en tant que nouveau téléchargement.</string>
+
+  <string name="intake_stage_back">Retour à tous les liens</string>
+  <plurals name="intake_stage_selection">
+    <item quantity="one">%1$d sur %2$d fichier · %3$s sur %4$s</item>
+    <item quantity="other">%1$d sur %2$d fichiers · %3$s sur %4$s</item>
+  </plurals>
+  <string name="intake_filter_files">Filtrer les fichiers</string>
+  <string name="intake_largest_file">Fichier le plus volumineux</string>
+  <string name="intake_skip_samples">Ignorer les extraits</string>
+  <plurals name="intake_skipped_extras">
+    <item quantity="one">%1$d fichier annexe ignoré</item>
+    <item quantity="other">%1$d fichiers annexes ignorés</item>
+  </plurals>
+  <string name="intake_kind_subtitles">Sous-titres</string>
+  <string name="intake_sort">Trier</string>
+  <string name="intake_sort_files">Trier les fichiers</string>
+  <string name="intake_expand">Développer</string>
+  <string name="intake_collapse">Réduire</string>
+
+  <string name="intake_file_unreadable">Impossible de lire le fichier</string>
+  <string name="intake_file_empty">Le fichier est vide</string>
+  <string name="intake_file_too_large">Le fichier dépasse %1$d Mio</string>
+
+  <string name="intake_tracker_too_long">Trop long.</string>
+  <string name="intake_tracker_spaces">Contient des espaces.</string>
+  <string name="intake_tracker_scheme">Commencez par http://, https:// ou udp://.</string>
+  <string name="intake_tracker_no_host">Nom d'hôte manquant.</string>
+  <string name="intake_tracker_udp_user_info">Les trackers UDP ne peuvent pas inclure de nom d'utilisateur ni de mot de passe.</string>
+  <string name="intake_tracker_udp_port">Les trackers UDP nécessitent un port.</string>
+  <string name="intake_tracker_port">Utilisez un port entre 1 et 65535.</string>
+</resources>
