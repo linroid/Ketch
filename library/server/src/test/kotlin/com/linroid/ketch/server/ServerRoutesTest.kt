@@ -175,14 +175,15 @@ class ServerRoutesTest {
   fun `PUT config with missing folder is rejected and not applied`() =
     testApplication {
       val ketch = createTestKetch()
+      val parent = Files.createTempDirectory("ketch-routes")
       application {
-        val server = createTestServer(ketch = ketch)
+        val server = createTestServer(ketch = ketch, allowedDirectories = listOf(parent.toString()))
         with(server) { configureServer() }
       }
       val client = createClient {
         install(ContentNegotiation) { json(json) }
       }
-      val missing = Files.createTempDirectory("ketch-routes").resolve("missing").toString()
+      val missing = parent.resolve("missing").toString()
       val response = client.put("/api/config") {
         contentType(ContentType.Application.Json)
         setBody(DownloadConfig(defaultDirectory = missing))

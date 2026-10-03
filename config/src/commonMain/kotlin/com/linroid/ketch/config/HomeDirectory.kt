@@ -17,8 +17,11 @@ internal fun expandHome(path: String, home: String?): String {
 
 /** Expands a leading `~` in the paths users write in a config file. */
 internal fun KetchConfig.expandHome(home: String?): KetchConfig {
-  val directory = download.defaultDirectory ?: return this
-  val expanded = expandHome(directory, home)
-  if (expanded == directory) return this
-  return copy(download = download.copy(defaultDirectory = expanded))
+  val directory = download.defaultDirectory?.let { expandHome(it, home) }
+  val allowed = server.allowedDirectories.map { expandHome(it, home) }
+  if (directory == download.defaultDirectory && allowed == server.allowedDirectories) return this
+  return copy(
+    download = download.copy(defaultDirectory = directory),
+    server = server.copy(allowedDirectories = allowed),
+  )
 }

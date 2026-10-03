@@ -236,8 +236,19 @@ resources in `library:endpoints` (`Api`) and shared with the client:
   `resolve` and `resolve/content` (resolve uploaded file bytes, such as a `.torrent` file)
 - **SSE**: `/api/events` (all tasks) and `/api/events/{id}` stream `task_added`,
   `task_removed`, `state_changed` and `progress` events
-- **Auth**: Optional bearer token (`KetchServer(apiToken = ...)`, `[server] apiToken` in
-  `config.toml`) required on every API route except pairing
+- **Auth**: Bearer token (`KetchServer(apiToken = ...)`, `[server] apiToken` in
+  `config.toml`) required on every API route except pairing, compared in constant time; ten
+  wrong tokens from an address within a minute get `429` until the minute ends. `KetchServer`
+  binds to loopback by default; `ketch server` beyond loopback always has a token (`--token`,
+  `KETCH_API_TOKEN`, `apiToken`, or one it creates in the owner-only `api-token` file) unless
+  started with `--no-token`
+- **Folders**: Without a token, and with one when `allowedDirectories` is set, callers are kept
+  to the download directory and `allowedDirectories` (`DestinationGuard` over core's
+  `DestinationPathPolicy`) for new tasks' destinations, resume destinations, the
+  `defaultDirectory` of `PUT /api/config` and `deleteFiles=true`; anything else is `403
+  path_rejected`
+- **Request bodies**: JSON only (`415` otherwise), at most 1 MiB, or 32 MiB for a new task and
+  16 MiB for uploaded content (`413` beyond)
 - **Pairing**: With a token and a `PairingApprover`, a device can ask for the token instead
   (`POST /api/pairing`, then poll `GET /api/pairing/{id}`): the approver decides, within two
   minutes, one request per address and four in all. Web pages are refused. The apps' servers

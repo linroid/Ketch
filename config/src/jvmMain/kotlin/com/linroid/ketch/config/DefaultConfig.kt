@@ -11,16 +11,25 @@ const val DEFAULT_CONFIG_CONTENT = """# Ketch Configuration
 [server]
 host = "0.0.0.0"
 port = 8642
+# Bearer token every API request must carry. Without one, `ketch server`
+# listening beyond this machine (any host but 127.0.0.1, localhost or ::1)
+# takes it from the KETCH_API_TOKEN environment variable, or creates one and
+# keeps it in the api-token file beside this one; --no-token goes without.
 # apiToken = "my-secret"
 # mdnsEnabled = true
 # Origins whose web pages may call the API: host[:port] for http and https,
 # scheme://host[:port], or "*" for any. Only used with apiToken: without one,
-# pages on other origins are always refused.
+# pages on other origins are always refused. With a token and no list, any
+# origin may call, so the web app can connect; pages still need the token.
 # corsAllowedHosts = ["localhost:3000"]
 # Without apiToken, requests must address this machine: localhost, one of its
 # IP addresses, its host name or <host>.local. List any other name used to
 # reach the server here.
 # allowedHosts = ["nas.example.com"]
+# Folders, besides the download directory, that API callers may save to and
+# delete files from. Without apiToken, callers are always kept to the download
+# directory and these folders; with apiToken, only once this list is set.
+# allowedDirectories = ["~/Media"]
 
 [download]
 # defaultDirectory = "~/Downloads"  # ~ is your home folder

@@ -45,7 +45,9 @@ class TorrentRemoteTest {
         val ketch = Ketch(KtorHttpEngine(), additionalSources = listOf(
           TorrentDownloadSource(TorrentConfig(dhtEnabled = false))))
         val port = ServerSocket(0).use { it.localPort }
-        val server = KetchServer(ketch, host = "127.0.0.1", port = port, mdnsEnabled = false)
+        // Without a token the server keeps clients to its folders, so the test's one is added.
+        val server = KetchServer(ketch, host = "127.0.0.1", port = port,
+          allowedDirectories = listOf(root.path), mdnsEnabled = false)
         val remote = RemoteKetch("127.0.0.1", port)
         try {
           seed.start()

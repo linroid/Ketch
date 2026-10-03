@@ -114,7 +114,8 @@ ketch -v "magnet:?xt=urn:btih:<info-hash>" ~/Downloads/
 Start the Ketch daemon server with REST API, SSE event stream, and the bundled web UI. It
 downloads HTTP(S), FTP/FTPS and BitTorrent sources, stores tasks in the
 [task database](#database) and restores them when it starts, and announces itself on the local
-network over mDNS unless `mdnsEnabled` is `false`.
+network over mDNS unless `mdnsEnabled` is `false`. It listens on every interface by default and
+then requires an [access token](#access-token).
 
 ```bash
 ketch server [options]
@@ -126,9 +127,11 @@ ketch server [options]
 | `--generate-config` | Generate a default config file at the [default path](#config-file-locations) and exit |
 | `--host <address>` | Bind address (default: `0.0.0.0`) |
 | `--port <number>` | Port number, 1-65535 (default: `8642`) |
-| `--token <string>` | API bearer token for authentication |
-| `--cors <origins>` | Comma-separated origins (`http://localhost:3000`), hosts for both `http` and `https` (`localhost:3000`), or `*`, whose web pages may call the API; needs `--token` (see [Web pages](#web-pages)) |
+| `--token <string>` | API bearer token; also read from `KETCH_API_TOKEN`. Without one, a server listening beyond loopback creates one (see [Access token](#access-token)) |
+| `--no-token` | Require no token, even when listening beyond loopback. Anyone who can reach the server can then use it |
+| `--cors <origins>` | Comma-separated origins (`http://localhost:3000`), hosts for both `http` and `https` (`localhost:3000`), or `*`, whose web pages may call the API; needs a token, and is `*` with a token unless set (see [Web pages](#web-pages)) |
 | `--allowed-hosts <names>` | Comma-separated extra `Host` names accepted without a token |
+| `--allowed-dirs <paths>` | Comma-separated folders, besides the download directory, that clients may save to and delete files from (see [Save folders](#save-folders)) |
 | `--dir <path>` | Download directory (default: `~/Downloads`) |
 | `--speed-limit <value>` | Global speed limit (e.g., `10m`, `500k`) |
 | `--help`, `-h` | Show help message |
@@ -136,14 +139,23 @@ ketch server [options]
 **Examples:**
 
 ```bash
-# Start with defaults
+# Start with defaults: every interface, with a token it creates on the first run
 ketch server
 
 # Custom port and download directory
 ketch server --port 9000 --dir /tmp/downloads
 
-# With authentication and CORS
+# With your own token, and only pages on localhost:3000 may call it
 ketch server --token my-secret --cors "localhost:3000"
+
+# The same token, from the environment
+KETCH_API_TOKEN=my-secret ketch server
+
+# This machine only, without a token
+ketch server --host 127.0.0.1 --no-token
+
+# Let clients also save to two more folders
+ketch server --allowed-dirs /srv/media,/srv/iso
 
 # With a config file, overriding the port
 ketch server --config /path/to/config.toml --port 9999
@@ -155,10 +167,68 @@ ketch server --generate-config
 ketch server --allowed-hosts nas.example.com
 ```
 
+#### Access token
+
+A server that listens beyond this machine, on any `--host` but `127.0.0.1`, `localhost` or
+`::1`, requires a bearer token (`Authorization: Bearer <token>`) on every API request. It uses
+the first of:
+
+1. `--token`
+2. the `KETCH_API_TOKEN` environment variable
+3. `apiToken` in the [config file](#configuration-file)
+4. the token in the `api-token` file in the [config directory](#config-file-locations), which
+   the first run creates, readable by your user only, and prints:
+
+   ```text
+     Auth:          new token, saved to /home/me/.config/ketch/api-token
+     Token:         3f2a9c1e…
+   ```
+
+   Later runs print where they read it from; `cat` the file to see it again, or delete it for a
+   new one.
+
+Enter the token where the Ketch apps or the browser extension ask for an access code, or open
+the web UI as `http://<address>:8642/#token=<token>`. An address that sends ten wrong tokens
+within a minute gets `429 Too Many Requests` for any token until that minute ends.
+
+A server on loopback takes no token unless one is given, since only this machine can reach it.
+`--no-token` runs without one even beyond loopback, and prints a warning: anyone who can reach
+the server can then add downloads, list, pause and remove tasks, and delete their files in the
+[save folders](#save-folders).
+
+#### Save folders
+
+Clients choose where downloads are saved, and removing a task with `deleteFiles=true` deletes
+its files. Without a token, the server keeps clients to the download directory (`--dir` or
+`defaultDirectory`) and the folders in `--allowed-dirs` or `allowedDirectories`:
+
+- A new task's destination must be inside them. A relative path is taken from the download
+  directory, and a file that exists is never overwritten: the download gets a free name such as
+  `file (1).zip`.
+- A resumed task's `destination` must be an absolute file path inside them.
+- `PUT /api/config` may only move the download directory to a folder inside them.
+- `deleteFiles=true` only deletes files inside them; remove the task without it otherwise.
+
+Anything else gets `403 Forbidden` with a `path_rejected` error. Paths are compared after `..`
+is resolved and symbolic links are followed, so a link inside a folder that points elsewhere
+counts as elsewhere.
+
+With a token, clients may save anywhere, as the Ketch apps let you type any folder on another
+device; set `--allowed-dirs` or `allowedDirectories` to keep them to these folders too.
+
+Whatever the client asks for, a file name that a site or a torrent suggests never leads out of
+its folder: path separators and characters Windows forbids become `_`.
+
+#### Request limits
+
+JSON request bodies must be `application/json` and at most 1 MiB, or 32 MiB for a new task,
+which can carry a resolved torrent; uploaded `.torrent` content may be 16 MiB. Longer bodies get
+`413 Payload Too Large`.
+
 #### Accepted hosts
 
-Without an API token, the server only answers requests whose `Host` header (ignoring the port)
-names this machine:
+Without an API token (on loopback, or with `--no-token`), the server only answers requests
+whose `Host` header (ignoring the port) names this machine:
 
 - `localhost`, `*.localhost`, `127.0.0.0/8` or `[::1]`
 - an IP address of one of the machine's network interfaces, such as `192.168.1.20`
@@ -170,29 +240,27 @@ where a web page points its own domain at your machine to reach the API from the
 Ketch apps connect to servers they discover on the network by IP address, and the browser
 extension defaults to `http://127.0.0.1:8642`, so neither needs configuration.
 
-With `--token` or `apiToken` set, any `Host` is accepted, since a web page cannot learn the
-token. Set a token when the server is reached through another name, such as a reverse proxy or
-a DNS alias, instead of listing every name.
+With a token, any `Host` is accepted, since a web page cannot learn the token. Keep a token when
+the server is reached through another name, such as a reverse proxy or a DNS alias, instead of
+listing every name.
 
 #### Web pages
 
 A browser lets any web page send requests to the server, so it checks where a browser request
 comes from:
 
-- **Without `--token`**, it refuses requests from web pages on another origin (a different host
+- **Without a token**, it refuses requests from web pages on another origin (a different host
   or port) with `403 Forbidden` and an `origin_not_allowed` error, and ignores `--cors`.
-  Otherwise any site you visit could start downloads that write anywhere you can, list your
-  tasks, and pause or cancel them. These still work: the web UI this server serves, browser
-  extensions such as Ketch's own, and clients outside a browser, such as the Ketch apps and
-  `curl`.
-- **With `--token`**, `--cors` lists the origins whose pages may call the API, such as
+  Otherwise any site you visit could start downloads, list your tasks, and pause or cancel
+  them. These still work: the web UI this server serves, browser extensions such as Ketch's
+  own, and clients outside a browser, such as the Ketch apps and `curl`.
+- **With a token**, `--cors` lists the origins whose pages may call the API, such as
   `http://localhost:3000` (a bare `localhost:3000` allows both `http` and `https`), or `*` for
-  any. Pages still need the token, which they cannot learn. Without `--cors`, only the web UI
-  this server serves can use it from a browser.
+  any. Without `--cors` or `corsAllowedHosts`, any origin may, so the hosted web app can
+  connect. Pages still need the token, which they cannot learn.
 
 Behind a reverse proxy that rewrites the `Host` header, the web UI counts as another origin;
-set a token there. The Ketch apps' server follows the same rules, and allows any origin once
-it has an access token, so the web app can connect.
+keep a token there. The Ketch apps' server follows the same rules.
 
 ### MCP server
 
@@ -328,6 +396,8 @@ warning, so a misspelled key silently keeps its default.
 [server]
 host = "0.0.0.0"
 port = 8642
+# Without apiToken, a server listening beyond loopback uses KETCH_API_TOKEN or
+# the token it keeps in the api-token file beside this one.
 # apiToken = "my-secret"
 # mdnsEnabled = true
 # corsAllowedHosts = ["localhost:3000"]  # host[:port] without a scheme, or "*"
@@ -335,6 +405,7 @@ port = 8642
 # IP addresses, its host name or <host>.local. List any other name used to
 # reach the server here.
 # allowedHosts = ["nas.example.com"]
+# allowedDirectories = ["~/Media"]
 
 [download]
 # defaultDirectory = "~/Downloads"  # ~ is your home folder
@@ -378,9 +449,10 @@ maxConnectionsPerHost = 8
 |---|---|---|---|
 | `host` | string | `"0.0.0.0"` | Network interface to bind to |
 | `port` | int | `8642` | Port to listen on (1-65535) |
-| `apiToken` | string | *(none)* | Bearer token for API authentication |
-| `corsAllowedHosts` | string[] | `[]` | Origins whose web pages may call the API (`["*"]` for any); needs `apiToken` (see [Web pages](#web-pages)) |
-| `allowedHosts` | string[] | `[]` | Extra `Host` names or IPs accepted without `apiToken` (see [Accepted hosts](#accepted-hosts)) |
+| `apiToken` | string | *(none)* | Bearer token for API authentication; without one, a server beyond loopback uses `KETCH_API_TOKEN` or the saved `api-token` (see [Access token](#access-token)) |
+| `corsAllowedHosts` | string[] | `[]` | Origins whose web pages may call the API (`["*"]` for any); needs a token, and any origin may with a token and no list (see [Web pages](#web-pages)) |
+| `allowedHosts` | string[] | `[]` | Extra `Host` names or IPs accepted without a token (see [Accepted hosts](#accepted-hosts)) |
+| `allowedDirectories` | string[] | `[]` | Folders, besides `defaultDirectory`, that clients may save to and delete files from; a leading `~` is your home folder (see [Save folders](#save-folders)) |
 | `mdnsEnabled` | bool | `true` | Announce the server on the local network (`_ketch._tcp`) |
 
 #### `[download]`

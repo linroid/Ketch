@@ -773,6 +773,17 @@ still delete its copy.
 
 `internal class DestinationPathPolicy` extracts `resolveDestPath`/`deduplicatePath`
 (`core/engine/DownloadExecution.kt:590-649`) for fresh downloads and imports alike.
+
+> **Status:** part of it exists. `DestinationPathPolicy` (public, `core/file`) holds the roots and
+> the containment check (`contains`, symlinks followed, dangling links refused), `confine` for a
+> new download's destination (relative paths rebased, file name sanitized, existing files
+> deduplicated), `confineFile` for a resume destination, `sanitizeFileName` (applied by the engine
+> to every source-suggested name) and `deduplicate`. The server applies it through
+> `DestinationGuard` with roots = `ServerConfig.allowedDirectories` + the live download directory:
+> always without a token, with one when the list is set (open question 5). Imports should reuse
+> it with the same roots, rather than a separate `transferRoots`. Still to do: NFC, the
+> `.ketch-` escape, `PathReservations`, and rejecting (rather than rebasing) relative or `..`
+> paths for imports.
 - **Rebasing**: roots are the live `defaultDirectory` (else `defaultDownloadDirectory()`) plus a
   new `ServerConfig.transferRoots`. Remote callers may name only a relative sub-folder (`..`,
   absolute paths, drive letters, schemes → 403 `path_rejected`); in-process callers may pass any
@@ -1379,8 +1390,10 @@ transfers between the two are refused as `same_instance` until one deletes its `
 5. Roots: **`transferRoots`** for imports now; confining existing destination parameters for
    remote callers behind a server flag.
 6. `ketch server` creating and saving a token on a fresh install that binds a non-loopback address
-   (printing a pairing link; `--no-token` opts out; existing configs untouched): **yes**, as a
-   separate change.
+   (printing a pairing link; `--no-token` opts out; existing configs untouched): **done**, for
+   any run without a token rather than fresh installs only, as configs made from the template
+   were as exposed. It keeps the token in an owner-only `api-token` file, leaving `config.toml`
+   untouched, and prints the token rather than a pairing link.
 7. Transfers from JS/WASI core engines: **not advertised** (no `HttpEngine` ships there).
 8. An in-place credential update on `DownloadTask`, which would also keep progress when cookies
    expire today and let partial imports land paused without a sign-in: **yes**, as a separate

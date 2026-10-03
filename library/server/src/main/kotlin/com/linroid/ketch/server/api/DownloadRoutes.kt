@@ -1,6 +1,5 @@
 package com.linroid.ketch.server.api
 
-import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
@@ -11,9 +10,9 @@ import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
 import com.linroid.ketch.endpoints.model.TasksResponse
+import com.linroid.ketch.server.DestinationGuard
 import com.linroid.ketch.server.TaskMapper
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.request.receive
 import io.ktor.server.resources.delete
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
@@ -24,9 +23,10 @@ import io.ktor.server.routing.Route
 private val log = KetchLogger("DownloadRoutes")
 
 /**
- * Installs the `/api/tasks` REST routes for managing tasks.
+ * Installs the `/api/tasks` REST routes for managing tasks. Paths callers choose, and files
+ * removing a task deletes, go through [destinations].
  */
-internal fun Route.downloadRoutes(ketch: KetchApi) {
+internal fun Route.downloadRoutes(ketch: KetchApi, destinations: DestinationGuard) {
   get<Api.Tasks> {
     log.d { "GET /api/tasks" }
     val tasks = ketch.tasks.value
@@ -34,9 +34,9 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
   }
 
   post<Api.Tasks> {
-    val request = call.receive<DownloadRequest>()
-    log.d { "POST /api/tasks url=${redactUrl(request.url)}" }
-    val task = ketch.download(request)
+    val received = call.receiveJson<DownloadRequest>(MAX_TASK_BODY_BYTES)
+    log.d { "POST /api/tasks url=${redactUrl(received.url)}" }
+    val task = ketch.download(destinations.newDownload(received))
     call.respond(
       HttpStatusCode.Created,
       TaskMapper.toSnapshot(task),
@@ -94,7 +94,7 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       )
       return@post
     }
-    task.resume(resource.destination?.let { Destination(it) })
+    task.resume(resource.destination?.let { destinations.resumeDestination(it) })
     log.d { "Resumed taskId=$taskId" }
     call.respond(TaskMapper.toSnapshot(task))
   }
@@ -135,6 +135,7 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       )
       return@delete
     }
+    if (deleteFiles) destinations.checkDeletion(task)
     task.remove(deleteFiles = deleteFiles)
     log.d { "Removed taskId=${resource.id} deleteFiles=$deleteFiles" }
     call.respond(HttpStatusCode.NoContent)
@@ -154,7 +155,7 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       )
       return@put
     }
-    val request = call.receive<SpeedLimitRequest>()
+    val request = call.receiveJson<SpeedLimitRequest>()
     task.setSpeedLimit(request.limit)
     log.d { "Speed limit set for taskId=$taskId: ${request.limit}" }
     call.respond(TaskMapper.toSnapshot(task))
@@ -174,7 +175,7 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       )
       return@put
     }
-    val request = call.receive<PriorityRequest>()
+    val request = call.receiveJson<PriorityRequest>()
     task.setPriority(request.priority)
     log.d { "Priority set for taskId=$taskId: ${request.priority}" }
     call.respond(TaskMapper.toSnapshot(task))
@@ -194,7 +195,7 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       )
       return@put
     }
-    val body = call.receive<ConnectionsRequest>()
+    val body = call.receiveJson<ConnectionsRequest>()
     // 0 means Auto (the task's default); older servers answered 400 for it, which
     // RemoteDownloadTask turns into UnsupportedOperationException.
     if (body.connections < 0) {

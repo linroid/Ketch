@@ -16,11 +16,11 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.defaultDownloadDirectory
+import com.linroid.ketch.core.file.DestinationPathPolicy
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.createFileAccessor
-import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
@@ -39,7 +39,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okio.Path
 import okio.Path.Companion.toPath
 
 /**
@@ -184,8 +183,11 @@ internal class DownloadExecution(
     }
     totalBytes = total
 
-    val fileName = resolvedUrl.suggestedFileName
-      ?: fileNameResolver.resolve(request, resolvedUrl)
+    // Names come from the server or the source's metadata, so they must not lead out of the
+    // folder, e.g. as `../.profile` or `/etc/hosts`.
+    val fileName = DestinationPathPolicy.sanitizeFileName(
+      resolvedUrl.suggestedFileName ?: fileNameResolver.resolve(request, resolvedUrl),
+    )
     val outputPath = resolveDestPath(
       destination = request.destination,
       // Resolved only when needed: the platform default may need an Android context. Sources
@@ -609,7 +611,7 @@ internal class DownloadExecution(
     if (fileName == null) return directory
     val outputPath = resolveChildPath(directory, fileName)
     return if (deduplicate && !directory.contains("://")) {
-      deduplicatePath(outputPath.toPath()).toString()
+      DestinationPathPolicy.deduplicate(outputPath.toPath()).toString()
     } else {
       outputPath
     }
@@ -622,30 +624,4 @@ internal class DownloadExecution(
     val record: TaskRecord,
     val segments: List<Segment>,
   )
-
-  companion object {
-    internal fun deduplicatePath(candidate: Path): Path {
-      val fileName = candidate.name
-      val directory = candidate.parent ?: return candidate
-      if (!platformFileSystem.exists(candidate)) return candidate
-
-      val dotIndex = fileName.lastIndexOf('.')
-      val baseName: String
-      val extension: String
-      if (dotIndex > 0) {
-        baseName = fileName.take(dotIndex)
-        extension = fileName.substring(dotIndex)
-      } else {
-        baseName = fileName
-        extension = ""
-      }
-
-      var seq = 1
-      while (true) {
-        val path = directory / "$baseName ($seq)$extension"
-        if (!platformFileSystem.exists(path)) return path
-        seq++
-      }
-    }
-  }
 }

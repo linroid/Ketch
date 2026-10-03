@@ -50,10 +50,12 @@ extension is in the browser stores:
   `ketch server`, or in the app open **Settings → Sharing** and choose **Allow another device**.
   Then choose **Add server** in the extension's settings and enter `http://127.0.0.1:8642`.
   Sharing from the app always has an access code: enter the one under **Advanced** as the access
-  token. For `ketch server`, enter its `apiToken`, if it has one.
+  token. For `ketch server`, enter its `apiToken` or the token it printed when it created one
+  (see [its access token](../../cli/README.md#access-token)); on `--host 127.0.0.1` it needs
+  none unless you give it one.
 - **Another device**: on that device, open **Settings → Sharing** and choose **Allow another
-  device**; the access code is under **Advanced** (for `ketch server`, set `apiToken` in
-  `config.toml`). In the extension's settings, choose **Add server** and enter the address Ketch
+  device**; the access code is under **Advanced** (for `ketch server`, the token it uses, as
+  above). In the extension's settings, choose **Add server** and enter the address Ketch
   shows, such as `http://192.168.1.20:8642`, and the code as the access token. A bare host such
   as `nas.local` gets port 8642.
 
