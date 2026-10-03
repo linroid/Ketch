@@ -22,10 +22,10 @@ import com.linroid.ketch.app.ui.devices.RemoveDeviceDialog
 import com.linroid.ketch.app.ui.devices.RenameDeviceDialog
 import com.linroid.ketch.app.ui.devices.openDeviceSettings
 import com.linroid.ketch.app.ui.devices.renameAndRemoveItems
-import com.linroid.ketch.app.ui.devices.setSpeedLimit
 import com.linroid.ketch.app.ui.devices.speedModeOf
-import com.linroid.ketch.app.ui.devices.switchSpeedMode
+import com.linroid.ketch.app.ui.pulse.setSpeedLimit
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
+import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_switch_to

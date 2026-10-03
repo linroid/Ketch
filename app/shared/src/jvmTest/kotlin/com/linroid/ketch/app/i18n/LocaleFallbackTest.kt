@@ -37,6 +37,15 @@ class LocaleFallbackTest {
     assertShows("values-zh-rTW", "zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh-Hant-HK", "zh-Hant-CN")
   }
 
+  @Test fun appLanguages_listEveryTranslation_underItsOwnName() = runTest {
+    assertEquals(translations().size + 1, AppLanguages.size, "AppLanguages lists English too")
+    for (language in AppLanguages) {
+      val folder = if (language.tag == "en") "values" else translationOf(language.tag)
+      assertShows(folder, language.tag)
+      assertEquals(languageName(folder), language.name.load(), language.tag)
+    }
+  }
+
   @Test fun languagesWithoutATranslation_fallBackToEnglish() = runTest {
     assertShows("values", "en-US", "en-GB", "it-IT", "nl", "ar-EG")
   }
@@ -58,6 +67,10 @@ class LocaleFallbackTest {
       Locale.setDefault(saved)
     }
   }
+
+  // The folder whose language tag reads tag: zh-Hant reads values-zh-rTW, pt-BR values-pt.
+  private fun translationOf(tag: String): String = translations()
+    .first { appLanguageOf(tagOf(it))?.tag == tag }
 
   // The translations' folders, such as values-ja and values-zh-rTW.
   private fun translations(): List<String> =

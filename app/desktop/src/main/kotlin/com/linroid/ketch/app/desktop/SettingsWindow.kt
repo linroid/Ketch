@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.ObserverHandle
@@ -24,6 +25,7 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
+import com.linroid.ketch.app.components.LocalDeviceTypes
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
@@ -40,6 +42,7 @@ import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.isDark
+import com.linroid.ketch.app.ui.devices.rememberDeviceTypes
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
 import com.linroid.ketch.app.ui.settings.SettingsHost
 import ketch.app.desktop.generated.resources.Res
@@ -156,6 +159,8 @@ internal fun SettingsWindow(
   onQuit: () -> Unit,
 ) {
   val target = settings.target ?: return
+  // Text resolves as it composes, so the window composes again in a new language.
+  val language = controller.appSettings.language
   Window(
     onCloseRequest = settings::close,
     state = windowState,
@@ -189,7 +194,9 @@ internal fun SettingsWindow(
         bringToFront(window)
       }
     }
-    SettingsMenuBar(onClose = settings::close, onMinimize = { windowState.isMinimized = true })
+    key(language) {
+      SettingsMenuBar(onClose = settings::close, onMinimize = { windowState.isMinimized = true })
+    }
     val focused = LocalWindowInfo.current.isWindowFocused
     SideEffect { settings.focused = focused }
     // Browsers and default apps may have changed while Ketch was in the background.
@@ -206,6 +213,7 @@ internal fun SettingsWindow(
       LocalFileLogger provides fileLogger,
       LocalDesktopHooks provides hooks,
       LocalIntegrationStatus provides integration.status,
+      LocalDeviceTypes provides rememberDeviceTypes(controller.state),
     ) {
       KetchTheme(
         darkTheme = darkTheme,
@@ -214,7 +222,7 @@ internal fun SettingsWindow(
         reduceMotion = appSettings.ui.reduceMotion || systemReducesMotion,
       ) {
         Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas)) {
-          SettingsHost(controller.state, target, onClose = settings::close)
+          key(language) { SettingsHost(controller.state, target, onClose = settings::close) }
         }
       }
     }

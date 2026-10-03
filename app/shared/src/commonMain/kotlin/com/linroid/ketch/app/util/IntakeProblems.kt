@@ -16,12 +16,14 @@ import ketch.app.shared.generated.resources.intake_action_sign_in
 import ketch.app.shared.generated.resources.intake_problem_busy
 import ketch.app.shared.generated.resources.intake_problem_busy_detail
 import ketch.app.shared.generated.resources.intake_problem_check_failed
+import ketch.app.shared.generated.resources.intake_problem_file_unreadable
 import ketch.app.shared.generated.resources.intake_problem_forbidden
 import ketch.app.shared.generated.resources.intake_problem_forbidden_detail
 import ketch.app.shared.generated.resources.intake_problem_ftp
 import ketch.app.shared.generated.resources.intake_problem_http
 import ketch.app.shared.generated.resources.intake_problem_magnet_timeout
 import ketch.app.shared.generated.resources.intake_problem_no_peers
+import ketch.app.shared.generated.resources.intake_problem_no_torrents
 import ketch.app.shared.generated.resources.intake_problem_not_found
 import ketch.app.shared.generated.resources.intake_problem_not_found_detail
 import ketch.app.shared.generated.resources.intake_problem_sign_in
@@ -99,10 +101,29 @@ enum class IntakeAction(val label: StringResource) {
  * The add-sheet problem for this failure to resolve [url]. A missing scheme never gets here:
  * [LinkParser] adds `https://` on its own.
  *
+ * @param url the link, or the name of a dropped [file].
  * @param discoverAvailable whether Discover can look for another source, which a missing file
  *   then offers.
+ * @param file whether a dropped file's content was resolved, such as a `.torrent` file's.
  */
-fun Throwable.toIntakeProblem(url: String, discoverAvailable: Boolean = false): IntakeProblem =
+fun Throwable.toIntakeProblem(
+  url: String,
+  discoverAvailable: Boolean = false,
+  file: Boolean = false,
+): IntakeProblem =
+  when {
+    // No source on the device takes it: a magnet or a .torrent there means no torrents at all.
+    this is KetchError.Unsupported && (file || LinkKind.of(url) == LinkKind.Magnet) -> {
+      IntakeProblem(title = Res.string.intake_problem_no_torrents.text())
+    }
+    file && this !is KetchError -> IntakeProblem(
+      title = Res.string.intake_problem_file_unreadable.text(),
+      detail = message?.takeIf { it.isNotBlank() }?.let(::verbatim),
+    )
+    else -> linkProblem(url, discoverAvailable)
+  }
+
+private fun Throwable.linkProblem(url: String, discoverAvailable: Boolean): IntakeProblem =
   when (this) {
     is KetchError.Unsupported -> IntakeProblem(
       title = Res.string.intake_problem_unsupported.text(),

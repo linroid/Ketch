@@ -59,10 +59,8 @@
 
   <string name="feedback_open_failed">%1$s을(를) 열 수 없음</string>
   <string name="feedback_drop_unsupported">.torrent 파일과 링크 목록만 놓아서 다운로드를 추가할 수 있습니다</string>
+  <string name="feedback_drop_no_links">놓은 항목에서 링크를 찾지 못했습니다</string>
   <string name="feedback_read_failed">%1$s을(를) 읽을 수 없음</string>
-  <string name="feedback_torrent_invalid">%1$s은(는) 올바른 토렌트 파일이 아닙니다</string>
-  <string name="feedback_file_unsupported">%1$s은(는) 지원되지 않는 파일입니다</string>
-  <string name="feedback_file_read_failed">%1$s을(를) 읽지 못했습니다</string>
   <string name="feedback_add_failed">%1$s을(를) 추가할 수 없음</string>
   <plurals name="feedback_add_failed_count">
     <item quantity="other">다운로드 %1$d개를 추가할 수 없음</item>
@@ -146,10 +144,6 @@
     <item quantity="other">다운로드 %1$d개를 %2$s에 보냄</item>
   </plurals>
   <string name="feedback_remove_here">여기서 제거</string>
-  <string name="feedback_added_here_one">%1$s 추가됨 → %2$s</string>
-  <plurals name="feedback_added_here">
-    <item quantity="other">다운로드 %1$d개 추가됨 → %2$s</item>
-  </plurals>
   <string name="feedback_options">옵션</string>
 
   <string name="feedback_pause_failed_one">%2$s에서 %1$s을(를) 일시정지할 수 없음</string>

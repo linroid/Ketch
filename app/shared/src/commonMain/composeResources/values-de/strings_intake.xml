@@ -146,6 +146,8 @@
   <string name="intake_problem_torrent">Dieser Torrent konnte nicht gelesen werden</string>
   <string name="intake_problem_ftp">Der FTP-Server hat einen Fehler gemeldet</string>
   <string name="intake_problem_check_failed">Dieser Link konnte nicht geprüft werden</string>
+  <string name="intake_problem_no_torrents">Dieses Gerät kann keine Torrents herunterladen</string>
+  <string name="intake_problem_file_unreadable">Diese Datei konnte nicht gelesen werden</string>
   <string name="intake_problem_sign_in">Anmeldung erforderlich</string>
   <string name="intake_action_sign_in">Anmelden</string>
   <string name="intake_action_paste_curl">Als cURL einfügen</string>

@@ -1,10 +1,6 @@
 package com.linroid.ketch.app.ui.devices
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,28 +8,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.linroid.ketch.app.components.KetchEyebrow
-import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.i18n.resolve
-import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.state.AppState
-import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
-import com.linroid.ketch.app.ui.pulse.SpeedModeControl
 import com.linroid.ketch.app.ui.pulse.SpeedModeOptions
 import com.linroid.ketch.app.ui.pulse.SpeedModePillContent
 import com.linroid.ketch.app.ui.pulse.SpeedModeView
 import com.linroid.ketch.app.ui.pulse.SpeedPopoverWidth
-import com.linroid.ketch.app.ui.pulse.SpeedSettingsButton
 import com.linroid.ketch.app.ui.pulse.rememberPendingJob
 import com.linroid.ketch.app.ui.pulse.speedModeView
 import ketch.app.shared.generated.resources.Res
-import ketch.app.shared.generated.resources.device_speed_applies
-import ketch.app.shared.generated.resources.device_speed_limit
 import ketch.app.shared.generated.resources.device_speed_of
-import ketch.app.shared.generated.resources.device_speed_update_failed
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -49,22 +36,19 @@ internal fun rememberDeviceSpeedView(state: AppState, device: DevicePresence): S
 
 /**
  * [device]'s speed mode pill on its card. Clicking it turns the Slow lane on or off where the
- * device has a speed mode, and otherwise opens its speed limit; the chevron opens the options.
- * The device the app shows gets the options of the Pulse bar's popover.
+ * device has a speed mode, and otherwise opens its speed limit; the chevron opens the options of
+ * the Pulse bar's popover, for this device whether or not the app shows it.
  */
 @Composable
 internal fun DeviceSpeedPill(
   state: AppState,
   device: DevicePresence,
-  active: Boolean,
   modifier: Modifier = Modifier,
 ) {
   val view = rememberDeviceSpeedView(state, device)
   val switching = rememberPendingJob()
   var open by remember { mutableStateOf(false) }
-  LaunchedEffect(device.entry) {
-    if (view.controller == null) state.settingsFor(device.entry).loadDownload()
-  }
+  LaunchedEffect(device.entry) { state.settingsFor(device.entry).loadDownload() }
   Box(modifier) {
     SpeedModePillContent(
       view = view,
@@ -82,51 +66,7 @@ internal fun DeviceSpeedPill(
       alignment = PopoverAlignment.End,
       title = stringResource(Res.string.device_speed_of, device.name.resolve()),
     ) {
-      if (active) {
-        SpeedModeOptions(state, onOpenSettings = { open = false })
-      } else {
-        DeviceSpeedOptions(state, device, view, onOpenSettings = { open = false })
-      }
+      SpeedModeOptions(state, device.entry, view, onOpenSettings = { open = false })
     }
   }
-}
-
-/**
- * The speed options of a device the app does not show: its mode where it has one, otherwise its
- * speed limit, and a link to its Speed settings for the rest.
- */
-@Composable
-private fun ColumnScope.DeviceSpeedOptions(
-  state: AppState,
-  device: DevicePresence,
-  view: SpeedModeView,
-  onOpenSettings: () -> Unit,
-) {
-  val spacing = KetchTheme.spacing
-  val controller = view.controller
-  val command = rememberPendingJob()
-  if (controller != null) {
-    SpeedModeControl(
-      controller = controller,
-      view = view,
-      onSelect = { command.track(state.switchSpeedMode(controller, it)) },
-    )
-  } else {
-    val settings = state.settingsFor(device.entry)
-    val caption = settings.downloadError
-      ?.let { Res.string.device_speed_update_failed.text(device.name, it) }
-      ?: Res.string.device_speed_applies.text(device.name)
-    KetchEyebrow(
-      text = stringResource(Res.string.device_speed_limit),
-      modifier = Modifier.padding(bottom = spacing.s2),
-    )
-    SpeedLimitPicker(
-      value = settings.download?.speedLimit ?: view.limit,
-      onCommit = { state.setSpeedLimit(device.entry, it) },
-      caption = caption.resolve(),
-      enabled = settings.download != null,
-    )
-  }
-  Spacer(Modifier.height(spacing.s3))
-  SpeedSettingsButton(state, device.deviceId, onOpenSettings)
 }

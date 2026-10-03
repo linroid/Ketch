@@ -1,9 +1,12 @@
 # Localization
 
-The apps show their text in the language of the system, or of the app where the platform has a
-per-app language setting (Android 13+, iOS), and fall back to English. Library, server and CLI
-output stay in English, as do log messages, `KetchError` messages, REST error responses, the
-prompts AI discovery sends to the model and the bug report "Copy details" puts on the clipboard.
+The apps show their text in the language of the system and fall back to English, unless one is
+chosen in Settings → General → Language. Android 13+ and iOS keep that choice in their per-app
+language setting (on iOS the row opens it in the Settings app); the desktop, the web app and
+older Android keep it in `config.toml` as `[appearance] language` and apply it themselves
+(`i18n/AppLanguage.kt`). Library, server and CLI output stay in English, as do log messages,
+`KetchError` messages, REST error responses, the prompts AI discovery sends to the model and the
+bug report "Copy details" puts on the clipboard.
 
 ## Languages
 
@@ -153,8 +156,10 @@ lacks falls back to English.
    bundled Inter and JetBrains Mono lack, Compose downloads Noto font slices from
    fonts.gstatic.com as text needs them, choosing the Chinese, Japanese or Korean variant from the
    browser's language. Offline, such text shows as boxes.
-6. Add it to the table above and run `./gradlew :app:shared:jvmTest`. To see the screens in it,
-   render the UI snapshots with `-PsnapshotLocale=<tag>` ([testing](testing.md#ui-snapshots)).
+6. Add it to `AppLanguages` in `i18n/AppLanguage.kt`, named in itself, so Settings lists it.
+7. Add it to the table above and run `./gradlew :app:shared:jvmTest`; `LocaleFallbackTest` checks
+   that every translation is listed. To see the screens in it, render the UI snapshots with
+   `-PsnapshotLocale=<tag>` ([testing](testing.md#ui-snapshots)).
 
 Translations come in by pull request. The files use the Android string resource format, which
 translation platforms such as Weblate and Crowdin read, should the project use one later.

@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
@@ -37,6 +38,7 @@ import com.linroid.ketch.config.WebConfigStore
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
 import kotlin.js.ExperimentalWasmJsInterop
@@ -84,9 +86,12 @@ fun main() {
   val activityEvents = reportWebActivity(controller)
   // Removals and other undoable operations still pending commit when the tab closes.
   window.addEventListener("pagehide", { controller.state.pendingOps.flush() })
-  controller.scope.launch { setPageLanguage() }
+  // The page's language and title follow the language the app shows, which Settings can change.
   controller.scope.launch {
-    controller.pulse.state.collect { document.title = it.tabTitle().load() }
+    snapshotFlow { controller.appSettings.language }.collectLatest {
+      setPageLanguage()
+      controller.pulse.state.collect { document.title = it.tabTitle().load() }
+    }
   }
   ComposeViewport(body) {
     // The installed app's title bar takes the canvas color of the theme the app shows.

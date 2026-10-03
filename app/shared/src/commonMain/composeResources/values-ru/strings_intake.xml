@@ -180,6 +180,8 @@
   <string name="intake_problem_torrent">Не удалось прочитать этот торрент</string>
   <string name="intake_problem_ftp">FTP-сервер сообщил об ошибке</string>
   <string name="intake_problem_check_failed">Не удалось проверить эту ссылку</string>
+  <string name="intake_problem_no_torrents">Это устройство не может скачивать торренты</string>
+  <string name="intake_problem_file_unreadable">Не удалось прочитать этот файл</string>
   <string name="intake_problem_sign_in">Требуется вход</string>
   <string name="intake_action_sign_in">Войти</string>
   <string name="intake_action_paste_curl">Вставить как cURL</string>

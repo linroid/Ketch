@@ -5,7 +5,7 @@ instance/InstanceEntry.kt:1
 instance/InstanceFactory.kt:1
 instance/InstanceManager.kt:1
 state/AiDiscoverController.kt:1
-state/AppState.kt:4
+state/AppState.kt:3
 state/IncomingDownloads.kt:3
 state/IntakeState.kt:8
 theme/Theme.kt:6

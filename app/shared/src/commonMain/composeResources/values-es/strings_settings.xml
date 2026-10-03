@@ -104,6 +104,8 @@
   <string name="settings_general_reduce_motion_auto">Automático sigue el ajuste de tu sistema.</string>
   <string name="settings_general_language">Idioma</string>
   <string name="settings_general_language_current">Español</string>
+  <string name="settings_general_language_system">Sistema</string>
+  <string name="settings_general_language_in_settings">Cámbialo en la app Ajustes</string>
   <string name="settings_general_shortcuts">Atajos de teclado…</string>
   <string name="settings_general_startup">Inicio y ventana</string>
   <string name="settings_general_close">Al cerrar la ventana</string>

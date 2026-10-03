@@ -68,6 +68,7 @@ import com.linroid.ketch.app.components.interactionOverlay
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.popupAppear
 import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.isEmpty
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.speedText
@@ -93,6 +94,7 @@ import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.devices.pairDevice
 import com.linroid.ketch.app.ui.devices.shortDurationText
+import com.linroid.ketch.app.ui.devices.systemName
 import com.linroid.ketch.app.ui.sidebar.PennantCluster
 import com.linroid.ketch.app.ui.sidebar.deviceShortcut
 import com.linroid.ketch.app.ui.sidebar.pennantHealth
@@ -374,7 +376,7 @@ internal fun ColumnScope.SwitcherRows(
           )
         },
         title = entry.device.name.resolve(),
-        subtitle = entry.device.detail.takeIf { entry.device.name != verbatim(it) },
+        subtitle = switcherSubtitle(entry.device).takeUnless { it.isEmpty() }?.resolve(),
         detail = switcherDetail(entry.device, now).resolve(),
         alert = entry.device.health == DeviceHealth.Unauthorized ||
           entry.device.connected && entry.device.health is DeviceHealth.Offline,
@@ -575,6 +577,15 @@ private fun digitPick(event: KeyEvent, entries: List<SwitcherEntry>): SwitcherEn
     entries.firstOrNull { it is SwitcherEntry.Device && it.number == digit }
   }
 }
+
+/**
+ * What the switcher says after [device]'s name: its host name or address, unless that is its
+ * name, and the system it runs, as in "nas.local:8642 · Linux".
+ */
+internal fun switcherSubtitle(device: DevicePresence): UiText = listOfNotNull(
+  device.detail.takeIf { device.name != verbatim(it) },
+  device.systemName,
+).map(::verbatim).joinText()
 
 /**
  * What the switcher says under [device]'s name: its speed while it downloads, the Slow lane, how

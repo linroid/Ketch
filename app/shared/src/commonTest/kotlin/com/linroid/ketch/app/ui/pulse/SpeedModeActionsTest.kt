@@ -150,9 +150,9 @@ class SpeedModeActionsTest {
   fun limitGoesToSettings_capAtFullSpeedOrNoSpeedMode_isTrue() = runTest {
     val f = fixture()
 
-    assertTrue(f.state.limitGoesToSettings(asSlowLane = false))
-    assertFalse(f.state.limitGoesToSettings(asSlowLane = true))
-    assertTrue(fixture(withSpeedMode = false).state.limitGoesToSettings(asSlowLane = true))
+    assertTrue(limitGoesToSettings(f.speed, asSlowLane = false))
+    assertFalse(limitGoesToSettings(f.speed, asSlowLane = true))
+    assertTrue(limitGoesToSettings(controller = null, asSlowLane = true))
   }
 
   @Test

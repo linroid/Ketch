@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
@@ -22,6 +23,7 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.ui.pulse.setSpeedLimit
 import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
@@ -133,6 +135,19 @@ class DeviceActionsTest {
   }
 
   @Test
+  fun setSpeedLimit_slowLaneOfThisMacWhileTheNasShows_turnsItOn() = devicesTest { f ->
+    f.state.switchInstance(f.nas)
+    runCurrent()
+    val local = f.state.instances.value.first { it.deviceId == LOCAL_DEVICE_ID }
+
+    f.state.setSpeedLimit(local, SpeedLimit.mbps(2), asSlowLane = true)
+    runCurrent()
+
+    assertEquals(SpeedMode.SlowLane, f.speed.mode.value)
+    assertEquals(SpeedLimit.mbps(2), f.speed.slowLaneSpeed)
+  }
+
+  @Test
   fun toggleSlowLane_thisMacWhileTheNasShows_switchesItsModeWithUndo() = devicesTest { f ->
     f.state.switchInstance(f.nas)
     runCurrent()
@@ -150,8 +165,8 @@ class DeviceActionsTest {
   }
 
   @Test
-  fun dropText_onTheNasCard_opensTheAddSheetForTheNas() = devicesTest { f ->
-    f.state.dropText(f.nas, "  https://example.com/ubuntu.iso\n")
+  fun addDroppedText_onTheNasCard_opensTheAddSheetForTheNas() = devicesTest { f ->
+    f.state.addDroppedText("  https://example.com/ubuntu.iso\n", f.nas)
 
     assertTrue(f.state.showAddDialog)
     assertEquals(
@@ -161,7 +176,7 @@ class DeviceActionsTest {
   }
 
   @Test
-  fun dropFiles_torrentOnTheNasCard_resolvesItOnTheNas() = runTest {
+  fun addDroppedFiles_torrentOnTheNasCard_resolvesItOnTheNas() = runTest {
     val nas = FakeKetchApi().apply {
       resolveContentResult = ResolvedSource(
         url = "magnet:?xt=urn:btih:abc",
@@ -175,7 +190,7 @@ class DeviceActionsTest {
     val f = fixture(nas)
     val file = DroppedFile("ubuntu.torrent") { byteArrayOf(1, 2, 3) }
 
-    f.state.dropFiles(f.nas, listOf(file))
+    f.state.addDroppedFiles(listOf(file), f.nas)
     runCurrent()
 
     assertEquals(f.nas.deviceId, f.state.intakeRequest?.targetDeviceId)

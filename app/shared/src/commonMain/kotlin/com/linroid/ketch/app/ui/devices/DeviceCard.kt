@@ -46,7 +46,6 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.localDeviceKind
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
@@ -71,15 +70,14 @@ import org.jetbrains.compose.resources.stringResource
  * online says why, with a way to fix it. Links and files dropped on the card are added there.
  *
  * @param work what the device's tasks add up to; see [rememberDeviceWork].
- * @param active whether it is the device the app shows.
- * @param marked whether its outline marks it as that device, which only matters among several.
+ * @param marked whether its outline marks it as the device the app shows, which only matters
+ *   among several.
  */
 @Composable
 internal fun DeviceCard(
   state: AppState,
   device: DevicePresence,
   work: DeviceWork,
-  active: Boolean,
   marked: Boolean,
   onRename: () -> Unit,
   onRemove: () -> Unit,
@@ -92,8 +90,8 @@ internal fun DeviceCard(
     label = stringResource(Res.string.device_drop_to_download, device.name.resolve()),
     enabled = problem == null,
     shape = shape,
-    onDropFiles = { state.dropFiles(device.entry, it) },
-    onDropText = { state.dropText(device.entry, it) },
+    onDropFiles = { state.addDroppedFiles(it, device.entry) },
+    onDropText = { state.addDroppedText(it, device.entry) },
     modifier = modifier,
   ) {
     Column(
@@ -109,7 +107,7 @@ internal fun DeviceCard(
       Column(Modifier.padding(KetchTheme.spacing.s5).weight(1f)) {
         CardHeader(state, device, dimmed = problem != null, onRename, onRemove)
         if (problem == null) {
-          DeviceDetails(state, device, work, active)
+          DeviceDetails(state, device, work)
         } else {
           ProblemDetails(state, device, problem, onRemove)
         }
@@ -159,7 +157,6 @@ private fun CardHeader(
         deviceId = device.deviceId,
         name = device.entry.label,
         size = DevicePennantDefaults.Large,
-        icon = deviceIcon(device, localDeviceKind()),
       )
       Text(
         text = device.name.resolve(),
@@ -212,11 +209,10 @@ private fun ColumnScope.DeviceDetails(
   state: AppState,
   device: DevicePresence,
   work: DeviceWork,
-  active: Boolean,
 ) {
   val spacing = KetchTheme.spacing
   Spacer(Modifier.height(spacing.s4))
-  SpeedRow(state, device, active)
+  SpeedRow(state, device)
   Spacer(Modifier.height(spacing.s3))
   DeviceLane(work.blocks)
   Spacer(Modifier.height(spacing.s4))
@@ -237,7 +233,7 @@ private fun ColumnScope.DeviceDetails(
 
 /** The device's total speed in large numerals, or "Idle", and its speed mode pill. */
 @Composable
-private fun SpeedRow(state: AppState, device: DevicePresence, active: Boolean) {
+private fun SpeedRow(state: AppState, device: DevicePresence) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val downloading = device.counts.downloading > 0
@@ -266,7 +262,7 @@ private fun SpeedRow(state: AppState, device: DevicePresence, active: Boolean) {
     }
     Spacer(Modifier.width(KetchTheme.spacing.s3))
     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-      DeviceSpeedPill(state, device, active = active)
+      DeviceSpeedPill(state, device)
     }
   }
 }

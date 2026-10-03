@@ -24,7 +24,8 @@ Multiplatform download manager library.
 The library is **substantially complete** with all core features implemented and working across
 Android, JVM/Desktop, iOS, and WebAssembly platforms.
 
-**Note:** The library has not been published yet, so public API breaking changes are allowed.
+**Note:** The library is published on Maven Central (`com.linroid.ketch`), but it is still pre-1.0,
+so public API breaking changes are allowed.
 
 ## Module Structure
 
@@ -280,8 +281,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `KetchConfig` root with server, download, remotes, AI, appearance, torrent, speed, UI,
   desktop, notifications and integration sections
 - `AiSettings`: AI discovery provider, token, model, endpoint and search keys
-- `AppearanceConfig`: accent palette and light/dark `ThemeMode` (app-only;
-  CLI and server ignore it)
+- `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
+  Settings (app-only; CLI and server ignore it)
 - `TorrentSettings`: extra trackers for public torrents (`TorrentConfig.additionalTrackers`),
   edited on the embedded instance's BitTorrent settings page and applied to torrents as they
   start or resume; a remote instance's trackers are only editable on that device
@@ -302,7 +303,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   never saved
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, mDNS, `autoStart`
   (apps start the server on launch)
-- `RemoteConfig`: pre-configured remote server connections
+- `RemoteConfig`: pre-configured remote server connections, with the system each device last
+  reported, which picks its `DeviceType` glyph in the apps' pennants
 - `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
   `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
   uses `WebConfigStore` (TOML in localStorage)
@@ -336,8 +338,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   code outside `theme/` and `components/` adds literal radii, colors or text sizes,
   `MaterialTheme.` or Material icons; keep its allowlist (`design-token-allowlist.txt`) empty.
   Composables read the time from `LocalClock`, never `Clock.System`
-- Localization: the apps follow the system or per-app language and fall back to English; the
-  languages are listed in [localization](docs/development/localization.md#languages). UI text
+- Localization: the apps follow the system language, or the one chosen in Settings → General
+  (`AppLanguages`; Android 13+ and iOS keep it in their per-app setting), and fall back to
+  English; the languages are listed in
+  [localization](docs/development/localization.md#languages). UI text
   lives in `composeResources/values/strings_<area>.xml`; state and model code returns `UiText`
   (`i18n/UiText.kt`), which composables `resolve()` and coroutines `load()`, and sizes, speeds,
   durations and dates come from `i18n/Formats.kt`. Never put a `UiText` in a string template: it

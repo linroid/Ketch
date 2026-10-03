@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -395,11 +396,15 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   }
   KetchTray(controller, status, actions, speedMode, trayState)
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
+  // Text resolves as it composes, so the menus compose again in a new language.
+  val language = controller.appSettings.language
   if (DesktopOs.current == DesktopOs.MAC) {
-    DockMenu(commands, status.pulse.counts)
-    val instances by controller.state.instances.collectAsState()
-    val menus = menuBar(menuBarContext(controller, status, speedMode, files, instances))
-    DefaultMenuBar(menus, commands::perform)
+    key(language) {
+      DockMenu(commands, status.pulse.counts)
+      val instances by controller.state.instances.collectAsState()
+      val menus = menuBar(menuBarContext(controller, status, speedMode, files, instances))
+      DefaultMenuBar(menus, commands::perform)
+    }
   }
   CloseDialogs(behavior, controller.appSettings)
 
@@ -436,7 +441,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       val focused = LocalWindowInfo.current.isWindowFocused
       SideEffect { windowFocused = focused }
       MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.themeMode.isDark())
-      KetchMenuBar(controller, status, actions, speedMode)
+      key(language) { KetchMenuBar(controller, status, actions, speedMode) }
       val shellSkips = remember(speedMode) {
         hostShortcuts(DesktopOs.current, slowLane = speedMode != null)
       }

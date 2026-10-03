@@ -9,7 +9,7 @@ The Ketch apps, the command line and the server all run on one Kotlin Multiplatf
 published on Maven Central under `com.linroid.ketch`. You can use it to:
 
 - **Embed the download engine** in an Android, iOS, JVM, Node.js or WASI app (`core`)
-- **Control a Ketch server** from any of those platforms and from the browser (`remote`)
+- **Control a Ketch server** from an Android, iOS or JVM app, or from the browser (`remote`)
 - **Talk to a server from any language** over its REST API and server-sent events
 - **Add protocols, storage or logging** by implementing small interfaces
 

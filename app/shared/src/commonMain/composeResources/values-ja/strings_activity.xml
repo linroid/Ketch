@@ -59,10 +59,8 @@
 
   <string name="feedback_open_failed">%1$sを開けませんでした</string>
   <string name="feedback_drop_unsupported">ドロップして追加できるのは、.torrentファイルとリンクの一覧のみです</string>
+  <string name="feedback_drop_no_links">ドロップされた内容にリンクが見つかりませんでした</string>
   <string name="feedback_read_failed">%1$sを読み込めませんでした</string>
-  <string name="feedback_torrent_invalid">%1$sは有効なトレントファイルではありません</string>
-  <string name="feedback_file_unsupported">%1$sはサポートされていないファイルです</string>
-  <string name="feedback_file_read_failed">%1$sの読み込みに失敗しました</string>
   <string name="feedback_add_failed">%1$sを追加できませんでした</string>
   <plurals name="feedback_add_failed_count">
     <item quantity="other">%1$d件のダウンロードを追加できませんでした</item>
@@ -146,10 +144,6 @@
     <item quantity="other">%1$d件のダウンロードを%2$sに送信しました</item>
   </plurals>
   <string name="feedback_remove_here">このデバイスから削除</string>
-  <string name="feedback_added_here_one">%1$sを追加しました → %2$s</string>
-  <plurals name="feedback_added_here">
-    <item quantity="other">%1$d件のダウンロードを追加しました → %2$s</item>
-  </plurals>
   <string name="feedback_options">オプション</string>
 
   <string name="feedback_pause_failed_one">%2$sで%1$sを一時停止できませんでした</string>

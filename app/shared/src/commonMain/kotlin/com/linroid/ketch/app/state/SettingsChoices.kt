@@ -234,6 +234,20 @@ private fun storageFolderName(path: String): String? {
 }
 
 /**
+ * [path] with the user's home folder as "~": `~/Downloads` for `/Users/alex/Downloads` or
+ * `/home/alex/Downloads`, `~\Downloads` for `C:\Users\alex\Downloads`, and the folder an
+ * Android document tree names; other paths are kept as they are.
+ */
+internal fun shortPathText(path: String): UiText =
+  if (isDocumentTree(path)) folderNameText(path) else verbatim(homeShortened(path))
+
+/** [path] with the user's home folder as "~", as [shortPathText] shows it; others as they are. */
+internal fun homeShortened(path: String): String {
+  val match = HomeFolder.find(path) ?: return path
+  return "~" + path.substring(match.range.last + 1)
+}
+
+/**
  * Folders the downloads in [tasks] were saved to, newest first and at most [limit] of them,
  * leaving out the ones in [exclude]. Paths are given without a trailing separator.
  */
@@ -310,3 +324,6 @@ private const val WORK_DAYS = 5
 
 // Between the days of a rule, as in "Mon, Wed, Fri".
 private const val DAY_SEPARATOR = ", "
+
+private val HomeFolder =
+  Regex("""^(/Users/[^/]+|/home/[^/]+|[A-Za-z]:\\Users\\[^\\]+)(?=$|[/\\])""")

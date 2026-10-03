@@ -97,11 +97,9 @@
   <!-- %1$s is a file or a link opened from outside the app. -->
   <string name="feedback_open_failed">Couldn't open %1$s</string>
   <string name="feedback_drop_unsupported">Only .torrent files and link lists can be dropped to add downloads</string>
+  <string name="feedback_drop_no_links">Found no links in what was dropped</string>
   <!-- %1$s is a file name. -->
   <string name="feedback_read_failed">Couldn't read %1$s</string>
-  <string name="feedback_torrent_invalid">%1$s is not a valid torrent file</string>
-  <string name="feedback_file_unsupported">%1$s is not a supported file</string>
-  <string name="feedback_file_read_failed">Failed to read %1$s</string>
   <!-- %1$s is a link or a file name. -->
   <string name="feedback_add_failed">Couldn't add %1$s</string>
   <plurals name="feedback_add_failed_count">
@@ -220,12 +218,6 @@
   </plurals>
   <!-- After sending downloads to another device: removes them from this one. -->
   <string name="feedback_remove_here">Remove here</string>
-  <!-- After adding while the device shows. %1$s is a file name, %2$s the device. -->
-  <string name="feedback_added_here_one">Added %1$s → %2$s</string>
-  <plurals name="feedback_added_here">
-    <item quantity="one">Added %1$d download → %2$s</item>
-    <item quantity="other">Added %1$d downloads → %2$s</item>
-  </plurals>
   <!-- Opens the add sheet on a download just added, to change its options. -->
   <string name="feedback_options">Options</string>
 

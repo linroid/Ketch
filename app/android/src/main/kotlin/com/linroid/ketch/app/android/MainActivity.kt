@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.app.Application
 import android.content.ComponentName
 import android.content.ContentResolver
+import android.content.Context
 import android.content.Context.BIND_AUTO_CREATE
 import android.content.Intent
 import android.content.ServiceConnection
@@ -34,6 +35,7 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.NotificationLink
+import com.linroid.ketch.app.i18n.appLanguageContext
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
@@ -66,6 +68,10 @@ class MainActivity : ComponentActivity() {
   private val permissionPrefs by lazy { getSharedPreferences(PERMISSION_PREFS, MODE_PRIVATE) }
   private var notificationOffer: Job? = null
   private var notificationRationale: AlertDialog? = null
+
+  override fun attachBaseContext(newBase: Context) {
+    super.attachBaseContext(appLanguageContext(newBase))
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)

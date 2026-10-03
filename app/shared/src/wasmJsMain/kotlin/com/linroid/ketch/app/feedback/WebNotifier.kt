@@ -2,37 +2,19 @@
 
 package com.linroid.ketch.app.feedback
 
-import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.joinText
-import com.linroid.ketch.app.i18n.load
-import com.linroid.ketch.app.i18n.percentText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppController
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.notify_web_offer
 import ketch.app.shared.generated.resources.notify_web_on
-import ketch.app.shared.generated.resources.pulse_downloading_count
-import ketch.app.shared.generated.resources.pulse_tab_progress
 import kotlinx.browser.document
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import kotlin.js.ExperimentalWasmJsInterop
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Posts Ketch's notifications in the browser with the Notification API, and shows the number of
@@ -78,9 +60,9 @@ class WebNotifier(private val onClick: (ActivityEvent) -> Unit = {}) : SystemNot
 
 /**
  * Reports what happens on the device the web app shows, as the notification settings allow:
- * events go to the app while the page has focus and become notifications otherwise. The tab
- * title shows the progress of its downloads and the installed app's icon its failures, and the
- * first completion offers to turn notifications on. Runs until the controller closes.
+ * events go to the app while the page has focus and become notifications otherwise. The
+ * installed app's icon shows the failures, and the first completion offers to turn notifications
+ * on. Runs until the controller closes.
  *
  * @return the events for `App(activityEvents = …)`.
  */
@@ -114,7 +96,6 @@ fun reportWebActivity(controller: AppController): Flow<ActivityEvent> {
     }
   }
   controller.scope.launch { ActivityRouting.failures(devices).collect { notifier.setBadge(it) } }
-  controller.scope.launch { showProgressInTitle(manager) }
   return toasts.receiveAsFlow()
 }
 
@@ -144,45 +125,6 @@ private fun offerNotifications(
     ),
   )
 }
-
-// "↓ 45% · Ketch" while the shown device downloads; the page's own title otherwise.
-@OptIn(ExperimentalCoroutinesApi::class)
-private suspend fun showProgressInTitle(manager: InstanceManager) {
-  val idleTitle = document.title
-  manager.activeApi
-    .flatMapLatest { it.tasks }
-    .flatMapLatest { tasks ->
-      if (tasks.isEmpty()) flowOf(emptyList()) else combine(tasks.map { it.state }) { it.toList() }
-    }
-    .conflate()
-    .transform {
-      emit(it)
-      delay(TITLE_INTERVAL)
-    }
-    .map(::progressTitle)
-    .distinctUntilChanged()
-    .collect { progress ->
-      document.title = progress?.let { listOf(it, verbatim(APP_NAME)).joinText().load() }
-        ?: idleTitle
-    }
-}
-
-// Progress of the downloading tasks of known size, or their count when no size is known.
-private fun progressTitle(states: List<DownloadState>): UiText? {
-  val downloading = states.filterIsInstance<DownloadState.Downloading>()
-  if (downloading.isEmpty()) return null
-  val sized = downloading.map { it.progress }.filter { it.totalBytes > 0 }
-  val progress = if (sized.isEmpty()) {
-    Res.string.pulse_downloading_count.text(downloading.size)
-  } else {
-    percentText((sized.sumOf { it.downloadedBytes } * 100 / sized.sumOf { it.totalBytes }).toInt())
-  }
-  return Res.string.pulse_tab_progress.text(progress)
-}
-
-private const val APP_NAME = "Ketch"
-
-private val TITLE_INTERVAL = 1.seconds
 
 private fun notificationPermission(): String =
   js("('Notification' in window) ? Notification.permission : 'unsupported'")

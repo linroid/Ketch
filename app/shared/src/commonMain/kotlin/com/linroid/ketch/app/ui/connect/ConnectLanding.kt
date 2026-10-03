@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
+import com.linroid.ketch.app.components.DeviceType
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.SailLanesIllustration
@@ -48,7 +49,6 @@ import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.i18n.resolve
-import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
@@ -289,7 +289,7 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
         name = device.name.resolve(),
         health = device.health.takeIf { device.connected },
         failures = device.unseenFailures,
-        icon = KetchIcon.Server.takeIf { unnamed },
+        fallbackType = DeviceType.Server.takeIf { unnamed },
       )
     }
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {

@@ -38,6 +38,9 @@ class FakeInstanceFactory(
   /** Name new remote clients report in their status. */
   var announcedName: String = "Ketch"
 
+  /** Operating system new remote clients report in their status. */
+  var announcedOs: String = "Linux"
+
   /** The factory to build the manager with. */
   val factory: InstanceFactory = InstanceFactory(
     deviceName = "MacBook Pro",
@@ -49,7 +52,7 @@ class FakeInstanceFactory(
   fun clientsOf(deviceId: String): List<FakeRemote> = remotes.filter { it.deviceId == deviceId }
 
   private fun createRemote(config: RemoteConfig): RemoteInstance {
-    val client = FakeRemote(config, stateOnStart, announcedName)
+    val client = FakeRemote(config, stateOnStart, announcedName, announcedOs)
     remotes += client
     return RemoteInstance(client, config, client.connection)
   }
@@ -65,6 +68,7 @@ class FakeRemote(
   val config: RemoteConfig,
   private val stateOnStart: ConnectionState,
   private val announcedName: String,
+  private val announcedOs: String,
 ) : KetchApi {
   /** `host:port` of the device. */
   val deviceId: String = "${config.host}:${config.port}"
@@ -97,7 +101,7 @@ class FakeRemote(
     version = "0.0.1",
     uptime = 3600,
     system = testSystem(
-      os = "Linux",
+      os = announcedOs,
       arch = "x64",
       javaVersion = "21",
       availableProcessors = 4,

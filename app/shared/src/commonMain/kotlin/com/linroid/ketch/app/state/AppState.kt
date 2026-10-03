@@ -45,6 +45,7 @@ import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.util.LinkKind
+import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.displayName
@@ -59,12 +60,11 @@ import ketch.app.shared.generated.resources.action_retry
 import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_try_again
 import ketch.app.shared.generated.resources.action_undo
+import ketch.app.shared.generated.resources.count_downloads
 import ketch.app.shared.generated.resources.device_any_in_sentence
 import ketch.app.shared.generated.resources.feedback_add_failed
 import ketch.app.shared.generated.resources.feedback_add_failed_count
 import ketch.app.shared.generated.resources.feedback_added
-import ketch.app.shared.generated.resources.feedback_added_here
-import ketch.app.shared.generated.resources.feedback_added_here_one
 import ketch.app.shared.generated.resources.feedback_cleared
 import ketch.app.shared.generated.resources.feedback_cleared_missing
 import ketch.app.shared.generated.resources.feedback_device_offline
@@ -74,9 +74,8 @@ import ketch.app.shared.generated.resources.feedback_discard_failed_one
 import ketch.app.shared.generated.resources.feedback_discarded
 import ketch.app.shared.generated.resources.feedback_discarded_one
 import ketch.app.shared.generated.resources.feedback_discovery_failed
+import ketch.app.shared.generated.resources.feedback_drop_no_links
 import ketch.app.shared.generated.resources.feedback_drop_unsupported
-import ketch.app.shared.generated.resources.feedback_file_read_failed
-import ketch.app.shared.generated.resources.feedback_file_unsupported
 import ketch.app.shared.generated.resources.feedback_moved
 import ketch.app.shared.generated.resources.feedback_moved_one
 import ketch.app.shared.generated.resources.feedback_nothing_missing
@@ -123,7 +122,6 @@ import ketch.app.shared.generated.resources.feedback_started_now
 import ketch.app.shared.generated.resources.feedback_started_now_one
 import ketch.app.shared.generated.resources.feedback_started_preempted
 import ketch.app.shared.generated.resources.feedback_switch_failed
-import ketch.app.shared.generated.resources.feedback_torrent_invalid
 import ketch.app.shared.generated.resources.feedback_undo_add
 import ketch.app.shared.generated.resources.feedback_undo_clear_finished
 import ketch.app.shared.generated.resources.feedback_undo_clear_missing
@@ -134,6 +132,10 @@ import ketch.app.shared.generated.resources.feedback_undo_remove
 import ketch.app.shared.generated.resources.feedback_undo_start_now
 import ketch.app.shared.generated.resources.feedback_undo_start_now_failed
 import ketch.app.shared.generated.resources.feedback_undo_start_now_failed_one
+import ketch.app.shared.generated.resources.intake_added_failed
+import ketch.app.shared.generated.resources.intake_added_here
+import ketch.app.shared.generated.resources.intake_added_left_out
+import ketch.app.shared.generated.resources.intake_added_to
 import ketch.app.shared.generated.resources.notify_all_finished
 import ketch.app.shared.generated.resources.notify_download_complete
 import ketch.app.shared.generated.resources.notify_download_failed
@@ -191,12 +193,8 @@ sealed interface ResolveState {
   data object Idle : ResolveState
   data object Resolving : ResolveState
   data class Resolved(val result: ResolvedSource) : ResolveState
-
-  /** Resolving failed; [text] says why, such as "ubuntu.torrent is not a valid torrent file". */
-  data class Error(
-    val text: UiText,
-    val cause: Throwable? = null,
-  ) : ResolveState
+  /** The device could not read the file; the add sheet words [cause] for its row. */
+  data class Error(val cause: Throwable) : ResolveState
 }
 
 /** Id of this device in [TaskKey]s: [LOCAL_DEVICE_ID] for the embedded one, else `host:port`. */
@@ -709,44 +707,50 @@ class AppState(
   }
 
   /**
-   * Adds dropped files: the first `.torrent` file opens the add dialog, which resolves it on the
-   * active device; link lists such as `.txt` files open the add sheet with their text.
+   * Adds dropped files to [target], by default the active device: the first `.torrent` file opens
+   * the add sheet, which resolves it there, and lists of links (see [LinkParser.isLinkList]) open
+   * it with their links.
    */
-  fun addDroppedFiles(files: List<DroppedFile>) {
-    val torrent = files.firstOrNull {
-      it.name.endsWith(".torrent", ignoreCase = true)
-    }
+  fun addDroppedFiles(files: List<DroppedFile>, target: InstanceEntry? = null) {
+    val torrent = files.firstOrNull { it.name.endsWith(".torrent", ignoreCase = true) }
     if (torrent != null) {
-      openIntake()
-      if (showAddDialog) resolveDroppedFile(torrent)
+      openIntake(IntakeRequest(targetDeviceId = target?.deviceId))
+      if (showAddDialog) resolveDroppedFile(torrent, target)
       return
     }
-    val linkLists = files.filter {
-      it.name.substringAfterLast('.', "").lowercase() in LINK_LIST_EXTENSIONS
-    }
-    if (linkLists.isEmpty()) {
+    val lists = files.filter { LinkParser.isLinkList(it.name) }
+    if (lists.isEmpty()) {
       postError(Res.string.feedback_drop_unsupported.text())
       return
     }
     scope.launch {
-      val text = linkLists.mapNotNull { file ->
-        try {
-          file.readBytes(MAX_LINK_LIST_BYTES).decodeToString()
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
-          postError(Res.string.feedback_read_failed.text(file.name), e.detail(), cause = e)
-          null
-        }
+      var unread = false
+      val text = lists.mapNotNull { file ->
+        catchingUnlessCancelled { file.readBytes(MAX_LINK_LIST_BYTES).decodeToString() }
+          .onFailure { e ->
+            log.w { "Couldn't read a dropped link list: ${e.describeCauses()}" }
+            postError(Res.string.feedback_read_failed.text(file.name), e.detail(), cause = e)
+            unread = true
+          }
+          .getOrNull()
+          ?.let { LinkParser.listText(it, file.name) }
       }.joinToString("\n").trim()
-      if (text.isNotEmpty()) openIntake(IntakeRequest(text = text))
+      when {
+        text.isNotEmpty() -> addDroppedText(text, target)
+        !unread -> postError(Res.string.feedback_drop_no_links.text())
+      }
     }
   }
 
-  /** Opens the add sheet for text dropped on the app, such as a link dragged from a browser. */
-  fun addDroppedText(text: String) {
+  /**
+   * Opens the add sheet aimed at [target], by default the active device, for text dropped on the
+   * app, such as a link dragged from a browser.
+   */
+  fun addDroppedText(text: String, target: InstanceEntry? = null) {
     val trimmed = text.trim()
-    if (trimmed.isNotEmpty()) openIntake(IntakeRequest(text = trimmed))
+    if (trimmed.isNotEmpty()) {
+      openIntake(IntakeRequest(text = trimmed, targetDeviceId = target?.deviceId))
+    }
   }
 
   /**
@@ -768,16 +772,7 @@ class AppState(
         }
       }.onFailure { e ->
         if (e is CancellationException) throw e
-        if (droppedFile === file) {
-          resolveState = ResolveState.Error(
-            text = when (e) {
-              is KetchError.SourceError -> Res.string.feedback_torrent_invalid.text(file.name)
-              is KetchError.Unsupported -> Res.string.feedback_file_unsupported.text(file.name)
-              else -> e.detail() ?: Res.string.feedback_file_read_failed.text(file.name)
-            },
-            cause = e,
-          )
-        }
+        if (droppedFile === file) resolveState = ResolveState.Error(e)
       }
     }
   }
@@ -1750,7 +1745,6 @@ class AppState(
     offerOptions: Boolean = false,
     retry: (() -> Unit)? = null,
   ) {
-    val deviceName = deviceNameOf(entry)
     if (added.isEmpty()) {
       val (name, e) = failures.firstOrNull() ?: return
       postError(
@@ -1765,20 +1759,10 @@ class AppState(
       )
       return
     }
-    val op = pendingOps.register(
-      undoTitle = Res.string.feedback_undo_add.text(),
-      timeout = ADD_UNDO_WINDOW,
-      undo = { reportFailures(FailedCommand.Remove, runEach(added) { it.remove(true) }) },
-    )
     val single = added.singleOrNull()?.takeIf { failures.isEmpty() }
-    val title = if (single != null) {
-      Res.string.feedback_added_here_one.text(single.displayName(), deviceName)
-    } else {
-      listOfNotNull(
-        Res.plurals.feedback_added_here.text(added.size, added.size, deviceName),
-        failedNote(failures.size),
-      ).joinText()
-    }
+    val what = single?.let { verbatim(it.displayName()) }
+      ?: Res.plurals.count_downloads.text(added.size)
+    val title = addedTitle(what, entry, failed = failures.size)
     val actions = buildList {
       if (single != null && offerOptions) {
         add(
@@ -1787,7 +1771,7 @@ class AppState(
           },
         )
       }
-      add(undoAction(op))
+      add(undoAddAction(added))
     }
     messages.post(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
@@ -1904,23 +1888,36 @@ class AppState(
     MessageAction(Res.string.action_try_again.text(), onClick)
 
   /**
-   * Registers the Undo of adding [tasks], which removes them with their files, and returns its
-   * button; [logger] notes each task that could not be removed.
+   * Registers the Undo of adding [tasks], which removes them with their files, all at once, and
+   * returns its button; one Error message names the tasks that could not be removed.
    */
-  internal fun undoAddAction(tasks: List<DownloadTask>, logger: KetchLogger): MessageAction {
+  internal fun undoAddAction(tasks: List<DownloadTask>): MessageAction {
     val op = pendingOps.register(
       undoTitle = Res.string.feedback_undo_add.text(),
       timeout = ADD_UNDO_WINDOW,
       undo = {
-        tasks.forEach { task ->
-          catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
-            logger.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
-          }
-        }
+        reportFailures(FailedCommand.Remove, runEach(tasks) { it.remove(deleteFiles = true) })
       },
     )
     return undoAction(op)
   }
+
+  /**
+   * The title of a message about adding [what] to [target]: "Added ubuntu.iso → This Mac" when
+   * the list shows [target], "… to NAS" when it does not, and how many [failed] or were [left]
+   * out.
+   */
+  internal fun addedTitle(what: UiText, target: InstanceEntry, failed: Int = 0, left: Int = 0) =
+    listOfNotNull(
+      // Under All devices the target may show already; "to" says it is not on screen.
+      if (target in shownInstances.value) {
+        Res.string.intake_added_here.text(what, target.displayName)
+      } else {
+        Res.string.intake_added_to.text(what, target.displayName)
+      },
+      Res.plurals.intake_added_failed.text(failed).takeIf { failed > 0 },
+      Res.plurals.intake_added_left_out.text(left).takeIf { left > 0 },
+    ).joinText()
 
   /** How logs name [entry]. */
   private fun nameOf(entry: InstanceEntry?): String = entry?.label ?: LOCAL_DEVICE_ID
@@ -1948,9 +1945,6 @@ class AppState(
   }
 
   private companion object {
-    /** Dropped files read as text and handed to the add sheet. */
-    val LINK_LIST_EXTENSIONS = setOf("txt", "csv", "url", "webloc")
-
     /** How long Start now waits for the task to start before naming what it preempted. */
     val START_TIMEOUT = 2.seconds
 

@@ -138,10 +138,10 @@ class InstanceManager(
   private val localSpeedMode = MutableStateFlow<Flow<SpeedMode>>(flowOf(SpeedMode.Full))
 
   // Clients started since they were created, by device id, with the jobs that learn their
-  // names. Both change only under connectionLock.
+  // names and systems. Both change only under connectionLock.
   private val connectionLock = Mutex()
   private val started = mutableMapOf<String, KetchApi>()
-  private val naming = mutableMapOf<String, Job>()
+  private val learning = mutableMapOf<String, Job>()
   private val connected = MutableStateFlow<Set<String>>(emptySet())
 
   /**
@@ -452,32 +452,34 @@ class InstanceManager(
     } catch (e: Exception) {
       log.w { "Couldn't connect to $deviceId: ${e.describeCauses()}" }
     }
-    if (entry.remoteConfig.name == null) naming[deviceId] = scope.launch { adoptName(entry) }
+    learning[deviceId] = scope.launch { learnStatus(entry) }
   }
 
-  // Names a device after the name it announces once connected, unless it has one already.
-  private suspend fun adoptName(entry: RemoteInstance) {
+  // Once connected, names a device after the name it announces, unless it has one already, and
+  // keeps the system it runs, so it shows as the kind of device it is while offline.
+  private suspend fun learnStatus(entry: RemoteInstance) {
     entry.connectionState.first { it == ConnectionState.Connected }
     val status = try {
       entry.instance.status()
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
-      log.d { "Couldn't read the name of ${entry.deviceId}: ${e.describeCauses()}" }
+      log.d { "Couldn't read the status of ${entry.deviceId}: ${e.describeCauses()}" }
       return
     }
-    val name = deviceNameOrNull(status.name) ?: return
+    val name = deviceNameOrNull(status.name)
+    val os = status.system.os.trim().ifEmpty { null }
     connectionLock.withLock {
-      val unnamed = entryOf(entry.deviceId) as? RemoteInstance
-      if (unnamed?.instance !== entry.instance || unnamed.remoteConfig.name != null) return
-      log.i { "Naming ${entry.deviceId} after the name it announces" }
+      val current = entryOf(entry.deviceId) as? RemoteInstance
+      if (current?.instance !== entry.instance) return
+      val saved = current.remoteConfig
+      val naming = saved.name == null && name != null
+      if (!naming && (os == null || os == saved.os)) return
+      if (naming) log.i { "Naming ${entry.deviceId} after the name it announces" }
       // A rename on another thread may land meanwhile; it wins.
       updateRemote(entry.deviceId) { remote ->
-        if (remote.remoteConfig.name != null) {
-          remote
-        } else {
-          remote.copy(remoteConfig = remote.remoteConfig.copy(name = name))
-        }
+        val config = remote.remoteConfig
+        remote.copy(remoteConfig = config.copy(name = config.name ?: name, os = os ?: config.os))
       }
       persistRemotes()
     }
@@ -485,7 +487,7 @@ class InstanceManager(
 
   private fun forget(deviceId: String) {
     started.remove(deviceId)
-    naming.remove(deviceId)?.cancel()
+    learning.remove(deviceId)?.cancel()
     connected.value = started.keys.toSet()
   }
 

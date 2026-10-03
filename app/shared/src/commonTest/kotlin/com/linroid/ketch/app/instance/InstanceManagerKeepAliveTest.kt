@@ -277,6 +277,22 @@ class InstanceManagerKeepAliveTest {
   }
 
   @Test
+  fun connect_namedDevice_keepsItsNameAndSavesItsSystem() = runTest {
+    val fakes = FakeInstanceFactory().apply {
+      announcedName = "Server"
+      announcedOs = "Android 15"
+    }
+    val store = RecordingConfigStore()
+    val manager = manager(fakes, listOf(nas.copy(name = "NAS", os = "Linux")), store)
+
+    val saved = store.config.remotes.single()
+    assertEquals("NAS", saved.name)
+    assertEquals("Android 15", saved.os)
+    assertEquals("Android 15", manager.remote("nas.local").remoteConfig.os)
+    manager.close()
+  }
+
+  @Test
   fun connect_deviceAnnouncingGenericName_keepsItsAddress() = runTest {
     val fakes = FakeInstanceFactory().apply { announcedName = "Ketch" }
     val manager = manager(fakes, listOf(nas))

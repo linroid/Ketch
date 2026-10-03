@@ -5,23 +5,37 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.MenuEntry
 import com.linroid.ketch.app.components.buildMenu
+import com.linroid.ketch.app.components.startTimeOptions
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.EmbeddedInstance
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.PulseCounts
+import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.rowOf
+import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
+import com.linroid.ketch.app.ui.inspector.urgentVictim
+import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
+import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RowMenuTest {
@@ -158,6 +172,28 @@ class RowMenuTest {
   }
 
   @Test
+  fun connectionTargets_leaveTorrentsOutOfAMixedSelectionOnly() = actionsTest { f ->
+    val magnet = DownloadRequest("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567")
+    val torrents = List(2) { rowOf(f.add(downloading, magnet)) }
+    val http = rowOf(f.add(downloading))
+
+    assertEquals(listOf(http), connectionTargets(torrents + http))
+    assertEquals(torrents, connectionTargets(torrents))
+  }
+
+  @Test
+  fun autoConnectionsOf_rowWithSegments_countsThemBeforeTheDeviceDefault() = actionsTest { f ->
+    val task = f.add(downloading)
+    val fresh = rowOf(task)
+    task.segments.value = List(3) { Segment(it, it * 100L, it * 100L + 99) }
+    val opened = rowOf(task)
+
+    assertEquals(3, autoConnectionsOf(f.state, listOf(opened)))
+    assertEquals(4, autoConnectionsOf(f.state, listOf(fresh)))
+    assertEquals(4, autoConnectionsOf(f.state, listOf(opened, fresh)))
+  }
+
+  @Test
   fun priorityEntries_urgentOnQueuedRow_startsItNowAndNamesTheVictim() = actionsTest { f ->
     val queued = f.add(DownloadState.Queued)
 
@@ -168,6 +204,49 @@ class RowMenuTest {
 
     assertEquals("Starts now · may pause debian.iso", urgent.caption.load())
     assertTrue("priority ${DownloadPriority.URGENT}" in queued.calls)
+  }
+
+  @Test
+  fun urgentVictim_rowsThatAllRun_namesNone() = actionsTest { f ->
+    // Urgent starts nothing here, so nothing makes room, however full the device is.
+    assertNull(urgentVictim(f.state, listOf(rowOf(f.add(downloading)))))
+    assertNull(urgentVictim(f.state, emptyList()))
+  }
+
+  @Test
+  fun sendTargets_withPresence_takeItsHealthAndSummary() = actionsTest { f ->
+    val nas = RemoteInstance(
+      RecordingKetchApi("NAS"),
+      RemoteConfig(host = "nas.local", name = "NAS"),
+      MutableStateFlow(ConnectionState.Connected),
+    )
+    val row = rowOf(f.add(downloading))
+    val presence = presence(nas, "NAS", health = DeviceHealth.Unauthorized, counts = PulseCounts(2))
+
+    val listed = sendTargets(listOf(nas), listOf(row)).single().option
+    val known = sendTargets(listOf(nas), listOf(row), listOf(presence)).single().option
+
+    assertEquals(DeviceHealth.Live, listed.health)
+    assertEquals(DeviceHealth.Unauthorized, known.health)
+    assertEquals("2 active", known.summary?.load())
+  }
+
+  @Test
+  fun startLaterEntries_scheduleThatPassed_checksNothingAndOffersNoClear() = actionsTest { f ->
+    val now = Instant.fromEpochSeconds(1_800_000_000)
+    val context = RowMenuContext(now = now, zone = TimeZone.UTC)
+    val later = startTimeOptions(context.now, context.zone)[1].schedule
+    val started = f.add(downloading, DownloadRequest("https://example.com/a.iso", schedule = later))
+    val waiting = f.add(DownloadState.Scheduled(later))
+
+    val passed = buildMenu { startLaterEntries(listOf(rowOf(started)), f.runner, context) }
+    val pending = buildMenu { startLaterEntries(listOf(rowOf(waiting)), f.runner, context) }
+
+    val items = passed.filterIsInstance<MenuEntry.Item>()
+    assertTrue(items.none { it.checked == true || it.label.load() == "Clear" })
+    val shown = pending.filterIsInstance<MenuEntry.Item>()
+    assertEquals(1, shown.count { it.checked == true })
+    assertTrue(shown.any { it.label.load() == "Clear" })
   }
 
   @Test

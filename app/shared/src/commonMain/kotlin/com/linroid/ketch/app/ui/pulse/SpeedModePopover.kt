@@ -27,6 +27,7 @@ import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
@@ -84,28 +85,32 @@ fun SpeedModePopover(
     modifier = modifier,
     title = stringResource(Res.string.pulse_speed),
   ) {
-    SpeedModeOptions(state, onOpenSettings = onDismissRequest)
+    val active by state.activeInstance.collectAsState()
+    SpeedModeOptions(state, active, rememberSpeedModeView(state), onDismissRequest)
   }
 }
 
 /**
- * The controls of the [SpeedModePopover], also shown by the phone's Pulse sheet.
+ * The controls of the [SpeedModePopover] for [device], shown or not, also shown by the phone's
+ * Pulse sheet and the device cards.
  *
+ * @param view what [device]'s speed mode pill shows.
  * @param fillModes whether the mode control takes the full width; a 280 dp popover is too narrow
  *   to share it equally between the three names.
  */
 @Composable
 internal fun ColumnScope.SpeedModeOptions(
   state: AppState,
+  device: InstanceEntry?,
+  view: SpeedModeView,
   onOpenSettings: () -> Unit,
   fillModes: Boolean = false,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  val view = rememberSpeedModeView(state)
-  val active by state.activeInstance.collectAsState()
   val controller = view.controller
-  val deviceName = active?.displayName ?: Res.string.device_any_in_sentence.text()
+  val settings = device?.let(state::settingsFor) ?: state.instanceSettings
+  val deviceName = device?.displayName ?: Res.string.device_any_in_sentence.text()
   val command = rememberPendingJob()
   var asSlowLane by remember(controller) { mutableStateOf(view.mode.isSlowLane) }
 
@@ -116,7 +121,7 @@ internal fun ColumnScope.SpeedModeOptions(
       onSelect = { mode ->
         asSlowLane = mode == SpeedLimitMode.SlowLane ||
           mode == SpeedLimitMode.Auto && asSlowLane
-        command.track(state.switchSpeedMode(mode))
+        command.track(state.switchSpeedMode(controller, mode))
       },
       fill = fillModes,
     )
@@ -126,9 +131,9 @@ internal fun ColumnScope.SpeedModeOptions(
   val limit = when {
     controller != null && asSlowLane -> controller.slowLaneSpeed
     controller != null && view.mode != SpeedMode.Full -> controller.settings.value.standard
-    else -> state.instanceSettings.download?.speedLimit ?: view.limit
+    else -> settings.download?.speedLimit ?: view.limit
   }
-  val error = state.instanceSettings.downloadError.takeIf { state.limitGoesToSettings(asSlowLane) }
+  val error = settings.downloadError.takeIf { limitGoesToSettings(controller, asSlowLane) }
   val caption = error?.let { Res.string.pulse_update_failed.text(deviceName, it) }
     ?: limitCaption(view, asSlowLane, deviceName)
   KetchEyebrow(
@@ -139,9 +144,9 @@ internal fun ColumnScope.SpeedModeOptions(
   )
   SpeedLimitPicker(
     value = limit,
-    onCommit = { command.track(state.setSpeedLimit(it, asSlowLane)) },
+    onCommit = { new -> device?.let { command.track(state.setSpeedLimit(it, new, asSlowLane)) } },
     caption = caption.resolve(),
-    enabled = controller != null || state.instanceSettings.download != null,
+    enabled = controller != null || settings.download != null,
     pending = command.pending,
   )
   if (controller != null) {
@@ -155,7 +160,7 @@ internal fun ColumnScope.SpeedModeOptions(
   Spacer(Modifier.height(spacing.s3))
   Spacer(Modifier.fillMaxWidth().height(1.dp).background(colors.divider))
   Spacer(Modifier.height(spacing.s2))
-  SpeedSettingsButton(state, active?.deviceId, onOpenSettings)
+  SpeedSettingsButton(state, device?.deviceId, onOpenSettings)
 }
 
 /** [controller]'s mode control and a caption of what the mode does now. */

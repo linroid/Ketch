@@ -129,6 +129,8 @@
   <string name="intake_problem_torrent">無法讀取這個種子</string>
   <string name="intake_problem_ftp">FTP 伺服器回報錯誤</string>
   <string name="intake_problem_check_failed">無法檢查這個連結</string>
+  <string name="intake_problem_no_torrents">這個裝置無法下載種子</string>
+  <string name="intake_problem_file_unreadable">無法讀取這個檔案</string>
   <string name="intake_problem_sign_in">需要登入</string>
   <string name="intake_action_sign_in">登入</string>
   <string name="intake_action_paste_curl">以 cURL 貼上</string>

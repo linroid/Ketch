@@ -129,6 +129,8 @@
   <string name="intake_problem_torrent">无法读取此种子</string>
   <string name="intake_problem_ftp">FTP 服务器报告了错误</string>
   <string name="intake_problem_check_failed">无法检查此链接</string>
+  <string name="intake_problem_no_torrents">此设备无法下载种子</string>
+  <string name="intake_problem_file_unreadable">无法读取此文件</string>
   <string name="intake_problem_sign_in">需要登录</string>
   <string name="intake_action_sign_in">登录</string>
   <string name="intake_action_paste_curl">粘贴为 cURL</string>

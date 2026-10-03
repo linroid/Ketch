@@ -209,8 +209,10 @@ private val NearbyDevices = listOf(
 
 private val LandingDevices = listOf(
   RemoteConfig("nas.local", name = "NAS-Basement") to ConnectionState.Connected,
-  RemoteConfig("192.168.1.7", name = "Den-PC") to ConnectionState.Disconnected(),
-  RemoteConfig("studio.local", name = "Studio-Mac") to ConnectionState.Unauthorized,
+  RemoteConfig("192.168.1.7", name = "Den-PC", os = "Windows 11") to
+    ConnectionState.Disconnected(),
+  RemoteConfig("studio.local", name = "Studio-Mac", os = "Mac OS X") to
+    ConnectionState.Unauthorized,
   RemoteConfig("192.168.1.42", port = 9000, watch = false) to ConnectionState.Disconnected(),
 )
 

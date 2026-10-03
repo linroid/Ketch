@@ -311,7 +311,9 @@ InstanceFactory()
   the app is in front; `backgroundGrace` after it leaves, only the active one stays.
 - A device that leaves that set disconnects and gets a fresh, unstarted client, which connects
   again when it is needed.
-- A device without a name takes the one it announces in `status()` once connected.
+- A device without a name takes the one it announces in `status()` once connected, and every
+  device keeps the system it reports there (`RemoteConfig.os`), which picks its pennant glyph
+  while it is offline.
 
 ### Switching devices
 
