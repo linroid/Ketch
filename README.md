@@ -176,9 +176,29 @@ the [CLI documentation](cli/README.md) lists every command.
 
 - **Metalink** — Downloads from several mirrors at once, with checksums
 - **WebDAV** — Download from WebDAV servers, with resume
-- **HLS** — Download and merge HTTP Live Streaming videos
+- **HLS and DASH** — Download and merge HTTP Live Streaming and MPEG-DASH videos, choosing the
+  quality and its matching audio
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
+- **Checksums** — Check a download against a hash you provide, or one the server publishes
+- **Proxy** — Download through an HTTP or SOCKS5 proxy or the system proxy, with a bypass list
+- **Faster segmented downloads** — Connections that finish early take over the rest of the slower
+  ones, so a download no longer waits on its slowest connection
+- **Stall detection and retry settings** — Reconnect when a connection stops sending data, and
+  choose timeouts and how often to retry, unlimited included
+- **Unfinished files look unfinished** — Downloads are written under a temporary name and get
+  their real name once complete
+- **Category folders** — Save videos, music, documents and archives to folders of their own, by
+  rules you set
+- **Torrent files, chosen any time** — Pick the files of a magnet link once its details arrive,
+  and change the selection while it downloads
+- **Keep awake** — Keep the computer from sleeping while downloads run, and optionally sleep or
+  shut down when they finish
+- **Automation hooks** — Run a command or call a webhook when a download finishes or fails
+- **Command line for running devices** — `ketch` and AI agents add, list, pause and watch the
+  downloads of the Ketch app or a server, instead of starting a second engine
+- **Docker image** — An official image for NAS and home servers on x64 and ARM, with a health
+  check and a fixed torrent port
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
   other device continues instead of starting over ([plan](docs/plans/task-transfer.md))
 - **Helper devices** — Let your other devices download parts of the same file over their own

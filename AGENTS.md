@@ -601,15 +601,61 @@ Planned features not yet implemented:
 
 1. **Metalink** - Multi-source downloads with mirrors, checksums, and chunk verification
 2. **WebDAV** - Download from WebDAV servers with resume support
-3. **HLS Support** - HTTP Live Streaming (HLS) as a pluggable `DownloadSource`, downloading
-   and merging `.m3u8` playlist segments into a single media file
+3. **HLS and DASH** - HTTP Live Streaming (`.m3u8`) and MPEG-DASH (`.mpd`) as a pluggable
+   `DownloadSource`, downloading and merging the media segments into a single file. It picks a
+   variant (the reserved `FileSelectionMode.SINGLE`) with its matching audio, handles AES-128 and
+   byte-range segments, and refuses live and DRM streams with a typed error. HLS ships first
 4. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
    supporting various media sites and extractors
 5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
-6. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
-   bytes, segment progress, resume state, finished files) between instances, so the destination
-   continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-7. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
-   own network and IP, joining or leaving mid-download without pausing it; see the
-   [proposal](docs/design/multi-instance-downloads.md)
+6. **Checksums** - `DownloadRequest` carries an expected hash, checked once an HTTP or FTP
+   download completes, with a server-published `Digest` / `Repr-Digest` as the fallback; a
+   mismatch fails the task with a typed error. Pure Kotlin on every target, settable from the
+   apps, the CLI (`--checksum`), REST and MCP. Today only `library:torrent` and `updater` hash
+   content; Metalink and mirrors build on this
+7. **Proxy** - HTTP(S) and SOCKS5 proxies with credentials and a bypass list, or the system
+   proxy, set in `DownloadConfig` / `[download]` with a per-download override and applied by
+   `KtorHttpEngine`, including the per-interface engines, which force `NO_PROXY` today. Today
+   CIO on the JVM honors only JVM proxy properties; the OS proxy and `HTTPS_PROXY` are ignored
+8. **Work-stealing segments** - The `LaneScheduler` / `RangeLedger` from the helper devices
+   [proposal](docs/design/multi-instance-downloads.md), shipped on its own first: connections
+   that finish claim the remaining bytes of slower ones, slow tails split, a failed range retries
+   alone instead of cancelling the batch, and a minimum segment size keeps small files whole
+9. **Timeouts and retry policy** - `DownloadConfig` gains an idle (no data) timeout, a minimum
+   speed, unlimited retries and a capped, jittered backoff that resets once bytes are saved; a
+   watchdog around HTTP segments and FTP transfers raises a retryable `KetchError.Network`.
+   Today socket and request timeouts are `Long.MAX_VALUE`, so a stalled connection hangs until
+   the task is paused, and the backoff (`retryDelayMs * (1 shl n)`) has no cap
+10. **Temporary file names** - HTTP and FTP downloads write under a temporary name and are
+    renamed to the final, deduplicated name after the last flush, never replacing a file that
+    appeared meanwhile. Today they write to the final name, preallocated to full size, so an
+    unfinished file looks complete
+11. **Category folders** - Rules (by extension, MIME type or host) choose the folder under the
+    default directory for downloads without an explicit destination, applied in the engine so
+    every client, the server and the browser extension get them
+12. **Torrent file selection after adding** - A magnet added without a selection can wait, with
+    its metadata, until files are chosen, and a running torrent's selection can change, through
+    `KetchApi`, the REST API and MCP. Today magnets from the extension, CLI, REST or MCP download
+    every file
+13. **Power options** - The apps keep the system awake while downloads run (an IOKit assertion
+    on macOS, `SetThreadExecutionState` on Windows, a logind inhibitor on Linux, a partial
+    `WakeLock` on Android), driven by the existing busy signal (`ForegroundPolicy`), and can
+    quit, sleep or shut down once the queue is empty
+14. **Automation hooks** - Task lifecycle events (added, completed, failed) run a configured
+    command or `POST` a webhook from the embedded engine or `ketch server`, set in `config.toml`
+15. **CLI for running instances** - `ketch` commands (add, list, pause, resume, watch as NDJSON)
+    and `ketch mcp` attach through `RemoteKetch` to the running desktop app or a server instead
+    of opening `ketch.db` with a second engine, and an idempotency key keeps retried submissions
+    from creating duplicates. Today `ketch mcp` and `ketch server` can open the desktop app's
+    `ketch.db` while it runs, and both engines resume the same tasks
+16. **Docker image** - A multi-arch (x64, arm64) image of `ketch server` published by the release
+    workflow, with an unauthenticated readiness endpoint that answers once saved tasks are
+    restored, configuration through environment variables, and a fixed, configurable BitTorrent
+    listen port (today the OS picks one on every launch)
+17. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+    bytes, segment progress, resume state, finished files) between instances, so the destination
+    continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
+18. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+    own network and IP, joining or leaving mid-download without pausing it; see the
+    [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 8
