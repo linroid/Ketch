@@ -28,7 +28,8 @@ interface MdnsRegistrar {
 
 /**
  * Returns [NativeMdnsRegistrar] on macOS (where JmDNS conflicts with
- * the system mDNSResponder), [DnsSdRegistrar] on other platforms.
+ * the system mDNSResponder), [DnsSdRegistrar] on other JVM platforms. Android callers must
+ * supply a registrar compiled against the Android DNS-SD artifact instead.
  */
 internal fun defaultMdnsRegistrar(): MdnsRegistrar {
   val os = System.getProperty("os.name", "").lowercase()

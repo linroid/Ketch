@@ -184,6 +184,7 @@ class KetchService : Service() {
             allowedHosts = serverConfig.allowedHosts,
             allowedDirectories = serverConfig.allowedDirectories,
             mdnsEnabled = serverConfig.mdnsEnabled,
+            mdnsRegistrar = AndroidMdnsRegistrar(),
             pairingApprover = { request, address ->
               pairingRequests.ask(request.name, request.code, request.os, address)
             },
