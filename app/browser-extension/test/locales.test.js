@@ -106,6 +106,14 @@ describe('messages', () => {
       assert.ok(messages.extension_description.message.length <= 132, locale);
     }
   });
+
+  test('French has a no-break space before two-part punctuation', () => {
+    const french = Object.fromEntries(translations).fr;
+    for (const [key, { message }] of Object.entries(french)) {
+      const text = message.replace(/<code>[^<]*<\/code>|[a-z]+:\/\//g, '');
+      assert.doesNotMatch(text, /[^ ][:;?!»]|«[^ ]/, key);
+    }
+  });
 });
 
 describe('message keys in the sources', () => {
