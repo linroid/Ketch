@@ -68,6 +68,10 @@ for the final release and 0 for other builds: `0.0.1-rc15` is `1.0.1015` and `0.
 which the next release upgrades. The scheme allows release candidates up to `rc998` and patch
 versions up to 64; the build fails beyond that.
 
+The Windows package also pins its UpgradeCode (`upgradeUuid`) to the one every earlier release
+carried, which jpackage derived from the vendor and the app name: Windows Installer only upgrades a
+product with the same UpgradeCode, so changing it would leave installed copies behind.
+
 ## Limitations
 
 - The builds are not signed or notarized. macOS may ask again for permissions it ties to the

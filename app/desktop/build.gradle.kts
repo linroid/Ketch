@@ -225,6 +225,10 @@ compose.desktop {
       }
       windows {
         iconFile.set(rootProject.file("art/icon.ico"))
+        // Windows Installer upgrades the installed app only from a package with the same
+        // UpgradeCode. Releases up to 0.0.1 carry the one jpackage derives from the vendor and the
+        // name; pinned, so setting a vendor or renaming the package can't break upgrades.
+        upgradeUuid = "C26C63A7-2024-313A-B051-DC34FFBA1BF7"
       }
       linux {
         iconFile.set(rootProject.file("art/icon.png"))

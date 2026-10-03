@@ -340,8 +340,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   while `[desktop] checkForUpdates` is on, downloads this system's installer with the `updater`
   module, and `UpdateInstaller` replaces the app once it quits (macOS bundle swap, `msiexec`,
   `pkexec dpkg -i`) and opens it again. The installers carry a monotonic numeric version
-  (`installerVersion()` in `app/desktop/build.gradle.kts`) so Windows Installer upgrades; see
-  [updates](docs/updates.md)
+  (`installerVersion()` in `app/desktop/build.gradle.kts`) and the MSI a pinned `upgradeUuid`,
+  so Windows Installer upgrades; see [updates](docs/updates.md)
 - Phones: a welcome flow on first launch (`ui/onboarding`); Android shows a splash while its
   service binds, and iOS 26 keeps user-started downloads running in the background with
   `BGContinuedProcessingTaskRequest`
