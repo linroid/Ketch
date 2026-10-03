@@ -99,6 +99,12 @@ internal class SingleInstance private constructor(
           } catch (_: IOException) {
             continue // Closed on exit.
           }
+          if (server.isClosed) {
+            // close() returns before this thread lets go of the socket, so a connection made
+            // after it can still be accepted; an instance that closed answers none.
+            socket.close()
+            break
+          }
           try {
             socket.soTimeout = TIMEOUT_MS
             when (val message = receive(socket, token)) {
