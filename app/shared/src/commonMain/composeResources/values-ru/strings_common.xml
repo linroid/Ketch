@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="language_tag">ru</string>
   <string name="size_bytes">%1$s Б</string>
   <string name="size_kb">%1$s КБ</string>
   <string name="size_mb">%1$s МБ</string>
