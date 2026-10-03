@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="downloads_title">다운로드</string>
+  <plurals name="downloads_count_downloading">
+    <item quantity="other">전체 %2$d개 중 %1$d개 다운로드 중</item>
+  </plurals>
+  <string name="downloads_view_list">목록</string>
+  <string name="downloads_view_table">표</string>
+  <string name="downloads_close_search">검색 닫기</string>
+  <string name="downloads_switch_device">기기 전환</string>
+  <string name="downloads_all_devices">모든 기기</string>
+  <string name="downloads_search_placeholder">검색하거나 링크 붙여넣기</string>
+  <string name="downloads_more">더 보기</string>
+  <string name="downloads_more_actions">기타 작업</string>
+  <string name="downloads_copy_all_links">모든 링크 복사</string>
+  <string name="downloads_columns">열</string>
+  <string name="downloads_row_density">행 간격</string>
+  <string name="downloads_density_default">기본</string>
+  <string name="downloads_density_compact">촘촘하게</string>
+  <string name="downloads_resolving">%1$d개 확인 중</string>
+  <string name="downloads_resolving_tooltip">피어에서 파일 목록을 가져오는 중 · 클릭해 파일 선택</string>
+  <string name="downloads_show_add_sheet">추가 시트 보기</string>
+  <plurals name="downloads_clear_finished_count">
+    <item quantity="other">완료된 %1$d개 지우기</item>
+  </plurals>
+  <string name="downloads_clear_finished">완료 항목 지우기</string>
+  <plurals name="downloads_clear_missing_count">
+    <item quantity="other">파일 없는 %1$d개 지우기</item>
+  </plurals>
+  <string name="downloads_clear_missing">파일 없는 항목 지우기</string>
+  <string name="downloads_clear_missing_caption">파일이 이동되었거나 삭제됨</string>
+  <string name="downloads_clear_missing_tooltip">파일이 이동되었거나 삭제된 완료 항목을 제거합니다</string>
+  <string name="downloads_select_all">모두 선택</string>
+  <string name="downloads_clear_selection">선택 해제</string>
+  <string name="downloads_retry_all_count">모두 재시도(%1$d)</string>
+
+  <plurals name="downloads_tab_failed">
+    <item quantity="other">%1$d개 실패</item>
+  </plurals>
+  <string name="downloads_tab_retry_all">모두 재시도</string>
+  <plurals name="downloads_tab_needs_link">
+    <item quantity="other">%1$d개는 새 링크 필요</item>
+  </plurals>
+  <string name="downloads_sort">정렬</string>
+  <string name="downloads_group">그룹</string>
+  <string name="downloads_label_value">%1$s: %2$s</string>
+  <string name="downloads_sort_by">정렬 기준</string>
+  <string name="downloads_group_by">그룹 기준</string>
+
+  <string name="downloads_facet_type">유형</string>
+  <string name="downloads_facet_site">사이트</string>
+  <string name="downloads_facet_device">기기</string>
+  <string name="downloads_facet_origin">출처</string>
+  <string name="downloads_facet_matched">%2$d개 중 %1$d개</string>
+
+  <string name="downloads_table_connections_short">연결</string>
+  <string name="downloads_table_column_auto">모든 기기를 볼 때 표시</string>
+  <string name="downloads_table_reset_columns">열 초기화</string>
+  <string name="downloads_table_sort_by">%1$s 기준 정렬</string>
+  <string name="downloads_table_sorted_ascending">%1$s, 오름차순 정렬됨</string>
+  <string name="downloads_table_sorted_descending">%1$s, 내림차순 정렬됨</string>
+  <string name="downloads_table_capped_at">%1$s 이하로 제한됨</string>
+  <string name="downloads_table_source_magnet">마그넷</string>
+  <string name="downloads_table_origin_unknown">알 수 없음</string>
+  <string name="downloads_table_speed_limited">이 다운로드에 속도 제한이 적용됨</string>
+
+  <string name="downloads_group_show">%1$s 보기</string>
+  <string name="downloads_group_hide">%1$s 숨기기</string>
+  <string name="downloads_group_collapsed">접힘</string>
+  <string name="downloads_group_expanded">펼쳐짐</string>
+  <string name="downloads_row_select">선택</string>
+  <string name="downloads_row_show_actions">작업 보기</string>
+  <string name="downloads_inspector_resize">인스펙터 크기 조절</string>
+
+  <string name="downloads_empty_clear_search">검색어 지우기</string>
+  <string name="downloads_empty_add_link">이 링크 추가</string>
+  <string name="downloads_empty_add_links">이 링크들 추가</string>
+  <string name="downloads_empty_show_all">모든 다운로드 보기</string>
+  <string name="downloads_empty_add">링크 추가</string>
+  <string name="downloads_empty_link_missing">이 링크는 다운로드 목록에 없습니다</string>
+  <string name="downloads_empty_links_missing">이 링크들은 다운로드 목록에 없습니다</string>
+  <string name="downloads_empty_add_it_to">대신 %1$s에 추가하세요.</string>
+  <string name="downloads_empty_add_them_to">대신 %1$s에 추가하세요.</string>
+  <string name="downloads_empty_no_match">“%1$s”에 해당하는 다운로드 없음</string>
+  <string name="downloads_empty_no_match_hint">이름, 사이트, 폴더, 오류에서 검색합니다.</string>
+  <string name="downloads_empty_all">아직 다운로드가 없습니다</string>
+  <string name="downloads_empty_downloading">다운로드 중인 항목 없음</string>
+  <string name="downloads_empty_downloading_hint">진행 중인 다운로드가 여기에 표시됩니다.</string>
+  <string name="downloads_empty_waiting">대기 중인 항목 없음</string>
+  <string name="downloads_empty_waiting_hint_one">%1$s에서는 한 번에 하나씩 다운로드합니다.</string>
+  <plurals name="downloads_empty_waiting_hint">
+    <item quantity="other">%1$s에서는 한 번에 %2$d개씩 다운로드합니다.</item>
+  </plurals>
+  <string name="downloads_empty_paused">일시정지된 다운로드 없음</string>
+  <string name="downloads_empty_paused_hint">일시정지한 다운로드가 여기에 표시됩니다.</string>
+  <string name="downloads_empty_done">완료된 다운로드 없음</string>
+  <string name="downloads_empty_done_hint">다운로드가 완료되면 여기에 표시됩니다.</string>
+  <string name="downloads_empty_failed">확인이 필요한 항목 없음</string>
+  <string name="downloads_empty_failed_hint">실패하거나 취소된 다운로드가 여기에 표시됩니다.</string>
+  <string name="downloads_empty_fleet">어느 기기에도 다운로드가 없습니다</string>
+  <string name="downloads_empty_fleet_hint">모든 기기의 다운로드가 여기에 표시됩니다.</string>
+  <string name="downloads_empty_add_to">%1$s에 링크 추가</string>
+  <string name="downloads_empty_remote">%1$s의 다운로드가 여기에 표시됩니다</string>
+  <string name="downloads_empty_unauthorized">%1$s에 새 액세스 토큰 필요</string>
+  <string name="downloads_empty_offline">%1$s에 연결할 수 없음</string>
+  <string name="downloads_empty_offline_hint">연결되면 이 기기의 다운로드가 여기에 표시됩니다.</string>
+  <string name="downloads_empty_loading">다운로드 불러오는 중</string>
+
+  <string name="launchpad_title">아직 다운로드가 없습니다</string>
+  <string name="launchpad_subtitle">링크를 붙여넣거나, 파일을 끌어다 놓거나, 브라우저에서 보내세요.</string>
+  <string name="launchpad_subtitle_phone">링크를 붙여넣거나, .torrent 파일을 열거나, 컴퓨터에서 다운로드를 추가하세요.</string>
+  <string name="launchpad_paste_title">링크 붙여넣기</string>
+  <string name="launchpad_paste_download">다운로드</string>
+  <string name="launchpad_paste_maybe">클립보드에 링크가 있습니다.</string>
+  <string name="launchpad_paste">붙여넣기</string>
+  <string name="launchpad_paste_hint_phone">아무 앱에서나 링크를 복사한 다음 여기에 붙여넣으세요.</string>
+  <string name="launchpad_paste_hint">링크를 복사한 다음 Ketch 어디에서나 %1$s 키를 누르세요.</string>
+  <string name="launchpad_paste_hint_plain">링크를 복사한 다음 Ketch 어디에서나 붙여넣으세요.</string>
+  <string name="launchpad_torrent_title">링크, 마그넷 링크 또는 .torrent 놓기</string>
+  <string name="launchpad_torrent_title_phone">.torrent 파일 열기</string>
+  <string name="launchpad_torrent_hint">이 창 어디에나 놓거나 .torrent 파일을 선택하세요.</string>
+  <string name="launchpad_torrent_hint_phone">또는 브라우저에서 마그넷 링크를 여세요.</string>
+  <string name="launchpad_browser_title">브라우저 다운로드 가로채기</string>
+  <string name="launchpad_browser_none">Chrome, Edge 또는 Firefox에서 Ketch로 다운로드를 보내세요.</string>
+  <string name="launchpad_browser_connected">%1$s ✓</string>
+  <string name="launchpad_browser_get">%1$s: 설치하기</string>
+  <string name="launchpad_pair_title">컴퓨터의 다운로드 제어</string>
+  <string name="launchpad_pair_hint">컴퓨터의 Ketch에 연결해 여기에서 다운로드를 추가하세요.</string>
+  <string name="launchpad_discover">또는 원하는 것을 설명하세요 · 찾기</string>
+  <string name="launchpad_checklist_title">Ketch 설정하기</string>
+  <string name="launchpad_checklist_close">설정 체크리스트 닫기</string>
+  <string name="launchpad_checklist_folder">다운로드 위치: %1$s</string>
+  <string name="launchpad_checklist_folder_choose">다운로드 위치 선택</string>
+  <string name="launchpad_checklist_change">변경…</string>
+  <string name="launchpad_checklist_extension">브라우저 확장 프로그램</string>
+  <string name="launchpad_checklist_detected">%1$s 감지됨</string>
+  <string name="launchpad_checklist_connected">연결됨</string>
+  <string name="launchpad_checklist_get_it">설치하기</string>
+  <string name="launchpad_checklist_phone">휴대폰에서 %1$s 제어</string>
+  <string name="launchpad_checklist_show_qr">QR 코드 보기</string>
+
+  <string name="downloads_clip_download">%1$s 다운로드</string>
+  <string name="downloads_clip_download_from">%2$s에서 %1$s 다운로드</string>
+  <string name="downloads_clip_copied">복사한 링크 다운로드</string>
+  <string name="downloads_clip_dismiss">이 링크 제안 안 함</string>
+
+  <plurals name="downloads_selected">
+    <item quantity="other">%1$d개 선택됨</item>
+  </plurals>
+
+  <string name="downloads_menu_file_missing">파일이 이동되었거나 삭제됨</string>
+  <string name="downloads_menu_hold_to_move">이동하려면 %1$s 키를 누르고 있으세요</string>
+  <string name="downloads_menu_moving">보낸 후 이전 기기에서 제거됨</string>
+  <string name="downloads_menu_speed_custom">사용자 지정…</string>
+  <plurals name="downloads_menu_speed_share">
+    <item quantity="other">선택한 %1$d개에 나누기</item>
+  </plurals>
+  <string name="downloads_menu_speed_each">각각 %1$s</string>
+  <string name="downloads_menu_urgent_may_pause">지금 시작 · %1$s 일시정지될 수 있음</string>
+  <string name="downloads_menu_urgent_starts_now">지금 시작</string>
+  <string name="downloads_menu_pick_start">날짜 및 시간 선택…</string>
+  <string name="downloads_menu_clear_schedule">지우기</string>
+
+  <string name="downloads_discard_title">중지하고 진행 상황을 삭제할까요?</string>
+  <plurals name="downloads_discard_title_many">
+    <item quantity="other">다운로드 %1$d개의 진행 상황을 삭제할까요?</item>
+  </plurals>
+  <string name="downloads_discard_body">이후에는 %1$s을(를) 재개할 수 없습니다.</string>
+  <string name="downloads_discard_body_many">이후에는 재개할 수 없습니다.</string>
+  <string name="downloads_discard_keep">유지</string>
+  <string name="downloads_discard_confirm">진행 상황 삭제</string>
+  <string name="downloads_speed_title">속도 제한</string>
+  <string name="downloads_speed_invalid">2m 또는 500k 같은 속도를 입력하세요</string>
+  <string name="downloads_speed_placeholder">2m, 500k 또는 무제한</string>
+  <string name="downloads_speed_set">제한 설정</string>
+  <string name="downloads_speed_caps">%1$s의 속도를 제한합니다. 전체 제한도 계속 적용됩니다.</string>
+  <plurals name="downloads_speed_caps_many">
+    <item quantity="other">다운로드 %1$d개의 속도를 각각 제한합니다. 전체 제한도 계속 적용됩니다.</item>
+  </plurals>
+  <string name="downloads_speed_limit">제한</string>
+  <string name="downloads_speed_limit_each">각각 제한</string>
+  <string name="downloads_send_title">%1$s을(를) %2$s에 보낼까요?</string>
+  <string name="downloads_move_title">%1$s을(를) %2$s(으)로 이동할까요?</string>
+  <string name="downloads_send_confirm">보내기</string>
+  <string name="downloads_move_confirm">이동</string>
+  <string name="downloads_send_note">이 정보는 해당 기기의 다운로드와 함께 저장되며, 그 기기를 제어하는 사람은 누구나 볼 수 있습니다.</string>
+
+  <string name="downloads_remove_title">“%1$s”을(를) 제거할까요?</string>
+  <plurals name="downloads_remove_title_many">
+    <item quantity="other">다운로드 %1$d개를 제거할까요?</item>
+  </plurals>
+  <string name="downloads_remove_subtitle">%1$s의 목록에서 제거합니다.</string>
+  <string name="downloads_remove_trash_files">파일도 휴지통으로 이동</string>
+  <string name="downloads_remove_trash_file">파일도 휴지통으로 이동</string>
+  <string name="downloads_remove_trash_partial">일부만 받은 파일도 휴지통으로 이동</string>
+  <plurals name="downloads_remove_trash_all">
+    <item quantity="other">파일 %1$d개도 모두 휴지통으로 이동</item>
+  </plurals>
+  <string name="downloads_remove_delete_files">파일도 영구적으로 삭제</string>
+  <string name="downloads_remove_delete_file">파일도 영구적으로 삭제</string>
+  <string name="downloads_remove_delete_partial">일부만 받은 파일도 영구적으로 삭제</string>
+  <plurals name="downloads_remove_delete_all">
+    <item quantity="other">파일 %1$d개도 모두 영구적으로 삭제</item>
+  </plurals>
+  <string name="downloads_remove_size_of">%1$s / %2$s</string>
+  <string name="downloads_remove_and_trash">제거하고 휴지통으로 이동</string>
+  <string name="downloads_remove_and_delete">제거하고 삭제</string>
+  <string name="downloads_remove_and_trash_size">제거하고 %1$s 휴지통으로 이동</string>
+  <string name="downloads_remove_and_delete_size">제거하고 %1$s 삭제</string>
+  <string name="downloads_remove_note_partial">일부만 받은 파일은 영구적으로 삭제됩니다</string>
+  <plurals name="downloads_remove_note_partials">
+    <item quantity="other">일부만 받은 파일 %1$d개가 영구적으로 삭제됩니다</item>
+  </plurals>
+  <string name="downloads_remove_note_frees">%1$s 확보</string>
+  <string name="downloads_remove_note_frees_after">%1$s 확보</string>
+  <string name="downloads_remove_note_free_on">%2$s에 %1$s 남음</string>
+
+  <string name="downloads_failed_pause">%2$s에서 %1$s을(를) 일시정지할 수 없음</string>
+  <string name="downloads_failed_resume">%2$s에서 %1$s을(를) 재개할 수 없음</string>
+  <string name="downloads_failed_retry">%2$s에서 %1$s을(를) 재시도할 수 없음</string>
+  <string name="downloads_failed_reconnect">%2$s에서 %1$s을(를) 다시 연결할 수 없음</string>
+  <string name="downloads_failed_open">%2$s에서 %1$s을(를) 열 수 없음</string>
+  <string name="downloads_failed_reveal">%2$s에서 %1$s을(를) 폴더에서 보여 줄 수 없음</string>
+  <string name="downloads_failed_speed_limit">%2$s에서 %1$s의 속도 제한을 설정할 수 없음</string>
+  <string name="downloads_failed_priority">%2$s에서 %1$s의 우선순위를 설정할 수 없음</string>
+  <string name="downloads_failed_connections">%2$s에서 %1$s의 연결 수를 설정할 수 없음</string>
+  <string name="downloads_failed_reschedule">%2$s에서 %1$s의 일정을 변경할 수 없음</string>
+
+  <plurals name="downloads_batch_paused">
+    <item quantity="other">다운로드 %1$d개 일시정지됨</item>
+  </plurals>
+  <plurals name="downloads_batch_resumed">
+    <item quantity="other">다운로드 %1$d개 재개됨</item>
+  </plurals>
+  <plurals name="downloads_batch_retrying">
+    <item quantity="other">다운로드 %1$d개 재시도 중</item>
+  </plurals>
+  <plurals name="downloads_batch_rescheduled">
+    <item quantity="other">다운로드 %1$d개 일정 변경됨</item>
+  </plurals>
+  <plurals name="downloads_batch_unlimited">
+    <item quantity="other">다운로드 %1$d개의 속도 제한 해제됨</item>
+  </plurals>
+  <plurals name="downloads_batch_limited">
+    <item quantity="other">다운로드 %1$d개를 %2$s 이하로 제한함</item>
+  </plurals>
+  <plurals name="downloads_batch_shared">
+    <item quantity="other">다운로드 %1$d개에 %2$s 나눠 할당함</item>
+  </plurals>
+  <plurals name="downloads_batch_priority">
+    <item quantity="other">다운로드 %1$d개의 우선순위를 %2$s으로 설정함</item>
+  </plurals>
+  <plurals name="downloads_batch_connections">
+    <item quantity="other">다운로드 %1$d개의 연결을 %2$d개로 설정함</item>
+  </plurals>
+  <plurals name="downloads_batch_failed">
+    <item quantity="other">%1$d개 실패</item>
+  </plurals>
+  <plurals name="downloads_skipped_finished">
+    <item quantity="other">%1$d개는 이미 완료됨</item>
+  </plurals>
+  <plurals name="downloads_skipped_running">
+    <item quantity="other">%1$d개는 이미 실행 중</item>
+  </plurals>
+  <plurals name="downloads_skipped_already_paused">
+    <item quantity="other">%1$d개는 이미 일시정지됨</item>
+  </plurals>
+  <plurals name="downloads_skipped_paused">
+    <item quantity="other">%1$d개 일시정지됨</item>
+  </plurals>
+  <plurals name="downloads_skipped_scheduled">
+    <item quantity="other">%1$d개 예약됨</item>
+  </plurals>
+  <plurals name="downloads_skipped_failed">
+    <item quantity="other">%1$d개 오류</item>
+  </plurals>
+  <plurals name="downloads_skipped_canceled">
+    <item quantity="other">%1$d개 취소됨</item>
+  </plurals>
+
+  <string name="downloads_trash_removed">%1$s 제거됨</string>
+  <string name="downloads_trash_its_file">파일은 휴지통으로 이동됩니다</string>
+  <string name="downloads_trash_their_files">파일은 휴지통으로 이동됩니다</string>
+  <plurals name="downloads_trash_moved">
+    <item quantity="other">파일 %1$d개를 휴지통으로 이동함</item>
+  </plurals>
+  <string name="downloads_trash_failed">%1$s을(를) 휴지통으로 이동할 수 없음</string>
+  <plurals name="downloads_trash_failed_many">
+    <item quantity="other">파일 %1$d개를 휴지통으로 이동할 수 없음</item>
+  </plurals>
+  <string name="downloads_trash_stays">다운로드는 목록에 남아 있습니다</string>
+  <string name="downloads_trash_stay">다운로드는 목록에 남아 있습니다</string>
+  <string name="downloads_remove_failed">%1$s을(를) 제거할 수 없음</string>
+
+  <string name="downloads_copied_link">링크 복사됨</string>
+  <plurals name="downloads_copied_links">
+    <item quantity="other">링크 %1$d개 복사됨</item>
+  </plurals>
+  <string name="downloads_copied_path">파일 경로 복사됨</string>
+  <plurals name="downloads_copied_paths">
+    <item quantity="other">파일 경로 %1$d개 복사됨</item>
+  </plurals>
+  <string name="downloads_copied_error">오류 복사됨</string>
+  <string name="downloads_copied_details">세부 정보 복사됨</string>
+  <string name="downloads_copy_failed_link">링크를 복사할 수 없음</string>
+  <string name="downloads_copy_failed_links">링크를 복사할 수 없음</string>
+  <string name="downloads_copy_failed_path">파일 경로를 복사할 수 없음</string>
+  <string name="downloads_copy_failed_paths">파일 경로를 복사할 수 없음</string>
+  <string name="downloads_copy_failed_error">오류를 복사할 수 없음</string>
+  <string name="downloads_copy_failed_details">세부 정보를 복사할 수 없음</string>
+  <string name="downloads_open_source_failed">소스 페이지를 열 수 없음</string>
+</resources>

@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="intake_space_needed">%1$s 필요</string>
+  <string name="intake_space_free_on">%2$s에 %1$s 남음</string>
+  <string name="intake_space_warning">%1$s 필요 · %3$s에 %2$s만 남음</string>
+  <string name="intake_added_here">%1$s 추가됨 → %2$s</string>
+  <string name="intake_added_to">%2$s에 %1$s 추가됨</string>
+  <plurals name="intake_added_failed">
+    <item quantity="other">%1$d개 실패</item>
+  </plurals>
+  <plurals name="intake_added_left_out">
+    <item quantity="other">%1$d개 제외됨</item>
+  </plurals>
+  <string name="intake_add_failed">%1$s을(를) 추가할 수 없음</string>
+  <string name="intake_restart_failed">%2$s에서 %1$s을(를) 처음부터 다시 시작할 수 없음</string>
+  <string name="intake_restarted">%1$s 처음부터 다시 시작됨</string>
+  <string name="intake_retry_failed">%2$s에서 %1$s을(를) 재시도할 수 없음</string>
+  <string name="intake_apply_failed">%2$s에서 %1$s의 옵션을 변경할 수 없음</string>
+  <string name="intake_file_list_ready">%1$s의 파일 목록 준비됨</string>
+  <string name="intake_file_list_ready_unnamed">토렌트의 파일 목록 준비됨</string>
+  <string name="intake_file_list_failed">%1$s의 파일 목록을 가져올 수 없음</string>
+  <string name="intake_file_list_failed_unnamed">토렌트의 파일 목록을 가져올 수 없음</string>
+  <string name="intake_choose_files">파일 선택</string>
+
+  <string name="intake_title_add">다운로드 추가</string>
+  <string name="intake_title_retry">옵션을 바꿔 재시도</string>
+  <string name="intake_title_edit">다운로드 옵션</string>
+
+  <string name="intake_drop_to_add">놓아서 추가</string>
+  <string name="intake_paste_hint_short">링크 또는 마그넷 링크 붙여넣기</string>
+  <string name="intake_paste_hint">링크 또는 마그넷 링크를 붙여넣거나 .torrent 파일을 놓으세요</string>
+  <string name="intake_curl_command">cURL 명령</string>
+  <string name="intake_paste_clipboard">클립보드에서 붙여넣기</string>
+  <string name="intake_open_torrent">.torrent 파일 열기</string>
+  <string name="intake_from_clipboard">클립보드에서 가져옴</string>
+  <string name="intake_clear_clipboard">클립보드의 텍스트 지우기</string>
+  <string name="intake_offer_paste">%1$s 붙여넣기</string>
+  <string name="intake_offer_paste_clipboard">클립보드에서 %1$s 붙여넣기</string>
+  <string name="intake_offer_paste_copied">복사한 링크 붙여넣기</string>
+  <string name="intake_discover_offer">링크가 없습니다. 찾기로 “%1$s” 검색할까요?</string>
+  <string name="intake_no_links">링크가 없습니다. 링크, 마그넷 링크 또는 cURL 명령을 붙여넣으세요.</string>
+  <string name="intake_discover">찾기</string>
+
+  <string name="intake_notice_no_curl">클립보드에 cURL 명령이 없습니다. 브라우저의 네트워크 패널에서 요청을 마우스 오른쪽 버튼으로 클릭하고 cURL로 복사(Copy as cURL)를 선택하세요.</string>
+  <string name="intake_notice_close_first">다른 다운로드를 추가하려면 이 시트를 닫으세요</string>
+  <string name="intake_notice_unsupported_files">.torrent 파일과 링크 목록만 추가할 수 있습니다</string>
+  <string name="intake_notice_read_failed">%1$s을(를) 읽을 수 없음</string>
+  <string name="intake_notice_read_failed_reason">%1$s을(를) 읽을 수 없음: %2$s</string>
+  <string name="intake_notice_no_links">놓은 항목에서 링크를 찾지 못했습니다</string>
+  <plurals name="intake_notice_first_links">
+    <item quantity="other">처음 %1$d개 링크만 표시</item>
+  </plurals>
+  <plurals name="intake_range_truncated">
+    <item quantity="other">처음 %1$d개 링크까지만 확장함</item>
+  </plurals>
+
+  <plurals name="intake_summary_links">
+    <item quantity="other">링크 %1$d개</item>
+  </plurals>
+  <plurals name="intake_summary_ready">
+    <item quantity="other">%1$d개 준비됨</item>
+  </plurals>
+  <plurals name="intake_summary_checking">
+    <item quantity="other">%1$d개 확인 중</item>
+  </plurals>
+  <plurals name="intake_summary_attention">
+    <item quantity="other">%1$d개 확인 필요</item>
+  </plurals>
+  <plurals name="intake_summary_duplicates">
+    <item quantity="other">%1$d개는 이미 Ketch에 있음</item>
+  </plurals>
+
+  <string name="intake_status_waiting">확인 대기 중…</string>
+  <string name="intake_status_fetching">피어에서 파일 목록을 가져오는 중… %1$s</string>
+  <string name="intake_status_reading_torrent">토렌트 파일을 읽는 중…</string>
+  <string name="intake_status_checking">확인 중…</string>
+  <string name="intake_status_downloads_again">다시 다운로드 · %1$s</string>
+  <plurals name="intake_status_files_chosen">
+    <item quantity="other">파일 %2$d개 중 %1$d개</item>
+  </plurals>
+  <string name="intake_split">%1$d × %2$s</string>
+  <plurals name="intake_status_expands">
+    <item quantity="other">링크 %1$d개로 확장</item>
+  </plurals>
+  <plurals name="intake_status_expands_first">
+    <item quantity="other">처음 %1$d개 링크로 확장</item>
+  </plurals>
+  <string name="intake_status_unknown_size">크기 알 수 없음</string>
+  <string name="intake_scheme_torrent">토렌트</string>
+  <string name="intake_status_resumable">재개 가능</string>
+  <plurals name="intake_status_up_to_connections">
+    <item quantity="other">최대 연결 %1$d개</item>
+  </plurals>
+  <string name="intake_badge_duplicate">이미 Ketch에 있음</string>
+  <string name="intake_badge_no_resume">재개 불가</string>
+  <string name="intake_duplicate_finished">%1$s 완료</string>
+  <string name="intake_duplicate_downloading">다운로드 중 · %1$s</string>
+  <string name="intake_duplicate_paused">%1$s에서 일시정지됨</string>
+  <string name="intake_duplicate_waiting">시작 대기 중</string>
+  <string name="intake_duplicate_failed">실패</string>
+  <string name="intake_duplicate_canceled">취소됨</string>
+  <string name="intake_age_just_now">방금</string>
+  <plurals name="intake_age_minutes">
+    <item quantity="other">%1$d분 전</item>
+  </plurals>
+  <plurals name="intake_age_hours">
+    <item quantity="other">%1$d시간 전</item>
+  </plurals>
+  <string name="intake_age_yesterday">어제</string>
+  <plurals name="intake_age_days">
+    <item quantity="other">%1$d일 전</item>
+  </plurals>
+
+  <plurals name="intake_problem_magnet_timeout">
+    <item quantity="other">%1$d분 동안 파일 목록을 보낸 피어가 없음</item>
+  </plurals>
+  <string name="intake_problem_unsupported">Ketch는 이런 종류의 링크를 다운로드할 수 없습니다</string>
+  <string name="intake_problem_unsupported_detail">http(s), ftp(s), magnet, .torrent 지원</string>
+  <string name="intake_problem_forbidden">서버가 접근을 거부함(403)</string>
+  <string name="intake_problem_forbidden_detail">로그인한 페이지에서 복사한 링크는 그 페이지의 쿠키가 필요한 경우가 많음</string>
+  <string name="intake_problem_not_found">찾을 수 없음</string>
+  <string name="intake_problem_not_found_detail">링크가 만료되었을 수 있음</string>
+  <string name="intake_problem_busy">서버 혼잡(%1$d)</string>
+  <string name="intake_problem_busy_detail">Ketch가 자동으로 재시도함</string>
+  <string name="intake_problem_http">서버 응답 %1$d</string>
+  <string name="intake_problem_no_peers">연결할 수 있는 피어 없음</string>
+  <string name="intake_problem_unreachable">%1$s에 연결할 수 없음</string>
+  <string name="intake_problem_unreachable_server">서버에 연결할 수 없음</string>
+  <string name="intake_problem_torrent">이 토렌트를 읽을 수 없음</string>
+  <string name="intake_problem_ftp">FTP 서버가 오류를 보고함</string>
+  <string name="intake_problem_check_failed">이 링크를 확인할 수 없음</string>
+  <string name="intake_problem_sign_in">로그인 필요</string>
+  <string name="intake_action_sign_in">로그인</string>
+  <string name="intake_action_paste_curl">cURL로 붙여넣기</string>
+  <string name="intake_action_add_headers">헤더 추가</string>
+  <string name="intake_action_find_mirror">작동하는 미러 찾기</string>
+  <string name="intake_action_keep_waiting">계속 기다리기</string>
+  <string name="intake_action_add_anyway">그래도 추가</string>
+
+  <string name="intake_download_all_now">지금 모든 파일 다운로드</string>
+  <string name="intake_finish_background">백그라운드에서 마치기</string>
+  <string name="intake_rename">이름 변경</string>
+  <string name="intake_keep_out">제외</string>
+  <string name="intake_download_again">다시 다운로드</string>
+  <string name="intake_add_all">모두 추가</string>
+  <string name="intake_remove_named">%1$s 제거</string>
+  <string name="intake_user_name">사용자 이름</string>
+  <string name="intake_password">비밀번호</string>
+  <string name="intake_connections">연결</string>
+
+  <string name="intake_options">옵션</string>
+  <string name="intake_pill_label">%1$s:</string>
+  <string name="intake_reset_speed">속도 초기화</string>
+  <string name="intake_reset_priority">우선순위 초기화</string>
+  <string name="intake_reset_start">시작 시간 초기화</string>
+  <string name="intake_reset_connections">연결 초기화</string>
+  <plurals name="intake_headers_count">
+    <item quantity="other">헤더 %1$d개</item>
+  </plurals>
+  <string name="intake_advanced_hide">고급 옵션 숨기기</string>
+  <string name="intake_advanced_show">고급 옵션…</string>
+  <string name="intake_advanced_caption">파일 이름, 리퍼러, 쿠키 및 기타 헤더</string>
+  <string name="intake_speed_limit">속도 제한</string>
+  <string name="intake_priority">우선순위</string>
+  <string name="intake_start">시작</string>
+  <string name="intake_peer_limit">피어 제한</string>
+  <string name="intake_single_connection">이 서버는 연결을 1개만 허용합니다</string>
+  <string name="intake_auto_device">자동으로 두면 기기가 결정합니다</string>
+  <string name="intake_auto_setting">자동은 기기 설정을 따릅니다: %1$d</string>
+  <string name="intake_priority_low_caption">대기 중인 다른 다운로드가 없을 때 실행</string>
+  <string name="intake_priority_normal_caption">기본 순서</string>
+  <string name="intake_priority_high_caption">보통 및 낮음보다 먼저</string>
+  <string name="intake_priority_urgent_caption">대기열을 건너뛰며 우선순위가 낮은 다운로드를 일시정지할 수 있음</string>
+  <string name="intake_option_unlimited">무제한</string>
+  <string name="intake_option_max_speed">최대 %1$s</string>
+  <string name="intake_option_urgent">⚡ 긴급</string>
+  <string name="intake_option_priority_low">낮은 우선순위</string>
+  <string name="intake_option_priority_high">높은 우선순위</string>
+  <plurals name="intake_option_peers">
+    <item quantity="other">피어 %1$d개</item>
+  </plurals>
+  <plurals name="intake_option_connections">
+    <item quantity="other">연결 %1$d개</item>
+  </plurals>
+  <string name="intake_option_auto">자동</string>
+
+  <string name="intake_save_to">저장 위치</string>
+  <string name="intake_folder_downloads">다운로드</string>
+  <string name="intake_default_folder">기본 폴더</string>
+  <string name="intake_recent">최근</string>
+  <string name="intake_pinned">고정됨</string>
+  <string name="intake_unpin">%1$s 고정 해제</string>
+  <string name="intake_pin">%1$s 고정</string>
+  <string name="intake_choose_folder">폴더 선택…</string>
+  <string name="intake_folder_on">%1$s의 폴더</string>
+  <string name="intake_torrents_app_folder">토렌트는 앱 폴더에 저장됩니다. 파일 앱에서 고른 폴더에는 링크로 받은 파일만 저장됩니다</string>
+
+  <string name="intake_advanced">고급</string>
+  <string name="intake_hide">숨기기</string>
+  <string name="intake_also_sent">이 링크와 함께 전송됨: %1$s</string>
+  <string name="intake_file_name">파일 이름</string>
+  <string name="intake_server_file_name">서버의 파일 이름 사용</string>
+  <string name="intake_user_agent_custom">사용자 지정</string>
+  <string name="intake_add_header">헤더 추가</string>
+  <string name="intake_paste_curl">cURL 붙여넣기</string>
+  <string name="intake_headers_saved">헤더는 작업과 함께 저장되며 이 기기에 연결된 기기에서 볼 수 있습니다.</string>
+  <string name="intake_header_name">헤더</string>
+  <string name="intake_header_value">값</string>
+  <string name="intake_remove_header">헤더 제거</string>
+
+  <string name="intake_submit_download_name">%1$s 다운로드</string>
+  <string name="intake_submit_schedule_name">%1$s 예약</string>
+  <plurals name="intake_submit_download_files">
+    <item quantity="other">파일 %1$d개 다운로드</item>
+  </plurals>
+  <plurals name="intake_submit_download_files_size">
+    <item quantity="other">파일 %1$d개 다운로드 · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_download_items">
+    <item quantity="other">항목 %1$d개 다운로드</item>
+  </plurals>
+  <plurals name="intake_submit_download_items_size">
+    <item quantity="other">항목 %1$d개 다운로드 · %2$s</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_files">
+    <item quantity="other">파일 %1$d개 예약</item>
+  </plurals>
+  <plurals name="intake_submit_schedule_items">
+    <item quantity="other">항목 %1$d개 예약</item>
+  </plurals>
+  <string name="intake_submit_apply">변경 사항 적용</string>
+  <string name="intake_submit_start_over">처음부터 다시 시작</string>
+  <string name="intake_submit_waiting_files">파일 목록 대기 중</string>
+  <string name="intake_submit_no_files">선택한 파일 없음</string>
+  <string name="intake_submit_nothing">추가할 항목 없음</string>
+  <string name="intake_hint_download">%1$s 키로 다운로드</string>
+  <string name="intake_hint_schedule">%1$s 키로 예약</string>
+  <string name="intake_hint_retry">%1$s 키로 재시도</string>
+  <string name="intake_hint_start_over">%1$s 키로 다시 시작</string>
+  <string name="intake_hint_apply">%1$s 키로 적용</string>
+  <string name="intake_download_all">모두 다운로드</string>
+  <string name="intake_task_gone">이 다운로드는 더 이상 목록에 없습니다.</string>
+  <string name="intake_confirm_close">입력한 내용을 버리고 닫을까요?</string>
+  <string name="intake_keep_editing">계속 편집</string>
+  <string name="intake_discard">버리기</string>
+
+  <string name="intake_outcome_starts_now">지금 시작</string>
+  <plurals name="intake_outcome_slots_free">
+    <item quantity="other">슬롯 %2$d개 중 %1$d개 비어 있음</item>
+  </plurals>
+  <string name="intake_outcome_eta">현재 속도로 ≈ %1$s</string>
+  <string name="intake_outcome_eta_soon">현재 속도로 1분 미만</string>
+  <string name="intake_outcome_urgent">⚡ 긴급: 지금 시작하고 %1$s(%2$s) 일시정지</string>
+  <string name="intake_outcome_waits_for_host">%1$s 대기 · 서버당 %2$d개</string>
+  <string name="intake_outcome_queued_next">대기열 · 다음 순서</string>
+  <plurals name="intake_outcome_queued_behind">
+    <item quantity="other">대기열 · 앞에 %1$d개</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now">
+    <item quantity="other">%1$d개 지금 시작</item>
+  </plurals>
+  <plurals name="intake_outcome_start_now_slots">
+    <item quantity="other">%1$d개 지금 시작(%2$s)</item>
+  </plurals>
+  <plurals name="intake_outcome_queued_count">
+    <item quantity="other">대기열 %1$d개</item>
+  </plurals>
+  <string name="intake_time_hours">%1$d시간</string>
+  <string name="intake_time_hours_minutes">%1$d시간 %2$d분</string>
+  <string name="intake_start_over_discard">처음부터 다시 시작 · 지금까지 다운로드한 분량(%1$s)은 삭제됩니다.</string>
+  <string name="intake_start_over_new">새 다운로드로 처음부터 시작합니다.</string>
+
+  <string name="intake_stage_back">모든 링크로 돌아가기</string>
+  <plurals name="intake_stage_selection">
+    <item quantity="other">파일 %2$d개 중 %1$d개 · %4$s 중 %3$s</item>
+  </plurals>
+  <string name="intake_filter_files">파일 필터</string>
+  <string name="intake_largest_file">가장 큰 파일</string>
+  <string name="intake_skip_samples">샘플 제외</string>
+  <plurals name="intake_skipped_extras">
+    <item quantity="other">부가 파일 %1$d개 제외됨</item>
+  </plurals>
+  <string name="intake_kind_subtitles">자막</string>
+  <string name="intake_sort">정렬</string>
+  <string name="intake_sort_files">파일 정렬</string>
+  <string name="intake_expand">펼치기</string>
+  <string name="intake_collapse">접기</string>
+
+  <string name="intake_file_unreadable">파일을 읽을 수 없습니다</string>
+  <string name="intake_file_empty">파일이 비어 있습니다</string>
+  <string name="intake_file_too_large">파일이 %1$d MiB보다 큽니다</string>
+
+  <string name="intake_tracker_too_long">너무 깁니다.</string>
+  <string name="intake_tracker_spaces">공백이 포함되어 있습니다.</string>
+  <string name="intake_tracker_scheme">http://, https:// 또는 udp://로 시작해야 합니다.</string>
+  <string name="intake_tracker_no_host">호스트 이름이 없습니다.</string>
+  <string name="intake_tracker_udp_user_info">UDP 트래커에는 사용자 이름이나 비밀번호를 넣을 수 없습니다.</string>
+  <string name="intake_tracker_udp_port">UDP 트래커에는 포트가 필요합니다.</string>
+  <string name="intake_tracker_port">1~65535 사이의 포트를 사용하세요.</string>
+</resources>
