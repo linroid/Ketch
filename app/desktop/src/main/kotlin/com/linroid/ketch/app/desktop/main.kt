@@ -39,6 +39,7 @@ import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.SystemNotifier
+import com.linroid.ketch.app.feedback.pairingNotificationCopy
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
@@ -393,6 +394,8 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   val activityEvents = remember {
     reportDesktopActivity(controller, notifier, ::inFront)
   }
+  // Pairing requests ask in the main window; from the tray while it is not in front.
+  remember { notifyPairingRequests(controller, notifier, ::mainInFront) }
   KetchTray(controller, status, actions, speedMode, trayState)
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
   // Text resolves as it composes, so the menus compose again in a new language.
@@ -496,7 +499,7 @@ private fun createInstanceManager(
           additionalSources = listOf(FtpDownloadSource(), torrentSource),
         ).also(launch.extensionServer::attach)
       },
-      localServerFactory = { ketchApi ->
+      localServerFactory = { ketchApi, pairingRequests ->
         // Reloaded here so a restart from Settings picks up the
         // saved port, token and mDNS choice.
         val saved = configStore.load()
@@ -514,6 +517,9 @@ private fun createInstanceManager(
           },
           allowedHosts = serverConfig.allowedHosts,
           mdnsEnabled = serverConfig.mdnsEnabled,
+          pairingApprover = { request, address ->
+            pairingRequests.ask(request.name, request.code, request.os, address)
+          },
         )
         server.start(wait = false)
         object : LocalServerHandle {
@@ -682,6 +688,23 @@ private fun reportDesktopActivity(
     }
   }
   return toasts.receiveAsFlow()
+}
+
+/**
+ * Posts a notification from the tray for each pairing request that arrives while the main window
+ * is not [inFront], where the app asks about it, so the owner comes to answer.
+ */
+private fun notifyPairingRequests(
+  controller: AppController,
+  notifier: TrayNotifier,
+  inFront: () -> Boolean,
+) {
+  controller.scope.launch {
+    controller.instanceManager.pairingRequests.watch(
+      onArrived = { ask -> if (!inFront()) notifier.post(pairingNotificationCopy(ask)) },
+      onLeft = {},
+    )
+  }
 }
 
 /**

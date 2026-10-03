@@ -129,6 +129,7 @@ as `Authorization: Bearer <token>`.
 | `PUT /api/tasks/{id}/speed-limit`, `/priority`, `/connections` | Change a task while it runs |
 | `DELETE /api/tasks/{id}?deleteFiles=true` | Remove a task, and its files if asked |
 | `GET /api/events`, `/api/events/{id}` | Server-sent events: `task_added`, `task_removed`, `state_changed`, `progress` |
+| `POST /api/pairing`, `GET`, `DELETE /api/pairing/{id}` | Ask the server's owner for the access code, poll for the answer, withdraw; no code needed |
 
 ```bash
 curl -X POST http://localhost:8642/api/tasks \
@@ -137,6 +138,9 @@ curl -X POST http://localhost:8642/api/tasks \
 
 curl -N http://localhost:8642/api/events
 ```
+
+The pairing routes only exist on servers whose owner can answer, such as the apps' (mDNS TXT
+`pairing=1`); `RemotePairing` in `remote` sends a request and waits for the answer.
 
 The routes are defined once as Ktor resources in `endpoints` (`Api`), with the wire models in
 `com.linroid.ketch.endpoints.model`. Without an access code the server only answers requests

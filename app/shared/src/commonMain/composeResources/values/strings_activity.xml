@@ -23,6 +23,13 @@
   <string name="notify_channel_active">Active downloads</string>
   <string name="notify_channel_done">Finished downloads</string>
   <string name="notify_channel_failed">Failed downloads</string>
+  <string name="notify_channel_pairing">Pairing requests</string>
+  <!-- A device found this one on the network and wants its access code, while Ketch is not in
+       front. %1$s is that device's name, such as "Pixel 9"; %2$s names this device inside a
+       sentence, such as "this Mac". -->
+  <string name="notify_pairing_title">%1$s wants to control %2$s</string>
+  <!-- %1$s is four digits the other device shows too. -->
+  <string name="notify_pairing_body">Allow it only if it shows %1$s.</string>
   <!-- Title of the Android notification that bundles several finished downloads. -->
   <string name="notify_finished_group">Finished downloads</string>
   <!-- The Android download service's notification while it only shares this device. %1$d is a

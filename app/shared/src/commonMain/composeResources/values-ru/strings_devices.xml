@@ -169,6 +169,14 @@
   <string name="connect_nearby_failed_hint">%1$s. Вставьте вместо этого ссылку для сопряжения.</string>
   <string name="connect_none_found">Устройства не найдены. На другом устройстве откройте «Настройки › Общий доступ» и разрешите подключение другого устройства.</string>
   <string name="connect_asks_for_code">%1$s · запрашивает код</string>
+  <string name="connect_asks_for_approval">%1$s · запрашивает разрешение</string>
+  <string name="connect_approval_waiting">Ожидание ответа от %1$s…</string>
+  <string name="connect_approval_check">Убедитесь, что на %1$s показан этот код, и разрешите доступ этому устройству.</string>
+  <string name="connect_approval_enter_code">Ввести код доступа</string>
+  <string name="connect_approval_denied">На %1$s не разрешили доступ этому устройству. Запросите снова или введите код доступа.</string>
+  <string name="connect_approval_expired">На %1$s никто не ответил. Запросите снова или введите код доступа.</string>
+  <string name="connect_approval_busy">На %1$s ещё рассматривают другой запрос с этого устройства. Запросите снова чуть позже или введите код доступа.</string>
+  <string name="connect_approval_ask_again">Запросить снова</string>
   <string name="connect_added_badge">Добавлено</string>
   <string name="connect_share_instead">Хотите управлять загрузками %1$s с другого устройства?</string>
   <string name="connect_show_pairing_code">Показать код сопряжения</string>
@@ -188,6 +196,11 @@
   <string name="connect_pairing_known">Устройство %1$s уже добавлено. При подключении оно будет показано.</string>
   <string name="connect_pairing_known_code">Устройство %1$s уже добавлено. При подключении оно будет показано и получит код из этой ссылки.</string>
   <string name="connect_pairing_has_code">Ссылка содержит код доступа.</string>
+  <string name="pairing_request_title">Разрешить %1$s управлять загрузками %2$s?</string>
+  <string name="pairing_request_check">Разрешайте, только если на %1$s показан этот код:</string>
+  <string name="pairing_request_note">Устройство сможет добавлять, приостанавливать и удалять загрузки здесь. Чтобы потом отозвать доступ, выберите «Новый код» в разделе «Настройки › Общий доступ».</string>
+  <string name="pairing_request_allow">Разрешить</string>
+  <string name="pairing_request_deny">Не разрешать</string>
 
   <string name="device_pick_torrents">Открыть торрент-файлы</string>
   <string name="device_pick_folder">Выберите папку для загрузок</string>

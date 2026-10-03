@@ -23,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
@@ -60,6 +61,10 @@ import ketch.app.shared.generated.resources.action_connect
 import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.connect_add_title
 import ketch.app.shared.generated.resources.connect_added_badge
+import ketch.app.shared.generated.resources.connect_approval_check
+import ketch.app.shared.generated.resources.connect_approval_enter_code
+import ketch.app.shared.generated.resources.connect_approval_waiting
+import ketch.app.shared.generated.resources.connect_asks_for_approval
 import ketch.app.shared.generated.resources.connect_asks_for_code
 import ketch.app.shared.generated.resources.connect_code_no_longer_accepted
 import ketch.app.shared.generated.resources.connect_find_on_network
@@ -84,7 +89,9 @@ import org.jetbrains.compose.resources.stringResource
  *
  * Desktop apps search the network as the sheet opens; phones search when "Find on network" is
  * tapped, which asks Android for its nearby devices permission first. The browser cannot
- * search, so the web hides it.
+ * search, so the web hides it. A device found there that asks for a code but lets its owner
+ * allow this device instead ([DiscoveredServer.pairable]) is asked to, while the sheet shows
+ * the code the owner checks.
  *
  * @param device a device that rejected its access code; the sheet then asks for a new one.
  * @param searchNow searches the network as the sheet opens on phones too, for a "Find on
@@ -127,12 +134,19 @@ fun AddDeviceSheet(
     onSubmit = submit,
     onPick = { server ->
       val known = added["${server.host}:${server.port}"]
-      if (known != null) {
-        state.switchInstance(known)
-        onDismiss()
-      } else {
-        form.pick(server)
-        if (!server.tokenRequired) submit(true)
+      when {
+        known != null -> {
+          state.switchInstance(known)
+          onDismiss()
+        }
+        server.tokenRequired && server.pairable -> form.pair(server, scope, connector) {
+          state.reportConnected(it, tried = true)
+          onDismiss()
+        }
+        else -> {
+          form.pick(server)
+          if (!server.tokenRequired) submit(true)
+        }
       }
     },
     onFind = { access.request { nearby?.search() } },
@@ -194,6 +208,7 @@ internal fun AddDeviceDialog(
       KetchButton(
         text = stringResource(Res.string.action_connect),
         onClick = { onSubmit(true) },
+        enabled = form.pairing == null,
         loading = form.connecting,
       )
     },
@@ -205,6 +220,11 @@ internal fun AddDeviceDialog(
       )
     },
   ) {
+    val pairing = form.pairing
+    if (pairing != null) {
+      PairingWaitPanel(pairing, onEnterCode = form::enterCodeInstead)
+      return@AdaptiveModal
+    }
     Text(
       text = when {
         device != null -> stringResource(Res.string.connect_code_no_longer_accepted, device.label)
@@ -217,7 +237,11 @@ internal fun AddDeviceDialog(
     val submit = { onSubmit(true) }
     PairingLinkField(form, onSubmit = submit, autoFocus = device == null)
     AccessCodeField(form, onSubmit = submit)
-    ConnectProblemNotice(form.problem, onAddAnyway = { onSubmit(false) }.takeIf { device == null })
+    ConnectProblemNotice(
+      problem = form.problem,
+      onAddAnyway = { onSubmit(false) }.takeIf { device == null },
+      onAskAgain = onPick,
+    )
     if (nearby != null) {
       NearbySection(
         nearby = nearby,
@@ -383,10 +407,11 @@ private fun NearbyRow(
         overflow = TextOverflow.Ellipsis,
       )
       Text(
-        text = if (server.tokenRequired) {
-          stringResource(Res.string.connect_asks_for_code, address)
-        } else {
-          address
+        text = when {
+          server.tokenRequired && server.pairable ->
+            stringResource(Res.string.connect_asks_for_approval, address)
+          server.tokenRequired -> stringResource(Res.string.connect_asks_for_code, address)
+          else -> address
         },
         style = type.caption,
         color = colors.textSecondary,
@@ -405,6 +430,49 @@ private fun NearbyRow(
         else -> Chevron()
       }
     }
+  }
+}
+
+/**
+ * What the sheet shows while the owner of a device decides whether to let this one in: the
+ * code they check, and the way to type the access code instead.
+ */
+@Composable
+private fun PairingWaitPanel(pairing: PairingWait, onEnterCode: () -> Unit) {
+  val colors = KetchTheme.colors
+  val type = KetchTheme.typography
+  val spacing = KetchTheme.spacing
+  Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+    ) {
+      KetchSpinner()
+      Text(
+        text = stringResource(Res.string.connect_approval_waiting, pairing.name),
+        style = type.label,
+        color = colors.textPrimary,
+      )
+    }
+    Text(
+      text = stringResource(Res.string.connect_approval_check, pairing.name),
+      style = type.bodyS,
+      color = colors.textSecondary,
+    )
+    Text(
+      text = pairing.code,
+      style = type.numeralXL,
+      color = colors.textPrimary,
+      modifier = Modifier.fillMaxWidth().padding(vertical = spacing.s2),
+      textAlign = TextAlign.Center,
+    )
+    KetchButton(
+      text = stringResource(Res.string.connect_approval_enter_code),
+      onClick = onEnterCode,
+      variant = KetchButtonVariant.Ghost,
+      size = KetchButtonSize.Small,
+      modifier = Modifier.offset(x = -ghostOverhang()),
+    )
   }
 }
 

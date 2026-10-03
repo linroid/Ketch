@@ -17,8 +17,9 @@ import com.linroid.ketch.remote.RemoteKetch
  *   engine with platform-specific dependencies.
  * @param localServerFactory optional factory that starts an HTTP
  *   server exposing the embedded [KetchApi]. Receives the embedded
- *   KetchApi instance. When non-null, server controls appear in
- *   the Embedded instance entry. Provided by Android and JVM/Desktop.
+ *   KetchApi instance and the [pairingRequests] its pairing requests go to.
+ *   When non-null, server controls appear in the Embedded instance entry.
+ *   Provided by Android and JVM/Desktop.
  * @param applyTorrentSettings applies changed torrent settings to the
  *   torrent source of the embedded instance, so they take effect without
  *   a restart. `null` when the embedded instance has no torrent support.
@@ -28,7 +29,7 @@ import com.linroid.ketch.remote.RemoteKetch
 class InstanceFactory(
   val deviceName: String = "Embedded",
   private val embeddedFactory: (() -> KetchApi)? = null,
-  private val localServerFactory: ((KetchApi) -> LocalServerHandle)? = null,
+  private val localServerFactory: ((KetchApi, PairingRequests) -> LocalServerHandle)? = null,
   internal val applyTorrentSettings: (suspend (TorrentSettings) -> Unit)? = null,
   private val remoteFactory: (RemoteConfig) -> RemoteInstance = ::remoteKetchInstance,
 ) {
@@ -40,6 +41,9 @@ class InstanceFactory(
     get() = localServerFactory != null
 
   private var localServer: LocalServerHandle? = null
+
+  /** Devices that asked the local server for its access code, waiting for an answer. */
+  val pairingRequests: PairingRequests = PairingRequests()
 
   /** Create the embedded [KetchApi] instance. */
   fun createEmbedded(): EmbeddedInstance {
@@ -61,7 +65,7 @@ class InstanceFactory(
   fun startServer(api: KetchApi) {
     val factory = localServerFactory
       ?: throw UnsupportedOperationException("Local server not supported on this platform")
-    localServer = factory(api)
+    localServer = factory(api, pairingRequests)
   }
 
   /** Stop the local server if running (does not close Ketch). */

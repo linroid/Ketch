@@ -14,6 +14,9 @@
   <string name="notify_channel_active">Aktive Downloads</string>
   <string name="notify_channel_done">Abgeschlossene Downloads</string>
   <string name="notify_channel_failed">Fehlgeschlagene Downloads</string>
+  <string name="notify_channel_pairing">Kopplungsanfragen</string>
+  <string name="notify_pairing_title">%1$s möchte %2$s steuern</string>
+  <string name="notify_pairing_body">Erlaube es nur, wenn %1$s angezeigt wird.</string>
   <string name="notify_finished_group">Abgeschlossene Downloads</string>
   <string name="notify_sharing_device">Dieses Gerät wird freigegeben</string>
   <string name="notify_server_on_port">Server auf Port %1$d</string>

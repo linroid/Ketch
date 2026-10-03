@@ -21,6 +21,7 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.percentText
 import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.instance.PairingAsk
 import com.linroid.ketch.app.platform.FileActionException
 import com.linroid.ketch.app.platform.openFileIntent
 import com.linroid.ketch.app.platform.shareFileIntent
@@ -39,15 +40,18 @@ import ketch.app.shared.generated.resources.notify_action_slow_lane
 import ketch.app.shared.generated.resources.notify_channel_active
 import ketch.app.shared.generated.resources.notify_channel_done
 import ketch.app.shared.generated.resources.notify_channel_failed
+import ketch.app.shared.generated.resources.notify_channel_pairing
 import ketch.app.shared.generated.resources.notify_finished_group
 import ketch.app.shared.generated.resources.notify_more_files
 import ketch.app.shared.generated.resources.notify_server_on_port
 import ketch.app.shared.generated.resources.notify_sharing_device
 import ketch.app.shared.generated.resources.notify_slow_lane_on
+import ketch.app.shared.generated.resources.pairing_request_allow
+import ketch.app.shared.generated.resources.pairing_request_deny
 import kotlinx.coroutines.runBlocking
 
 /**
- * Posts Ketch's notifications on Android, in three channels:
+ * Posts Ketch's notifications on Android, in four channels:
  *
  * - [CHANNEL_ACTIVE]: the download service's [ongoing] notification, with the total progress,
  *   the files in flight and Pause all and Slow lane buttons. On Android 16 a single download
@@ -55,6 +59,8 @@ import kotlinx.coroutines.runBlocking
  * - [CHANNEL_DONE]: finished downloads with Open and Share, grouped once more than
  *   [GROUP_AFTER] show.
  * - [CHANNEL_FAILED]: failed downloads with Retry.
+ * - [CHANNEL_PAIRING]: devices that want this one's access code, with Allow and Don't allow,
+ *   which start [service] with [ACTION_PAIRING_ALLOW] and [ACTION_PAIRING_DENY].
  *
  * Tapping a notification opens [activity] with a [NotificationLink], which [linkOf] reads back.
  * The ongoing notification's buttons start [service] with [ACTION_PAUSE_ALL] and
@@ -94,11 +100,13 @@ class AndroidNotifier(
     val active = Res.string.notify_channel_active.text().load()
     val done = Res.string.notify_channel_done.text().load()
     val failed = Res.string.notify_channel_failed.text().load()
+    val pairing = Res.string.notify_channel_pairing.text().load()
     system.createNotificationChannels(
       listOf(
         channel(CHANNEL_ACTIVE, active, NotificationManager.IMPORTANCE_LOW),
         channel(CHANNEL_DONE, done, NotificationManager.IMPORTANCE_DEFAULT),
-        channel(CHANNEL_FAILED, failed, NotificationManager.IMPORTANCE_HIGH)
+        channel(CHANNEL_FAILED, failed, NotificationManager.IMPORTANCE_HIGH),
+        channel(CHANNEL_PAIRING, pairing, NotificationManager.IMPORTANCE_HIGH)
       )
     )
     system.deleteNotificationChannel(LEGACY_CHANNEL)
@@ -233,6 +241,40 @@ class AndroidNotifier(
     return style
   }
 
+  /**
+   * Asks about [ask], a device that wants this one's access code, with [copy] and Allow and
+   * Don't allow buttons; a tap opens the app, which asks too. [cancelPairing] withdraws it.
+   */
+  suspend fun showPairing(ask: PairingAsk, copy: NotificationCopy) {
+    if (!manager.areNotificationsEnabled()) {
+      log.d { "Notifications are off, not asking about pairing" }
+      return
+    }
+    val tag = pairingTag(ask.id)
+    val allow = Res.string.pairing_request_allow.text().load()
+    val deny = Res.string.pairing_request_deny.text().load()
+    val notification = builder(CHANNEL_PAIRING, copy)
+      .setPriority(NotificationCompat.PRIORITY_HIGH)
+      .setTimeoutAfter(PAIRING_TIMEOUT_MS)
+      .setContentIntent(showIntent(tag))
+      .addAction(0, deny, pairingIntent(ask.id, ACTION_PAIRING_DENY))
+      .addAction(0, allow, pairingIntent(ask.id, ACTION_PAIRING_ALLOW))
+      .build()
+    post(tag, ID_PAIRING, notification)
+  }
+
+  /** Withdraws the notification about the pairing request [id], once it is answered or gone. */
+  fun cancelPairing(id: Long) {
+    manager.cancel(pairingTag(id), ID_PAIRING)
+  }
+
+  private fun pairingIntent(id: Long, action: String): PendingIntent = PendingIntent.getService(
+    context,
+    requestCode(pairingTag(id), action),
+    Intent(context, service).setAction(action).putExtra(EXTRA_PAIRING_ID, id),
+    FLAGS
+  )
+
   private fun builder(channel: String, copy: NotificationCopy): NotificationCompat.Builder =
     NotificationCompat.Builder(context, channel)
       .setSmallIcon(smallIcon)
@@ -359,6 +401,15 @@ class AndroidNotifier(
     /** Channel of failed downloads. */
     const val CHANNEL_FAILED: String = "downloads_failed"
 
+    /** Channel of devices that want this one's access code. */
+    const val CHANNEL_PAIRING: String = "pairing_requests"
+
+    /** Asks the service to let in the device of the pairing request in [pairingIdOf]. */
+    const val ACTION_PAIRING_ALLOW: String = "com.linroid.ketch.app.action.PAIRING_ALLOW"
+
+    /** Asks the service to turn away the device of the pairing request in [pairingIdOf]. */
+    const val ACTION_PAIRING_DENY: String = "com.linroid.ketch.app.action.PAIRING_DENY"
+
     /** Id of the ongoing notification, which the service shows in the foreground. */
     const val ONGOING_ID: Int = 1
 
@@ -387,6 +438,11 @@ class AndroidNotifier(
     private const val ID_TASK = 2
     private const val ID_SUMMARY = 3
     private const val ID_GROUP = 4
+    private const val ID_PAIRING = 5
+    private const val EXTRA_PAIRING_ID = "pairingId"
+
+    // A request expires on the server after two minutes; its notification goes with it.
+    private const val PAIRING_TIMEOUT_MS = 2 * 60 * 1000L
     private const val FLAGS = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 
     /**
@@ -403,6 +459,10 @@ class AndroidNotifier(
       return NotificationLink(taskKey, filter, retry = action == ACTION_RETRY)
     }
 
+    /** The pairing request whose Allow or Don't allow started the service with [intent]. */
+    fun pairingIdOf(intent: Intent?): Long? =
+      intent?.takeIf { it.hasExtra(EXTRA_PAIRING_ID) }?.getLongExtra(EXTRA_PAIRING_ID, 0L)
+
     /** Withdraws the notification about the task [key]. */
     fun cancel(context: Context, key: TaskKey) {
       NotificationManagerCompat.from(context).cancel(tagOf(key), ID_TASK)
@@ -410,6 +470,8 @@ class AndroidNotifier(
 
     // A task's newer notification replaces its older one.
     private fun tagOf(key: TaskKey): String = "task:${key.encode()}"
+
+    private fun pairingTag(id: Long): String = "pairing:$id"
 
     // PendingIntents differing only in extras are the same one, so each gets its own code.
     private fun requestCode(tag: String, what: String): Int = "$tag/$what".hashCode()

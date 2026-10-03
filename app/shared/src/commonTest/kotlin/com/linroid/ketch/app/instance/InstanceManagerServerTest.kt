@@ -19,7 +19,7 @@ class InstanceManagerServerTest {
   ): InstanceManager = InstanceManager(
     factory = InstanceFactory(
       embeddedFactory = { FakeKetchApi() },
-      localServerFactory = {
+      localServerFactory = { _, _ ->
         startServer()
         object : LocalServerHandle {
           override fun stop() {}

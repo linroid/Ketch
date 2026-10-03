@@ -24,6 +24,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
+import com.linroid.ketch.app.instance.PairingRequests
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.SystemClipboard
@@ -672,7 +673,7 @@ internal class MovableClock(@Volatile var now: Instant) : Clock {
 }
 
 /** Starts a sharing server that only pretends to listen. */
-internal val PretendServer: (KetchApi) -> LocalServerHandle = {
+internal val PretendServer: (KetchApi, PairingRequests) -> LocalServerHandle = { _, _ ->
   object : LocalServerHandle {
     override fun stop() {}
   }
