@@ -4,6 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.app.i18n.AppLanguages
+import com.linroid.ketch.app.i18n.PlatformLanguage
+import com.linroid.ketch.app.i18n.appLanguageOf
 import com.linroid.ketch.config.AccentColor
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.DesktopSettings
@@ -39,6 +42,22 @@ class AppSettingsController(
   /** Whether the UI follows the system or forces light or dark. */
   val themeMode: ThemeMode get() = config.appearance.theme
 
+  /**
+   * The language the UI shows: the tag of one of [AppLanguages], or `null` while it follows the
+   * system. Android 13 and later and iOS keep it in their per-app language setting, the other
+   * platforms in config.toml.
+   */
+  var language: String? by mutableStateOf(chosenLanguage())
+    private set
+
+  /** Whether Settings lists the languages to pick from; on iOS it opens the system's Settings. */
+  val picksLanguageInApp: Boolean get() = PlatformLanguage.pickInApp
+
+  init {
+    // A language kept in config.toml is the app's to apply; the system applies its own.
+    if (!PlatformLanguage.systemKeepsChoice) language?.let(PlatformLanguage::apply)
+  }
+
   /** UI state remembered between launches. */
   val ui: UiPreferences get() = config.ui
 
@@ -72,6 +91,35 @@ class AppSettingsController(
   /** Persists the light/dark mode. */
   fun saveThemeMode(mode: ThemeMode) {
     update { it.copy(appearance = it.appearance.copy(theme = mode)) }
+  }
+
+  /**
+   * Shows the UI in [tag], the tag of one of [AppLanguages], or in the system's language for
+   * `null`, from now on.
+   */
+  fun saveLanguage(tag: String?) {
+    if (!PlatformLanguage.systemKeepsChoice) {
+      update { it.copy(appearance = it.appearance.copy(language = tag)) }
+    }
+    PlatformLanguage.apply(tag)
+    language = tag
+  }
+
+  /** Reads the language again, which the system's per-app setting may have changed. */
+  fun refreshLanguage() {
+    language = chosenLanguage()
+  }
+
+  /** Opens the system's settings for the app, where iOS chooses the app's language. */
+  fun openLanguageSettings() = PlatformLanguage.openSystemSettings()
+
+  private fun chosenLanguage(): String? {
+    val tag = if (PlatformLanguage.systemKeepsChoice) {
+      PlatformLanguage.systemChoice()
+    } else {
+      config.appearance.language
+    }
+    return appLanguageOf(tag)?.tag
   }
 
   /**

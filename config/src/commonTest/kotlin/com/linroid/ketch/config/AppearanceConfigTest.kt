@@ -56,4 +56,27 @@ class AppearanceConfigTest {
     assertEquals(ThemeMode.System, legacy.appearance.theme)
     assertEquals(AccentColor.Harbor, legacy.appearance.accent)
   }
+
+  @Test
+  fun `language round trips and is left out while it follows the system`() {
+    val encoded = ConfigStore.toml.encodeToString(
+      KetchConfig.serializer(),
+      KetchConfig(appearance = AppearanceConfig(language = "zh-Hant")),
+    )
+    assertTrue(encoded.contains("language = \"zh-Hant\""), encoded)
+    val decoded = ConfigStore.toml
+      .decodeFromString(KetchConfig.serializer(), encoded)
+    assertEquals("zh-Hant", decoded.appearance.language)
+
+    val system = ConfigStore.toml.encodeToString(KetchConfig.serializer(), KetchConfig())
+    assertTrue("language" !in system, system)
+    val legacy = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[appearance]
+      |theme = "dark"
+      """.trimMargin(),
+    )
+    assertEquals(null, legacy.appearance.language)
+  }
 }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.AppLanguages
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
@@ -80,6 +82,8 @@ import ketch.app.shared.generated.resources.settings_general_device_name
 import ketch.app.shared.generated.resources.settings_general_device_name_hint
 import ketch.app.shared.generated.resources.settings_general_language
 import ketch.app.shared.generated.resources.settings_general_language_current
+import ketch.app.shared.generated.resources.settings_general_language_in_settings
+import ketch.app.shared.generated.resources.settings_general_language_system
 import ketch.app.shared.generated.resources.settings_general_login_add_failed
 import ketch.app.shared.generated.resources.settings_general_login_remove_failed
 import ketch.app.shared.generated.resources.settings_general_login_update_failed
@@ -180,10 +184,7 @@ fun GeneralSettings(state: AppState, systemDeviceName: String?) {
         )
       },
     )
-    SettingsRow(
-      title = stringResource(Res.string.settings_general_language),
-      trailing = { SettingsValue(stringResource(Res.string.settings_general_language_current)) },
-    )
+    LanguageRow(appSettings)
   }
 
   if (LocalDesktopHooks.current.isSupported) StartupGroup(state, appSettings)
@@ -390,3 +391,33 @@ private fun AccentPicker(selected: KetchAccent, onSelect: (KetchAccent) -> Unit)
 private val SwatchSize = 22.dp
 private val SwatchRing = 30.dp
 private val SwatchItemWidth = 52.dp
+
+/**
+ * The language the app shows: a list of the translations and System where the app chooses it,
+ * or on iOS, which keeps an app's language in its own Settings, a row that opens them.
+ */
+@Composable
+private fun LanguageRow(appSettings: AppSettingsController) {
+  // The system's per-app setting may have changed while Settings was closed.
+  LaunchedEffect(Unit) { appSettings.refreshLanguage() }
+  val title = stringResource(Res.string.settings_general_language)
+  if (!appSettings.picksLanguageInApp) {
+    SettingsRow(
+      title = title,
+      description = stringResource(Res.string.settings_general_language_in_settings),
+      modifier = Modifier.clickable(role = Role.Button) { appSettings.openLanguageSettings() },
+      trailing = { SettingsValue(stringResource(Res.string.settings_general_language_current)) },
+    )
+    return
+  }
+  SettingsSelectRow(
+    title = title,
+    value = appSettings.language,
+    options = listOf(null) + AppLanguages.map { it.tag },
+    label = { tag ->
+      AppLanguages.firstOrNull { it.tag == tag }?.name
+        ?: Res.string.settings_general_language_system.text()
+    },
+    onSelect = appSettings::saveLanguage,
+  )
+}

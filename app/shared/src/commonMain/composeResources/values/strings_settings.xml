@@ -137,6 +137,10 @@
   <string name="settings_general_language">Language</string>
   <!-- The language the app shows, named in that language itself: English, Deutsch, 日本語. -->
   <string name="settings_general_language_current">English</string>
+  <!-- The Language choice that follows the system's language. -->
+  <string name="settings_general_language_system">System</string>
+  <!-- Under Language on iOS, which keeps an app's language in the Settings app: tapping the row opens it. -->
+  <string name="settings_general_language_in_settings">Change it in the Settings app</string>
   <string name="settings_general_shortcuts">Keyboard shortcuts…</string>
   <string name="settings_general_startup">Startup and window</string>
   <string name="settings_general_close">When I close the window</string>

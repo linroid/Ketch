@@ -100,6 +100,8 @@
   <string name="settings_general_reduce_motion_auto">「自動」會依照系統的設定。</string>
   <string name="settings_general_language">語言</string>
   <string name="settings_general_language_current">繁體中文</string>
+  <string name="settings_general_language_system">系統</string>
+  <string name="settings_general_language_in_settings">在「設定」App 中更改</string>
   <string name="settings_general_shortcuts">鍵盤快速鍵…</string>
   <string name="settings_general_startup">啟動和視窗</string>
   <string name="settings_general_close">關閉視窗時</string>

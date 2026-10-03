@@ -6,9 +6,11 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.initAppLanguage
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.MAX_TORRENT_FILE_BYTES
+import com.linroid.ketch.config.FileConfigStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,6 +46,7 @@ class KetchApplication : Application() {
 
   override fun onCreate() {
     super.onCreate()
+    initAppLanguage(this, savedLanguage())
     try {
       startForegroundService(Intent(this, KetchService::class.java))
     } catch (e: IllegalStateException) {
@@ -52,6 +55,15 @@ class KetchApplication : Application() {
       // creates the service when it opens.
       fileLogger.w("[KetchApplication] Couldn't start the service: ${e.describeCauses()}")
     }
+  }
+
+  // The language chosen in Settings, which the app applies itself before Android 13.
+  private fun savedLanguage(): String? = try {
+    FileConfigStore(filesDir.resolve("config.toml").absolutePath).load()
+      .appearance.language
+  } catch (e: Exception) {
+    fileLogger.w("[KetchApplication] Couldn't read the language: ${e.describeCauses()}")
+    null
   }
 
   /** Reads a `.torrent` file opened with Ketch from a file manager or another app. */

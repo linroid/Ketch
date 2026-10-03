@@ -40,9 +40,13 @@ enum class ThemeMode {
  *
  * @property accent accent palette used by the UI.
  * @property theme light/dark mode used by the UI.
+ * @property language BCP 47 tag of the language the UI shows, such as "de" or "zh-Hant"; `null`
+ *   follows the system. Android 13 and later and iOS keep the choice in their per-app language
+ *   setting instead, so the apps leave this unset there.
  */
 @Serializable
 data class AppearanceConfig(
   val accent: AccentColor = AccentColor.Signal,
   val theme: ThemeMode = ThemeMode.System,
+  val language: String? = null,
 )

@@ -6,6 +6,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -288,13 +289,15 @@ fun ApplicationScope.KetchTray(
   val fleet = status.fleet
   val now = LocalClock.current.now()
   val entries = trayMenu(TrayContext(fleet, speed, recent, now, devices))
+  // Text resolves as it composes, so the menu composes again in a new language.
+  val language = controller.appSettings.language
   Tray(
     icon = rememberTrayIcon(fleet, status.unseenFailures),
     state = state,
     tooltip = trayTooltip(fleet, now).resolve(),
     onAction = actions.showWindow,
   ) {
-    MenuEntries(entries, KeyboardPlatform.current, commands::perform)
+    key(language) { MenuEntries(entries, KeyboardPlatform.current, commands::perform) }
   }
 }
 
