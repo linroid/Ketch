@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <string name="language_tag">ko</string>
   <string name="size_bytes">%1$s B</string>
   <string name="size_kb">%1$s KB</string>
   <string name="size_mb">%1$s MB</string>
