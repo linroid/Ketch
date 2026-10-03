@@ -13,7 +13,9 @@ opens when it needs it, or a Ketch server elsewhere, such as a NAS.
 - **Popup**: shows each instance's connection and recent downloads, pauses and resumes them, and
   adds a pasted link or magnet link.
 - **Signed-in downloads**: the site's cookies, the referring page and the browser's user agent go
-  along, so downloads that need a session work in Ketch too.
+  along, so downloads that need a session work in Ketch too. They stay with that site: when a
+  download redirects to another host, Ketch sends it the user agent and only the origin of the
+  referring page, not the cookies.
 
 ## Supported browsers
 

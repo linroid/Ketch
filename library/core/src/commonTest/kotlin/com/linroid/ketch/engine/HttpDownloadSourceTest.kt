@@ -145,6 +145,36 @@ class HttpDownloadSourceTest {
   }
 
   @Test
+  fun download_headRefused_probesWithGetAndDownloadsSegments() = runTest {
+    val engine = FakeHttpEngine(headErrorCode = 403)
+    val file = MemoryFile()
+    val context = context(
+      config = DownloadConfig(maxConnectionsPerDownload = 4),
+      fileAccessor = file,
+    )
+
+    HttpDownloadSource(engine).download(context)
+
+    assertEquals(1, engine.probeCallCount)
+    assertEquals(4, engine.downloadCallCount)
+    assertContentEquals(engine.content, file.bytes)
+  }
+
+  @Test
+  fun resume_headRefused_checksServerIdentityWithProbe() = runTest {
+    val engine = FakeHttpEngine(headErrorCode = 405)
+    val file = MemoryFile(ByteArray(1000))
+    val state = HttpDownloadSource.buildResumeState(
+      etag = "\"old\"", lastModified = null, totalBytes = 1000,
+    )
+
+    assertFailsWith<KetchError.FileChanged> {
+      HttpDownloadSource(engine).resume(context(fileAccessor = file), state)
+    }
+    assertEquals(1, engine.probeCallCount)
+  }
+
+  @Test
   fun resolve_withConfig_reportsDefaultConnectionsAsMaxSegments() = runTest {
     val source = HttpDownloadSource(FakeHttpEngine())
 

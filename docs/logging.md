@@ -68,7 +68,7 @@ val ketch = Ketch(
 - Magnet metadata lookups and their timeouts
 
 ### Debug Level (Recommended for Development)
-- HEAD requests, response headers and segment calculations
+- HEAD requests and GET probes, redirects, response headers and segment calculations
 - Each segment's start and completion
 - File preallocation and resume validation
 - Tracker announces per tracker, DHT bootstrap and lookups
@@ -201,6 +201,9 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
   the real exception
 - Magnet links keep only their `xt` topic and `dn` name; tracker and source parameters are
   counted, not printed
+- Request header values are never logged. A redirect to another origin logs the names of the
+  headers left behind, such as `Not sending Cookie, Authorization to another origin`, and
+  `Cookie`, `Set-Cookie` and `Authorization` response headers are logged as `***`
 - Tracker URLs are reduced to `scheme://host:port`, including URLs quoted in error messages,
   because paths and queries carry private tracker passkeys
 - Cookie and authorization header values are masked in HTTP debug logs, and request headers

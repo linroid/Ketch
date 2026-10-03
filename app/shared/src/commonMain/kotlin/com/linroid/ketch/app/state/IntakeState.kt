@@ -387,7 +387,10 @@ internal fun intakeSummary(entries: List<IntakeEntry>): IntakeSummary {
   return IntakeSummary(links, ready, checking, attention, duplicates, bytes)
 }
 
-/** A user agent the Advanced section offers; `null` [value] sends Ketch's own. */
+/**
+ * A user agent the Advanced section offers. A `null` [value] sends no header, so the device's
+ * engine sends Ketch's own, `Ketch/<version>`.
+ */
 enum class UserAgentChoice(val label: UiText, val value: String?) {
   Ketch(verbatim("Ketch"), null),
   Chrome(

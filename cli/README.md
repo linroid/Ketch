@@ -87,7 +87,14 @@ command exits when the download completes or fails.
 | `--speed-limit <value>` | Limit download speed (e.g., `500k`, `1m`, `10m`) |
 | `--priority <level>` | Set download priority: `low`, `normal`, `high`, `urgent` |
 | `--max-concurrent <n>` | Max simultaneous downloads (default: 3) |
+| `-H`, `--header <header>` | Send a request header, as `'Name: value'`; repeatable |
+| `--user-agent <value>` | Send this `User-Agent` instead of `Ketch/<version>` |
+| `--referer <url>` | Send this `Referer` |
 | `--help`, `-h` | Show help message |
+
+Headers go with every request of the download. A redirect to another scheme, host or port keeps
+only `User-Agent`, `Accept`, `Accept-Encoding`, `Accept-Language` and the origin of `Referer`;
+cookies, `Authorization` and other headers stay with the site they were given for.
 
 **Examples:**
 
@@ -103,6 +110,10 @@ ketch https://example.com/file.zip /tmp/file.zip
 
 # With speed limit and priority
 ketch --speed-limit 1m --priority high https://example.com/file.zip
+
+# A file behind a sign-in, with the cookie and referring page the site expects
+ketch -H 'Cookie: session=abc123' --referer https://example.com/downloads \
+  https://example.com/files/report.pdf
 
 # FTP with credentials, and a magnet link into a directory, with debug logs
 ketch ftp://user:secret@ftp.example.com/pub/file.iso

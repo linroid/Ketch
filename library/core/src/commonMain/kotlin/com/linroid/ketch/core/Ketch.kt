@@ -29,6 +29,7 @@ import com.linroid.ketch.core.engine.DownloadScheduler
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.RequestHeaders
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
@@ -156,8 +157,12 @@ class Ketch(
    * Starts a new download and adds it to the [tasks] flow.
    * The task may be queued if the maximum number of concurrent
    * downloads has been reached.
+   *
+   * @throws IllegalArgumentException if a header in [DownloadRequest.headers] cannot be sent
+   *   (see [RequestHeaders.requireValid])
    */
   override suspend fun download(request: DownloadRequest): DownloadTask {
+    RequestHeaders.requireValid(request.headers)
     val taskId = Uuid.random().toString()
     val now = Clock.System.now()
     val isScheduled = request.schedule !is DownloadSchedule.Immediate ||

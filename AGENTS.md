@@ -72,8 +72,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### `library:core` (implementation)
 - `com.linroid.ketch.core` -- `Ketch` (implements `KetchApi`), `KetchDispatchers`
 - `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `DownloadExecution`,
-  `RangeSupportDetector`, `ServerInfo`, `DownloadSource`, `HttpDownloadSource`, `SourceResolver`,
-  `SourceResumeState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
+  `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
+  `SourceResolver`, `SourceResumeState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
   `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`,
@@ -86,7 +86,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `TaskStore`, `InMemoryTaskStore`, `TaskRecord`, `TaskState`
 
 ### `library:ktor`, `library:kermit`, `library:sqlite`
-- `com.linroid.ketch.engine` -- `KtorHttpEngine` (`withNetworkInterfaces()` on Android/JVM)
+- `com.linroid.ketch.engine` -- `KtorHttpEngine` (`withNetworkInterfaces()` on Android/JVM),
+  `RedirectCache`
 - `com.linroid.ketch.log` -- `KermitLogger`
 - `com.linroid.ketch.sqlite` -- `SqliteTaskStore`, `DriverFactory` (expect/actual),
   `UnreadableDatabase`
@@ -163,6 +164,21 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Content of unknown size (no `Content-Length`, e.g. generated archives) streams over one
   connection; a retry or resume restarts it, and the completed task records the file's size
 - Pause / Resume with server identity validation (ETag, Last-Modified)
+- HTTP probes use HEAD; when it is refused with 400, 403, 404, 405 or 501 (URLs presigned for GET
+  only), `RangeSupportDetector` asks `HttpEngine.probe`, a `GET` with `Range: bytes=0-0` whose
+  body is never read. Engines without it (the default throws `UnsupportedOperationException`)
+  keep the HEAD error
+- Request headers (`DownloadRequest.headers`, `resolve` properties): `Ketch.download` rejects
+  non-token names and values with control characters (`RequestHeaders.requireValid`, whose
+  messages never quote values); engines drop `Host`, `Range`, `Content-Length` and hop-by-hop
+  headers (`RequestHeaders.sendable`)
+- `KtorHttpEngine` sends `User-Agent: Ketch/<version>` unless the headers name one (`userAgent`,
+  `null` for none) and follows redirects itself (`followRedirects` off on its client copy): at
+  most 20, never HTTPS to HTTP or to other schemes. A hop to another scheme, host or port keeps
+  only `User-Agent`, `Accept`, `Accept-Encoding`, `Accept-Language` and `Referer` cut to its
+  origin, and drops URL user info. `RedirectCache` remembers each request's final target and
+  that hop's headers (per URL and headers, 30 minutes, 64 entries); HEAD and probes always follow
+  the redirects and refresh it, GETs reuse it and forget it when the target fails
 - Names from a server (`Content-Disposition`), a URL or an FTP path pass through
   `sanitizeFileName()` (last `/` or `\` segment, no control, bidi or Windows-reserved characters
   or device names, at most 255 UTF-8 bytes, `null` when nothing is left), in the sources and again

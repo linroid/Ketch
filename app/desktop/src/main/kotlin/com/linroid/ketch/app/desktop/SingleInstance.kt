@@ -99,6 +99,12 @@ internal class SingleInstance private constructor(
           } catch (_: IOException) {
             continue // Closed on exit.
           }
+          // On Linux an accept already waiting in the kernel can still take a connection after
+          // close() returns; a closed instance must not answer it.
+          if (server.isClosed) {
+            socket.close()
+            break
+          }
           try {
             socket.soTimeout = TIMEOUT_MS
             when (val message = receive(socket, token)) {
