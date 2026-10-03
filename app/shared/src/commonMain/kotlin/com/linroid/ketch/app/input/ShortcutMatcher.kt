@@ -24,9 +24,8 @@ data class ShortcutContext(
   val menuOpen: Boolean = false,
 ) {
   init {
-    require(overlay == null || overlay == CommandScope.Intake || overlay == CommandScope.Palette) {
-      "Only the add sheet and the palette are overlays, not $overlay"
-    }
+    val valid = overlay == null || overlay == CommandScope.Intake || overlay == CommandScope.Palette
+    require(valid) { "Only the add sheet and the palette are overlays, not $overlay" }
   }
 }
 

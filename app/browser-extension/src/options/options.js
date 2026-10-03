@@ -1,6 +1,7 @@
 import { withEndpoint } from '../lib/connection.js';
 import { ext } from '../lib/ext.js';
-import { describeStatus, failureHint } from '../lib/format.js';
+import { describeStatus, failureHint, withHint } from '../lib/format.js';
+import { localizePage, t } from '../lib/i18n.js';
 import { KetchClient } from '../lib/ketch-client.js';
 import {
   isLoopbackUrl,
@@ -17,6 +18,8 @@ const CHECK_TIMEOUT_MS = 4_000;
 const ALL_SITES = { origins: ['<all_urls>'] };
 
 const $ = (id) => document.getElementById(id);
+// Before anything clones the instance card templates.
+localizePage();
 const toggles = {
   interceptDownloads: $('intercept-downloads'),
   forwardCookies: $('forward-cookies'),
@@ -171,13 +174,13 @@ async function checkConnection(card, { launch = false } = {}) {
   const dot = card.querySelector('.status-dot');
   if (!app && !url) {
     dot.removeAttribute('data-state');
-    showCardStatus(card, 'info', 'Enter the address of a Ketch server.');
+    showCardStatus(card, 'info', t('instance_enter_address'));
     return;
   }
   const check = String(Number(card.dataset.check ?? 0) + 1);
   card.dataset.check = check;
   dot.removeAttribute('data-state');
-  showCardStatus(card, 'info', launch && app ? 'Opening Ketch…' : 'Connecting…');
+  showCardStatus(card, 'info', launch && app ? t('status_opening_app') : t('status_connecting'));
   const instance = app
     ? { type: 'app' }
     : { type: 'server', url, token: card.querySelector('.instance-token').value.trim() };
@@ -186,7 +189,7 @@ async function checkConnection(card, { launch = false } = {}) {
       return new KetchClient(endpoint, { timeoutMs: CHECK_TIMEOUT_MS }).status();
     }, { launch });
     if (card.dataset.check !== check) return;
-    if (!status.version) throw new Error('This address does not look like a Ketch server');
+    if (!status.version) throw new Error(t('error_not_ketch'));
     dot.dataset.state = 'online';
     showCardStatus(card, 'info', describeStatus(status, { withOs: true }));
     const nameInput = card.querySelector('.instance-name');
@@ -197,8 +200,7 @@ async function checkConnection(card, { launch = false } = {}) {
   } catch (error) {
     if (card.dataset.check !== check) return;
     dot.dataset.state = 'offline';
-    const hint = failureHint(error, instance);
-    showCardStatus(card, 'error', hint ? `${error.message}. ${hint}` : error.message);
+    showCardStatus(card, 'error', withHint(error.message, failureHint(error, instance)));
   }
 }
 

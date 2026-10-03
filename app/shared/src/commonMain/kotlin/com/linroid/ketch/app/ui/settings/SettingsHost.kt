@@ -52,6 +52,11 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_target_on
+import ketch.app.shared.generated.resources.settings_close
+import ketch.app.shared.generated.resources.settings_search_placeholder
+import org.jetbrains.compose.resources.stringResource
 
 /** The app's log files, which the About page opens or shares; `null` when the app keeps none. */
 val LocalFileLogger = staticCompositionLocalOf<FileLogger?> { null }
@@ -131,7 +136,10 @@ internal fun SettingsContent(
     if (permission != null) add(SettingsFeature.BrowserNotifications)
     if (fileLogger != null) add(SettingsFeature.Logs)
   }
-  val hits = remember(query, categories, features) { searchSettings(query, categories, features) }
+  val index = rememberSettingsSearchIndex()
+  val hits = remember(query, categories, features, index) {
+    searchSettings(query, categories, features, index)
+  }
   val searching = query.isNotBlank()
 
   BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -284,13 +292,18 @@ internal fun SettingsContent(
           jump = jump,
           actions = {
             if (selected.page.isDevicePage && device != null) {
-              SettingsDeviceChip(instances, device, onSelect = selectDevice, label = "On")
+              SettingsDeviceChip(
+                devices = instances,
+                selected = device,
+                onSelect = selectDevice,
+                label = stringResource(Res.string.device_target_on),
+              )
             }
             if (!inWindow) {
               KetchIconButton(
                 icon = KetchIcon.Close,
                 onClick = onClose,
-                contentDescription = "Close settings",
+                contentDescription = stringResource(Res.string.settings_close),
               )
             }
           },
@@ -396,7 +409,7 @@ private fun SettingsSearchField(
   KetchTextField(
     value = query,
     onValueChange = onQueryChange,
-    placeholder = "Search settings",
+    placeholder = stringResource(Res.string.settings_search_placeholder),
     leadingIcon = KetchIcon.Search,
     trailing = if (showShortcut && query.isEmpty()) {
       {

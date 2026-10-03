@@ -50,6 +50,11 @@ import com.linroid.ketch.app.components.LaneStripDefaults
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.isEmpty
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -67,15 +72,23 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.command
 import com.linroid.ketch.app.ui.downloads.actions.icon
-import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.downloads.actions.rememberSendMode
+import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.downloads.actions.sendEntries
 import com.linroid.ketch.app.ui.downloads.actions.sendTargets
-import com.linroid.ketch.app.ui.inspector.tabs.formatSize
+import com.linroid.ketch.app.ui.inspector.tabs.compactSizeText
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
 import com.linroid.ketch.app.ui.list.outputFile
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_close
+import ketch.app.shared.generated.resources.inspector_copy_name
+import ketch.app.shared.generated.resources.inspector_file_missing
+import ketch.app.shared.generated.resources.inspector_more_actions
+import ketch.app.shared.generated.resources.inspector_share
+import ketch.app.shared.generated.resources.inspector_share_failed
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -106,8 +119,8 @@ internal fun rememberDeviceLabel(state: AppState, row: TaskRow): DeviceLabel {
   }
   return DeviceLabel(
     id = row.key.deviceId,
-    name = entry?.displayName ?: row.device.name,
-    pennantName = entry?.label ?: row.device.name,
+    name = (entry?.displayName ?: row.device.name).resolve(),
+    pennantName = entry?.label ?: row.deviceName,
     health = health,
   )
 }
@@ -156,7 +169,7 @@ internal fun TaskHeader(
       }
       KetchIconButton(
         icon = KetchIcon.Close,
-        contentDescription = "Close inspector",
+        contentDescription = stringResource(Res.string.inspector_close),
         onClick = onClose,
         size = KetchButtonSize.Small,
       )
@@ -222,7 +235,11 @@ private fun TaskName(name: String, onCopy: () -> Unit) {
           .focusRing(focus.visible, shape, colors.focusRing)
           .clip(shape)
           .trackFocusVisibility(focus)
-          .clickable(onClickLabel = "Copy name", role = Role.Button, onClick = onCopy)
+          .clickable(
+            onClickLabel = stringResource(Res.string.inspector_copy_name),
+            role = Role.Button,
+            onClick = onCopy,
+          )
           .semantics { contentDescription = name },
       )
     }
@@ -237,15 +254,18 @@ private fun TaskName(name: String, onCopy: () -> Unit) {
 @Composable
 private fun Subline(row: TaskRow, device: DeviceLabel) {
   val spacing = KetchTheme.spacing
-  val text = listOfNotNull(row.sizeBytes?.let(::formatSize), row.sourceHost).joinToString(" · ")
+  val text = listOfNotNull(
+    row.sizeBytes?.let(::compactSizeText),
+    row.sourceHost?.let(::verbatim),
+  ).joinText()
   FlowRow(
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     verticalArrangement = Arrangement.spacedBy(spacing.s0_5),
     itemVerticalAlignment = Alignment.CenterVertically,
   ) {
-    if (text.isNotEmpty()) {
+    if (!text.isEmpty()) {
       Text(
-        text = text,
+        text = text.resolve(),
         style = KetchTheme.typography.caption,
         color = KetchTheme.colors.textSecondary,
         maxLines = 1,
@@ -290,15 +310,14 @@ internal fun DeviceName(
  * between parts.
  */
 @Composable
-private fun MetricLine(parts: List<String>) {
+private fun MetricLine(parts: List<MetricPart>) {
   val colors = KetchTheme.colors
+  val texts = parts.map { it.text.resolve() }
   val text = buildAnnotatedString {
     parts.forEachIndexed { index, part ->
       if (index > 0) append(" · ")
-      val strong = part.endsWith("%") || part.endsWith("/s")
-      withStyle(SpanStyle(color = if (strong) colors.textPrimary else colors.textSecondary)) {
-        append(keepPartsTogether(part))
-      }
+      val color = if (part.strong) colors.textPrimary else colors.textSecondary
+      withStyle(SpanStyle(color = color)) { append(keepPartsTogether(texts[index])) }
     }
   }
   Text(text = text, style = KetchTheme.typography.numeral, color = colors.textTertiary)
@@ -317,7 +336,7 @@ private fun ReasonLine(row: TaskRow, reason: InspectorReason, onReason: (ReasonA
   ) {
     KetchIconImage(icon = reasonIcon(row, reason), size = spacing.s4, tint = tint)
     Text(
-      text = reason.text,
+      text = reason.text.resolve(),
       style = KetchTheme.typography.labelS,
       color = if (reason.warning) colors.status.paused.color else colors.textSecondary,
       maxLines = 2,
@@ -327,7 +346,7 @@ private fun ReasonLine(row: TaskRow, reason: InspectorReason, onReason: (ReasonA
     val action = reason.action
     if (action != null) {
       KetchButton(
-        text = action.label,
+        text = action.label.resolve(),
         onClick = { onReason(action) },
         variant = KetchButtonVariant.Secondary,
         size = KetchButtonSize.Small,
@@ -376,7 +395,7 @@ internal fun ActionBar(
   ) {
     if (row.state is DownloadState.Completed && remote) {
       Text(
-        text = row.content.detail,
+        text = row.content.detail.resolve(),
         style = KetchTheme.typography.labelS,
         color = colors.textSecondary,
         modifier = Modifier.padding(end = spacing.s1),
@@ -384,7 +403,7 @@ internal fun ActionBar(
     }
     buttons.forEachIndexed { index, action ->
       KetchButton(
-        text = rowActionLabel(action, files?.revealLabel),
+        text = rowActionLabel(action, files?.revealLabel).resolve(),
         onClick = { runner.run(action, listOf(row)) },
         variant = if (index == 0 && action != RowAction.Pause) {
           KetchButtonVariant.Primary
@@ -400,8 +419,14 @@ internal fun ActionBar(
       !remote && row.state is DownloadState.Completed
     ) {
       KetchButton(
-        text = "Share",
-        onClick = { state.runTaskCommand(row.task, "share ${row.name}") { files.share(path) } },
+        text = stringResource(Res.string.inspector_share),
+        onClick = {
+          state.runTaskCommand(
+            task = row.task,
+            pendingKey = "share ${row.name}",
+            failure = { device -> Res.string.inspector_share_failed.text(row.name, device) },
+          ) { files.share(path) }
+        },
         variant = KetchButtonVariant.Secondary,
         leadingIcon = KetchIcon.Open,
       )
@@ -446,15 +471,16 @@ private val InControls = setOf(
 private fun SendToButton(row: TaskRow, runner: RowActionRunner, instances: List<InstanceEntry>) {
   var open by remember { mutableStateOf(false) }
   Box {
+    val label = RowAction.SendTo.label.resolve()
     KetchButton(
-      text = "Send to",
+      text = label,
       onClick = { open = true },
       variant = KetchButtonVariant.Secondary,
       leadingIcon = KetchIcon.Devices,
     )
     val mode = rememberSendMode()
     val presence by runner.state.instanceManager.presence.collectAsState()
-    KetchMenu(expanded = open, onDismissRequest = { open = false }, title = "Send to") {
+    KetchMenu(expanded = open, onDismissRequest = { open = false }, title = label) {
       sendEntries(listOf(row), runner, sendTargets(instances, listOf(row), presence), mode)
     }
   }
@@ -478,13 +504,13 @@ private fun MoreButton(
   Box {
     KetchIconButton(
       icon = KetchIcon.More,
-      contentDescription = "More actions",
+      contentDescription = stringResource(Res.string.inspector_more_actions),
       onClick = { open = true },
     )
     KetchMenu(expanded = open, onDismissRequest = { open = false }, title = row.name) {
       if (runner.isFileMissing(row)) {
         item(
-          label = "File moved or deleted",
+          label = Res.string.inspector_file_missing.text(),
           onClick = {},
           icon = KetchIcon.Warning,
           enabled = false,

@@ -22,17 +22,27 @@ import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.deviceNameOrNull
 import com.linroid.ketch.app.platform.isMobilePlatform
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IncomingDownload
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.util.PairingLink
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_connect
+import ketch.app.shared.generated.resources.connect_not_now
+import ketch.app.shared.generated.resources.connect_pairing_has_code
+import ketch.app.shared.generated.resources.connect_pairing_known
+import ketch.app.shared.generated.resources.connect_pairing_known_code
+import ketch.app.shared.generated.resources.connect_pairing_new
+import ketch.app.shared.generated.resources.connect_pairing_title
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Asks before connecting to the device a pairing link opened from outside the app names, such
@@ -88,25 +98,29 @@ internal fun PairingDialog(
   val type = KetchTheme.typography
   val spacing = KetchTheme.spacing
   val name = deviceNameOrNull(link.name) ?: known?.remoteConfig?.name ?: link.host
-  val noun = localDeviceNoun().replaceFirstChar { it.lowercase() }
+  val noun = localDeviceNounInSentence().resolve()
   AdaptiveModal(
     onDismissRequest = onDismiss,
     dismissible = !form.connecting,
     contentSpacing = spacing.s4,
-    title = { Text("Connect to $name?") },
+    title = { Text(stringResource(Res.string.connect_pairing_title, name)) },
     confirmButton = {
       val focus = remember { FocusRequester() }
       // Return connects on desktop, as in a system dialog.
       LaunchedEffect(Unit) { if (!isMobilePlatform) focus.requestFocus() }
       KetchButton(
-        text = "Connect",
+        text = stringResource(Res.string.action_connect),
         onClick = { onSubmit(true) },
         loading = form.connecting,
         modifier = Modifier.focusRequester(focus),
       )
     },
     dismissButton = {
-      KetchButton(text = "Not now", onClick = onDismiss, variant = KetchButtonVariant.Secondary)
+      KetchButton(
+        text = stringResource(Res.string.connect_not_now),
+        onClick = onDismiss,
+        variant = KetchButtonVariant.Secondary,
+      )
     },
   ) {
     Row(
@@ -137,9 +151,9 @@ internal fun PairingDialog(
     }
     Text(
       text = when {
-        known == null -> "You'll see its downloads here and can add new ones to it from $noun."
-        link.token == null -> "You've added $name already. Connecting shows it."
-        else -> "You've added $name already. Connecting shows it and gives it this link's code."
+        known == null -> stringResource(Res.string.connect_pairing_new, noun)
+        link.token == null -> stringResource(Res.string.connect_pairing_known, name)
+        else -> stringResource(Res.string.connect_pairing_known_code, name)
       },
       style = type.bodyS,
       color = colors.textSecondary,
@@ -155,7 +169,7 @@ internal fun PairingDialog(
           tint = colors.status.completed.color,
         )
         Text(
-          text = "The link includes its access code.",
+          text = stringResource(Res.string.connect_pairing_has_code),
           style = type.caption,
           color = colors.textSecondary,
         )

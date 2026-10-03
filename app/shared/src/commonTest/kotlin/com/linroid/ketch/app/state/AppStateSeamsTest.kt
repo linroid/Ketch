@@ -9,6 +9,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.ActivityEvent
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.platform.DroppedFile
@@ -204,8 +205,8 @@ class AppStateSeamsTest {
     )
 
     val message = state.messages.active.value.single()
-    assertEquals("Download failed", message.title)
-    assertEquals("q3-report.pdf: Access denied (403)", toastDetail(message))
+    assertEquals("Download failed", message.title.load())
+    assertEquals("q3-report.pdf: Access denied (403)", toastDetail(message).load())
   }
 
   @Test
@@ -215,7 +216,7 @@ class AppStateSeamsTest {
 
     state.report(ActivityEvent.Added(key, DownloadRequest(url = "https://example.com/a.iso")))
 
-    assertEquals(listOf("Added a.iso"), state.messages.history.value.map { it.title })
+    assertEquals(listOf("Added a.iso"), state.messages.history.value.map { it.title }.load())
   }
 
   @Test

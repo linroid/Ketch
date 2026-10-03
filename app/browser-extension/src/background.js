@@ -5,8 +5,9 @@
  */
 
 import { ext } from './lib/ext.js';
-import { failureHint, nameFromUrl, taskName } from './lib/format.js';
+import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
+import { t } from './lib/i18n.js';
 import { captureDecision } from './lib/intercept.js';
 import { fileNameFromPath, isSupportedLinkUrl } from './lib/request.js';
 import { findInstance, loadSettings, onSettingsChanged, saveSettings } from './lib/settings.js';
@@ -15,10 +16,10 @@ import { findInstance, loadSettings, onSettingsChanged, saveSettings } from './l
 const CAPTURE_TIMEOUT_MS = 6_000;
 
 const MENUS = [
-  { kind: 'link', contexts: ['link'], title: 'Download link with Ketch' },
-  { kind: 'image', contexts: ['image'], title: 'Download image with Ketch' },
-  { kind: 'video', contexts: ['video'], title: 'Download video with Ketch' },
-  { kind: 'audio', contexts: ['audio'], title: 'Download audio with Ketch' },
+  { kind: 'link', contexts: ['link'], title: t('menu_download_link') },
+  { kind: 'image', contexts: ['image'], title: t('menu_download_image') },
+  { kind: 'video', contexts: ['video'], title: t('menu_download_video') },
+  { kind: 'audio', contexts: ['audio'], title: t('menu_download_audio') },
 ];
 
 ext.runtime.onInstalled.addListener(async ({ reason }) => {
@@ -108,7 +109,7 @@ async function captureDownload(item, gate) {
     }, settings, { timeoutMs: CAPTURE_TIMEOUT_MS });
   } catch (error) {
     await release();
-    notifyFailure('Downloading in the browser instead', instance, error);
+    notifyFailure(t('notify_fallback_browser'), instance, error);
     return;
   }
   await removeBrowserDownload(item.id);
@@ -134,7 +135,7 @@ async function handleMagnet(url) {
     notifySent(settings, instance, taskName(task));
     return { handled: true };
   } catch (error) {
-    notifyFailure('Opening the magnet link in another app', instance, error);
+    notifyFailure(t('notify_fallback_magnet'), instance, error);
     return { handled: false };
   }
 }
@@ -146,9 +147,9 @@ async function handleMenuClick(info, tab) {
   const instance = findInstance(settings, target.instanceId);
   const url = target.kind === 'link' ? info.linkUrl : info.srcUrl;
   if (!url || !isSupportedLinkUrl(url)) {
-    notify("Ketch can't download this", url?.startsWith('blob:')
-      ? 'The page streams this media itself, so there is no link to download.'
-      : 'Only http, https, ftp and magnet links can be sent to Ketch.');
+    notify(t('notify_unsupported'), url?.startsWith('blob:')
+      ? t('notify_unsupported_stream')
+      : t('notify_unsupported_scheme'));
     return;
   }
   try {
@@ -159,7 +160,7 @@ async function handleMenuClick(info, tab) {
     }, settings);
     notifySent(settings, instance, taskName(task) || nameFromUrl(url));
   } catch (error) {
-    notifyFailure(`Couldn't send to ${instance.name}`, instance, error);
+    notifyFailure(t('notify_send_failed', instance.name), instance, error);
   }
 }
 
@@ -185,7 +186,7 @@ function rebuildMenus(settings) {
         await createMenu({
           id: `${menu.kind}:${instance.id}`,
           parentId: menu.kind,
-          title: isDefault ? `${instance.name} (default)` : instance.name,
+          title: isDefault ? t('instance_name_default', instance.name) : instance.name,
           contexts: menu.contexts,
         });
       }
@@ -214,14 +215,15 @@ function parseMenuId(menuId) {
 
 function notifySent(settings, instance, name) {
   if (!settings.notifications) return;
-  const where = settings.instances.length > 1 ? `Sent to ${instance.name}` : 'Sent to Ketch';
-  notify(where, name || 'Download added');
+  const where = settings.instances.length > 1
+    ? t('notify_sent_to', instance.name)
+    : t('notify_sent_to_ketch');
+  notify(where, name || t('notify_download_added'));
 }
 
 function notifyFailure(title, instance, error) {
   const message = String(error?.message ?? error).replace(/\.$/, '');
-  const hint = failureHint(error, instance);
-  notify(title, hint ? `${message}. ${hint}` : message);
+  notify(title, withHint(message, failureHint(error, instance)));
 }
 
 function notify(title, message) {

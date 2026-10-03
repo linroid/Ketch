@@ -1,6 +1,8 @@
 package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
@@ -60,8 +62,8 @@ data class RemoteInstance(
  * Name the app shows for this device: [localDeviceNoun] ("This Mac") for the embedded one, else
  * [InstanceEntry.label].
  */
-val InstanceEntry.displayName: String
-  get() = if (this is EmbeddedInstance) localDeviceNoun() else label
+val InstanceEntry.displayName: UiText
+  get() = if (this is EmbeddedInstance) localDeviceNoun() else verbatim(label)
 
 /**
  * Secondary text under [displayName]: the host name of the embedded device, else `host:port`.

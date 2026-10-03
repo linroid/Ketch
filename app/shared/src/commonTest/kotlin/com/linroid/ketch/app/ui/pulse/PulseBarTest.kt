@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppSettingsController
@@ -66,9 +67,9 @@ class PulseBarTest {
 
     val pulse = state.pulse.state.value.counts
     StatusFilter.entries.forEach { filter ->
-      assertEquals(tabs[filter], pulse.count(filter), "tab ${filter.label}")
+      assertEquals(tabs[filter], pulse.count(filter), "tab $filter")
     }
     val parts = countParts(pulse, state.pulse.state.value.failures)
-    assertEquals(listOf("1↓", "2 waiting", "2 failed"), parts.map { it.text })
+    assertEquals(listOf("1↓", "2 waiting", "2 failed"), parts.map { it.text }.load())
   }
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ketch extension settings</title>
+  <title data-i18n="options_title">Ketch extension settings</title>
   <link rel="stylesheet" href="../ui/common.css">
   <link rel="stylesheet" href="options.css">
   <script type="module" src="options.js"></script>
@@ -14,98 +14,109 @@
       <img src="../icons/icon-48.png" alt="" width="40" height="40">
       <div>
         <h1>Ketch</h1>
-        <p class="muted">Send downloads from this browser to Ketch on this computer or a remote
-          server.</p>
+        <p class="muted" data-i18n="options_intro">Send downloads from this browser to Ketch on
+          this computer or a remote server.</p>
       </div>
-      <span id="saved" class="saved muted" role="status" hidden>Saved</span>
+      <span id="saved" class="saved muted" role="status" data-i18n="options_saved"
+            hidden>Saved</span>
     </header>
 
     <div id="permission-banner" class="banner" hidden>
-      <p>Ketch needs access to websites to capture their downloads, send their cookies, and
-        reach your Ketch servers.</p>
-      <button id="grant-access" class="primary" type="button">Allow access</button>
+      <p data-i18n="options_permission">Ketch needs access to websites to capture their
+        downloads, send their cookies, and reach your Ketch servers.</p>
+      <button id="grant-access" class="primary" type="button"
+              data-i18n="options_allow_access">Allow access</button>
     </div>
 
     <section>
-      <h2>Ketch instances</h2>
-      <p class="muted">Captured downloads and magnet links go to the default instance. Right-click
-        a link, image or video to send it to any of them.</p>
+      <h2 data-i18n="options_instances">Ketch instances</h2>
+      <p class="muted" data-i18n="options_instances_detail">Captured downloads and magnet links go
+        to the default instance. Right-click a link, image or video to send it to any of them.</p>
       <div id="instances" class="instances"></div>
       <div class="add-buttons">
-        <button id="add-app" type="button" hidden>Add Ketch on this computer</button>
-        <button id="add-server" type="button">Add server</button>
+        <button id="add-app" type="button" data-i18n="options_add_app" hidden>Add Ketch on this
+          computer</button>
+        <button id="add-server" type="button" data-i18n="options_add_server">Add server</button>
       </div>
     </section>
 
     <section>
-      <h2>Browser downloads</h2>
+      <h2 data-i18n="options_browser_downloads">Browser downloads</h2>
       <label class="row">
-        <span class="row-text">Capture downloads
-          <small class="muted">Downloads you start in the browser go to Ketch instead. If Ketch
-            can't be reached, the browser downloads them as usual.</small>
+        <span class="row-text"><span data-i18n="options_capture">Capture downloads</span>
+          <small class="muted" data-i18n="options_capture_detail">Downloads you start in the
+            browser go to Ketch instead. If Ketch can't be reached, the browser downloads them as
+            usual.</small>
         </span>
         <input id="intercept-downloads" class="switch" type="checkbox" role="switch">
       </label>
       <label class="row">
-        <span class="row-text">Leave small files to the browser
-          <small class="muted">Files smaller than this stay in the browser. Files of unknown size
-            always go to Ketch. 0 sends everything.</small>
+        <span class="row-text"><span data-i18n="options_min_size">Leave small files to the
+          browser</span>
+          <small class="muted" data-i18n="options_min_size_detail">Files smaller than this stay in
+            the browser. Files of unknown size always go to Ketch. 0 sends everything.</small>
         </span>
         <span class="size-field">
           <input id="min-file-size" type="number" min="0" step="1" inputmode="decimal">
-          <span class="muted">MB</span>
+          <span class="muted" data-i18n="options_min_size_unit">MB</span>
         </span>
       </label>
       <label class="row stacked">
-        <span class="row-text">Sites to leave to the browser
-          <small class="muted">One per line. Includes their subdomains, so example.com also
-            covers downloads.example.com.</small>
+        <span class="row-text"><span data-i18n="options_excluded">Sites to leave to the
+          browser</span>
+          <small class="muted" data-i18n="options_excluded_detail">One per line. Includes their
+            subdomains, so example.com also covers downloads.example.com.</small>
         </span>
         <textarea id="excluded-hosts" rows="3" spellcheck="false"
                   placeholder="example.com"></textarea>
       </label>
       <label class="row">
-        <span class="row-text">Send cookies and referrer
-          <small class="muted">Lets Ketch download files that need you to be signed in. Ketch
-            stores them with the task so it can resume it later.</small>
+        <span class="row-text"><span data-i18n="options_cookies">Send cookies and referrer</span>
+          <small class="muted" data-i18n="options_cookies_detail">Lets Ketch download files that
+            need you to be signed in. Ketch stores them with the task so it can resume it
+            later.</small>
         </span>
         <input id="forward-cookies" class="switch" type="checkbox" role="switch">
       </label>
     </section>
 
     <section>
-      <h2>Links and notifications</h2>
+      <h2 data-i18n="options_links_notifications">Links and notifications</h2>
       <label class="row">
-        <span class="row-text">Send clicked magnet links to Ketch
-          <small class="muted">Alt+click a magnet link to open it in another app instead.</small>
+        <span class="row-text"><span data-i18n="options_magnet">Send clicked magnet links to
+          Ketch</span>
+          <small class="muted" data-i18n="options_magnet_detail">Alt+click a magnet link to open
+            it in another app instead.</small>
         </span>
         <input id="capture-magnet-links" class="switch" type="checkbox" role="switch">
       </label>
       <label class="row">
-        <span class="row-text">Notify when a download is sent
-          <small class="muted">Problems are always shown.</small>
+        <span class="row-text"><span data-i18n="options_notify">Notify when a download is
+          sent</span>
+          <small class="muted" data-i18n="options_notify_detail">Problems are always
+            shown.</small>
         </span>
         <input id="notifications" class="switch" type="checkbox" role="switch">
       </label>
     </section>
 
     <section class="help">
-      <h2>Setting up Ketch</h2>
+      <h2 data-i18n="options_help">Setting up Ketch</h2>
       <dl>
-        <dt>On this computer</dt>
-        <dd>Install the Ketch desktop app and open it once, so your browsers can find it. After
-          that, the extension opens Ketch whenever a download needs it; there is no server to
-          turn on or token to copy.</dd>
-        <dt>On another device</dt>
-        <dd>On that device, open Settings → Remote access, turn on <b>Server</b> and <b>Allow
-          other devices</b>, then generate an access token. Add the device here with
-          <b>Add server</b>, its address, such as <code>http://192.168.1.20:8642</code>, and the
-          token. For <code>ketch server</code>, set <code>apiToken</code> in its
-          config.toml.</dd>
-        <dt>Command line or sandboxed browsers</dt>
-        <dd>To use <code>ketch server</code> on this computer, or from a browser installed as a
-          Flatpak or Snap, which can't start other apps, add it as a server at
-          <code>http://127.0.0.1:8642</code>.</dd>
+        <dt data-i18n="options_help_this_computer">On this computer</dt>
+        <dd data-i18n="options_help_this_computer_detail">Install the Ketch desktop app and open
+          it once, so your browsers can find it. After that, the extension opens Ketch whenever a
+          download needs it; there is no server to turn on or token to copy.</dd>
+        <dt data-i18n="options_help_other_device">On another device</dt>
+        <dd data-i18n-markup="options_help_other_device_detail">On that device, open Settings →
+          Remote access, turn on <b>Server</b> and <b>Allow other devices</b>, then generate an
+          access token. Add the device here with <b>Add server</b>, its address, such as
+          <code>http://192.168.1.20:8642</code>, and the token. For <code>ketch server</code>, set
+          <code>apiToken</code> in its config.toml.</dd>
+        <dt data-i18n="options_help_command_line">Command line or sandboxed browsers</dt>
+        <dd data-i18n-markup="options_help_command_line_detail">To use <code>ketch server</code>
+          on this computer, or from a browser installed as a Flatpak or Snap, which can't start
+          other apps, add it as a server at <code>http://127.0.0.1:8642</code>.</dd>
       </dl>
     </section>
   </main>
@@ -114,17 +125,20 @@
     <article class="instance">
       <div class="instance-head">
         <span class="status-dot"></span>
-        <input class="instance-name" type="text" aria-label="Name" placeholder="This computer">
+        <input class="instance-name" type="text" aria-label="Name" placeholder="This computer"
+               data-i18n-aria-label="instance_name"
+               data-i18n-placeholder="instance_this_computer">
         <label class="default-choice">
-          <input type="radio" name="default-instance"> Default
+          <input type="radio" name="default-instance">
+          <span data-i18n="instance_default">Default</span>
         </label>
       </div>
-      <p class="instance-kind muted">The Ketch app on this computer. The extension opens it when
-        a download needs it.</p>
+      <p class="instance-kind muted" data-i18n="instance_app_detail">The Ketch app on this
+        computer. The extension opens it when a download needs it.</p>
       <p class="instance-status muted"></p>
       <div class="instance-actions">
-        <button class="test" type="button">Test connection</button>
-        <button class="remove danger" type="button">Remove</button>
+        <button class="test" type="button" data-i18n="instance_test">Test connection</button>
+        <button class="remove danger" type="button" data-i18n="instance_remove">Remove</button>
       </div>
     </article>
   </template>
@@ -133,28 +147,30 @@
     <article class="instance">
       <div class="instance-head">
         <span class="status-dot"></span>
-        <input class="instance-name" type="text" aria-label="Name" placeholder="Name">
+        <input class="instance-name" type="text" aria-label="Name" placeholder="Name"
+               data-i18n-aria-label="instance_name" data-i18n-placeholder="instance_name">
         <label class="default-choice">
-          <input type="radio" name="default-instance"> Default
+          <input type="radio" name="default-instance">
+          <span data-i18n="instance_default">Default</span>
         </label>
       </div>
       <div class="fields">
-        <label>Address
+        <label><span data-i18n="instance_address">Address</span>
           <input class="instance-url" type="text" placeholder="http://192.168.1.20:8642"
                  spellcheck="false" autocomplete="off">
         </label>
-        <label>Access token
+        <label><span data-i18n="instance_token">Access token</span>
           <input class="instance-token" type="password" placeholder="Not required"
-                 autocomplete="off">
+                 autocomplete="off" data-i18n-placeholder="instance_token_placeholder">
         </label>
       </div>
       <p class="instance-status muted"></p>
-      <p class="instance-note" hidden>This address isn't encrypted: the access token and any
-        cookies sent with downloads travel over the network in plain text. Prefer https, or use it
-        only on a network you trust.</p>
+      <p class="instance-note" data-i18n="instance_insecure" hidden>This address isn't encrypted:
+        the access token and any cookies sent with downloads travel over the network in plain
+        text. Prefer https, or use it only on a network you trust.</p>
       <div class="instance-actions">
-        <button class="test" type="button">Test connection</button>
-        <button class="remove danger" type="button">Remove</button>
+        <button class="test" type="button" data-i18n="instance_test">Test connection</button>
+        <button class="remove danger" type="button" data-i18n="instance_remove">Remove</button>
       </div>
     </article>
   </template>

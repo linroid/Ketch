@@ -1,4 +1,5 @@
 import { ext } from './ext.js';
+import { t } from './i18n.js';
 
 /** Port the Ketch app and `ketch server` listen on unless configured otherwise. */
 export const DEFAULT_PORT = 8642;
@@ -37,12 +38,17 @@ export const MAGNET_CAPTURE_KEY = 'captureMagnetLinks';
  * @property {boolean} notifications notify when a download is sent or falls back
  */
 
-/** Name of the Ketch app instance unless the user renames it. */
-const LOCAL_INSTANCE_NAME = 'This computer';
+/**
+ * Name of the Ketch app instance unless the user renames it. It is saved with the instance, in
+ * the language the browser had then.
+ */
+function localInstanceName() {
+  return t('instance_this_computer');
+}
 
 /** @returns {Instance} the Ketch app on this computer */
 export function localInstance() {
-  return { id: LOCAL_INSTANCE_ID, type: 'app', name: LOCAL_INSTANCE_NAME };
+  return { id: LOCAL_INSTANCE_ID, type: 'app', name: localInstanceName() };
 }
 
 /** @returns {Settings} */
@@ -71,19 +77,19 @@ export function defaultSettings() {
  */
 export function normalizeServerUrl(input) {
   const trimmed = String(input ?? '').trim();
-  if (!trimmed) throw new Error('Enter the address of a Ketch server');
+  if (!trimmed) throw new Error(t('error_address_required'));
   const hasScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed);
   let url;
   try {
     url = new URL(hasScheme ? trimmed : `http://${trimmed}`);
   } catch {
-    throw new Error(`"${trimmed}" is not a valid address`);
+    throw new Error(t('error_address_invalid', trimmed));
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('The address must start with http:// or https://');
+    throw new Error(t('error_address_scheme'));
   }
   if (url.username || url.password) {
-    throw new Error('Put the access token in the token field, not in the address');
+    throw new Error(t('error_address_credentials'));
   }
   if (!hasScheme && !url.port) url.port = String(DEFAULT_PORT);
   return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
@@ -170,7 +176,7 @@ function normalizeInstance(candidate) {
   const type = candidate.type === 'app' || (candidate.type !== 'server' && !candidate.url)
     ? 'app'
     : 'server';
-  if (type === 'app') return { id, type, name: name || LOCAL_INSTANCE_NAME };
+  if (type === 'app') return { id, type, name: name || localInstanceName() };
   let url;
   try {
     url = normalizeServerUrl(candidate.url);

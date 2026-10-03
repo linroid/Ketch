@@ -10,6 +10,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppSettingsController
@@ -200,6 +201,6 @@ class SpeedSettingsModelTest {
 
     assertEquals(SpeedLimitMode.Full, fixture.speedMode.settings.value.mode)
     val error = fixture.state.messages.active.value.single { it.level == MessageLevel.Error }
-    assertTrue(error.title.contains("Slow lane"), error.title)
+    assertTrue(error.title.load().contains("Slow lane"), error.title.load())
   }
 }

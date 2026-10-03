@@ -5,7 +5,10 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -16,46 +19,47 @@ class RemoveTasksDialogTest {
   private val gib = 1L shl 30
   private val mib = 1L shl 20
   private val file = RemovalItem("ubuntu.iso", hasFile = true, bytes = 2 * gib, trashable = true)
+  private val mac = verbatim("This Mac")
 
   @Test
-  fun removeDialogCopy_unchecked_offersAPlainRemove() {
-    val copy = removeDialogCopy(RemovalPlan(listOf(file), trash = true), "This Mac", false)
+  fun removeDialogCopy_unchecked_offersAPlainRemove() = runTest {
+    val copy = removeDialogCopy(RemovalPlan(listOf(file), trash = true), mac, false)
 
-    assertEquals("Remove “ubuntu.iso”?", copy.title)
-    assertEquals("From the list on This Mac.", copy.subtitle)
-    assertEquals("Also move the file to the Trash · 2.00 GB", copy.checkbox)
+    assertEquals("Remove “ubuntu.iso”?", copy.title.load())
+    assertEquals("From the list on This Mac.", copy.subtitle.load())
+    assertEquals("Also move the file to the Trash · 2.00 GB", copy.checkbox.load())
     assertNull(copy.note)
-    assertEquals("Remove", copy.confirm)
+    assertEquals("Remove", copy.confirm.load())
     assertFalse(copy.danger)
   }
 
   @Test
-  fun removeDialogCopy_checkedWithTrash_trashesWithADangerButton() {
-    val copy = removeDialogCopy(RemovalPlan(listOf(file), trash = true), "This Mac", true)
+  fun removeDialogCopy_checkedWithTrash_trashesWithADangerButton() = runTest {
+    val copy = removeDialogCopy(RemovalPlan(listOf(file), trash = true), mac, true)
 
-    assertEquals("Remove and trash 2.00 GB", copy.confirm)
+    assertEquals("Remove and trash 2.00 GB", copy.confirm.load())
     assertTrue(copy.danger)
     // The Trash keeps the space until it is emptied.
     assertNull(copy.note)
   }
 
   @Test
-  fun removeDialogCopy_checkedWithoutTrash_deletesPermanentlyAndSaysWhatItFrees() {
+  fun removeDialogCopy_checkedWithoutTrash_deletesPermanentlyAndSaysWhatItFrees() = runTest {
     val copy = removeDialogCopy(
       plan = RemovalPlan(listOf(file), trash = false),
-      deviceName = "NAS",
+      deviceName = verbatim("NAS"),
       checked = true,
       freeBytes = 48 * gib,
     )
 
-    assertEquals("Also delete the file permanently · 2.00 GB", copy.checkbox)
-    assertEquals("Frees 2.00 GB · 48.00 GB free on NAS", copy.note)
-    assertEquals("Remove and delete 2.00 GB", copy.confirm)
+    assertEquals("Also delete the file permanently · 2.00 GB", copy.checkbox.load())
+    assertEquals("Frees 2.00 GB · 48.00 GB free on NAS", copy.note.load())
+    assertEquals("Remove and delete 2.00 GB", copy.confirm.load())
     assertTrue(copy.danger)
   }
 
   @Test
-  fun removeDialogCopy_partialFile_namesHowMuchOfItExists() {
+  fun removeDialogCopy_partialFile_namesHowMuchOfItExists() = runTest {
     val partial = RemovalItem(
       name = "blender.dmg",
       hasFile = true,
@@ -64,40 +68,43 @@ class RemoveTasksDialogTest {
       partial = true,
     )
 
-    val copy = removeDialogCopy(RemovalPlan(listOf(partial), trash = false), "This Mac", true)
+    val copy = removeDialogCopy(RemovalPlan(listOf(partial), trash = false), mac, true)
 
-    assertEquals("Also delete the partial file permanently · 812.0 MB of 2.00 GB", copy.checkbox)
-    assertEquals("Remove and delete 812.0 MB", copy.confirm)
+    assertEquals(
+      "Also delete the partial file permanently · 812.0 MB of 2.00 GB",
+      copy.checkbox.load(),
+    )
+    assertEquals("Remove and delete 812.0 MB", copy.confirm.load())
   }
 
   @Test
-  fun removeDialogCopy_multiFileTorrent_countsItsFiles() {
+  fun removeDialogCopy_multiFileTorrent_countsItsFiles() = runTest {
     val torrent = RemovalItem("archlinux", hasFile = true, bytes = 3 * gib, fileCount = 14)
 
-    val copy = removeDialogCopy(RemovalPlan(listOf(torrent), trash = false), "This Mac", false)
+    val copy = removeDialogCopy(RemovalPlan(listOf(torrent), trash = false), mac, false)
 
-    assertEquals("Also delete all 14 files permanently · 3.00 GB", copy.checkbox)
+    assertEquals("Also delete all 14 files permanently · 3.00 GB", copy.checkbox.load())
   }
 
   @Test
-  fun removeDialogCopy_severalDownloads_sumsTheirFiles() {
+  fun removeDialogCopy_severalDownloads_sumsTheirFiles() = runTest {
     val items = listOf(file, file.copy(name = "debian.iso"), RemovalItem("q.pdf", hasFile = false))
 
-    val copy = removeDialogCopy(RemovalPlan(items, trash = true), "This Mac", true)
+    val copy = removeDialogCopy(RemovalPlan(items, trash = true), mac, true)
 
-    assertEquals("Remove 3 downloads?", copy.title)
-    assertEquals("Also move the files to the Trash · 4.00 GB", copy.checkbox)
-    assertEquals("Remove and trash 4.00 GB", copy.confirm)
+    assertEquals("Remove 3 downloads?", copy.title.load())
+    assertEquals("Also move the files to the Trash · 4.00 GB", copy.checkbox.load())
+    assertEquals("Remove and trash 4.00 GB", copy.confirm.load())
   }
 
   @Test
-  fun removeDialogCopy_noFiles_hasNoBox() {
+  fun removeDialogCopy_noFiles_hasNoBox() = runTest {
     val queued = RemovalItem("q.pdf", hasFile = false)
 
-    val copy = removeDialogCopy(RemovalPlan(listOf(queued), trash = true), "This Mac", true)
+    val copy = removeDialogCopy(RemovalPlan(listOf(queued), trash = true), mac, true)
 
     assertNull(copy.checkbox)
-    assertEquals("Remove", copy.confirm)
+    assertEquals("Remove", copy.confirm.load())
     assertFalse(copy.danger)
   }
 
@@ -111,19 +118,29 @@ class RemoveTasksDialogTest {
   }
 
   @Test
-  fun removeDialogCopy_finishedAndPartialWithTrash_saysThePartialFileIsDeleted() {
+  fun removeDialogCopy_finishedAndPartialWithTrash_saysThePartialFileIsDeleted() = runTest {
     val partial = RemovalItem("b.dmg", hasFile = true, bytes = 812 * mib, partial = true)
 
     val copy = removeDialogCopy(
       plan = RemovalPlan(listOf(file, partial), trash = true),
-      deviceName = "This Mac",
+      deviceName = mac,
       checked = true,
       freeBytes = 48 * gib,
     )
 
-    assertEquals("Also move the files to the Trash · 2.79 GB", copy.checkbox)
-    assertEquals("The partial file is deleted permanently · frees 812.0 MB", copy.note)
-    assertEquals("Remove and trash 2.79 GB", copy.confirm)
+    assertEquals("Also move the files to the Trash · 2.79 GB", copy.checkbox.load())
+    assertEquals("The partial file is deleted permanently · frees 812.0 MB", copy.note.load())
+    assertEquals("Remove and trash 2.79 GB", copy.confirm.load())
+  }
+
+  @Test
+  fun removeDialogCopy_twoPartialsWithTrash_countsThem() = runTest {
+    val partial = RemovalItem("b.dmg", hasFile = true, bytes = 812 * mib, partial = true)
+    val items = listOf(file, partial, partial.copy(name = "c.dmg"))
+
+    val copy = removeDialogCopy(RemovalPlan(items, trash = true), mac, checked = true)
+
+    assertEquals("2 partial files are deleted permanently · frees 1.59 GB", copy.note.load())
   }
 
   @Test

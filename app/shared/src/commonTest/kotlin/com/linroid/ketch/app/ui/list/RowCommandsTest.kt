@@ -8,6 +8,8 @@ import com.linroid.ketch.app.components.DebouncedCommit
 import com.linroid.ketch.app.components.parseSpeedInput
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.RecordingTask
@@ -59,7 +61,7 @@ class RowCommandsTest {
     runCurrent()
 
     val error = f.errors().single()
-    assertEquals("Couldn't pause ${rowOf(task).name} on This Mac", error.title)
+    assertEquals("Couldn't pause ${rowOf(task).name} on This Mac", error.title.load())
   }
 
   @Test
@@ -84,7 +86,7 @@ class RowCommandsTest {
     assertTrue(f.controller.state.tasks.value.isEmpty())
     assertTrue(task.calls.isEmpty())
     val toast = f.controller.messages.active.value.last()
-    assertTrue(toast.actions.any { it.label == "Undo" })
+    assertTrue(toast.actions.any { it.label.load() == "Undo" })
     advanceTimeBy(7.seconds)
     runCurrent()
     assertEquals(listOf("remove deleteFiles=false"), task.calls)
@@ -108,7 +110,23 @@ class RowCommandsTest {
     runCurrent()
 
     assertEquals(listOf(task.request.url), f.clipboard.written)
-    assertEquals("Copied link", f.controller.messages.history.value.first().title)
+    assertEquals("Copied link", f.controller.messages.history.value.first().title.load())
+  }
+
+  @Test
+  fun run_copyError_putsTheErrorsTitleAndHintOnTheClipboard() = actionsTest { f ->
+    // The copy reads the error's text while virtual time runs.
+    warmStrings()
+    val task = f.api.add(DownloadState.Failed(KetchError.Http(404)))
+
+    f.commands.run(RowAction.CopyError, rowOf(task))
+    runCurrent()
+
+    assertEquals(
+      listOf("File not found (404)\nThe server no longer has this file."),
+      f.clipboard.written,
+    )
+    assertEquals("Copied error", f.controller.messages.history.value.first().title.load())
   }
 
   @Test
@@ -142,7 +160,7 @@ class RowCommandsTest {
 
       f.commands.run(RowAction.OpenSourcePage, rowOf(task))
 
-      assertEquals("Couldn't open the source page", f.errors().single().title)
+      assertEquals("Couldn't open the source page", f.errors().single().title.load())
     }
 
   @Test
@@ -189,7 +207,7 @@ class RowCommandsTest {
   fun isBusy_pauseInFlight_isBusy() {
     val row = ListFixtures.row("a", downloading)
 
-    assertTrue(RowCommands.isBusy(row, setOf(row.key to "pause ${row.name}")))
+    assertTrue(RowCommands.isBusy(row, setOf(row.key to TaskCommand.Pause.key)))
   }
 
   @Test
@@ -208,4 +226,3 @@ class RowCommandsTest {
     const val PAGE = "https://example.com/releases"
   }
 }
-

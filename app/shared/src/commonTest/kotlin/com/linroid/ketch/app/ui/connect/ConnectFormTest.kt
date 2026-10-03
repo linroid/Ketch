@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.connect
 
 import com.linroid.ketch.app.FakeInstanceFactory
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -34,7 +35,7 @@ class ConnectFormTest {
   }
 
   @Test
-  fun target_pairingLink_carriesAddressCodeAndName() {
+  fun target_pairingLink_carriesAddressCodeAndName() = runTest {
     val form = ConnectForm(pairingLink)
 
     assertEquals(
@@ -43,7 +44,7 @@ class ConnectFormTest {
     )
     assertEquals(
       "Lins-MacBook-Pro · 192.168.1.20:8642 · includes its access code",
-      form.linkSummary,
+      form.linkSummary.load(),
     )
   }
 
@@ -93,14 +94,14 @@ class ConnectFormTest {
   }
 
   @Test
-  fun port_typedWithLetters_keepsTheDigits() {
+  fun port_typedWithLetters_keepsTheDigits() = runTest {
     val form = ConnectForm()
     form.toggleManual()
 
     form.port = "86a42999"
 
     assertEquals("86429", form.port)
-    assertEquals("Use a port from 1 to 65535", form.portError)
+    assertEquals("Use a port from 1 to 65535", form.portError.load())
   }
 
   @Test
@@ -118,7 +119,10 @@ class ConnectFormTest {
     form.connect(this, connector(ConnectionState.Connected)) {}
 
     assertFalse(form.connecting)
-    assertEquals("Use a pairing link or an address such as nas.local:8642", form.linkError)
+    assertEquals(
+      "Use a pairing link or an address such as nas.local:8642",
+      form.linkError.load(),
+    )
     form.link = "nas.local"
     assertNull(form.linkError)
   }
@@ -255,8 +259,8 @@ class ConnectFormTest {
     runCurrent()
 
     assertEquals(
-      ConnectProblem.Failed("Connection lost. Check the connection and try again."),
-      form.problem,
+      "Connection lost. Check the connection and try again.",
+      (form.problem as ConnectProblem.Failed).message.load(),
     )
     assertFalse(form.connecting)
   }

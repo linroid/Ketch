@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.shell
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -68,6 +67,12 @@ import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.interactionOverlay
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.popupAppear
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -75,7 +80,7 @@ import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.LanServerDiscovery
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
@@ -87,13 +92,28 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.devices.pairDevice
-import com.linroid.ketch.app.ui.devices.shortDuration
-import com.linroid.ketch.app.ui.pulse.speedText
+import com.linroid.ketch.app.ui.devices.shortDurationText
 import com.linroid.ketch.app.ui.sidebar.PennantCluster
 import com.linroid.ketch.app.ui.sidebar.deviceShortcut
 import com.linroid.ketch.app.ui.sidebar.pennantHealth
 import com.linroid.ketch.app.ui.sidebar.pennantName
 import com.linroid.ketch.app.ui.sidebar.rememberDevices
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.shell_device_active
+import ketch.app.shared.generated.resources.shell_device_connecting_now
+import ketch.app.shared.generated.resources.shell_device_failed
+import ketch.app.shared.generated.resources.shell_device_idle
+import ketch.app.shared.generated.resources.shell_device_last_seen
+import ketch.app.shared.generated.resources.shell_device_needs_new_token
+import ketch.app.shared.generated.resources.shell_device_not_connected
+import ketch.app.shared.generated.resources.shell_device_offline
+import ketch.app.shared.generated.resources.shell_device_slow_lane
+import ketch.app.shared.generated.resources.shell_device_waiting
+import ketch.app.shared.generated.resources.shell_devices_online
+import ketch.app.shared.generated.resources.shell_devices_speed
+import ketch.app.shared.generated.resources.switcher_add_device
+import ketch.app.shared.generated.resources.switcher_find_on_network
+import ketch.app.shared.generated.resources.switcher_share
 import kotlin.time.Instant
 
 /**
@@ -117,7 +137,7 @@ internal sealed interface SwitcherEntry {
 
   /** A way to add or share a device. */
   data class Action(
-    val label: String,
+    val label: UiText,
     val icon: KetchIcon,
     override val run: () -> Unit,
   ) : SwitcherEntry
@@ -159,14 +179,18 @@ internal fun rememberDeviceActions(
   val instances by state.instances.collectAsState()
   val shares = share && state.instanceManager.isLocalServerSupported &&
     instances.any { it is EmbeddedInstance }
-  val noun = localDeviceNoun().replaceFirstChar { it.lowercase() }
-  return remember(state, canSearch, shares, noun) {
+  return remember(state, canSearch, shares) {
     listOfNotNull(
-      SwitcherEntry.Action("Add device…", KetchIcon.Plus) { state.addDevice() },
-      SwitcherEntry.Action("Find on network", KetchIcon.Network) { state.findOnNetwork() }
-        .takeIf { canSearch },
-      SwitcherEntry.Action("Share $noun…", KetchIcon.QrCode) { state.pairDevice() }
-        .takeIf { shares }
+      SwitcherEntry.Action(Res.string.switcher_add_device.text(), KetchIcon.Plus) {
+        state.addDevice()
+      },
+      SwitcherEntry.Action(Res.string.switcher_find_on_network.text(), KetchIcon.Network) {
+        state.findOnNetwork()
+      }.takeIf { canSearch },
+      SwitcherEntry.Action(
+        Res.string.switcher_share.text(localDeviceNounInSentence()),
+        KetchIcon.QrCode
+      ) { state.pairDevice() }.takeIf { shares }
     )
   }
 }
@@ -331,8 +355,8 @@ internal fun ColumnScope.SwitcherRows(
     when (entry) {
       is SwitcherEntry.All -> SwitcherRow(
         leading = { PennantCluster(devices, ring = KetchTheme.colors.surfaceRaised) },
-        title = KetchCommands.AllDevices.label,
-        detail = allDevicesDetail(devices),
+        title = KetchCommands.AllDevices.label.resolve(),
+        detail = allDevicesDetail(devices).resolve(),
         current = scope == DeviceScope.All,
         shortcut = KetchCommands.AllDevices.shortcutLabel(),
         highlighted = index == highlighted,
@@ -349,9 +373,9 @@ internal fun ColumnScope.SwitcherRows(
             failures = entry.device.unseenFailures,
           )
         },
-        title = entry.device.name,
-        subtitle = entry.device.detail.takeIf { it != entry.device.name },
-        detail = switcherDetail(entry.device, now),
+        title = entry.device.name.resolve(),
+        subtitle = entry.device.detail.takeIf { entry.device.name != verbatim(it) },
+        detail = switcherDetail(entry.device, now).resolve(),
         alert = entry.device.health == DeviceHealth.Unauthorized ||
           entry.device.connected && entry.device.health is DeviceHealth.Offline,
         current = scope != DeviceScope.All && entry.device.deviceId == active?.deviceId,
@@ -471,7 +495,7 @@ private fun ActionRow(
       KetchIconImage(entry.icon, size = glyph, tint = colors.textSecondary)
     }
     Text(
-      text = entry.label,
+      text = entry.label.resolve(),
       style = KetchTheme.typography.label,
       color = colors.textPrimary,
       maxLines = 1,
@@ -557,44 +581,48 @@ private fun digitPick(event: KeyEvent, entries: List<SwitcherEntry>): SwitcherEn
  * many tasks are active or wait, and failures; or why it cannot be reached, with when it was
  * last seen.
  */
-internal fun switcherDetail(device: DevicePresence, now: Instant): String {
+internal fun switcherDetail(device: DevicePresence, now: Instant): UiText {
   val health = device.health
   return when {
-    health == DeviceHealth.Unauthorized -> "Needs a new access token"
-    !device.connected -> "Not connected"
-    health is DeviceHealth.Offline -> {
-      val seen = device.lastSeen?.let { " · last seen ${shortDuration(now - it)} ago" }.orEmpty()
-      "Offline$seen"
-    }
-    health == DeviceHealth.Connecting -> "Connecting…"
+    health == DeviceHealth.Unauthorized -> Res.string.shell_device_needs_new_token.text()
+    !device.connected -> Res.string.shell_device_not_connected.text()
+    health is DeviceHealth.Offline -> listOfNotNull(
+      Res.string.shell_device_offline.text(),
+      device.lastSeen?.let { Res.string.shell_device_last_seen.text(shortDurationText(now - it)) }
+    ).joinText()
+    health == DeviceHealth.Connecting -> Res.string.shell_device_connecting_now.text()
     else -> {
       val counts = device.counts
       listOfNotNull(
-        speedText(device.speed).toString().takeIf { counts.downloading > 0 },
-        "Slow lane".takeIf { device.speedMode.isSlowLane },
+        speedText(device.speed).takeIf { counts.downloading > 0 },
+        Res.string.shell_device_slow_lane.text().takeIf { device.speedMode.isSlowLane },
         when {
-          counts.downloading > 0 -> "${counts.downloading} active"
-          counts.waiting > 0 -> "${counts.waiting} waiting"
-          else -> "Idle"
+          counts.downloading > 0 -> Res.plurals.shell_device_active.text(counts.downloading)
+          counts.waiting > 0 -> Res.plurals.shell_device_waiting.text(counts.waiting)
+          else -> Res.string.shell_device_idle.text()
         },
-        "${device.failures} failed".takeIf { device.failures > 0 }
-      ).joinToString(" · ")
+        Res.plurals.shell_device_failed.text(device.failures).takeIf { device.failures > 0 }
+      ).joinText()
     }
   }
 }
 
 /** What the switcher says under All devices: "↓ 9.1 MB/s · 4 active", or what waits. */
-internal fun allDevicesDetail(devices: List<DevicePresence>): String {
+internal fun allDevicesDetail(devices: List<DevicePresence>): UiText {
   val online = devices.filter { it.connected && it.health.isOnline }
   val downloading = online.sumOf { it.counts.downloading }
   val waiting = online.sumOf { it.counts.waiting }
-  val reachable = "${online.size} of ${devices.size} online".takeIf { online.size < devices.size }
+  val reachable = Res.string.shell_devices_online.text(online.size, devices.size)
+    .takeIf { online.size < devices.size }
   val activity = when {
-    downloading > 0 -> "↓ ${speedText(online.sumOf { it.speed })} · $downloading active"
-    waiting > 0 -> "$waiting waiting"
-    else -> "Idle"
+    downloading > 0 -> listOf(
+      Res.string.shell_devices_speed.text(speedText(online.sumOf { it.speed })),
+      Res.plurals.shell_device_active.text(downloading)
+    ).joinText()
+    waiting > 0 -> Res.plurals.shell_device_waiting.text(waiting)
+    else -> Res.string.shell_device_idle.text()
   }
-  return listOfNotNull(activity, reachable).joinToString(" · ")
+  return listOfNotNull(activity, reachable).joinText()
 }
 
 /**

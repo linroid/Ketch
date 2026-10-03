@@ -40,6 +40,8 @@ import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.ToastMode
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchColors
@@ -48,9 +50,12 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.darkKetchColors
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.theme.lightKetchColors
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_dismiss
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -81,16 +86,16 @@ fun KetchToast(
   message: AppMessage,
   onDismiss: () -> Unit,
   modifier: Modifier = Modifier,
-  detail: String? = message.detail,
+  detail: UiText? = message.detail,
 ) {
   // A slot that shows another message starts its timer and swipe afresh.
   key(message.id) {
     KetchToast(
-      title = message.title,
+      title = message.title.resolve(),
       onDismiss = onDismiss,
       modifier = modifier,
       level = message.level,
-      detail = detail,
+      detail = detail?.resolve(),
       actions = message.actions,
       duration = toastDuration(message),
     )
@@ -197,7 +202,7 @@ fun KetchToast(
       }
     }
     actions.take(MAX_ACTIONS).forEach { action ->
-      ToastAction(action.label) {
+      ToastAction(action.label.resolve()) {
         action.onClick()
         currentDismiss()
       }
@@ -231,11 +236,12 @@ private fun ToastClose(onClick: () -> Unit) {
   val colors = KetchTheme.colors
   val interactions = remember { MutableInteractionSource() }
   val hovered by interactions.collectIsHoveredAsState()
+  val description = stringResource(Res.string.action_dismiss)
   Box(
     contentAlignment = Alignment.Center,
     modifier = Modifier
       .size(CloseTarget)
-      .semantics { contentDescription = "Dismiss" }
+      .semantics { contentDescription = description }
       .ketchClickable(interactions, onClick = onClick),
   ) {
     KetchIconImage(

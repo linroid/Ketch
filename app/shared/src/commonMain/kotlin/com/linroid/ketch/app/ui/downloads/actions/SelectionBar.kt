@@ -40,6 +40,11 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -48,9 +53,25 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.list.rowDivider
-import com.linroid.ketch.app.util.downloads
-import com.linroid.ketch.app.util.formatBytes
-import com.linroid.ketch.app.util.plural
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.bar_copy_links
+import ketch.app.shared.generated.resources.bar_copy_paths
+import ketch.app.shared.generated.resources.bar_discard
+import ketch.app.shared.generated.resources.bar_label_count
+import ketch.app.shared.generated.resources.bar_label_number
+import ketch.app.shared.generated.resources.bar_remove
+import ketch.app.shared.generated.resources.bar_speed
+import ketch.app.shared.generated.resources.bar_tooltip_counted
+import ketch.app.shared.generated.resources.bar_tooltip_partial
+import ketch.app.shared.generated.resources.bar_tooltip_remove
+import ketch.app.shared.generated.resources.batch_copy_link
+import ketch.app.shared.generated.resources.downloads_clear_selection
+import ketch.app.shared.generated.resources.downloads_more
+import ketch.app.shared.generated.resources.downloads_more_actions
+import ketch.app.shared.generated.resources.downloads_select_all
+import ketch.app.shared.generated.resources.downloads_selected
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A verb of the selection bar. Clicking it runs its action on its rows, or opens the choices of
@@ -65,7 +86,7 @@ import com.linroid.ketch.app.util.plural
 @Immutable
 internal data class BarVerb(
   val action: RowAction,
-  val label: String,
+  val label: UiText,
   val rows: List<TaskRow>,
   val counted: Boolean = false,
   val asks: Boolean = false,
@@ -77,11 +98,11 @@ internal data class BarVerb(
   val dropdown: Boolean get() = action in DropdownActions
 
   /** Its tooltip over a selection of [total] rows, such as "Pause 2 of 3 selected". */
-  fun tooltip(total: Int): String = when {
-    counted -> "$label $count of $total selected"
-    asks -> "Remove ${downloads(count)}…"
-    action == RowAction.CopyLink -> "Copy ${plural(count, "link")}"
-    count < total -> "$label · $count of $total selected"
+  fun tooltip(total: Int): UiText = when {
+    counted -> Res.string.bar_tooltip_counted.text(label, count, total)
+    asks -> Res.plurals.bar_tooltip_remove.text(count)
+    action == RowAction.CopyLink -> Res.plurals.batch_copy_link.text(count)
+    count < total -> Res.string.bar_tooltip_partial.text(label, count, total)
     else -> label
   }
 }
@@ -97,41 +118,47 @@ internal data class BarVerb(
 internal fun barVerbs(
   batch: List<BatchAction>,
   canSend: Boolean,
-  revealLabel: String? = null,
+  revealLabel: UiText? = null,
 ): Pair<List<BarVerb>, List<BarVerb>> {
   val byAction = batch.associate { it.action to it.rows }
-  fun verb(action: RowAction, label: String, counted: Boolean = false, asks: Boolean = false) =
-    byAction[action]?.let { BarVerb(action, label, it, counted, asks) }
+  fun verb(
+    action: RowAction,
+    label: UiText = action.label,
+    counted: Boolean = false,
+    asks: Boolean = false,
+  ) = byAction[action]?.let { BarVerb(action, label, it, counted, asks) }
 
   val bar = listOfNotNull(
-    verb(RowAction.Pause, "Pause", counted = true),
-    verb(RowAction.Resume, "Resume", counted = true),
-    verb(RowAction.Retry, "Retry", counted = true),
-    verb(RowAction.Priority, "Priority"),
-    verb(RowAction.SpeedLimit, "Speed"),
-    verb(RowAction.SendTo, "Send to").takeIf { canSend },
-    verb(RowAction.CopyLink, "Copy links"),
-    verb(RowAction.Remove, "Remove…", asks = true),
+    verb(RowAction.Pause, counted = true),
+    verb(RowAction.Resume, counted = true),
+    verb(RowAction.Retry, counted = true),
+    verb(RowAction.Priority),
+    verb(RowAction.SpeedLimit, Res.string.bar_speed.text()),
+    verb(RowAction.SendTo).takeIf { canSend },
+    verb(RowAction.CopyLink, Res.string.bar_copy_links.text()),
+    verb(RowAction.Remove, Res.string.bar_remove.text(), asks = true),
   )
   val more = listOfNotNull(
-    verb(RowAction.StartNow, "Start now", counted = true),
-    verb(RowAction.Open, "Open", counted = true),
-    verb(RowAction.ShowInFolder, revealLabel ?: "Show in folder", counted = true),
-    verb(RowAction.Connections, "Connections"),
-    verb(RowAction.StartLater, "Start later"),
-    verb(RowAction.CopyPath, "Copy file paths", counted = true),
-    verb(RowAction.DownloadAgain, "Download again", counted = true),
-    verb(RowAction.StopAndDiscard, "Discard progress…", counted = true),
-    verb(RowAction.Remove, "Remove from list"),
+    verb(RowAction.StartNow, counted = true),
+    verb(RowAction.Open, counted = true),
+    verb(RowAction.ShowInFolder, revealLabel ?: RowAction.ShowInFolder.label, counted = true),
+    verb(RowAction.Connections),
+    verb(RowAction.StartLater),
+    verb(RowAction.CopyPath, Res.string.bar_copy_paths.text(), counted = true),
+    verb(RowAction.DownloadAgain, counted = true),
+    verb(RowAction.StopAndDiscard, Res.string.bar_discard.text(), counted = true),
+    verb(RowAction.Remove),
   )
   return bar to more
 }
 
 /** "3 selected · 2.40 GB": how many rows are selected and their known total size. */
-internal fun selectionSummary(rows: List<TaskRow>): String {
+internal fun selectionSummary(rows: List<TaskRow>): UiText {
   val bytes = rows.sumOf { it.sizeBytes ?: 0L }
-  return listOfNotNull("${rows.size} selected", formatBytes(bytes).takeIf { bytes > 0 })
-    .joinToString(" · ")
+  return listOfNotNull(
+    Res.plurals.downloads_selected.text(rows.size),
+    sizeText(bytes).takeIf { bytes > 0 },
+  ).joinText()
 }
 
 /**
@@ -257,7 +284,7 @@ private fun SelectionLead(rows: List<TaskRow>, onClear: () -> Unit) {
       onClick = onClear,
     )
     Text(
-      text = "${rows.size} selected",
+      text = pluralStringResource(Res.plurals.downloads_selected, rows.size, rows.size),
       style = KetchTheme.typography.label,
       color = colors.textPrimary,
       maxLines = 1,
@@ -265,7 +292,7 @@ private fun SelectionLead(rows: List<TaskRow>, onClear: () -> Unit) {
     val bytes = rows.sumOf { it.sizeBytes ?: 0L }
     if (bytes > 0) {
       Text(
-        text = "· ${formatBytes(bytes)}",
+        text = "· " + sizeText(bytes).resolve(),
         style = KetchTheme.typography.numeralS,
         color = colors.textSecondary,
         maxLines = 1,
@@ -295,15 +322,16 @@ private fun VerbButton(
   Box {
     BarButton(
       icon = verb.action.icon,
-      label = verb.label,
+      label = verb.label.resolve(),
       count = verb.count.takeIf { verb.counted },
       dropdown = dropdown,
-      tooltip = verb.tooltip(selected.size),
+      tooltip = verb.tooltip(selected.size).resolve(),
       shortcut = shortcut,
       onClick = { if (dropdown) open = true else runVerb(verb, selected, runner) },
     )
     if (dropdown) {
-      KetchMenu(expanded = open, onDismissRequest = { open = false }, title = verb.label) {
+      val title = verb.label.resolve()
+      KetchMenu(expanded = open, onDismissRequest = { open = false }, title = title) {
         verbChoices(verb, runner, context)
       }
     }
@@ -323,14 +351,14 @@ private fun MoreVerbs(
   Box {
     KetchIconButton(
       icon = KetchIcon.More,
-      contentDescription = "More actions",
+      contentDescription = stringResource(Res.string.downloads_more_actions),
       onClick = { open = true },
       selected = open,
     )
     KetchMenu(
       expanded = open,
       onDismissRequest = { open = false },
-      title = "${selected.size} selected",
+      title = pluralStringResource(Res.plurals.downloads_selected, selected.size, selected.size),
     ) {
       moreEntries(verbs, selected, runner, context, onSelectAll)
     }
@@ -351,7 +379,11 @@ private fun KetchMenuScope.moreEntries(
       divider()
       destructive = true
     }
-    val label = if (verb.counted) "${verb.label} (${verb.count})" else verb.label
+    val label = if (verb.counted) {
+      Res.string.bar_label_count.text(verb.label, verb.count)
+    } else {
+      verb.label
+    }
     if (verb.dropdown) {
       submenu(label, verb.action.icon) { verbChoices(verb, runner, context) }
     } else {
@@ -497,11 +529,11 @@ private fun CompactSelectionBar(
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
       KetchIconButton(
         icon = KetchIcon.Close,
-        contentDescription = "Clear selection",
+        contentDescription = stringResource(Res.string.downloads_clear_selection),
         onClick = onClear,
       )
       Text(
-        text = selectionSummary(rows),
+        text = selectionSummary(rows).resolve(),
         style = KetchTheme.typography.bodyStrong,
         color = colors.textPrimary,
         maxLines = 1,
@@ -509,15 +541,19 @@ private fun CompactSelectionBar(
         modifier = Modifier.weight(1f).padding(start = spacing.s1),
       )
       if (onSelectAll != null) {
-        TextAction(text = "Select all", onClick = onSelectAll)
+        TextAction(text = stringResource(Res.string.downloads_select_all), onClick = onSelectAll)
       }
     }
     Row(modifier = Modifier.fillMaxWidth()) {
       for (verb in shown) {
         LabelledVerb(
           icon = verb.action.icon,
-          label = if (verb.counted) "${verb.label} ${verb.count}" else verb.label,
-          description = verb.tooltip(total),
+          label = if (verb.counted) {
+            Res.string.bar_label_number.text(verb.label, verb.count).resolve()
+          } else {
+            verb.label.resolve()
+          },
+          description = verb.tooltip(total).resolve(),
           onClick = { runVerb(verb, rows, runner) },
           modifier = Modifier.weight(1f),
         )
@@ -527,14 +563,14 @@ private fun CompactSelectionBar(
         Box(Modifier.weight(1f)) {
           LabelledVerb(
             icon = KetchIcon.More,
-            label = "More",
-            description = "More actions",
+            label = stringResource(Res.string.downloads_more),
+            description = stringResource(Res.string.downloads_more_actions),
             onClick = { open = true },
           )
           KetchMenu(
             expanded = open,
             onDismissRequest = { open = false },
-            title = "$total selected",
+            title = pluralStringResource(Res.plurals.downloads_selected, total, total),
           ) {
             moreEntries(overflow, rows, runner, context, onSelectAll = null)
           }

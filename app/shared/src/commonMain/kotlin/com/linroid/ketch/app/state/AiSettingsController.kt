@@ -3,9 +3,17 @@ package com.linroid.ketch.app.state
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.LlmProvider
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_ai_engine_failed
+import ketch.app.shared.generated.resources.settings_ai_test_connection_failed
+import ketch.app.shared.generated.resources.settings_ai_test_incomplete
+import ketch.app.shared.generated.resources.settings_ai_test_unsupported
 import kotlinx.coroutines.CancellationException
 
 /** Outcome of a "test connection" attempt on the settings page. */
@@ -13,7 +21,9 @@ sealed interface AiConnectionTest {
   data object Idle : AiConnectionTest
   data object Running : AiConnectionTest
   data class Success(val reply: String) : AiConnectionTest
-  data class Failure(val message: String) : AiConnectionTest
+
+  /** The test failed, for the reason [message]: the provider's own words, or ours. */
+  data class Failure(val message: UiText) : AiConnectionTest
 }
 
 /**
@@ -108,8 +118,11 @@ class AiSettingsController(
     val target = provider ?: temporary
     if (target == null) {
       connectionTest = AiConnectionTest.Failure(
-        if (supported) "Fill in the fields above first."
-        else "AI discovery isn't available on this platform.",
+        if (supported) {
+          Res.string.settings_ai_test_incomplete.text()
+        } else {
+          Res.string.settings_ai_test_unsupported.text()
+        },
       )
       return
     }
@@ -122,7 +135,7 @@ class AiSettingsController(
         .onFailure { e ->
           if (e is CancellationException) throw e
           connectionTest = AiConnectionTest.Failure(
-            e.message ?: "Connection failed.",
+            e.message?.let(::verbatim) ?: Res.string.settings_ai_test_connection_failed.text(),
           )
         }
     } finally {
@@ -154,7 +167,7 @@ class AiSettingsController(
       .onFailure { e ->
         if (e is CancellationException) throw e
         connectionTest = AiConnectionTest.Failure(
-          e.message ?: "Could not start the discovery engine.",
+          e.message?.let(::verbatim) ?: Res.string.settings_ai_engine_failed.text(),
         )
       }
       .getOrNull()

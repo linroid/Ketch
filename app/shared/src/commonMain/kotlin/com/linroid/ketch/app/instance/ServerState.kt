@@ -1,5 +1,7 @@
 package com.linroid.ketch.app.instance
 
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.config.ServerConfig
 
 /** State of the optional HTTP server exposing the embedded instance. */
@@ -14,6 +16,10 @@ sealed class ServerState {
     val port: Int get() = config.port
   }
 
-  /** The last start attempt failed, e.g. because the port is in use. */
-  data class Failed(val message: String) : ServerState()
+  /**
+   * The last start attempt failed, e.g. because the port is in use.
+   *
+   * @property reason why, as the server reported it, or a generic reason when it did not say.
+   */
+  data class Failed(val reason: UiText) : ServerState()
 }

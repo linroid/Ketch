@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.ListFixtures.START
 import com.linroid.ketch.app.state.ListFixtures.downloading
 import com.linroid.ketch.app.state.ListFixtures.row
@@ -254,7 +255,7 @@ class SpeedHistoryStoreTest {
   }
 
   @Test
-  fun timelineEntries_taskAddedSinceTheAppOpened_addsItAtCreation() {
+  fun timelineEntries_taskAddedSinceTheAppOpened_addsItAtCreation() = runTest {
     val created = START + 2.seconds
 
     val entries = timelineEntries(
@@ -265,17 +266,13 @@ class SpeedHistoryStoreTest {
       started = false,
     )
 
-    assertEquals(
-      listOf(
-        TimelineEntry(created, TimelineKind.Added, "Added"),
-        TimelineEntry(START + 5.seconds, TimelineKind.Started, "Started")
-      ),
-      entries
-    )
+    assertEquals(listOf(created, START + 5.seconds), entries.map { it.at })
+    assertEquals(listOf(TimelineKind.Added, TimelineKind.Started), entries.map { it.kind })
+    assertEquals(listOf("Added", "Started"), entries.map { it.label }.load())
   }
 
   @Test
-  fun timelineEntries_stateChanges_nameEachStep() {
+  fun timelineEntries_stateChanges_nameEachStep() = runTest {
     val queued = row("a", DownloadState.Queued)
     val running = row("a", downloading(10))
     val stopped = row("a", paused)
@@ -285,12 +282,12 @@ class SpeedHistoryStoreTest {
     assertEquals("Resumed", text(queued, running, started = true))
     assertEquals("Paused", text(running, stopped))
     assertEquals("Resumed", text(stopped, running))
-    assertEquals("Failed · ${failed.content.error!!.title}", text(running, failed))
+    assertEquals("Failed · Access denied (403)", text(running, failed))
     assertEquals("Retried", text(failed, running))
   }
 
   @Test
-  fun timelineEntries_requestChanges_describeEachChange() {
+  fun timelineEntries_requestChanges_describeEachChange() = runTest {
     val before = row("a", downloading(10), request = DownloadRequest("https://example.com/a"))
     val after = row(
       "a",
@@ -302,20 +299,21 @@ class SpeedHistoryStoreTest {
       ),
     )
 
-    val texts = timelineEntries(before, after, START, START, started = true).map { it.text }
+    val entries = timelineEntries(before, after, START, START, started = true)
+    val texts = entries.map { it.label }.load()
 
     assertEquals(listOf("Connections Auto → 8", "Limit → 2 MB/s", "Priority → Urgent"), texts)
   }
 
   @Test
-  fun timelineEntries_limitCleared_saysRemoved() {
+  fun timelineEntries_limitCleared_saysRemoved() = runTest {
     val limited = DownloadRequest("https://example.com/a", speedLimit = SpeedLimit.mbps(1))
     val before = row("a", downloading(10), request = limited)
     val after = row("a", downloading(10), request = limited.copy(speedLimit = SpeedLimit.Unlimited))
 
     assertEquals(
       listOf("Limit removed"),
-      timelineEntries(before, after, START, START, started = true).map { it.text }
+      timelineEntries(before, after, START, START, started = true).map { it.label }.load()
     )
   }
 
@@ -331,12 +329,12 @@ class SpeedHistoryStoreTest {
 
     assertEquals(
       listOf("Added", "Started", "Paused"),
-      store.timelines.value[a].orEmpty().map { it.text }
+      store.timelines.value[a].orEmpty().map { it.label }.load()
     )
   }
 
-  private fun text(before: TaskRow, after: TaskRow, started: Boolean = true): String =
-    timelineEntries(before, after, START, START, started).single().text
+  private suspend fun text(before: TaskRow, after: TaskRow, started: Boolean = true): String =
+    timelineEntries(before, after, START, START, started).single().label.load()
 
   /** Row a downloading 2 000 bytes over two connections that have [first] and [second] bytes. */
   private fun segmented(first: Long, second: Long): TaskRow =

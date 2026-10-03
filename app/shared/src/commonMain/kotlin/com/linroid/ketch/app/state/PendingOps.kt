@@ -2,6 +2,8 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.verbatim
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -19,12 +21,13 @@ import kotlin.time.Duration.Companion.seconds
  * An operation that can still be undone.
  *
  * @property id unique id within this run of the app.
- * @property label what undoing it reverts, for "Undo {label}", such as "Clear Finished".
+ * @property undoTitle what undoing it does, as the command palette names it, such as "Undo clear
+ *   finished".
  * @property hides tasks the list hides until the operation is undone or committed.
  */
 data class PendingOp(
   val id: Long,
-  val label: String,
+  val undoTitle: UiText,
   val hides: Set<TaskKey>,
 )
 
@@ -68,7 +71,7 @@ class PendingOps(
   /**
    * Registers an operation that commits after [timeout] unless undone first.
    *
-   * @param label what undoing it reverts.
+   * @param undoTitle what undoing it does, such as "Undo remove".
    * @param hides tasks to hide until it is undone or committed.
    * @param timeout how long it can be undone.
    * @param commit runs when the window ends or on [flush]; failures are logged, so report them
@@ -76,13 +79,13 @@ class PendingOps(
    * @param undo runs when the operation is undone; the hidden tasks show again first.
    */
   fun register(
-    label: String,
+    undoTitle: UiText,
     hides: Set<TaskKey> = emptySet(),
     timeout: Duration = window,
     commit: suspend () -> Unit = {},
     undo: suspend () -> Unit = {},
   ): PendingOp {
-    val entry = Entry(PendingOp(nextId++, label, hides), commit, undo)
+    val entry = Entry(PendingOp(nextId++, undoTitle, hides), commit, undo)
     entries += entry
     publish()
     entry.timer = scope.launch {
@@ -103,7 +106,7 @@ class PendingOps(
       try {
         entry.undo()
       } catch (e: Exception) {
-        log.w { "Undo of ${entry.op.label} failed: ${e.describeCauses()}" }
+        log.w { "Undo of operation ${entry.op.id} failed: ${e.describeCauses()}" }
       }
     }
     return true
@@ -149,7 +152,7 @@ class PendingOps(
         try {
           entry.commit()
         } catch (e: Exception) {
-          log.w { "Commit of ${entry.op.label} failed: ${e.describeCauses()}" }
+          log.w { "Commit of operation ${entry.op.id} failed: ${e.describeCauses()}" }
         } finally {
           entries -= entry
           publish()

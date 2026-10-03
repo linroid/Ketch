@@ -4,8 +4,10 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.StatusFilter
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -26,7 +28,7 @@ class OngoingDownloadsTest {
   }
 
   @Test
-  fun of_nothingDownloadingOrQueued_returnsNull() {
+  fun of_nothingDownloadingOrQueued_returnsNull() = runTest {
     val tasks = listOf(
       task("done", DownloadState.Completed("/downloads/done.bin", 10)),
       task("paused", DownloadState.Paused(DownloadProgress(5, 10))),
@@ -37,7 +39,7 @@ class OngoingDownloadsTest {
   }
 
   @Test
-  fun of_severalDownloading_reportsCountSpeedSizeAndTimeLeft() {
+  fun of_severalDownloading_reportsCountSpeedSizeAndTimeLeft() = runTest {
     val tasks = listOf(
       task("a", downloading(512 * MB, GB, speed = MB)),
       task("b", downloading(256 * MB, GB, speed = MB)),
@@ -46,57 +48,57 @@ class OngoingDownloadsTest {
 
     val downloads = assertNotNull(OngoingDownloads.of(tasks))
 
-    assertEquals("Downloading 3 files · 4.0 MB/s", downloads.title)
-    assertEquals("768.0 MB of 3.00 GB · about 10 min left", downloads.text)
+    assertEquals("Downloading 3 files · 4.0 MB/s", downloads.title.load())
+    assertEquals("768.0 MB of 3.00 GB · about 10 min left", downloads.text.load())
     assertEquals(250, downloads.permille)
     assertEquals(StatusFilter.Downloading, downloads.filter)
     assertNull(downloads.lanes)
   }
 
   @Test
-  fun of_timeLeftUnderAMinuteOrOverAnHour_saysSo() {
+  fun of_timeLeftUnderAMinuteOrOverAnHour_saysSo() = runTest {
     val soon = OngoingDownloads.of(listOf(task("a", downloading(0, 1000, speed = 100))))
     val later = OngoingDownloads.of(listOf(task("a", downloading(0, 3_900_000, speed = 1000))))
 
-    assertEquals("0 B of 1000 B · less than a minute left", soon?.text)
-    assertEquals("about 1h 5m left", later?.text?.substringAfter(" · "))
+    assertEquals("0 B of 1000 B · less than a minute left", soon?.text.load())
+    assertEquals("about 1h 5m left", later?.text.load()?.substringAfter(" · "))
   }
 
   @Test
-  fun of_sizeUnknown_isIndeterminateAndShowsBytesSoFar() {
+  fun of_sizeUnknown_isIndeterminateAndShowsBytesSoFar() = runTest {
     val downloads = assertNotNull(OngoingDownloads.of(listOf(task("a", downloading(5 * MB, 0)))))
 
-    assertEquals("Downloading 1 file", downloads.title)
-    assertEquals("5.0 MB", downloads.text)
+    assertEquals("Downloading 1 file", downloads.title.load())
+    assertEquals("5.0 MB", downloads.text.load())
     assertNull(downloads.permille)
     assertNull(downloads.percent)
-    assertEquals(listOf("a.bin  5.0 MB"), downloads.lines)
+    assertEquals(listOf("a.bin  5.0 MB"), downloads.lines.load())
     assertEquals(listOf(OngoingDownloads.PROGRESS_MAX), downloads.lanes)
   }
 
   @Test
-  fun of_moreBytesThanTheSize_capsProgressAtFull() {
+  fun of_moreBytesThanTheSize_capsProgressAtFull() = runTest {
     val downloads = assertNotNull(OngoingDownloads.of(listOf(task("a", downloading(1100, 1000)))))
 
     assertEquals(OngoingDownloads.PROGRESS_MAX, downloads.permille)
-    assertEquals(listOf("a.bin  100%"), downloads.lines)
+    assertEquals(listOf("a.bin  100%"), downloads.lines.load())
   }
 
   @Test
-  fun of_everyTaskQueued_waitsOnTheWaitingTab() {
+  fun of_everyTaskQueued_waitsOnTheWaitingTab() = runTest {
     val tasks = listOf(task("a", DownloadState.Queued), task("b", DownloadState.Queued))
 
     val downloads = assertNotNull(OngoingDownloads.of(tasks))
 
-    assertEquals("Waiting to download 2 files", downloads.title)
-    assertNull(downloads.text)
+    assertEquals("Waiting to download 2 files", downloads.title.load())
+    assertNull(downloads.text.load())
     assertNull(downloads.permille)
-    assertEquals(listOf("a.bin  Waiting", "b.bin  Waiting"), downloads.lines)
+    assertEquals(listOf("a.bin  Waiting", "b.bin  Waiting"), downloads.lines.load())
     assertEquals(StatusFilter.Waiting, downloads.filter)
   }
 
   @Test
-  fun of_moreFilesThanLines_listsDownloadsFirstAndCountsTheRest() {
+  fun of_moreFilesThanLines_listsDownloadsFirstAndCountsTheRest() = runTest {
     val tasks = List(3) { task("q$it", DownloadState.Queued) } +
       List(4) { task("d$it", downloading(500, 1000, speed = 100)) }
 
@@ -110,13 +112,13 @@ class OngoingDownloadsTest {
         "d3.bin  50% · 100 B/s",
         "q0.bin  Waiting"
       ),
-      downloads.lines
+      downloads.lines.load()
     )
     assertEquals(2, downloads.more)
   }
 
   @Test
-  fun of_singleDownload_givesOneLanePerConnection() {
+  fun of_singleDownload_givesOneLanePerConnection() = runTest {
     val tasks = listOf(task("a", downloading(450, 1000), ranges(4, 1000)))
 
     val downloads = assertNotNull(OngoingDownloads.of(tasks))
@@ -127,7 +129,7 @@ class OngoingDownloadsTest {
   }
 
   @Test
-  fun of_moreConnectionsThanAndroidDraws_mergesNeighbouringLanes() {
+  fun of_moreConnectionsThanAndroidDraws_mergesNeighbouringLanes() = runTest {
     val tasks = listOf(task("a", downloading(0, 1600), ranges(16, 1600)))
 
     val lanes = assertNotNull(OngoingDownloads.of(tasks)?.lanes)
@@ -136,7 +138,7 @@ class OngoingDownloadsTest {
   }
 
   @Test
-  fun of_singleDownloadWithAQueue_hasNoLanes() {
+  fun of_singleDownloadWithAQueue_hasNoLanes() = runTest {
     val tasks = listOf(
       task("a", downloading(450, 1000), ranges(4, 1000)),
       task("b", DownloadState.Queued)

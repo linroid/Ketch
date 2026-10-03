@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  How a download's row, its actions and the status tabs describe a task. See
+  docs/development/localization.md.
+-->
+<resources>
+  <!-- Status tabs of the Downloads page. -->
+  <string name="status_tab_all">All</string>
+  <string name="status_tab_downloading">Downloading</string>
+  <string name="status_tab_waiting">Waiting</string>
+  <string name="status_tab_paused">Paused</string>
+  <string name="status_tab_done">Done</string>
+  <string name="status_tab_failed">Failed</string>
+
+  <!-- A task's status in a word or two, in its row. -->
+  <string name="row_status_downloading">Downloading</string>
+  <string name="row_status_stalled">Stalled</string>
+  <string name="row_status_paused">Paused</string>
+  <string name="row_status_queued">Queued</string>
+  <string name="row_status_scheduled">Scheduled</string>
+  <string name="row_status_done">Done</string>
+  <string name="row_status_file_missing">File missing</string>
+  <string name="row_status_failed">Failed</string>
+  <string name="row_status_canceled">Canceled</string>
+
+  <!-- Details of a row, joined by " · ". %1$s is a duration, such as "12s". -->
+  <string name="row_stalled_for">Stalled · no data for %1$s</string>
+  <string name="row_paused">Paused</string>
+  <string name="row_canceled">Canceled</string>
+  <!-- %1$s is a device name, such as "NAS-Basement". -->
+  <string name="row_saved_on">Saved on %1$s</string>
+  <string name="row_missing_file">File moved or deleted</string>
+  <string name="row_completed">Completed</string>
+  <!-- How long a finished download took. %1$s is a duration, such as "4m 2s". -->
+  <string name="row_took">took %1$s</string>
+  <plurals name="row_files">
+    <item quantity="one">%1$d file</item>
+    <item quantity="other">%1$d files</item>
+  </plurals>
+  <plurals name="row_connections">
+    <item quantity="one">%1$d connection</item>
+    <item quantity="other">%1$d connections</item>
+  </plurals>
+  <!-- A task's own speed limit. %1$s is a speed, such as "2 MB/s". -->
+  <string name="row_speed_limit">limit %1$s</string>
+  <!-- Follows other details after " · ", so it starts in lower case in English. -->
+  <string name="row_limited_by_slow_lane">limited by Slow lane</string>
+  <!-- %1$s is a time of day, such as 09:05. -->
+  <string name="row_starts_today">Starts today at %1$s</string>
+  <string name="row_starts_tomorrow">Starts tomorrow at %1$s</string>
+  <!-- %1$s is a date, such as "Sep 28", %2$s a time of day. -->
+  <string name="row_starts_on">Starts %1$s at %2$s</string>
+  <!-- How long until a scheduled start. %1$s is a span, such as "3h 12m". -->
+  <string name="row_starts_in">in %1$s</string>
+  <string name="row_starts_after">Starts after %1$s</string>
+  <string name="row_waiting_for_conditions">Waiting for conditions</string>
+
+  <!-- Bytes so far of the total. %1$s and %2$s are sizes, such as "1.0 KB". -->
+  <string name="summary_size_of_total">%1$s / %2$s</string>
+  <!-- Average speed of a finished download. %1$s is a speed, such as "2.5 MB/s". -->
+  <string name="summary_average_speed">avg %1$s</string>
+
+  <!-- What the Downloads list sorts by, in column headers and the Sort menu. -->
+  <string name="sort_smart">Smart</string>
+  <string name="sort_name">Name</string>
+  <string name="sort_size">Size</string>
+  <string name="sort_progress">Progress</string>
+  <string name="sort_speed">Speed</string>
+  <string name="sort_time_left">Left</string>
+  <string name="sort_added">Added</string>
+  <string name="sort_status">Status</string>
+  <string name="sort_connections">Connections</string>
+  <string name="sort_source">Source</string>
+  <string name="sort_origin">Origin</string>
+  <string name="sort_priority">Priority</string>
+  <string name="sort_device">Device</string>
+  <!-- How the Downloads list groups rows, in the Group menu. -->
+  <string name="group_smart">Smart</string>
+  <string name="group_status">Status</string>
+  <string name="group_day">Day</string>
+  <string name="group_device">Device</string>
+  <string name="group_site">Site</string>
+  <string name="group_type">Type</string>
+  <string name="group_none">None</string>
+  <!-- Headers of groups of rows. -->
+  <string name="group_title_downloading">Downloading</string>
+  <string name="group_title_waiting">Waiting</string>
+  <string name="group_title_paused">Paused</string>
+  <string name="group_title_attention">Needs attention</string>
+  <string name="group_title_other_site">Other</string>
+  <string name="group_title_today">Added today</string>
+  <string name="group_title_yesterday">Added yesterday</string>
+  <string name="group_title_week">Added this week</string>
+  <string name="group_title_earlier">Added earlier</string>
+  <!-- Details after a group's header, joined by " · ". %1$s is a time of day, such as 14:32. -->
+  <string name="group_all_done_at">all done ≈ %1$s</string>
+  <string name="group_in_start_order">in start order</string>
+
+  <!-- Where a task was added from, in the Origin column. -->
+  <string name="origin_browser">Browser</string>
+  <string name="origin_discover">Discover</string>
+  <string name="origin_agent">Agent</string>
+  <string name="origin_app">App</string>
+  <string name="origin_cli">CLI</string>
+  <!-- Broad file types, as group titles. -->
+  <string name="file_type_video">Video</string>
+  <string name="file_type_audio">Audio</string>
+  <string name="file_type_image">Images</string>
+  <string name="file_type_doc">Documents</string>
+  <string name="file_type_archive">Archives</string>
+  <string name="file_type_app">Apps</string>
+  <string name="file_type_torrent">Torrents</string>
+  <string name="file_type_other">Other</string>
+
+  <!-- Why a queued task waits. -->
+  <string name="queue_waiting_slot">Waiting for a free slot (%1$d of %2$d in use)</string>
+  <!-- %1$s is a host name, %2$d how many downloads a site may run at once. -->
+  <string name="queue_waiting_host">Waiting for %1$s (%2$d per site)</string>
+  <string name="queue_waiting_start">Waiting to start</string>
+
+  <!-- Actions on a task, in menus, buttons and the command palette. -->
+  <string name="action_row_pause">Pause</string>
+  <string name="action_row_resume">Resume</string>
+  <string name="action_row_reconnect">Reconnect</string>
+  <string name="action_row_start_now">Start now</string>
+  <string name="action_row_speed_limit">Speed limit</string>
+  <string name="action_row_connections">Connections</string>
+  <string name="action_row_priority">Priority</string>
+  <string name="action_row_start_later">Start later</string>
+  <string name="action_row_send_to">Send to</string>
+  <string name="action_row_copy_link">Copy link</string>
+  <string name="action_row_details">Details</string>
+  <string name="action_row_open">Open</string>
+  <string name="action_row_show_in_folder">Show in folder</string>
+  <string name="action_row_copy_path">Copy file path</string>
+  <string name="action_row_download_again">Download again</string>
+  <string name="action_row_retry">Retry</string>
+  <string name="action_row_retry_with_options">Retry with options…</string>
+  <string name="action_row_edit_link">Edit link…</string>
+  <string name="action_row_enter_credentials">Enter credentials…</string>
+  <string name="action_row_find_another_source">Find another source</string>
+  <string name="action_row_open_source_page">Open source page</string>
+  <string name="action_row_copy_error">Copy error</string>
+  <string name="action_row_copy_details">Copy details</string>
+  <string name="action_row_stop_and_discard">Stop and discard progress…</string>
+  <string name="action_row_remove">Remove from list</string>
+  <string name="action_row_remove_and_trash">Remove and trash file…</string>
+  <string name="action_row_remove_and_delete">Remove and delete files…</string>
+  <!-- Menu labels of actions on several selected downloads. %1$d is how many. -->
+  <plurals name="batch_pause">
+    <item quantity="one">Pause %1$d download</item>
+    <item quantity="other">Pause %1$d downloads</item>
+  </plurals>
+  <plurals name="batch_resume">
+    <item quantity="one">Resume %1$d download</item>
+    <item quantity="other">Resume %1$d downloads</item>
+  </plurals>
+  <plurals name="batch_start_now">
+    <item quantity="one">Start %1$d download now</item>
+    <item quantity="other">Start %1$d downloads now</item>
+  </plurals>
+  <plurals name="batch_retry">
+    <item quantity="one">Retry %1$d download</item>
+    <item quantity="other">Retry %1$d downloads</item>
+  </plurals>
+  <plurals name="batch_open">
+    <item quantity="one">Open %1$d file</item>
+    <item quantity="other">Open %1$d files</item>
+  </plurals>
+  <!-- %1$s is the label, such as "Show in Finder", %2$d how many downloads. -->
+  <string name="batch_show_in_folder">%1$s (%2$d)</string>
+  <plurals name="batch_copy_link">
+    <item quantity="one">Copy %1$d link</item>
+    <item quantity="other">Copy %1$d links</item>
+  </plurals>
+  <plurals name="batch_copy_path">
+    <item quantity="one">Copy %1$d file path</item>
+    <item quantity="other">Copy %1$d file paths</item>
+  </plurals>
+  <plurals name="batch_download_again">
+    <item quantity="one">Download %1$d file again</item>
+    <item quantity="other">Download %1$d files again</item>
+  </plurals>
+  <plurals name="batch_discard">
+    <item quantity="one">Discard progress of %1$d download…</item>
+    <item quantity="other">Discard progress of %1$d downloads…</item>
+  </plurals>
+  <plurals name="batch_remove">
+    <item quantity="one">Remove %1$d download from list</item>
+    <item quantity="other">Remove %1$d downloads from list</item>
+  </plurals>
+  <plurals name="batch_remove_files">
+    <item quantity="one">Remove %1$d download and its file…</item>
+    <item quantity="other">Remove %1$d downloads and their files…</item>
+  </plurals>
+  <!-- Buttons of the bar shown while downloads are selected. -->
+  <string name="bar_speed">Speed</string>
+  <string name="bar_copy_links">Copy links</string>
+  <string name="bar_remove">Remove…</string>
+  <string name="bar_copy_paths">Copy file paths</string>
+  <string name="bar_discard">Discard progress…</string>
+  <!-- A bar action in a menu with how many selected downloads it applies to: "Pause (3)". -->
+  <string name="bar_label_count">%1$s (%2$d)</string>
+  <!-- The same on a phone's bar button: "Pause 3". -->
+  <string name="bar_label_number">%1$s %2$d</string>
+  <!-- Tooltips of the bar's buttons. %1$s is the button's label, %2$d how many of the %3$d
+       selected downloads it applies to. -->
+  <string name="bar_tooltip_counted">%1$s %2$d of %3$d selected</string>
+  <string name="bar_tooltip_partial">%1$s · %2$d of %3$d selected</string>
+  <plurals name="bar_tooltip_remove">
+    <item quantity="one">Remove %1$d download…</item>
+    <item quantity="other">Remove %1$d downloads…</item>
+  </plurals>
+  <!-- The Connections submenu of one torrent. -->
+  <string name="row_menu_peer_limit">Peer limit</string>
+  <!-- In the Send to menu while moving. %1$s is a device name. -->
+  <string name="send_move_to">Move to %1$s</string>
+  <!-- How the platform's file manager shows a downloaded file. -->
+  <string name="reveal_in_finder">Show in Finder</string>
+  <string name="reveal_in_explorer">Show in Explorer</string>
+  <string name="reveal_in_folder">Show in folder</string>
+  <string name="reveal_in_files">Show in Files</string>
+  <plurals name="action_row_retry_with_connections">
+    <item quantity="one">Retry with %1$d connection</item>
+    <item quantity="other">Retry with %1$d connections</item>
+  </plurals>
+</resources>

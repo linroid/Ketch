@@ -11,6 +11,10 @@ import com.linroid.ketch.app.snapshot.withSettings
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchDensity
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_downloads_folders
+import kotlinx.coroutines.runBlocking
+import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -21,12 +25,13 @@ import kotlin.test.assertEquals
 class SettingsSearchRenderTest {
   @Test
   fun settingsIndex_everyEntry_namesARowOrGroupOnItsPage() {
+    val index = runBlocking { loadSettingsSearchIndex() }
     val missing = SettingsCategory.entries.flatMap { category ->
       val texts = renderedTexts(category)
-      SettingsIndex
+      index.entries
         .filter { it.category == category && it.needs in Shown && it.title !in Conditional }
         .filter { entry -> entry.anchors.none { it.lowercase() in texts } }
-        .map { "${category.title}: ${it.title}" }
+        .map { "${it.page}: ${it.title}" }
     }
 
     assertEquals(emptyList(), missing)
@@ -69,6 +74,8 @@ class SettingsSearchRenderTest {
      * Settings that only show sometimes: the add sheet's folders once there are any, and the
      * Sharing rows under its collapsed Advanced section.
      */
-    val Conditional = AdvancedRows + "Folders in the add sheet"
+    val Conditional: Set<String> = runBlocking {
+      (AdvancedRows + Res.string.settings_downloads_folders).map { getString(it) }.toSet()
+    }
   }
 }

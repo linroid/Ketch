@@ -18,6 +18,9 @@ import androidx.core.app.NotificationManagerCompat
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.platform.FileActionException
 import com.linroid.ketch.app.platform.openFileIntent
 import com.linroid.ketch.app.platform.shareFileIntent
@@ -26,6 +29,22 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.darkKetchColors
 import com.linroid.ketch.app.theme.lightKetchColors
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_open
+import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.notify_action_full_speed
+import ketch.app.shared.generated.resources.notify_action_pause_all
+import ketch.app.shared.generated.resources.notify_action_share
+import ketch.app.shared.generated.resources.notify_action_slow_lane
+import ketch.app.shared.generated.resources.notify_channel_active
+import ketch.app.shared.generated.resources.notify_channel_done
+import ketch.app.shared.generated.resources.notify_channel_failed
+import ketch.app.shared.generated.resources.notify_finished_group
+import ketch.app.shared.generated.resources.notify_more_files
+import ketch.app.shared.generated.resources.notify_server_on_port
+import ketch.app.shared.generated.resources.notify_sharing_device
+import ketch.app.shared.generated.resources.notify_slow_lane_on
+import kotlinx.coroutines.runBlocking
 
 /**
  * Posts Ketch's notifications on Android, in three channels:
@@ -40,6 +59,9 @@ import com.linroid.ketch.app.theme.lightKetchColors
  * Tapping a notification opens [activity] with a [NotificationLink], which [linkOf] reads back.
  * The ongoing notification's buttons start [service] with [ACTION_PAUSE_ALL] and
  * [ACTION_SLOW_LANE], and dismissing it starts it with [ACTION_REPOST_NOTIFICATION].
+ *
+ * Its text is the app's string resources, read in the language of the app's windows: call
+ * [setUpChannels] and [ongoingNotification] from a coroutine.
  *
  * @param context context to post from.
  * @param activity the app's activity.
@@ -59,17 +81,28 @@ class AndroidNotifier(
   @Volatile
   var accent: KetchAccent = KetchAccent.Signal
 
-  /** Creates the notification channels and removes the one older versions used. */
-  fun createChannels() {
+  // The buttons of the notifications [notify] posts, read once by [setUpChannels] or on first use.
+  @Volatile
+  private var labels: Labels? = null
+
+  /**
+   * Creates the notification channels, named in the app's language, and removes the one older
+   * versions used. Calling it again renames them, such as after the language changed.
+   */
+  suspend fun setUpChannels() {
     val system = context.getSystemService(NotificationManager::class.java)
+    val active = Res.string.notify_channel_active.text().load()
+    val done = Res.string.notify_channel_done.text().load()
+    val failed = Res.string.notify_channel_failed.text().load()
     system.createNotificationChannels(
       listOf(
-        channel(CHANNEL_ACTIVE, "Active downloads", NotificationManager.IMPORTANCE_LOW),
-        channel(CHANNEL_DONE, "Finished downloads", NotificationManager.IMPORTANCE_DEFAULT),
-        channel(CHANNEL_FAILED, "Failed downloads", NotificationManager.IMPORTANCE_HIGH)
+        channel(CHANNEL_ACTIVE, active, NotificationManager.IMPORTANCE_LOW),
+        channel(CHANNEL_DONE, done, NotificationManager.IMPORTANCE_DEFAULT),
+        channel(CHANNEL_FAILED, failed, NotificationManager.IMPORTANCE_HIGH)
       )
     )
     system.deleteNotificationChannel(LEGACY_CHANNEL)
+    labels = Labels.load()
   }
 
   /**
@@ -79,7 +112,11 @@ class AndroidNotifier(
    * @param serverPort port of the local server, or `null` when it is not running.
    * @param slowLane whether the slow lane is on, which turns its button into Full speed.
    */
-  fun ongoing(tasks: List<DownloadTask>, serverPort: Int?, slowLane: Boolean): Notification {
+  suspend fun ongoingNotification(
+    tasks: List<DownloadTask>,
+    serverPort: Int?,
+    slowLane: Boolean,
+  ): Notification {
     val downloads = OngoingDownloads.of(tasks)
     val builder = NotificationCompat.Builder(context, CHANNEL_ACTIVE)
       .setSmallIcon(smallIcon)
@@ -91,18 +128,23 @@ class AndroidNotifier(
       .setShowWhen(false)
       .setContentIntent(showIntent(ONGOING_TAG, filter = downloads?.filter))
       .setDeleteIntent(serviceIntent(ACTION_REPOST_NOTIFICATION))
-    if (slowLane) builder.setSubText("Slow lane")
+    if (slowLane) builder.setSubText(Res.string.notify_slow_lane_on.text().load())
     when {
       downloads != null -> describe(builder, downloads)
       serverPort != null -> builder
-        .setContentTitle("Sharing this device")
-        .setContentText("Server on port $serverPort")
-      else -> builder.setContentTitle("Ketch")
+        .setContentTitle(Res.string.notify_sharing_device.text().load())
+        .setContentText(Res.string.notify_server_on_port.text(serverPort).load())
+      else -> builder.setContentTitle(APP_NAME)
     }
     if (downloads != null) {
-      builder.addAction(0, "Pause all", serviceIntent(ACTION_PAUSE_ALL))
-      val speedLabel = if (slowLane) "Full speed" else "Slow lane"
-      builder.addAction(0, speedLabel, serviceIntent(ACTION_SLOW_LANE))
+      val pauseAll = Res.string.notify_action_pause_all.text().load()
+      builder.addAction(0, pauseAll, serviceIntent(ACTION_PAUSE_ALL))
+      val speed = if (slowLane) {
+        Res.string.notify_action_full_speed
+      } else {
+        Res.string.notify_action_slow_lane
+      }
+      builder.addAction(0, speed.text().load(), serviceIntent(ACTION_SLOW_LANE))
     }
     val notification = builder.build()
     notification.flags = notification.flags or Notification.FLAG_NO_CLEAR
@@ -138,7 +180,8 @@ class AndroidNotifier(
           .setCategory(NotificationCompat.CATEGORY_ERROR)
           .setContentIntent(showIntent(tag, task = event.taskKey))
         if (NotificationAction.Retry in copy.actions) {
-          builder.addAction(0, "Retry", showIntent(tag, task = event.taskKey, retry = true))
+          val retry = labels().retry
+          builder.addAction(0, retry, showIntent(tag, task = event.taskKey, retry = true))
         }
         post(tag, ID_TASK, builder.build())
       }
@@ -158,12 +201,12 @@ class AndroidNotifier(
     }
   }
 
-  private fun describe(builder: NotificationCompat.Builder, downloads: OngoingDownloads) {
-    builder.setContentTitle(downloads.title).setContentText(downloads.text)
+  private suspend fun describe(builder: NotificationCompat.Builder, downloads: OngoingDownloads) {
+    builder.setContentTitle(downloads.title.load()).setContentText(downloads.text?.load())
     val lanes = downloads.lanes
     if (lanes != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
       builder.setStyle(laneStyle(lanes, downloads)).setRequestPromotedOngoing(true)
-      downloads.percent?.let { builder.setShortCriticalText("$it%") }
+      downloads.percent?.let { builder.setShortCriticalText(percentText(it).load()) }
     } else {
       val permille = downloads.permille
       builder.setProgress(OngoingDownloads.PROGRESS_MAX, permille ?: 0, permille == null)
@@ -181,10 +224,12 @@ class AndroidNotifier(
       .setProgress(downloads.lanePosition)
   }
 
-  private fun inboxStyle(downloads: OngoingDownloads): NotificationCompat.InboxStyle {
+  private suspend fun inboxStyle(downloads: OngoingDownloads): NotificationCompat.InboxStyle {
     val style = NotificationCompat.InboxStyle()
-    downloads.lines.forEach(style::addLine)
-    if (downloads.more > 0) style.setSummaryText("+${downloads.more} more")
+    downloads.lines.forEach { style.addLine(it.load()) }
+    if (downloads.more > 0) {
+      style.setSummaryText(Res.plurals.notify_more_files.text(downloads.more).load())
+    }
     return style
   }
 
@@ -203,10 +248,11 @@ class AndroidNotifier(
     path: String,
     tag: String,
   ): NotificationCompat.Action? {
+    val labels = labels()
     val (label, intent) = try {
       when (action) {
-        NotificationAction.Open -> "Open" to openFileIntent(context, path)
-        NotificationAction.Share -> "Share" to shareFileIntent(context, path)
+        NotificationAction.Open -> labels.open to openFileIntent(context, path)
+        NotificationAction.Share -> labels.share to shareFileIntent(context, path)
         NotificationAction.Reveal, NotificationAction.Retry -> return null
       }
     } catch (e: FileActionException) {
@@ -227,7 +273,7 @@ class AndroidNotifier(
     val summary = NotificationCompat.Builder(context, CHANNEL_DONE)
       .setSmallIcon(smallIcon)
       .setColor(accentColor())
-      .setContentTitle("Finished downloads")
+      .setContentTitle(labels().finished)
       .setGroup(GROUP_DONE)
       .setGroupSummary(true)
       .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
@@ -283,6 +329,26 @@ class AndroidNotifier(
   private fun channel(id: String, name: String, importance: Int): NotificationChannel =
     NotificationChannel(id, name, importance).apply { setShowBadge(id != CHANNEL_ACTIVE) }
 
+  // Read on first use when [setUpChannels] has not run yet; [notify] runs off the main thread.
+  private fun labels(): Labels = labels ?: runBlocking { Labels.load() }.also { labels = it }
+
+  /** The buttons and titles of the notifications [notify] posts, in the app's language. */
+  private class Labels(
+    val open: String,
+    val share: String,
+    val retry: String,
+    val finished: String,
+  ) {
+    companion object {
+      suspend fun load(): Labels = Labels(
+        open = Res.string.action_open.text().load(),
+        share = Res.string.notify_action_share.text().load(),
+        retry = Res.string.action_retry.text().load(),
+        finished = Res.string.notify_finished_group.text().load(),
+      )
+    }
+  }
+
   companion object {
     /** Channel of the download service's ongoing notification. */
     const val CHANNEL_ACTIVE: String = "downloads_active"
@@ -309,6 +375,7 @@ class AndroidNotifier(
     /** Bundles finished downloads once more than this many show. */
     const val GROUP_AFTER: Int = 3
 
+    private const val APP_NAME = "Ketch"
     private const val ACTION_SHOW = "com.linroid.ketch.app.action.SHOW"
     private const val ACTION_RETRY = "com.linroid.ketch.app.action.RETRY"
     private const val EXTRA_TASK_KEY = "taskKey"

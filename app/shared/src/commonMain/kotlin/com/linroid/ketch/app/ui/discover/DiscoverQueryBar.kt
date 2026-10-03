@@ -29,6 +29,15 @@ import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AiDiscoverDraft
 import com.linroid.ketch.app.theme.KetchTheme
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.discover_find
+import ketch.app.shared.generated.resources.discover_query_placeholder
+import ketch.app.shared.generated.resources.discover_sites_count
+import ketch.app.shared.generated.resources.discover_sites_hint
+import ketch.app.shared.generated.resources.discover_sites_limit
+import ketch.app.shared.generated.resources.discover_stop
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The search: a 48 dp field for what to find, the "Limit to websites" chip and Find, which
@@ -60,7 +69,7 @@ internal fun DiscoverQueryBar(
     KetchTextField(
       value = draft.query,
       onValueChange = { draft.query = it },
-      placeholder = "Describe what you want to download",
+      placeholder = stringResource(Res.string.discover_query_placeholder),
       leadingIcon = KetchIcon.Discover,
       textStyle = KetchTheme.typography.body,
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -107,13 +116,18 @@ private fun SearchButton(
 ) {
   if (searching) {
     KetchButton(
-      text = "Stop",
+      text = stringResource(Res.string.discover_stop),
       onClick = onStop,
       variant = KetchButtonVariant.Secondary,
       leadingIcon = KetchIcon.Stop,
     )
   } else {
-    KetchButton(text = "Find", onClick = onSearch, enabled = canSearch, shortcut = "↩")
+    KetchButton(
+      text = stringResource(Res.string.discover_find),
+      onClick = onSearch,
+      enabled = canSearch,
+      shortcut = "↩",
+    )
   }
 }
 
@@ -123,9 +137,9 @@ private fun SitesChip(draft: AiDiscoverDraft) {
   val sites = draft.siteList()
   KetchChip(
     label = when (sites.size) {
-      0 -> "Limit to websites"
+      0 -> stringResource(Res.string.discover_sites_limit)
       1 -> sites.single()
-      else -> "${sites.size} websites"
+      else -> pluralStringResource(Res.plurals.discover_sites_count, sites.size, sites.size)
     },
     selected = sites.isNotEmpty(),
     onClick = { draft.showSites = !draft.showSites },
@@ -144,19 +158,22 @@ private fun SitesField(
     KetchTextField(
       value = draft.sites,
       onValueChange = { draft.sites = it },
-      placeholder = "ubuntu.com, blender.org",
+      placeholder = ExampleSites.joinToString(", "),
       leadingIcon = KetchIcon.Link,
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
       keyboardActions = keyboardActions,
       modifier = Modifier.fillMaxWidth().submitOnEnter(onSearch),
     )
     Text(
-      text = "Searches only these websites and their subdomains. Separate them with commas.",
+      text = stringResource(Res.string.discover_sites_hint),
       style = KetchTheme.typography.caption,
       color = KetchTheme.colors.textTertiary,
     )
   }
 }
+
+// Websites the website field shows as an example, in the comma-separated form it reads.
+private val ExampleSites = listOf("ubuntu.com", "blender.org")
 
 /** Runs [onSubmit] on Enter from a hardware keyboard, instead of the field taking it. */
 private fun Modifier.submitOnEnter(onSubmit: () -> Unit): Modifier = onPreviewKeyEvent { event ->

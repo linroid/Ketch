@@ -1,6 +1,8 @@
 package com.linroid.ketch.app.state
 
 import com.linroid.ketch.app.FakeAiProvider
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
@@ -142,7 +144,7 @@ class AiDiscoverControllerTest {
     controller.discover("blender", sites = "")
     runCurrent()
 
-    assertEquals(AiDiscoverState.Error(message), controller.state)
+    assertEquals(AiDiscoverState.Error(verbatim(message)), controller.state)
     assertEquals(steps, controller.steps)
   }
 
@@ -152,7 +154,8 @@ class AiDiscoverControllerTest {
 
     controller.discover("blender", sites = "")
 
-    assertIs<AiDiscoverState.Error>(controller.state)
+    val error = assertIs<AiDiscoverState.Error>(controller.state)
+    assertEquals("AI discovery is not available on this device.", error.message.load())
     assertNull(controller.pending)
   }
 

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Failures explained in plain words: a title, a hint with the likely cause and fix, and the short
+  form of the hint that follows the title on a download's row after " · ", which starts in lower
+  case in English. See docs/development/localization.md.
+-->
+<resources>
+  <!-- A failure explained in one line. %1$s is its title, %2$s its hint. -->
+  <string name="error_title_hint">%1$s. %2$s</string>
+  <string name="error_connection_lost">Connection lost</string>
+  <!-- %1$s is a host name, such as github.com. -->
+  <string name="error_network_hint">Couldn't reach %1$s.</string>
+  <string name="error_network_hint_short">couldn't reach %1$s</string>
+  <string name="error_network_hint_server">Couldn't reach the server.</string>
+  <string name="error_network_hint_server_short">couldn't reach the server</string>
+  <string name="error_retried_once">Ketch retried once.</string>
+  <plurals name="error_retried">
+    <item quantity="one">Ketch retried %1$d time.</item>
+    <item quantity="other">Ketch retried %1$d times.</item>
+  </plurals>
+  <string name="error_check_connection">Check the connection and try again.</string>
+  <string name="error_check_connection_short">check the connection and try again</string>
+  <string name="error_not_supported">Not supported on this device</string>
+  <string name="error_something_went_wrong">Something went wrong</string>
+
+  <string name="error_disk">Couldn't write the file</string>
+  <string name="error_disk_hint">Check free space and folder permissions.</string>
+  <string name="error_disk_hint_short">check free space and folder permissions</string>
+  <!-- %1$s is a device name, such as "NAS-Basement". -->
+  <string name="error_disk_hint_on">Check free space and folder permissions on %1$s.</string>
+  <string name="error_disk_hint_on_short">check free space and folder permissions on %1$s</string>
+  <!-- %1$s is the free space, such as "1.2 GB", %2$s a device name. -->
+  <string name="error_disk_hint_free">%1$s free on %2$s. Check space and folder permissions.</string>
+  <string name="error_disk_hint_free_short">%1$s free on %2$s</string>
+
+  <string name="error_unsupported">This server can't do this download</string>
+  <string name="error_unsupported_hint">It doesn't report a size or support ranges.</string>
+  <string name="error_unsupported_hint_short">it doesn't report a size or support ranges</string>
+  <string name="error_file_changed">File changed on the server</string>
+  <!-- %1$s is the change the engine noticed, in English, such as "ETag changed". -->
+  <string name="error_file_changed_hint">Resuming would corrupt it (%1$s).</string>
+  <string name="error_file_changed_hint_short">resuming would corrupt it (%1$s)</string>
+  <string name="error_corrupt_resume">Saved progress is damaged</string>
+  <string name="error_corrupt_resume_hint">The downloaded part can't be reused.</string>
+  <string name="error_corrupt_resume_hint_short">the downloaded part can't be reused</string>
+  <string name="error_canceled">Canceled</string>
+  <string name="error_wrong_credentials">Wrong user name or password</string>
+  <!-- %1$s is a protocol, such as FTP. -->
+  <string name="error_wrong_credentials_hint">The %1$s server rejected the sign-in.</string>
+  <string name="error_wrong_credentials_hint_short">the %1$s server rejected the sign-in</string>
+  <string name="error_torrent_stopped">The torrent stopped</string>
+  <string name="error_torrent_stopped_hint">No reachable peers or trackers.</string>
+  <string name="error_torrent_stopped_hint_short">no reachable peers or trackers</string>
+  <!-- %1$s is a protocol, such as FTP. -->
+  <string name="error_source">The %1$s server reported an error</string>
+
+  <!-- HTTP failures. %1$d is the HTTP status code. -->
+  <string name="error_http_sign_in">Sign-in required (%1$d)</string>
+  <!-- %1$s is a host name. -->
+  <string name="error_http_sign_in_hint">%1$s wants you signed in. Send it from the Ketch browser extension so your cookies come along.</string>
+  <string name="error_http_sign_in_hint_short">%1$s wants you signed in</string>
+  <string name="error_http_sign_in_hint_server">The server wants you signed in. Send it from the Ketch browser extension so your cookies come along.</string>
+  <string name="error_http_sign_in_hint_server_short">the server wants you signed in</string>
+  <string name="error_http_forbidden">Access denied (403)</string>
+  <string name="error_http_forbidden_hint">The link may have expired.</string>
+  <!-- %1$s is a browser, such as Chrome, or error_browser_yours. -->
+  <string name="error_http_forbidden_hint_browser">The link may have expired. Captured from %1$s? Capture it again from the page.</string>
+  <string name="error_http_forbidden_hint_short">the link may have expired</string>
+  <string name="error_browser_yours">your browser</string>
+  <string name="error_http_not_found">File not found (%1$d)</string>
+  <string name="error_http_not_found_hint">The server no longer has this file.</string>
+  <string name="error_http_not_found_hint_short">the server no longer has this file</string>
+  <string name="error_http_range">Server refused to resume</string>
+  <string name="error_http_range_hint">The saved position is no longer valid.</string>
+  <string name="error_http_range_hint_short">the saved position is no longer valid</string>
+  <string name="error_http_rate_limited">Server is rate-limiting</string>
+  <!-- %1$d is a number of seconds. -->
+  <string name="error_http_rate_limited_hint_in">Try again in %1$d s with fewer connections.</string>
+  <string name="error_http_rate_limited_hint_in_short">try again in %1$d s with fewer connections</string>
+  <string name="error_http_rate_limited_hint">Try again later with fewer connections.</string>
+  <string name="error_http_rate_limited_hint_short">try again later with fewer connections</string>
+  <string name="error_http_server">Server error (%1$d)</string>
+  <string name="error_http_server_hint">Usually temporary.</string>
+  <string name="error_http_server_hint_short">usually temporary</string>
+  <string name="error_http_other">Server answered %1$d</string>
+</resources>

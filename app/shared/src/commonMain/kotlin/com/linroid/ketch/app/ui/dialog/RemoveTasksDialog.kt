@@ -14,10 +14,39 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchCheckbox
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.common.AdaptiveModal
-import com.linroid.ketch.app.util.formatBytes
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_cancel
+import ketch.app.shared.generated.resources.action_remove
+import ketch.app.shared.generated.resources.downloads_remove_and_delete
+import ketch.app.shared.generated.resources.downloads_remove_and_delete_size
+import ketch.app.shared.generated.resources.downloads_remove_and_trash
+import ketch.app.shared.generated.resources.downloads_remove_and_trash_size
+import ketch.app.shared.generated.resources.downloads_remove_delete_all
+import ketch.app.shared.generated.resources.downloads_remove_delete_file
+import ketch.app.shared.generated.resources.downloads_remove_delete_files
+import ketch.app.shared.generated.resources.downloads_remove_delete_partial
+import ketch.app.shared.generated.resources.downloads_remove_note_free_on
+import ketch.app.shared.generated.resources.downloads_remove_note_frees
+import ketch.app.shared.generated.resources.downloads_remove_note_frees_after
+import ketch.app.shared.generated.resources.downloads_remove_note_partial
+import ketch.app.shared.generated.resources.downloads_remove_note_partials
+import ketch.app.shared.generated.resources.downloads_remove_size_of
+import ketch.app.shared.generated.resources.downloads_remove_subtitle
+import ketch.app.shared.generated.resources.downloads_remove_title
+import ketch.app.shared.generated.resources.downloads_remove_title_many
+import ketch.app.shared.generated.resources.downloads_remove_trash_all
+import ketch.app.shared.generated.resources.downloads_remove_trash_file
+import ketch.app.shared.generated.resources.downloads_remove_trash_files
+import ketch.app.shared.generated.resources.downloads_remove_trash_partial
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * One download a [RemoveTasksDialog] removes, as far as its copy needs it.
@@ -120,11 +149,11 @@ data class RemovalPlan(val items: List<RemovalItem>, val trash: Boolean) {
  * @property danger whether the confirm button removes files, which makes it a Danger button.
  */
 data class RemoveDialogCopy(
-  val title: String,
-  val subtitle: String,
-  val checkbox: String?,
-  val note: String?,
-  val confirm: String,
+  val title: UiText,
+  val subtitle: UiText,
+  val checkbox: UiText?,
+  val note: UiText?,
+  val confirm: UiText,
   val danger: Boolean,
 )
 
@@ -135,42 +164,66 @@ data class RemoveDialogCopy(
  */
 fun removeDialogCopy(
   plan: RemovalPlan,
-  deviceName: String,
+  deviceName: UiText,
   checked: Boolean,
   freeBytes: Long? = null,
 ): RemoveDialogCopy {
   val single = plan.items.singleOrNull()
   val title = if (single != null) {
-    "Remove “${single.name}”?"
+    Res.string.downloads_remove_title.text(single.name)
   } else {
-    "Remove ${plan.items.size} downloads?"
+    Res.plurals.downloads_remove_title_many.text(plan.items.size)
   }
-  val subtitle = "From the list on $deviceName."
-  if (!plan.hasFiles) return RemoveDialogCopy(title, subtitle, null, null, "Remove", false)
-  val withFiles = plan.items.filter { it.hasFile }
-  val one = withFiles.singleOrNull()
-  val noun = when {
-    one == null -> "the files"
-    one.partial -> "the partial file"
-    one.fileCount > 1 -> "all ${one.fileCount} files"
-    else -> "the file"
-  }
+  val subtitle = Res.string.downloads_remove_subtitle.text(deviceName)
+  val remove = Res.string.action_remove.text()
+  if (!plan.hasFiles) return RemoveDialogCopy(title, subtitle, null, null, remove, false)
+  val one = plan.items.filter { it.hasFile }.singleOrNull()
   val size = when {
     one != null && one.partial && one.totalBytes != null ->
-      "${formatBytes(one.bytes)} of ${formatBytes(one.totalBytes)}"
-    plan.bytes > 0 -> formatBytes(plan.bytes)
+      Res.string.downloads_remove_size_of.text(sizeText(one.bytes), sizeText(one.totalBytes))
+    plan.bytes > 0 -> sizeText(plan.bytes)
     else -> null
   }
-  val box = if (plan.trash) "Also move $noun to the Trash" else "Also delete $noun permanently"
-  val checkbox = listOfNotNull(box, size).joinToString(" · ")
+  val checkbox = listOfNotNull(filesBox(one, plan.trash), size).joinText()
   val note = if (checked) deletionNote(plan, deviceName, freeBytes) else null
-  val verb = if (plan.trash) "Remove and trash" else "Remove and delete"
   val confirm = when {
-    !checked -> "Remove"
-    plan.bytes > 0 -> "$verb ${formatBytes(plan.bytes)}"
-    else -> verb
+    !checked -> remove
+    plan.bytes > 0 -> {
+      val freed = sizeText(plan.bytes)
+      if (plan.trash) {
+        Res.string.downloads_remove_and_trash_size.text(freed)
+      } else {
+        Res.string.downloads_remove_and_delete_size.text(freed)
+      }
+    }
+    plan.trash -> Res.string.downloads_remove_and_trash.text()
+    else -> Res.string.downloads_remove_and_delete.text()
   }
   return RemoveDialogCopy(title, subtitle, checkbox, note, confirm, danger = checked)
+}
+
+/**
+ * The box that also moves the files to the Trash, with [trash], or deletes them: of the one
+ * download with a file, [one], or of several when `null`.
+ */
+private fun filesBox(one: RemovalItem?, trash: Boolean): UiText = when {
+  one == null -> if (trash) {
+    Res.string.downloads_remove_trash_files.text()
+  } else {
+    Res.string.downloads_remove_delete_files.text()
+  }
+  one.partial -> if (trash) {
+    Res.string.downloads_remove_trash_partial.text()
+  } else {
+    Res.string.downloads_remove_delete_partial.text()
+  }
+  one.fileCount > 1 -> if (trash) {
+    Res.plurals.downloads_remove_trash_all.text(one.fileCount)
+  } else {
+    Res.plurals.downloads_remove_delete_all.text(one.fileCount)
+  }
+  trash -> Res.string.downloads_remove_trash_file.text()
+  else -> Res.string.downloads_remove_delete_file.text()
 }
 
 /**
@@ -178,21 +231,23 @@ fun removeDialogCopy(
  * space that frees, with the space left on the device when every file is deleted. Files in the
  * Trash keep their space until it is emptied, so they free none.
  */
-private fun deletionNote(plan: RemovalPlan, deviceName: String, freeBytes: Long?): String? {
+private fun deletionNote(plan: RemovalPlan, deviceName: UiText, freeBytes: Long?): UiText? {
   val deleted = plan.deleted
   val freed = deleted.sumOf { it.bytes }
-  val parts = listOfNotNull(
-    when {
-      !plan.trash || deleted.isEmpty() -> null
-      deleted.size == 1 -> "the partial file is deleted permanently"
-      else -> "${deleted.size} partial files are deleted permanently"
-    },
-    "frees ${formatBytes(freed)}".takeIf { freed > 0 },
-    freeBytes?.takeIf { freed > 0 && !plan.trash }
-      ?.let { "${formatBytes(it)} free on $deviceName" },
-  )
-  if (parts.isEmpty()) return null
-  return parts.joinToString(" · ").replaceFirstChar { it.uppercaseChar() }
+  val partials = when {
+    !plan.trash || deleted.isEmpty() -> null
+    deleted.size == 1 -> Res.string.downloads_remove_note_partial.text()
+    else -> Res.plurals.downloads_remove_note_partials.text(deleted.size)
+  }
+  // The note starts with what it frees unless the partial files come first.
+  val frees = when {
+    freed <= 0 -> null
+    partials == null -> Res.string.downloads_remove_note_frees.text(sizeText(freed))
+    else -> Res.string.downloads_remove_note_frees_after.text(sizeText(freed))
+  }
+  val freeOn = freeBytes?.takeIf { freed > 0 && !plan.trash }
+    ?.let { Res.string.downloads_remove_note_free_on.text(sizeText(it), deviceName) }
+  return listOfNotNull(partials, frees, freeOn).takeIf { it.isNotEmpty() }?.joinText()
 }
 
 /**
@@ -215,7 +270,7 @@ fun initiallyChecked(plan: RemovalPlan, withFiles: Boolean): Boolean = withFiles
 @Composable
 fun RemoveTasksDialog(
   plan: RemovalPlan,
-  deviceName: String,
+  deviceName: UiText,
   onDismiss: () -> Unit,
   onConfirm: (withFiles: Boolean) -> Unit,
   withFiles: Boolean = false,
@@ -227,13 +282,17 @@ fun RemoveTasksDialog(
   val copy = removeDialogCopy(plan, deviceName, checked, freeBytes)
   AdaptiveModal(
     onDismissRequest = onDismiss,
-    title = { Text(copy.title) },
+    title = { Text(copy.title.resolve()) },
     dismissButton = {
-      KetchButton(text = "Cancel", variant = KetchButtonVariant.Secondary, onClick = onDismiss)
+      KetchButton(
+        text = stringResource(Res.string.action_cancel),
+        variant = KetchButtonVariant.Secondary,
+        onClick = onDismiss,
+      )
     },
     confirmButton = {
       KetchButton(
-        text = copy.confirm,
+        text = copy.confirm.resolve(),
         variant = if (copy.danger) KetchButtonVariant.Danger else KetchButtonVariant.Secondary,
         onClick = {
           onConfirm(checked)
@@ -242,13 +301,17 @@ fun RemoveTasksDialog(
       )
     },
   ) {
-    Text(text = copy.subtitle, style = type.body, color = colors.textSecondary)
+    Text(text = copy.subtitle.resolve(), style = type.body, color = colors.textSecondary)
     if (copy.checkbox != null) {
       Column {
-        KetchCheckbox(checked = checked, onCheckedChange = { checked = it }, label = copy.checkbox)
+        KetchCheckbox(
+          checked = checked,
+          onCheckedChange = { checked = it },
+          label = copy.checkbox.resolve(),
+        )
         if (copy.note != null) {
           Text(
-            text = copy.note,
+            text = copy.note.resolve(),
             style = type.caption,
             color = colors.textSecondary,
             modifier = Modifier.padding(

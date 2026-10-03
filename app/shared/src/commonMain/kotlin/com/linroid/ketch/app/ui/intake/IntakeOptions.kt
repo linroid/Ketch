@@ -52,11 +52,18 @@ import com.linroid.ketch.app.components.PEER_LIMIT_STEP
 import com.linroid.ketch.app.components.PeerLimitRange
 import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.components.StartTimePicker
+import com.linroid.ketch.app.components.StepperCount
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.priorityText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -65,9 +72,13 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.state.AUTHORIZATION_HEADER
+import com.linroid.ketch.app.state.COOKIE_HEADER
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.HeaderRow
+import com.linroid.ketch.app.state.IntakeHeaders
 import com.linroid.ketch.app.state.IntakeMode
+import com.linroid.ketch.app.state.IntakeOption
 import com.linroid.ketch.app.state.IntakeOptionValue
 import com.linroid.ketch.app.state.IntakeSession
 import com.linroid.ketch.app.state.IntakeSource
@@ -79,7 +90,58 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.inspector.FirstThatFits
-import com.linroid.ketch.app.util.priorityLabel
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_active_downloads
+import ketch.app.shared.generated.resources.device_free_space
+import ketch.app.shared.generated.resources.intake_add_header
+import ketch.app.shared.generated.resources.intake_advanced
+import ketch.app.shared.generated.resources.intake_advanced_caption
+import ketch.app.shared.generated.resources.intake_advanced_hide
+import ketch.app.shared.generated.resources.intake_advanced_show
+import ketch.app.shared.generated.resources.intake_also_sent
+import ketch.app.shared.generated.resources.intake_auto_device
+import ketch.app.shared.generated.resources.intake_auto_setting
+import ketch.app.shared.generated.resources.intake_choose_folder
+import ketch.app.shared.generated.resources.intake_connections
+import ketch.app.shared.generated.resources.intake_default_folder
+import ketch.app.shared.generated.resources.intake_file_name
+import ketch.app.shared.generated.resources.intake_folder_downloads
+import ketch.app.shared.generated.resources.intake_folder_on
+import ketch.app.shared.generated.resources.intake_header_name
+import ketch.app.shared.generated.resources.intake_header_value
+import ketch.app.shared.generated.resources.intake_headers_count
+import ketch.app.shared.generated.resources.intake_headers_saved
+import ketch.app.shared.generated.resources.intake_hide
+import ketch.app.shared.generated.resources.intake_option_auto
+import ketch.app.shared.generated.resources.intake_options
+import ketch.app.shared.generated.resources.intake_paste_curl
+import ketch.app.shared.generated.resources.intake_peer_limit
+import ketch.app.shared.generated.resources.intake_pill_label
+import ketch.app.shared.generated.resources.intake_pin
+import ketch.app.shared.generated.resources.intake_pinned
+import ketch.app.shared.generated.resources.intake_priority
+import ketch.app.shared.generated.resources.intake_priority_high_caption
+import ketch.app.shared.generated.resources.intake_priority_low_caption
+import ketch.app.shared.generated.resources.intake_priority_normal_caption
+import ketch.app.shared.generated.resources.intake_priority_urgent_caption
+import ketch.app.shared.generated.resources.intake_recent
+import ketch.app.shared.generated.resources.intake_remove_header
+import ketch.app.shared.generated.resources.intake_remove_named
+import ketch.app.shared.generated.resources.intake_reset_connections
+import ketch.app.shared.generated.resources.intake_reset_priority
+import ketch.app.shared.generated.resources.intake_reset_speed
+import ketch.app.shared.generated.resources.intake_reset_start
+import ketch.app.shared.generated.resources.intake_save_to
+import ketch.app.shared.generated.resources.intake_server_file_name
+import ketch.app.shared.generated.resources.intake_single_connection
+import ketch.app.shared.generated.resources.intake_speed_limit
+import ketch.app.shared.generated.resources.intake_start
+import ketch.app.shared.generated.resources.intake_torrents_app_folder
+import ketch.app.shared.generated.resources.intake_unpin
+import ketch.app.shared.generated.resources.pulse_slow_lane
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The one line of options under the rows: where to save, and an Options pill that sums up the
@@ -102,7 +164,7 @@ internal fun OptionsRow(actions: IntakeActions) {
   }
   if (session.isSystemFolder && session.entries.any { it.isTorrent }) {
     NoticeLine(
-      text = "Torrents save to the app folder: folders picked in Files only take links",
+      text = stringResource(Res.string.intake_torrents_app_folder),
       icon = KetchIcon.Info,
     )
   }
@@ -135,10 +197,11 @@ private fun OptionsLine(
   val changed = values.filter { it.changed }
   // The pill sums up only a sheet without changes; otherwise the chips say what changed.
   val summary = if (style.summary && changed.isEmpty()) {
-    values.joinToString(SEPARATOR) { it.text }
+    values.map { it.text }.joinText().resolve()
   } else {
     ""
   }
+  val options = stringResource(Res.string.intake_options)
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
@@ -149,20 +212,20 @@ private fun OptionsLine(
     }
     Box {
       OptionPill(
-        label = "Options".takeIf { style.optionsLabel },
+        label = options.takeIf { style.optionsLabel },
         value = summary,
         icon = KetchIcon.Lanes,
-        description = "Options",
+        description = options,
         onClick = { optionsOpen = true },
       )
       OptionsMenu(session, expanded = optionsOpen, onDismiss = { optionsOpen = false })
     }
     for (value in changed) {
       ValueChip(
-        text = value.text,
+        text = value.text.resolve(),
         onClick = { optionsOpen = true },
         onRemove = { session.resetOption(value.option) },
-        removeLabel = "Reset ${value.option.name.lowercase()}",
+        removeLabel = stringResource(resetLabel(value.option)),
       )
     }
     HeadersChip(session)
@@ -176,7 +239,7 @@ private fun HeadersChip(session: IntakeSession) {
   val count = session.headers.toMap().size
   if (count == 0) return
   ValueChip(
-    text = if (count == 1) "1 header" else "$count headers",
+    text = pluralStringResource(Res.plurals.intake_headers_count, count, count),
     onClick = { session.updateAdvancedOpen(true) },
     onRemove = null,
   )
@@ -188,7 +251,11 @@ private fun HeadersChip(session: IntakeSession) {
  */
 @Composable
 private fun OptionsMenu(session: IntakeSession, expanded: Boolean, onDismiss: () -> Unit) {
-  KetchMenu(expanded = expanded, onDismissRequest = onDismiss, title = "Options") {
+  KetchMenu(
+    expanded = expanded,
+    onDismissRequest = onDismiss,
+    title = stringResource(Res.string.intake_options),
+  ) {
     custom {
       OptionsPanel(
         session = session,
@@ -200,8 +267,12 @@ private fun OptionsMenu(session: IntakeSession, expanded: Boolean, onDismiss: ()
     if (session.mode != IntakeMode.Edit) {
       divider()
       item(
-        label = if (session.advancedOpen) "Hide advanced options" else "Advanced options…",
-        caption = "File name, referer, cookies and other headers",
+        label = if (session.advancedOpen) {
+          Res.string.intake_advanced_hide.text()
+        } else {
+          Res.string.intake_advanced_show.text()
+        },
+        caption = Res.string.intake_advanced_caption.text(),
         icon = KetchIcon.Settings,
         onClick = { session.updateAdvancedOpen(!session.advancedOpen) },
       )
@@ -217,24 +288,27 @@ private fun OptionsMenu(session: IntakeSession, expanded: Boolean, onDismiss: ()
 internal fun OptionsPanel(session: IntakeSession, modifier: Modifier = Modifier) {
   val spacing = KetchTheme.spacing
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s4), modifier = modifier) {
-    OptionField("Speed limit") {
+    OptionField(stringResource(Res.string.intake_speed_limit)) {
       SpeedLimitPicker(
         value = session.speedLimit,
         onCommit = { session.speedLimit = it },
         modifier = Modifier.fillMaxWidth(),
       )
     }
-    OptionField("Priority", caption = priorityCaption(session.priority)) {
+    OptionField(
+      label = stringResource(Res.string.intake_priority),
+      caption = stringResource(priorityCaption(session.priority)),
+    ) {
       KetchSegmented(
         options = DownloadPriority.entries,
         selected = session.priority,
         onSelect = { session.priority = it },
-        label = ::priorityLabel,
+        label = { priorityText(it).resolve() },
         icon = { priority -> KetchIcon.Bolt.takeIf { priority == DownloadPriority.URGENT } },
       )
     }
     if (session.mode != IntakeMode.Retry) {
-      OptionField("Start") {
+      OptionField(stringResource(Res.string.intake_start)) {
         StartTimePicker(value = session.schedule, onSelect = { session.schedule = it })
       }
     }
@@ -249,13 +323,15 @@ private fun ConnectionsField(session: IntakeSession) {
   val max = session.maxConnections ?: IntakeSession.MAX_CONNECTIONS
   val single = !torrents && max <= 1
   val auto = if (torrents) null else session.autoConnections?.coerceAtMost(max)
+  val singleReason = stringResource(Res.string.intake_single_connection)
   val caption = when {
-    single -> "This server allows 1 connection"
-    torrents -> "Auto lets the device decide"
-    auto != null -> "Auto uses the device's setting: $auto"
+    single -> singleReason
+    torrents -> stringResource(Res.string.intake_auto_device)
+    auto != null -> stringResource(Res.string.intake_auto_setting, auto)
     else -> null
   }
-  OptionField(if (torrents) "Peer limit" else "Connections", caption = caption) {
+  val label = if (torrents) Res.string.intake_peer_limit else Res.string.intake_connections
+  OptionField(stringResource(label), caption = caption) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
@@ -267,12 +343,12 @@ private fun ConnectionsField(session: IntakeSession) {
         range = if (torrents) PeerLimitRange else 1..max,
         step = if (torrents) PEER_LIMIT_STEP else 1,
         enabled = !single,
-        noun = if (torrents) "peers" else "connections",
-        disabledReason = "This server allows 1 connection".takeIf { single },
+        counts = if (torrents) StepperCount.Peers else StepperCount.Connections,
+        disabledReason = singleReason.takeIf { single },
       )
       if (connections != 0 && !single) {
         KetchButton(
-          text = "Auto",
+          text = stringResource(Res.string.intake_option_auto),
           onClick = { session.connections = 0 },
           variant = KetchButtonVariant.Ghost,
           size = KetchButtonSize.Small,
@@ -351,7 +427,7 @@ private fun OptionPill(
     }
     if (label != null && value.isNotEmpty()) {
       Text(
-        text = "$label:",
+        text = stringResource(Res.string.intake_pill_label, label),
         style = KetchTheme.typography.labelS,
         color = if (changed) colors.accentText else colors.textTertiary,
         maxLines = 1,
@@ -379,7 +455,7 @@ private fun ValueChip(
   text: String,
   onClick: () -> Unit,
   onRemove: (() -> Unit)?,
-  removeLabel: String = "Remove $text",
+  removeLabel: String = stringResource(Res.string.intake_remove_named, text),
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -436,12 +512,16 @@ private fun SaveToPill(
   val folder = session.folder
   val default = session.defaultFolder
   val free = session.targetStatus?.system?.usableSpace?.takeIf { folder == null && it > 0 }
-  val name = folderLabel(folder ?: default ?: "Downloads")
+  val name = folderLabel(folder ?: default ?: stringResource(Res.string.intake_folder_downloads))
+  val saveTo = stringResource(Res.string.intake_save_to)
   val local = session.target is EmbeddedInstance && actions.picker.canPickFolder
   Box(modifier) {
     OptionPill(
-      label = "Save to".takeIf { label },
-      value = name + (free?.takeIf { showFree }?.let { " · ${formatSpace(it)} free" } ?: ""),
+      label = saveTo.takeIf { label },
+      value = listOfNotNull(
+        verbatim(name),
+        free?.takeIf { showFree }?.let { Res.string.device_free_space.text(formatSpace(it)) },
+      ).joinText().resolve(),
       icon = KetchIcon.Folder,
       changed = folder != null,
       onClick = { expanded = true },
@@ -449,33 +529,34 @@ private fun SaveToPill(
     KetchMenu(
       expanded = expanded,
       onDismissRequest = { expanded = false },
-      title = "Save to",
+      title = saveTo,
     ) {
       item(
-        label = default?.let(::folderLabel) ?: "Default folder",
-        caption = default,
+        label = default?.let { verbatim(folderLabel(it)) }
+          ?: Res.string.intake_default_folder.text(),
+        caption = default?.let(::verbatim),
         icon = KetchIcon.Folder,
         checked = folder == null,
         onClick = { session.folder = null },
       )
       val recent = session.recentFolders.filter { it !in session.pinnedFolders }
       if (recent.isNotEmpty()) {
-        header("Recent")
+        header(Res.string.intake_recent.text())
         recent.forEach { path ->
           item(
-            label = folderLabel(path),
-            caption = path,
+            label = verbatim(folderLabel(path)),
+            caption = verbatim(path),
             checked = folder == path,
             onClick = { session.folder = path },
           )
         }
       }
       if (session.pinnedFolders.isNotEmpty()) {
-        header("Pinned")
+        header(Res.string.intake_pinned.text())
         session.pinnedFolders.forEach { path ->
           item(
-            label = folderLabel(path),
-            caption = path,
+            label = verbatim(folderLabel(path)),
+            caption = verbatim(path),
             icon = KetchIcon.Pennant,
             checked = folder == path,
             onClick = { session.folder = path },
@@ -484,10 +565,13 @@ private fun SaveToPill(
       }
       if (folder != null) {
         if (folder in session.pinnedFolders) {
-          item(label = "Unpin ${folderLabel(folder)}", onClick = { session.unpinFolder(folder) })
+          item(
+            label = Res.string.intake_unpin.text(folderLabel(folder)),
+            onClick = { session.unpinFolder(folder) },
+          )
         } else {
           item(
-            label = "Pin ${folderLabel(folder)}",
+            label = Res.string.intake_pin.text(folderLabel(folder)),
             icon = KetchIcon.Plus,
             onClick = { session.pinFolder(folder) },
           )
@@ -495,7 +579,11 @@ private fun SaveToPill(
       }
       divider()
       if (local) {
-        item(label = "Choose folder…", icon = KetchIcon.Folder, onClick = actions::pickFolder)
+        item(
+          label = Res.string.intake_choose_folder.text(),
+          icon = KetchIcon.Folder,
+          onClick = actions::pickFolder,
+        )
       } else {
         custom { dismiss -> FolderField(session, dismiss) }
       }
@@ -514,7 +602,7 @@ private fun FolderField(session: IntakeSession, dismiss: () -> Unit) {
   KetchTextField(
     value = path,
     onValueChange = { path = it },
-    label = "Folder on ${session.targetName()}",
+    label = stringResource(Res.string.intake_folder_on, session.targetName().resolve()),
     placeholder = session.defaultFolder.orEmpty(),
     mono = true,
     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -580,9 +668,9 @@ internal fun AdvancedSection(actions: IntakeActions) {
     modifier = Modifier.intakeCard().padding(spacing.s3),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      KetchEyebrow("Advanced", Modifier.weight(1f))
+      KetchEyebrow(stringResource(Res.string.intake_advanced), Modifier.weight(1f))
       KetchButton(
-        text = "Hide",
+        text = stringResource(Res.string.intake_hide),
         onClick = { session.updateAdvancedOpen(false) },
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
@@ -592,7 +680,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
     val own = (single?.source as? IntakeSource.Link)?.headers.orEmpty()
     if (own.isNotEmpty()) {
       Text(
-        text = "Also sent with this link: ${own.keys.joinToString(", ")}",
+        text = stringResource(Res.string.intake_also_sent, own.keys.joinToString(", ")),
         style = KetchTheme.typography.caption,
         color = colors.textSecondary,
       )
@@ -601,14 +689,14 @@ internal fun AdvancedSection(actions: IntakeActions) {
       KetchTextField(
         value = single.fileName,
         onValueChange = { single.fileName = it },
-        label = "File name",
+        label = stringResource(Res.string.intake_file_name),
         placeholder = single.name,
         enabled = !session.isSystemFolder,
         modifier = Modifier.fillMaxWidth(),
       )
       if (session.isSystemFolder) {
         Text(
-          text = "Uses the server's file name",
+          text = stringResource(Res.string.intake_server_file_name),
           style = KetchTheme.typography.caption,
           color = colors.textTertiary,
         )
@@ -620,13 +708,17 @@ internal fun AdvancedSection(actions: IntakeActions) {
         headers.referer = it
         changed()
       },
-      label = "Referer",
+      label = IntakeHeaders.REFERER,
       placeholder = "https://",
       mono = true,
       modifier = Modifier.fillMaxWidth(),
     )
     Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
-      Text("User-Agent", style = KetchTheme.typography.labelS, color = colors.textSecondary)
+      Text(
+        text = IntakeHeaders.USER_AGENT,
+        style = KetchTheme.typography.labelS,
+        color = colors.textSecondary,
+      )
       KetchSegmented(
         options = UserAgentChoice.entries,
         selected = headers.userAgent,
@@ -634,7 +726,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
           headers.userAgent = it
           changed()
         },
-        label = { it.label },
+        label = { it.label.resolve() },
       )
       if (headers.userAgent == UserAgentChoice.Custom) {
         KetchTextField(
@@ -655,7 +747,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
         headers.cookie = it
         changed()
       },
-      label = "Cookie",
+      label = COOKIE_HEADER,
       placeholder = "name=value; other=value",
       multiline = true,
     )
@@ -665,7 +757,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
         headers.authorization = it
         changed()
       },
-      label = "Authorization",
+      label = AUTHORIZATION_HEADER,
       placeholder = "Bearer …",
     )
     for (row in headers.extra.toList()) {
@@ -680,14 +772,14 @@ internal fun AdvancedSection(actions: IntakeActions) {
     }
     Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
       KetchButton(
-        text = "Add header",
+        text = stringResource(Res.string.intake_add_header),
         onClick = { headers.extra += HeaderRow() },
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
         leadingIcon = KetchIcon.Plus,
       )
       KetchButton(
-        text = "Paste cURL",
+        text = stringResource(Res.string.intake_paste_curl),
         onClick = { actions.pasteCurl() },
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
@@ -695,7 +787,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
       )
     }
     Text(
-      text = "Headers are saved with the task and visible to devices connected to this one.",
+      text = stringResource(Res.string.intake_headers_saved),
       style = KetchTheme.typography.caption,
       color = colors.textTertiary,
     )
@@ -741,7 +833,7 @@ private fun ExtraHeader(row: HeaderRow, onChange: () -> Unit, onRemove: () -> Un
         row.name = it
         onChange()
       },
-      placeholder = "Header",
+      placeholder = stringResource(Res.string.intake_header_name),
       clearable = false,
       modifier = Modifier.weight(HEADER_NAME_WEIGHT),
     )
@@ -751,13 +843,13 @@ private fun ExtraHeader(row: HeaderRow, onChange: () -> Unit, onRemove: () -> Un
         row.value = it
         onChange()
       },
-      placeholder = "Value",
+      placeholder = stringResource(Res.string.intake_header_value),
       mono = true,
       modifier = Modifier.weight(1f),
     )
     KetchIconButton(
       icon = KetchIcon.Close,
-      contentDescription = "Remove header",
+      contentDescription = stringResource(Res.string.intake_remove_header),
       size = KetchButtonSize.Small,
       onClick = onRemove,
     )
@@ -769,24 +861,30 @@ private fun ExtraHeader(row: HeaderRow, onChange: () -> Unit, onRemove: () -> Un
  * [presence], with [free] bytes when the sheet read them more recently; `null` when nothing is
  * known yet.
  */
-internal fun targetSummary(presence: DevicePresence?, free: Long? = null): String? {
+internal fun targetSummary(presence: DevicePresence?, free: Long? = null): UiText? {
   val usable = free ?: presence?.disk?.usableBytes?.takeIf { it > 0 }
   val active = presence?.counts?.downloading ?: 0
   return listOfNotNull(
-    usable?.let { "${formatSpace(it)} free" },
-    "$active active".takeIf { active > 0 },
-    "Slow lane".takeIf { presence?.speedMode?.isSlowLane == true },
-  ).joinToString(" · ").ifEmpty { null }
+    usable?.let { Res.string.device_free_space.text(formatSpace(it)) },
+    Res.string.device_active_downloads.text(active).takeIf { active > 0 },
+    Res.string.pulse_slow_lane.text().takeIf { presence?.speedMode?.isSlowLane == true },
+  ).takeIf { it.isNotEmpty() }?.joinText()
 }
 
+private fun priorityCaption(priority: DownloadPriority): StringResource = when (priority) {
+  DownloadPriority.LOW -> Res.string.intake_priority_low_caption
+  DownloadPriority.NORMAL -> Res.string.intake_priority_normal_caption
+  DownloadPriority.HIGH -> Res.string.intake_priority_high_caption
+  DownloadPriority.URGENT -> Res.string.intake_priority_urgent_caption
+}
 
-private fun priorityCaption(priority: DownloadPriority): String = when (priority) {
-  DownloadPriority.LOW -> "Runs when nothing else is waiting"
-  DownloadPriority.NORMAL -> "Default order"
-  DownloadPriority.HIGH -> "Ahead of Normal and Low"
-  DownloadPriority.URGENT -> "Jumps the queue; may pause a lower-priority download"
+/** What the ✕ of [option]'s chip does: "Reset speed". */
+private fun resetLabel(option: IntakeOption): StringResource = when (option) {
+  IntakeOption.Speed -> Res.string.intake_reset_speed
+  IntakeOption.Priority -> Res.string.intake_reset_priority
+  IntakeOption.Start -> Res.string.intake_reset_start
+  IntakeOption.Connections -> Res.string.intake_reset_connections
 }
 
 private const val SECRET_LINES = 3
-private const val SEPARATOR = " · "
 private const val HEADER_NAME_WEIGHT = 0.4f

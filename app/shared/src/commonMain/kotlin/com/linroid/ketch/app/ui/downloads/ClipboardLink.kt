@@ -30,6 +30,7 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.i18n.SEPARATOR
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.platform.SystemClipboard
@@ -44,7 +45,11 @@ import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.links
 import com.linroid.ketch.app.util.urlHost
 import com.linroid.ketch.config.ClipboardMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_clip_copied
+import ketch.app.shared.generated.resources.downloads_clip_dismiss
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 /** What the page knows about a link on the clipboard. */
 internal sealed interface ClipboardLink {
@@ -209,7 +214,8 @@ internal fun ClipboardChipRow(
   ) {
     KetchIconImage(KetchIcon.Link, size = KetchTheme.density.controlGlyph, tint = colors.accentText)
     Text(
-      text = listOfNotNull("Download copied link", label).joinToString(" · "),
+      text = listOfNotNull(stringResource(Res.string.downloads_clip_copied), label)
+        .joinToString(SEPARATOR),
       style = KetchTheme.typography.labelS,
       color = colors.accentText,
       maxLines = 1,
@@ -218,7 +224,7 @@ internal fun ClipboardChipRow(
     )
     KetchIconButton(
       icon = KetchIcon.Close,
-      contentDescription = "Don't offer this link",
+      contentDescription = stringResource(Res.string.downloads_clip_dismiss),
       onClick = onDismiss,
       tint = colors.accentText,
     )

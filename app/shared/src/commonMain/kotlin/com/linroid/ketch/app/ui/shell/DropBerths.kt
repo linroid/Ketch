@@ -34,11 +34,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.ui.DROP_KINDS
 import com.linroid.ketch.app.ui.DROP_OVERLAY_ALPHA
 import com.linroid.ketch.app.ui.DropHoverState
 import com.linroid.ketch.app.ui.DropOverlay
@@ -47,6 +50,13 @@ import com.linroid.ketch.app.ui.pulse.diskLabel
 import com.linroid.ketch.app.ui.sidebar.deviceLine
 import com.linroid.ketch.app.ui.sidebar.pennantName
 import com.linroid.ketch.app.ui.sidebar.rememberDevices
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.berth_drop_on
+import ketch.app.shared.generated.resources.berth_ready
+import ketch.app.shared.generated.resources.device_active_downloads
+import ketch.app.shared.generated.resources.drop_kinds
+import ketch.app.shared.generated.resources.shell_device_not_connected
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What a drag of links, magnets or `.torrent` files from another app shows over the content
@@ -116,7 +126,7 @@ internal fun DropBerths(state: AppState, hover: DropHoverState, modifier: Modifi
         }
       }
       Text(
-        text = DROP_KINDS,
+        text = stringResource(Res.string.drop_kinds),
         style = KetchTheme.typography.bodyS,
         color = colors.textSecondary,
         textAlign = TextAlign.Center,
@@ -163,9 +173,9 @@ internal fun BerthContent(device: DevicePresence, hovered: Boolean, modifier: Mo
       modifier = content.padding(bottom = spacing.s2),
     )
     // A narrow berth wraps before the name, not at a hyphen inside it.
-    val name = device.name.replace('-', NON_BREAKING_HYPHEN)
+    val name = device.name.resolve().replace('-', NON_BREAKING_HYPHEN)
     Text(
-      text = if (reachable) "Drop on $name" else name,
+      text = if (reachable) stringResource(Res.string.berth_drop_on, name) else name,
       style = KetchTheme.typography.bodyStrong,
       color = if (lit) colors.accentText else colors.textPrimary,
       textAlign = TextAlign.Center,
@@ -174,7 +184,7 @@ internal fun BerthContent(device: DevicePresence, hovered: Boolean, modifier: Mo
       modifier = content,
     )
     Text(
-      text = berthCaption(device),
+      text = berthCaption(device).resolve(),
       style = KetchTheme.typography.caption,
       color = colors.textSecondary,
       textAlign = TextAlign.Center,
@@ -189,14 +199,15 @@ internal fun BerthContent(device: DevicePresence, hovered: Boolean, modifier: Mo
  * The second line of [device]'s berth: "1.8 TB free · 3 active" while it can take a drop,
  * otherwise why it cannot.
  */
-internal fun berthCaption(device: DevicePresence): String {
-  if (!device.connected) return "Not connected"
+internal fun berthCaption(device: DevicePresence): UiText {
+  if (!device.connected) return Res.string.shell_device_not_connected.text()
   if (!device.health.isOnline) return deviceLine(device).text
   val parts = listOfNotNull(
     device.disk?.let(::diskLabel),
-    device.counts.downloading.takeIf { it > 0 }?.let { "$it active" }
+    device.counts.downloading.takeIf { it > 0 }
+      ?.let { Res.string.device_active_downloads.text(it) },
   )
-  return parts.joinToString(" · ").ifEmpty { "Ready" }
+  return if (parts.isEmpty()) Res.string.berth_ready.text() else parts.joinText()
 }
 
 /**

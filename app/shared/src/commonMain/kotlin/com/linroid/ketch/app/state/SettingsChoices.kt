@@ -5,11 +5,33 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
+import com.linroid.ketch.app.i18n.ByteUnit
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.decimalSeparator
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.i18n.weekdayShortText
 import com.linroid.ketch.app.util.clockText
 import com.linroid.ketch.app.util.percentDecode
 import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.Weekday
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.settings_auto_day_at
+import ketch.app.shared.generated.resources.settings_auto_full_speed_all_week
+import ketch.app.shared.generated.resources.settings_auto_full_speed_until
+import ketch.app.shared.generated.resources.settings_auto_slow_lane_all_week
+import ketch.app.shared.generated.resources.settings_auto_slow_lane_until
+import ketch.app.shared.generated.resources.settings_auto_tomorrow_at
+import ketch.app.shared.generated.resources.settings_folder_internal_storage
+import ketch.app.shared.generated.resources.settings_port_invalid
+import ketch.app.shared.generated.resources.settings_rule_every_day
+import ketch.app.shared.generated.resources.settings_rule_weekdays
+import ketch.app.shared.generated.resources.settings_rule_weekends
+import ketch.app.shared.generated.resources.settings_speed_unlimited
+import ketch.app.shared.generated.resources.speed_per_second
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
@@ -30,21 +52,29 @@ fun countChoices(presets: List<Int>, current: Int): List<Int> =
   (presets + current).distinct().sortedWith(compareBy({ it == 0 }, { it }))
 
 /** "Unlimited", "512 KB/s", "2 MB/s" or "1.5 MB/s". */
-fun formatSpeedLimit(limit: SpeedLimit): String {
-  if (limit.isUnlimited) return "Unlimited"
+fun speedLimitText(limit: SpeedLimit): UiText {
+  if (limit.isUnlimited) return Res.string.settings_speed_unlimited.text()
   val unit = preferredUnit(limit)
-  return "${formatSpeedAmount(limit, unit)} ${unit.label}"
+  val size = when (unit) {
+    SpeedUnit.KB -> ByteUnit.KB
+    SpeedUnit.MB -> ByteUnit.MB
+  }
+  return Res.string.speed_per_second.text(size.text(formatSpeedAmount(limit, unit)))
 }
 
 /** MB/s from 1 MB/s up, KB/s below. */
 fun preferredUnit(limit: SpeedLimit): SpeedUnit =
   if (limit.bytesPerSecond >= SpeedUnit.MB.bytes) SpeedUnit.MB else SpeedUnit.KB
 
-/** [limit] in [unit], with up to two decimals: "2", "1.5", "0.25". */
+/**
+ * [limit] in [unit], with up to two decimals and the locale's decimal separator: "2", "1.5",
+ * "0.25" ("1,5" in German), which the speed fields read back.
+ */
 fun formatSpeedAmount(limit: SpeedLimit, unit: SpeedUnit): String {
   val hundredths = (limit.bytesPerSecond * 100 + unit.bytes / 2) / unit.bytes
   val fraction = (hundredths % 100).toString().padStart(2, '0').trimEnd('0')
-  return if (fraction.isEmpty()) "${hundredths / 100}" else "${hundredths / 100}.$fraction"
+  if (fraction.isEmpty()) return "${hundredths / 100}"
+  return "${hundredths / 100}${decimalSeparator()}$fraction"
 }
 
 /**
@@ -82,9 +112,9 @@ private val SlowLaneSpeeds = listOf(
 )
 
 /** Why [text] is not a usable TCP port, or `null` when it is. */
-fun portError(text: String): String? {
+fun portError(text: String): UiText? {
   val port = text.trim().toIntOrNull()
-  return if (port == null || port !in 1..65535) "Enter a port from 1 to 65535." else null
+  return if (port == null || port !in 1..65535) Res.string.settings_port_invalid.text() else null
 }
 
 /** The rule "Add rule" starts from: working days, 09:00 to 18:00. */
@@ -112,19 +142,19 @@ fun toggleRuleDay(days: Set<Weekday>, day: Weekday): Set<Weekday> {
 }
 
 /** "Every day", "Weekdays", "Weekends" or the days in order, such as "Mon, Wed, Fri". */
-fun ruleDaysLabel(days: Set<Weekday>): String {
+fun ruleDaysLabel(days: Set<Weekday>): UiText {
   val workdays = Weekday.entries.take(WORK_DAYS).toSet()
   return when {
-    days.isEmpty() || days.size == Weekday.entries.size -> "Every day"
-    days == workdays -> "Weekdays"
-    days == Weekday.entries.toSet() - workdays -> "Weekends"
-    else -> Weekday.entries.filter { it in days }.joinToString(", ") { it.shortName }
+    days.isEmpty() || days.size == Weekday.entries.size -> Res.string.settings_rule_every_day.text()
+    days == workdays -> Res.string.settings_rule_weekdays.text()
+    days == Weekday.entries.toSet() - workdays -> Res.string.settings_rule_weekends.text()
+    else -> Weekday.entries.filter { it in days }.map { it.shortName }.joinText(DAY_SEPARATOR)
   }
 }
 
 /** "Mon" to "Sun". */
-val Weekday.shortName: String
-  get() = name.take(SHORT_DAY_LENGTH)
+val Weekday.shortName: UiText
+  get() = weekdayShortText(DayOfWeek.entries[ordinal])
 
 /**
  * A rule time typed as "9", "9:30", "930" or "09:30", as the `HH:MM` that [SpeedRule] keeps;
@@ -152,24 +182,25 @@ fun normalizeRuleTime(text: String): String? {
  *
  * @param mode the Auto mode in effect, from [SpeedModeController.mode].
  */
-fun autoModeSummary(mode: SpeedMode.Auto, now: Instant, zone: TimeZone): String {
+fun autoModeSummary(mode: SpeedMode.Auto, now: Instant, zone: TimeZone): UiText {
   val until = mode.until
-  val state = if (mode.slowLane) "Slow lane on" else "Full speed"
   return when {
-    until != null -> "$state until ${changeTime(until, now, zone)}"
-    mode.slowLane -> "Slow lane on all week"
-    else -> "Full speed, no rule starts this week"
+    until != null && mode.slowLane ->
+      Res.string.settings_auto_slow_lane_until.text(changeTime(until, now, zone))
+    until != null -> Res.string.settings_auto_full_speed_until.text(changeTime(until, now, zone))
+    mode.slowLane -> Res.string.settings_auto_slow_lane_all_week.text()
+    else -> Res.string.settings_auto_full_speed_all_week.text()
   }
 }
 
 // "18:00" today, "tomorrow 09:00", or "Fri 09:00" later in the week.
-private fun changeTime(at: Instant, now: Instant, zone: TimeZone): String {
+private fun changeTime(at: Instant, now: Instant, zone: TimeZone): UiText {
   val time = at.toLocalDateTime(zone)
   val today = now.toLocalDateTime(zone).date
   return when (time.date) {
-    today -> time.clockText()
-    today.plus(1, DateTimeUnit.DAY) -> "tomorrow ${time.clockText()}"
-    else -> "${Weekday.entries[time.dayOfWeek.ordinal].shortName} ${time.clockText()}"
+    today -> verbatim(time.clockText())
+    today.plus(1, DateTimeUnit.DAY) -> Res.string.settings_auto_tomorrow_at.text(time.clockText())
+    else -> Res.string.settings_auto_day_at.text(weekdayShortText(time.dayOfWeek), time.clockText())
   }
 }
 
@@ -185,13 +216,18 @@ fun isDocumentTree(path: String): Boolean = path.startsWith("content://")
 
 /**
  * Short name of a download folder: its last segment, such as "Downloads", or for a document tree
- * URI the folder it names, such as "Download" for `…/tree/primary%3ADownload`.
+ * URI the folder it names, such as "Download" for `…/tree/primary%3ADownload`, and "Internal
+ * storage" for the root of the device's storage.
  */
-fun folderName(path: String): String {
+fun folderNameText(path: String): UiText =
+  storageFolderName(path)?.let(::verbatim) ?: Res.string.settings_folder_internal_storage.text()
+
+// The name of the folder at path, or null for the root of a document tree.
+private fun storageFolderName(path: String): String? {
   if (isDocumentTree(path)) {
     val document = percentDecode(path.substringAfterLast('/'))
     val folder = document.substringAfter(':').trimEnd('/').substringAfterLast('/')
-    return folder.ifEmpty { "Internal storage" }
+    return folder.ifEmpty { null }
   }
   val trimmed = path.trimEnd('/', '\\')
   return trimmed.substringAfterLast('/').substringAfterLast('\\').ifEmpty { path }
@@ -271,4 +307,6 @@ fun parseHostList(text: String): List<String> =
 
 private const val RECENT_FOLDERS = 3
 private const val WORK_DAYS = 5
-private const val SHORT_DAY_LENGTH = 3
+
+// Between the days of a rule, as in "Mon, Wed, Fri".
+private const val DAY_SEPARATOR = ", "

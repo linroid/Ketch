@@ -5,10 +5,13 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
@@ -19,14 +22,24 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
 import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_try_again
+import ketch.app.shared.generated.resources.action_undo
+import ketch.app.shared.generated.resources.device_drop_read_failed
+import ketch.app.shared.generated.resources.device_drop_unsupported
+import ketch.app.shared.generated.resources.device_reconnect_failed
+import ketch.app.shared.generated.resources.device_slow_lane_off
+import ketch.app.shared.generated.resources.device_slow_lane_on
+import ketch.app.shared.generated.resources.device_speed_follows_rules
+import ketch.app.shared.generated.resources.device_speed_mode_failed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 
@@ -81,23 +94,28 @@ internal fun AppState.switchSpeedMode(
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
-      log.w { "Couldn't switch to $name: ${e.describeCauses()}" }
+      log.w { "Couldn't switch to $mode: ${e.describeCauses()}" }
       messages.post(
         level = MessageLevel.Error,
-        title = "Couldn't switch to $name",
+        title = Res.string.device_speed_mode_failed.text(name),
         actions = listOf(
-          MessageAction("Try again") { switchSpeedMode(controller, mode, undoable) }
+          MessageAction(Res.string.action_try_again.text()) {
+            switchSpeedMode(controller, mode, undoable)
+          },
         ),
         cause = e,
       )
       return@launchCommand
     }
     val title = when (mode) {
-      SpeedLimitMode.SlowLane -> "Slow lane on · ${formatSpeedLimit(controller.slowLaneLimit)}"
-      SpeedLimitMode.Full -> "Slow lane off"
-      SpeedLimitMode.Auto -> "Speed follows your rules"
+      SpeedLimitMode.SlowLane ->
+        Res.string.device_slow_lane_on.text(speedLimitText(controller.slowLaneLimit))
+      SpeedLimitMode.Full -> Res.string.device_slow_lane_off.text()
+      SpeedLimitMode.Auto -> Res.string.device_speed_follows_rules.text()
     }
-    val undo = MessageAction("Undo") { switchSpeedMode(controller, previous, undoable = false) }
+    val undo = MessageAction(Res.string.action_undo.text()) {
+      switchSpeedMode(controller, previous, undoable = false)
+    }
     messages.post(
       level = MessageLevel.Success,
       title = title,
@@ -122,7 +140,7 @@ internal fun AppState.retryNow(device: RemoteInstance): Job = launchCommand {
     log.w { "Couldn't reconnect to ${device.deviceId}: ${e.describeCauses()}" }
     messages.post(
       level = MessageLevel.Error,
-      title = "Couldn't reconnect to ${device.label}",
+      title = Res.string.device_reconnect_failed.text(device.displayName),
       cause = e,
       deviceId = device.deviceId,
     )
@@ -186,7 +204,7 @@ internal fun AppState.dropFiles(entry: InstanceEntry, files: List<DroppedFile>) 
   if (lists.isEmpty()) {
     messages.post(
       level = MessageLevel.Error,
-      title = "Only .torrent files and lists of links can be dropped to add downloads",
+      title = Res.string.device_drop_unsupported.text(),
     )
     return
   }
@@ -197,8 +215,8 @@ internal fun AppState.dropFiles(entry: InstanceEntry, files: List<DroppedFile>) 
           log.w { "Couldn't read a dropped link list: ${e.describeCauses()}" }
           messages.post(
             level = MessageLevel.Error,
-            title = "Couldn't read ${file.name}",
-            detail = e.message,
+            title = Res.string.device_drop_read_failed.text(file.name),
+            detail = e.message?.let(::verbatim),
             cause = e,
           )
         }

@@ -21,16 +21,26 @@ import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.SpeedHistoryStore
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.clockTime
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.pulse_history_empty
+import ketch.app.shared.generated.resources.pulse_last_5_minutes
+import ketch.app.shared.generated.resources.pulse_limit
+import ketch.app.shared.generated.resources.pulse_no_limit
+import ketch.app.shared.generated.resources.pulse_speed
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 import kotlin.time.Instant
 
@@ -48,7 +58,7 @@ internal fun SpeedHistoryPopover(
     expanded = expanded,
     onDismissRequest = onDismissRequest,
     width = PopoverWidth,
-    title = "Speed",
+    title = stringResource(Res.string.pulse_speed),
   ) {
     val pulse by state.pulse.state.collectAsState()
     val instances by state.instances.collectAsState()
@@ -59,11 +69,11 @@ internal fun SpeedHistoryPopover(
     SpeedHistoryContent(
       samples = chart.samples,
       end = chart.end,
-      limitLabel = view.label.takeUnless { view.limit.isUnlimited },
+      limitLabel = view.label.takeUnless { view.limit.isUnlimited }?.resolve(),
       limit = view.limit.takeUnless { it.isUnlimited }?.bytesPerSecond,
       devices = pulse.devices,
       pennantName = { device ->
-        instances.firstOrNull { it.deviceId == device.deviceId }?.label ?: device.name
+        instances.firstOrNull { it.deviceId == device.deviceId }?.label ?: device.deviceId
       },
     )
   }
@@ -82,13 +92,13 @@ internal fun SpeedHistoryContent(
   limitLabel: String?,
   limit: Long?,
   devices: List<DevicePulse>,
-  pennantName: (DevicePulse) -> String = { it.name },
+  pennantName: (DevicePulse) -> String = { it.deviceId },
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val zone = remember { TimeZone.currentSystemDefault() }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-    KetchEyebrow("Last 5 minutes")
+    KetchEyebrow(stringResource(Res.string.pulse_last_5_minutes))
     if (samples.any { it > 0 }) {
       KetchSpeedChart(
         bands = listOf(SpeedBand(samples, colors.accent)),
@@ -102,7 +112,7 @@ internal fun SpeedHistoryContent(
       )
     } else {
       Text(
-        text = "Nothing downloaded in the last 5 minutes.",
+        text = stringResource(Res.string.pulse_history_empty),
         style = KetchTheme.typography.caption,
         color = colors.textSecondary,
       )
@@ -128,21 +138,25 @@ private fun DeviceSpeedRow(device: DevicePulse, pennantName: String) {
     )
     Column(Modifier.weight(1f)) {
       Text(
-        text = device.name,
+        text = device.name.resolve(),
         style = KetchTheme.typography.label,
         color = colors.textPrimary,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
       Text(
-        text = if (device.cap.isUnlimited) "No limit" else "Limit ${formatSpeedLimit(device.cap)}",
+        text = if (device.cap.isUnlimited) {
+          stringResource(Res.string.pulse_no_limit)
+        } else {
+          Res.string.pulse_limit.text(speedLimitText(device.cap)).resolve()
+        },
         style = KetchTheme.typography.caption,
         color = colors.textTertiary,
         maxLines = 1,
       )
     }
     Text(
-      text = if (device.health.isOnline) speedText(device.speed).toString() else "—",
+      text = if (device.health.isOnline) speedText(device.speed).resolve() else "—",
       style = KetchTheme.typography.numeral,
       color = colors.textPrimary,
     )

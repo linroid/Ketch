@@ -6,6 +6,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IncomingDownload
@@ -125,7 +126,7 @@ class AppStateDroppedFileTest {
     )
     runCurrent()
 
-    assertEquals("too large", assertIs<ResolveState.Error>(state.resolveState).message)
+    assertEquals("too large", assertIs<ResolveState.Error>(state.resolveState).text.load())
     assertNull(api.lastResolvedContent)
   }
 
@@ -143,7 +144,7 @@ class AppStateDroppedFileTest {
 
     assertEquals(
       "broken.torrent is not a valid torrent file",
-      assertIs<ResolveState.Error>(state.resolveState).message,
+      assertIs<ResolveState.Error>(state.resolveState).text.load(),
     )
   }
 

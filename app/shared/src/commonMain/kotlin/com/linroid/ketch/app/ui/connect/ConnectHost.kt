@@ -8,9 +8,13 @@ import androidx.compose.runtime.remember
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DiscoveryState
 import com.linroid.ketch.app.util.PairingLink
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.connect_link_incomplete
+import ketch.app.shared.generated.resources.connect_link_incomplete_detail
 
 private val log = KetchLogger("ConnectHost")
 
@@ -36,8 +40,8 @@ fun ConnectHost(state: AppState) {
         log.w { "Ignoring a pairing link that names no device: ${redactUrl(pairing.label)}" }
         state.messages.post(
           level = MessageLevel.Error,
-          title = "That pairing link is incomplete",
-          detail = "Copy it again from Settings › Sharing on the other device",
+          title = Res.string.connect_link_incomplete.text(),
+          detail = Res.string.connect_link_incomplete_detail.text(),
         )
         state.incoming.complete(pairing)
       }

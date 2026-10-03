@@ -2,6 +2,8 @@ package com.linroid.ketch.app.components
 
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.app.i18n.load
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -222,38 +224,38 @@ class LaneStripTest {
   }
 
   @Test
-  fun laneStripDescription_downloading_countsConnectionsActiveAndPercent() {
+  fun laneStripDescription_downloading_countsConnectionsActiveAndPercent() = runTest {
     val segments = evenSegments(8, downloaded = 50).mapIndexed { i, segment ->
       if (i < 2) segment.copy(downloadedBytes = segment.totalBytes) else segment
     }
 
     assertEquals(
       "8 connections, 6 active, 62 percent",
-      laneStripDescription(segments, progress = null, phase = LanePhase.Downloading)
+      laneStripDescription(segments, progress = null, phase = LanePhase.Downloading).load()
     )
     assertEquals(
       "8 connections, 6 active, 62 percent, 1 stalled",
-      laneStripDescription(segments, progress = null, phase = LanePhase.Downloading, stalled = 1)
+      laneStripDescription(segments, null, LanePhase.Downloading, stalled = 1).load()
     )
   }
 
   @Test
-  fun laneStripDescription_paused_leavesOutActiveConnections() {
+  fun laneStripDescription_paused_leavesOutActiveConnections() = runTest {
     val segments = listOf(Segment(0, 0, 99, downloadedBytes = 42))
 
     assertEquals(
       "1 connection, 42 percent",
-      laneStripDescription(segments, progress = null, phase = LanePhase.Paused)
+      laneStripDescription(segments, progress = null, phase = LanePhase.Paused).load()
     )
   }
 
   @Test
-  fun laneStripDescription_unknownSize_saysSo() {
+  fun laneStripDescription_unknownSize_saysSo() = runTest {
     val progress = DownloadProgress(downloadedBytes = 300, totalBytes = -1)
 
     assertEquals(
       "size unknown",
-      laneStripDescription(emptyList(), progress, phase = LanePhase.Downloading)
+      laneStripDescription(emptyList(), progress, phase = LanePhase.Downloading).load()
     )
   }
 

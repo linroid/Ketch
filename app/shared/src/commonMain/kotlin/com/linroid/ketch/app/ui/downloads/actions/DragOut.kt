@@ -4,6 +4,7 @@ import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
@@ -26,6 +27,10 @@ import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.KetchTypography
 import com.linroid.ketch.app.ui.list.outputFile
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.count_downloads
+import ketch.app.shared.generated.resources.row_files
+import org.jetbrains.compose.resources.pluralStringResource
 
 /**
  * What dragging rows out of the Downloads list carries.
@@ -83,16 +88,24 @@ internal expect fun draggedTaskKeys(event: DragAndDropEvent): List<TaskKey>
  *
  * @param rows the rows a drag that starts here carries: the selection when this row is in it,
  *   otherwise this row.
+ * @param count what the drag shows after the first row's name when it carries several rows,
+ *   [dragCount] of them.
  */
 @Composable
-internal fun Modifier.taskDragSource(rows: () -> List<TaskRow>): Modifier {
+internal fun Modifier.taskDragSource(
+  rows: () -> List<TaskRow>,
+  count: () -> String?,
+): Modifier {
   val measurer = rememberTextMeasurer()
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
   val currentRows by rememberUpdatedState(rows)
+  val currentCount by rememberUpdatedState(count)
   return dragAndDropSource(
-    drawDragDecoration = { drawDragPreview(currentRows(), measurer, colors, spacing, type) },
+    drawDragDecoration = {
+      drawDragPreview(currentRows(), measurer, colors, spacing, type, currentCount())
+    },
   ) { _ ->
     val dragged = currentRows()
     if (dragged.isEmpty()) null else dragTransferData(DragPayload.of(dragged))
@@ -100,9 +113,24 @@ internal fun Modifier.taskDragSource(rows: () -> List<TaskRow>): Modifier {
 }
 
 /**
+ * What a drag of [rows] shows after the first row's name: "3 files" when every row brings its
+ * file, otherwise "3 downloads"; `null` for one row.
+ */
+@Composable
+internal fun dragCount(rows: List<TaskRow>): String? {
+  if (rows.size < 2) return null
+  val files = remember(rows) { DragPayload.of(rows).files.size }
+  return if (files == rows.size) {
+    pluralStringResource(Res.plurals.row_files, rows.size, rows.size)
+  } else {
+    pluralStringResource(Res.plurals.count_downloads, rows.size, rows.size)
+  }
+}
+
+/**
  * Draws what a drag of [rows] shows under the pointer, in the theme's [colors], [spacing] and
- * [type]: a pill with the first row's name and, for several rows, how many files or downloads
- * come along, at the start of the drawing area.
+ * [type]: a pill with the first row's name and, for several rows, [count], how many files or
+ * downloads come along, at the start of the drawing area.
  */
 internal fun DrawScope.drawDragPreview(
   rows: List<TaskRow>,
@@ -110,18 +138,14 @@ internal fun DrawScope.drawDragPreview(
   colors: KetchColors,
   spacing: KetchSpacing,
   type: KetchTypography,
+  count: String?,
 ) {
   val first = rows.firstOrNull() ?: return
   val padding = spacing.s3.toPx()
   val gap = spacing.s2.toPx()
   val height = spacing.s8.toPx().coerceAtMost(size.height)
-  val badge = if (rows.size > 1) {
-    val files = DragPayload.of(rows).files.size
-    val noun = if (files == rows.size) "files" else "downloads"
-    measurer.measure("${rows.size} $noun", type.numeralS.copy(color = colors.onAccent))
-  } else {
-    null
-  }
+  val badge = count?.takeIf { rows.size > 1 }
+    ?.let { measurer.measure(it, type.numeralS.copy(color = colors.onAccent)) }
   val badgeWidth = badge?.let { it.size.width + gap * 2 } ?: 0f
   val nameMax = (size.width - padding * 2 - badgeWidth - gap).coerceAtLeast(0f)
   val name = measurer.measure(

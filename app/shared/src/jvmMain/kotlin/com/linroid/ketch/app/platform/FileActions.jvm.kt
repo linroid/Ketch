@@ -1,6 +1,12 @@
 package com.linroid.ketch.app.platform
 
 import androidx.compose.runtime.Composable
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.reveal_in_explorer
+import ketch.app.shared.generated.resources.reveal_in_finder
+import ketch.app.shared.generated.resources.reveal_in_folder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
@@ -42,10 +48,10 @@ internal sealed interface RevealCommand {
 }
 
 /** Menu label of [FileActions.reveal] on [os]. */
-internal fun revealLabel(os: DesktopOs): String = when (os) {
-  DesktopOs.MacOs -> "Show in Finder"
-  DesktopOs.Windows -> "Show in Explorer"
-  DesktopOs.Linux -> "Show in folder"
+internal fun revealLabel(os: DesktopOs): UiText = when (os) {
+  DesktopOs.MacOs -> Res.string.reveal_in_finder.text()
+  DesktopOs.Windows -> Res.string.reveal_in_explorer.text()
+  DesktopOs.Linux -> Res.string.reveal_in_folder.text()
 }
 
 /**
@@ -78,7 +84,7 @@ internal fun revealCommand(os: DesktopOs, file: File, canBrowse: Boolean): Revea
 internal object DesktopFileActions : FileActions {
   private val os = DesktopOs.current
 
-  override val revealLabel: String = revealLabel(os)
+  override val revealLabel: UiText = revealLabel(os)
 
   override val canShare: Boolean = false
 

@@ -16,12 +16,13 @@ import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.testStatus
 import com.linroid.ketch.app.testSystem
 import com.linroid.ketch.app.util.extractFilename
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
@@ -33,6 +34,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -47,6 +49,10 @@ class IntakeStateTest {
 
   private val links = (1..5).map { "https://cdn.example.com/files/archive-$it.zip" }
 
+  // Loading a string for the first time lets virtual time run, which would time magnets out.
+  @BeforeTest
+  fun loadStrings() = runTest { warmStrings() }
+
   @Test
   fun submit_fiveLinks_addsFiveTasks() = runTest {
     val api = IntakeTestApi()
@@ -54,8 +60,8 @@ class IntakeStateTest {
 
     assertEquals(5, session.summary.links)
     assertEquals(5, session.summary.ready)
-    assertTrue(session.summary.text.startsWith("5 links · 5 ready · "))
-    assertEquals("Download 5 files · ${formatBytes(5_000_000)}", session.primaryLabel)
+    assertTrue(session.summary.text.load().startsWith("5 links · 5 ready · "))
+    assertEquals("Download 5 files · 4.8 MB", session.primaryLabel.load())
     var closed = false
     session.submit { closed = true }
     runCurrent()
@@ -83,8 +89,9 @@ class IntakeStateTest {
   fun primaryLabel_oneLink_namesTheFile() = runTest {
     val session = session(IntakeTestApi(), IntakeRequest(links.first()))
 
-    assertEquals("Download archive-1.zip", session.primaryLabel)
+    assertEquals("Download archive-1.zip", session.primaryLabel.load())
     assertEquals("download", session.submitVerb)
+    assertEquals("↩ to download", session.submitHint("↩").load())
   }
 
   @Test
@@ -93,8 +100,9 @@ class IntakeStateTest {
 
     session.schedule = DownloadSchedule.AtTime(Instant.parse("2030-01-01T01:00:00Z"))
 
-    assertEquals("Schedule 2 files", session.primaryLabel)
+    assertEquals("Schedule 2 files", session.primaryLabel.load())
     assertEquals("schedule", session.submitVerb)
+    assertEquals("↩ to schedule", session.submitHint("↩").load())
     // The Start chip says when, so the outcome line does not repeat it.
     assertNull(session.outcome)
   }
@@ -105,7 +113,8 @@ class IntakeStateTest {
     val api = IntakeTestApi(check = { url, _ -> if (url == magnet) torrent(url) else ready(url) })
     val session = session(api, IntakeRequest("${links.first()}\n$magnet"))
 
-    assertTrue(session.primaryLabel.startsWith("Download 2 items · "), session.primaryLabel)
+    val label = session.primaryLabel.load()
+    assertTrue(label.startsWith("Download 2 items · "), label)
   }
 
   @Test
@@ -114,7 +123,7 @@ class IntakeStateTest {
     api.base.add(DownloadState.Queued, DownloadRequest(links.first()))
     val session = session(api, IntakeRequest(links.first()))
 
-    assertEquals("Nothing to add", session.primaryLabel)
+    assertEquals("Nothing to add", session.primaryLabel.load())
     assertFalse(session.canSubmit)
   }
 
@@ -151,7 +160,7 @@ class IntakeStateTest {
     val session = session(api, IntakeRequest(editTask = TaskKey(LOCAL_DEVICE_ID, task.taskId)))
 
     assertTrue(session.showsOptions)
-    assertEquals("Apply changes", session.primaryLabel)
+    assertEquals("Apply changes", session.primaryLabel.load())
     assertEquals("apply", session.submitVerb)
   }
 
@@ -174,12 +183,12 @@ class IntakeStateTest {
 
     val values = session.optionValues
 
-    assertEquals(listOf("Unlimited", "Normal", "Now", "Auto"), values.map { it.text })
+    assertEquals(listOf("Unlimited", "Normal", "Now", "Auto"), values.map { it.text }.load())
     assertTrue(values.none { it.changed })
   }
 
   @Test
-  fun intakeOptionValues_changedValues_readAsChips() {
+  fun intakeOptionValues_changedValues_readAsChips() = runTest {
     val values = intakeOptionValues(
       speedLimit = SpeedLimit.mbps(2),
       priority = DownloadPriority.URGENT,
@@ -193,13 +202,13 @@ class IntakeStateTest {
 
     assertEquals(
       listOf("Max 2 MB/s", "⚡ Urgent", "Starts 23:00 tonight", "8 connections"),
-      values.map { it.text },
+      values.map { it.text }.load(),
     )
     assertTrue(values.all { it.changed })
   }
 
   @Test
-  fun intakeOptionValues_retryHighPriorityAndTorrentPeers_readTheirOwnWay() {
+  fun intakeOptionValues_retryHighPriorityAndTorrentPeers_readTheirOwnWay() = runTest {
     val values = intakeOptionValues(
       speedLimit = SpeedLimit.Unlimited,
       priority = DownloadPriority.HIGH,
@@ -215,11 +224,14 @@ class IntakeStateTest {
       listOf(IntakeOption.Speed, IntakeOption.Priority, IntakeOption.Connections),
       values.map { it.option },
     )
-    assertEquals(listOf("Unlimited", "High priority", "50 peers"), values.map { it.text })
+    assertEquals(
+      listOf("Unlimited", "High priority", "50 peers"),
+      values.map { it.text }.load(),
+    )
   }
 
   @Test
-  fun intakeOptionValues_startThatPassed_isNotAChange() {
+  fun intakeOptionValues_startThatPassed_isNotAChange() = runTest {
     val values = intakeOptionValues(
       speedLimit = SpeedLimit.Unlimited,
       priority = DownloadPriority.NORMAL,
@@ -231,11 +243,14 @@ class IntakeStateTest {
       zone = TimeZone.UTC,
     )
 
-    assertEquals(IntakeOptionValue(IntakeOption.Start, "Now", changed = false), values[2])
+    val start = values[2]
+    assertEquals(IntakeOption.Start, start.option)
+    assertEquals("Now", start.text.load())
+    assertFalse(start.changed)
   }
 
   @Test
-  fun intakeOptionValues_serverWithOneConnection_isNotAChange() {
+  fun intakeOptionValues_serverWithOneConnection_isNotAChange() = runTest {
     val values = intakeOptionValues(
       speedLimit = SpeedLimit.Unlimited,
       priority = DownloadPriority.NORMAL,
@@ -248,7 +263,7 @@ class IntakeStateTest {
     )
 
     val connections = values.single { it.option == IntakeOption.Connections }
-    assertEquals("1 connection", connections.text)
+    assertEquals("1 connection", connections.text.load())
     assertFalse(connections.changed)
   }
 
@@ -309,8 +324,8 @@ class IntakeStateTest {
     assertEquals(4, api.base.requests.size)
     val toast = state.messages.active.value.last()
     assertEquals(MessageLevel.Warning, toast.level)
-    assertTrue(toast.title.endsWith("· 1 failed"), toast.title)
-    assertEquals("Review", toast.actions.first().label)
+    assertTrue(toast.title.load().endsWith("· 1 failed"), toast.title.load())
+    assertEquals("Review", toast.actions.first().label.load())
   }
 
   @Test
@@ -326,7 +341,7 @@ class IntakeStateTest {
     session.submit {}
     runCurrent()
     val review = state.messages.active.value.last().actions.first()
-    assertEquals("Review", review.label)
+    assertEquals("Review", review.label.load())
     review.onClick()
 
     assertEquals(listOf(parts[1]), state.intakeRequest?.seeds?.map { it.url })
@@ -340,7 +355,7 @@ class IntakeStateTest {
     val session = session(api, IntakeRequest(links.joinToString("\n")))
 
     assertEquals(1, session.summary.attention)
-    assertEquals("Download 4 files · ${formatBytes(4_000_000)}", session.primaryLabel)
+    assertEquals("Download 4 files · 3.8 MB", session.primaryLabel.load())
     session.submit {}
     runCurrent()
 
@@ -391,9 +406,15 @@ class IntakeStateTest {
   }
 
   @Test
-  fun summaryText_severalProblems_agreesInNumber() {
-    assertEquals("2 links · 1 ready · 1 needs attention", IntakeSummary(2, 1, 0, 1, 0, 0).text)
-    assertEquals("3 links · 1 ready · 2 need attention", IntakeSummary(3, 1, 0, 2, 0, 0).text)
+  fun summaryText_severalProblems_agreesInNumber() = runTest {
+    assertEquals(
+      "2 links · 1 ready · 1 needs attention",
+      IntakeSummary(2, 1, 0, 1, 0, 0).text.load(),
+    )
+    assertEquals(
+      "3 links · 1 ready · 2 need attention",
+      IntakeSummary(3, 1, 0, 2, 0, 0).text.load(),
+    )
   }
 
   @Test
@@ -425,7 +446,7 @@ class IntakeStateTest {
     val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
     val session = session(api, IntakeRequest(magnet))
 
-    assertEquals("Waiting for file list", session.primaryLabel)
+    assertEquals("Waiting for file list", session.primaryLabel.load())
     assertFalse(session.canSubmit)
     metadata.complete(torrent(magnet))
     runCurrent()
@@ -434,7 +455,7 @@ class IntakeStateTest {
     val entry = session.entries.single()
     assertEquals(entry, session.torrentStage)
     assertEquals(setOf("0", "1"), entry.selectedFiles)
-    assertEquals("Download 2 files · ${formatBytes(2_000)}", session.primaryLabel)
+    assertEquals("Download 2 files · 2.0 KB", session.primaryLabel.load())
   }
 
   @Test
@@ -575,7 +596,7 @@ class IntakeStateTest {
     session.priority = DownloadPriority.HIGH
 
     assertFalse(session.startsOver)
-    assertEquals("Retry", session.primaryLabel)
+    assertEquals("Retry", session.primaryLabel.load())
     session.submit {}
     runCurrent()
 
@@ -620,7 +641,7 @@ class IntakeStateTest {
     session.headers.cookie = "session=1"
 
     assertTrue(session.startsOver)
-    assertEquals("Start over", session.primaryLabel)
+    assertEquals("Start over", session.primaryLabel.load())
     session.submit {}
     runCurrent()
 
@@ -676,7 +697,7 @@ class IntakeStateTest {
   }
 
   @Test
-  fun intakeOutcome_freeSlots_startNowWithTheTime() {
+  fun intakeOutcome_freeSlots_startNowWithTheTime() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 2)
     val running = listOf(task("a", downloading(speed = 1_000_000)))
     val outcome =
@@ -686,16 +707,19 @@ class IntakeStateTest {
   }
 
   @Test
-  fun intakeOutcome_lessThanAMinuteLeft_saysSoWithoutApproximating() {
+  fun intakeOutcome_lessThanAMinuteLeft_saysSoWithoutApproximating() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 2)
     val running = listOf(task("a", downloading(speed = 1_000_000)))
     val outcome = outcome(listOf("a.example"), DownloadPriority.NORMAL, config, running, 30_000_000)
 
-    assertEquals("Starts now · 1 of 2 slots free · under a minute at current speed", outcome)
+    assertEquals(
+      "Starts now · 1 of 2 slots free · under a minute at current speed",
+      outcome,
+    )
   }
 
   @Test
-  fun intakeOutcome_slotsFull_isQueuedBehindTheWaitingOnes() {
+  fun intakeOutcome_slotsFull_isQueuedBehindTheWaitingOnes() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 1)
     val tasks = listOf(
       task("a", downloading()),
@@ -705,11 +729,21 @@ class IntakeStateTest {
 
     val outcome = outcome(listOf("x.example"), DownloadPriority.NORMAL, config, tasks)
 
-    assertEquals("Queued · 2nd in line", outcome)
+    assertEquals("Queued · 1 ahead", outcome)
   }
 
   @Test
-  fun intakeOutcome_urgentWithFullSlots_namesTheTaskItPauses() {
+  fun intakeOutcome_slotsFullWithNothingWaiting_isNextInLine() = runTest {
+    val config = DownloadConfig(maxConcurrentDownloads = 1)
+    val tasks = listOf(task("a", downloading()))
+
+    val outcome = outcome(listOf("x.example"), DownloadPriority.NORMAL, config, tasks)
+
+    assertEquals("Queued · next in line", outcome)
+  }
+
+  @Test
+  fun intakeOutcome_urgentWithFullSlots_namesTheTaskItPauses() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 1)
     val tasks = listOf(task("debian-12.iso", downloading(), DownloadPriority.LOW))
 
@@ -719,7 +753,7 @@ class IntakeStateTest {
   }
 
   @Test
-  fun intakeOutcome_hostFull_waitsForTheServer() {
+  fun intakeOutcome_hostFull_waitsForTheServer() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 4, maxConnectionsPerHost = 1)
     val tasks = listOf(task("a", downloading(), host = "github.com"))
 
@@ -729,7 +763,7 @@ class IntakeStateTest {
   }
 
   @Test
-  fun intakeOutcome_batch_splitsStartingAndQueued() {
+  fun intakeOutcome_batch_splitsStartingAndQueued() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 2)
     val hosts = List(6) { "h$it.example" }
 
@@ -769,15 +803,7 @@ class IntakeStateTest {
     assertEquals(setOf("0", "4"), defaultTorrentSelection(files))
   }
 
-  @Test
-  fun ordinal_numbers_useTheirSuffix() {
-    assertEquals(
-      listOf("1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "102nd"),
-      listOf(1, 2, 3, 4, 11, 12, 13, 21, 102).map(::ordinal),
-    )
-  }
-
-  private fun outcome(
+  private suspend fun outcome(
     hosts: List<String?>,
     priority: DownloadPriority,
     config: DownloadConfig,
@@ -792,7 +818,7 @@ class IntakeStateTest {
     bytes = bytes,
     now = NOW,
     zone = TimeZone.UTC,
-  )
+  ).load()
 
   private fun task(
     name: String,

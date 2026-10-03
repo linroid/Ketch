@@ -143,7 +143,7 @@ class ActivityRoutingTest {
   }
 
   @Test
-  fun copyOf_completed_namesFileAndTransferSummary() {
+  fun copyOf_completed_namesFileAndTransferSummary() = runTest {
     val copy = ActivityRouting.copyOf(completed)
 
     assertEquals(
@@ -161,7 +161,7 @@ class ActivityRoutingTest {
   }
 
   @Test
-  fun copyOf_completedWithoutSize_saysHowLongItTook() {
+  fun copyOf_completedWithoutSize_saysHowLongItTook() = runTest {
     val event = completed.copy(state = DownloadState.Completed("/downloads/a.bin", null, 5.seconds))
 
     val copy = ActivityRouting.copyOf(event)
@@ -170,7 +170,7 @@ class ActivityRoutingTest {
   }
 
   @Test
-  fun copyOf_failed_usesErrorCatalogTitle() {
+  fun copyOf_failed_usesErrorCatalogTitle() = runTest {
     val copy = ActivityRouting.copyOf(failed)
 
     assertEquals(
@@ -184,7 +184,7 @@ class ActivityRoutingTest {
   }
 
   @Test
-  fun copyOf_batch_countsFilesAndBytes() {
+  fun copyOf_batch_countsFilesAndBytes() = runTest {
     val event = ActivityEvent.CompletedBatch(List(4) { completed })
 
     val copy = ActivityRouting.copyOf(event)
@@ -194,7 +194,7 @@ class ActivityRoutingTest {
   }
 
   @Test
-  fun copyOf_queueDrained_countsFilesAndBytes() {
+  fun copyOf_queueDrained_countsFilesAndBytes() = runTest {
     val event = ActivityEvent.QueueDrained(LOCAL_DEVICE_ID, files = 6, bytes = 3L * 1024 * 1024)
 
     val copy = ActivityRouting.copyOf(event)
@@ -204,14 +204,14 @@ class ActivityRoutingTest {
   }
 
   @Test
-  fun copyOf_otherDevice_prefixesTitle() {
+  fun copyOf_otherDevice_prefixesTitle() = runTest {
     val copy = ActivityRouting.copyOf(completed, deviceName = "NAS-Basement")
 
     assertEquals("On NAS-Basement: Download complete", copy?.title)
   }
 
   @Test
-  fun copyOf_inAppOnlyEvents_returnsNull() {
+  fun copyOf_inAppOnlyEvents_returnsNull() = runTest {
     assertNull(ActivityRouting.copyOf(ActivityEvent.Added(key, request)))
     assertNull(ActivityRouting.copyOf(ActivityEvent.Recovered(LOCAL_DEVICE_ID, 3)))
     assertNull(ActivityRouting.copyOf(ActivityEvent.DeviceOffline("nas:8642")))

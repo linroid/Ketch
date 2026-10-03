@@ -12,17 +12,25 @@ import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.feedback.OngoingDownloads
 import com.linroid.ketch.app.feedback.ToastMode
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.PendingOps
 import com.linroid.ketch.app.util.displayName
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.feedback_background_pause
+import ketch.app.shared.generated.resources.feedback_background_use_computer
+import ketch.app.shared.generated.resources.ongoing_downloading
+import ketch.app.shared.generated.resources.ongoing_downloading_file
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +44,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
@@ -202,11 +211,12 @@ object KetchBackground {
           .collect { pausing ->
             val id = shown
             if (pausing && id == null && !closed) {
+              val useComputer = Res.string.feedback_background_use_computer.text()
               shown = messages.post(
                 level = MessageLevel.Info,
-                title = "Downloads pause when Ketch is in the background",
+                title = Res.string.feedback_background_pause.text(),
                 deviceId = LOCAL_DEVICE_ID,
-                actions = listOf(MessageAction("Use a computer instead", onUseComputer)),
+                actions = listOf(MessageAction(useComputer, onUseComputer)),
                 toast = ToastMode.Sticky,
                 placement = MessagePlacement.Banner,
               ).id
@@ -331,20 +341,23 @@ internal class ContinuedDownloads(
   }
 }
 
-/** What the system shows for [tasks] in the background; `null` when none downloads or waits. */
-internal fun backgroundProgress(tasks: List<DownloadTask>): BackgroundProgress? {
+/**
+ * What the system shows for [tasks] in the background, in the language of the app's windows;
+ * `null` when none downloads or waits.
+ */
+internal suspend fun backgroundProgress(tasks: List<DownloadTask>): BackgroundProgress? {
   val ongoing = OngoingDownloads.of(tasks) ?: return null
   val downloading = tasks.filter { it.state.value is DownloadState.Downloading }
   val title = when (downloading.size) {
     0 -> ongoing.title
     1 -> downloading.single().let {
-      "Downloading ${displayName(it.requestState.value, it.state.value)}"
+      Res.string.ongoing_downloading_file.text(displayName(it.requestState.value, it.state.value))
     }
-    else -> "Downloading ${downloading.size} files"
+    else -> Res.plurals.ongoing_downloading.text(downloading.size)
   }
   return BackgroundProgress(
-    title = title,
-    subtitle = ongoing.text.orEmpty(),
+    title = title.load(),
+    subtitle = ongoing.text?.load().orEmpty(),
     permille = ongoing.permille ?: -1,
   )
 }
@@ -390,7 +403,7 @@ internal class BackgroundPauser(
   private val scope: CoroutineScope,
   private val saved: PausedTaskIds,
   private val commitPending: () -> Job = { Job().apply { complete() } },
-  private val onPaused: (count: Int) -> Unit = {},
+  private val onPaused: suspend (count: Int) -> Unit = {},
   private val onResumed: () -> Unit = {},
 ) {
   private val log = KetchLogger("KetchBackground")
@@ -421,7 +434,7 @@ internal class BackgroundPauser(
       } finally {
         // Also when iOS ran out of time, for the tasks paused until then.
         val waiting = saved.ids.size
-        if (waiting > 0) onPaused(waiting)
+        if (waiting > 0) withContext(NonCancellable) { onPaused(waiting) }
       }
     }.also { suspension = it }
   }

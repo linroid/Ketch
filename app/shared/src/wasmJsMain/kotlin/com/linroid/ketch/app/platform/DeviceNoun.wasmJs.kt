@@ -1,3 +1,3 @@
 package com.linroid.ketch.app.platform
 
-actual fun localDeviceNoun(): String = "This browser"
+actual fun localDeviceKind(): LocalDeviceKind = LocalDeviceKind.Browser

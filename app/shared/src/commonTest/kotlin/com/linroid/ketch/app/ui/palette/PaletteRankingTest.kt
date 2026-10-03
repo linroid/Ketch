@@ -1,11 +1,13 @@
 package com.linroid.ketch.app.ui.palette
 
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.SettingsCategory
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -115,7 +117,7 @@ class PaletteRankingTest {
   }
 
   @Test
-  fun paletteResults_emptyQuery_listsRecentThenEachProvider() {
+  fun paletteResults_emptyQuery_listsRecentThenEachProvider() = runTest {
     val items = listOf(
       item("Pause all"),
       item("Undo"),
@@ -125,17 +127,19 @@ class PaletteRankingTest {
 
     val results = paletteResults("", items, recent = listOf("ubuntu.iso"))
 
+    // Headings as their English text, rows as they are.
+    val entries = results.entries.map { if (it is PaletteEntry.Header) it.title.load() else it }
     assertEquals(
       listOf(
-        PaletteEntry.Header("Recent"),
+        "Recent",
         PaletteEntry.Row(items[3], 0),
-        PaletteEntry.Header("Commands"),
+        "Commands",
         PaletteEntry.Row(items[0], 1),
         PaletteEntry.Row(items[1], 2),
-        PaletteEntry.Header("Go to"),
+        "Go to",
         PaletteEntry.Row(items[2], 3)
       ),
-      results.entries
+      entries
     )
     assertEquals(3, results.entryIndex(1))
   }
@@ -152,7 +156,7 @@ class PaletteRankingTest {
   }
 
   @Test
-  fun paletteResults_speedToken_setsTheSlowLaneFirst() {
+  fun paletteResults_speedToken_setsTheSlowLaneFirst() = runTest {
     val source = PaletteSource(
       query = "5m",
       devices = listOf(PaletteDevice(LOCAL_DEVICE_ID, "This Mac", 1, active = true, "Idle")),
@@ -168,7 +172,7 @@ class PaletteRankingTest {
   }
 
   @Test
-  fun paletteResults_pauseNas_putsTheNasCommandFirst() {
+  fun paletteResults_pauseNas_putsTheNasCommandFirst() = runTest {
     val source = PaletteSource(
       query = "pause nas",
       devices = listOf(

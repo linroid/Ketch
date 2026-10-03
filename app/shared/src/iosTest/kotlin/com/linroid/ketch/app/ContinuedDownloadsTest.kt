@@ -3,6 +3,7 @@ package com.linroid.ketch.app
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RecordingTask
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -100,7 +101,7 @@ class ContinuedDownloadsTest {
   }
 
   @Test
-  fun backgroundProgress_oneDownload_namesItsFile() {
+  fun backgroundProgress_oneDownload_namesItsFile() = runTest {
     val shown = shownFor(downloading)
 
     assertEquals("Downloading file1.bin", shown?.title)
@@ -108,12 +109,12 @@ class ContinuedDownloadsTest {
   }
 
   @Test
-  fun backgroundProgress_severalDownloads_countsThem() {
+  fun backgroundProgress_severalDownloads_countsThem() = runTest {
     assertEquals("Downloading 3 files", shownFor(downloading, downloading, downloading)?.title)
   }
 
   @Test
-  fun backgroundProgress_onlyWaiting_isIndeterminate() {
+  fun backgroundProgress_onlyWaiting_isIndeterminate() = runTest {
     val shown = shownFor(DownloadState.Queued)
 
     assertEquals("Waiting to download 1 file", shown?.title)
@@ -122,12 +123,12 @@ class ContinuedDownloadsTest {
   }
 
   @Test
-  fun backgroundProgress_nothingActive_isNull() {
+  fun backgroundProgress_nothingActive_isNull() = runTest {
     assertNull(shownFor(DownloadState.Paused(RecordingTask.PROGRESS)))
   }
 
   /** What [backgroundProgress] shows for a device with tasks in [states]. */
-  private fun shownFor(vararg states: DownloadState): BackgroundProgress? {
+  private suspend fun shownFor(vararg states: DownloadState): BackgroundProgress? {
     val api = RecordingKetchApi()
     states.forEach { api.add(it) }
     return backgroundProgress(api.tasks.value)

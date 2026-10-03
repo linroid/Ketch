@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.app.FakeKetchApi
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -18,6 +19,7 @@ import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -124,7 +126,7 @@ class DeviceWorkTest {
   }
 
   @Test
-  fun nextActions_busyDeviceWithFailures_offersEveryAction() {
+  fun nextActions_busyDeviceWithFailures_offersEveryAction() = runTest {
     val waiting = task("blender-4.2-macos-arm64", DownloadState.Queued).first
     val actions = nextActions(
       device(counts = PulseCounts(downloading = 1, waiting = 1, failed = 2), failures = 1),
@@ -133,7 +135,7 @@ class DeviceWorkTest {
 
     assertEquals(
       listOf("Retry 1 failed", "Pause all here", "Start blender-4.2-macos-a… now"),
-      actions.map { it.label }
+      actions.map { it.label }.load()
     )
   }
 
@@ -143,7 +145,7 @@ class DeviceWorkTest {
   }
 
   @Test
-  fun fleetSentence_twoBusyDevices_countsFilesAndFinish() {
+  fun fleetSentence_twoBusyDevices_countsFilesAndFinish() = runTest {
     val mac = device(counts = PulseCounts(downloading = 2), speed = 1000)
     val nas = device(
       name = "NAS-Basement",
@@ -159,11 +161,11 @@ class DeviceWorkTest {
 
     val sentence = fleetSentence(listOf(mac, nas), work, SpeedMode.Full, now, TimeZone.UTC)
 
-    assertEquals("Downloading 3 files on 2 devices · all done ≈ 14:31", sentence)
+    assertEquals("Downloading 3 files on 2 devices · all done ≈ 14:31", sentence.load())
   }
 
   @Test
-  fun fleetSentence_deviceNotKeptConnected_isLeftOut() {
+  fun fleetSentence_deviceNotKeptConnected_isLeftOut() = runTest {
     val mac = device(counts = PulseCounts(done = 1))
     val nas = device(
       name = "NAS",
@@ -174,6 +176,6 @@ class DeviceWorkTest {
 
     val sentence = fleetSentence(listOf(mac, nas), emptyMap(), SpeedMode.Full, now, TimeZone.UTC)
 
-    assertEquals("All quiet", sentence)
+    assertEquals("All quiet", sentence.load())
   }
 }

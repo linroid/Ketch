@@ -36,6 +36,7 @@ import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.components.StatusDotDefaults
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.theme.FileTypeHue
@@ -222,20 +223,27 @@ private fun Devices() {
     val options = listOf(
       DeviceOption(
         id = "local",
-        name = "This Mac",
+        name = verbatim("This Mac"),
         health = DeviceHealth.Local(),
         pennantName = "Lins-MacBook-Pro",
-        summary = "412 GB free · 2 active",
+        summary = verbatim("412 GB free · 2 active"),
         shortcut = "⌘⌥1",
       ),
       DeviceOption(
         id = "nas",
-        name = "NAS-Basement",
+        name = verbatim("NAS-Basement"),
         health = DeviceHealth.Live,
-        summary = "1.8 TB free · 2 active · Slow lane",
+        pennantName = "NAS-Basement",
+        summary = verbatim("1.8 TB free · 2 active · Slow lane"),
         shortcut = "⌘⌥2",
       ),
-      DeviceOption("den", "Den-PC", DeviceHealth.Offline(), shortcut = "⌘⌥3")
+      DeviceOption(
+        id = "den",
+        name = verbatim("Den-PC"),
+        health = DeviceHealth.Offline(),
+        pennantName = "Den-PC",
+        shortcut = "⌘⌥3",
+      ),
     )
     var target by remember { mutableStateOf("local") }
     DeviceTargetChip(selectedId = target, options = options, onSelect = { target = it.id })

@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchBottomSheet
-import com.linroid.ketch.app.platform.HorizontalResizePointerIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchElevationLevel
@@ -49,6 +48,9 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.inspector.InspectorPlacement
 import com.linroid.ketch.app.ui.inspector.TaskInspector
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_inspector_resize
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The inspector docked beside the table: a 1 dp divider whose 6 dp handle drags the width
@@ -117,6 +119,7 @@ private fun ResizeHandle(
   modifier: Modifier = Modifier,
 ) {
   val spacing = KetchTheme.spacing
+  val description = stringResource(Res.string.downloads_inspector_resize)
   Box(
     modifier = modifier
       .width(InspectorHandleWidth)
@@ -128,7 +131,7 @@ private fun ResizeHandle(
         onResizeEnd = onResizeEnd,
         dragInteractions = interactions,
       )
-      .semantics { contentDescription = "Resize the inspector" },
+      .semantics { contentDescription = description },
   )
 }
 

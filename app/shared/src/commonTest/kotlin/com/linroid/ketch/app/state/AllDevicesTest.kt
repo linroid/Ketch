@@ -12,10 +12,15 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.fixtureTest
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.DeviceScope
+import com.linroid.ketch.app.ui.downloads.actions.FakeFileActions
 import com.linroid.ketch.app.ui.shell.Fleet
 import com.linroid.ketch.app.ui.shell.fleet
-import com.linroid.ketch.app.ui.downloads.actions.FakeFileActions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -25,6 +30,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -39,6 +45,10 @@ private val UNDO_WINDOW_PASSED = 10.seconds
 class AllDevicesTest {
 
   private val downloading = DownloadState.Downloading(DownloadProgress(10, 100, 50))
+
+  // Loading a string for the first time lets virtual time run, which would end Undo windows.
+  @BeforeTest
+  fun loadStrings() = runTest { warmStrings() }
 
   private fun task(id: String) = ListTestTask(id, DownloadState.Queued)
   private val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=ubuntu"
@@ -90,7 +100,7 @@ class AllDevicesTest {
   @Test
   fun rows_oneDeviceShown_keepTheOthersInAllRows() = runTest {
     val shown = MutableStateFlow<DeviceScope>(DeviceScope.Single(LOCAL_DEVICE_ID))
-    val nas = DeviceInfo("NAS", RowCapabilities.remote())
+    val nas = DeviceInfo(verbatim("NAS"), RowCapabilities.remote())
     val model = TaskListModel(
       sources = flowOf(
         listOf(
@@ -134,7 +144,7 @@ class AllDevicesTest {
     advanceTimeBy(1.seconds)
     val shown = fleet.state.tasks.value.single { fleet.state.keyOf(it).deviceId == NAS_ID }
 
-    fleet.state.runTaskCommand(shown, "pause") { pause() }
+    fleet.state.runTaskCommand(shown, "pause", failure("pause")) { pause() }
     runCurrent()
 
     assertEquals(listOf("pause"), task.calls)
@@ -186,7 +196,7 @@ class AllDevicesTest {
 
     assertEquals(listOf("pause"), here.calls)
     assertEquals(listOf("pause"), there.calls)
-    assertEquals("Paused 2 downloads on 2 devices", fleet.messages().first().title)
+    assertEquals("Paused 2 downloads on 2 devices", fleet.messages().first().title.load())
   }
 
   @Test
@@ -199,7 +209,7 @@ class AllDevicesTest {
 
     assertEquals(listOf("pause"), here.calls)
     assertTrue(there.calls.isEmpty())
-    assertEquals("Paused 1 download", fleet.messages().first().title)
+    assertEquals("Paused 1 download", fleet.messages().first().title.load())
   }
 
   @Test
@@ -225,7 +235,10 @@ class AllDevicesTest {
     fleet.state.sendTo(listOf(task), fleet.remote)
     runCurrent()
     val confirmation = assertNotNull(fleet.state.sendConfirmation)
-    assertEquals("Cookies from your browser will be sent to NAS.", confirmation.warning)
+    assertEquals(
+      "Cookies from your browser will be sent to NAS.",
+      confirmation.warningText.load(),
+    )
     assertTrue(fleet.nas.recording.requests.isEmpty())
 
     fleet.state.confirmSend()
@@ -233,7 +246,7 @@ class AllDevicesTest {
 
     assertNull(fleet.state.sendConfirmation)
     assertEquals(headers, fleet.nas.recording.requests.single().headers)
-    assertEquals("Sent ubuntu.iso to NAS", fleet.messages().first().title)
+    assertEquals("Sent ubuntu.iso to NAS", fleet.messages().first().title.load())
   }
 
   @Test
@@ -257,7 +270,7 @@ class AllDevicesTest {
 
     fleet.state.sendTo(listOf(partial, finished), fleet.remote, move = true)
     runCurrent()
-    assertEquals("Moved 2 downloads to NAS", fleet.messages().first().title)
+    assertEquals("Moved 2 downloads to NAS", fleet.messages().first().title.load())
     assertTrue(fleet.state.tasks.value.isEmpty())
     advanceTimeBy(UNDO_WINDOW_PASSED)
 
@@ -285,7 +298,7 @@ class AllDevicesTest {
 
     fleet.state.sendTo(listOf(task), fleet.remote)
     runCurrent()
-    fleet.messages().first().actions.single { it.label == "Show" }.onClick()
+    fleet.messages().first().actions.single { it.label.load() == "Show" }.onClick()
     runCurrent()
 
     assertEquals(DeviceScope.All, fleet.state.deviceScope.value)
@@ -294,12 +307,17 @@ class AllDevicesTest {
   }
 
   @Test
-  fun credentialWarning_signInOnly_namesTheSignIn() {
+  fun credentialWarningText_signInOnly_namesTheSignIn() = runTest {
+    val nas = verbatim("NAS")
     assertEquals(
       "Sign-in details will be sent to NAS.",
-      credentialWarning(listOf(mapOf("authorization" to "Basic x")), "NAS"),
+      credentialWarningText(listOf(mapOf("authorization" to "Basic x")), nas).load(),
     )
-    assertNull(credentialWarning(listOf(mapOf("User-Agent" to "Ketch")), "NAS"))
+    assertEquals(
+      "Cookies and sign-in details from your browser will be sent to NAS.",
+      credentialWarningText(listOf(mapOf("Cookie" to "a=1", "Authorization" to "x")), nas).load(),
+    )
+    assertNull(credentialWarningText(listOf(mapOf("User-Agent" to "Ketch")), nas))
   }
 
   @Test
@@ -378,7 +396,7 @@ class AllDevicesTest {
 
     assertTrue(tasks.all { it.calls == listOf("remove deleteFiles=true") })
     assertEquals(3, fleet.mac.recording.requests.size)
-    assertEquals(listOf("Restarted 3 downloads"), fleet.messages().map { it.title })
+    assertEquals(listOf("Restarted 3 downloads"), fleet.messages().map { it.title }.load())
   }
 
   @Test
@@ -396,10 +414,10 @@ class AllDevicesTest {
     runCurrent()
     val error = fleet.messages().first()
     assertEquals(MessageLevel.Error, error.level)
-    assertEquals("Couldn't download ubuntu.iso again on This Mac", error.title)
+    assertEquals("Couldn't download ubuntu.iso again on This Mac", error.title.load())
 
     failing = false
-    error.actions.single { it.label == "Try again" }.onClick()
+    error.actions.single { it.label.load() == "Try again" }.onClick()
     runCurrent()
 
     assertEquals(listOf("remove deleteFiles=true"), task.calls)
@@ -414,9 +432,9 @@ class AllDevicesTest {
     runCurrent()
 
     val message = fleet.messages().single()
-    assertEquals("Started 2 downloads now", message.title)
+    assertEquals("Started 2 downloads now", message.title.load())
     assertTrue(tasks.all { it.state.value is DownloadState.Downloading })
-    message.actions.single { it.label == "Undo" }.onClick()
+    message.actions.single { it.label.load() == "Undo" }.onClick()
     runCurrent()
     assertTrue(tasks.all { it.request.priority == DownloadPriority.NORMAL })
   }
@@ -433,6 +451,10 @@ class AllDevicesTest {
 
     assertEquals(listOf("resume"), here.calls)
     assertEquals(listOf("resume"), there.calls)
-    assertEquals("Retrying 2 downloads on 2 devices", fleet.messages().first().title)
+    assertEquals("Retrying 2 downloads on 2 devices", fleet.messages().first().title.load())
   }
 }
+
+// A command's error title for the device's name: "Couldn't {what} on {device}".
+private fun failure(what: String): (UiText) -> UiText =
+  { device -> listOf(verbatim("Couldn't $what on "), device).joinText(separator = "") }

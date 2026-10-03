@@ -57,6 +57,8 @@ import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDialogDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.rememberKetchSheetState
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.CommandScope
@@ -82,8 +84,26 @@ import com.linroid.ketch.app.ui.common.ModalForm
 import com.linroid.ketch.app.ui.common.modalForm
 import com.linroid.ketch.app.ui.downloads.ClipboardLink
 import com.linroid.ketch.app.util.toCopy
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_cancel
+import ketch.app.shared.generated.resources.action_close
+import ketch.app.shared.generated.resources.action_done
+import ketch.app.shared.generated.resources.intake_action_add_anyway
+import ketch.app.shared.generated.resources.intake_confirm_close
+import ketch.app.shared.generated.resources.intake_discard
+import ketch.app.shared.generated.resources.intake_discover
+import ketch.app.shared.generated.resources.intake_discover_offer
+import ketch.app.shared.generated.resources.intake_download_all
+import ketch.app.shared.generated.resources.intake_keep_editing
+import ketch.app.shared.generated.resources.intake_no_links
+import ketch.app.shared.generated.resources.intake_task_gone
+import ketch.app.shared.generated.resources.intake_title_add
+import ketch.app.shared.generated.resources.intake_title_edit
+import ketch.app.shared.generated.resources.intake_title_retry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /** Sizes of the add sheet. */
 internal object IntakeSheetDefaults {
@@ -245,7 +265,7 @@ internal class IntakeActions(
       catchingUnlessCancelled {
         if (reveal) actions.reveal(path) else actions.open(path)
       }.onFailure { e ->
-        session.notice = e.message ?: e.toCopy().title
+        session.notice = e.message?.let(::verbatim) ?: e.toCopy().title
       }
     }
   }
@@ -482,11 +502,13 @@ private fun IntakeHeader(actions: IntakeActions, phone: Boolean, modifier: Modif
       modifier = Modifier.fillMaxWidth(),
     ) {
       Text(
-        text = when (session.mode) {
-          IntakeMode.Add -> "Add downloads"
-          IntakeMode.Retry -> "Retry with options"
-          IntakeMode.Edit -> "Download options"
-        },
+        text = stringResource(
+          when (session.mode) {
+            IntakeMode.Add -> Res.string.intake_title_add
+            IntakeMode.Retry -> Res.string.intake_title_retry
+            IntakeMode.Edit -> Res.string.intake_title_edit
+          },
+        ),
         style = KetchTheme.typography.titleL,
         color = KetchTheme.colors.textPrimary,
         maxLines = 1,
@@ -497,7 +519,7 @@ private fun IntakeHeader(actions: IntakeActions, phone: Boolean, modifier: Modif
       if (phone) {
         KetchIconButton(
           icon = KetchIcon.Close,
-          contentDescription = "Close",
+          contentDescription = stringResource(Res.string.action_close),
           onClick = actions::close,
         )
       }
@@ -522,7 +544,7 @@ private fun AddBody(
     TorrentStage(actions, stage, onBack = { session.torrentStage = null })
   } else {
     PasteArea(actions, matcher, phone, clipboardLink, dropping)
-    session.notice?.let { NoticeLine(it, KetchIcon.Info) }
+    session.notice?.let { NoticeLine(it.resolve(), KetchIcon.Info) }
     if (session.entries.isEmpty()) session.discoverQuery?.let { DiscoverOffer(actions, it) }
   }
   // The options wait until there is something to add.
@@ -539,11 +561,15 @@ private fun AddBody(
       ) {
         AdvancedSection(actions)
       }
-      session.spaceWarning?.let { NoticeLine(it, KetchIcon.Warning, warning = true) }
-      session.cookieWarning?.let { NoticeLine(it, KetchIcon.Warning, warning = true) }
+      session.spaceWarning?.let { NoticeLine(it.resolve(), KetchIcon.Warning, warning = true) }
+      session.cookieWarning?.let { NoticeLine(it.resolve(), KetchIcon.Warning, warning = true) }
       session.outcome?.let { outcome ->
         val warning = session.mode == IntakeMode.Retry && session.startsOver
-        NoticeLine(outcome, if (warning) KetchIcon.Warning else KetchIcon.Info, warning = warning)
+        NoticeLine(
+          text = outcome.resolve(),
+          icon = if (warning) KetchIcon.Warning else KetchIcon.Info,
+          warning = warning,
+        )
       }
     }
   }
@@ -589,8 +615,11 @@ private fun DiscoverOffer(actions: IntakeActions, query: String) {
   ) {
     KetchIconImage(KetchIcon.Discover, size = KetchTheme.density.controlGlyph, tint = colors.accent)
     Text(
-      text = if (session.canDiscover) "No links here. Search Discover for \"$query\"?"
-      else "No links here. Paste a link, a magnet or a cURL command.",
+      text = if (session.canDiscover) {
+        stringResource(Res.string.intake_discover_offer, query)
+      } else {
+        stringResource(Res.string.intake_no_links)
+      },
       style = KetchTheme.typography.bodyS,
       color = colors.textSecondary,
       maxLines = 2,
@@ -599,7 +628,7 @@ private fun DiscoverOffer(actions: IntakeActions, query: String) {
     )
     if (session.canDiscover) {
       KetchButton(
-        text = "Discover",
+        text = stringResource(Res.string.intake_discover),
         onClick = { session.discover(query) },
         variant = KetchButtonVariant.Tonal,
         size = KetchButtonSize.Small,
@@ -614,12 +643,12 @@ private fun DiscoverOffer(actions: IntakeActions, query: String) {
 private fun RetryProblem(session: IntakeSession) {
   val task = session.task
   if (task == null) {
-    NoticeLine("This download is no longer in the list.", KetchIcon.Warning, warning = true)
+    NoticeLine(stringResource(Res.string.intake_task_gone), KetchIcon.Warning, warning = true)
     return
   }
   val failed = task.state.value as? DownloadState.Failed ?: return
   val copy = failed.error.toCopy()
-  ProblemCard(title = copy.title, detail = copy.hint)
+  ProblemCard(title = copy.title.resolve(), detail = copy.hint?.resolve())
 }
 
 @Composable
@@ -627,7 +656,7 @@ private fun EditBody(actions: IntakeActions) {
   val session = actions.session
   val task = session.task
   if (task == null) {
-    NoticeLine("This download is no longer in the list.", KetchIcon.Warning, warning = true)
+    NoticeLine(stringResource(Res.string.intake_task_gone), KetchIcon.Warning, warning = true)
     return
   }
   TaskPreview(task)
@@ -664,19 +693,20 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
       Spacer(Modifier.weight(1f))
       if (primaryShown && session.canSubmit && !batchStage) SubmitHint(session)
     }
-    val secondary: Pair<String, () -> Unit>? = when {
+    val secondary: Pair<StringResource, () -> Unit>? = when {
       batchStage -> null
-      session.mode == IntakeMode.Add && session.allFailed -> "Add anyway" to actions::addAnyway
-      stageEntry != null && session.mode == IntakeMode.Add -> "Download all" to {
+      session.mode == IntakeMode.Add && session.allFailed ->
+        Res.string.intake_action_add_anyway to actions::addAnyway
+      stageEntry != null && session.mode == IntakeMode.Add -> Res.string.intake_download_all to {
         stageEntry.selectedFiles = stageEntry.files.mapTo(LinkedHashSet()) { it.id }
         actions.submit()
       }
       phone -> null
-      else -> "Cancel" to actions::close
+      else -> Res.string.action_cancel to actions::close
     }
     secondary?.let { (label, onClick) ->
       KetchButton(
-        text = label,
+        text = stringResource(label),
         onClick = onClick,
         variant = KetchButtonVariant.Secondary,
         size = if (phone) KetchButtonSize.Large else KetchButtonSize.Medium,
@@ -686,7 +716,11 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
     }
     if (primaryShown || batchStage) {
       KetchButton(
-        text = if (batchStage) "Done" else session.primaryLabel,
+        text = if (batchStage) {
+          stringResource(Res.string.action_done)
+        } else {
+          session.primaryLabel.resolve()
+        },
         onClick = if (batchStage) ({ session.torrentStage = null }) else actions::submit,
         enabled = batchStage || session.canSubmit,
         loading = session.submitting,
@@ -706,7 +740,7 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
 private fun SubmitHint(session: IntakeSession) {
   val chord = KetchCommands.IntakeAdd.shortcutLabel() ?: return
   Text(
-    text = "$chord to ${session.submitVerb}",
+    text = session.submitHint(chord).resolve(),
     style = KetchTheme.typography.labelS,
     color = KetchTheme.colors.textTertiary,
     maxLines = 1,
@@ -723,18 +757,18 @@ private fun ConfirmClose(actions: IntakeActions, modifier: Modifier) {
     modifier = modifier.fillMaxWidth(),
   ) {
     Text(
-      text = "Close and discard what you typed?",
+      text = stringResource(Res.string.intake_confirm_close),
       style = KetchTheme.typography.bodyS,
       color = KetchTheme.colors.textPrimary,
       modifier = Modifier.weight(1f),
     )
     KetchButton(
-      text = "Keep editing",
+      text = stringResource(Res.string.intake_keep_editing),
       onClick = actions.session::keepEditing,
       variant = KetchButtonVariant.Secondary,
     )
     KetchButton(
-      text = "Discard",
+      text = stringResource(Res.string.intake_discard),
       onClick = actions::discardAndClose,
       variant = KetchButtonVariant.Danger,
     )

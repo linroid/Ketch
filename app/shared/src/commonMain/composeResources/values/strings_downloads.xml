@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Downloads page: its header, tabs, table, list, empty states and first-run launchpad, the
+  selection bar, row menus and dialogs, and the messages their commands post. See
+  docs/development/localization.md.
+-->
+<resources>
+  <!-- The page header. -->
+  <string name="downloads_title">Downloads</string>
+  <!-- Read out for the count pill after the title: %1$d downloading of %2$d in all. -->
+  <plurals name="downloads_count_downloading">
+    <item quantity="one">%1$d downloading of %2$d</item>
+    <item quantity="other">%1$d downloading of %2$d</item>
+  </plurals>
+  <string name="downloads_view_list">List</string>
+  <string name="downloads_view_table">Table</string>
+  <string name="downloads_close_search">Close search</string>
+  <string name="downloads_switch_device">Switch device</string>
+  <!-- The device chip while every device shows. -->
+  <string name="downloads_all_devices">All devices</string>
+  <string name="downloads_search_placeholder">Search or paste a link</string>
+  <!-- The "⋯" buttons of the header and of the phone's selection bar. -->
+  <string name="downloads_more">More</string>
+  <string name="downloads_more_actions">More actions</string>
+  <string name="downloads_copy_all_links">Copy all links</string>
+  <string name="downloads_columns">Columns</string>
+  <string name="downloads_row_density">Row density</string>
+  <string name="downloads_density_default">Default</string>
+  <string name="downloads_density_compact">Compact</string>
+  <!-- A chip while torrents finishing in the background fetch their file lists. %1$d is how many. -->
+  <string name="downloads_resolving">Resolving %1$d</string>
+  <string name="downloads_resolving_tooltip">Fetching file lists from peers · click to choose files</string>
+  <string name="downloads_show_add_sheet">Show the add sheet</string>
+  <plurals name="downloads_clear_finished_count">
+    <item quantity="one">Clear %1$d finished</item>
+    <item quantity="other">Clear %1$d finished</item>
+  </plurals>
+  <string name="downloads_clear_finished">Clear finished</string>
+  <!-- Removes the finished downloads whose files were moved or deleted. %1$d is how many. -->
+  <plurals name="downloads_clear_missing_count">
+    <item quantity="one">Clear %1$d missing</item>
+    <item quantity="other">Clear %1$d missing</item>
+  </plurals>
+  <string name="downloads_clear_missing">Clear missing</string>
+  <!-- Caption of Clear missing in menus. -->
+  <string name="downloads_clear_missing_caption">Files moved or deleted</string>
+  <string name="downloads_clear_missing_tooltip">Remove the finished downloads whose files were moved or deleted</string>
+  <string name="downloads_select_all">Select all</string>
+  <string name="downloads_clear_selection">Clear selection</string>
+  <!-- On the header of a group of failed and canceled downloads. %1$d is how many. -->
+  <string name="downloads_retry_all_count">Retry all (%1$d)</string>
+
+  <!-- The summary at the end of the Failed tab, parts joined by " · ". -->
+  <plurals name="downloads_tab_failed">
+    <item quantity="one">%1$d failed</item>
+    <item quantity="other">%1$d failed</item>
+  </plurals>
+  <string name="downloads_tab_retry_all">Retry all</string>
+  <!-- Failed downloads whose link has to change before a retry can work. -->
+  <plurals name="downloads_tab_needs_link">
+    <item quantity="one">%1$d needs a new link</item>
+    <item quantity="other">%1$d need a new link</item>
+  </plurals>
+  <!-- Buttons that open the sort and group menus, followed by the current choice. -->
+  <string name="downloads_sort">Sort</string>
+  <string name="downloads_group">Group</string>
+  <!-- A menu button's name and its current choice, such as "Sort: Smart". The choice shows brighter. -->
+  <string name="downloads_label_value">%1$s: %2$s</string>
+  <!-- Headers in the sort menu. -->
+  <string name="downloads_sort_by">Sort by</string>
+  <string name="downloads_group_by">Group by</string>
+
+  <!-- The search facets under the tabs. -->
+  <string name="downloads_facet_type">Type</string>
+  <string name="downloads_facet_site">Site</string>
+  <string name="downloads_facet_device">Device</string>
+  <string name="downloads_facet_origin">Origin</string>
+  <!-- How many downloads match the search of how many are on the tab: "12 of 340". -->
+  <string name="downloads_facet_matched">%1$d of %2$d</string>
+
+  <!-- The table. The other column headers are the sort_ strings. -->
+  <!-- The Connections column's header, abbreviated to fit a narrow column. -->
+  <string name="downloads_table_connections_short">Conn.</string>
+  <!-- Caption of the Device column in the column menu while every device shows. -->
+  <string name="downloads_table_column_auto">Shown for All devices</string>
+  <string name="downloads_table_reset_columns">Reset columns</string>
+  <!-- Read out on a column header. %1$s is the column, such as "Size". -->
+  <string name="downloads_table_sort_by">Sort by %1$s</string>
+  <string name="downloads_table_sorted_ascending">%1$s, sorted ascending</string>
+  <string name="downloads_table_sorted_descending">%1$s, sorted descending</string>
+  <!-- A download's own speed cap. %1$s is a speed, such as "2 MB/s". -->
+  <string name="downloads_table_capped_at">Capped at %1$s</string>
+  <!-- The Source column of a torrent without a site. -->
+  <string name="downloads_table_source_magnet">Magnet</string>
+  <!-- The Origin column when nothing says where a download came from. -->
+  <string name="downloads_table_origin_unknown">Unknown</string>
+  <string name="downloads_table_speed_limited">A speed limit caps this download</string>
+
+  <!-- Group headers and rows, read out. %1$s is a group's title, such as "Downloading". -->
+  <string name="downloads_group_show">Show %1$s</string>
+  <string name="downloads_group_hide">Hide %1$s</string>
+  <string name="downloads_group_collapsed">Collapsed</string>
+  <string name="downloads_group_expanded">Expanded</string>
+  <string name="downloads_row_select">Select</string>
+  <string name="downloads_row_show_actions">Show actions</string>
+  <string name="downloads_inspector_resize">Resize the inspector</string>
+
+  <!-- Empty tabs and searches. -->
+  <string name="downloads_empty_clear_search">Clear search</string>
+  <string name="downloads_empty_add_link">Add this link</string>
+  <string name="downloads_empty_add_links">Add these links</string>
+  <string name="downloads_empty_show_all">Show all downloads</string>
+  <string name="downloads_empty_add">Add a link</string>
+  <string name="downloads_empty_link_missing">This link isn't in your downloads</string>
+  <string name="downloads_empty_links_missing">These links aren't in your downloads</string>
+  <!-- %1$s is a device name, such as "This Mac". -->
+  <string name="downloads_empty_add_it_to">Add it to %1$s instead.</string>
+  <string name="downloads_empty_add_them_to">Add them to %1$s instead.</string>
+  <!-- %1$s is what was searched for. -->
+  <string name="downloads_empty_no_match">No downloads match “%1$s”</string>
+  <string name="downloads_empty_no_match_hint">Search looks at names, sites, folders and errors.</string>
+  <string name="downloads_empty_all">No downloads yet</string>
+  <string name="downloads_empty_downloading">Nothing downloading</string>
+  <string name="downloads_empty_downloading_hint">Downloads that are running show here.</string>
+  <string name="downloads_empty_waiting">Nothing waiting</string>
+  <!-- %1$s is a device name, such as "This Mac". -->
+  <string name="downloads_empty_waiting_hint_one">%1$s runs one download at a time.</string>
+  <!-- %1$s is a device name, %2$d how many downloads it runs at once, two or more. -->
+  <plurals name="downloads_empty_waiting_hint">
+    <item quantity="one">%1$s runs %2$d at a time.</item>
+    <item quantity="other">%1$s runs %2$d at a time.</item>
+  </plurals>
+  <string name="downloads_empty_paused">No paused downloads</string>
+  <string name="downloads_empty_paused_hint">Downloads you pause show here.</string>
+  <string name="downloads_empty_done">No finished downloads</string>
+  <string name="downloads_empty_done_hint">Downloads show here once they finish.</string>
+  <string name="downloads_empty_failed">Nothing needs attention</string>
+  <string name="downloads_empty_failed_hint">Failed and canceled downloads show here.</string>
+  <string name="downloads_empty_fleet">No downloads on any device</string>
+  <string name="downloads_empty_fleet_hint">Downloads from all your devices appear here.</string>
+  <!-- %1$s is a device name. -->
+  <string name="downloads_empty_add_to">Add a link to %1$s</string>
+  <string name="downloads_empty_remote">Downloads on %1$s will appear here</string>
+  <string name="downloads_empty_unauthorized">%1$s needs a new access token</string>
+  <string name="downloads_empty_offline">Can't reach %1$s</string>
+  <string name="downloads_empty_offline_hint">Its downloads show here once it connects.</string>
+  <string name="downloads_empty_loading">Loading downloads</string>
+
+  <!-- The launchpad shown before the first download. -->
+  <string name="launchpad_title">No downloads yet</string>
+  <string name="launchpad_subtitle">Paste a link, drop a file, or send one from your browser.</string>
+  <string name="launchpad_subtitle_phone">Paste a link, open a .torrent file, or add downloads from your computer.</string>
+  <string name="launchpad_paste_title">Paste a link</string>
+  <string name="launchpad_paste_download">Download it</string>
+  <string name="launchpad_paste_maybe">There's a link on the clipboard.</string>
+  <string name="launchpad_paste">Paste</string>
+  <string name="launchpad_paste_hint_phone">Copy a link in any app, then paste it here.</string>
+  <!-- %1$s is the paste shortcut, such as ⌘V. -->
+  <string name="launchpad_paste_hint">Copy a link, then press %1$s anywhere in Ketch.</string>
+  <!-- The same where the paste shortcut is unknown. -->
+  <string name="launchpad_paste_hint_plain">Copy a link, then press paste anywhere in Ketch.</string>
+  <string name="launchpad_torrent_title">Drop a link, magnet or .torrent</string>
+  <string name="launchpad_torrent_title_phone">Open a .torrent file</string>
+  <string name="launchpad_torrent_hint">Anywhere in this window, or choose a .torrent file.</string>
+  <string name="launchpad_torrent_hint_phone">Or open a magnet link from your browser.</string>
+  <string name="launchpad_browser_title">Capture from your browser</string>
+  <string name="launchpad_browser_none">Send downloads to Ketch from Chrome, Edge or Firefox.</string>
+  <!-- A browser found on the computer. %1$s is its name, such as Firefox. -->
+  <string name="launchpad_browser_connected">%1$s ✓</string>
+  <string name="launchpad_browser_get">%1$s: Get it</string>
+  <string name="launchpad_pair_title">Control your computer's downloads</string>
+  <string name="launchpad_pair_hint">Connect to Ketch on your computer and add downloads from here.</string>
+  <string name="launchpad_discover">Or describe what you want · Discover</string>
+  <!-- The setup checklist under the launchpad. -->
+  <string name="launchpad_checklist_title">Set up Ketch</string>
+  <string name="launchpad_checklist_close">Close the setup checklist</string>
+  <!-- %1$s is a folder, such as ~/Downloads. -->
+  <string name="launchpad_checklist_folder">Downloads go to %1$s</string>
+  <string name="launchpad_checklist_folder_choose">Choose where downloads go</string>
+  <string name="launchpad_checklist_change">Change…</string>
+  <string name="launchpad_checklist_extension">Browser extension</string>
+  <!-- Follows launchpad_checklist_extension after " · ". %1$s is a browser, such as Firefox. -->
+  <string name="launchpad_checklist_detected">%1$s detected</string>
+  <string name="launchpad_checklist_connected">Connected</string>
+  <string name="launchpad_checklist_get_it">Get it</string>
+  <!-- %1$s is this device as a sentence names it, such as "this Mac". -->
+  <string name="launchpad_checklist_phone">Control %1$s from your phone</string>
+  <string name="launchpad_checklist_show_qr">Show QR</string>
+
+  <!-- The Add button and the phone's clipboard chip. %1$s is a file name, %2$s a site. -->
+  <string name="downloads_clip_download">Download %1$s</string>
+  <string name="downloads_clip_download_from">Download %1$s from %2$s</string>
+  <string name="downloads_clip_copied">Download copied link</string>
+  <string name="downloads_clip_dismiss">Don't offer this link</string>
+
+  <!-- The selection bar. -->
+  <plurals name="downloads_selected">
+    <item quantity="one">%1$d selected</item>
+    <item quantity="other">%1$d selected</item>
+  </plurals>
+
+  <!-- Row menus. -->
+  <string name="downloads_menu_file_missing">File moved or deleted</string>
+  <!-- Under the devices of Send to. %1$s is a key, such as Alt or ⌥. -->
+  <string name="downloads_menu_hold_to_move">Hold %1$s to move instead</string>
+  <string name="downloads_menu_moving">Removed from the old device once sent</string>
+  <string name="downloads_menu_speed_custom">Custom…</string>
+  <!-- Splits a total speed between the %1$d selected downloads. -->
+  <plurals name="downloads_menu_speed_share">
+    <item quantity="one">Share across these %1$d</item>
+    <item quantity="other">Share across these %1$d</item>
+  </plurals>
+  <!-- Each download's part of a shared speed. %1$s is a speed, such as "2.5 MB/s". -->
+  <string name="downloads_menu_speed_each">%1$s each</string>
+  <!-- Under Urgent for a waiting download. %1$s is the download it would pause. -->
+  <string name="downloads_menu_urgent_may_pause">Starts now · may pause %1$s</string>
+  <string name="downloads_menu_urgent_starts_now">Starts now</string>
+  <string name="downloads_menu_pick_start">Pick date &amp; time…</string>
+  <string name="downloads_menu_clear_schedule">Clear</string>
+
+  <!-- Dialogs. -->
+  <string name="downloads_discard_title">Stop and discard progress?</string>
+  <plurals name="downloads_discard_title_many">
+    <item quantity="one">Discard the progress of %1$d download?</item>
+    <item quantity="other">Discard the progress of %1$d downloads?</item>
+  </plurals>
+  <!-- %1$s is a file name. -->
+  <string name="downloads_discard_body">%1$s can't be resumed after this.</string>
+  <string name="downloads_discard_body_many">They can't be resumed after this.</string>
+  <string name="downloads_discard_keep">Keep</string>
+  <string name="downloads_discard_confirm">Discard progress</string>
+  <string name="downloads_speed_title">Speed limit</string>
+  <!-- 2m and 500k are typed as they are. For "unlimited", write settings_speed_unlimited in lower case: the field accepts that word as well as "unlimited". -->
+  <string name="downloads_speed_invalid">Type a speed such as 2m or 500k</string>
+  <string name="downloads_speed_placeholder">2m, 500k or unlimited</string>
+  <string name="downloads_speed_set">Set limit</string>
+  <!-- %1$s is a file name. -->
+  <string name="downloads_speed_caps">Caps %1$s; the global limit still applies.</string>
+  <plurals name="downloads_speed_caps_many">
+    <item quantity="one">Caps each of %1$d download; the global limit still applies.</item>
+    <item quantity="other">Caps each of %1$d downloads; the global limit still applies.</item>
+  </plurals>
+  <string name="downloads_speed_limit">Limit</string>
+  <string name="downloads_speed_limit_each">Limit for each</string>
+  <!-- Asks before sending downloads that carry cookies. %1$s is a file name or a number of downloads, %2$s a device. -->
+  <string name="downloads_send_title">Send %1$s to %2$s?</string>
+  <string name="downloads_move_title">Move %1$s to %2$s?</string>
+  <string name="downloads_send_confirm">Send</string>
+  <string name="downloads_move_confirm">Move</string>
+  <string name="downloads_send_note">They are saved with the download there, where anyone who controls it can see them.</string>
+
+  <!-- The Remove dialog. %1$s is a file name. -->
+  <string name="downloads_remove_title">Remove “%1$s”?</string>
+  <plurals name="downloads_remove_title_many">
+    <item quantity="one">Remove %1$d download?</item>
+    <item quantity="other">Remove %1$d downloads?</item>
+  </plurals>
+  <!-- %1$s is a device name, such as "This Mac". -->
+  <string name="downloads_remove_subtitle">From the list on %1$s.</string>
+  <!-- The box that also removes the files; a size may follow after " · ". -->
+  <string name="downloads_remove_trash_files">Also move the files to the Trash</string>
+  <string name="downloads_remove_trash_file">Also move the file to the Trash</string>
+  <string name="downloads_remove_trash_partial">Also move the partial file to the Trash</string>
+  <plurals name="downloads_remove_trash_all">
+    <item quantity="one">Also move all %1$d files to the Trash</item>
+    <item quantity="other">Also move all %1$d files to the Trash</item>
+  </plurals>
+  <string name="downloads_remove_delete_files">Also delete the files permanently</string>
+  <string name="downloads_remove_delete_file">Also delete the file permanently</string>
+  <string name="downloads_remove_delete_partial">Also delete the partial file permanently</string>
+  <plurals name="downloads_remove_delete_all">
+    <item quantity="one">Also delete all %1$d files permanently</item>
+    <item quantity="other">Also delete all %1$d files permanently</item>
+  </plurals>
+  <!-- How much of a partial file exists. %1$s and %2$s are sizes: "812.0 MB of 2.00 GB". -->
+  <string name="downloads_remove_size_of">%1$s of %2$s</string>
+  <string name="downloads_remove_and_trash">Remove and trash</string>
+  <string name="downloads_remove_and_delete">Remove and delete</string>
+  <!-- %1$s is a size, such as "2.00 GB". -->
+  <string name="downloads_remove_and_trash_size">Remove and trash %1$s</string>
+  <string name="downloads_remove_and_delete_size">Remove and delete %1$s</string>
+  <!-- What deleting the files means, parts joined by " · ". -->
+  <string name="downloads_remove_note_partial">The partial file is deleted permanently</string>
+  <plurals name="downloads_remove_note_partials">
+    <item quantity="one">%1$d partial file is deleted permanently</item>
+    <item quantity="other">%1$d partial files are deleted permanently</item>
+  </plurals>
+  <!-- %1$s is a size. The first starts the note, the second follows another part. -->
+  <string name="downloads_remove_note_frees">Frees %1$s</string>
+  <string name="downloads_remove_note_frees_after">frees %1$s</string>
+  <!-- %1$s is a size, %2$s a device name: "48.00 GB free on NAS". -->
+  <string name="downloads_remove_note_free_on">%1$s free on %2$s</string>
+
+  <!--
+    Commands on downloads that failed. %1$s is a file name or a number of downloads, such as
+    "2 downloads", %2$s a device name.
+  -->
+  <string name="downloads_failed_pause">Couldn't pause %1$s on %2$s</string>
+  <string name="downloads_failed_resume">Couldn't resume %1$s on %2$s</string>
+  <string name="downloads_failed_retry">Couldn't retry %1$s on %2$s</string>
+  <string name="downloads_failed_reconnect">Couldn't reconnect %1$s on %2$s</string>
+  <string name="downloads_failed_open">Couldn't open %1$s on %2$s</string>
+  <string name="downloads_failed_reveal">Couldn't show %1$s in its folder on %2$s</string>
+  <string name="downloads_failed_speed_limit">Couldn't set the speed limit of %1$s on %2$s</string>
+  <string name="downloads_failed_priority">Couldn't set the priority of %1$s on %2$s</string>
+  <string name="downloads_failed_connections">Couldn't set the connections of %1$s on %2$s</string>
+  <string name="downloads_failed_reschedule">Couldn't reschedule %1$s on %2$s</string>
+
+  <!-- What a command did to several downloads, parts joined by " · ". %1$d is how many. -->
+  <plurals name="downloads_batch_paused">
+    <item quantity="one">Paused %1$d download</item>
+    <item quantity="other">Paused %1$d downloads</item>
+  </plurals>
+  <plurals name="downloads_batch_resumed">
+    <item quantity="one">Resumed %1$d download</item>
+    <item quantity="other">Resumed %1$d downloads</item>
+  </plurals>
+  <plurals name="downloads_batch_retrying">
+    <item quantity="one">Retrying %1$d download</item>
+    <item quantity="other">Retrying %1$d downloads</item>
+  </plurals>
+  <plurals name="downloads_batch_rescheduled">
+    <item quantity="one">Rescheduled %1$d download</item>
+    <item quantity="other">Rescheduled %1$d downloads</item>
+  </plurals>
+  <plurals name="downloads_batch_unlimited">
+    <item quantity="one">Removed the speed limit of %1$d download</item>
+    <item quantity="other">Removed the speed limit of %1$d downloads</item>
+  </plurals>
+  <!-- %2$s is a speed, such as "2 MB/s". -->
+  <plurals name="downloads_batch_limited">
+    <item quantity="one">Limited %1$d download to %2$s</item>
+    <item quantity="other">Limited %1$d downloads to %2$s</item>
+  </plurals>
+  <!-- %2$s is a speed split between them. -->
+  <plurals name="downloads_batch_shared">
+    <item quantity="one">Sharing %2$s across %1$d download</item>
+    <item quantity="other">Sharing %2$s across %1$d downloads</item>
+  </plurals>
+  <!-- %2$s is a priority, such as "High". -->
+  <plurals name="downloads_batch_priority">
+    <item quantity="one">Set %1$d download to %2$s priority</item>
+    <item quantity="other">Set %1$d downloads to %2$s priority</item>
+  </plurals>
+  <!-- %2$d is a number of connections. -->
+  <plurals name="downloads_batch_connections">
+    <item quantity="one">Set %1$d download to %2$d connections</item>
+    <item quantity="other">Set %1$d downloads to %2$d connections</item>
+  </plurals>
+  <plurals name="downloads_batch_failed">
+    <item quantity="one">%1$d failed</item>
+    <item quantity="other">%1$d failed</item>
+  </plurals>
+  <!-- Why a command left some of the selected downloads alone. %1$d is how many. -->
+  <plurals name="downloads_skipped_finished">
+    <item quantity="one">%1$d already finished</item>
+    <item quantity="other">%1$d already finished</item>
+  </plurals>
+  <plurals name="downloads_skipped_running">
+    <item quantity="one">%1$d already running</item>
+    <item quantity="other">%1$d already running</item>
+  </plurals>
+  <plurals name="downloads_skipped_already_paused">
+    <item quantity="one">%1$d already paused</item>
+    <item quantity="other">%1$d already paused</item>
+  </plurals>
+  <plurals name="downloads_skipped_paused">
+    <item quantity="one">%1$d paused</item>
+    <item quantity="other">%1$d paused</item>
+  </plurals>
+  <plurals name="downloads_skipped_scheduled">
+    <item quantity="one">%1$d scheduled</item>
+    <item quantity="other">%1$d scheduled</item>
+  </plurals>
+  <plurals name="downloads_skipped_failed">
+    <item quantity="one">%1$d with an error</item>
+    <item quantity="other">%1$d with an error</item>
+  </plurals>
+  <plurals name="downloads_skipped_canceled">
+    <item quantity="one">%1$d canceled</item>
+    <item quantity="other">%1$d canceled</item>
+  </plurals>
+
+  <!-- Removing downloads with their files. %1$s is a file name or a number of downloads. -->
+  <string name="downloads_trash_removed">Removed %1$s</string>
+  <string name="downloads_trash_its_file">Its file goes to the Trash</string>
+  <string name="downloads_trash_their_files">Their files go to the Trash</string>
+  <plurals name="downloads_trash_moved">
+    <item quantity="one">Moved %1$d file to the Trash</item>
+    <item quantity="other">Moved %1$d files to the Trash</item>
+  </plurals>
+  <!-- %1$s is a file name. -->
+  <string name="downloads_trash_failed">Couldn't move %1$s to the Trash</string>
+  <plurals name="downloads_trash_failed_many">
+    <item quantity="one">Couldn't move %1$d file to the Trash</item>
+    <item quantity="other">Couldn't move %1$d files to the Trash</item>
+  </plurals>
+  <string name="downloads_trash_stays">The download stays in the list</string>
+  <string name="downloads_trash_stay">The downloads stay in the list</string>
+  <!-- %1$s is a file name or a number of downloads. -->
+  <string name="downloads_remove_failed">Couldn't remove %1$s</string>
+
+  <!-- Copying to the clipboard. -->
+  <string name="downloads_copied_link">Copied link</string>
+  <plurals name="downloads_copied_links">
+    <item quantity="one">Copied %1$d link</item>
+    <item quantity="other">Copied %1$d links</item>
+  </plurals>
+  <string name="downloads_copied_path">Copied file path</string>
+  <plurals name="downloads_copied_paths">
+    <item quantity="one">Copied %1$d file path</item>
+    <item quantity="other">Copied %1$d file paths</item>
+  </plurals>
+  <string name="downloads_copied_error">Copied error</string>
+  <string name="downloads_copied_details">Copied details</string>
+  <string name="downloads_copy_failed_link">Couldn't copy the link</string>
+  <string name="downloads_copy_failed_links">Couldn't copy the links</string>
+  <string name="downloads_copy_failed_path">Couldn't copy the file path</string>
+  <string name="downloads_copy_failed_paths">Couldn't copy the file paths</string>
+  <string name="downloads_copy_failed_error">Couldn't copy the error</string>
+  <string name="downloads_copy_failed_details">Couldn't copy the details</string>
+  <string name="downloads_open_source_failed">Couldn't open the source page</string>
+</resources>

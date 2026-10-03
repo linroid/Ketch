@@ -4,8 +4,19 @@ package com.linroid.ketch.app.feedback
 
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppController
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.notify_web_offer
+import ketch.app.shared.generated.resources.notify_web_on
+import ketch.app.shared.generated.resources.pulse_downloading_count
+import ketch.app.shared.generated.resources.pulse_tab_progress
 import kotlinx.browser.document
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -120,14 +131,14 @@ private fun offerNotifications(
 ) {
   messages.post(
     level = MessageLevel.Success,
-    title = copy.title,
-    detail = copy.body.ifEmpty { null },
+    title = verbatim(copy.title),
+    detail = copy.body.ifEmpty { null }?.let(::verbatim),
     taskKey = ActivityRouting.taskKeyOf(event),
     deviceId = ActivityRouting.deviceIdOf(event),
     actions = listOf(
-      MessageAction("Notify me") {
+      MessageAction(Res.string.notify_web_offer.text()) {
         notifier.requestPermission { granted ->
-          if (granted) messages.post(MessageLevel.Success, "Notifications on")
+          if (granted) messages.post(MessageLevel.Success, Res.string.notify_web_on.text())
         }
       }
     ),
@@ -150,17 +161,26 @@ private suspend fun showProgressInTitle(manager: InstanceManager) {
     }
     .map(::progressTitle)
     .distinctUntilChanged()
-    .collect { progress -> document.title = progress?.let { "$it · Ketch" } ?: idleTitle }
+    .collect { progress ->
+      document.title = progress?.let { listOf(it, verbatim(APP_NAME)).joinText().load() }
+        ?: idleTitle
+    }
 }
 
 // Progress of the downloading tasks of known size, or their count when no size is known.
-private fun progressTitle(states: List<DownloadState>): String? {
+private fun progressTitle(states: List<DownloadState>): UiText? {
   val downloading = states.filterIsInstance<DownloadState.Downloading>()
   if (downloading.isEmpty()) return null
   val sized = downloading.map { it.progress }.filter { it.totalBytes > 0 }
-  if (sized.isEmpty()) return "↓ ${downloading.size} downloading"
-  return "↓ ${sized.sumOf { it.downloadedBytes } * 100 / sized.sumOf { it.totalBytes }}%"
+  val progress = if (sized.isEmpty()) {
+    Res.string.pulse_downloading_count.text(downloading.size)
+  } else {
+    percentText((sized.sumOf { it.downloadedBytes } * 100 / sized.sumOf { it.totalBytes }).toInt())
+  }
+  return Res.string.pulse_tab_progress.text(progress)
 }
+
+private const val APP_NAME = "Ketch"
 
 private val TITLE_INTERVAL = 1.seconds
 

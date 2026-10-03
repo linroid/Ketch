@@ -3,6 +3,9 @@ package com.linroid.ketch.app.ui.discover
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AiCandidate
@@ -11,7 +14,14 @@ import com.linroid.ketch.app.state.CandidateAddResult
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.util.downloads
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_review
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.count_downloads
+import ketch.app.shared.generated.resources.intake_add_failed
+import ketch.app.shared.generated.resources.intake_added_failed
+import ketch.app.shared.generated.resources.intake_added_here
+import ketch.app.shared.generated.resources.intake_added_to
 import kotlinx.coroutines.Job
 
 private val log = KetchLogger("DiscoverScreen")
@@ -59,17 +69,18 @@ private fun AppState.reportDiscovered(
   val review = if (failed.isEmpty()) {
     null
   } else {
-    MessageAction("Review") {
+    MessageAction(Res.string.action_review.text()) {
       openIntake(aiDiscover.reviewRequest(failed, target.deviceId, query))
     }
   }
   val tasks = result.added
   if (tasks.isEmpty()) {
-    val what = failed.singleOrNull()?.let(::candidateName) ?: downloads(failed.size)
+    val what = failed.singleOrNull()?.let { verbatim(candidateName(it)) }
+      ?: Res.plurals.count_downloads.text(failed.size)
     messages.post(
       level = MessageLevel.Error,
-      title = "Couldn't add $what",
-      detail = firstError?.message,
+      title = Res.string.intake_add_failed.text(what),
+      detail = firstError?.message?.let(::verbatim),
       deviceId = target.deviceId,
       actions = listOfNotNull(review),
       cause = firstError,
@@ -81,22 +92,26 @@ private fun AppState.reportDiscovered(
   val shown = target in shownInstances.value
   val single = tasks.singleOrNull()?.takeIf { failed.isEmpty() }
   val key = single?.let { TaskKey(target.deviceId, it.taskId) }
-  val show = MessageAction("Show") {
+  val show = MessageAction(Res.string.action_show.text()) {
     if (!shown) switchInstance(target)
     showDownloads(StatusFilter.All)
     key?.let(::inspect)
   }
-  val what = added.singleOrNull()?.takeIf { single != null }?.let(::candidateName)
-    ?: downloads(tasks.size)
+  val what = added.singleOrNull()?.takeIf { single != null }?.let { verbatim(candidateName(it)) }
+    ?: Res.plurals.count_downloads.text(tasks.size)
   val device = target.displayName
-  val title = buildString {
-    append(if (shown) "Added $what → $device" else "Added $what to $device")
-    if (failed.isNotEmpty()) append(" · ${failed.size} failed")
-  }
+  val title = listOfNotNull(
+    if (shown) {
+      Res.string.intake_added_here.text(what, device)
+    } else {
+      Res.string.intake_added_to.text(what, device)
+    },
+    Res.plurals.intake_added_failed.text(failed.size).takeIf { failed.isNotEmpty() },
+  ).joinText()
   messages.post(
     level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
     title = title,
-    detail = firstError?.message,
+    detail = firstError?.message?.let(::verbatim),
     taskKey = key,
     deviceId = target.deviceId,
     actions = listOf(review ?: show, undo),

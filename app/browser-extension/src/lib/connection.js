@@ -4,6 +4,7 @@
  */
 
 import { ext } from './ext.js';
+import { t } from './i18n.js';
 import { FailureKind, KetchRequestError } from './ketch-client.js';
 import { isLoopbackUrl } from './settings.js';
 
@@ -88,7 +89,7 @@ async function connectToApp(deps, launch) {
     );
   } catch (error) {
     if (error?.name === 'TimeoutError') {
-      throw new KetchRequestError(FailureKind.TIMEOUT, "Ketch didn't start in time", {
+      throw new KetchRequestError(FailureKind.TIMEOUT, t('error_app_start_timeout'), {
         cause: error,
       });
     }
@@ -97,25 +98,25 @@ async function connectToApp(deps, launch) {
     if (/not found|no such native application/i.test(String(error?.message))) {
       throw new KetchRequestError(
         FailureKind.APP_NOT_INSTALLED,
-        "The Ketch app isn't set up on this computer",
+        t('error_app_not_installed'),
         { cause: error },
       );
     }
-    throw new KetchRequestError(FailureKind.UNREACHABLE, "Couldn't reach the Ketch app", {
+    throw new KetchRequestError(FailureKind.UNREACHABLE, t('error_app_unreachable'), {
       cause: error,
     });
   }
   if (reply?.error === 'not_running') {
-    throw new KetchRequestError(FailureKind.APP_NOT_RUNNING, "Ketch isn't running");
+    throw new KetchRequestError(FailureKind.APP_NOT_RUNNING, t('error_app_not_running'));
   }
   if (reply?.error) {
     throw new KetchRequestError(
-      FailureKind.UNREACHABLE, reply.message || "The Ketch app couldn't connect");
+      FailureKind.UNREACHABLE, reply.message || t('error_app_connect_failed'));
   }
   // Downloads carry cookies, so only ever send them to this computer.
   if (typeof reply?.url !== 'string' || !isLoopbackUrl(reply.url) ||
     typeof reply.token !== 'string' || !reply.token) {
-    throw new KetchRequestError(FailureKind.UNREACHABLE, 'The Ketch app sent an invalid reply');
+    throw new KetchRequestError(FailureKind.UNREACHABLE, t('error_app_invalid_reply'));
   }
   return { url: reply.url, token: reply.token };
 }

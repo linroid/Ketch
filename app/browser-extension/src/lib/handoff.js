@@ -2,6 +2,7 @@
 
 import { withEndpoint } from './connection.js';
 import { ext } from './ext.js';
+import { t } from './i18n.js';
 import { KetchClient } from './ketch-client.js';
 import {
   buildDownloadRequest,
@@ -51,7 +52,7 @@ const TORRENT_FETCH_TIMEOUT_MS = 15_000;
 export async function sendToKetch(instance, download, settings, options = {}) {
   const { url } = download;
   if (!isSupportedLinkUrl(url)) {
-    throw new Error("Ketch can't download this kind of link");
+    throw new Error(t('error_unsupported_link'));
   }
   const deps = options.deps ?? browserDeps();
   const deadline = () => options.timeoutMs === undefined
@@ -122,12 +123,12 @@ async function fetchTorrentFile(fetchImpl, url, includeCookies, deadline) {
       signal: deadline ?? AbortSignal.timeout(TORRENT_FETCH_TIMEOUT_MS),
     });
     if (!response.ok) {
-      throw new Error(`Couldn't fetch the torrent file (HTTP ${response.status})`);
+      throw new Error(t('error_torrent_http', response.status));
     }
     return await readAtMost(response, MAX_TORRENT_BYTES);
   } catch (error) {
     if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
-      throw new Error('Timed out fetching the torrent file', { cause: error });
+      throw new Error(t('error_torrent_timeout'), { cause: error });
     }
     throw error;
   }
@@ -138,7 +139,7 @@ async function fetchTorrentFile(fetchImpl, url, includeCookies, deadline) {
  * response can't exhaust memory.
  */
 async function readAtMost(response, limit) {
-  const tooLarge = () => new Error('The torrent file is too large');
+  const tooLarge = () => new Error(t('error_torrent_too_large'));
   if (Number(response.headers.get('Content-Length')) > limit) {
     await response.body?.cancel();
     throw tooLarge();

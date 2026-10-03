@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.platform
 
 import androidx.compose.runtime.Composable
+import com.linroid.ketch.app.i18n.UiText
 
 /**
  * Opens, reveals and shares the files that downloads saved on this device.
@@ -14,7 +15,7 @@ interface FileActions {
    * Label of [reveal] in menus: "Show in Finder", "Show in Explorer", "Show in Files" or
    * "Show in folder"; `null` where files cannot be revealed, as on Android.
    */
-  val revealLabel: String?
+  val revealLabel: UiText?
 
   /** Whether [share] can hand files to other apps here. */
   val canShare: Boolean

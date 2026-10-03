@@ -8,10 +8,33 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.ByteUnit
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.clockTime
+import com.linroid.ketch.app.i18n.decimal
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.i18n.weekdayShortText
 import com.linroid.ketch.app.instance.ServerState
-import com.linroid.ketch.app.util.clockLabel
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.remote.ConnectionState
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.date_at_time
+import ketch.app.shared.generated.resources.group_all_done_at
+import ketch.app.shared.generated.resources.pulse_all_quiet
+import ketch.app.shared.generated.resources.pulse_all_quiet_free
+import ketch.app.shared.generated.resources.pulse_attention
+import ketch.app.shared.generated.resources.pulse_connecting
+import ketch.app.shared.generated.resources.pulse_downloading
+import ketch.app.shared.generated.resources.pulse_downloading_count
+import ketch.app.shared.generated.resources.pulse_downloading_on_devices
+import ketch.app.shared.generated.resources.pulse_needs_token
+import ketch.app.shared.generated.resources.pulse_offline
+import ketch.app.shared.generated.resources.pulse_slow_lane
+import ketch.app.shared.generated.resources.pulse_slow_lane_until
+import ketch.app.shared.generated.resources.pulse_tab_progress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,6 +60,7 @@ import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -172,7 +196,7 @@ data class PulseCounts(
  */
 data class DevicePulse(
   val deviceId: String,
-  val name: String,
+  val name: UiText,
   val health: DeviceHealth,
   val counts: PulseCounts,
   val failures: Int,
@@ -260,56 +284,54 @@ data class PulseState(
   fun sentence(
     now: Instant = Clock.System.now(),
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
-  ): String {
+  ): UiText {
     val online = online
     val downloading = online.sumOf { it.counts.downloading }
     val offline = devices.firstOrNull { !it.health.isOnline }
     val base = when {
       downloading > 0 -> activeSentence(online, downloading, now, timeZone)
       offline != null -> offlineSentence(offline)
-      failures > 0 -> {
-        "$failures ${plural(failures, "download needs", "downloads need")} attention"
-      }
+      failures > 0 -> Res.plurals.pulse_attention.text(failures)
       else -> {
         val disk = diskDevice
         if (disk?.disk == null) {
-          "All quiet"
+          Res.string.pulse_all_quiet.text()
         } else {
-          "All quiet · ${formatSpace(disk.disk.usableBytes)} free on ${disk.name}"
+          Res.string.pulse_all_quiet_free.text(formatSpace(disk.disk.usableBytes), disk.name)
         }
       }
     }
-    return base + slowLaneSuffix(now, timeZone)
+    return listOfNotNull(base, slowLaneSuffix(now, timeZone)).joinText()
   }
 
   /** Short form for a window title, such as "3 downloading · 45%"; `null` when idle. */
-  fun shortSentence(): String? {
+  fun shortSentence(): UiText? {
     val (downloading, percent) = downloadingNow()
-    return when {
-      downloading == 0 -> null
-      percent == null -> "$downloading downloading"
-      else -> "$downloading downloading · $percent%"
-    }
+    if (downloading == 0) return null
+    val count = Res.string.pulse_downloading_count.text(downloading)
+    return if (percent == null) count else listOf(count, percentText(percent)).joinText()
   }
 
   /** Title of the web app's tab: "↓ 45% · Ketch" while downloads run, otherwise "Ketch". */
-  fun tabTitle(): String {
+  fun tabTitle(): UiText {
     val (downloading, percent) = downloadingNow()
-    return when {
-      downloading == 0 -> APP_NAME
-      percent == null -> "↓ $downloading · $APP_NAME"
-      else -> "↓ $percent% · $APP_NAME"
+    if (downloading == 0) return AppName
+    val progress = if (percent == null) {
+      verbatim("↓ $downloading")
+    } else {
+      Res.string.pulse_tab_progress.text(percentText(percent))
     }
+    return listOf(progress, AppName).joinText()
   }
 
   private val online: List<DevicePulse> get() = devices.filter { it.health.isOnline }
 
   // Tasks downloading on online devices, and the percent of their known size received; the
   // percent is null when no size is known.
-  private fun downloadingNow(): Pair<Int, Long?> {
+  private fun downloadingNow(): Pair<Int, Int?> {
     val online = online
     val size = online.sumOf { it.sizeBytes }
-    val percent = if (size > 0) online.sumOf { it.downloadedBytes } * 100 / size else null
+    val percent = if (size > 0) (online.sumOf { it.downloadedBytes } * 100 / size).toInt() else null
     return online.sumOf { it.counts.downloading } to percent
   }
 
@@ -318,12 +340,16 @@ data class PulseState(
     downloading: Int,
     now: Instant,
     timeZone: TimeZone,
-  ): String {
+  ): UiText {
     val busy = online.filter { it.counts.downloading > 0 }
-    val where = if (busy.size > 1) " on ${busy.size} devices" else ""
-    val files = "Downloading $downloading ${plural(downloading, "file", "files")}$where"
+    val files = if (busy.size > 1) {
+      Res.plurals.pulse_downloading_on_devices.text(downloading, downloading, busy.size)
+    } else {
+      Res.plurals.pulse_downloading.text(downloading)
+    }
     val finish = finishTime(busy, now) ?: return files
-    return "$files · all done ≈ ${clockLabel(finish, now, timeZone)}"
+    return listOf(files, Res.string.group_all_done_at.text(clockLabel(finish, now, timeZone)))
+      .joinText()
   }
 
   // Each device's remaining bytes over the speed it can reach under its cap. Bandwidth never
@@ -344,25 +370,28 @@ data class PulseState(
     return now + latest
   }
 
-  private fun offlineSentence(device: DevicePulse): String = when (device.health) {
-    DeviceHealth.Connecting -> "Connecting to ${device.name}"
-    DeviceHealth.Unauthorized -> "${device.name} needs a token"
-    else -> "${device.name} is offline · retrying"
+  private fun offlineSentence(device: DevicePulse): UiText = when (device.health) {
+    DeviceHealth.Connecting -> Res.string.pulse_connecting.text(device.name)
+    DeviceHealth.Unauthorized -> Res.string.pulse_needs_token.text(device.name)
+    else -> Res.string.pulse_offline.text(device.name)
   }
 
-  private fun slowLaneSuffix(now: Instant, timeZone: TimeZone): String = when (mode) {
-    SpeedMode.Full -> ""
-    SpeedMode.SlowLane -> " · Slow lane"
+  /** "Slow lane" or "Slow lane until 18:00" while it caps the speed; `null` otherwise. */
+  private fun slowLaneSuffix(now: Instant, timeZone: TimeZone): UiText? = when (mode) {
+    SpeedMode.Full -> null
+    SpeedMode.SlowLane -> Res.string.pulse_slow_lane.text()
     is SpeedMode.Auto -> when {
-      !mode.slowLane -> ""
-      mode.until == null -> " · Slow lane"
-      else -> " · Slow lane until ${clockLabel(mode.until, now, timeZone)}"
+      !mode.slowLane -> null
+      mode.until == null -> Res.string.pulse_slow_lane.text()
+      else -> Res.string.pulse_slow_lane_until.text(clockLabel(mode.until, now, timeZone))
     }
   }
 
   private companion object {
     val MAX_ETA = 7.days
-    const val APP_NAME = "Ketch"
+
+    // The product's name, which every language writes the same.
+    val AppName = verbatim("Ketch")
   }
 }
 
@@ -378,7 +407,7 @@ data class PulseState(
  */
 class PulseSource(
   val deviceId: String,
-  val name: String,
+  val name: UiText,
   val tasks: Flow<List<DownloadTask>>,
   val config: Flow<DownloadConfig?>,
   val status: suspend () -> KetchStatus,
@@ -528,9 +557,7 @@ class PulseModel(
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
-          log.d {
-            "Could not read free space of deviceId=${source.deviceId}: ${e.describeCauses()}"
-          }
+          log.d { "Couldn't read free space of deviceId=${source.deviceId}: ${e.describeCauses()}" }
         }
       }
     }
@@ -576,7 +603,7 @@ class PulseModel(
 
   private class DeviceLive(
     val deviceId: String,
-    val name: String,
+    val name: UiText,
     val health: DeviceHealth,
     val cap: SpeedLimit,
     val totals: TaskTotals,
@@ -620,21 +647,18 @@ private fun <T> Flow<T>.throttleLatest(period: Duration): Flow<T> = conflate().t
   delay(period)
 }
 
-private fun plural(count: Int, one: String, many: String): String = if (count == 1) one else many
-
 /** Disk space as "412 GB", "3.1 GB" or "1.8 TB": whole gigabytes from 10 GB, else one decimal. */
-internal fun formatSpace(bytes: Long): String {
-  val gb = 1024L * 1024 * 1024
-  val tb = gb * 1024
-  return when {
-    bytes >= tb -> "${tenths(bytes, tb)} TB"
-    bytes >= 10 * gb -> "${(bytes + gb / 2) / gb} GB"
-    bytes >= gb -> "${tenths(bytes, gb)} GB"
-    else -> formatBytes(bytes)
-  }
+internal fun formatSpace(bytes: Long): UiText = when {
+  bytes >= ByteUnit.TB.bytes -> ByteUnit.TB.text(decimal(bytes.toDouble() / ByteUnit.TB.bytes, 1))
+  bytes >= 10 * ByteUnit.GB.bytes ->
+    ByteUnit.GB.text(decimal(bytes.toDouble() / ByteUnit.GB.bytes, 0))
+  bytes >= ByteUnit.GB.bytes -> ByteUnit.GB.text(decimal(bytes.toDouble() / ByteUnit.GB.bytes, 1))
+  else -> sizeText(bytes)
 }
 
-private fun tenths(bytes: Long, unit: Long): String {
-  val tenths = (bytes * 10 + unit / 2) / unit
-  return "${tenths / 10}.${tenths % 10}"
+/** "14:32" on the day of [now], "Tue 09:00" on another day; rounded to the nearest minute. */
+internal fun clockLabel(instant: Instant, now: Instant, timeZone: TimeZone): UiText {
+  val time = (instant + 30.seconds).toLocalDateTime(timeZone)
+  if (time.date == now.toLocalDateTime(timeZone).date) return verbatim(clockTime(time))
+  return Res.string.date_at_time.text(weekdayShortText(time.dayOfWeek), clockTime(time))
 }

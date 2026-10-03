@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.SpeedLimitPicker
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
@@ -27,6 +29,12 @@ import com.linroid.ketch.app.ui.pulse.SpeedPopoverWidth
 import com.linroid.ketch.app.ui.pulse.SpeedSettingsButton
 import com.linroid.ketch.app.ui.pulse.rememberPendingJob
 import com.linroid.ketch.app.ui.pulse.speedModeView
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_speed_applies
+import ketch.app.shared.generated.resources.device_speed_limit
+import ketch.app.shared.generated.resources.device_speed_of
+import ketch.app.shared.generated.resources.device_speed_update_failed
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What [device]'s speed mode pill shows: its own mode and limit, whether or not it is the device
@@ -72,7 +80,7 @@ internal fun DeviceSpeedPill(
       onDismissRequest = { open = false },
       width = SpeedPopoverWidth,
       alignment = PopoverAlignment.End,
-      title = "Speed of ${device.name}",
+      title = stringResource(Res.string.device_speed_of, device.name.resolve()),
     ) {
       if (active) {
         SpeedModeOptions(state, onOpenSettings = { open = false })
@@ -105,12 +113,17 @@ private fun ColumnScope.DeviceSpeedOptions(
     )
   } else {
     val settings = state.settingsFor(device.entry)
-    KetchEyebrow("Speed limit", Modifier.padding(bottom = spacing.s2))
+    val caption = settings.downloadError
+      ?.let { Res.string.device_speed_update_failed.text(device.name, it) }
+      ?: Res.string.device_speed_applies.text(device.name)
+    KetchEyebrow(
+      text = stringResource(Res.string.device_speed_limit),
+      modifier = Modifier.padding(bottom = spacing.s2),
+    )
     SpeedLimitPicker(
       value = settings.download?.speedLimit ?: view.limit,
       onCommit = { state.setSpeedLimit(device.entry, it) },
-      caption = settings.downloadError?.let { "Couldn't update ${device.name} · $it" }
-        ?: "Applies to every download on ${device.name}.",
+      caption = caption.resolve(),
       enabled = settings.download != null,
     )
   }

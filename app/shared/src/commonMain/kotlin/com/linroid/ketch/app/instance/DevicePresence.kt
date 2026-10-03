@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.DiskSpace
@@ -69,7 +70,7 @@ import kotlin.time.Instant
  */
 data class DevicePresence(
   val entry: InstanceEntry,
-  val name: String,
+  val name: UiText,
   val detail: String,
   val health: DeviceHealth,
   val connected: Boolean,

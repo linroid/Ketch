@@ -1,6 +1,8 @@
 package com.linroid.ketch.app.components
 
 import androidx.compose.ui.graphics.Color
+import com.linroid.ketch.app.i18n.load
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -50,10 +52,11 @@ class KetchSpeedChartTest {
   }
 
   @Test
-  fun formatSpeedCeiling_roundValues_dropTheirDecimals() {
-    assertEquals("10 MB/s", formatSpeedCeiling(10 * MIB))
-    assertEquals("1 GB/s", formatSpeedCeiling(1024 * MIB))
-    assertEquals("512 B/s", formatSpeedCeiling(512))
+  fun speedCeilingText_roundValues_dropTheirDecimals() = runTest {
+    assertEquals("10 MB/s", speedCeilingText(10 * MIB).load())
+    assertEquals("1 GB/s", speedCeilingText(1024 * MIB).load())
+    assertEquals("512 B/s", speedCeilingText(512).load())
+    assertEquals("1.5 MB/s", speedCeilingText(MIB + MIB / 2).load())
   }
 
   @Test

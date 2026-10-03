@@ -4,6 +4,8 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.fixtureTest
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppState
@@ -19,7 +21,7 @@ import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 
 /** A remote device of a test. */
-internal val RemoteDevice = DeviceInfo("NAS", RowCapabilities.remote())
+internal val RemoteDevice = DeviceInfo(verbatim("NAS"), RowCapabilities.remote())
 
 /**
  * An app with one recording device and a [RowActionRunner] over it, run by the test's scheduler.
@@ -30,7 +32,7 @@ internal val RemoteDevice = DeviceInfo("NAS", RowCapabilities.remote())
  */
 internal class ActionsFixture(
   scope: TestScope,
-  revealLabel: String? = "Show in Finder",
+  revealLabel: UiText? = verbatim("Show in Finder"),
   canTrash: Boolean = false,
   openUri: (String) -> Unit = {},
 ) {
@@ -58,7 +60,7 @@ internal class ActionsFixture(
 
 /** Runs [block] over a new [ActionsFixture], closing it even when an assertion fails. */
 internal fun actionsTest(
-  revealLabel: String? = "Show in Finder",
+  revealLabel: UiText? = verbatim("Show in Finder"),
   canTrash: Boolean = false,
   openUri: (String) -> Unit = {},
   block: suspend TestScope.(ActionsFixture) -> Unit,
@@ -67,7 +69,7 @@ internal fun actionsTest(
 
 /** File actions that record their calls. */
 internal class FakeFileActions(
-  override val revealLabel: String?,
+  override val revealLabel: UiText?,
   override val canTrash: Boolean = false,
 ) : FileActions {
   val calls = mutableListOf<String>()

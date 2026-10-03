@@ -3,6 +3,7 @@ package com.linroid.ketch.app.state
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.linroid.ketch.app.i18n.UiText
 
 /** Where the current Discover search is. */
 sealed interface AiDiscoverState {
@@ -15,8 +16,8 @@ sealed interface AiDiscoverState {
   /** The search finished with [candidates], best first; it may have found none. */
   data class Results(val candidates: List<AiCandidate>) : AiDiscoverState
 
-  /** The search failed with [message]. */
-  data class Error(val message: String) : AiDiscoverState
+  /** The search failed with [message], such as what the model provider answered. */
+  data class Error(val message: UiText) : AiDiscoverState
 }
 
 /**

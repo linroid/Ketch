@@ -1,12 +1,11 @@
 package com.linroid.ketch.app.ui.downloads
 
-import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.GroupBy
 import com.linroid.ketch.app.state.ListArrangement
-import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.SortKey
 import com.linroid.ketch.app.theme.lightKetchColors
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -39,27 +38,33 @@ class DownloadTableTest {
   }
 
   @Test
-  fun reasonText_failedRow_startsWithTheErrorTitleInTheFailedColor() {
+  fun reasonText_failure_startsWithTheErrorTitleInTheFailedColor() {
     val colors = lightKetchColors()
-    val row = ListFixtures.row("weights", DownloadState.Failed(KetchError.Http(403, "Forbidden")))
 
-    val text = reasonText(row, colors)
+    val text = reasonText("detail", "Access denied (403)", "the link may have expired", colors)
 
-    val title = row.content.error!!.title
-    assertTrue(text.text.startsWith(title))
+    assertEquals("Access denied (403) · the link may have expired", text.text)
     assertEquals(colors.status.failed.color, text.spanStyles.single().item.color)
   }
 
   @Test
-  fun reasonText_queuedRow_isItsDetail() {
-    val row = ListFixtures.row("queued", DownloadState.Queued)
-
-    assertEquals(row.content.detail, reasonText(row, lightKetchColors()).text)
+  fun reasonText_noFailure_isTheDetail() {
+    assertEquals(
+      "Waiting to start",
+      reasonText("Waiting to start", null, null, lightKetchColors()).text
+    )
   }
 
   @Test
-  fun clearFinishedLabel_noneFinished_dropsTheCount() {
-    assertEquals("Clear 4 finished", clearFinishedLabel(4))
-    assertEquals("Clear finished", clearFinishedLabel(0))
+  fun clearFinishedLabel_noneFinished_dropsTheCount() = runTest {
+    assertEquals("Clear 4 finished", clearFinishedLabel(4).load())
+    assertEquals("Clear finished", clearFinishedLabel(0).load())
+  }
+
+  @Test
+  fun columnTitle_abbreviatedHeader_isSpelledOutInMenus() = runTest {
+    assertEquals("Conn.", TableColumn.Connections.label.load())
+    assertEquals("Connections", TableColumn.Connections.title.load())
+    assertEquals("Left", TableColumn.Left.title.load())
   }
 }

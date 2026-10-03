@@ -2,6 +2,9 @@ package com.linroid.ketch.app.ui.shell
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -9,7 +12,7 @@ import kotlin.test.assertNull
 class PhoneTopBarTest {
 
   @Test
-  fun searchSuggestion_link_offersToDownloadIt() {
+  fun searchSuggestion_link_offersToDownloadIt() = runTest {
     val suggestion = searchSuggestion("https://example.com/files/ubuntu.iso", discover = true)
 
     assertEquals(
@@ -19,8 +22,15 @@ class PhoneTopBarTest {
       ),
       suggestion,
     )
-    assertEquals("Download on This phone", suggestion?.label("This phone"))
+    assertEquals("Download on This phone", suggestion?.label(verbatim("This phone")).load())
     assertEquals("ubuntu.iso", suggestion?.detail)
+  }
+
+  @Test
+  fun searchSuggestion_links_namesHowMany() = runTest {
+    val suggestion = searchSuggestion("https://a.example/1.iso https://b.example/2.iso", true)
+
+    assertEquals("Download 2 links on NAS", suggestion?.label(verbatim("NAS")).load())
   }
 
   @Test

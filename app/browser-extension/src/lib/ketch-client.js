@@ -3,6 +3,8 @@
  * script, the popup and the options page.
  */
 
+import { t } from './i18n.js';
+
 /** Why a request to Ketch failed, so callers can tell the user what to fix. */
 export const FailureKind = Object.freeze({
   /** Nothing answered: the server is off, or the address is wrong. */
@@ -125,22 +127,22 @@ export class KetchClient {
     } catch (error) {
       if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
         throw new KetchRequestError(
-          FailureKind.TIMEOUT, `Ketch at ${this.#baseUrl} did not respond`, { cause: error });
+          FailureKind.TIMEOUT, t('error_no_response', this.#baseUrl), { cause: error });
       }
       throw new KetchRequestError(
-        FailureKind.UNREACHABLE, `Can't reach Ketch at ${this.#baseUrl}`, { cause: error });
+        FailureKind.UNREACHABLE, t('error_unreachable', this.#baseUrl), { cause: error });
     }
     if (response.status === 401 || response.status === 403) {
       throw new KetchRequestError(
         FailureKind.UNAUTHORIZED,
-        this.#token ? 'Ketch rejected the access token' : 'Ketch requires an access token',
+        this.#token ? t('error_token_rejected') : t('error_token_required'),
         { status: response.status },
       );
     }
     const text = await response.text();
     const payload = parseJson(text);
     if (!response.ok) {
-      const message = payload?.message || `Ketch answered with HTTP ${response.status}`;
+      const message = payload?.message || t('error_http_status', response.status);
       throw new KetchRequestError(FailureKind.REJECTED, message, { status: response.status });
     }
     return payload ?? {};

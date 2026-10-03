@@ -7,6 +7,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
@@ -60,7 +61,7 @@ class RowActionRunnerTest {
     running.forEach { assertEquals(listOf("pause"), it.calls) }
     assertTrue(done.calls.isEmpty())
     val message = f.messages().last()
-    assertEquals("Paused 2 downloads · 1 already finished", message.title)
+    assertEquals("Paused 2 downloads · 1 already finished", message.title.load())
     assertEquals(MessageLevel.Success, message.level)
   }
 
@@ -73,11 +74,11 @@ class RowActionRunnerTest {
     runCurrent()
 
     val message = f.messages().last()
-    assertEquals("Paused 1 download · 1 failed", message.title)
+    assertEquals("Paused 1 download · 1 failed", message.title.load())
     assertEquals(MessageLevel.Warning, message.level)
-    assertEquals("Connection lost", message.detail)
+    assertEquals("Connection lost", message.detail.load())
     bad.failure = null
-    message.actions.single { it.label == "Try again" }.onClick()
+    message.actions.single { it.label.load() == "Try again" }.onClick()
     runCurrent()
     assertEquals(listOf("pause"), good.calls)
     assertEquals(listOf("pause", "pause"), bad.calls)
@@ -93,7 +94,7 @@ class RowActionRunnerTest {
     runCurrent()
 
     tasks.forEach { assertEquals(listOf("pause"), it.calls) }
-    assertEquals("Paused 2 downloads", f.messages().last().title)
+    assertEquals("Paused 2 downloads", f.messages().last().title.load())
   }
 
   @Test
@@ -106,7 +107,7 @@ class RowActionRunnerTest {
     runCurrent()
 
     val errors = f.messages().filter { it.level == MessageLevel.Error }
-    assertEquals(listOf("Couldn't pause 2 downloads on This Mac"), errors.map { it.title })
+    assertEquals(listOf("Couldn't pause 2 downloads on This Mac"), errors.map { it.title }.load())
   }
 
   @Test
@@ -120,7 +121,7 @@ class RowActionRunnerTest {
 
     val copied = "https://example.com/a.iso\nhttps://example.com/b.iso"
     assertEquals(listOf(copied), f.clipboard.written)
-    assertEquals("Copied 2 links", f.messages().last().title)
+    assertEquals("Copied 2 links", f.messages().last().title.load())
   }
 
   @Test
@@ -181,8 +182,8 @@ class RowActionRunnerTest {
 
     assertEquals(listOf(kept, running), f.state.tasks.value)
     val message = f.messages().last()
-    assertEquals("Cleared 1 download with a missing file", message.title)
-    assertTrue(message.actions.any { it.label == "Undo" })
+    assertEquals("Cleared 1 download with a missing file", message.title.load())
+    assertTrue(message.actions.any { it.label.load() == "Undo" })
     assertTrue(gone.calls.isEmpty())
     advanceTimeBy(7.seconds)
     runCurrent()
@@ -201,7 +202,7 @@ class RowActionRunnerTest {
 
     assertTrue(task.calls.isEmpty())
     val message = f.messages().last()
-    assertEquals("No missing files to clear", message.title)
+    assertEquals("No missing files to clear", message.title.load())
     assertEquals(MessageLevel.Info, message.level)
   }
 
@@ -219,7 +220,7 @@ class RowActionRunnerTest {
 
     assertFalse(f.runner.isFileMissing(row))
     assertTrue(task.calls.isEmpty())
-    assertEquals("No missing files to clear", f.messages().last().title)
+    assertEquals("No missing files to clear", f.messages().last().title.load())
   }
 
   @Test
@@ -239,7 +240,7 @@ class RowActionRunnerTest {
       runCurrent()
       assertEquals(listOf("remove deleteFiles=false"), task.calls)
       assertEquals(listOf("trash /downloads/a.iso"), f.files.calls)
-      assertEquals("Moved 1 file to the Trash", f.messages().last().title)
+      assertEquals("Moved 1 file to the Trash", f.messages().last().title.load())
     }
 
   @Test
@@ -253,9 +254,9 @@ class RowActionRunnerTest {
 
     assertTrue(task.calls.isEmpty())
     val error = f.messages().last()
-    assertTrue(error.title.startsWith("Couldn't move "), error.title)
-    assertTrue(error.title.endsWith(" to the Trash"), error.title)
-    assertEquals("The download stays in the list", error.detail)
+    assertTrue(error.title.load().startsWith("Couldn't move "), error.title.load())
+    assertTrue(error.title.load().endsWith(" to the Trash"), error.title.load())
+    assertEquals("The download stays in the list", error.detail.load())
   }
 
   @Test
@@ -280,7 +281,7 @@ class RowActionRunnerTest {
 
     f.runner.remove(listOf(rowOf(task)), withFiles = true)
     runCurrent()
-    f.messages().last().actions.single { it.label == "Undo" }.onClick()
+    f.messages().last().actions.single { it.label.load() == "Undo" }.onClick()
     advanceTimeBy(7.seconds)
     runCurrent()
 
@@ -303,7 +304,7 @@ class RowActionRunnerTest {
       assertEquals(listOf("remove deleteFiles=false"), done.calls)
       assertEquals(listOf("remove deleteFiles=true"), partial.calls)
       assertEquals(listOf("trash /downloads/a.iso"), f.files.calls)
-      assertEquals("Moved 1 file to the Trash", f.messages().last().title)
+      assertEquals("Moved 1 file to the Trash", f.messages().last().title.load())
     }
 
   @Test

@@ -1,5 +1,8 @@
 package com.linroid.ketch.app.state
 
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.intake_file_unreadable
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
@@ -41,7 +44,7 @@ fun IncomingDownloads.offerFile(url: NSURL) {
     // Mapped data is paged in on access, so an oversized file is rejected without loading it.
     val data = NSData.dataWithContentsOfURL(url, NSDataReadingMappedIfSafe, null)
     if (data == null) {
-      offer(IncomingDownload.Failed(name, "The file could not be read"))
+      offer(IncomingDownload.Failed(name, Res.string.intake_file_unreadable.text()))
       return
     }
     val length = minOf(data.length.toLong(), MAX_TORRENT_FILE_BYTES + 1L).toInt()

@@ -2,8 +2,11 @@ package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.ServerConfig
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -40,7 +43,16 @@ class InstanceManagerServerTest {
     val manager = manager(ServerConfig()) { throw IllegalStateException("Port in use") }
     manager.startServer()
     val state = assertIs<ServerState.Failed>(manager.serverState.value)
-    assertEquals("Port in use", state.message)
+    assertEquals(verbatim("Port in use"), state.reason)
+    manager.close()
+  }
+
+  @Test
+  fun `a failed start without a message gives the generic reason`() = runTest {
+    val manager = manager(ServerConfig()) { throw IllegalStateException() }
+    manager.startServer()
+    val state = assertIs<ServerState.Failed>(manager.serverState.value)
+    assertEquals("Could not start the server.", state.reason.load())
     manager.close()
   }
 

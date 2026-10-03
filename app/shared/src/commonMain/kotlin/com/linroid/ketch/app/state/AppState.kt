@@ -25,6 +25,11 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.ToastMode
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.sizeText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.DiscoveredServer
@@ -42,15 +47,98 @@ import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.extractFilename
-import com.linroid.ketch.app.util.formatBytes
-import com.linroid.ketch.app.util.plural
 import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.action_try_again
+import ketch.app.shared.generated.resources.action_undo
+import ketch.app.shared.generated.resources.device_any_in_sentence
+import ketch.app.shared.generated.resources.feedback_add_failed
+import ketch.app.shared.generated.resources.feedback_add_failed_count
+import ketch.app.shared.generated.resources.feedback_added
+import ketch.app.shared.generated.resources.feedback_added_here
+import ketch.app.shared.generated.resources.feedback_added_here_one
+import ketch.app.shared.generated.resources.feedback_cleared
+import ketch.app.shared.generated.resources.feedback_cleared_missing
+import ketch.app.shared.generated.resources.feedback_device_offline
+import ketch.app.shared.generated.resources.feedback_device_online
+import ketch.app.shared.generated.resources.feedback_discard_failed
+import ketch.app.shared.generated.resources.feedback_discard_failed_one
+import ketch.app.shared.generated.resources.feedback_discarded
+import ketch.app.shared.generated.resources.feedback_discarded_one
+import ketch.app.shared.generated.resources.feedback_discovery_failed
+import ketch.app.shared.generated.resources.feedback_drop_unsupported
+import ketch.app.shared.generated.resources.feedback_file_read_failed
+import ketch.app.shared.generated.resources.feedback_file_unsupported
+import ketch.app.shared.generated.resources.feedback_moved
+import ketch.app.shared.generated.resources.feedback_moved_one
+import ketch.app.shared.generated.resources.feedback_nothing_missing
+import ketch.app.shared.generated.resources.feedback_nothing_to_pause
+import ketch.app.shared.generated.resources.feedback_open_failed
+import ketch.app.shared.generated.resources.feedback_options
+import ketch.app.shared.generated.resources.feedback_part_failed
+import ketch.app.shared.generated.resources.feedback_pause_failed
+import ketch.app.shared.generated.resources.feedback_pause_failed_one
+import ketch.app.shared.generated.resources.feedback_paused
+import ketch.app.shared.generated.resources.feedback_paused_on_devices
+import ketch.app.shared.generated.resources.feedback_read_failed
+import ketch.app.shared.generated.resources.feedback_recovered
+import ketch.app.shared.generated.resources.feedback_redownload_failed
+import ketch.app.shared.generated.resources.feedback_redownload_failed_one
+import ketch.app.shared.generated.resources.feedback_remove_device_failed
+import ketch.app.shared.generated.resources.feedback_remove_failed
+import ketch.app.shared.generated.resources.feedback_remove_failed_one
+import ketch.app.shared.generated.resources.feedback_remove_here
+import ketch.app.shared.generated.resources.feedback_removed
+import ketch.app.shared.generated.resources.feedback_removed_one
+import ketch.app.shared.generated.resources.feedback_restarted
+import ketch.app.shared.generated.resources.feedback_restarted_one
+import ketch.app.shared.generated.resources.feedback_resume_failed
+import ketch.app.shared.generated.resources.feedback_resume_failed_one
+import ketch.app.shared.generated.resources.feedback_resumed
+import ketch.app.shared.generated.resources.feedback_resumed_on_devices
+import ketch.app.shared.generated.resources.feedback_retry_failed
+import ketch.app.shared.generated.resources.feedback_retry_failed_one
+import ketch.app.shared.generated.resources.feedback_retrying
+import ketch.app.shared.generated.resources.feedback_retrying_on_devices
+import ketch.app.shared.generated.resources.feedback_scheduled_at
+import ketch.app.shared.generated.resources.feedback_scheduled_on_time
+import ketch.app.shared.generated.resources.feedback_send_cookies
+import ketch.app.shared.generated.resources.feedback_send_cookies_and_sign_in
+import ketch.app.shared.generated.resources.feedback_send_failed
+import ketch.app.shared.generated.resources.feedback_send_failed_one
+import ketch.app.shared.generated.resources.feedback_send_sign_in
+import ketch.app.shared.generated.resources.feedback_sent
+import ketch.app.shared.generated.resources.feedback_sent_one
+import ketch.app.shared.generated.resources.feedback_start_now_failed
+import ketch.app.shared.generated.resources.feedback_start_now_failed_one
+import ketch.app.shared.generated.resources.feedback_started_now
+import ketch.app.shared.generated.resources.feedback_started_now_one
+import ketch.app.shared.generated.resources.feedback_started_preempted
+import ketch.app.shared.generated.resources.feedback_switch_failed
+import ketch.app.shared.generated.resources.feedback_torrent_invalid
+import ketch.app.shared.generated.resources.feedback_undo_add
+import ketch.app.shared.generated.resources.feedback_undo_clear_finished
+import ketch.app.shared.generated.resources.feedback_undo_clear_missing
+import ketch.app.shared.generated.resources.feedback_undo_discard
+import ketch.app.shared.generated.resources.feedback_undo_move
+import ketch.app.shared.generated.resources.feedback_undo_pause_all
+import ketch.app.shared.generated.resources.feedback_undo_remove
+import ketch.app.shared.generated.resources.feedback_undo_start_now
+import ketch.app.shared.generated.resources.feedback_undo_start_now_failed
+import ketch.app.shared.generated.resources.feedback_undo_start_now_failed_one
+import ketch.app.shared.generated.resources.notify_all_finished
+import ketch.app.shared.generated.resources.notify_download_complete
+import ketch.app.shared.generated.resources.notify_download_failed
+import ketch.app.shared.generated.resources.notify_downloads_finished
+import ketch.app.shared.generated.resources.notify_on_device
+import ketch.app.shared.generated.resources.row_files
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -81,6 +169,8 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
+import org.jetbrains.compose.resources.PluralStringResource
+import org.jetbrains.compose.resources.StringResource
 import kotlin.reflect.KProperty
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -93,15 +183,17 @@ sealed interface DiscoveryState {
   data class Finished(
     val servers: List<DiscoveredServer>,
   ) : DiscoveryState
-  data class Error(val message: String) : DiscoveryState
+  data class Error(val text: UiText) : DiscoveryState
 }
 
 sealed interface ResolveState {
   data object Idle : ResolveState
   data object Resolving : ResolveState
   data class Resolved(val result: ResolvedSource) : ResolveState
+
+  /** Resolving failed; [text] says why, such as "ubuntu.torrent is not a valid torrent file". */
   data class Error(
-    val message: String,
+    val text: UiText,
     val cause: Throwable? = null,
   ) : ResolveState
 }
@@ -435,7 +527,7 @@ class AppState(
     }
     scope.launch {
       incoming.failures.collect {
-        postError("Couldn't open ${it.label}", detail = it.message)
+        postError(Res.string.feedback_open_failed.text(it.label), detail = it.reason)
       }
     }
     scope.launch {
@@ -632,7 +724,7 @@ class AppState(
       it.name.substringAfterLast('.', "").lowercase() in LINK_LIST_EXTENSIONS
     }
     if (linkLists.isEmpty()) {
-      postError("Only .torrent files and link lists can be dropped to add downloads")
+      postError(Res.string.feedback_drop_unsupported.text())
       return
     }
     scope.launch {
@@ -642,7 +734,7 @@ class AppState(
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
-          postError("Couldn't read ${file.name}", detail = e.message, cause = e)
+          postError(Res.string.feedback_read_failed.text(file.name), e.detail(), cause = e)
           null
         }
       }.joinToString("\n").trim()
@@ -677,10 +769,10 @@ class AppState(
         if (e is CancellationException) throw e
         if (droppedFile === file) {
           resolveState = ResolveState.Error(
-            message = when (e) {
-              is KetchError.SourceError -> "${file.name} is not a valid torrent file"
-              is KetchError.Unsupported -> "${file.name} is not a supported file"
-              else -> e.message ?: "Failed to read ${file.name}"
+            text = when (e) {
+              is KetchError.SourceError -> Res.string.feedback_torrent_invalid.text(file.name)
+              is KetchError.Unsupported -> Res.string.feedback_file_unsupported.text(file.name)
+              else -> e.detail() ?: Res.string.feedback_file_read_failed.text(file.name)
             },
             cause = e,
           )
@@ -722,7 +814,7 @@ class AppState(
             properties = mapOf(TaskOrigin.PROPERTY to TaskOrigin.App.id),
           )
         } catch (e: IllegalArgumentException) {
-          postError("Couldn't add $url", detail = e.message, cause = e)
+          postError(Res.string.feedback_add_failed.text(url), e.detail(), cause = e)
           null
         }
       }
@@ -749,7 +841,7 @@ class AppState(
         throw e
       } catch (e: Exception) {
         log.w { "Couldn't switch to ${instance.label}: ${e.describeCauses()}" }
-        postError("Couldn't switch to ${instance.label}", detail = e.message, cause = e)
+        postError(Res.string.feedback_switch_failed.text(instance.label), e.detail(), cause = e)
       } finally {
         switchingInstance = null
       }
@@ -802,7 +894,7 @@ class AppState(
         throw e
       } catch (e: Exception) {
         discoveryState = DiscoveryState.Error(
-          e.message ?: "Failed to discover LAN servers"
+          e.detail() ?: Res.string.feedback_discovery_failed.text()
         )
       }
     }
@@ -822,7 +914,11 @@ class AppState(
         throw e
       } catch (e: Exception) {
         log.w { "Couldn't remove ${instance.label}: ${e.describeCauses()}" }
-        postError("Couldn't remove ${instance.label}", detail = e.message, cause = e)
+        postError(
+          Res.string.feedback_remove_device_failed.text(instance.label),
+          e.detail(),
+          cause = e,
+        )
       }
     }
   }
@@ -837,32 +933,45 @@ class AppState(
   /**
    * Runs [block] on [task] in the app scope, so leaving the screen never cancels it.
    *
-   * While it runs, [pending] holds the task with [label]. A failure is logged and posted as one
-   * Error message naming the device, with a Try again button. Cancelling the command posts
-   * nothing; a `CancellationException` thrown by the call itself, such as from a closed client,
-   * is a failure.
+   * While it runs, [pending] holds the task with [pendingKey]. A failure is logged and posted as
+   * one Error message titled [failure] of the device's name, such as "Couldn't pause ubuntu.iso
+   * on NAS-Basement", with a Try again button. Cancelling the command posts nothing; a
+   * `CancellationException` thrown by the call itself, such as from a closed client, is a
+   * failure.
    *
-   * @param label what the command does, in lower case, such as "set speed limit"; the error
-   *   reads "Couldn't {label} on {device}".
+   * @param pendingKey what [pending] holds the task with while the command runs, such as
+   *   "pause"; never shown.
+   * @param failure the error's title for the device's name, which is the device's own name or
+   *   "this device" when the task's device is unknown.
    */
   fun runTaskCommand(
     task: DownloadTask,
-    label: String,
+    pendingKey: String,
+    failure: (device: UiText) -> UiText,
     block: suspend DownloadTask.() -> Unit,
   ): Job {
     val device = deviceOf(task)
     val key = TaskKey(device?.deviceId ?: LOCAL_DEVICE_ID, task.taskId)
     return scope.launch {
-      trackPending(key, label) {
+      trackPending(key, pendingKey) {
         catchingUnlessCancelled { task.block() }.onFailure { e ->
-          val deviceName = nameOf(device)
-          log.w { "Couldn't $label on $deviceName: taskId=${task.taskId} ${e.describeCauses()}" }
-          postError(
-            title = "Couldn't $label on $deviceName",
-            detail = e.message,
-            cause = e,
+          log.w {
+            "Command $pendingKey failed on ${nameOf(device)}: taskId=${task.taskId} " +
+              e.describeCauses()
+          }
+          val deviceName = device?.label?.let(::verbatim)
+            ?: Res.string.device_any_in_sentence.text()
+          val retry = MessageAction(Res.string.action_try_again.text()) {
+            runTaskCommand(task, pendingKey, failure, block)
+          }
+          messages.post(
+            level = MessageLevel.Error,
+            title = failure(deviceName),
+            detail = e.message?.let(::verbatim),
             taskKey = key,
-            actions = listOf(MessageAction("Try again") { runTaskCommand(task, label, block) }),
+            deviceId = key.deviceId,
+            actions = listOf(retry),
+            cause = e,
           )
         }
       }
@@ -892,26 +1001,29 @@ class AppState(
       if (paused.isEmpty()) {
         // Nothing to undo, so no operation is registered for ⌘Z to land on.
         if (failures.isEmpty()) {
-          messages.post(MessageLevel.Info, "Nothing to pause")
+          messages.post(MessageLevel.Info, Res.string.feedback_nothing_to_pause.text())
         } else {
-          reportFailures("pause", failures)
+          reportFailures(FailedCommand.Pause, failures)
         }
         return@launch
       }
-      val op = pendingOps.register(label = "Pause All", undo = {
-        reportFailures("resume", runEach(paused) { it.resume() })
+      val op = pendingOps.register(Res.string.feedback_undo_pause_all.text(), undo = {
+        reportFailures(FailedCommand.Resume, runEach(paused) { it.resume() })
       })
       val devices = results.count { (_, result) -> result.paused.isNotEmpty() }
-      val title = buildString {
-        append("Paused ${downloads(paused.size)}")
-        if (devices > 1) append(" on $devices devices")
-        scheduledNote(scheduled)?.let { append(" · ").append(it) }
-        if (failures.isNotEmpty()) append(" · ${failures.size} failed")
-      }
+      val title = listOfNotNull(
+        if (devices > 1) {
+          Res.plurals.feedback_paused_on_devices.text(paused.size, paused.size, devices)
+        } else {
+          Res.plurals.feedback_paused.text(paused.size)
+        },
+        scheduledNote(scheduled),
+        failedNote(failures.size),
+      ).joinText()
       messages.post(
         level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
         title = title,
-        detail = failures.firstOrNull()?.second?.message,
+        detail = failures.firstOrNull()?.second?.detail(),
         actions = listOf(undoAction(op)),
         cause = failures.firstOrNull()?.second,
       )
@@ -919,7 +1031,12 @@ class AppState(
 
   /** Resumes every paused task on each of [targets], the shown devices by default. */
   fun resumeAll(targets: List<InstanceEntry> = shownInstances.value): Job =
-    runOnAll(targets, { it is DownloadState.Paused }, "Resumed", "resume") { _, task ->
+    runOnAll(
+      targets = targets,
+      matches = { it is DownloadState.Paused },
+      verb = BatchVerb.Resumed,
+      command = FailedCommand.Resume,
+    ) { _, task ->
       task.resume()
     }
 
@@ -929,7 +1046,13 @@ class AppState(
    * refused to resume) start over.
    */
   fun retryFailed(targets: List<InstanceEntry> = shownInstances.value): Job =
-    runOnAll(targets, { it is DownloadState.Failed }, "Retrying", "retry", ::retryOn)
+    runOnAll(
+      targets = targets,
+      matches = { it is DownloadState.Failed },
+      verb = BatchVerb.Retrying,
+      command = FailedCommand.Retry,
+      action = ::retryOn,
+    )
 
   /**
    * Removes the finished tasks of each of [targets] (the shown devices by default) from the
@@ -940,8 +1063,12 @@ class AppState(
       visibleTasks(entry).filter { it.state.value is DownloadState.Completed }
     }
     if (tasks.isEmpty()) return
-    deferRemoval(tasks, deleteFiles = { false }, label = "Clear Finished") { count ->
-      "Cleared $count finished ${if (count == 1) "download" else "downloads"}"
+    deferRemoval(
+      tasks,
+      deleteFiles = { false },
+      undoTitle = Res.string.feedback_undo_clear_finished.text(),
+    ) { count ->
+      Res.plurals.feedback_cleared.text(count)
     }
   }
 
@@ -966,16 +1093,14 @@ class AppState(
         .map { it.first }
         .filter { keyOf(it) !in hidden }
       if (missing.isEmpty()) {
-        messages.post(MessageLevel.Info, "No missing files to clear")
+        messages.post(MessageLevel.Info, Res.string.feedback_nothing_missing.text())
         return@launch
       }
-      deferRemoval(missing, deleteFiles = { false }, label = "Clear Missing") { count ->
-        if (count == 1) {
-          "Cleared 1 download with a missing file"
-        } else {
-          "Cleared $count downloads with missing files"
-        }
-      }
+      deferRemoval(
+        missing,
+        deleteFiles = { false },
+        undoTitle = Res.string.feedback_undo_clear_missing.text(),
+      ) { count -> Res.plurals.feedback_cleared_missing.text(count) }
     }
 
   /** Whether the file a finished [task] saved is still there; `true` when it cannot be told. */
@@ -998,7 +1123,9 @@ class AppState(
 
   private fun removeTasks(tasks: List<DownloadTask>, deleteFiles: (DownloadTask) -> Boolean) {
     if (tasks.isEmpty()) return
-    deferRemoval(tasks, deleteFiles, label = "Remove") { "Removed ${what(tasks)}" }
+    deferRemoval(tasks, deleteFiles, Res.string.feedback_undo_remove.text()) {
+      what(tasks, Res.string.feedback_removed_one, Res.plurals.feedback_removed)
+    }
   }
 
   /**
@@ -1013,11 +1140,11 @@ class AppState(
     }
     val paused = runEach(running) { it.pause() }.filter { it.second == null }.map { it.first }
     val op = pendingOps.register(
-      label = "Discard Progress",
-      commit = { reportFailures("discard progress of", runEach(tasks) { it.cancel() }) },
-      undo = { reportFailures("resume", runEach(paused) { it.resume() }) },
+      undoTitle = Res.string.feedback_undo_discard.text(),
+      commit = { reportFailures(FailedCommand.Discard, runEach(tasks) { it.cancel() }) },
+      undo = { reportFailures(FailedCommand.Resume, runEach(paused) { it.resume() }) },
     )
-    val title = "Discarded progress of ${what(tasks)}"
+    val title = what(tasks, Res.string.feedback_discarded_one, Res.plurals.feedback_discarded)
     messages.post(MessageLevel.Success, title, actions = listOf(undoAction(op)))
   }
 
@@ -1036,7 +1163,7 @@ class AppState(
     val targets = tasks.mapNotNull { task -> deviceOf(task)?.let { it to task } }
     if (targets.isEmpty()) return@launch
     val results = runEach(targets) { (entry, task) ->
-      trackPending(TaskKey(entry.deviceId, task.taskId), "download again") {
+      trackPending(TaskKey(entry.deviceId, task.taskId), PENDING_REDOWNLOAD) {
         restart(entry, task)
       }
     }
@@ -1045,32 +1172,31 @@ class AppState(
     failed.forEach { (target, e) ->
       log.w { "Couldn't restart taskId=${target.second.taskId}: ${e.describeCauses()}" }
     }
-    val retry = MessageAction("Try again") { retryRestarts(failed) }
+    val retry = tryAgainAction { retryRestarts(failed) }
     if (done.isEmpty()) {
       val (target, e) = failed.first()
       val (entry, task) = target
       postError(
         title = if (failed.size == 1) {
-          "Couldn't download ${task.displayName()} again on ${nameOf(entry)}"
+          Res.string.feedback_redownload_failed_one.text(task.displayName(), deviceNameOf(entry))
         } else {
-          "Couldn't download ${downloads(failed.size)} again"
+          Res.plurals.feedback_redownload_failed.text(failed.size)
         },
-        detail = e.message,
+        detail = e.detail(),
         cause = e,
         taskKey = TaskKey(entry.deviceId, task.taskId).takeIf { failed.size == 1 },
         actions = listOf(retry),
       )
       return@launch
     }
-    val title = buildString {
-      append("Restarted ")
-      append(what(done))
-      if (failed.isNotEmpty()) append(" · ${failed.size} failed")
-    }
+    val title = listOfNotNull(
+      what(done, Res.string.feedback_restarted_one, Res.plurals.feedback_restarted),
+      failedNote(failed.size),
+    ).joinText()
     messages.post(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
-      detail = failed.firstOrNull()?.second?.message,
+      detail = failed.firstOrNull()?.second?.detail(),
       deviceId = targets.map { it.first.deviceId }.distinct().singleOrNull(),
       actions = if (failed.isEmpty()) emptyList() else listOf(retry),
       cause = failed.firstOrNull()?.second,
@@ -1088,8 +1214,14 @@ class AppState(
       current is DownloadState.Canceled -> redownload(task)
       current is DownloadState.Failed && current.error.needsFreshStart() -> redownload(task)
       current is DownloadState.Failed || current is DownloadState.Paused -> {
-        val verb = if (current is DownloadState.Failed) "retry" else "resume"
-        runTaskCommand(task, "$verb ${task.displayName()}") { resume() }
+        val failed = current is DownloadState.Failed
+        val name = task.displayName()
+        val command = if (failed) FailedCommand.Retry else FailedCommand.Resume
+        runTaskCommand(
+          task = task,
+          pendingKey = "${if (failed) "retry" else "resume"} $name",
+          failure = { device -> command.one.text(name, device) },
+        ) { resume() }
       }
     }
   }
@@ -1123,23 +1255,26 @@ class AppState(
       .filter { it.state.value is DownloadState.Downloading && it !in starting }
     val results = runEach(starts) { start ->
       val key = TaskKey(start.entry?.deviceId ?: LOCAL_DEVICE_ID, start.task.taskId)
-      trackPending(key, "start now") { start.run() }
+      trackPending(key, PENDING_START_NOW) { start.run() }
     }
     val started = results.filter { it.second == null }.map { it.first }
     val failed = results.mapNotNull { (start, e) -> e?.let { start to it } }
     failed.forEach { (start, e) ->
       log.w { "Couldn't start taskId=${start.task.taskId} now: ${e.describeCauses()}" }
     }
-    val retry = MessageAction("Try again") { startNow(failed.map { it.first.task }) }
+    val retry = tryAgainAction { startNow(failed.map { it.first.task }) }
     if (started.isEmpty()) {
       val (start, e) = failed.first()
       postError(
         title = if (failed.size == 1) {
-          "Couldn't start ${start.task.displayName()} now on ${nameOf(start.entry)}"
+          Res.string.feedback_start_now_failed_one.text(
+            start.task.displayName(),
+            deviceNameOf(start.entry),
+          )
         } else {
-          "Couldn't start ${downloads(failed.size)} now"
+          Res.plurals.feedback_start_now_failed.text(failed.size)
         },
-        detail = e.message,
+        detail = e.detail(),
         cause = e,
         taskKey = start.entry?.let { TaskKey(it.deviceId, start.task.taskId) }
           ?.takeIf { failed.size == 1 },
@@ -1148,22 +1283,22 @@ class AppState(
       return@launch
     }
     val preempted = running.filter { it.state.value is DownloadState.Queued }
-    val op = pendingOps.register(label = "Start Now", undo = {
-      reportFailures("undo start now of", runEach(started) { it.undo() }.map { (start, e) ->
-        start.task to e
-      })
+    val op = pendingOps.register(Res.string.feedback_undo_start_now.text(), undo = {
+      val results = runEach(started) { it.undo() }.map { (start, e) -> start.task to e }
+      reportFailures(FailedCommand.UndoStartNow, results)
     })
-    val title = buildString {
-      append("Started ${what(started.map { it.task })} now")
-      if (preempted.isNotEmpty()) {
-        append(" · paused ${preempted.joinToString(", ") { it.displayName() }} to make room")
-      }
-      if (failed.isNotEmpty()) append(" · ${failed.size} failed")
-    }
+    val startedTasks = started.map { it.task }
+    val title = listOfNotNull(
+      what(startedTasks, Res.string.feedback_started_now_one, Res.plurals.feedback_started_now),
+      preempted.takeIf { it.isNotEmpty() }?.let { tasks ->
+        Res.string.feedback_started_preempted.text(tasks.joinToString(", ") { it.displayName() })
+      },
+      failedNote(failed.size),
+    ).joinText()
     messages.post(
       level = if (failed.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
-      detail = failed.firstOrNull()?.second?.message,
+      detail = failed.firstOrNull()?.second?.detail(),
       actions = listOfNotNull(undoAction(op), retry.takeIf { failed.isNotEmpty() }),
       cause = failed.firstOrNull()?.second,
     )
@@ -1187,12 +1322,12 @@ class AppState(
     val outgoing = tasks.filter { deviceOf(it)?.instance !== target.instance }
     if (outgoing.isEmpty()) return
     val warning = if (target is RemoteInstance) {
-      credentialWarning(outgoing.map { it.requestState.value.headers }, nameOf(target))
+      credentialWarningText(outgoing.map { it.requestState.value.headers }, deviceNameOf(target))
     } else {
       null
     }
     if (warning != null && !confirmed) {
-      sendConfirmation = SendConfirmation(outgoing, target, move, warning)
+      sendConfirmation = SendConfirmation(outgoing, target, move, warningText = warning)
       return
     }
     send(outgoing, target, move)
@@ -1229,46 +1364,62 @@ class AppState(
       failures.forEach { (task, e) ->
         log.w { "Couldn't send taskId=${task.taskId} to $targetName: ${e.describeCauses()}" }
       }
+      val targetText = deviceNameOf(target)
       if (sent.isEmpty()) {
         val e = failures.first().second
         postError(
-          title = "Couldn't send ${what(failures.map { it.first })} to $targetName",
-          detail = e.message,
-          cause = e,
-          actions = listOf(
-            MessageAction("Try again") { sendTo(tasks, target, move, confirmed = true) },
+          title = what(
+            failures.map { it.first },
+            Res.string.feedback_send_failed_one,
+            Res.plurals.feedback_send_failed,
+            targetText
           ),
+          detail = e.detail(),
+          cause = e,
+          actions = listOf(tryAgainAction { sendTo(tasks, target, move, confirmed = true) }),
         )
         return@launch
       }
-      val failedNote = if (failures.isEmpty()) "" else " · ${failures.size} failed"
       val sources = sent.map { it.first }
       if (move) {
         val op = pendingOps.register(
-          label = "Move",
+          undoTitle = Res.string.feedback_undo_move.text(),
           hides = hide(sources),
           commit = {
-            reportFailures("remove", runEach(sources) { it.remove(it.hasPartialFile) })
+            reportFailures(
+              FailedCommand.Remove,
+              runEach(sources) { it.remove(it.hasPartialFile) },
+            )
           },
           undo = {
             val copies = sent.map { it.second }
-            reportFailures("remove", runEach(copies) { it.remove(deleteFiles = true) })
+            reportFailures(FailedCommand.Remove, runEach(copies) { it.remove(deleteFiles = true) })
           },
         )
         messages.post(
           level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
-          title = "Moved ${what(sources)} to $targetName$failedNote",
+          title = listOfNotNull(
+            what(sources, Res.string.feedback_moved_one, Res.plurals.feedback_moved, targetText),
+            failedNote(failures.size),
+          ).joinText(),
           deviceId = target.deviceId,
           actions = listOf(undoAction(op)),
         )
       } else {
         messages.post(
           level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
-          title = "Sent ${what(sources)} to $targetName$failedNote",
+          title = listOfNotNull(
+            what(sources, Res.string.feedback_sent_one, Res.plurals.feedback_sent, targetText),
+            failedNote(failures.size),
+          ).joinText(),
           deviceId = target.deviceId,
           actions = listOf(
-            MessageAction("Show") { showOn(target, sent.singleOrNull()?.second) },
-            MessageAction("Remove here") { removeTasks(sources) { it.hasPartialFile } },
+            MessageAction(Res.string.action_show.text()) {
+              showOn(target, sent.singleOrNull()?.second)
+            },
+            MessageAction(Res.string.feedback_remove_here.text()) {
+              removeTasks(sources) { it.hasPartialFile }
+            },
           ),
         )
       }
@@ -1291,7 +1442,10 @@ class AppState(
         if (event.taskKey in claimedAdds) return
         val message = messages.post(
           level = MessageLevel.Info,
-          title = onDevice(event.taskKey.deviceId, "Added ${displayName(event.request)}"),
+          title = onDevice(
+            event.taskKey.deviceId,
+            Res.string.feedback_added.text(displayName(event.request)),
+          ),
           taskKey = event.taskKey,
           deviceId = event.taskKey.deviceId,
           toast = ToastMode.Silent,
@@ -1301,9 +1455,9 @@ class AppState(
       }
       is ActivityEvent.Completed -> messages.post(
         level = MessageLevel.Success,
-        title = onDevice(event.taskKey.deviceId, "Download complete"),
-        detail = (listOf(displayName(event.request, event.state)) + transferSummary(event.state))
-          .joinToString(" · "),
+        title = onDevice(event.taskKey.deviceId, Res.string.notify_download_complete.text()),
+        detail = (listOf(verbatim(displayName(event.request, event.state))) +
+          transferSummary(event.state)).joinText(),
         taskKey = event.taskKey,
         deviceId = event.taskKey.deviceId,
         notify = true,
@@ -1312,47 +1466,44 @@ class AppState(
         val bytes = event.completions.sumOf { it.state.totalBytes ?: 0L }
         messages.post(
           level = MessageLevel.Success,
-          title = "${downloads(event.completions.size)} finished",
-          detail = formatBytes(bytes).takeIf { bytes > 0 },
+          title = Res.plurals.notify_downloads_finished.text(event.completions.size),
+          detail = sizeText(bytes).takeIf { bytes > 0 },
           notify = true,
         )
       }
       is ActivityEvent.Failed -> messages.post(
         level = MessageLevel.Error,
-        title = onDevice(event.taskKey.deviceId, "Download failed"),
-        detail = displayName(event.request, event.state),
+        title = onDevice(event.taskKey.deviceId, Res.string.notify_download_failed.text()),
+        detail = verbatim(displayName(event.request, event.state)),
         taskKey = event.taskKey,
         deviceId = event.taskKey.deviceId,
-        actions = listOf(MessageAction("Retry") { retry(event.taskKey) }),
+        actions = listOf(MessageAction(Res.string.action_retry.text()) { retry(event.taskKey) }),
         notify = true,
         cause = event.state.error,
       )
       is ActivityEvent.Recovered -> messages.post(
         level = MessageLevel.Info,
-        title = onDevice(
-          event.deviceId,
-          "Resuming ${downloads(event.count)} from your last session",
-        ),
+        title = onDevice(event.deviceId, Res.plurals.feedback_recovered.text(event.count)),
         deviceId = event.deviceId,
       )
       is ActivityEvent.QueueDrained -> messages.post(
         level = MessageLevel.Success,
-        title = onDevice(event.deviceId, "All downloads finished"),
+        title = onDevice(event.deviceId, Res.string.notify_all_finished.text()),
         detail = listOfNotNull(
-          plural(event.files, "file"),
-          formatBytes(event.bytes).takeIf { event.bytes > 0 },
-        ).joinToString(" · "),
+          Res.plurals.row_files.text(event.files),
+          sizeText(event.bytes).takeIf { event.bytes > 0 },
+        ).joinText(),
         deviceId = event.deviceId,
         notify = true,
       )
       is ActivityEvent.DeviceOffline -> messages.post(
         level = MessageLevel.Warning,
-        title = "${deviceName(event.deviceId)} went offline",
+        title = Res.string.feedback_device_offline.text(deviceName(event.deviceId)),
         deviceId = event.deviceId,
       )
       is ActivityEvent.DeviceOnline -> messages.post(
         level = MessageLevel.Success,
-        title = "Reconnected to ${deviceName(event.deviceId)}",
+        title = Res.string.feedback_device_online.text(deviceName(event.deviceId)),
         deviceId = event.deviceId,
       )
     }
@@ -1431,14 +1582,16 @@ class AppState(
   private fun deferRemoval(
     tasks: List<DownloadTask>,
     deleteFiles: (DownloadTask) -> Boolean,
-    label: String,
-    title: (Int) -> String,
+    undoTitle: UiText,
+    title: (Int) -> UiText,
   ) {
     val keys = hide(tasks)
     val op = pendingOps.register(
-      label = label,
+      undoTitle = undoTitle,
       hides = keys,
-      commit = { reportFailures("remove", runEach(tasks) { it.remove(deleteFiles(it)) }) },
+      commit = {
+        reportFailures(FailedCommand.Remove, runEach(tasks) { it.remove(deleteFiles(it)) })
+      },
     )
     messages.post(MessageLevel.Success, title(tasks.size), actions = listOf(undoAction(op)))
   }
@@ -1567,31 +1720,39 @@ class AppState(
     offerOptions: Boolean = false,
     retry: (() -> Unit)? = null,
   ) {
-    val deviceName = entry.label
+    val deviceName = deviceNameOf(entry)
     if (added.isEmpty()) {
       val (name, e) = failures.firstOrNull() ?: return
       postError(
-        title = "Couldn't add " + if (failures.size == 1) name else downloads(failures.size),
-        detail = e.message,
+        title = if (failures.size == 1) {
+          Res.string.feedback_add_failed.text(name)
+        } else {
+          Res.plurals.feedback_add_failed_count.text(failures.size)
+        },
+        detail = e.detail(),
         cause = e,
-        actions = listOfNotNull(retry?.let { MessageAction("Try again", it) }),
+        actions = listOfNotNull(retry?.let { tryAgainAction(it) }),
       )
       return
     }
-    val op = pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
-      reportFailures("remove", runEach(added) { it.remove(deleteFiles = true) })
-    })
+    val op = pendingOps.register(
+      undoTitle = Res.string.feedback_undo_add.text(),
+      timeout = ADD_UNDO_WINDOW,
+      undo = { reportFailures(FailedCommand.Remove, runEach(added) { it.remove(true) }) },
+    )
     val single = added.singleOrNull()?.takeIf { failures.isEmpty() }
     val title = if (single != null) {
-      "Added ${single.displayName()} → $deviceName"
+      Res.string.feedback_added_here_one.text(single.displayName(), deviceName)
     } else {
-      "Added ${downloads(added.size)} → $deviceName" +
-        if (failures.isEmpty()) "" else " · ${failures.size} failed"
+      listOfNotNull(
+        Res.plurals.feedback_added_here.text(added.size, added.size, deviceName),
+        failedNote(failures.size),
+      ).joinText()
     }
     val actions = buildList {
       if (single != null && offerOptions) {
         add(
-          MessageAction("Options") {
+          MessageAction(Res.string.feedback_options.text()) {
             openIntake(IntakeRequest(editTask = TaskKey(entry.deviceId, single.taskId)))
           },
         )
@@ -1601,7 +1762,7 @@ class AppState(
     messages.post(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
-      detail = failures.firstOrNull()?.first,
+      detail = failures.firstOrNull()?.first?.let(::verbatim),
       taskKey = single?.let { TaskKey(entry.deviceId, it.taskId) },
       deviceId = entry.deviceId,
       actions = actions,
@@ -1616,8 +1777,8 @@ class AppState(
   private fun runOnAll(
     targets: List<InstanceEntry>,
     matches: (DownloadState) -> Boolean,
-    verb: String,
-    command: String,
+    verb: BatchVerb,
+    command: FailedCommand,
     action: suspend (InstanceEntry, DownloadTask) -> Unit,
   ): Job = scope.launch {
     val tasks = targets.flatMap { entry ->
@@ -1633,31 +1794,33 @@ class AppState(
       reportFailures(command, results)
       return@launch
     }
-    val title = buildString {
-      append("$verb ${downloads(done)}")
-      if (devices > 1) append(" on $devices devices")
-      if (failures.isNotEmpty()) append(" · ${failures.size} failed")
-    }
+    val title = listOfNotNull(
+      if (devices > 1) verb.onDevices.text(done, done, devices) else verb.here.text(done),
+      failedNote(failures.size),
+    ).joinText()
     messages.post(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
-      detail = failures.firstOrNull()?.second?.message,
+      detail = failures.firstOrNull()?.second?.detail(),
       cause = failures.firstOrNull()?.second,
     )
   }
 
   /** Posts one Error message for the failures in [results], if any. */
-  private fun reportFailures(command: String, results: List<Pair<DownloadTask, Throwable?>>) {
+  private fun reportFailures(
+    command: FailedCommand,
+    results: List<Pair<DownloadTask, Throwable?>>,
+  ) {
     val failures = results.mapNotNull { (task, error) -> error?.let { task to it } }
     if (failures.isEmpty()) return
     failures.forEach { (task, e) ->
-      log.w { "Couldn't $command taskId=${task.taskId}: ${e.describeCauses()}" }
+      log.w { "Command $command failed: taskId=${task.taskId} ${e.describeCauses()}" }
     }
     val (task, e) = failures.first()
     val device = deviceOf(task)
     postError(
-      title = "Couldn't $command ${what(failures.map { it.first })} on ${nameOf(device)}",
-      detail = e.message,
+      title = what(failures.map { it.first }, command.one, command.many, deviceNameOf(device)),
+      detail = e.detail(),
       cause = e,
       taskKey = TaskKey(device?.deviceId ?: LOCAL_DEVICE_ID, task.taskId),
     )
@@ -1687,8 +1850,8 @@ class AppState(
   }
 
   private fun postError(
-    title: String,
-    detail: String? = null,
+    title: UiText,
+    detail: UiText? = null,
     cause: Throwable? = null,
     taskKey: TaskKey? = null,
     actions: List<MessageAction> = emptyList(),
@@ -1705,32 +1868,44 @@ class AppState(
   }
 
   private fun undoAction(op: PendingOp): MessageAction =
-    MessageAction("Undo") { pendingOps.undo(op.id) }
+    MessageAction(Res.string.action_undo.text()) { pendingOps.undo(op.id) }
+
+  private fun tryAgainAction(onClick: () -> Unit): MessageAction =
+    MessageAction(Res.string.action_try_again.text(), onClick)
 
   /**
    * Registers the Undo of adding [tasks], which removes them with their files, and returns its
    * button; [logger] notes each task that could not be removed.
    */
   internal fun undoAddAction(tasks: List<DownloadTask>, logger: KetchLogger): MessageAction {
-    val op = pendingOps.register(label = "Add", timeout = ADD_UNDO_WINDOW, undo = {
-      tasks.forEach { task ->
-        catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
-          logger.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
+    val op = pendingOps.register(
+      undoTitle = Res.string.feedback_undo_add.text(),
+      timeout = ADD_UNDO_WINDOW,
+      undo = {
+        tasks.forEach { task ->
+          catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
+            logger.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
+          }
         }
-      }
-    })
+      },
+    )
     return undoAction(op)
   }
 
-  private fun nameOf(entry: InstanceEntry?): String = entry?.label ?: "this device"
+  /** How logs name [entry]. */
+  private fun nameOf(entry: InstanceEntry?): String = entry?.label ?: LOCAL_DEVICE_ID
 
-  private fun deviceName(deviceId: String): String =
-    instances.value.firstOrNull { it.deviceId == deviceId }?.label ?: deviceId
+  /** How messages name [entry]: its own name, or "this device" without one. */
+  private fun deviceNameOf(entry: InstanceEntry?): UiText =
+    entry?.label?.let(::verbatim) ?: Res.string.device_any_in_sentence.text()
+
+  private fun deviceName(deviceId: String): UiText =
+    verbatim(instances.value.firstOrNull { it.deviceId == deviceId }?.label ?: deviceId)
 
   /** Prefixes [title] with the device when it is not the active one. */
-  private fun onDevice(deviceId: String, title: String): String =
+  private fun onDevice(deviceId: String, title: UiText): UiText =
     if (deviceId == (activeInstance.value?.deviceId ?: LOCAL_DEVICE_ID)) title
-    else "On ${deviceName(deviceId)}: $title"
+    else Res.string.notify_on_device.text(deviceName(deviceId), title)
 
   /** Picks the folder of the last add on [entry] as a directory destination. */
   private suspend fun folderDestination(entry: InstanceEntry, folder: String): Destination {
@@ -1764,33 +1939,45 @@ class AppState(
  * @property tasks the downloads to send.
  * @property target the device they go to.
  * @property move whether they are removed here once sent.
- * @property warning what goes along, such as "Cookies from your browser will be sent to
+ * @property warningText what goes along, such as "Cookies from your browser will be sent to
  *   NAS-Basement."
  */
 data class SendConfirmation(
   val tasks: List<DownloadTask>,
   val target: InstanceEntry,
   val move: Boolean,
-  val warning: String,
+  val warningText: UiText,
 )
+
+/** Which of [headers] would send cookies, a sign-in or both; `null` for neither. */
+private fun credentialsIn(headers: List<Map<String, String>>): Credentials? {
+  val names = headers.flatMap { it.keys }
+  val cookies = names.any { it.equals(COOKIE_HEADER, ignoreCase = true) }
+  val signIn = names.any { it.equals(AUTHORIZATION_HEADER, ignoreCase = true) }
+  return when {
+    cookies && signIn -> Credentials.CookiesAndSignIn
+    cookies -> Credentials.Cookies
+    signIn -> Credentials.SignIn
+    else -> null
+  }
+}
+
+/** What a request sends that another device would keep. */
+private enum class Credentials { Cookies, SignIn, CookiesAndSignIn }
 
 /**
  * What of [headers] a device named [deviceName] would receive and keep: cookies, a sign-in or
  * both; `null` when none of the requests sends any.
  */
-internal fun credentialWarning(headers: List<Map<String, String>>, deviceName: String): String? {
-  val names = headers.flatMap { it.keys }
-  val cookies = names.any { it.equals(COOKIE_HEADER, ignoreCase = true) }
-  val signIn = names.any { it.equals(AUTHORIZATION_HEADER, ignoreCase = true) }
-  return when {
-    cookies && signIn -> {
-      "Cookies and sign-in details from your browser will be sent to $deviceName."
-    }
-    cookies -> "Cookies from your browser will be sent to $deviceName."
-    signIn -> "Sign-in details will be sent to $deviceName."
-    else -> null
+internal fun credentialWarningText(
+  headers: List<Map<String, String>>,
+  deviceName: UiText,
+): UiText? = when (credentialsIn(headers)) {
+    Credentials.CookiesAndSignIn -> Res.string.feedback_send_cookies_and_sign_in.text(deviceName)
+    Credentials.Cookies -> Res.string.feedback_send_cookies.text(deviceName)
+    Credentials.SignIn -> Res.string.feedback_send_sign_in.text(deviceName)
+    null -> null
   }
-}
 
 internal const val COOKIE_HEADER = "Cookie"
 internal const val AUTHORIZATION_HEADER = "Authorization"
@@ -1806,6 +1993,10 @@ internal const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024
 
 /** How long a new download can be undone, together with its file. */
 internal val ADD_UNDO_WINDOW = 8.seconds
+
+/** What [AppState.pending] holds a task with while it starts over or starts now; never shown. */
+private const val PENDING_REDOWNLOAD = "redownload"
+private const val PENDING_START_NOW = "startNow"
 
 /** How many adds [AppState.addedTasks] holds for a Downloads page that is still busy. */
 private const val ADDED_BUFFER = 8
@@ -1850,20 +2041,58 @@ internal suspend fun <R> catchingUnlessCancelled(block: suspend () -> R): Result
 private fun KetchError.needsFreshStart(): Boolean = toCopy().primary == RowAction.DownloadAgain
 
 /** "2 scheduled still start at 02:00" for the scheduled tasks a bulk pause leaves alone. */
-private fun scheduledNote(schedules: List<DownloadSchedule>): String? {
+private fun scheduledNote(schedules: List<DownloadSchedule>): UiText? {
   if (schedules.isEmpty()) return null
+  val count = schedules.size
   val first = schedules.filterIsInstance<DownloadSchedule.AtTime>().minOfOrNull { it.startAt }
-    ?: return "${schedules.size} scheduled still start on time"
+    ?: return Res.plurals.feedback_scheduled_on_time.text(count)
   val time = clockTime(first, TimeZone.currentSystemDefault())
-  return "${schedules.size} scheduled still start at $time"
+  return Res.plurals.feedback_scheduled_at.text(count, count, time)
+}
+
+/** "2 failed", after a message's title, for [count] failures; `null` for none. */
+private fun failedNote(count: Int): UiText? =
+  if (count > 0) Res.plurals.feedback_part_failed.text(count) else null
+
+/** This failure's own message, shown as it is under a message's title. */
+private fun Throwable.detail(): UiText? = message?.let(::verbatim)
+
+/**
+ * A command on downloads whose failures are reported together: [one] names the download and
+ * the device, [many] counts the downloads.
+ */
+private enum class FailedCommand(val one: StringResource, val many: PluralStringResource) {
+  Pause(Res.string.feedback_pause_failed_one, Res.plurals.feedback_pause_failed),
+  Resume(Res.string.feedback_resume_failed_one, Res.plurals.feedback_resume_failed),
+  Retry(Res.string.feedback_retry_failed_one, Res.plurals.feedback_retry_failed),
+  Discard(Res.string.feedback_discard_failed_one, Res.plurals.feedback_discard_failed),
+  UndoStartNow(
+    Res.string.feedback_undo_start_now_failed_one,
+    Res.plurals.feedback_undo_start_now_failed,
+  ),
+  Remove(Res.string.feedback_remove_failed_one, Res.plurals.feedback_remove_failed),
+}
+
+/** What a batch did, as its message says: on one device ([here]) or on several ([onDevices]). */
+private enum class BatchVerb(val here: PluralStringResource, val onDevices: PluralStringResource) {
+  Resumed(Res.plurals.feedback_resumed, Res.plurals.feedback_resumed_on_devices),
+  Retrying(Res.plurals.feedback_retrying, Res.plurals.feedback_retrying_on_devices),
 }
 
 /** Name of this task for messages, from its current request and state. */
 private fun DownloadTask.displayName(): String = displayName(requestState.value, state.value)
 
-/** The name of the only one of [tasks], else how many they are, such as "3 downloads". */
-private fun what(tasks: List<DownloadTask>): String =
-  tasks.singleOrNull()?.displayName() ?: downloads(tasks.size)
+/**
+ * [one] with the name of the only one of [tasks], else [many] with how many they are, such as
+ * "Removed 3 downloads"; [args] follow the name or the count, such as the device.
+ */
+private fun what(
+  tasks: List<DownloadTask>,
+  one: StringResource,
+  many: PluralStringResource,
+  vararg args: Any,
+): UiText = tasks.singleOrNull()?.let { one.text(it.displayName(), *args) }
+  ?: many.text(tasks.size, tasks.size, *args)
 
 /**
  * Whether this task's file is unfinished, so removing the task once it was sent elsewhere takes

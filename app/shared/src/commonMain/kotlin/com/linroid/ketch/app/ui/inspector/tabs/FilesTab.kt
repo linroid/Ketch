@@ -41,12 +41,37 @@ import com.linroid.ketch.app.components.LanePhase
 import com.linroid.ketch.app.components.LaneStripCanvas
 import com.linroid.ketch.app.components.LaneStripDefaults
 import com.linroid.ketch.app.components.lanePhase
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.isEmpty
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.percentText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.util.plural
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_file_description
+import ketch.app.shared.generated.resources.inspector_file_description_no_share
+import ketch.app.shared.generated.resources.inspector_file_unnamed
+import ketch.app.shared.generated.resources.inspector_files_all_done
+import ketch.app.shared.generated.resources.inspector_files_done_of
+import ketch.app.shared.generated.resources.inspector_files_filter
+import ketch.app.shared.generated.resources.inspector_files_map
+import ketch.app.shared.generated.resources.inspector_files_no_match
+import ketch.app.shared.generated.resources.inspector_files_not_selected
+import ketch.app.shared.generated.resources.inspector_files_one_done
+import ketch.app.shared.generated.resources.inspector_files_sort
+import ketch.app.shared.generated.resources.inspector_files_waiting
+import ketch.app.shared.generated.resources.inspector_percent_spoken
+import ketch.app.shared.generated.resources.inspector_sort_incomplete
+import ketch.app.shared.generated.resources.inspector_sort_name
+import ketch.app.shared.generated.resources.inspector_sort_size
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The Files tab of the inspector for a torrent: every file it downloads, with its size and
@@ -89,7 +114,7 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
   ) {
     if (files.isEmpty()) {
       Text(
-        text = "The file list arrives with the torrent's metadata.",
+        text = stringResource(Res.string.inspector_files_waiting),
         style = type.caption,
         color = colors.textTertiary,
       )
@@ -99,15 +124,15 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
     val summary = @Composable { summaryModifier: Modifier ->
       Column(modifier = summaryModifier) {
         Text(
-          text = title,
+          text = title.resolve(),
           style = type.numeral,
           color = colors.textPrimary,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
-        if (detail.isNotEmpty()) {
+        if (!detail.isEmpty()) {
           Text(
-            text = detail,
+            text = detail.resolve(),
             style = type.caption,
             color = colors.textSecondary,
             maxLines = 1,
@@ -126,7 +151,7 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
         KetchTextField(
           value = query,
           onValueChange = { query = it },
-          placeholder = "Filter files",
+          placeholder = stringResource(Res.string.inspector_files_filter),
           leadingIcon = KetchIcon.Search,
           modifier = Modifier.weight(1f),
         )
@@ -143,7 +168,7 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
       }
     }
     val blocks = remember(files) { files.blocks() }
-    val mapDescription = remember(files) { filesMapDescription(files) }
+    val mapDescription = filesMapDescription(files).resolve()
     LaneStripCanvas(
       segments = blocks,
       phase = phase,
@@ -154,7 +179,7 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
     )
     if (shown.isEmpty()) {
       Text(
-        text = "No files match “${query.trim()}”",
+        text = stringResource(Res.string.inspector_files_no_match, query.trim()),
         style = type.caption,
         color = colors.textTertiary,
         modifier = Modifier.padding(vertical = spacing.s2),
@@ -178,12 +203,13 @@ private fun SortChip(sort: FileSort, onSort: (FileSort) -> Unit) {
   var open by remember { mutableStateOf(false) }
   Box {
     KetchChip(
-      label = sort.label,
+      label = sort.label.resolve(),
       selected = false,
       onClick = { open = true },
       trailingIcon = KetchIcon.ChevronDown,
     )
-    KetchMenu(expanded = open, onDismissRequest = { open = false }, title = "Sort files") {
+    val title = stringResource(Res.string.inspector_files_sort)
+    KetchMenu(expanded = open, onDismissRequest = { open = false }, title = title) {
       for (option in FileSort.entries) {
         item(label = option.label, onClick = { onSort(option) }, checked = option == sort)
       }
@@ -196,22 +222,26 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
-  val size = if (file.size >= 0) formatSize(file.size) else "–"
+  val size = (if (file.size >= 0) compactSizeText(file.size) else verbatim(UNKNOWN)).resolve()
   val percent = file.percent
-  KetchTooltip(text = file.path) {
+  val name = file.label.resolve()
+  val description = if (percent != null) {
+    Res.string.inspector_file_description
+      .text(name, size, Res.string.inspector_percent_spoken.text(percent))
+  } else {
+    Res.string.inspector_file_description_no_share.text(name, size)
+  }.resolve()
+  KetchTooltip(text = file.pathText.resolve()) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       modifier = Modifier
         .fillMaxWidth()
         .height(metrics.rowHeight)
-        .clearAndSetSemantics {
-          contentDescription = listOfNotNull(file.name, size, percent?.let { "$it percent" })
-            .joinToString(", ")
-        },
+        .clearAndSetSemantics { contentDescription = description },
     ) {
-      if (chip) KetchFileTypeChip(fileName = file.name, size = KetchFileTypeChipDefaults.TableSize)
-      FileName(file.name, Modifier.weight(1f))
+      if (chip) KetchFileTypeChip(fileName = name, size = KetchFileTypeChipDefaults.TableSize)
+      FileName(name, Modifier.weight(1f))
       Text(
         text = size,
         style = type.numeral,
@@ -238,7 +268,7 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
           )
         }
         Text(
-          text = percent?.let { "$it%" } ?: "–",
+          text = (percent?.let(::percentText) ?: verbatim(UNKNOWN)).resolve(),
           style = type.numeral,
           color = if (file.isDone) colors.textTertiary else colors.textPrimary,
           textAlign = TextAlign.End,
@@ -284,35 +314,48 @@ private class FileMetrics(spacing: KetchSpacing, density: KetchDensity) {
 }
 
 /** Orders of the Files tab. */
-internal enum class FileSort(val label: String) {
+internal enum class FileSort(private val resource: StringResource) {
   /** Files still downloading first, then the torrent's order. */
-  IncompleteFirst("Incomplete first"),
-  Name("Name"),
+  IncompleteFirst(Res.string.inspector_sort_incomplete),
+  Name(Res.string.inspector_sort_name),
 
   /** Largest first. */
-  Size("Size"),
+  Size(Res.string.inspector_sort_size);
+
+  /** What the sort menu calls it. */
+  val label: UiText get() = resource.text()
 }
 
 /**
  * One file of a torrent.
  *
  * @property id the file's id in the torrent's resolved file list.
- * @property path its path in the torrent, folders included, or "File 12" when unnamed.
+ * @property path its path in the torrent, folders included; `null` when the list names it not.
  * @property start where it begins in the torrent's bytes.
  * @property size its size in bytes, `-1` when unknown.
  * @property downloaded bytes downloaded so far.
+ * @property number its place in the torrent, counting from 1, which names an unnamed file.
  */
 @Immutable
 internal data class TorrentFile(
   val id: String,
-  val path: String,
+  val path: String?,
   val start: Long,
   val size: Long,
   val downloaded: Long,
+  val number: Int = 0,
 ) {
-  /** The file's own name, without its folders. */
-  val name: String
-    get() = path.substringAfterLast('/')
+  /** The file's own name, without its folders; `null` when unnamed. */
+  val name: String?
+    get() = path?.substringAfterLast('/')
+
+  /** [name] as the list shows it, or "File 12" when unnamed. */
+  val label: UiText
+    get() = name?.let(::verbatim) ?: Res.string.inspector_file_unnamed.text(number)
+
+  /** [path] as its tooltip shows it, or "File 12" when unnamed. */
+  val pathText: UiText
+    get() = path?.let(::verbatim) ?: Res.string.inspector_file_unnamed.text(number)
 
   /** Whether all of a file of known size is downloaded. */
   val isDone: Boolean
@@ -342,24 +385,27 @@ internal fun torrentFiles(row: TaskRow): List<TorrentFile> {
       val size = segment.totalBytes
       TorrentFile(
         id = id,
-        path = names[id] ?: "File ${segment.index + 1}",
+        path = names[id],
         start = segment.start,
         size = size,
         downloaded = if (completed) size else segment.downloadedBytes.coerceIn(0, size),
+        number = segment.index + 1,
       )
     }
   }
   val selected = row.request.selectedFileIds
   var offset = 0L
-  return source.filter { selected.isEmpty() || it.id in selected }.map { file ->
-    TorrentFile(
-      id = file.id,
-      path = file.name,
-      start = offset,
-      size = file.size,
-      downloaded = if (completed && file.size >= 0) file.size else 0,
-    ).also { offset += file.size.coerceAtLeast(0) }
-  }
+  return source.withIndex().filter { (_, file) -> selected.isEmpty() || file.id in selected }
+    .map { (index, file) ->
+      TorrentFile(
+        id = file.id,
+        path = file.name,
+        start = offset,
+        size = file.size,
+        downloaded = if (completed && file.size >= 0) file.size else 0,
+        number = index + 1,
+      ).also { offset += file.size.coerceAtLeast(0) }
+    }
 }
 
 /** How many files [torrentFiles] lists for [row], without building them. */
@@ -374,45 +420,48 @@ internal fun torrentFileCount(row: TaskRow): Int {
  * The two lines over the file list: how many files are done, such as "9 of 14 files done", and
  * their bytes, such as "3.2 of 7.9 GB", with the files the torrent [listed] but does not download.
  */
-internal fun filesSummary(files: List<TorrentFile>, listed: Int): Pair<String, String> {
+internal fun filesSummary(files: List<TorrentFile>, listed: Int): Pair<UiText, UiText> {
   val done = files.count { it.isDone }
+  val count = files.size
   val title = when {
-    done < files.size -> "$done of ${plural(files.size, "file")} done"
-    files.size == 1 -> "1 file done"
-    else -> "All ${files.size} files done"
+    done < count -> Res.plurals.inspector_files_done_of.text(count, done, count)
+    count == 1 -> Res.string.inspector_files_one_done.text()
+    else -> Res.plurals.inspector_files_all_done.text(count)
   }
   val known = files.filter { it.size >= 0 }
   val total = known.sumOf { it.size }
   val downloaded = known.sumOf { it.downloaded.coerceIn(0, it.size) }
   val detail = buildList {
     if (total > 0) {
-      add(if (downloaded >= total) formatSize(total) else formatBytesOf(downloaded, total))
+      add(if (downloaded >= total) compactSizeText(total) else bytesOfText(downloaded, total))
     }
-    if (listed > files.size) add("${listed - files.size} not selected")
-  }.joinToString(" · ")
+    val unselected = listed - count
+    if (unselected > 0) add(Res.plurals.inspector_files_not_selected.text(unselected))
+  }.joinText()
   return title to detail
 }
 
 /** What the file map says to a screen reader: "300 files, 100 done, 33 percent". */
-private fun filesMapDescription(files: List<TorrentFile>): String {
+private fun filesMapDescription(files: List<TorrentFile>): UiText {
   val known = files.filter { it.size > 0 }
   val total = known.sumOf { it.size }
   val downloaded = known.sumOf { it.downloaded.coerceIn(0, it.size) }
   val percent = if (total > 0) downloaded * 100 / total else 0
-  return "${plural(files.size, "file")}, ${files.count { it.isDone }} done, $percent percent"
+  val done = files.count { it.isDone }
+  return Res.plurals.inspector_files_map.text(files.size, files.size, done, percent)
 }
 
 /** These files in [sort] order. */
 internal fun List<TorrentFile>.sortedFor(sort: FileSort): List<TorrentFile> = when (sort) {
   FileSort.IncompleteFirst -> sortedWith(compareBy({ it.isDone }, { it.start }))
-  FileSort.Name -> sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.path })
+  FileSort.Name -> sortedWith(compareBy(nullsLast(String.CASE_INSENSITIVE_ORDER)) { it.path })
   FileSort.Size -> sortedWith(compareByDescending<TorrentFile> { it.size }.thenBy { it.start })
 }
 
 /** The files whose path contains [query], ignoring case; all of them for a blank query. */
 internal fun List<TorrentFile>.matching(query: String): List<TorrentFile> {
   val text = query.trim()
-  return if (text.isEmpty()) this else filter { it.path.contains(text, ignoreCase = true) }
+  return if (text.isEmpty()) this else filter { it.path?.contains(text, ignoreCase = true) == true }
 }
 
 /**
@@ -437,3 +486,6 @@ internal fun List<TorrentFile>.blocks(): List<Segment> {
 
 /** Torrents with more files than this get a filter field. */
 internal const val FILTER_THRESHOLD: Int = 20
+
+/** What a size or share reads while it is unknown. */
+private const val UNKNOWN = "–"

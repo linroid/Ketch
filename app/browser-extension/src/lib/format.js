@@ -1,9 +1,20 @@
 /** Text shown for tasks, sizes and connection problems in the popup and options page. */
 
+import { languageTag, t } from './i18n.js';
 import { FailureKind } from './ketch-client.js';
 import { isLoopbackUrl } from './settings.js';
 
-const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
+/** Formats a number of each unit, from bytes to terabytes. */
+const UNITS = [
+  (size) => t('size_bytes', size),
+  (size) => t('size_kilobytes', size),
+  (size) => t('size_megabytes', size),
+  (size) => t('size_gigabytes', size),
+  (size) => t('size_terabytes', size),
+];
+
+/** Number formats of the messages' language, by the number of decimals. */
+const numberFormats = new Map();
 
 /**
  * Formats a byte count with binary multiples, e.g. `1.5 MB`.
@@ -19,7 +30,21 @@ export function formatBytes(bytes) {
     unit++;
   }
   const digits = unit === 0 || value >= 10 ? 0 : 1;
-  return `${value.toFixed(digits)} ${UNITS[unit]}`;
+  return UNITS[unit](formatNumber(value, digits));
+}
+
+/** Formats `value` with `digits` decimals, as the messages' language writes numbers. */
+function formatNumber(value, digits) {
+  let format = numberFormats.get(digits);
+  if (!format) {
+    format = new Intl.NumberFormat(languageTag(), {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+      useGrouping: false,
+    });
+    numberFormats.set(digits, format);
+  }
+  return format.format(value);
 }
 
 /**
@@ -45,9 +70,9 @@ export function taskName(task) {
 export function nameFromUrl(url) {
   if (/^magnet:/i.test(url)) {
     const name = new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('dn');
-    return name || 'Magnet link';
+    return name || t('task_magnet_link');
   }
-  if (/^torrent:/i.test(url)) return 'Torrent';
+  if (/^torrent:/i.test(url)) return t('task_torrent');
   try {
     const parsed = new URL(url);
     const segment = parsed.pathname.split('/').filter(Boolean).pop();
@@ -75,11 +100,11 @@ export function describeTaskState(task) {
     case 'downloading': {
       const { downloadedBytes = 0, totalBytes = 0, bytesPerSecond = 0 } = state.progress ?? {};
       const fraction = totalBytes > 0 ? Math.min(downloadedBytes / totalBytes, 1) : null;
-      const amount = totalBytes > 0
-        ? `${formatBytes(downloadedBytes)} of ${formatBytes(totalBytes)}`
-        : formatBytes(downloadedBytes);
+      const speed = t('speed_per_second', formatBytes(bytesPerSecond));
       return {
-        text: `${amount} · ${formatBytes(bytesPerSecond)}/s`,
+        text: totalBytes > 0
+          ? t('task_downloading_of', formatBytes(downloadedBytes), formatBytes(totalBytes), speed)
+          : t('task_downloading', formatBytes(downloadedBytes), speed),
         progress: fraction,
         tone: 'active',
         canPause: true,
@@ -89,30 +114,30 @@ export function describeTaskState(task) {
     case 'paused': {
       const { downloadedBytes = 0, totalBytes = 0 } = state.progress ?? {};
       const fraction = totalBytes > 0 ? Math.min(downloadedBytes / totalBytes, 1) : null;
-      const text = fraction === null ? 'Paused' : `Paused · ${Math.floor(fraction * 100)}%`;
+      const text = fraction === null
+        ? t('task_paused')
+        : t('task_paused_percent', formatNumber(Math.floor(fraction * 100), 0));
       return { text, progress: fraction, tone: 'idle', canPause: false, canResume: true };
     }
     case 'queued':
-      return { text: 'Queued', progress: null, tone: 'idle', canPause: true, canResume: false };
+      return stateWithoutBar(t('task_queued'), 'idle', { canPause: true });
     case 'scheduled':
-      return { text: 'Scheduled', progress: null, tone: 'idle', canPause: false, canResume: false };
+      return stateWithoutBar(t('task_scheduled'), 'idle');
     case 'completed':
-      return { text: 'Completed', progress: null, tone: 'done', canPause: false, canResume: false };
+      return stateWithoutBar(t('task_completed'), 'done');
     case 'failed': {
-      const reason = state.error?.message || state.error?.type || 'unknown error';
-      return {
-        text: `Failed: ${reason}`,
-        progress: null,
-        tone: 'error',
-        canPause: false,
-        canResume: true,
-      };
+      const reason = state.error?.message || state.error?.type || t('task_unknown_error');
+      return stateWithoutBar(t('task_failed', reason), 'error', { canResume: true });
     }
     case 'canceled':
-      return { text: 'Canceled', progress: null, tone: 'idle', canPause: false, canResume: false };
+      return stateWithoutBar(t('task_canceled'), 'idle');
     default:
-      return { text: '', progress: null, tone: 'idle', canPause: false, canResume: false };
+      return stateWithoutBar('', 'idle');
   }
+}
+
+function stateWithoutBar(text, tone, { canPause = false, canResume = false } = {}) {
+  return { text, progress: null, tone, canPause, canResume };
 }
 
 /**
@@ -122,9 +147,15 @@ export function describeTaskState(task) {
  * @param {{ withOs?: boolean }} [options]
  */
 export function describeStatus(status, { withOs = false } = {}) {
-  const named = status.name && status.name !== 'Ketch' ? ` to ${status.name}` : '';
-  const os = withOs && status.system?.os ? ` on ${status.system.os}` : '';
-  return `Connected${named} · Ketch ${status.version ?? ''}${os}`.trimEnd();
+  const name = status.name && status.name !== 'Ketch' ? status.name : undefined;
+  const os = withOs ? status.system?.os : undefined;
+  const version = status.version ?? '';
+  let text;
+  if (name && os) text = t('status_connected_to_on', name, version, os);
+  else if (name) text = t('status_connected_to', name, version);
+  else if (os) text = t('status_connected_on', version, os);
+  else text = t('status_connected', version);
+  return text.trimEnd();
 }
 
 /**
@@ -138,21 +169,28 @@ export function failureHint(error, instance) {
   const app = instance.type === 'app';
   switch (error?.kind) {
     case FailureKind.APP_NOT_INSTALLED:
-      return 'Install the Ketch desktop app and open it once, then try again. With "ketch ' +
-        'server", or a browser installed as a Flatpak or Snap, add Ketch as a server instead.';
+      return t('hint_app_not_installed');
     case FailureKind.APP_NOT_RUNNING:
-      return 'Ketch opens by itself when you send it a download.';
+      return t('hint_app_not_running');
     case FailureKind.UNREACHABLE:
     case FailureKind.TIMEOUT:
-      if (app) return 'Open Ketch and try again.';
-      return isLoopbackUrl(instance.url)
-        ? 'Open Ketch and turn on Settings → Remote access → Server, or run "ketch server".'
-        : 'Check that the server is running and this address is reachable from here.';
+      if (app) return t('hint_open_app');
+      return isLoopbackUrl(instance.url) ? t('hint_local_server') : t('hint_remote_server');
     case FailureKind.UNAUTHORIZED:
-      return 'Enter the access token shown in Ketch under Settings → Remote access.';
+      return t('hint_access_token');
     default:
       return '';
   }
+}
+
+/**
+ * Joins an error message and what to do about it into one text.
+ *
+ * @param {string} message
+ * @param {string} hint empty when there is nothing to add
+ */
+export function withHint(message, hint) {
+  return hint ? t('error_with_hint', message, hint) : message;
 }
 
 function lastSegment(path) {

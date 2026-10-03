@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the Android app says outside the shared UI. Android's resource rules apply here: escape
+  apostrophes as \'. See docs/development/localization.md.
+-->
 <resources>
-  <string name="app_name">Ketch</string>
+  <string name="app_name" translatable="false">Ketch</string>
+
+  <!-- Shown in the text selection menu of other apps: downloads the links in the selection. -->
+  <string name="process_text_label">Download with Ketch</string>
+  <!-- Shown when text shared with Ketch holds no link. -->
+  <string name="quick_add_no_link">No link to download</string>
+
+  <!-- Asked once, after the first download is added, before the system asks for the permission. -->
+  <string name="notifications_offer_title">Get notified when downloads finish</string>
+  <string name="notifications_offer_message">Ketch can tell you when a download finishes or fails while you use other apps.</string>
+  <string name="notifications_offer_allow">Allow</string>
+  <string name="notifications_offer_not_now">Not now</string>
 </resources>

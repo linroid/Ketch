@@ -71,13 +71,22 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.elideMiddle
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_retry
+import ketch.app.shared.generated.resources.action_show
+import ketch.app.shared.generated.resources.settings_action_hide
+import ketch.app.shared.generated.resources.settings_load_failed
+import ketch.app.shared.generated.resources.settings_no_device
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 
 /** How long typing must pause before a text setting is saved. */
 private const val COMMIT_DELAY_MS = 600L
@@ -294,7 +303,7 @@ fun <T> SettingsSelectRow(
   title: String,
   value: T,
   options: List<T>,
-  label: (T) -> String,
+  label: (T) -> UiText,
   onSelect: (T) -> Unit,
   modifier: Modifier = Modifier,
   description: String? = null,
@@ -335,7 +344,7 @@ fun <T> SettingsSelectRow(
           horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.End),
         ) {
           Text(
-            text = label(value),
+            text = label(value).resolve(),
             style = KetchTheme.typography.label,
             color = colors.textPrimary,
             maxLines = 1,
@@ -366,8 +375,10 @@ fun <T> SettingsSelectRow(
  * Row with `[−] 3 [+]` on the right, for a count chosen from [values], in order; each press
  * applies at once.
  *
- * @param label how a value reads, such as "Unlimited" for 0.
- * @param noun what is counted, for screen readers, such as "downloads at once".
+ * @param label how [value] reads, such as "Unlimited" for 0.
+ * @param state [value] with what is counted, for screen readers, such as "3 downloads at once".
+ * @param fewer what the minus button does, such as "Fewer downloads at once".
+ * @param more what the plus button does, such as "More downloads at once".
  */
 @Composable
 internal fun SettingsStepperRow(
@@ -375,8 +386,10 @@ internal fun SettingsStepperRow(
   description: String,
   value: Int,
   values: List<Int>,
-  label: (Int) -> String,
-  noun: String,
+  label: String,
+  state: String,
+  fewer: String,
+  more: String,
   onChange: (Int) -> Unit,
 ) {
   SettingsRow(
@@ -387,16 +400,16 @@ internal fun SettingsStepperRow(
       Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
-        modifier = Modifier.semantics { stateDescription = "${label(value)} $noun" },
+        modifier = Modifier.semantics { stateDescription = state },
       ) {
         StepButton(
           plus = false,
-          description = "Fewer $noun",
+          description = fewer,
           enabled = index > 0,
           onClick = { values.getOrNull(index - 1)?.let(onChange) },
         )
         Text(
-          text = label(value),
+          text = label,
           style = KetchTheme.typography.numeral,
           color = KetchTheme.colors.textPrimary,
           textAlign = TextAlign.Center,
@@ -405,7 +418,7 @@ internal fun SettingsStepperRow(
         )
         StepButton(
           plus = true,
-          description = "More $noun",
+          description = more,
           enabled = index in 0 until values.lastIndex,
           onClick = { values.getOrNull(index + 1)?.let(onChange) },
         )
@@ -467,7 +480,7 @@ fun SettingsTextInput(
   modifier: Modifier = Modifier,
   placeholder: String = "",
   normalize: (String) -> String = { it.trim() },
-  validate: (String) -> String? = { null },
+  validate: (String) -> UiText? = { null },
   secret: Boolean = false,
   numeric: Boolean = false,
   mono: Boolean = false,
@@ -503,7 +516,7 @@ fun SettingsTextInput(
     },
     modifier = modifier,
     placeholder = placeholder,
-    error = validate(text),
+    error = validate(text)?.resolve(),
     onDone = {
       commit()
       focusManager.clearFocus()
@@ -526,7 +539,11 @@ fun SettingsTextInput(
       {
         if (showToggle) {
           KetchButton(
-            text = if (revealed) "Hide" else "Show",
+            text = if (revealed) {
+              stringResource(Res.string.settings_action_hide)
+            } else {
+              stringResource(Res.string.action_show)
+            },
             onClick = { revealed = !revealed },
             variant = KetchButtonVariant.Ghost,
             size = KetchButtonSize.Small,
@@ -743,7 +760,7 @@ internal fun SettingsLoading(text: String) {
 @Composable
 internal fun NoDeviceNotice() {
   SettingsNotice(
-    text = "Connect to a device to change its settings.",
+    text = stringResource(Res.string.settings_no_device),
     tone = NoticeTone.Info,
   )
 }
@@ -754,17 +771,21 @@ internal fun NoDeviceNotice() {
  * @param loaded whether the page has settings to show despite the error.
  */
 @Composable
-internal fun DeviceSettingsError(error: String?, loaded: Boolean, onRetry: () -> Unit) {
+internal fun DeviceSettingsError(error: UiText?, loaded: Boolean, onRetry: () -> Unit) {
   if (error == null) return
   SettingsNotice(
-    text = if (loaded) error else "Couldn't load the settings: $error",
+    text = if (loaded) {
+      error.resolve()
+    } else {
+      stringResource(Res.string.settings_load_failed, error.resolve())
+    },
     tone = NoticeTone.Error,
     action = if (loaded) {
       null
     } else {
       {
         KetchButton(
-          text = "Retry",
+          text = stringResource(Res.string.action_retry),
           onClick = onRetry,
           variant = KetchButtonVariant.Secondary,
           size = KetchButtonSize.Small,

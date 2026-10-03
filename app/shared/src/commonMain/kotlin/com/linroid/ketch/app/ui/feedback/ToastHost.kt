@@ -17,8 +17,13 @@ import com.linroid.ketch.app.components.toastDuration
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessagePlacement
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.toCopy
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.toast_subject_reason
 
 /**
  * Shows the active toast messages of [messages], at most [MAX_TOASTS] stacked 8 dp apart with
@@ -71,13 +76,13 @@ internal fun overflowingToasts(active: List<AppMessage>): List<AppMessage> =
  * ([toCopy]), after what failed when the message names it, as in "q3-report.pdf: Access denied
  * (403)". A failure the catalog cannot explain reads as its own message.
  */
-internal fun toastDetail(message: AppMessage): String? {
+internal fun toastDetail(message: AppMessage): UiText? {
   val cause = message.cause ?: return message.detail
   val copy = cause.toCopy()
   val unexplained = copy.hint == null && copy.details != null
-  val reason = if (unexplained) cause.message ?: copy.title else copy.title
-  val subject = message.detail?.takeUnless { it == cause.message }
-  return if (subject == null) reason else "$subject: $reason"
+  val reason = if (unexplained) cause.message?.let(::verbatim) ?: copy.title else copy.title
+  val subject = message.detail?.takeUnless { it == cause.message?.let(::verbatim) }
+  return if (subject == null) reason else Res.string.toast_subject_reason.text(subject, reason)
 }
 
 /** Most toasts shown at once. */

@@ -1,0 +1,21 @@
+# Files that still hold hard-coded user-facing text, with how many literals.
+feedback/ActivityMonitor.kt:8
+input/KeyChord.kt:12
+instance/InstanceEntry.kt:1
+instance/InstanceFactory.kt:1
+instance/InstanceManager.kt:1
+state/AiDiscoverController.kt:1
+state/AppState.kt:4
+state/IncomingDownloads.kt:3
+state/IntakeState.kt:8
+theme/Theme.kt:6
+ui/connect/DeviceConnector.kt:1
+ui/devices/DeviceText.kt:1
+ui/intake/IntakeOptions.kt:3
+ui/settings/AboutSettings.kt:1
+ui/sidebar/Sidebar.kt:1
+util/CurlParser.kt:5
+util/DisplayName.kt:2
+util/ErrorCopy.kt:10
+util/FileKind.kt:22
+util/IntakeProblems.kt:2

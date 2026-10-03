@@ -10,8 +10,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.config.UiPreferences
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.onboarding_folder_error
 
 private val log = KetchLogger("WelcomeFlow")
 
@@ -63,7 +67,7 @@ internal class WelcomeState(
   var folder: String? by mutableStateOf(folder)
 
   /** What to tell the user when the chosen folder could not be used; `null` otherwise. */
-  var folderError: String? by mutableStateOf(null)
+  var folderError: UiText? by mutableStateOf(null)
 
   /** Whether the folder picker is open or the folder is being applied. */
   var choosingFolder: Boolean by mutableStateOf(false)
@@ -114,7 +118,8 @@ internal class WelcomeState(
         folder = chosen
       }.onFailure { error ->
         log.w { "Couldn't use the chosen folder: ${error.describeCauses()}" }
-        folderError = FOLDER_ERROR
+        // The picker's grant was refused, or the device would not take the folder.
+        folderError = Res.string.onboarding_folder_error.text()
       }
     } finally {
       choosingFolder = false
@@ -131,9 +136,6 @@ internal class WelcomeState(
     )
   }
 }
-
-// Why a folder could not be used: the picker's grant was refused, or the device would not take it.
-private const val FOLDER_ERROR = "Couldn't use that folder. Try another one."
 
 /** A [WelcomeState] on the first step that survives the activity being recreated. */
 @Composable

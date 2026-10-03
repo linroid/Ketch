@@ -52,22 +52,37 @@ import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
+import com.linroid.ketch.app.input.altKeyName
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.ui.pulse.speedText
 import com.linroid.ketch.app.ui.shell.DeviceDrag
 import com.linroid.ketch.app.ui.shell.DropHint
 import com.linroid.ketch.app.ui.shell.deviceDropTarget
 import com.linroid.ketch.app.ui.shell.dropHint
 import com.linroid.ketch.app.ui.shell.onSecondaryPress
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.shell_device_connecting
+import ketch.app.shared.generated.resources.shell_device_idle
+import ketch.app.shared.generated.resources.shell_device_needs_token
+import ketch.app.shared.generated.resources.shell_device_off
+import ketch.app.shared.generated.resources.shell_device_offline
+import ketch.app.shared.generated.resources.shell_device_waiting
+import ketch.app.shared.generated.resources.sidebar_add_device
+import ketch.app.shared.generated.resources.sidebar_all_devices_tooltip
+import ketch.app.shared.generated.resources.sidebar_device_menu
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What a device row says after the device's name.
@@ -76,7 +91,7 @@ import com.linroid.ketch.app.ui.shell.onSecondaryPress
  * @property slowLane whether the device's downloads run in the Slow lane.
  */
 internal data class DeviceLine(
-  val text: String,
+  val text: UiText,
   val alert: Boolean = false,
   val slowLane: Boolean = false,
 )
@@ -87,16 +102,19 @@ internal data class DeviceLine(
  * "Off", which is not a problem.
  */
 internal fun deviceLine(device: DevicePresence): DeviceLine = when {
-  device.health == DeviceHealth.Unauthorized -> DeviceLine("Needs token", alert = true)
-  !device.connected -> DeviceLine("Off")
-  device.health is DeviceHealth.Offline -> DeviceLine("Offline", alert = true)
-  device.health == DeviceHealth.Connecting -> DeviceLine("Connecting")
+  device.health == DeviceHealth.Unauthorized ->
+    DeviceLine(Res.string.shell_device_needs_token.text(), alert = true)
+  !device.connected -> DeviceLine(Res.string.shell_device_off.text())
+  device.health is DeviceHealth.Offline ->
+    DeviceLine(Res.string.shell_device_offline.text(), alert = true)
+  device.health == DeviceHealth.Connecting -> DeviceLine(Res.string.shell_device_connecting.text())
   device.counts.downloading > 0 -> DeviceLine(
-    text = speedText(device.speed).toString(),
+    text = speedText(device.speed),
     slowLane = device.speedMode.isSlowLane,
   )
-  device.counts.waiting > 0 -> DeviceLine("${device.counts.waiting} waiting")
-  else -> DeviceLine("Idle")
+  device.counts.waiting > 0 ->
+    DeviceLine(Res.plurals.shell_device_waiting.text(device.counts.waiting))
+  else -> DeviceLine(Res.string.shell_device_idle.text())
 }
 
 /**
@@ -107,11 +125,9 @@ internal fun allDevicesLine(devices: List<DevicePresence>): DeviceLine {
   val online = devices.filter { it.connected && it.health.isOnline }
   val waiting = online.sumOf { it.counts.waiting }
   return when {
-    online.any { it.counts.downloading > 0 } -> DeviceLine(
-      text = speedText(online.sumOf { it.speed }).toString(),
-    )
-    waiting > 0 -> DeviceLine("$waiting waiting")
-    else -> DeviceLine("Idle")
+    online.any { it.counts.downloading > 0 } -> DeviceLine(speedText(online.sumOf { it.speed }))
+    waiting > 0 -> DeviceLine(Res.plurals.shell_device_waiting.text(waiting))
+    else -> DeviceLine(Res.string.shell_device_idle.text())
   }
 }
 
@@ -146,11 +162,8 @@ internal fun rememberAltHeld(): Boolean {
  * Apple keyboards, Alt elsewhere; `null` on touch screens.
  */
 @Composable
-internal fun moveKeyLabel(): String? = when {
-  KetchTheme.density == KetchDensity.Comfortable -> null
-  KeyboardPlatform.current.isApple -> "⌥"
-  else -> "Alt"
-}
+internal fun moveKeyLabel(): String? =
+  if (KetchTheme.density == KetchDensity.Comfortable) null else altKeyName(KeyboardPlatform.current)
 
 /**
  * A device in the sidebar: its pennant with the health ring and unseen failures, its name and
@@ -232,7 +245,7 @@ internal fun DeviceRowContent(
   ) {
     Column(Modifier.weight(1f)) {
       Text(
-        text = device.name,
+        text = device.name.resolve(),
         style = KetchTheme.typography.label,
         fontWeight = if (active) FontWeight.SemiBold else null,
         color = if (active || hint != null) colors.textPrimary else colors.textSecondary,
@@ -241,7 +254,7 @@ internal fun DeviceRowContent(
       )
       if (hint != null) {
         Text(
-          text = hint.text,
+          text = hint.text.resolve(),
           style = KetchTheme.typography.caption,
           color = if (hint.accepts) colors.accentText else colors.textSecondary,
           maxLines = 1,
@@ -254,7 +267,7 @@ internal fun DeviceRowContent(
         KetchIconImage(KetchIcon.SlowLane, size = LineGlyph, tint = colors.status.paused.color)
       }
       Text(
-        text = line.text,
+        text = line.text.resolve(),
         style = KetchTheme.typography.numeralS,
         color = if (line.alert) colors.status.failed.color else colors.textSecondary,
         maxLines = 1,
@@ -279,13 +292,13 @@ internal fun AllDevicesRow(
   SidebarRow(
     selected = selected,
     onClick = onClick,
-    tooltip = "Every device's downloads",
+    tooltip = stringResource(Res.string.sidebar_all_devices_tooltip),
     shortcut = KetchCommands.AllDevices.shortcutLabel(),
     modifier = modifier,
     leading = { PennantCluster(devices) },
   ) {
     Text(
-      text = KetchCommands.AllDevices.label,
+      text = KetchCommands.AllDevices.label.resolve(),
       style = KetchTheme.typography.label,
       fontWeight = if (selected) FontWeight.SemiBold else null,
       color = if (selected) colors.textPrimary else colors.textSecondary,
@@ -294,7 +307,7 @@ internal fun AllDevicesRow(
       modifier = Modifier.weight(1f),
     )
     Text(
-      text = line.text,
+      text = line.text.resolve(),
       style = KetchTheme.typography.numeralS,
       color = colors.textSecondary,
       maxLines = 1,
@@ -350,7 +363,7 @@ internal fun AddDeviceRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
     },
   ) {
     Text(
-      text = "Add device",
+      text = stringResource(Res.string.sidebar_add_device),
       style = KetchTheme.typography.label,
       color = colors.textSecondary,
       maxLines = 1,
@@ -399,6 +412,7 @@ private fun SidebarRow(
     Modifier
   }
   val rowHeight = KetchTheme.density.deviceRow
+  val menuLabel = stringResource(Res.string.sidebar_device_menu)
   val height by animateDpAsState(
     targetValue = if (dropping) maxOf(rowHeight, spacing.s12) else rowHeight,
     animationSpec = tween(motion.short, easing = motion.easeStandard),
@@ -426,7 +440,7 @@ private fun SidebarRow(
           interactionSource = interactions,
           indication = null,
           role = Role.Tab,
-          onLongClickLabel = onSecondaryClick?.let { DEVICE_MENU_LABEL },
+          onLongClickLabel = onSecondaryClick?.let { menuLabel },
           // A long press opens the menu where there is no right click.
           onLongClick = onSecondaryClick,
           onClick = onClick,
@@ -449,9 +463,6 @@ internal fun Modifier.onMenuKey(onMenu: () -> Unit): Modifier = onKeyEvent { eve
 /** The chord that switches to the device listed [number]th, or `null` past the ninth. */
 internal fun deviceShortcut(number: Int): String? =
   KetchCommands.deviceOrNull(number)?.shortcutLabel()
-
-/** What a long press on a device opens, for screen readers. */
-internal const val DEVICE_MENU_LABEL = "Device menu"
 
 private const val MAX_CLUSTERED = 3
 

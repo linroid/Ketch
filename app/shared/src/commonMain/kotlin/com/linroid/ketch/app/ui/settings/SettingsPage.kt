@@ -69,6 +69,11 @@ import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -87,9 +92,9 @@ import com.linroid.ketch.app.state.SettingsSection
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.clipboardMode
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.folderName
-import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.folderNameText
 import com.linroid.ketch.app.state.isDocumentTree
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchAccent
@@ -102,6 +107,51 @@ import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.ThemeMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_target_choose
+import ketch.app.shared.generated.resources.device_target_connecting
+import ketch.app.shared.generated.resources.device_target_offline
+import ketch.app.shared.generated.resources.settings_back
+import ketch.app.shared.generated.resources.settings_changes_apply
+import ketch.app.shared.generated.resources.settings_close
+import ketch.app.shared.generated.resources.settings_device_menu_title
+import ketch.app.shared.generated.resources.settings_device_unauthorized
+import ketch.app.shared.generated.resources.settings_downloads_folder
+import ketch.app.shared.generated.resources.settings_network_system_default
+import ketch.app.shared.generated.resources.settings_search_count
+import ketch.app.shared.generated.resources.settings_search_no_match
+import ketch.app.shared.generated.resources.settings_speed_mode_full
+import ketch.app.shared.generated.resources.settings_summary_clipboard_fill
+import ketch.app.shared.generated.resources.settings_summary_clipboard_off
+import ketch.app.shared.generated.resources.settings_summary_clipboard_suggest
+import ketch.app.shared.generated.resources.settings_summary_discover_search
+import ketch.app.shared.generated.resources.settings_summary_downloads_all
+import ketch.app.shared.generated.resources.settings_summary_downloads_count
+import ketch.app.shared.generated.resources.settings_summary_extension
+import ketch.app.shared.generated.resources.settings_summary_extension_in
+import ketch.app.shared.generated.resources.settings_summary_extension_in_more
+import ketch.app.shared.generated.resources.settings_summary_extension_missing
+import ketch.app.shared.generated.resources.settings_summary_limit
+import ketch.app.shared.generated.resources.settings_summary_no_limit
+import ketch.app.shared.generated.resources.settings_summary_not_set_up
+import ketch.app.shared.generated.resources.settings_summary_notifications_on
+import ketch.app.shared.generated.resources.settings_summary_off
+import ketch.app.shared.generated.resources.settings_summary_sharing_local
+import ketch.app.shared.generated.resources.settings_summary_sharing_on
+import ketch.app.shared.generated.resources.settings_summary_sharing_port
+import ketch.app.shared.generated.resources.settings_summary_speed_auto_full
+import ketch.app.shared.generated.resources.settings_summary_speed_auto_slow_lane
+import ketch.app.shared.generated.resources.settings_summary_speed_capped
+import ketch.app.shared.generated.resources.settings_summary_speed_slow_lane
+import ketch.app.shared.generated.resources.settings_summary_trackers
+import ketch.app.shared.generated.resources.settings_summary_version
+import ketch.app.shared.generated.resources.settings_theme_dark
+import ketch.app.shared.generated.resources.settings_theme_light
+import ketch.app.shared.generated.resources.settings_theme_system
+import ketch.app.shared.generated.resources.settings_title
+import ketch.app.shared.generated.resources.settings_torrent_no_trackers
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The settings of one [category]. Every layout of Settings shows its pages through this.
@@ -180,11 +230,11 @@ internal fun SettingsCategoryPage(
           KetchIconButton(
             icon = KetchIcon.ChevronLeft,
             onClick = onBack,
-            contentDescription = "Back to settings",
+            contentDescription = stringResource(Res.string.settings_back),
           )
         }
         Text(
-          text = category.title,
+          text = category.titleText.resolve(),
           style = KetchTheme.typography.titleL,
           color = colors.textPrimary,
           maxLines = 1,
@@ -207,7 +257,7 @@ internal fun SettingsCategoryPage(
           ) {
             content(category)
             Text(
-              text = "Changes apply as you make them.",
+              text = stringResource(Res.string.settings_changes_apply),
               style = KetchTheme.typography.caption,
               color = colors.textTertiary,
               textAlign = TextAlign.Center,
@@ -246,7 +296,7 @@ private class CoordinatesHolder {
 internal fun SettingsNav(
   categories: List<SettingsCategory>,
   selected: SettingsCategory,
-  summaries: Map<SettingsCategory, String>,
+  summaries: Map<SettingsCategory, UiText>,
   onOpen: (SettingsCategory) -> Unit,
   deviceChip: (@Composable () -> Unit)?,
   search: @Composable () -> Unit,
@@ -272,7 +322,7 @@ internal fun SettingsNav(
         val pages = categories.filter { it.section == section }
         if (pages.isEmpty()) continue
         SectionHeader(
-          title = section.title,
+          title = section.title.resolve(),
           trailing = deviceChip.takeIf { section == SettingsSection.Device },
           modifier = Modifier.padding(
             top = if (section == SettingsSection.App) 0.dp else spacing.s4,
@@ -281,7 +331,7 @@ internal fun SettingsNav(
         pages.forEach { category ->
           SettingsNavItem(
             category = category,
-            summary = summaries[category],
+            summary = summaries[category]?.resolve(),
             selected = category == selected,
             onSurface = onSurface,
             onClick = { onOpen(category) },
@@ -357,7 +407,7 @@ private fun SettingsNavItem(
   ) {
     KetchHueTile(icon = category.icon, hue = category.hue, size = KetchHueTileDefaults.XSmall)
     Text(
-      text = category.title,
+      text = category.titleText.resolve(),
       style = KetchTheme.typography.label,
       fontWeight = if (selected) FontWeight.SemiBold else null,
       color = if (selected) colors.textPrimary else colors.textSecondary,
@@ -391,7 +441,7 @@ private fun itemFill(selected: Boolean, hovered: Boolean, onSurface: Boolean): C
 @Composable
 internal fun SettingsList(
   categories: List<SettingsCategory>,
-  summaries: Map<SettingsCategory, String>,
+  summaries: Map<SettingsCategory, UiText>,
   inset: Dp,
   onOpen: (SettingsCategory) -> Unit,
   onClose: (() -> Unit)?,
@@ -421,10 +471,14 @@ internal fun SettingsList(
         KetchIconButton(
           icon = KetchIcon.ChevronLeft,
           onClick = onClose,
-          contentDescription = "Close settings",
+          contentDescription = stringResource(Res.string.settings_close),
         )
       }
-      Text(text = "Settings", style = KetchTheme.typography.pageTitle, color = colors.textPrimary)
+      Text(
+        text = stringResource(Res.string.settings_title),
+        style = KetchTheme.typography.pageTitle,
+        color = colors.textPrimary,
+      )
     }
     search()
     if (results != null) {
@@ -435,13 +489,13 @@ internal fun SettingsList(
       val pages = categories.filter { it.section == section }
       if (pages.isEmpty()) continue
       SettingsGroup(
-        title = section.title,
+        title = section.title.resolve(),
         action = deviceChip.takeIf { section == SettingsSection.Device },
       ) {
         pages.forEach { category ->
           SettingsRow(
-            title = category.title,
-            description = summaries[category] ?: category.description,
+            title = category.titleText.resolve(),
+            description = (summaries[category] ?: category.descriptionText).resolve(),
             modifier = Modifier.clickable(role = Role.Button) { onOpen(category) },
             leading = {
               KetchHueTile(
@@ -456,7 +510,7 @@ internal fun SettingsList(
       }
     }
     Text(
-      text = "Changes apply as you make them.",
+      text = stringResource(Res.string.settings_changes_apply),
       style = KetchTheme.typography.caption,
       color = colors.textTertiary,
       textAlign = TextAlign.Center,
@@ -486,7 +540,7 @@ internal fun SettingsSearchResults(
   val spacing = KetchTheme.spacing
   if (hits.isEmpty()) {
     Text(
-      text = "No settings match “${query.trim()}”.",
+      text = stringResource(Res.string.settings_search_no_match, query.trim()),
       style = KetchTheme.typography.bodyS,
       color = colors.textSecondary,
       modifier = Modifier.padding(horizontal = spacing.s3, vertical = spacing.s2),
@@ -511,7 +565,7 @@ internal fun SettingsSearchResults(
     }
   }
   if (inGroup) {
-    val count = if (hits.size == 1) "1 setting" else "${hits.size} settings"
+    val count = pluralStringResource(Res.plurals.settings_search_count, hits.size, hits.size)
     SettingsGroup(title = count) { items() }
   } else {
     items()
@@ -567,10 +621,10 @@ private fun SearchResult(
         overflow = TextOverflow.Ellipsis,
       )
       // A page answers by its description, so that is where its matches show.
-      val where = if (entry.title == entry.category.title) {
+      val where = if (entry.title == entry.page) {
         highlighted(entry.description, hit.descriptionMatches, match)
       } else {
-        AnnotatedString(entry.category.title)
+        AnnotatedString(entry.page)
       }
       if (where.isNotEmpty()) {
         Text(
@@ -625,7 +679,7 @@ internal fun SettingsDeviceChip(
           focus = focus,
           enabled = choosable,
           role = Role.DropdownList,
-          onClickLabel = "Choose device",
+          onClickLabel = stringResource(Res.string.device_target_choose),
           onClick = { expanded = true },
         )
         .padding(horizontal = spacing.s2),
@@ -644,7 +698,7 @@ internal fun SettingsDeviceChip(
         size = DevicePennantDefaults.XSmall,
       )
       Text(
-        text = selected.displayName,
+        text = selected.displayName.resolve(),
         style = KetchTheme.typography.labelS,
         fontWeight = FontWeight.SemiBold,
         color = colors.textPrimary,
@@ -663,7 +717,7 @@ internal fun SettingsDeviceChip(
     KetchMenu(
       expanded = expanded,
       onDismissRequest = { expanded = false },
-      title = "Settings for",
+      title = stringResource(Res.string.settings_device_menu_title),
     ) {
       for (device in devices) {
         val state = health[device.deviceId] ?: DeviceHealth.Local()
@@ -671,10 +725,10 @@ internal fun SettingsDeviceChip(
           label = device.displayName,
           onClick = { onSelect(device) },
           caption = when (state) {
-            DeviceHealth.Connecting -> "Connecting…"
-            is DeviceHealth.Offline -> "Offline"
-            DeviceHealth.Unauthorized -> "Needs a new access code"
-            is DeviceHealth.Local, DeviceHealth.Live -> device.detail
+            DeviceHealth.Connecting -> Res.string.device_target_connecting.text()
+            is DeviceHealth.Offline -> Res.string.device_target_offline.text()
+            DeviceHealth.Unauthorized -> Res.string.settings_device_unauthorized.text()
+            is DeviceHealth.Local, DeviceHealth.Live -> verbatim(device.detail)
           },
           enabled = state.isOnline,
           checked = device.deviceId == selected.deviceId,
@@ -715,7 +769,7 @@ internal val SettingsCategory.hue: FileTypeHue
 internal fun rememberSettingsSummaries(
   state: AppState,
   device: InstanceEntry?,
-): Map<SettingsCategory, String> {
+): Map<SettingsCategory, UiText> {
   val appSettings = state.appSettings
   val aiSettings = state.aiSettings
   val integration = LocalIntegrationStatus.current
@@ -738,7 +792,7 @@ internal fun rememberSettingsSummaries(
       SettingsCategory.Discover,
       discoverSummary(aiSettings.settings, aiSettings.withPlatformCredentials(aiSettings.settings)),
     )
-    put(SettingsCategory.About, "Version ${KetchApi.VERSION}")
+    put(SettingsCategory.About, Res.string.settings_summary_version.text(KetchApi.VERSION))
     if (download != null) put(SettingsCategory.Downloads, downloadsSummary(download))
     val speed = when {
       speedMode != null && speedSettings != null && mode != null ->
@@ -754,14 +808,14 @@ internal fun rememberSettingsSummaries(
 }
 
 /** "Light · Signal": the theme and the accent. */
-internal fun generalSummary(theme: ThemeMode, accent: KetchAccent): String =
-  "${theme.label} · ${accent.displayName}"
+internal fun generalSummary(theme: ThemeMode, accent: KetchAccent): UiText =
+  listOf(theme.label, accent.displayName).joinText()
 
 /**
  * "4 on": how many kinds of event are reported at all, or "Off" when none is. "All downloads
  * finished" is reported the way finished downloads are, so it counts only while they are.
  */
-internal fun notificationsSummary(settings: NotificationSettings): String {
+internal fun notificationsSummary(settings: NotificationSettings): UiText {
   val finished = settings.finished != NotificationMode.Off
   val on = listOf(
     finished,
@@ -769,7 +823,11 @@ internal fun notificationsSummary(settings: NotificationSettings): String {
     finished && settings.queueDrained,
     settings.deviceOffline,
   ).count { it }
-  return if (on == 0) "Off" else "$on on"
+  return if (on == 0) {
+    Res.string.settings_summary_off.text()
+  } else {
+    Res.plurals.settings_summary_notifications_on.text(on)
+  }
 }
 
 /**
@@ -780,13 +838,16 @@ internal fun integrationSummary(
   status: IntegrationStatus,
   desktop: Boolean,
   clipboard: ClipboardMode,
-): String {
+): UiText {
   val connected = status.browsers.filter { it.extensionConnected }.map { it.name }
   return when {
-    connected.size == 1 -> "${connected.single()} ✓"
-    connected.size > 1 -> "${connected.first()} + ${connected.size - 1} ✓"
-    status.extensionConnected -> "Extension ✓"
-    desktop -> "Extension not set up"
+    connected.size == 1 -> Res.string.settings_summary_extension_in.text(connected.single())
+    connected.size > 1 -> Res.string.settings_summary_extension_in_more.text(
+      connected.first(),
+      connected.size - 1,
+    )
+    status.extensionConnected -> Res.string.settings_summary_extension.text()
+    desktop -> Res.string.settings_summary_extension_missing.text()
     else -> clipboard.summary
   }
 }
@@ -796,71 +857,85 @@ internal fun integrationSummary(
  *
  * @param effective [settings] with the credentials the platform supplies.
  */
-internal fun discoverSummary(settings: AiSettings, effective: AiSettings): String = when {
-  !effective.llm.isComplete || !effective.search.isComplete -> "Not set up"
-  !settings.enabled -> "Off"
-  effective.search.provider == SearchProvider.None -> effective.llm.provider.label
-  else -> "${effective.llm.provider.label} · ${effective.search.provider.label} search"
+internal fun discoverSummary(settings: AiSettings, effective: AiSettings): UiText = when {
+  !effective.llm.isComplete || !effective.search.isComplete ->
+    Res.string.settings_summary_not_set_up.text()
+  !settings.enabled -> Res.string.settings_summary_off.text()
+  effective.search.provider == SearchProvider.None -> effective.llm.provider.displayName
+  else -> Res.string.settings_summary_discover_search.text(
+    effective.llm.provider.displayName,
+    effective.search.provider.displayName,
+  )
 }
 
 /**
  * "~/Downloads · 3 at a time": where downloads go and how many run together, "all at once"
  * without a limit.
  */
-internal fun downloadsSummary(config: DownloadConfig): String {
-  val folder = config.defaultDirectory?.let(::shortFolder) ?: "Downloads folder"
+internal fun downloadsSummary(config: DownloadConfig): UiText {
+  val folder = config.defaultDirectory?.let(::shortFolder)
+    ?: Res.string.settings_downloads_folder.text()
   val count = config.maxConcurrentDownloads
-  return if (count == 0) "$folder · all at once" else "$folder · $count at a time"
+  return if (count == 0) {
+    Res.string.settings_summary_downloads_all.text(folder)
+  } else {
+    Res.plurals.settings_summary_downloads_count.text(count, folder, count)
+  }
 }
 
 /**
  * [path] for a one-line summary: "~/Downloads" for a folder right in the home folder on macOS or
  * Linux, otherwise its name.
  */
-internal fun shortFolder(path: String): String {
-  if (isDocumentTree(path)) return folderName(path)
+internal fun shortFolder(path: String): UiText {
+  if (isDocumentTree(path)) return folderNameText(path)
   val home = HomeFolder.find(path)
   if (home != null) {
     val rest = path.substring(home.value.length).trim('/')
-    if (rest.isNotEmpty() && '/' !in rest) return "~/$rest"
+    if (rest.isNotEmpty() && '/' !in rest) return verbatim("~/$rest")
   }
-  return folderName(path)
+  return folderNameText(path)
 }
 
 /** "Slow lane · 1 MB/s": the mode of a device with speed modes, and the limit it applies. */
-internal fun speedSummary(mode: SpeedMode, settings: SpeedSettings, slowLane: SpeedLimit): String =
+internal fun speedSummary(mode: SpeedMode, settings: SpeedSettings, slowLane: SpeedLimit): UiText =
   when (mode) {
     SpeedMode.Full -> if (settings.standard.isUnlimited) {
-      "Full speed"
+      Res.string.settings_speed_mode_full.text()
     } else {
-      "Full speed · ${formatSpeedLimit(settings.standard)}"
+      Res.string.settings_summary_speed_capped.text(speedLimitText(settings.standard))
     }
-    SpeedMode.SlowLane -> "Slow lane · ${formatSpeedLimit(slowLane)}"
+    SpeedMode.SlowLane -> Res.string.settings_summary_speed_slow_lane.text(speedLimitText(slowLane))
     is SpeedMode.Auto -> if (mode.slowLane) {
-      "Auto · Slow lane ${formatSpeedLimit(slowLane)}"
+      Res.string.settings_summary_speed_auto_slow_lane.text(speedLimitText(slowLane))
     } else {
-      "Auto · Full speed"
+      Res.string.settings_summary_speed_auto_full.text()
     }
   }
 
 /** "Limit 5 MB/s" for a device without speed modes, or "No limit". */
-internal fun remoteSpeedSummary(limit: SpeedLimit): String =
-  if (limit.isUnlimited) "No limit" else "Limit ${formatSpeedLimit(limit)}"
+internal fun remoteSpeedSummary(limit: SpeedLimit): UiText = if (limit.isUnlimited) {
+  Res.string.settings_summary_no_limit.text()
+} else {
+  Res.string.settings_summary_limit.text(speedLimitText(limit))
+}
 
 /** "en0 + en7": the networks downloads are spread across, or the system's default. */
-internal fun networkSummary(networks: NetworkInterfaces?): String? {
+internal fun networkSummary(networks: NetworkInterfaces?): UiText? {
   if (networks == null) return null
   val selected = networks.config.interfaceIds
-  if (!networks.supported || selected.isEmpty()) return "System default"
+  if (!networks.supported || selected.isEmpty()) {
+    return Res.string.settings_network_system_default.text()
+  }
   val names = networks.available.associate { it.id to it.name }
-  return selected.joinToString(" + ") { names[it] ?: it }
+  return verbatim(selected.joinToString(" + ") { names[it] ?: it })
 }
 
 /** "3 trackers", or "No extra trackers". */
-internal fun trackersSummary(count: Int): String = when (count) {
-  0 -> "No extra trackers"
-  1 -> "1 tracker"
-  else -> "$count trackers"
+internal fun trackersSummary(count: Int): UiText = if (count == 0) {
+  Res.string.settings_torrent_no_trackers.text()
+} else {
+  Res.plurals.settings_summary_trackers.text(count)
 }
 
 /**
@@ -872,30 +947,34 @@ internal fun trackersSummary(count: Int): String = when (count) {
 internal fun sharingSummary(
   server: ServerState,
   interfaces: List<NetworkInterfaceInfo>?,
-): String = when {
-  server !is ServerState.Running -> "Off"
-  server.config.isLoopbackOnly -> "This device only"
+): UiText = when {
+  server !is ServerState.Running -> Res.string.settings_summary_off.text()
+  server.config.isLoopbackOnly -> Res.string.settings_summary_sharing_local.text()
   else -> {
     val address = interfaces?.let(::pairingAddresses)?.firstOrNull()
-    if (address != null) "On · $address:${server.port}" else "On · port ${server.port}"
+    if (address != null) {
+      Res.string.settings_summary_sharing_on.text("$address:${server.port}")
+    } else {
+      Res.string.settings_summary_sharing_port.text(server.port)
+    }
   }
 }
 
 /** What happens to copied links, as the clipboard setting reads in summaries. */
-internal val ClipboardMode.summary: String
+internal val ClipboardMode.summary: UiText
   get() = when (this) {
-    ClipboardMode.Fill -> "Fills copied links"
-    ClipboardMode.Suggest -> "Suggests copied links"
-    ClipboardMode.Off -> "Clipboard off"
-  }
+    ClipboardMode.Fill -> Res.string.settings_summary_clipboard_fill
+    ClipboardMode.Suggest -> Res.string.settings_summary_clipboard_suggest
+    ClipboardMode.Off -> Res.string.settings_summary_clipboard_off
+  }.text()
 
 /** How the theme reads in Settings. */
-internal val ThemeMode.label: String
+internal val ThemeMode.label: UiText
   get() = when (this) {
-    ThemeMode.System -> "System"
-    ThemeMode.Light -> "Light"
-    ThemeMode.Dark -> "Dark"
-  }
+    ThemeMode.System -> Res.string.settings_theme_system
+    ThemeMode.Light -> Res.string.settings_theme_light
+    ThemeMode.Dark -> Res.string.settings_theme_dark
+  }.text()
 
 /** Home folders of macOS and Linux, which summaries shorten to "~". */
 private val HomeFolder = Regex("^/(Users|home)/[^/]+")

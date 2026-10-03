@@ -6,6 +6,9 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.state.ListFixtures.downloading
 import com.linroid.ketch.app.util.RowStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +22,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
@@ -27,7 +31,10 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskListModelTest {
-  private val nas = DeviceInfo("NAS-Basement", RowCapabilities.remote())
+  @BeforeTest
+  fun loadStrings() = runTest { warmStrings() }
+
+  private val nas = DeviceInfo(verbatim("NAS-Basement"), RowCapabilities.remote())
 
   @Test
   fun rows_twoDevices_keyEachTaskByItsDevice() = runTest {
@@ -47,7 +54,7 @@ class TaskListModelTest {
       listOf(TaskKey(LOCAL_DEVICE_ID, "1"), TaskKey("nas.local:8642", "1")),
       rows.map { it.key }
     )
-    assertEquals("Saved on NAS-Basement", rows[1].content.detail)
+    assertEquals("Saved on NAS-Basement", rows[1].content.detail.load())
     assertSame(remote, model.row(TaskKey("nas.local:8642", "1"))?.task)
   }
 
@@ -103,7 +110,10 @@ class TaskListModelTest {
 
     advanceTimeBy(300)
 
-    assertEquals("Waiting for a free slot (1 of 1 in use)", model.rows.value[1].content.detail)
+    assertEquals(
+      "Waiting for a free slot (1 of 1 in use)",
+      model.rows.value[1].content.detail.load()
+    )
   }
 
   @Test
@@ -118,7 +128,7 @@ class TaskListModelTest {
     assertEquals(RowStatus.Downloading, moving.content.status)
     assertEquals(RowStatus.Stalled, stalled.content.status)
     assertTrue(stalled.isStalled)
-    assertTrue(stalled.content.detail.startsWith("Stalled · no data for "))
+    assertTrue(stalled.content.detail.load().startsWith("Stalled · no data for "))
   }
 
   @Test
@@ -146,8 +156,8 @@ class TaskListModelTest {
     advanceTimeBy(3_000)
     val resorted = model.view.value
 
-    assertEquals(listOf("Downloading", "Added today"), held.groups.map { it.title })
-    assertEquals(listOf("Added today"), resorted.groups.map { it.title })
+    assertEquals(listOf("Downloading", "Added today"), held.groups.map { it.title }.load())
+    assertEquals(listOf("Added today"), resorted.groups.map { it.title }.load())
     assertEquals(listOf("a", "b"), resorted.keys.map { it.taskId })
   }
 
@@ -165,8 +175,8 @@ class TaskListModelTest {
     advanceTimeBy(1)
     val released = model.view.value
 
-    assertEquals(listOf("Downloading", "Added today"), held.groups.map { it.title })
-    assertEquals(listOf("Added today"), released.groups.map { it.title })
+    assertEquals(listOf("Downloading", "Added today"), held.groups.map { it.title }.load())
+    assertEquals(listOf("Added today"), released.groups.map { it.title }.load())
   }
 
   @Test

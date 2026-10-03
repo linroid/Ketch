@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import java.util.Locale
 
 plugins {
   alias(libs.plugins.kotlinMultiplatform)
@@ -149,6 +150,17 @@ tasks.named<Test>("jvmTest") {
   outputs.upToDateWhen { !updateTokenAllowlist }
   outputs.cacheIf { !updateTokenAllowlist }
   systemProperty("updateTokenAllowlist", updateTokenAllowlist.toString())
+  // Tests read the English strings and format numbers the English way, whatever the machine's
+  // language and region. `-PsnapshotLocale=de-DE` renders the snapshots in another language
+  // instead; tests that assert English text then fail, so run only the snapshots with it.
+  val locale = providers.gradleProperty("snapshotLocale").map(Locale::forLanguageTag)
+    .getOrElse(Locale.US)
+  inputs.property("snapshotLocale", locale.toLanguageTag())
+  for (category in listOf("", ".display", ".format")) {
+    systemProperty("user.language$category", locale.language)
+    systemProperty("user.country$category", locale.country)
+    systemProperty("user.script$category", locale.script)
+  }
   // The guard reads the source text itself, comments included, not the compiled classes.
   inputs.dir("src/commonMain/kotlin")
     .withPropertyName("tokenGuardSources")

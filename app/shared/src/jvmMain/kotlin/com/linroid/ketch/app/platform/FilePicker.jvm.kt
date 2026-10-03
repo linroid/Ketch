@@ -1,6 +1,12 @@
 package com.linroid.ketch.app.platform
 
 import androidx.compose.runtime.Composable
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.text
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.device_pick_choose
+import ketch.app.shared.generated.resources.device_pick_folder
+import ketch.app.shared.generated.resources.device_pick_torrents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
@@ -21,14 +27,22 @@ actual fun rememberFilePicker(): FilePicker = AwtFilePicker
 internal object AwtFilePicker : FilePicker {
   override val canPickFolder: Boolean = true
 
-  override suspend fun pickFolder(initialFolder: String?): String? =
-    withContext(Dispatchers.Swing) {
-      if (DesktopOs.current == DesktopOs.MacOs) pickMacFolder(initialFolder)
-      else chooseFolder(initialFolder)
+  override suspend fun pickFolder(initialFolder: String?): String? {
+    val title = Res.string.device_pick_folder.text().load()
+    val choose = Res.string.device_pick_choose.text().load()
+    return withContext(Dispatchers.Swing) {
+      if (DesktopOs.current == DesktopOs.MacOs) pickMacFolder(initialFolder, title)
+      else chooseFolder(initialFolder, title, choose)
     }
+  }
 
-  override suspend fun pickTorrentFiles(): List<DroppedFile> = withContext(Dispatchers.Swing) {
-    showFileDialog("Open torrent files") { dialog ->
+  override suspend fun pickTorrentFiles(): List<DroppedFile> {
+    val title = Res.string.device_pick_torrents.text().load()
+    return withContext(Dispatchers.Swing) { showTorrentDialog(title) }
+  }
+
+  private fun showTorrentDialog(title: String): List<DroppedFile> =
+    showFileDialog(title) { dialog ->
       dialog.isMultipleMode = true
       dialog.setFilenameFilter { _, name -> name.endsWith(".torrent", ignoreCase = true) }
       // Windows ignores filename filters but takes a pattern as the file name.
@@ -36,12 +50,11 @@ internal object AwtFilePicker : FilePicker {
       dialog.isVisible = true
       dialog.files.filter { it.isFile }.map { it.toDroppedFile() }
     }
-  }
 
-  private fun pickMacFolder(initialFolder: String?): String? {
+  private fun pickMacFolder(initialFolder: String?, title: String): String? {
     System.setProperty(MAC_FOLDER_DIALOG, "true")
     try {
-      return showFileDialog("Choose a download folder") { dialog ->
+      return showFileDialog(title) { dialog ->
         dialog.directory = initialFolder
         dialog.isVisible = true
         dialog.file?.let { File(dialog.directory, it).path }
@@ -51,12 +64,12 @@ internal object AwtFilePicker : FilePicker {
     }
   }
 
-  private fun chooseFolder(initialFolder: String?): String? {
+  private fun chooseFolder(initialFolder: String?, title: String, choose: String): String? {
     val chooser = JFileChooser(initialFolder)
-    chooser.dialogTitle = "Choose a download folder"
+    chooser.dialogTitle = title
     chooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
     chooser.isAcceptAllFileFilterUsed = false
-    val result = chooser.showDialog(focusedWindow(), "Choose")
+    val result = chooser.showDialog(focusedWindow(), choose)
     return if (result == JFileChooser.APPROVE_OPTION) chooser.selectedFile?.path else null
   }
 

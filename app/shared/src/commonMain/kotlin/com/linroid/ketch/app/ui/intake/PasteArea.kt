@@ -43,6 +43,9 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -56,6 +59,19 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.ClipboardLink
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.ClipboardMode
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.intake_clear_clipboard
+import ketch.app.shared.generated.resources.intake_curl_command
+import ketch.app.shared.generated.resources.intake_drop_to_add
+import ketch.app.shared.generated.resources.intake_from_clipboard
+import ketch.app.shared.generated.resources.intake_offer_paste
+import ketch.app.shared.generated.resources.intake_offer_paste_clipboard
+import ketch.app.shared.generated.resources.intake_offer_paste_copied
+import ketch.app.shared.generated.resources.intake_open_torrent
+import ketch.app.shared.generated.resources.intake_paste_clipboard
+import ketch.app.shared.generated.resources.intake_paste_hint
+import ketch.app.shared.generated.resources.intake_paste_hint_short
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The add sheet's input: a roomy area to paste or type links, magnets and cURL commands into,
@@ -128,11 +144,13 @@ internal fun PasteArea(
         Box {
           if (empty) {
             Text(
-              text = when {
-                dropping -> "Drop to add"
-                phone -> "Paste links or magnets"
-                else -> "Paste links or magnets — or drop a .torrent file"
-              },
+              text = stringResource(
+                when {
+                  dropping -> Res.string.intake_drop_to_add
+                  phone -> Res.string.intake_paste_hint_short
+                  else -> Res.string.intake_paste_hint
+                },
+              ),
               style = type.body,
               color = if (dropping) colors.accentText else colors.textTertiary,
             )
@@ -148,7 +166,7 @@ internal fun PasteArea(
       Box(fieldModifier) { textField() }
     } else {
       KetchTooltip(
-        text = KetchCommands.IntakeNewLine.label,
+        text = KetchCommands.IntakeNewLine.label.resolve(),
         shortcut = KetchCommands.IntakeNewLine.shortcutLabel(),
         // Typing a link and pressing ↩ adds it; the chord for another line shows on hover.
         enabled = !empty,
@@ -201,7 +219,8 @@ internal fun PasteArea(
           modifier = Modifier.weight(1f),
         ) {
           when (note) {
-            is PasteNote.Offer -> ClipboardOfferChip(note.label, onClick = actions::pasteClipboard)
+            is PasteNote.Offer ->
+              ClipboardOfferChip(note.label.resolve(), onClick = actions::pasteClipboard)
             is PasteNote.Text -> TextNote(note, actions)
           }
         }
@@ -215,10 +234,10 @@ internal fun PasteArea(
 /** What the [PasteArea]'s bottom line says about its text. */
 private sealed interface PasteNote {
   /** The empty area offers the clipboard. */
-  class Offer(val label: String) : PasteNote
+  class Offer(val label: UiText) : PasteNote
 
   /** "From clipboard ✕", and a batch's summary or that the text is a cURL command. */
-  class Text(val fromClipboard: Boolean, val summary: String?) : PasteNote
+  class Text(val fromClipboard: Boolean, val summary: UiText?) : PasteNote
 }
 
 private fun pasteNote(session: IntakeSession, offer: ClipboardOffer?): PasteNote? {
@@ -226,7 +245,7 @@ private fun pasteNote(session: IntakeSession, offer: ClipboardOffer?): PasteNote
   val batch = session.entries.size > 1 || (session.entries.singleOrNull()?.linkCount ?: 1) > 1
   val summary = when {
     batch -> session.summary.text
-    session.isCurl -> "cURL command"
+    session.isCurl -> Res.string.intake_curl_command.text()
     else -> null
   }
   if (!session.fromClipboard && summary == null) return null
@@ -243,7 +262,7 @@ private fun PasteButtons(actions: IntakeActions, paste: Boolean, modifier: Modif
     if (paste && session.clipboardMode != ClipboardMode.Off) {
       KetchIconButton(
         icon = KetchIcon.Paste,
-        contentDescription = "Paste from clipboard",
+        contentDescription = stringResource(Res.string.intake_paste_clipboard),
         shortcut = KetchCommands.PasteLinks.shortcutLabel(),
         size = KetchButtonSize.Small,
         onClick = actions::paste,
@@ -251,7 +270,7 @@ private fun PasteButtons(actions: IntakeActions, paste: Boolean, modifier: Modif
     }
     KetchIconButton(
       icon = KetchIcon.FileTorrent,
-      contentDescription = "Open .torrent file",
+      contentDescription = stringResource(Res.string.intake_open_torrent),
       shortcut = KetchCommands.IntakeOpenTorrent.shortcutLabel(),
       size = KetchButtonSize.Small,
       onClick = actions::pickTorrents,
@@ -267,7 +286,7 @@ private fun TextNote(note: PasteNote.Text, actions: IntakeActions) {
   if (note.fromClipboard) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
-        text = "From clipboard",
+        text = stringResource(Res.string.intake_from_clipboard),
         style = type.caption,
         color = colors.textSecondary,
         maxLines = 1,
@@ -275,7 +294,7 @@ private fun TextNote(note: PasteNote.Text, actions: IntakeActions) {
       )
       KetchIconButton(
         icon = KetchIcon.Close,
-        contentDescription = "Clear the text from the clipboard",
+        contentDescription = stringResource(Res.string.intake_clear_clipboard),
         size = KetchButtonSize.Small,
         onClick = actions.session::dismissClipboard,
       )
@@ -283,7 +302,7 @@ private fun TextNote(note: PasteNote.Text, actions: IntakeActions) {
   }
   if (note.summary != null) {
     Text(
-      text = note.summary,
+      text = note.summary.resolve(),
       style = type.caption,
       color = colors.textSecondary,
       maxLines = 1,
@@ -298,7 +317,7 @@ private fun TextNote(note: PasteNote.Text, actions: IntakeActions) {
 }
 
 /** What the clipboard chip offers: its text and the clip's hash, when known. */
-internal data class ClipboardOffer(val label: String, val hash: String?)
+internal data class ClipboardOffer(val label: UiText, val hash: String?)
 
 /**
  * The chip the empty sheet shows for [link]: "Paste ubuntu-24.04.iso from clipboard" for a link
@@ -315,10 +334,15 @@ internal fun clipboardOffer(
     ClipboardLink.None -> null
     is ClipboardLink.Found -> {
       val name = middleEllipsis(displayName(DownloadRequest(url = link.url)), MAX_OFFER_NAME)
-      ClipboardOffer(if (short) "Paste $name" else "Paste $name from clipboard", link.hash)
+      val label = if (short) {
+        Res.string.intake_offer_paste.text(name)
+      } else {
+        Res.string.intake_offer_paste_clipboard.text(name)
+      }
+      ClipboardOffer(label, link.hash)
     }
     // macOS calls any text a link, and a filled sheet already read it there.
-    ClipboardLink.Maybe -> ClipboardOffer("Paste copied link", hash = null)
+    ClipboardLink.Maybe -> ClipboardOffer(Res.string.intake_offer_paste_copied.text(), hash = null)
       .takeIf { mode == ClipboardMode.Suggest && isMobilePlatform }
   }.takeIf { mode != ClipboardMode.Off }
 

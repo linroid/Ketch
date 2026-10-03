@@ -1,7 +1,9 @@
 package com.linroid.ketch.app.ui.intake
 
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.ui.downloads.ClipboardLink
 import com.linroid.ketch.config.ClipboardMode
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -15,20 +17,18 @@ class PasteAreaTest {
   )
 
   @Test
-  fun clipboardOffer_linkReadSilently_namesTheFile() {
+  fun clipboardOffer_linkReadSilently_namesTheFile() = runTest {
     val offer = clipboardOffer(ClipboardMode.Suggest, found)
 
-    assertEquals(
-      ClipboardOffer("Paste ubuntu-24.04-desktop-amd64.iso from clipboard", "abc"),
-      offer,
-    )
+    assertEquals("Paste ubuntu-24.04-desktop-amd64.iso from clipboard", offer?.label.load())
+    assertEquals("abc", offer?.hash)
   }
 
   @Test
-  fun clipboardOffer_short_leavesTheClipboardToTheGlyph() {
+  fun clipboardOffer_short_leavesTheClipboardToTheGlyph() = runTest {
     val offer = clipboardOffer(ClipboardMode.Fill, found, short = true)
 
-    assertEquals("Paste ubuntu-24.04-desktop-amd64.iso", offer?.label)
+    assertEquals("Paste ubuntu-24.04-desktop-amd64.iso", offer?.label.load())
   }
 
   @Test

@@ -9,10 +9,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.MdnsDiscoverer
 import com.linroid.ketch.app.instance.createMdnsDiscoverer
 import com.linroid.ketch.config.ServerConfig
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.connect_nearby_failed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -57,7 +61,7 @@ internal class NearbySearch(
     private set
 
   /** Why the last search failed, or `null`. */
-  var error by mutableStateOf<String?>(null)
+  var error by mutableStateOf<UiText?>(null)
     private set
 
   /** Starts a search, unless one is under way; devices found before stay listed. */
@@ -77,7 +81,7 @@ internal class NearbySearch(
         throw e
       } catch (e: Exception) {
         log.w { "Couldn't search the network: ${e.describeCauses()}" }
-        error = "Couldn't search your network"
+        error = Res.string.connect_nearby_failed.text()
       } finally {
         searching = false
         searched = true

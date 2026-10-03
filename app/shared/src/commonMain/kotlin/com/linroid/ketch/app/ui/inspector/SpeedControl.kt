@@ -48,11 +48,19 @@ import com.linroid.ketch.app.components.DebouncedCommit
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.state.formatSpeedLimit
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_limit_marker
+import ketch.app.shared.generated.resources.inspector_speed_limit
+import ketch.app.shared.generated.resources.inspector_speed_more
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.floor
@@ -160,7 +168,7 @@ internal fun SpeedControl(
   presets: List<SpeedLimit>,
   onCommit: (SpeedLimit) -> Unit,
   globalCap: SpeedLimit,
-  globalName: String,
+  globalName: UiText,
   pending: Boolean,
   modifier: Modifier = Modifier,
 ) {
@@ -190,12 +198,16 @@ internal fun SpeedControl(
           val limit = option?.limit
           if (limit == null) popover = true else commit(limit)
         },
-        label = { option -> option?.label().orEmpty() },
+        label = { option -> option?.label()?.resolve().orEmpty() },
         icon = { option ->
           KetchIcon.More.takeIf { option?.isMore == true && option.custom == null }
         },
         description = { option ->
-          "Another speed limit".takeIf { option?.isMore == true && option.custom == null }
+          if (option?.isMore == true && option.custom == null) {
+            stringResource(Res.string.inspector_speed_more)
+          } else {
+            null
+          }
         },
       )
     }
@@ -216,10 +228,10 @@ internal fun SpeedControl(
   }
 }
 
-private fun SpeedOption.label(): String = when {
-  custom != null -> formatSpeedLimit(custom)
-  limit == null -> ""
-  else -> formatSpeedLimit(limit)
+private fun SpeedOption.label(): UiText = when {
+  custom != null -> speedLimitText(custom)
+  limit == null -> UiText.Empty
+  else -> speedLimitText(limit)
 }
 
 /** The slider, with the device's limit marked, over the [SpeedLimitPicker]. */
@@ -228,7 +240,7 @@ private fun SpeedPopoverContent(
   value: SpeedLimit,
   onCommit: (SpeedLimit) -> Unit,
   globalCap: SpeedLimit,
-  globalName: String,
+  globalName: UiText,
   pending: Boolean,
 ) {
   val colors = KetchTheme.colors
@@ -238,13 +250,13 @@ private fun SpeedPopoverContent(
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s3)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
-        text = "Speed limit",
+        text = stringResource(Res.string.inspector_speed_limit),
         style = type.label,
         color = colors.textSecondary,
         modifier = Modifier.weight(1f),
       )
       Text(
-        text = formatSpeedLimit(preview ?: value),
+        text = speedLimitText(preview ?: value).resolve(),
         style = type.numeral,
         color = colors.textPrimary,
       )
@@ -258,13 +270,13 @@ private fun SpeedPopoverContent(
       )
       Row {
         Text(
-          text = formatSpeedLimit(SpeedScale.Min),
+          text = speedLimitText(SpeedScale.Min).resolve(),
           style = type.numeralS,
           color = colors.textTertiary,
           modifier = Modifier.weight(1f),
         )
         Text(
-          text = formatSpeedLimit(SpeedScale.Max),
+          text = speedLimitText(SpeedScale.Max).resolve(),
           style = type.numeralS,
           color = colors.textTertiary,
         )
@@ -282,7 +294,8 @@ private fun SpeedPopoverContent(
               },
           )
           Text(
-            text = "$globalName ${formatSpeedLimit(globalCap)}",
+            text = Res.string.inspector_limit_marker.text(globalName, speedLimitText(globalCap))
+              .resolve(),
             style = type.caption,
             color = colors.textSecondary,
           )
@@ -331,6 +344,8 @@ internal fun LogSpeedSlider(
   }
   DisposableEffect(keys) { onDispose { keys.flush() } }
   val shown = dragging?.let(SpeedScale::limitAt) ?: stepped ?: value
+  val shownText = speedLimitText(shown).resolve()
+  val description = stringResource(Res.string.inspector_speed_limit)
   val fraction = SpeedScale.fractionOf(shown)
   val thumbRadius = spacing.s2
   fun commitKey(limit: SpeedLimit) {
@@ -343,8 +358,8 @@ internal fun LogSpeedSlider(
       .fillMaxWidth()
       .height(KetchTheme.density.buttonSmall)
       .semantics {
-        contentDescription = "Speed limit"
-        stateDescription = formatSpeedLimit(shown)
+        contentDescription = description
+        stateDescription = shownText
         progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
         setProgress { target ->
           currentOnCommit(SpeedScale.limitAt(target))

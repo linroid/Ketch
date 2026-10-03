@@ -30,12 +30,49 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.downloads_empty_add
+import ketch.app.shared.generated.resources.downloads_empty_add_it_to
+import ketch.app.shared.generated.resources.downloads_empty_add_link
+import ketch.app.shared.generated.resources.downloads_empty_add_links
+import ketch.app.shared.generated.resources.downloads_empty_add_them_to
+import ketch.app.shared.generated.resources.downloads_empty_add_to
+import ketch.app.shared.generated.resources.downloads_empty_all
+import ketch.app.shared.generated.resources.downloads_empty_clear_search
+import ketch.app.shared.generated.resources.downloads_empty_done
+import ketch.app.shared.generated.resources.downloads_empty_done_hint
+import ketch.app.shared.generated.resources.downloads_empty_downloading
+import ketch.app.shared.generated.resources.downloads_empty_downloading_hint
+import ketch.app.shared.generated.resources.downloads_empty_failed
+import ketch.app.shared.generated.resources.downloads_empty_failed_hint
+import ketch.app.shared.generated.resources.downloads_empty_fleet
+import ketch.app.shared.generated.resources.downloads_empty_fleet_hint
+import ketch.app.shared.generated.resources.downloads_empty_link_missing
+import ketch.app.shared.generated.resources.downloads_empty_links_missing
+import ketch.app.shared.generated.resources.downloads_empty_loading
+import ketch.app.shared.generated.resources.downloads_empty_no_match
+import ketch.app.shared.generated.resources.downloads_empty_no_match_hint
+import ketch.app.shared.generated.resources.downloads_empty_offline
+import ketch.app.shared.generated.resources.downloads_empty_offline_hint
+import ketch.app.shared.generated.resources.downloads_empty_paused
+import ketch.app.shared.generated.resources.downloads_empty_paused_hint
+import ketch.app.shared.generated.resources.downloads_empty_remote
+import ketch.app.shared.generated.resources.downloads_empty_show_all
+import ketch.app.shared.generated.resources.downloads_empty_unauthorized
+import ketch.app.shared.generated.resources.downloads_empty_waiting
+import ketch.app.shared.generated.resources.downloads_empty_waiting_hint
+import ketch.app.shared.generated.resources.downloads_empty_waiting_hint_one
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What an empty tab or search says, and the way out of it.
@@ -47,21 +84,25 @@ import com.linroid.ketch.app.util.links
  * @property actionLabel the button's label.
  */
 internal data class EmptyCopy(
-  val title: String,
-  val hint: String? = null,
+  val title: UiText,
+  val hint: UiText? = null,
   val icon: KetchIcon,
   val action: EmptyAction? = null,
-  val actionLabel: String? = action?.label,
+  val actionLabel: UiText? = action?.label,
 )
 
 /** What the button of an empty tab or search does. */
-internal enum class EmptyAction(val label: String) {
-  ClearSearch("Clear search"),
-  AddLinks("Add this link"),
-  ShowAll("Show all downloads"),
+internal enum class EmptyAction(private val resource: StringResource) {
+  ClearSearch(Res.string.downloads_empty_clear_search),
+  AddLinks(Res.string.downloads_empty_add_link),
+  ShowAll(Res.string.downloads_empty_show_all),
 
   /** Opens the add sheet. */
-  Add("Add a link"),
+  Add(Res.string.downloads_empty_add);
+
+  /** The button's label, such as "Clear search". */
+  val label: UiText
+    get() = resource.text()
 }
 
 /**
@@ -74,7 +115,7 @@ internal enum class EmptyAction(val label: String) {
 internal fun emptyCopy(
   filter: StatusFilter,
   query: String,
-  deviceName: String,
+  deviceName: UiText,
   slots: Int?,
 ): EmptyCopy {
   val search = query.trim()
@@ -83,18 +124,28 @@ internal fun emptyCopy(
     return if (links.isNotEmpty()) {
       val one = links.size == 1
       EmptyCopy(
-        title = if (one) "This link isn't in your downloads" else {
-          "These links aren't in your downloads"
+        title = if (one) {
+          Res.string.downloads_empty_link_missing.text()
+        } else {
+          Res.string.downloads_empty_links_missing.text()
         },
-        hint = "Add ${if (one) "it" else "them"} to $deviceName instead.",
+        hint = if (one) {
+          Res.string.downloads_empty_add_it_to.text(deviceName)
+        } else {
+          Res.string.downloads_empty_add_them_to.text(deviceName)
+        },
         icon = KetchIcon.Link,
         action = EmptyAction.AddLinks,
-        actionLabel = if (one) EmptyAction.AddLinks.label else "Add these links",
+        actionLabel = if (one) {
+          EmptyAction.AddLinks.label
+        } else {
+          Res.string.downloads_empty_add_links.text()
+        },
       )
     } else {
       EmptyCopy(
-        title = "No downloads match “$search”",
-        hint = "Search looks at names, sites, folders and errors.",
+        title = Res.string.downloads_empty_no_match.text(search),
+        hint = Res.string.downloads_empty_no_match_hint.text(),
         icon = KetchIcon.Search,
         action = EmptyAction.ClearSearch,
       )
@@ -102,36 +153,36 @@ internal fun emptyCopy(
   }
   return when (filter) {
     StatusFilter.All -> EmptyCopy(
-      title = "No downloads yet",
+      title = Res.string.downloads_empty_all.text(),
       icon = KetchIcon.Active,
     )
     StatusFilter.Downloading -> EmptyCopy(
-      title = "Nothing downloading",
-      hint = "Downloads that are running show here.",
+      title = Res.string.downloads_empty_downloading.text(),
+      hint = Res.string.downloads_empty_downloading_hint.text(),
       icon = KetchIcon.Active,
       action = EmptyAction.ShowAll,
     )
     StatusFilter.Waiting -> EmptyCopy(
-      title = "Nothing waiting",
-      hint = slots?.let { "$deviceName runs ${runsAtATime(it)}." },
+      title = Res.string.downloads_empty_waiting.text(),
+      hint = slots?.let { runsAtATime(deviceName, it) },
       icon = KetchIcon.Queued,
       action = EmptyAction.ShowAll,
     )
     StatusFilter.Paused -> EmptyCopy(
-      title = "No paused downloads",
-      hint = "Downloads you pause show here.",
+      title = Res.string.downloads_empty_paused.text(),
+      hint = Res.string.downloads_empty_paused_hint.text(),
       icon = KetchIcon.Pause,
       action = EmptyAction.ShowAll,
     )
     StatusFilter.Done -> EmptyCopy(
-      title = "No finished downloads",
-      hint = "Downloads show here once they finish.",
+      title = Res.string.downloads_empty_done.text(),
+      hint = Res.string.downloads_empty_done_hint.text(),
       icon = KetchIcon.Done,
       action = EmptyAction.ShowAll,
     )
     StatusFilter.Failed -> EmptyCopy(
-      title = "Nothing needs attention",
-      hint = "Failed and canceled downloads show here.",
+      title = Res.string.downloads_empty_failed.text(),
+      hint = Res.string.downloads_empty_failed_hint.text(),
       icon = KetchIcon.CheckCircle,
       action = EmptyAction.ShowAll,
     )
@@ -142,34 +193,42 @@ internal fun emptyCopy(
  * The copy of every device shown at once while none has downloads, with a button that adds one
  * to [targetName], where new downloads go.
  */
-internal fun fleetEmptyCopy(targetName: String): EmptyCopy = EmptyCopy(
-  title = "No downloads on any device",
-  hint = "Downloads from all your devices appear here.",
+internal fun fleetEmptyCopy(targetName: UiText): EmptyCopy = EmptyCopy(
+  title = Res.string.downloads_empty_fleet.text(),
+  hint = Res.string.downloads_empty_fleet_hint.text(),
   icon = KetchIcon.Fleet,
   action = EmptyAction.Add,
-  actionLabel = "Add a link to $targetName",
+  actionLabel = Res.string.downloads_empty_add_to.text(targetName),
 )
 
 /** The copy of a remote device that has no downloads yet, with a button that adds one to it. */
-internal fun remoteEmptyCopy(deviceName: String): EmptyCopy = EmptyCopy(
-  title = "Downloads on $deviceName will appear here",
+internal fun remoteEmptyCopy(deviceName: UiText): EmptyCopy = EmptyCopy(
+  title = Res.string.downloads_empty_remote.text(deviceName),
   icon = KetchIcon.Server,
   action = EmptyAction.Add,
-  actionLabel = "Add a link to $deviceName",
+  actionLabel = Res.string.downloads_empty_add_to.text(deviceName),
 )
 
 /**
  * The copy of a remote device that cannot be reached and has sent no downloads yet: offline, or
  * refusing its access token when [unauthorized]. The banner above the page offers the way out.
  */
-internal fun offlineCopy(deviceName: String, unauthorized: Boolean): EmptyCopy = EmptyCopy(
-  title = if (unauthorized) "$deviceName needs a new access token" else "Can't reach $deviceName",
-  hint = "Its downloads show here once it connects.",
+internal fun offlineCopy(deviceName: UiText, unauthorized: Boolean): EmptyCopy = EmptyCopy(
+  title = if (unauthorized) {
+    Res.string.downloads_empty_unauthorized.text(deviceName)
+  } else {
+    Res.string.downloads_empty_offline.text(deviceName)
+  },
+  hint = Res.string.downloads_empty_offline_hint.text(),
   icon = KetchIcon.Server,
 )
 
-private fun runsAtATime(slots: Int): String =
-  if (slots == 1) "one download at a time" else "$slots at a time"
+/** "This Mac runs 3 at a time.", or "This Mac runs one download at a time." for one [slots]. */
+private fun runsAtATime(deviceName: UiText, slots: Int): UiText = if (slots == 1) {
+  Res.string.downloads_empty_waiting_hint_one.text(deviceName)
+} else {
+  Res.plurals.downloads_empty_waiting_hint.text(slots, deviceName, slots)
+}
 
 /** An empty tab or search, centered, with [copy]'s button running [onAction]. */
 @Composable
@@ -204,14 +263,14 @@ internal fun EmptyMessage(
       }
       Spacer(Modifier.height(spacing.s1))
       Text(
-        text = copy.title,
+        text = copy.title.resolve(),
         style = KetchTheme.typography.titleM,
         color = colors.textPrimary,
         textAlign = TextAlign.Center,
       )
       copy.hint?.let {
         Text(
-          text = it,
+          text = it.resolve(),
           style = KetchTheme.typography.bodyS,
           color = colors.textSecondary,
           textAlign = TextAlign.Center,
@@ -221,7 +280,7 @@ internal fun EmptyMessage(
       if (action != null && copy.actionLabel != null) {
         Spacer(Modifier.height(spacing.s1))
         KetchButton(
-          text = copy.actionLabel,
+          text = copy.actionLabel.resolve(),
           onClick = { onAction(action) },
           variant = if (action == EmptyAction.AddLinks || action == EmptyAction.Add) {
             KetchButtonVariant.Tonal
@@ -257,11 +316,12 @@ internal fun SkeletonRows(rowHeight: Dp, chip: Dp, modifier: Modifier = Modifier
       label = "skeletonAlpha",
     ).value
   }
+  val description = stringResource(Res.string.downloads_empty_loading)
   Column(
     modifier = modifier
       .fillMaxWidth()
       .alpha(alpha)
-      .semantics { contentDescription = "Loading downloads" },
+      .semantics { contentDescription = description },
   ) {
     repeat(SKELETON_ROWS) { index ->
       Row(
