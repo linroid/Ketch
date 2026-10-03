@@ -72,18 +72,6 @@ fun KetchSpeedChart(
   showAxis: Boolean = true,
   timeLabel: ((index: Int) -> String)? = null,
 ) {
-  SpeedChart(bands, modifier, limits, slots, showAxis, timeLabel)
-}
-
-@Composable
-private fun SpeedChart(
-  bands: List<SpeedBand>,
-  modifier: Modifier,
-  limits: List<SpeedLimitLine>,
-  slots: Int,
-  showAxis: Boolean,
-  timeLabel: ((index: Int) -> String)?,
-) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val measurer = rememberTextMeasurer()

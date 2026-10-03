@@ -37,13 +37,13 @@ class KetchCommand internal constructor(
   val id: String,
   val label: String,
   val icon: KetchIcon?,
-  val scope: CommandScope,
+  val scope: CommandScope = CommandScope.Global,
   private val mac: KeyChord?,
-  private val pc: KeyChord?,
-  private val web: List<KeyChord>?,
-  val inMenus: Boolean,
-  val onWeb: Boolean,
-  val yieldsToTextField: Boolean,
+  private val pc: KeyChord? = mac,
+  private val web: List<KeyChord>? = null,
+  val inMenus: Boolean = false,
+  val onWeb: Boolean = true,
+  val yieldsToTextField: Boolean = false,
 ) {
   /**
    * The chords that run this command on [platform], the one to show in menus and tooltips first.

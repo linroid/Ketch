@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,94 +37,92 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   val torrent = controller.torrent
   // Trackers taken away by "Remove all", offered back until restored.
   var removed by remember { mutableStateOf(emptyList<String>()) }
-  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
-    if (torrent == null) {
-      SettingsNotice(
-        text = "Change the extra trackers on ${device.label} itself, or in its config.toml.",
-        tone = NoticeTone.Info,
-      )
-      return@Column
-    }
-    val trackers = torrent.trackers
-    val save = { list: List<String> -> controller.updateTorrent(torrent.copy(trackers = list)) }
-    controller.torrentError?.let {
-      SettingsNotice(text = it, tone = NoticeTone.Error)
-    }
-    if (removed.isNotEmpty()) {
-      SettingsNotice(
-        text = if (removed.size == 1) "Removed 1 tracker." else "Removed ${removed.size} trackers.",
-        tone = NoticeTone.Info,
-        action = {
-          KetchButton(
-            text = "Undo",
-            onClick = {
-              save((removed + trackers).distinct())
-              removed = emptyList()
-            },
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-            leadingIcon = KetchIcon.Undo,
-          )
-        },
-      )
-    }
-    SettingsGroup(
-      title = "Extra trackers",
-      footer = "Public torrents also announce to these as they start; private ones never do." +
-        if (trackers.size > MAX_EXTRA_TRACKERS) {
-          " Only the first $MAX_EXTRA_TRACKERS are used."
-        } else {
-          ""
-        },
-      action = if (trackers.isNotEmpty()) {
-        {
-          KetchButton(
-            text = "Remove all",
-            onClick = {
-              removed = trackers
-              save(emptyList())
-            },
-            variant = KetchButtonVariant.Ghost,
-            size = KetchButtonSize.Small,
-          )
-        }
-      } else {
-        null
-      },
-    ) {
-      AddTrackersRow(
-        onAdd = { text ->
-          val added = addTrackers(trackers, text)
-          if (added.trackers != trackers) save(added.trackers)
-          added.rejected
-        },
-      )
-      if (trackers.isEmpty()) {
-        SettingsRow(title = "No extra trackers")
-      }
-      trackers.forEachIndexed { index, url ->
-        val host = trackerHost(url)
-        SettingsRow(
-          title = host,
-          description = url,
-          trailing = {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-            ) {
-              if (index >= MAX_EXTRA_TRACKERS) {
-                KetchBadge("Unused", KetchBadgeTone.Warning)
-              }
-              KetchIconButton(
-                icon = KetchIcon.Close,
-                onClick = { save(trackers - url) },
-                size = KetchButtonSize.Small,
-                contentDescription = "Remove $host",
-              )
-            }
+  if (torrent == null) {
+    SettingsNotice(
+      text = "Change the extra trackers on ${device.label} itself, or in its config.toml.",
+      tone = NoticeTone.Info,
+    )
+    return
+  }
+  val trackers = torrent.trackers
+  val save = { list: List<String> -> controller.updateTorrent(torrent.copy(trackers = list)) }
+  controller.torrentError?.let {
+    SettingsNotice(text = it, tone = NoticeTone.Error)
+  }
+  if (removed.isNotEmpty()) {
+    SettingsNotice(
+      text = if (removed.size == 1) "Removed 1 tracker." else "Removed ${removed.size} trackers.",
+      tone = NoticeTone.Info,
+      action = {
+        KetchButton(
+          text = "Undo",
+          onClick = {
+            save((removed + trackers).distinct())
+            removed = emptyList()
           },
+          variant = KetchButtonVariant.Secondary,
+          size = KetchButtonSize.Small,
+          leadingIcon = KetchIcon.Undo,
+        )
+      },
+    )
+  }
+  SettingsGroup(
+    title = "Extra trackers",
+    footer = "Public torrents also announce to these as they start; private ones never do." +
+      if (trackers.size > MAX_EXTRA_TRACKERS) {
+        " Only the first $MAX_EXTRA_TRACKERS are used."
+      } else {
+        ""
+      },
+    action = if (trackers.isNotEmpty()) {
+      {
+        KetchButton(
+          text = "Remove all",
+          onClick = {
+            removed = trackers
+            save(emptyList())
+          },
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
         )
       }
+    } else {
+      null
+    },
+  ) {
+    AddTrackersRow(
+      onAdd = { text ->
+        val added = addTrackers(trackers, text)
+        if (added.trackers != trackers) save(added.trackers)
+        added.rejected
+      },
+    )
+    if (trackers.isEmpty()) {
+      SettingsRow(title = "No extra trackers")
+    }
+    trackers.forEachIndexed { index, url ->
+      val host = trackerHost(url)
+      SettingsRow(
+        title = host,
+        description = url,
+        trailing = {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+          ) {
+            if (index >= MAX_EXTRA_TRACKERS) {
+              KetchBadge("Unused", KetchBadgeTone.Warning)
+            }
+            KetchIconButton(
+              icon = KetchIcon.Close,
+              onClick = { save(trackers - url) },
+              size = KetchButtonSize.Small,
+              contentDescription = "Remove $host",
+            )
+          }
+        },
+      )
     }
   }
 }

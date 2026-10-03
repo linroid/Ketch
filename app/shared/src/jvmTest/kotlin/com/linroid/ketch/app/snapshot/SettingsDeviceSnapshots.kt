@@ -6,16 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.NetworkInterfaceConfig
-import com.linroid.ketch.api.NetworkInterfaceInfo
-import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.ObservedPeak
@@ -42,7 +36,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -171,7 +164,7 @@ class SettingsDeviceSnapshots {
   ) {
     for (size in sizes) {
       for (theme in themes) {
-        withEnvironment(setup, theme, size.density) { environment ->
+        withEnvironment({ DeviceEnvironment(setup, theme, size.density.toMode()) }) { environment ->
           SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, interact) {
             PageFrame(environment, theme, size.density, category, remote = setup.remote)
           }
@@ -188,33 +181,10 @@ class SettingsDeviceSnapshots {
   ) {
     for (size in sizes) {
       for (theme in SnapshotTheme.entries) {
-        withEnvironment(DeviceSetup(), theme, size.density) { environment ->
-          val data = environment.data
-          SnapshotHarness.capture(
-            name = "$name-${theme.id}-${size.id}",
-            size = size,
-            interact = { AppScenario(environment.controller, data, this).open() },
-          ) {
-            App(environment.controller)
-          }
+        withEnvironment({ DeviceEnvironment(DeviceSetup(), theme, size.density.toMode()) }) {
+          captureApp(name, size, theme, it, open)
         }
       }
-    }
-  }
-
-  private fun withEnvironment(
-    setup: DeviceSetup,
-    theme: SnapshotTheme,
-    density: KetchDensity,
-    block: (DeviceEnvironment) -> Unit,
-  ) {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      DeviceEnvironment(setup, theme, density.toMode())
-    }
-    try {
-      block(environment)
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 
@@ -256,10 +226,7 @@ private fun PageFrame(
             category = it,
             state = state,
             device = if (remote) instances.last() else instances.first(),
-            appSettings = state.appSettings,
-            aiSettings = state.aiSettings,
             systemDeviceName = environment.data.deviceName,
-            onTestAi = {},
           )
         },
       )
@@ -310,8 +277,12 @@ private data class DeviceSetup(
  * observed speed, three network interfaces, extra trackers, pinned folders, and a sharing server
  * that only pretends to listen.
  */
-private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, density: DensityMode) {
-  val data = SampleData.downloads(
+private class DeviceEnvironment(
+  setup: DeviceSetup,
+  theme: SnapshotTheme,
+  density: DensityMode,
+) : SnapshotEnvironment {
+  override val data = SampleData.downloads(
     SampleData.DOWNLOAD_CONFIG.copy(defaultDirectory = setup.folder ?: SampleData.DOWNLOAD_DIR),
   ).let { sample ->
     SampleData(
@@ -336,11 +307,7 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
     factory = InstanceFactory(
       deviceName = data.deviceName,
       embeddedFactory = { api },
-      localServerFactory = {
-        object : LocalServerHandle {
-          override fun stop() {}
-        }
-      },
+      localServerFactory = PretendServer,
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
         RemoteInstance(
@@ -367,7 +334,7 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
   )
 
   /** The controller the pages and the app root show. */
-  val controller = AppController(
+  override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     speedMode = speedMode,
@@ -382,7 +349,7 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
     check(instanceManager.instances.value.first().deviceId == "local")
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     speedScope.cancel()
     instanceManager.close()
@@ -418,36 +385,3 @@ private class DeviceEnvironment(setup: DeviceSetup, theme: SnapshotTheme, densit
   }
 }
 
-/**
- * [SampleKetchApi] with Wi-Fi, Ethernet and a VPN, the first two picked for downloads, or, when
- * it should [fail], no answer about them.
- */
-private class NetworkedApi(
-  private val sample: SampleKetchApi,
-  private val fail: Boolean = false,
-) : KetchApi by sample {
-  private var networks = NetworkInterfaces(
-    supported = true,
-    available = listOf(
-      NetworkInterfaceInfo("en0", "en0", listOf("fe80::1c2a:3bff:fe4d:5e6f", "192.168.1.20")),
-      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
-      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
-    ),
-    config = NetworkInterfaceConfig(listOf("en0", "en7")),
-  )
-
-  override suspend fun networkInterfaces(): NetworkInterfaces {
-    if (fail) throw IllegalStateException("The device didn't answer.")
-    return networks
-  }
-
-  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
-    networks = networks.copy(config = config)
-    return networks
-  }
-}
-
-private fun KetchDensity.toMode(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
-}

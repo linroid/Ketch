@@ -39,13 +39,11 @@ import com.linroid.ketch.app.ui.downloads.columnChooser
 import com.linroid.ketch.app.ui.downloads.emptyCopy
 import com.linroid.ketch.app.ui.downloads.offlineCopy
 import com.linroid.ketch.app.ui.downloads.remoteEmptyCopy
-import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.DownloadsLayout
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.runBlocking
 
 /**
  * The Downloads page (W3-TABLE): the table with its groups, columns and docked inspector, the
@@ -222,17 +220,8 @@ class TableSnapshots {
   @Test
   fun launchpad_desktop_showsTheBrowserTileAndChecklist() {
     for (theme in SnapshotTheme.entries) {
-      val environment = runBlocking(SnapshotHarness.ui) {
-        // Discovery is supported but not set up, as on a fresh desktop install.
-        SampleEnvironment(
-          data = SampleData.empty(),
-          theme = theme,
-          density = DensityMode.Compact,
-          aiProviderFactory = { null },
-        )
-      }
-      try {
-        runBlocking(SnapshotHarness.ui) { environment.start() }
+      // Discovery is supported but not set up, as on a fresh desktop install.
+      withSample(theme, data = SampleData.empty(), aiProviderFactory = { null }) { env ->
         snapshot("launchpad-desktop", SnapshotSize.SmallDesktop, theme) {
           CompositionLocalProvider(
             LocalDesktopHooks provides DesktopSupport,
@@ -252,12 +241,10 @@ class TableSnapshots {
                   border = KetchTheme.colors.hairline,
                 )
             ) {
-              Launchpad(environment.controller.state, phone = false)
+              Launchpad(env.controller.state, phone = false)
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }

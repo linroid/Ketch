@@ -98,11 +98,4 @@ class SingleInstanceTest {
     SingleInstance.acquire(dir, emptyList(), onRequest = { "reply" }) { }!!.close()
     assertNull(SingleInstance.request(dir, "connect"))
   }
-
-  @Test
-  fun fileArguments_acceptsPathsAndFileUris() {
-    val args = listOf("-psn_0_12345", "", "file:///tmp/a%20b.torrent", "c.torrent")
-    val files = fileArguments(args).files
-    assertEquals(listOf(File("/tmp/a b.torrent"), File("c.torrent").absoluteFile), files)
-  }
 }

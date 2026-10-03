@@ -2,6 +2,7 @@ package com.linroid.ketch.app.state
 
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.formatBytes
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -457,9 +458,4 @@ private fun <T : Comparable<T>> nullsLast(x: T?, y: T?, descending: Boolean): In
   y == null -> -1
   descending -> y.compareTo(x)
   else -> x.compareTo(y)
-}
-
-private fun clockTime(instant: Instant, timeZone: TimeZone): String {
-  val time = instant.toLocalDateTime(timeZone)
-  return "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
 }

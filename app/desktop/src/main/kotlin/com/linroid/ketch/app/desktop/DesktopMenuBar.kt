@@ -43,6 +43,7 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
+import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
@@ -62,9 +63,6 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.io.FilenameFilter
-
-private val isMac = System.getProperty("os.name").startsWith("Mac")
-private val isWindows = System.getProperty("os.name").startsWith("Windows")
 
 /**
  * What the tray and the menu bar ask of the host, which owns the main window and the app's
@@ -102,7 +100,7 @@ fun FrameWindowScope.KetchMenuBar(
   actions: DesktopActions,
   speedMode: SpeedModeController? = null,
 ) {
-  if (!isMac) return
+  if (DesktopOs.current != DesktopOs.MAC) return
   val state = controller.state
   val files = rememberFileActions()
   val clipboard = rememberSystemClipboard()
@@ -112,35 +110,50 @@ fun FrameWindowScope.KetchMenuBar(
     }
   }
   val instances by state.instances.collectAsState()
-  val active by state.activeInstance.collectAsState()
-  val shown by controller.instanceManager.deviceScope.collectAsState()
-  val ops by state.pendingOps.ops.collectAsState()
-  val mode = speedMode?.mode?.collectAsState()?.value
   val selectedKeys = state.selectedKeys
   val selection by remember(selectedKeys, instances) {
     selectionFlow(selectedKeys, instances)
   }.collectAsState(emptyList())
-  val platform = KeyboardPlatform.current
-  val menus = menuBar(
-    MenuBarContext(
-      counts = status.pulse.counts,
-      failures = status.pulse.failures,
-      filter = state.statusFilter,
-      devices = instances.map { it.displayName },
-      activeDevice = instances.indexOf(active).takeIf { it >= 0 },
-      selection = selection,
-      undoLabel = ops.lastOrNull()?.label,
-      slowLane = mode?.isSlowLane,
-      allDevices = shown == DeviceScope.All,
-      revealLabel = files?.revealLabel,
-      platform = platform,
-    ),
-  )
+  val context = menuBarContext(controller, status, speedMode, files, instances, selection)
+  val menus = menuBar(context)
   MenuBar {
     for (menu in menus) {
-      Menu(menu.title) { MenuEntries(menu.entries, platform, commands::perform) }
+      Menu(menu.title) { MenuEntries(menu.entries, context.platform, commands::perform) }
     }
   }
+}
+
+/**
+ * What the macOS menu bar reflects of [controller] now, with [instances], the devices, and the
+ * [selection].
+ */
+@Composable
+internal fun menuBarContext(
+  controller: AppController,
+  status: DesktopStatus,
+  speedMode: SpeedModeController?,
+  files: FileActions?,
+  instances: List<InstanceEntry>,
+  selection: List<SelectedTask> = emptyList(),
+): MenuBarContext {
+  val state = controller.state
+  val active by state.activeInstance.collectAsState()
+  val shown by state.deviceScope.collectAsState()
+  val ops by state.pendingOps.ops.collectAsState()
+  val mode = speedMode?.mode?.collectAsState()?.value
+  return MenuBarContext(
+    counts = status.pulse.counts,
+    failures = status.pulse.failures,
+    filter = state.statusFilter,
+    devices = instances.map { it.displayName },
+    activeDevice = instances.indexOf(active).takeIf { it >= 0 },
+    selection = selection,
+    undoLabel = ops.lastOrNull()?.label,
+    slowLane = mode?.isSlowLane,
+    allDevices = shown == DeviceScope.All,
+    revealLabel = files?.revealLabel,
+    platform = KeyboardPlatform.Mac,
+  )
 }
 
 /** One entry of a menu in the menu bar or the tray. */
@@ -372,7 +385,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
     MenuBarMenu(
       "Device",
       buildList {
-        val devices = context.devices.take(MAX_DEVICE_ITEMS)
+        val devices = context.devices.take(KetchCommands.NUMBERED_DEVICES)
         add(
           item(
             KetchCommands.AllDevices,
@@ -452,7 +465,6 @@ private val SHELL_COMMANDS = setOf(
   KetchCommands.Activity,
 )
 private val TEXT_REDO_KEY = Key.Z
-private const val MAX_DEVICE_ITEMS = 9
 
 /** Renders [entries] in a tray or menu bar menu; clicks call [onAction]. */
 @Composable
@@ -572,13 +584,13 @@ internal class DesktopCommands(
 
   /** Runs [command]; a command the desktop does not bind does nothing. */
   fun run(command: KetchCommand) {
-    val filter = StatusFilter.entries.firstOrNull { KetchCommands.tab(it) == command }
+    val filter = KetchCommands.tabFilter(command)
     if (filter != null) {
       actions.showWindow()
       state.showDownloads(filter)
       return
     }
-    val device = (1..MAX_DEVICE_ITEMS).firstOrNull { KetchCommands.device(it) == command }
+    val device = KetchCommands.deviceNumber(command)
     if (device != null) {
       state.instances.value.getOrNull(device - 1)?.let {
         actions.showWindow()
@@ -798,7 +810,7 @@ internal class DesktopCommands(
       isMultipleMode = true
       filenameFilter = FilenameFilter { _, name -> name.endsWith(".torrent", ignoreCase = true) }
       // Windows ignores the filter but matches the name pattern.
-      if (isWindows) file = "*.torrent"
+      if (DesktopOs.current == DesktopOs.WINDOWS) file = "*.torrent"
     }
     val picked = try {
       dialog.isVisible = true
@@ -895,11 +907,4 @@ internal class DesktopCommands(
   }
 
   private fun nameOf(task: DownloadTask): String = displayName(task.request, task.state.value)
-}
-
-/** Name of [mode] in sentence case, as menus and messages show it. */
-internal fun speedModeName(mode: SpeedLimitMode): String = when (mode) {
-  SpeedLimitMode.Full -> "Full speed"
-  SpeedLimitMode.SlowLane -> "Slow lane"
-  SpeedLimitMode.Auto -> "Auto"
 }

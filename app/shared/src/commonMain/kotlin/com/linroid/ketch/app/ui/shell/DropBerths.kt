@@ -38,6 +38,7 @@ import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.DROP_KINDS
 import com.linroid.ketch.app.ui.DROP_OVERLAY_ALPHA
 import com.linroid.ketch.app.ui.DropHoverState
 import com.linroid.ketch.app.ui.DropOverlay
@@ -209,7 +210,6 @@ internal fun berthColumns(count: Int, width: Dp, minWidth: Dp, gap: Dp): Int {
   return minOf(wanted, MAX_BERTH_COLUMNS, fitting)
 }
 
-private const val DROP_KINDS = "Links, magnets, .torrent files and lists of links"
 private const val MAX_BERTH_COLUMNS = 4
 private const val DISABLED_ALPHA = 0.5f
 private const val NON_BREAKING_HYPHEN = '\u2011'

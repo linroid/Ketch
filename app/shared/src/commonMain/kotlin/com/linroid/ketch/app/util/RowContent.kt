@@ -11,7 +11,6 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.taskActions
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
@@ -79,8 +78,8 @@ data class RowContent(
   val statusText: String,
   val detail: String,
   val size: String,
-  val speed: String,
-  val time: String,
+  val speed: String = "",
+  val time: String = "",
   val added: String,
   val progress: Float? = null,
   val limited: Boolean = false,
@@ -152,8 +151,6 @@ fun rowContent(
         statusText = "Paused",
         detail = listOfNotNull("Paused", percent).joinToString(SEPARATOR),
         size = runningSize(state),
-        speed = "",
-        time = "",
         added = added,
         progress = fraction(progress),
       )
@@ -164,8 +161,6 @@ fun rowContent(
       detail = (context.config?.let { QueueReason.of(request, it, context.running) }
         ?: QueueReason.Next).text,
       size = knownSize(request),
-      speed = "",
-      time = "",
       added = added,
     )
     is DownloadState.Scheduled -> RowContent(
@@ -173,8 +168,6 @@ fun rowContent(
       statusText = "Scheduled",
       detail = scheduleText(state.schedule, context.now, context.timeZone),
       size = knownSize(request),
-      speed = "",
-      time = "",
       added = added,
     )
     is DownloadState.Completed -> completedContent(state, host, context.device, missing, added)
@@ -185,8 +178,6 @@ fun rowContent(
         statusText = "Failed",
         detail = listOfNotNull(copy.title, copy.shortHint).joinToString(SEPARATOR),
         size = knownSize(request),
-        speed = "",
-        time = "",
         added = added,
         error = copy,
       )
@@ -196,8 +187,6 @@ fun rowContent(
       statusText = "Canceled",
       detail = listOfNotNull("Canceled", host).joinToString(SEPARATOR),
       size = "",
-      speed = "",
-      time = "",
       added = added,
     )
   }
@@ -212,7 +201,7 @@ fun formatAdded(createdAt: Instant, now: Instant, timeZone: TimeZone): String {
   val added = createdAt.toLocalDateTime(timeZone)
   val today = now.toLocalDateTime(timeZone).date
   return when (added.date) {
-    today -> "Today ${clockTime(added)}"
+    today -> "Today ${added.clockText()}"
     today.minus(1, DateTimeUnit.DAY) -> "Yesterday"
     else -> shortDate(added.date, today)
   }
@@ -240,7 +229,6 @@ private fun completedContent(
     statusText = if (missing) "File missing" else "Done",
     detail = detail,
     size = size ?: UNKNOWN,
-    speed = "",
     time = state.downloadTime?.let { "took ${formatDuration(it)}" }.orEmpty(),
     added = added,
   )
@@ -257,14 +245,11 @@ private fun downloadingDetail(
     listOfNotNull(segments.size.takeIf { it > 1 }?.let { "$it files" })
   } else {
     val connections = segments.count { !it.isComplete }
-    listOfNotNull(connections.takeIf { it > 0 }?.let(::connectionsText))
+    listOfNotNull(connections.takeIf { it > 0 }?.let { plural(it, "connection") })
   }
   val detail = parts + listOfNotNull(host, "limited by Slow lane".takeIf { slowLane })
   return detail.joinToString(SEPARATOR).ifEmpty { "Downloading" }
 }
-
-private fun connectionsText(count: Int): String =
-  if (count == 1) "1 connection" else "$count connections"
 
 private fun runningSize(state: DownloadState): String {
   val progress = when (state) {
@@ -285,7 +270,7 @@ private fun runningSize(state: DownloadState): String {
  * " of " it reads as list rows show it: "2.41 of 5.69 GB".
  */
 fun formatSizeOf(downloaded: Long, total: Long, separator: String = "/"): String {
-  val unit = SIZE_UNITS.lastOrNull { total >= it.second } ?: SIZE_UNITS.first()
+  val unit = SizeUnits.lastOrNull { total >= it.second } ?: SizeUnits.first()
   fun number(bytes: Long): String {
     val value = bytes.coerceAtLeast(0).toDouble() / unit.second
     if (unit.second == 1L) return bytes.coerceAtLeast(0).toString()
@@ -299,7 +284,8 @@ fun formatSizeOf(downloaded: Long, total: Long, separator: String = "/"): String
   return "${number(downloaded.coerceAtMost(total))}$separator${number(total)} ${unit.first}"
 }
 
-private val SIZE_UNITS = listOf(
+/** Byte units from B to TB, each with its size in bytes. */
+internal val SizeUnits = listOf(
   "B" to 1L,
   "KB" to (1L shl 10),
   "MB" to (1L shl 20),
@@ -340,7 +326,7 @@ private fun scheduleText(schedule: DownloadSchedule, now: Instant, timeZone: Tim
         today.plus(1, DateTimeUnit.DAY) -> "tomorrow"
         else -> shortDate(start.date, today)
       }
-      val startsAt = "Starts $day at ${clockTime(start)}"
+      val startsAt = "Starts $day at ${start.clockText()}"
       val remaining = schedule.startAt - now
       if (remaining > Duration.ZERO) "$startsAt · in ${formatSpan(remaining)}" else startsAt
     }
@@ -367,16 +353,10 @@ private fun formatSpan(duration: Duration): String {
   }
 }
 
-private fun clockTime(time: LocalDateTime): String =
-  "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
-
 private fun shortDate(date: LocalDate, today: LocalDate): String {
-  val day = "${MONTHS[date.month.ordinal]} ${date.day}"
+  val day = "${date.month.shortName} ${date.day}"
   return if (date.year == today.year) day else "$day, ${date.year}"
 }
 
 private const val SEPARATOR = " · "
 private const val UNKNOWN = "–"
-private val MONTHS = listOf(
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-)

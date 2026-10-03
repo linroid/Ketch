@@ -60,7 +60,7 @@ internal fun ShellScaffold(
   Row(
     modifier
       .fillMaxSize()
-      .canvasWash(colors, EmberRadius)
+      .canvasWash(colors)
       .windowInsetsPadding(WindowInsets.safeDrawing),
   ) {
     navigation()
@@ -147,7 +147,7 @@ internal fun PhoneScaffold(
  * Draws the window's canvas: the 160° wash over the canvas color, and the warm ember glow of
  * [emberRadius] from the bottom-left corner, where the sidebar ends.
  */
-internal fun Modifier.canvasWash(colors: KetchColors, emberRadius: Dp): Modifier =
+internal fun Modifier.canvasWash(colors: KetchColors, emberRadius: Dp = EmberRadius): Modifier =
   drawWithCache {
     val wash = colors.wash
     val angle = WASH_ANGLE_DEGREES * PI / 180

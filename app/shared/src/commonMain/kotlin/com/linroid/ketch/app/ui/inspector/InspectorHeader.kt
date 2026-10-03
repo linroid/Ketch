@@ -67,13 +67,13 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.command
 import com.linroid.ketch.app.ui.downloads.actions.icon
-import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.downloads.actions.rememberSendMode
 import com.linroid.ketch.app.ui.downloads.actions.sendEntries
 import com.linroid.ketch.app.ui.downloads.actions.sendTargets
 import com.linroid.ketch.app.ui.inspector.tabs.formatSize
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
+import com.linroid.ketch.app.ui.list.outputFile
 import kotlinx.coroutines.delay
 import kotlinx.datetime.TimeZone
 import kotlin.time.Duration.Companion.seconds

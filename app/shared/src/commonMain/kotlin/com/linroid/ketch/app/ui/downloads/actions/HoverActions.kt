@@ -13,9 +13,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.linroid.ketch.app.components.KetchIconButton
@@ -26,6 +23,7 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.list.RowCommands
+import com.linroid.ketch.app.ui.list.outputFile
 
 /**
  * The buttons that fade in at the end of a row while the pointer is over it: Open and Show for a
@@ -38,29 +36,24 @@ import com.linroid.ketch.app.ui.list.RowCommands
  *
  * @param visible whether the pointer is over the row, or the row holds the keyboard focus.
  * @param menu the list's [RowMenuState], so "⋯" closes any other menu and the list holds still
- *   while it is open; `null` keeps the menu to these buttons.
+ *   while it is open.
  */
 @Composable
 internal fun HoverActions(
   row: TaskRow,
   visible: Boolean,
   runner: RowActionRunner,
+  menu: RowMenuState,
   modifier: Modifier = Modifier,
-  menu: RowMenuState? = null,
 ) {
   val motion = KetchTheme.motion
-  var ownMenuOpen by remember { mutableStateOf(false) }
-  val request = menu?.request?.takeIf { it.anchor == row.key && it.position == null }
-  if (menu != null && request != null) {
+  val request = menu.request?.takeIf { it.anchor == row.key && it.position == null }
+  if (request != null) {
     DisposableEffect(menu, request) { onDispose { menu.closeIfCurrent(request) } }
   }
-  val menuOpen = if (menu != null) request != null else ownMenuOpen
+  val menuOpen = request != null
   val setMenuOpen: (Boolean) -> Unit = { open ->
-    when {
-      menu == null -> ownMenuOpen = open
-      open -> menu.open(row.key, listOf(row))
-      else -> request?.let(menu::closeIfCurrent)
-    }
+    if (open) menu.open(row.key, listOf(row)) else request?.let(menu::closeIfCurrent)
   }
   LaunchedEffect(visible, row.key, row.outputFile) { if (visible) runner.checkFile(row) }
   AnimatedVisibility(
@@ -112,12 +105,9 @@ private fun HoverButtons(
           onClick = { setMenuOpen(true) },
           selected = menuOpen,
         )
-        RowMenu(
-          expanded = menuOpen,
-          onDismissRequest = { setMenuOpen(false) },
-          rows = listOf(row),
-          runner = runner,
-        )
+        if (menuOpen) {
+          RowMenu(onDismissRequest = { setMenuOpen(false) }, rows = listOf(row), runner = runner)
+        }
       }
     }
   }

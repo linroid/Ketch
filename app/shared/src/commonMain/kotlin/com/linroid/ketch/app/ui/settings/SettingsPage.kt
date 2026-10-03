@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -28,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -59,11 +59,13 @@ import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchHueTile
 import com.linroid.ketch.app.components.KetchHueTileDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
@@ -75,12 +77,9 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.instance.detail
 import com.linroid.ketch.app.instance.displayName
-import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.IntegrationStatus
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
-import com.linroid.ketch.app.state.AiSettingsController
-import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.SettingsCategory
@@ -95,7 +94,6 @@ import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.util.pairingAddresses
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.ClipboardMode
@@ -113,37 +111,22 @@ import com.linroid.ketch.config.ThemeMode
  * @param state the app, whose device pages edit [device].
  * @param device device whose download, speed, network, torrent and sharing settings are shown;
  *   `null` while none is connected.
- * @param appSettings this app's own config sections.
- * @param aiSettings AI discovery settings and provider.
  * @param systemDeviceName name this device goes by when none is set, or `null` when the app has
  *   no device of its own (the web app).
- * @param onTestAi calls the AI provider with the saved settings.
- * @param fileLogger the app's log files, offered under About; `null` when the app keeps none.
  */
 @Composable
 fun SettingsCategoryContent(
   category: SettingsCategory,
   state: AppState,
   device: InstanceEntry?,
-  appSettings: AppSettingsController,
-  aiSettings: AiSettingsController,
   systemDeviceName: String?,
-  onTestAi: () -> Unit,
-  fileLogger: FileLogger? = null,
 ) {
   when (category) {
-    SettingsCategory.General -> GeneralSettings(state, appSettings, systemDeviceName)
+    SettingsCategory.General -> GeneralSettings(state, systemDeviceName)
     SettingsCategory.Notifications -> NotificationSettingsPage(state)
     SettingsCategory.Integration -> IntegrationSettingsPage(state)
-    SettingsCategory.Discover -> AiDiscoverySettings(
-      settings = aiSettings.settings,
-      supported = aiSettings.supported,
-      resolveCredentials = aiSettings::withPlatformCredentials,
-      connectionTest = aiSettings.connectionTest,
-      onChange = { aiSettings.save(it) },
-      onTest = onTestAi,
-    )
-    SettingsCategory.About -> AboutSettings(state, fileLogger)
+    SettingsCategory.Discover -> AiDiscoverySettings(state)
+    SettingsCategory.About -> AboutSettings(state)
     SettingsCategory.Downloads -> device?.let { DownloadSettings(state, it) } ?: NoDeviceNotice()
     SettingsCategory.Speed -> device?.let { SpeedSettingsPage(state, it) } ?: NoDeviceNotice()
     SettingsCategory.Network -> device?.let { NetworkSettings(state, it) } ?: NoDeviceNotice()
@@ -235,14 +218,11 @@ internal fun SettingsCategoryPage(
       }
     }
     val margin = with(LocalDensity.current) { spacing.s4.toPx() }
-    SettingsJumpEffect(
-      jump = settingsJump,
-      request = jump,
-      scroll = scroll,
-      content = { scrolled.value },
-      margin = margin,
-      animate = !KetchTheme.reduceMotion,
-    )
+    val animate = !KetchTheme.reduceMotion
+    // Runs the request once the page is laid out; see SettingsJump.jump.
+    LaunchedEffect(settingsJump, jump) {
+      if (jump != null) settingsJump.jump(jump.anchors, scroll, { scrolled.value }, margin, animate)
+    }
   }
 }
 
@@ -327,12 +307,7 @@ private fun SectionHeader(
       .heightIn(min = KetchTheme.density.chip + spacing.s1)
       .padding(start = spacing.s3, end = spacing.s2, bottom = spacing.s1),
   ) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textSecondary,
-      maxLines = 1,
-    )
+    KetchEyebrow(title, color = KetchTheme.colors.textSecondary, maxLines = 1)
     if (trailing != null) {
       Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { trailing() }
     }
@@ -475,13 +450,7 @@ internal fun SettingsList(
                 size = KetchHueTileDefaults.Small,
               )
             },
-            trailing = {
-              KetchIconImage(
-                icon = KetchIcon.Chevron,
-                size = KetchTheme.density.controlGlyph,
-                tint = colors.textTertiary,
-              )
-            },
+            trailing = { Chevron() },
           )
         }
       }
@@ -577,13 +546,7 @@ private fun SearchResult(
     modifier = outer
       .focusRing(focus.visible, shape, colors.focusRing)
       .background(fill, if (filled) RectangleShape else shape)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(
         horizontal = if (filled) spacing.s4 else spacing.s1,
         vertical = if (filled) spacing.s3 else spacing.s1,
@@ -657,10 +620,9 @@ internal fun SettingsDeviceChip(
         .background(colors.surface)
         .background(overlay)
         .border(HairlineWidth, colors.borderStrong, shape)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           enabled = choosable,
           role = Role.DropdownList,
           onClickLabel = "Choose device",
@@ -936,11 +898,7 @@ internal val ThemeMode.label: String
   }
 
 /** Home folders of macOS and Linux, which summaries shorten to "~". */
-private object HomeFolder {
-  private val pattern = Regex("^/(Users|home)/[^/]+")
-
-  fun find(path: String): MatchResult? = pattern.find(path)
-}
+private val HomeFolder = Regex("^/(Users|home)/[^/]+")
 
 /** Widest the main pane of Settings lets its rows grow. */
 private val PageMaxWidth = 640.dp

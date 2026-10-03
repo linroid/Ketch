@@ -35,10 +35,9 @@ import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
@@ -50,6 +49,8 @@ import com.linroid.ketch.app.state.toDeviceHealth
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.intake.targetSummary
+import com.linroid.ketch.app.util.downloads
+import com.linroid.ketch.app.util.plural
 import com.linroid.ketch.app.util.priorityLabel
 import kotlin.math.roundToInt
 import kotlin.time.Clock
@@ -118,7 +119,6 @@ internal fun RowMenuAnchor(menu: RowMenuState, key: TaskKey, runner: RowActionRu
   Box(Modifier.absoluteOffset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }) {
     // Cancels the menu's gap below its anchor, so its corner sits at the pointer.
     RowMenu(
-      expanded = true,
       onDismissRequest = menu::close,
       rows = request.rows,
       runner = runner,
@@ -136,26 +136,18 @@ internal fun RowMenuAnchor(menu: RowMenuState, key: TaskKey, runner: RowActionRu
  */
 @Composable
 internal fun RowMenu(
-  expanded: Boolean,
   onDismissRequest: () -> Unit,
   rows: List<TaskRow>,
   runner: RowActionRunner,
   modifier: Modifier = Modifier,
   offset: DpOffset = DpOffset.Zero,
 ) {
-  if (!expanded || rows.isEmpty()) return
+  if (rows.isEmpty()) return
   val single = rows.singleOrNull()
   LaunchedEffect(single?.key) { single?.let(runner::checkFile) }
   val instances by runner.state.instances.collectAsState()
   val presence by runner.state.instanceManager.presence.collectAsState()
-  val context = RowMenuContext(
-    revealLabel = runner.files?.revealLabel,
-    devices = sendTargets(instances, rows, presence),
-    now = LocalClock.current.now(),
-    zone = TimeZone.currentSystemDefault(),
-    urgentVictim = urgentVictim(rows, runner),
-    send = rememberSendMode(),
-  )
+  val context = rowMenuContext(rows, runner, sendTargets(instances, rows, presence))
   val title = single?.name ?: downloads(rows.size)
   KetchMenu(
     expanded = true,
@@ -193,6 +185,21 @@ internal data class RowMenuContext(
   val zone: TimeZone = TimeZone.currentSystemDefault(),
   val urgentVictim: String? = null,
   val send: SendMode = SendMode(),
+)
+
+/** The [RowMenuContext] of a menu of [rows] open now, which can send them to [devices]. */
+@Composable
+internal fun rowMenuContext(
+  rows: List<TaskRow>,
+  runner: RowActionRunner,
+  devices: List<SendTarget>,
+): RowMenuContext = RowMenuContext(
+  revealLabel = runner.files?.revealLabel,
+  devices = devices,
+  now = LocalClock.current.now(),
+  zone = TimeZone.currentSystemDefault(),
+  urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
+  send = rememberSendMode(),
 )
 
 /**
@@ -448,7 +455,7 @@ internal fun sendTargets(
       is RemoteInstance -> entry.connectionState.value.toDeviceHealth()
       else -> DeviceHealth.Local()
     }
-    val name = if (entry is EmbeddedInstance) localDeviceNoun() else entry.label
+    val name = entry.displayName
     val summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId })
     SendTarget(entry, DeviceOption(entry.deviceId, name, health, summary = summary))
   }
@@ -486,13 +493,11 @@ internal fun batchLabel(action: RowAction, count: Int, revealLabel: String?): St
     RowAction.Resume -> "Resume $what"
     RowAction.StartNow -> "Start $what now"
     RowAction.Retry -> "Retry $what"
-    RowAction.Open -> if (count == 1) "Open 1 file" else "Open $count files"
+    RowAction.Open -> "Open ${plural(count, "file")}"
     RowAction.ShowInFolder -> "${revealLabel ?: action.label} ($count)"
-    RowAction.CopyLink -> if (count == 1) "Copy 1 link" else "Copy $count links"
-    RowAction.CopyPath -> if (count == 1) "Copy 1 file path" else "Copy $count file paths"
-    RowAction.DownloadAgain -> {
-      if (count == 1) "Download 1 file again" else "Download $count files again"
-    }
+    RowAction.CopyLink -> "Copy ${plural(count, "link")}"
+    RowAction.CopyPath -> "Copy ${plural(count, "file path")}"
+    RowAction.DownloadAgain -> "Download ${plural(count, "file")} again"
     RowAction.StopAndDiscard -> "Discard progress of $what…"
     RowAction.Remove -> "Remove $what from list"
     RowAction.RemoveAndTrash, RowAction.RemoveAndDelete -> {

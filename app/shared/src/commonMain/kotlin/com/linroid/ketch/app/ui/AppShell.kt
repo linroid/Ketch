@@ -231,7 +231,7 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
         } else if (layout.navigation == ShellNavigation.Phone) {
           PhoneShell(shell, commands, destinations, windowDrop)
         } else {
-          WideShell(shell, commands, destinations, layout, windowDrop)
+          WideShell(shell, destinations, layout, windowDrop)
         }
       }
     }
@@ -347,7 +347,6 @@ private fun ShellRequests(appState: AppState, shell: ShellState, openSettingsReq
 @Composable
 private fun WideShell(
   shell: ShellState,
-  commands: ShellCommands,
   destinations: List<AppDestination>,
   layout: KetchLayout,
   windowDrop: DropHoverState,
@@ -358,26 +357,9 @@ private fun WideShell(
     layout = layout,
     navigation = {
       if (layout.navigation == ShellNavigation.Sidebar) {
-        Sidebar(
-          state = appState,
-          destinations = destinations,
-          destination = shell.destination,
-          settingsSelected = shell.settingsOpen,
-          onSelect = { shell.show(it) },
-          onOpenSettings = { appState.openSettings() },
-          onToggleSidebar = { shell.toggleSidebar() },
-        )
+        Sidebar(shell, destinations)
       } else {
-        NavRail(
-          state = appState,
-          destinations = destinations,
-          destination = shell.destination,
-          settingsSelected = shell.settingsOpen,
-          showSidebarToggle = layout.tier == LayoutTier.Expanded,
-          onSelect = { shell.show(it) },
-          onOpenSettings = { appState.openSettings() },
-          onToggleSidebar = { shell.toggleSidebar() },
-        )
+        NavRail(shell, destinations, showSidebarToggle = layout.tier == LayoutTier.Expanded)
       }
     },
     top = { BannerHost(appState) },
@@ -473,13 +455,7 @@ private fun PhoneShell(
   PhoneScaffold(
     chrome = shell.chrome,
     topBar = {
-      PhoneTopBar(
-        shell = shell,
-        title = shell.destination.label,
-        showsBottomBar = showsBottomBar,
-        onShow = { shell.show(it) },
-        onOpenSettings = { appState.openSettings() },
-      )
+      PhoneTopBar(shell, showsBottomBar)
     },
     banners = { BannerHost(appState) },
     bottomBar = if (showsBottomBar) {

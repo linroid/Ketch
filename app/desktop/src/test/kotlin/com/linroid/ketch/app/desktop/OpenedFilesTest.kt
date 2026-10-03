@@ -22,15 +22,20 @@ class OpenedFilesTest {
 
   @Test
   fun fileArguments_pathsAndFileUris_routesThemToAbsoluteFiles() {
-    val opened = fileArguments(listOf("a.torrent", "file:///tmp/b.torrent"))
+    val uris = listOf("file:///tmp/b.torrent", "file:///tmp/a%20b.torrent")
+    val opened = fileArguments(listOf("a.torrent") + uris)
 
-    assertEquals(listOf(File("a.torrent").absoluteFile, File("/tmp/b.torrent")), opened.files)
+    assertEquals(
+      listOf(File("a.torrent").absoluteFile, File("/tmp/b.torrent"), File("/tmp/a b.torrent")),
+      opened.files,
+    )
     assertEquals(emptyList(), opened.links)
   }
 
   @Test
   fun fileArguments_flagsBlanksAndOtherSchemes_leavesThemOut() {
-    val opened = fileArguments(listOf(BACKGROUND_FLAG, "", "ketch://open", "mailto:x@y"))
+    val args = listOf(BACKGROUND_FLAG, "-psn_0_12345", "", "ketch://open", "mailto:x@y")
+    val opened = fileArguments(args)
 
     assertEquals(OpenedArguments(), opened)
   }

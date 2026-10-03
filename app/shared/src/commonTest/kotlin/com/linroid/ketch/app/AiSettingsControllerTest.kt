@@ -1,14 +1,10 @@
 package com.linroid.ketch.app
 
 import com.linroid.ketch.app.state.AiConnectionTest
-import com.linroid.ketch.app.state.AiDiscoverRequest
-import com.linroid.ketch.app.state.AiDiscoverResponse
 import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AiSettingsController
-import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.config.AiSettings
-import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
@@ -19,39 +15,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-
-private class FakeConfigStore(
-  private var config: KetchConfig = KetchConfig(),
-) : ConfigStore {
-  var saves = 0
-    private set
-
-  override fun load(): KetchConfig = config
-
-  override fun save(config: KetchConfig) {
-    this.config = config
-    saves++
-  }
-}
-
-private class FakeAiProvider(
-  private val reply: String = "OK",
-  private val failure: Throwable? = null,
-) : AiDiscoveryProvider {
-  var closed = false
-    private set
-
-  override suspend fun discover(
-    request: AiDiscoverRequest,
-    onStep: (DiscoveryStep) -> Unit,
-  ): AiDiscoverResponse = AiDiscoverResponse(request.query, emptyList())
-
-  override suspend fun verify(): String = failure?.let { throw it } ?: reply
-
-  override fun close() {
-    closed = true
-  }
-}
 
 /**
  * Builds a provider only for settings it considers usable, after
@@ -89,7 +52,7 @@ class AiSettingsControllerTest {
   fun initialSettingsComeFromTheStore() {
     val stored = usableSettings()
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(KetchConfig(ai = stored)),
+      configStore = RecordingConfigStore(KetchConfig(ai = stored)),
       factory = FakeFactory(),
     )
     assertEquals(stored, controller.settings)
@@ -99,7 +62,7 @@ class AiSettingsControllerTest {
   @Test
   fun withoutAFactoryDiscoveryIsUnsupported() {
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(KetchConfig(ai = usableSettings())),
+      configStore = RecordingConfigStore(KetchConfig(ai = usableSettings())),
     )
     assertFalse(controller.supported)
     assertNull(controller.provider)
@@ -108,7 +71,7 @@ class AiSettingsControllerTest {
   @Test
   fun incompleteSettingsLeaveNoProvider() {
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(),
+      configStore = RecordingConfigStore(),
       factory = FakeFactory(),
     )
     assertTrue(controller.supported)
@@ -118,7 +81,7 @@ class AiSettingsControllerTest {
 
   @Test
   fun savingCredentialsRebuildsTheProviderAndPersistsThem() {
-    val store = FakeConfigStore()
+    val store = RecordingConfigStore()
     val controller = AiSettingsController(store, FakeFactory())
     controller.save(usableSettings())
     assertEquals(1, store.saves)
@@ -128,7 +91,7 @@ class AiSettingsControllerTest {
 
   @Test
   fun savingKeepsUnrelatedConfigSections() {
-    val store = FakeConfigStore(KetchConfig(name = "laptop"))
+    val store = RecordingConfigStore(KetchConfig(name = "laptop"))
     val controller = AiSettingsController(store, FakeFactory())
     controller.save(usableSettings())
     assertEquals("laptop", store.load().name)
@@ -136,7 +99,7 @@ class AiSettingsControllerTest {
 
   @Test
   fun rebuildingReleasesTheReplacedProvider() {
-    val store = FakeConfigStore(KetchConfig(ai = usableSettings()))
+    val store = RecordingConfigStore(KetchConfig(ai = usableSettings()))
     val controller = AiSettingsController(store, FakeFactory())
     val first = controller.provider as FakeAiProvider
     controller.save(usableSettings(apiKey = "sk-other"))
@@ -147,7 +110,7 @@ class AiSettingsControllerTest {
   @Test
   fun platformCredentialsComeFromTheFactory() {
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(),
+      configStore = RecordingConfigStore(),
       factory = FakeFactory(platform = envToken),
     )
     val resolved = controller.withPlatformCredentials(AiSettings())
@@ -156,7 +119,7 @@ class AiSettingsControllerTest {
 
   @Test
   fun withoutAFactorySettingsPassThroughUnchanged() {
-    val controller = AiSettingsController(FakeConfigStore())
+    val controller = AiSettingsController(RecordingConfigStore())
     val settings = AiSettings(enabled = true)
     assertEquals(settings, controller.withPlatformCredentials(settings))
   }
@@ -164,7 +127,7 @@ class AiSettingsControllerTest {
   @Test
   fun anEnvironmentTokenMakesSwitchedOnDiscoveryAvailable() {
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(KetchConfig(ai = AiSettings(enabled = true))),
+      configStore = RecordingConfigStore(KetchConfig(ai = AiSettings(enabled = true))),
       factory = FakeFactory(platform = envToken),
     )
     assertTrue(controller.available)
@@ -175,7 +138,7 @@ class AiSettingsControllerTest {
     // Review case: a blank saved token with the key exported used to
     // leave Test connection unusable.
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(),
+      configStore = RecordingConfigStore(),
       factory = FakeFactory(platform = envToken),
     )
     controller.testConnection(AiSettings(enabled = true))
@@ -186,7 +149,7 @@ class AiSettingsControllerTest {
   fun closeReleasesTheProvider() {
     // Review case: a discarded controller must not leak its engine.
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(KetchConfig(ai = usableSettings())),
+      configStore = RecordingConfigStore(KetchConfig(ai = usableSettings())),
       factory = FakeFactory(),
     )
     val running = controller.provider as FakeAiProvider
@@ -202,7 +165,7 @@ class AiSettingsControllerTest {
     // (and the Discover tab) on while the Enable switch showed off.
     val factory = FakeFactory(usable = { true })
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(KetchConfig(ai = AiSettings(enabled = false))),
+      configStore = RecordingConfigStore(KetchConfig(ai = AiSettings(enabled = false))),
       factory = factory,
     )
     assertNull(controller.provider)
@@ -212,7 +175,7 @@ class AiSettingsControllerTest {
 
   @Test
   fun switchingDiscoveryOffReleasesTheProvider() {
-    val store = FakeConfigStore(KetchConfig(ai = usableSettings()))
+    val store = RecordingConfigStore(KetchConfig(ai = usableSettings()))
     val controller = AiSettingsController(store, FakeFactory())
     val running = controller.provider as FakeAiProvider
     controller.save(usableSettings().copy(enabled = false))
@@ -223,7 +186,7 @@ class AiSettingsControllerTest {
   @Test
   fun testConnectionWorksWhileDiscoveryIsSwitchedOff() = runTest {
     val factory = FakeFactory(usable = { it.llm.isComplete })
-    val controller = AiSettingsController(FakeConfigStore(), factory)
+    val controller = AiSettingsController(RecordingConfigStore(), factory)
     controller.testConnection(usableSettings().copy(enabled = false))
     assertEquals(AiConnectionTest.Success("OK"), controller.connectionTest)
     // The check must not switch discovery on behind the user's back.
@@ -234,7 +197,7 @@ class AiSettingsControllerTest {
   @Test
   fun testConnectionReportsTheModelReply() = runTest {
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(),
+      configStore = RecordingConfigStore(),
       factory = FakeFactory(provider = { FakeAiProvider(reply = "OK") }),
     )
     controller.testConnection(usableSettings())
@@ -244,10 +207,10 @@ class AiSettingsControllerTest {
   @Test
   fun testConnectionReportsProviderFailures() = runTest {
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(),
+      configStore = RecordingConfigStore(),
       factory = FakeFactory(
         provider = {
-          FakeAiProvider(failure = IllegalStateException("401 no key"))
+          FakeAiProvider(verifyFailure = IllegalStateException("401 no key"))
         },
       ),
     )
@@ -260,7 +223,7 @@ class AiSettingsControllerTest {
   @Test
   fun testConnectionWithoutAProviderAsksForTheMissingFields() = runTest {
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(),
+      configStore = RecordingConfigStore(),
       factory = FakeFactory(),
     )
     controller.testConnection(AiSettings(enabled = true))
@@ -272,7 +235,7 @@ class AiSettingsControllerTest {
   @Test
   fun savingClearsAStaleTestResult() = runTest {
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(),
+      configStore = RecordingConfigStore(),
       factory = FakeFactory(),
     )
     controller.testConnection(usableSettings())
@@ -283,7 +246,7 @@ class AiSettingsControllerTest {
 
   @Test
   fun chooseProvider_newProvider_switchesDiscoveryOnWithItsDefaults() {
-    val store = FakeConfigStore(
+    val store = RecordingConfigStore(
       KetchConfig(
         ai = AiSettings(
           llm = LlmSettings(
@@ -308,7 +271,7 @@ class AiSettingsControllerTest {
   fun chooseProvider_sameProvider_keepsModelAndEndpoint() {
     val llm = LlmSettings(provider = LlmProvider.OpenAi, model = "gpt-custom")
     val controller = AiSettingsController(
-      configStore = FakeConfigStore(KetchConfig(ai = AiSettings(llm = llm))),
+      configStore = RecordingConfigStore(KetchConfig(ai = AiSettings(llm = llm))),
       factory = FakeFactory(),
     )
 
@@ -319,7 +282,7 @@ class AiSettingsControllerTest {
 
   @Test
   fun chooseProvider_providerWithoutAKey_makesDiscoveryAvailable() {
-    val controller = AiSettingsController(FakeConfigStore(), FakeFactory())
+    val controller = AiSettingsController(RecordingConfigStore(), FakeFactory())
     assertFalse(controller.available)
 
     controller.chooseProvider(LlmProvider.Ollama)

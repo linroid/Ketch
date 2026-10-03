@@ -1,21 +1,16 @@
 package com.linroid.ketch.app
 
 import com.linroid.ketch.api.DownloadConfig
-import com.linroid.ketch.api.DownloadRequest
-import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
-import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.InstanceSettingsController
 import com.linroid.ketch.config.TorrentSettings
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -27,9 +22,7 @@ import kotlin.test.assertNull
 private class SettingsKetchApi(
   var config: DownloadConfig = DownloadConfig(),
   var networks: NetworkInterfaces = NetworkInterfaces(),
-) : KetchApi {
-  override val backendLabel = "Settings"
-  override val tasks = MutableStateFlow(emptyList<DownloadTask>())
+) : KetchApi by FakeKetchApi("Settings") {
   val applied = mutableListOf<DownloadConfig>()
   val networkRequests = mutableListOf<List<String>>()
   var gate: CompletableDeferred<Unit>? = null
@@ -38,24 +31,7 @@ private class SettingsKetchApi(
   /** What the instance makes of an accepted config, like a server clamping a value. */
   var accept: (DownloadConfig) -> DownloadConfig = { it }
 
-  override suspend fun download(request: DownloadRequest): DownloadTask =
-    throw UnsupportedOperationException()
-
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    throw UnsupportedOperationException()
-
-  override suspend fun status(): KetchStatus = KetchStatus(
-    name = "remote",
-    version = "test",
-    revision = "test",
-    uptime = 0,
-    config = config,
-    system = SystemInfo(
-      os = "test", arch = "test", separator = "/", javaVersion = "N/A",
-      availableProcessors = 1, maxMemory = 0, totalMemory = 0, freeMemory = 0,
-      downloadDirectory = "/downloads", totalSpace = 0, freeSpace = 0, usableSpace = 0,
-    ),
-  )
+  override suspend fun status(): KetchStatus = testStatus("remote", config)
 
   override suspend fun updateConfig(config: DownloadConfig) {
     gate?.await()
@@ -73,9 +49,6 @@ private class SettingsKetchApi(
     networks = networks.copy(config = config)
     return networks
   }
-
-  override suspend fun start() {}
-  override fun close() {}
 }
 
 class InstanceSettingsControllerTest {

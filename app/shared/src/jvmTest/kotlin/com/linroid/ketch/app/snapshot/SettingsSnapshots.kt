@@ -8,28 +8,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.NetworkInterfaceConfig
-import com.linroid.ketch.api.NetworkInterfaceInfo
-import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.DesktopHooks
-import com.linroid.ketch.app.platform.DetectedBrowser
 import com.linroid.ketch.app.platform.IntegrationStatus
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
-import com.linroid.ketch.app.state.AiDiscoveryProvider
-import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
-import com.linroid.ketch.app.state.AiDiscoverRequest
-import com.linroid.ketch.app.state.AiDiscoverResponse
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsTarget
@@ -55,7 +43,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -178,14 +165,14 @@ class SettingsSnapshots {
   @Test
   fun phone_search_listsResultsInAGroup() {
     for (theme in SnapshotTheme.entries) {
-      phoneSnapshot("settings-phone-search", theme, query = "speed")
+      contentSnapshot("settings-phone-search", PhoneTall, theme, query = "speed")
     }
   }
 
   @Test
   fun card_search_marksTheResultEnterOpens() {
     for (theme in SnapshotTheme.entries) {
-      cardSnapshot("settings-card-search", theme, query = "speed")
+      contentSnapshot("settings-card-search", CardSize, theme, query = "speed")
     }
   }
 
@@ -199,7 +186,7 @@ class SettingsSnapshots {
     lastPage: SettingsTarget.Page? = null,
     interact: suspend SnapshotScene.() -> Unit = {},
   ) {
-    withEnvironment(theme, size.density, lastPage) { environment ->
+    withSettings(theme, size.density, lastPage) { environment ->
       SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, interact) {
         SettingsFrame(environment, theme, size.density, desktop = true) {
           SettingsContent(environment.controller.state, target, onClose = {}, initialQuery = query)
@@ -208,22 +195,19 @@ class SettingsSnapshots {
     }
   }
 
-  /** Renders [SettingsContent] on the card of a tablet or the web, beside nothing else. */
-  private fun cardSnapshot(name: String, theme: SnapshotTheme, query: String) {
-    withEnvironment(theme, CardSize.density, lastPage = null) { environment ->
-      SnapshotHarness.capture("$name-${theme.id}-${CardSize.id}", CardSize) {
-        SettingsFrame(environment, theme, CardSize.density, desktop = false) {
-          SettingsContent(environment.controller.state, null, onClose = {}, initialQuery = query)
-        }
-      }
-    }
-  }
-
-  /** Renders [SettingsContent] full screen on a phone, as the app's shell shows it. */
-  private fun phoneSnapshot(name: String, theme: SnapshotTheme, query: String) {
-    withEnvironment(theme, PhoneTall.density, lastPage = null) { environment ->
-      SnapshotHarness.capture("$name-${theme.id}-${PhoneTall.id}", PhoneTall) {
-        SettingsFrame(environment, theme, PhoneTall.density, desktop = false) {
+  /**
+   * Renders [SettingsContent] at [size] beside nothing else, on the card of a tablet or the web
+   * or full screen on a phone, as the app's shell shows it.
+   */
+  private fun contentSnapshot(
+    name: String,
+    size: SnapshotSize,
+    theme: SnapshotTheme,
+    query: String,
+  ) {
+    withSettings(theme, size.density) { environment ->
+      SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) {
+        SettingsFrame(environment, theme, size.density, desktop = false) {
           SettingsContent(environment.controller.state, null, onClose = {}, initialQuery = query)
         }
       }
@@ -237,31 +221,7 @@ class SettingsSnapshots {
     theme: SnapshotTheme,
     open: AppScenario.() -> Unit,
   ) {
-    withEnvironment(theme, size.density, lastPage = null) { environment ->
-      SnapshotHarness.capture(
-        name = "$name-${theme.id}-${size.id}",
-        size = size,
-        interact = { AppScenario(environment.controller, environment.data, this).open() },
-      ) {
-        App(environment.controller)
-      }
-    }
-  }
-
-  private fun withEnvironment(
-    theme: SnapshotTheme,
-    density: KetchDensity,
-    lastPage: SettingsTarget.Page?,
-    block: (SettingsEnvironment) -> Unit,
-  ) {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SettingsEnvironment(theme, density.toMode(), lastPage)
-    }
-    try {
-      block(environment)
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
-    }
+    withSettings(theme, size.density) { captureApp(name, size, theme, it) { open() } }
   }
 
   private companion object {
@@ -312,32 +272,6 @@ internal fun SettingsFrame(
   }
 }
 
-/** What the desktop app reports while the extension is set up in Chrome only. */
-private val SampleIntegration = IntegrationStatus(
-  browsers = listOf(
-    DetectedBrowser("Chrome", extensionConnected = true),
-    DetectedBrowser("Edge"),
-    DetectedBrowser("Firefox"),
-  ),
-  extensionConnected = true,
-  magnetHandler = true,
-)
-
-/** Desktop hooks that do nothing, so the pages show their desktop rows. */
-private val DesktopHooksShown = object : DesktopHooks {
-  override val isSupported: Boolean get() = true
-}
-
-/** Discovery that can run but is never asked, so the Discover page shows. */
-private object IdleDiscovery : AiDiscoveryProviderFactory {
-  override fun create(settings: AiSettings): AiDiscoveryProvider = object : AiDiscoveryProvider {
-    override suspend fun discover(request: AiDiscoverRequest, onStep: (DiscoveryStep) -> Unit) =
-      AiDiscoverResponse(request.query, emptyList())
-
-    override suspend fun verify(): String = "OK"
-  }
-}
-
 /**
  * The sample's devices with what Settings summarizes: this Mac sharing on the network in Slow
  * lane over Wi-Fi and Ethernet, three extra trackers, Anthropic discovery with Brave search,
@@ -349,24 +283,20 @@ internal class SettingsEnvironment(
   theme: SnapshotTheme,
   density: DensityMode,
   lastPage: SettingsTarget.Page? = null,
-) {
+) : SnapshotEnvironment {
   private val nas = SampleData.NAS.copy(name = "NAS-Basement", watch = true)
-  val data = SampleData(
+  override val data = SampleData(
     tasks = SampleData.downloads().tasks,
     remotes = listOf(nas),
     ui = { it.copy(settingsPage = lastPage?.name) },
   )
-  private val api = TwoNetworks(SampleKetchApi(data))
+  private val api = NetworkedApi(SampleKetchApi(data))
   private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
       deviceName = data.deviceName,
       embeddedFactory = { api },
-      localServerFactory = {
-        object : LocalServerHandle {
-          override fun stop() {}
-        }
-      },
+      localServerFactory = PretendServer,
       remoteFactory = { config ->
         RemoteInstance(
           instance = SampleKetchApi(data),
@@ -410,7 +340,7 @@ internal class SettingsEnvironment(
   )
 
   /** The controller Settings and the app root show. */
-  val controller = AppController(
+  override val controller = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = IdleDiscovery,
     context = SnapshotHarness.ui,
@@ -422,27 +352,21 @@ internal class SettingsEnvironment(
     instanceManager.startServer()
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     speedScope.cancel()
     instanceManager.close()
   }
 }
 
-/** [sample] on Wi-Fi, Ethernet and a VPN, with downloads spread over the first two. */
-private class TwoNetworks(private val sample: SampleKetchApi) : KetchApi by sample {
-  override suspend fun networkInterfaces(): NetworkInterfaces = NetworkInterfaces(
-    supported = true,
-    available = listOf(
-      NetworkInterfaceInfo("en0", "en0", listOf("fe80::1c2a:3bff:fe4d:5e6f", "192.168.1.20")),
-      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
-      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
-    ),
-    config = NetworkInterfaceConfig(listOf("en0", "en7")),
-  )
-}
+/**
+ * Runs [block] over a [SettingsEnvironment] in [theme] at [density] that shows [lastPage] when
+ * Settings opens without a page.
+ */
+internal fun <T> withSettings(
+  theme: SnapshotTheme,
+  density: KetchDensity,
+  lastPage: SettingsTarget.Page? = null,
+  block: (SettingsEnvironment) -> T,
+): T = withEnvironment({ SettingsEnvironment(theme, density.toMode(), lastPage) }, block = block)
 
-private fun KetchDensity.toMode(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
-}

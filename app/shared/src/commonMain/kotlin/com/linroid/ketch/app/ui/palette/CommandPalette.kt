@@ -3,7 +3,6 @@ package com.linroid.ketch.app.ui.palette
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -38,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -60,9 +58,7 @@ import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -85,9 +81,11 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.CommandScope
@@ -97,8 +95,6 @@ import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.displayName
-import com.linroid.ketch.app.platform.rememberFileActions
-import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
@@ -109,12 +105,13 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
+import com.linroid.ketch.app.ui.downloads.actions.rememberRowCommands
 import com.linroid.ketch.app.ui.list.FileNameText
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
+import com.linroid.ketch.app.ui.shell.KeyCap
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.ui.shell.shellShortcuts
 import com.linroid.ketch.app.util.formatBytes
@@ -141,9 +138,6 @@ internal object PaletteDefaults {
 
   /** Height of the key hints at the bottom. */
   val FooterHeight: Dp = 28.dp
-
-  /** Height of a key cap. */
-  val KeyCapHeight: Dp = 20.dp
 
   /** Width of hairline dividers. */
   val Hairline: Dp = 1.dp
@@ -317,7 +311,7 @@ private fun PalettePanel(
       KetchCommands.PaletteClose, KetchCommands.Palette -> onDismiss()
       else -> {
         // ⌥⌘n downloads a typed link on device n; any other global chord runs and closes.
-        val device = (1..MAX_DEVICE_CHORDS).firstOrNull { KetchCommands.device(it) == command }
+        val device = KetchCommands.deviceNumber(command)
         val target = device?.let { number -> source.devices.firstOrNull { it.number == number } }
         val download = target?.let { downloadOn(items, it.deviceId) }
         if (download != null) {
@@ -438,17 +432,6 @@ private fun rememberPaletteSource(
     timeZone = TimeZone.currentSystemDefault(),
     platform = platform,
   )
-}
-
-@Composable
-private fun rememberRowCommands(state: AppState): RowCommands {
-  val files = rememberFileActions()
-  val clipboard = rememberSystemClipboard()
-  val uriHandler = LocalUriHandler.current
-  val scope = rememberCoroutineScope()
-  return remember(state, files, clipboard, uriHandler, scope) {
-    RowCommands(state, files, clipboard, scope, uriHandler::openUri)
-  }
 }
 
 /** What a device is doing, after its name: "2 active · 6.4 MB/s", "Idle", "Offline"… */
@@ -644,11 +627,7 @@ private fun SectionHeader(title: String) {
       .padding(horizontal = spacing.s3)
       .padding(bottom = spacing.s1),
   ) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textTertiary,
-    )
+    KetchEyebrow(title)
   }
 }
 
@@ -683,12 +662,7 @@ private fun PaletteRow(
         }
       }
       .focusProperties { canFocus = false }
-      .clickable(
-        interactionSource = remember { MutableInteractionSource() },
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(remember { MutableInteractionSource() }, onClick = onClick)
       .semantics { selected = highlighted }
       .padding(horizontal = spacing.s3),
   ) {
@@ -813,20 +787,6 @@ private fun TitleAndSubtitle(
 }
 
 @Composable
-private fun KeyCap(text: String) {
-  val colors = KetchTheme.colors
-  Box(
-    contentAlignment = Alignment.Center,
-    modifier = Modifier
-      .heightIn(min = PaletteDefaults.KeyCapHeight)
-      .background(colors.surfaceSunken, KetchTheme.shapes.xs)
-      .padding(horizontal = KetchTheme.spacing.s2),
-  ) {
-    Text(text = text, style = KetchTheme.typography.labelS, color = colors.textSecondary)
-  }
-}
-
-@Composable
 private fun NoMatches(query: String, modifier: Modifier = Modifier) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -910,6 +870,5 @@ private object WindowOrigin : PopupPositionProvider {
   ): IntOffset = IntOffset.Zero
 }
 
-private const val MAX_DEVICE_CHORDS = 9
 private const val PLACEHOLDER = "Paste a link, search downloads, or type a command"
 private const val SHORT_PLACEHOLDER = "Paste a link, search, or type a command"

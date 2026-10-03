@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.app.state.PulseScope
-import com.linroid.ketch.app.state.deviceId
 
 /** Which devices the app shows: one, or every device at once. */
 sealed interface DeviceScope {
@@ -23,10 +22,6 @@ sealed interface DeviceScope {
     const val MIN_DEVICES: Int = 2
   }
 }
-
-/** The devices of [devices] in this scope, in their order. */
-fun DeviceScope.of(devices: List<InstanceEntry>): List<InstanceEntry> =
-  devices.filter { includes(it.deviceId) }
 
 /** The scope the Pulse bar sums up for this one. */
 fun DeviceScope.toPulseScope(): PulseScope = when (this) {

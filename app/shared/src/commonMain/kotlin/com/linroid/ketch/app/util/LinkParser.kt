@@ -69,6 +69,9 @@ enum class LinkKind {
   /** A link of another kind, which the device that resolves it may not support. */
   Other;
 
+  /** Whether a torrent downloads it: a magnet or a `.torrent` file link. */
+  val isTorrent: Boolean get() = this == Magnet || this == TorrentFile
+
   companion object {
     /** The kind of [url], judged by its scheme and, for HTTP, its path. */
     fun of(url: String): LinkKind {
@@ -380,6 +383,12 @@ private fun expand(url: String): IntakeItem.Range? {
   val globs = mutableListOf<Glob>()
   val literal = StringBuilder()
   var hasRange = false
+  fun flush() {
+    if (literal.isEmpty()) return
+    val text = literal.toString()
+    globs += Glob(1) { text }
+    literal.clear()
+  }
   var i = 0
   while (i < url.length) {
     val char = url[i]
@@ -394,20 +403,13 @@ private fun expand(url: String): IntakeItem.Range? {
       i++
       continue
     }
-    if (literal.isNotEmpty()) {
-      val text = literal.toString()
-      globs += Glob(1) { text }
-      literal.clear()
-    }
+    flush()
     globs += glob
     hasRange = true
     i = close + 1
   }
   if (!hasRange) return null
-  if (literal.isNotEmpty()) {
-    val text = literal.toString()
-    globs += Glob(1) { text }
-  }
+  flush()
   val total = globs.fold(1L) { product, glob ->
     if (product > Long.MAX_VALUE / glob.size) Long.MAX_VALUE else product * glob.size
   }

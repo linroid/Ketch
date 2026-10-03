@@ -23,6 +23,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
@@ -38,7 +39,7 @@ import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
+import com.linroid.ketch.app.util.clockTime
 import kotlinx.datetime.TimeZone
 
 /**
@@ -163,11 +164,7 @@ private fun Timeline(entries: List<TimelineEntry>, timeZone: TimeZone) {
   var expanded by remember { mutableStateOf(false) }
   val hidden = if (expanded) 0 else (entries.size - TIMELINE_SHOWN).coerceAtLeast(0)
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-    Text(
-      text = eyebrowText("Since Ketch opened"),
-      style = type.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow("Since Ketch opened")
     if (hidden > 0) {
       KetchButton(
         text = "Show $hidden earlier",

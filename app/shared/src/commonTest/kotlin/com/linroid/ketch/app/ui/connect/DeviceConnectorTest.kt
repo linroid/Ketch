@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.connect
 
 import com.linroid.ketch.app.FakeInstanceFactory
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -46,6 +47,9 @@ class DeviceConnectorTest {
     return manager
   }
 
+  private fun connectorTest(block: suspend TestScope.(InstanceManager) -> Unit) =
+    fixtureTest({ manager() }, InstanceManager::close, block)
+
   private fun connector(manager: InstanceManager, probe: Probe) =
     DeviceConnector(manager, { shown += it }, probe)
 
@@ -60,8 +64,7 @@ class DeviceConnectorTest {
   )
 
   @Test
-  fun connect_deviceLetsKetchIn_addsItWithItsCodeAndShowsIt() = runTest {
-    val manager = manager()
+  fun connect_deviceLetsKetchIn_addsItWithItsCodeAndShowsIt() = connectorTest { manager ->
     val probe = Probe()
 
     val outcome = connector(manager, probe).connect(link)
@@ -72,12 +75,10 @@ class DeviceConnectorTest {
     assertEquals("Lins-MacBook-Pro", device.remoteConfig.name)
     assertEquals(listOf<InstanceEntry>(device), shown)
     assertEquals("secret", probe.checked.single().apiToken)
-    manager.close()
   }
 
   @Test
-  fun connect_deviceAsksForCode_addsNothing() = runTest {
-    val manager = manager()
+  fun connect_deviceAsksForCode_addsNothing() = connectorTest { manager ->
     val probe = Probe(ProbeResult(ConnectionState.Unauthorized))
 
     val withoutCode = connector(manager, probe).connect(link.copy(token = null))
@@ -87,24 +88,20 @@ class DeviceConnectorTest {
     assertEquals(ConnectOutcome.NeedsCode(rejected = true), withCode)
     assertTrue(manager.remotes().isEmpty())
     assertTrue(shown.isEmpty())
-    manager.close()
   }
 
   @Test
-  fun connect_nothingAnswers_addsNothing() = runTest {
-    val manager = manager()
+  fun connect_nothingAnswers_addsNothing() = connectorTest { manager ->
     val probe = Probe(ProbeResult(ConnectionState.Disconnected("No answer")))
 
     val outcome = connector(manager, probe).connect(link)
 
     assertEquals(ConnectOutcome.Unreachable, outcome)
     assertTrue(manager.remotes().isEmpty())
-    manager.close()
   }
 
   @Test
-  fun connect_withoutCheck_addsTheDeviceWithoutShowingIt() = runTest {
-    val manager = manager()
+  fun connect_withoutCheck_addsTheDeviceWithoutShowingIt() = connectorTest { manager ->
     val probe = Probe()
 
     val outcome = connector(manager, probe).connect(link, check = false)
@@ -113,17 +110,13 @@ class DeviceConnectorTest {
     assertEquals(1, manager.remotes().size)
     assertTrue(probe.checked.isEmpty())
     assertTrue(shown.isEmpty())
-    manager.close()
   }
 
   @Test
-  fun connect_withoutCheckButShown_showsTheDevice() = runTest {
-    val manager = manager()
-
+  fun connect_withoutCheckButShown_showsTheDevice() = connectorTest { manager ->
     connector(manager, Probe()).connect(link, check = false, show = true)
 
     assertEquals(manager.remotes().single(), shown.single())
-    manager.close()
   }
 
   @Test
@@ -199,25 +192,21 @@ class DeviceConnectorTest {
   }
 
   @Test
-  fun connect_addressWithoutName_takesTheNameTheDeviceAnnounces() = runTest {
-    val manager = manager()
+  fun connect_addressWithoutName_takesTheNameTheDeviceAnnounces() = connectorTest { manager ->
     val probe = Probe(ProbeResult(ConnectionState.Connected, name = "NAS-Basement"))
 
     connector(manager, probe).connect(PairingLink("nas.local"))
 
     assertEquals("NAS-Basement", manager.remotes().single().remoteConfig.name)
-    manager.close()
   }
 
   @Test
-  fun connect_deviceAnnouncesTheGenericName_staysUnnamed() = runTest {
-    val manager = manager()
+  fun connect_deviceAnnouncesTheGenericName_staysUnnamed() = connectorTest { manager ->
     val probe = Probe(ProbeResult(ConnectionState.Connected, name = "Ketch"))
 
     connector(manager, probe).connect(PairingLink("nas.local"))
 
     assertNull(manager.remotes().single().remoteConfig.name)
-    manager.close()
   }
 
   @Test

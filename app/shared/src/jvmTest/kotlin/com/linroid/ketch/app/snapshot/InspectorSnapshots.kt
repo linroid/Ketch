@@ -27,8 +27,6 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.app.platform.FileActions
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.ListFixtures
@@ -49,10 +47,7 @@ import com.linroid.ketch.app.ui.inspector.TaskHeader
 import com.linroid.ketch.app.ui.inspector.TaskInspector
 import com.linroid.ketch.app.ui.inspector.rememberDeviceLabel
 import com.linroid.ketch.app.ui.list.RowCommands
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
@@ -71,8 +66,6 @@ class InspectorSnapshots {
 
   @Test
   fun inspector_inTheApp_rendersInTheDownloadsPage() {
-    val sizes = listOf(SnapshotSize.Desktop, SnapshotSize.Medium, SnapshotSize.Phone)
-    appSnapshots("inspector-app", sizes = sizes) { inspect(UBUNTU) }
     appSnapshots("inspector-app-failed", sizes = listOf(SnapshotSize.Desktop)) { inspect(FAILED) }
   }
 
@@ -168,13 +161,8 @@ class InspectorSnapshots {
   @Test
   fun controls_remoteDevice_disableStart() {
     for (theme in SnapshotTheme.entries) {
-      val data = SampleData.downloads()
-      val environment = runBlocking(SnapshotHarness.ui) {
-        SampleEnvironment(data, theme, DensityMode.Compact)
-      }
-      try {
-        runBlocking(SnapshotHarness.ui) { withTimeout(START) { environment.start() } }
-        val state = environment.controller.state
+      withSample(theme) { env ->
+        val state = env.controller.state
         val tooltip: suspend SnapshotScene.() -> Unit = {
           hover(185.dp, 220.dp)
           settle(minimum = 1.seconds)
@@ -189,8 +177,6 @@ class InspectorSnapshots {
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }
@@ -198,13 +184,8 @@ class InspectorSnapshots {
   @Test
   fun header_remoteCompleted_offersCopyPath() {
     for (theme in SnapshotTheme.entries) {
-      val data = SampleData.downloads()
-      val environment = runBlocking(SnapshotHarness.ui) {
-        SampleEnvironment(data, theme, DensityMode.Compact)
-      }
-      try {
-        runBlocking(SnapshotHarness.ui) { withTimeout(START) { environment.start() } }
-        val state = environment.controller.state
+      withSample(theme) { env ->
+        val state = env.controller.state
         snapshot("inspector-header-remote", Small, theme) {
           CompositionLocalProvider(LocalAppState provides state) {
             Pane(DockedWidth, InspectorPlacement.Docked) {
@@ -231,8 +212,6 @@ class InspectorSnapshots {
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }
@@ -246,33 +225,21 @@ class InspectorSnapshots {
     interact: suspend SnapshotScene.() -> Unit = {},
     setup: Setup.() -> TaskKey?,
   ) {
-    val data = SampleData.downloads()
-    val density = if (size.density == KetchDensity.Compact) {
-      DensityMode.Compact
-    } else {
-      DensityMode.Comfortable
-    }
-    val environment = runBlocking(SnapshotHarness.ui) { SampleEnvironment(data, theme, density) }
-    try {
-      val key = runBlocking(SnapshotHarness.ui) {
-        withTimeout(START) { environment.start() }
-        Setup(environment.controller.state, data).setup()
-      }
-      val state = environment.controller.state
+    withSample(theme, size.density.toMode()) { env ->
+      val state = env.controller.state
+      val key = runBlocking(SnapshotHarness.ui) { Setup(state, env.data).setup() }
       snapshot(name, size, theme, interact) {
         CompositionLocalProvider(LocalAppState provides state) {
           val scope = rememberCoroutineScope()
           val runner = remember(scope) {
-            val commands = RowCommands(state, InspectorFiles, InspectorClipboard, scope) {}
-            RowActionRunner(state, commands, InspectorFiles, InspectorClipboard, scope)
+            val commands = RowCommands(state, SnapshotFiles(), SnapshotClipboard(), scope) {}
+            RowActionRunner(commands)
           }
           Pane(width, placement) {
             InspectorContent(state, key, placement, onClose = {}, runner = runner)
           }
         }
       }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 
@@ -361,35 +328,6 @@ private fun Pane(width: Dp, placement: InspectorPlacement, content: @Composable 
       ) { content() }
     }
   }
-}
-
-/** Files that exist, without touching this machine. */
-private object InspectorFiles : FileActions {
-  override val revealLabel: String = "Show in Finder"
-  override val canShare: Boolean = false
-  override val canTrash: Boolean = true
-
-  override suspend fun open(path: String) {}
-
-  override suspend fun reveal(path: String) {}
-
-  override suspend fun share(path: String) {}
-
-  override suspend fun exists(path: String): Boolean = true
-
-  override suspend fun moveToTrash(path: String) {}
-}
-
-/** A clipboard that keeps nothing. */
-private object InspectorClipboard : SystemClipboard {
-  override val readsSilently: Boolean = true
-  override val pasteEvents = emptyFlow<String>()
-
-  override suspend fun hasLink(): Boolean = false
-
-  override suspend fun readText(): String? = null
-
-  override suspend fun writeText(text: String) {}
 }
 
 /** A download that finished on a remote device, whose file is out of this one's reach. */

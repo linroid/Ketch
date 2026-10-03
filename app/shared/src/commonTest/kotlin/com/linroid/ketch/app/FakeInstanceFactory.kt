@@ -6,7 +6,6 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -82,8 +81,6 @@ class FakeRemote(
     private set
   var startedAfterClose = false
     private set
-  var statusCount = 0
-    private set
 
   override suspend fun start() {
     if (closed) startedAfterClose = true
@@ -95,30 +92,21 @@ class FakeRemote(
     closed = true
   }
 
-  override suspend fun status(): KetchStatus {
-    statusCount++
-    return KetchStatus(
-      name = announcedName,
-      version = "0.0.1",
-      revision = "test",
-      uptime = 3600,
-      config = DownloadConfig(),
-      system = SystemInfo(
-        os = "Linux",
-        arch = "x64",
-        separator = "/",
-        javaVersion = "21",
-        availableProcessors = 4,
-        maxMemory = 0,
-        totalMemory = 0,
-        freeMemory = 0,
-        downloadDirectory = "/volume1/downloads",
-        totalSpace = 4_000_000_000_000,
-        freeSpace = 1_800_000_000_000,
-        usableSpace = 1_800_000_000_000,
-      ),
-    )
-  }
+  override suspend fun status(): KetchStatus = testStatus(
+    name = announcedName,
+    version = "0.0.1",
+    uptime = 3600,
+    system = testSystem(
+      os = "Linux",
+      arch = "x64",
+      javaVersion = "21",
+      availableProcessors = 4,
+      downloadDirectory = "/volume1/downloads",
+      totalSpace = 4_000_000_000_000,
+      freeSpace = 1_800_000_000_000,
+      usableSpace = 1_800_000_000_000,
+    ),
+  )
 
   override suspend fun download(request: DownloadRequest): DownloadTask =
     throw UnsupportedOperationException("FakeRemote does not support downloads")

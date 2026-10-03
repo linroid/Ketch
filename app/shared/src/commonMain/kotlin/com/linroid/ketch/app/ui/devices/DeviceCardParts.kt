@@ -1,10 +1,8 @@
 package com.linroid.ketch.app.ui.devices
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -29,7 +27,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -42,9 +39,9 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DevicePresence
@@ -53,6 +50,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.pulse.DiskBar
 import com.linroid.ketch.app.ui.pulse.diskUsed
 import com.linroid.ketch.app.util.formatBytes
 
@@ -146,14 +144,7 @@ private fun RowScope.CountCell(
       .clip(shape)
       .background(overlay)
       .clearAndSetSemantics { contentDescription = description }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClickLabel = "Show",
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClickLabel = "Show", onClick = onClick)
       .padding(vertical = KetchTheme.spacing.s1),
   ) {
     Text(
@@ -199,22 +190,12 @@ internal fun Storage(device: DevicePresence, work: DeviceWork) {
   val ink = if (short) colors.status.paused.color else colors.textSecondary
   val folder = disk?.directory ?: device.status?.system?.downloadDirectory
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2)) {
-    Box(
-      Modifier
-        .fillMaxWidth()
-        .height(StorageBarHeight)
-        .clip(KetchTheme.shapes.full)
-        .background(colors.surfaceSunken)
-    ) {
-      if (disk != null) {
-        Box(
-          Modifier
-            .fillMaxHeight()
-            .fillMaxWidth(diskUsed(disk))
-            .background(if (short) colors.status.paused.color else colors.textTertiary)
-        )
-      }
-    }
+    DiskBar(
+      used = disk?.let(::diskUsed),
+      short = short,
+      track = colors.surfaceSunken,
+      modifier = Modifier.fillMaxWidth().height(StorageBarHeight),
+    )
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
         text = when {
@@ -328,13 +309,7 @@ private fun InfoChip(chip: DeviceChip, modifier: Modifier = Modifier) {
         .clip(shape)
         .background(colors.surfaceSunken)
         .background(overlay)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
-          role = Role.Button,
-          onClick = chip.onClick,
-        )
+        .ketchClickable(interactions, focus, onClick = chip.onClick)
         .padding(start = spacing.s2, end = spacing.s3),
     ) {
       KetchIconImage(

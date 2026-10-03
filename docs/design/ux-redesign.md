@@ -274,8 +274,8 @@ while the waves land.
 | `theme/KetchShapes.kt` | New radius scale (§3.5). Fixes the current `md` (8) being smaller than `sm` (10). `round` becomes a deprecated alias of `full`. |
 | `theme/KetchSpacing.kt` | Numeric 4-pt scale (§3.6). The old names become deprecated aliases of the same value (`xxs` = `s0_5`, `xs` = `s1`, `md` = `s2`, `lg` = `s3`, `xl` = `s4`, `xxl` = `s5`, `xxxl` = `s6`, `x4l` = `s8`, `x5l` = `s10`, `x6l` = `s16`). `sm` (6) has no grid step: it stays a deprecated 6 dp alias, and its call sites move to `s1` or `s2` as their files are rewritten. |
 | `theme/KetchFonts.kt` (new) | `rememberKetchTypography()` and `rememberKetchFontsLoaded()`. Compose resources generate an internal `Res`, so other modules (such as `app/web`) use these functions instead of `Res.font.*`. |
-| `theme/KetchElevation.kt` | Levels `e0..e4` (§3.8). `ShadowLayer` keeps its shape and maps 1:1 to `Modifier.dropShadow(shape, Shadow(radius, spread, color, offset))` (CMP 1.12). |
-| `theme/KetchMotion.kt` | New durations, easings and springs (§3.10). Fixes `easeEmphasized == easeStandard` and the degenerate `easeDecelerate`. |
+| `theme/KetchElevation.kt` | Levels `e0..e4` (§3.8). Each level is a list of Compose `Shadow`s, drawn with `Modifier.dropShadow(shape, shadow)` (CMP 1.12). |
+| `theme/KetchMotion.kt` | New durations, easings and springs (§3.10). Fixes the degenerate `easeDecelerate`. |
 | `theme/KetchDensity.kt` (new) | `LocalKetchDensity`, values `Compact` and `Comfortable` (§3.7). |
 | `theme/KetchWindowChrome.kt` (new) | `LocalWindowChrome = WindowChrome(top: Dp, leading: Dp)`, default `WindowChrome.None` (0, 0). Desktop macOS provides `(28.dp, 78.dp)`. |
 | `theme/Surfaces.kt` (new) | `Modifier.ketchSurface(level: KetchElevationLevel, shape: Shape, fill: Color, border: Color?)`. This is the only way feature code builds a surface. |
@@ -377,8 +377,8 @@ white on `dangerFill` (5.2 / 4.9:1).
 - HIGH = `ChevronUp` in `accentText`.
 - URGENT = `Bolt` glyph on an accent-filled pill (h16, padding 4, white glyph).
 
-Connection health shares one function, `healthColor(state)`, used by the device pennant ring,
-`ConnectionStatusDot` and the Pulse bar badge:
+Connection health shares one function, `healthColor(health)` on a `DeviceHealth`, used by the
+device pennant ring, `ConnectionStatusDot` and the Pulse bar badge:
 
 | State | Color | Behavior |
 |---|---|---|
@@ -593,7 +593,7 @@ In dark, shadow alpha is multiplied by 3, and raised surfaces get a 1 dp top hig
 | `long` / `longExit` | 320 / 200 ms | Sheet and dialog enter / exit |
 | `xlong` | 480 ms | Onboarding, the add lane flight |
 | `easeStandard` | `CubicBezier(0.2, 0, 0, 1)` | Default |
-| `easeDecelerate` (enter) | `CubicBezier(0.05, 0.7, 0.1, 1)` | Enter; also aliased as `easeEmphasized` |
+| `easeDecelerate` (enter) | `CubicBezier(0.05, 0.7, 0.1, 1)` | Enter |
 | `easeAccelerate` (exit) | `CubicBezier(0.3, 0, 0.8, 0.15)` | Exit |
 | `progressSpring` | `spring(dampingRatio = 1f, stiffness = 200f)` | Progress fill, lane widths |
 | `placementSpring` | `spring(stiffness = 400f)` | `Modifier.animateItem(fadeInSpec = tween(150), placementSpec = placementSpring)` |

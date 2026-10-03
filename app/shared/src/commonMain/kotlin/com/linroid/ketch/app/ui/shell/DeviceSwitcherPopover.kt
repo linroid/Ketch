@@ -1,7 +1,5 @@
 package com.linroid.ketch.app.ui.shell
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -40,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -53,7 +50,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +66,8 @@ import androidx.compose.ui.window.PopupProperties
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.interactionOverlay
+import com.linroid.ketch.app.components.ketchClickable
+import com.linroid.ketch.app.components.popupAppear
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -209,24 +207,13 @@ internal fun DeviceSwitcherPopover(
     properties = PopupProperties(focusable = true),
   ) {
     val focus = remember { FocusRequester() }
-    val appear = remember { Animatable(0f) }
-    val motion = KetchTheme.motion
-    LaunchedEffect(Unit) {
-      focus.requestFocus()
-      appear.animateTo(1f, tween(motion.short, easing = motion.easeDecelerate))
-    }
     SwitcherPanel(
       state = state,
       entries = entries,
       onDismissRequest = onDismissRequest,
       modifier = Modifier
         .heightIn(max = maxHeight)
-        .graphicsLayer {
-          alpha = appear.value
-          val scale = APPEAR_SCALE + (1f - APPEAR_SCALE) * appear.value
-          scaleX = scale
-          scaleY = scale
-        }
+        .popupAppear(focus)
         .focusRequester(focus)
         .focusable(),
     )
@@ -240,11 +227,10 @@ internal fun SwitcherPanel(
   entries: List<SwitcherEntry>,
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
-  initialHighlight: Int = -1,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  var highlighted by remember { mutableIntStateOf(initialHighlight) }
+  var highlighted by remember { mutableIntStateOf(-1) }
   // Rows the keyboard moves to scroll into view; the ones the pointer rests on are in view.
   var fromKeyboard by remember { mutableStateOf(false) }
   val move = { step: Int ->
@@ -517,12 +503,7 @@ private fun SwitcherItem(
       .padding(horizontal = inset)
       .heightIn(min = minHeight)
       .background(KetchTheme.colors.interactionOverlay(highlighted, pressed), shape)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, onClick = onClick)
       .padding(horizontal = spacing.s2),
     content = content,
   )
@@ -653,7 +634,6 @@ private val DigitKeys = listOf(
   Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine
 )
 
-private const val APPEAR_SCALE = 0.96f
 
 private val SwitcherWidth: Dp = 360.dp
 private val CheckGlyph: Dp = 14.dp

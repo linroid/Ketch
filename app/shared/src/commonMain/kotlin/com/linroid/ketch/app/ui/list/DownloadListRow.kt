@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -32,8 +31,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.KetchFileTypeChip
@@ -62,6 +59,7 @@ import com.linroid.ketch.app.ui.downloads.actions.TaskRowFrame
 import com.linroid.ketch.app.ui.downloads.actions.icon
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.downloads.addedRow
+import com.linroid.ketch.app.util.ErrorCopy
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.formatSizeOf
 import kotlinx.coroutines.launch
@@ -104,8 +102,6 @@ private fun RowBody(
   val completion = rememberRowCompletion(row)
   val lanes = showsLanes(row, completion)
   val chip = if (touch) KetchFileTypeChipDefaults.TouchSize else KetchFileTypeChipDefaults.ListSize
-  val divider = colors.divider
-  val dividerInset = spacing.s3 + chip + spacing.s3
   TaskRowFrame(
     row = row,
     actions = actions,
@@ -114,16 +110,7 @@ private fun RowBody(
       .fillMaxWidth()
       .padding(horizontal = spacing.s1)
       .addedRow(task.key, KetchTheme.shapes.md)
-      .drawBehind {
-        val y = size.height - density / 2
-        val inset = dividerInset.toPx()
-        val (start, end) = if (layoutDirection == LayoutDirection.Ltr) {
-          inset to size.width
-        } else {
-          0f to size.width - inset
-        }
-        drawLine(divider, Offset(start, y), Offset(end, y), strokeWidth = density)
-      },
+      .rowDivider(colors.divider, spacing.s3 + chip + spacing.s3),
   ) { frame ->
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -260,14 +247,19 @@ internal fun secondLine(row: TaskRow, touch: Boolean, colors: KetchColors): Anno
   }
   return buildAnnotatedString {
     if (error != null) {
-      withStyle(SpanStyle(color = colors.status.failed.color)) { append(error.title) }
-      error.shortHint?.let { hint ->
-        append(SEPARATOR)
-        append(hint)
-      }
+      appendError(error, colors)
       if (parts.isNotEmpty()) append(SEPARATOR)
     }
     append(parts.joinToString(SEPARATOR))
+  }
+}
+
+/** Appends [error]'s title in the failed color, then its short hint. */
+internal fun AnnotatedString.Builder.appendError(error: ErrorCopy, colors: KetchColors) {
+  withStyle(SpanStyle(color = colors.status.failed.color)) { append(error.title) }
+  error.shortHint?.let { hint ->
+    append(SEPARATOR)
+    append(hint)
   }
 }
 
@@ -322,50 +314,32 @@ internal fun BoxScope.HoverOverlay(
   val fill = rowFill(colors, frame, actions.keyboard.hasFocus)
   // The strip, the write heads reaching above it and the row's bottom padding.
   val lanes = LaneStripDefaults.RowHeight + spacing.s0_5 + spacing.s2
+  val fade = spacing.s6
   Box(
     contentAlignment = Alignment.CenterEnd,
     modifier = Modifier
       .matchParentSize()
       .then(if (aboveLanes) Modifier.padding(bottom = lanes) else Modifier),
   ) {
-    HoverButtons(
-      row = row,
-      actions = actions,
-      frame = frame,
-      fill = fill,
-      fade = spacing.s6,
-      modifier = placement,
-    )
-  }
-}
-
-@Composable
-private fun HoverButtons(
-  row: TaskRow,
-  actions: ListActions,
-  frame: RowFrameState,
-  fill: Color,
-  fade: Dp,
-  modifier: Modifier = Modifier,
-) {
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.End,
-    modifier = modifier
-      .fillMaxHeight()
-      .then(
-        if (frame.hovered) {
-          Modifier.drawBehind {
-            val stop = (fade.toPx() / size.width).coerceIn(0f, 1f)
-            drawRect(Brush.horizontalGradient(0f to fill.copy(alpha = 0f), stop to fill))
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.End,
+      modifier = placement
+        .fillMaxHeight()
+        .then(
+          if (frame.hovered) {
+            Modifier.drawBehind {
+              val stop = (fade.toPx() / size.width).coerceIn(0f, 1f)
+              drawRect(Brush.horizontalGradient(0f to fill.copy(alpha = 0f), stop to fill))
+            }
+          } else {
+            Modifier
           }
-        } else {
-          Modifier
-        }
-      )
-      .padding(start = fade, end = KetchTheme.spacing.s2),
-  ) {
-    HoverActions(row, frame.hovered, actions.runner, menu = actions.menu)
+        )
+        .padding(start = fade, end = spacing.s2),
+    ) {
+      HoverActions(row, frame.hovered, actions.runner, menu = actions.menu)
+    }
   }
 }
 

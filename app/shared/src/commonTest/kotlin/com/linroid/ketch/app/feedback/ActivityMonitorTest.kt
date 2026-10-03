@@ -1,20 +1,14 @@
 package com.linroid.ketch.app.feedback
 
-import com.linroid.ketch.api.Destination
-import com.linroid.ketch.api.DownloadCondition
-import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
-import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.Segment
-import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.TaskKey
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -39,29 +33,6 @@ class ActivityMonitorTest {
   private val old = startedAt - 1.hours
   private val new = startedAt + 1.seconds
 
-  private class FakeTask(
-    override val taskId: String,
-    state: DownloadState,
-    override val createdAt: Instant,
-  ) : DownloadTask {
-    override val request: DownloadRequest = DownloadRequest(url = "https://example.com/$taskId")
-    override val requestState: StateFlow<DownloadRequest> = MutableStateFlow(request)
-    override val state = MutableStateFlow(state)
-    override val segments: StateFlow<List<Segment>> = MutableStateFlow(emptyList())
-
-    override suspend fun pause() {}
-    override suspend fun resume(destination: Destination?) {}
-    override suspend fun cancel() {}
-    override suspend fun setSpeedLimit(limit: SpeedLimit) {}
-    override suspend fun setPriority(priority: DownloadPriority) {}
-    override suspend fun setConnections(connections: Int) {}
-    override suspend fun reschedule(
-      schedule: DownloadSchedule,
-      conditions: List<DownloadCondition>,
-    ) {}
-    override suspend fun remove(deleteFiles: Boolean) {}
-  }
-
   private class Harness(
     val tasks: MutableStateFlow<List<DownloadTask>>,
     val online: MutableStateFlow<Boolean>,
@@ -85,7 +56,7 @@ class ActivityMonitorTest {
   private fun completed(bytes: Long) = DownloadState.Completed("/downloads/file", bytes)
 
   private fun task(id: String, state: DownloadState, createdAt: Instant = old) =
-    FakeTask(id, state, createdAt)
+    ListTestTask(id, state, DownloadRequest(url = "https://example.com/$id"), createdAt)
 
   @Test
   fun events_tasksTerminalAtLoad_emitNothing() = runTest {

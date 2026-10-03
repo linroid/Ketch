@@ -48,9 +48,9 @@ import com.linroid.ketch.app.util.links
  */
 internal data class EmptyCopy(
   val title: String,
-  val hint: String?,
+  val hint: String? = null,
   val icon: KetchIcon,
-  val action: EmptyAction?,
+  val action: EmptyAction? = null,
   val actionLabel: String? = action?.label,
 )
 
@@ -103,9 +103,7 @@ internal fun emptyCopy(
   return when (filter) {
     StatusFilter.All -> EmptyCopy(
       title = "No downloads yet",
-      hint = null,
       icon = KetchIcon.Active,
-      action = null,
     )
     StatusFilter.Downloading -> EmptyCopy(
       title = "Nothing downloading",
@@ -155,7 +153,6 @@ internal fun fleetEmptyCopy(targetName: String): EmptyCopy = EmptyCopy(
 /** The copy of a remote device that has no downloads yet, with a button that adds one to it. */
 internal fun remoteEmptyCopy(deviceName: String): EmptyCopy = EmptyCopy(
   title = "Downloads on $deviceName will appear here",
-  hint = null,
   icon = KetchIcon.Server,
   action = EmptyAction.Add,
   actionLabel = "Add a link to $deviceName",
@@ -169,7 +166,6 @@ internal fun offlineCopy(deviceName: String, unauthorized: Boolean): EmptyCopy =
   title = if (unauthorized) "$deviceName needs a new access token" else "Can't reach $deviceName",
   hint = "Its downloads show here once it connects.",
   icon = KetchIcon.Server,
-  action = null,
 )
 
 private fun runsAtATime(slots: Int): String =

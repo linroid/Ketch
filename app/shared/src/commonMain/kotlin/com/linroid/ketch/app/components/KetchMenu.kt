@@ -1,9 +1,6 @@
 package com.linroid.ketch.app.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -24,10 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,17 +39,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -68,10 +62,10 @@ import androidx.compose.ui.window.PopupProperties
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommand
+import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -166,24 +160,34 @@ class KetchMenuScope internal constructor() {
 
 /** One entry of a [KetchMenu]. */
 internal sealed interface MenuEntry {
+  /** An entry drawn as a row that can be picked: an [Item] or a [Submenu]. */
+  sealed interface Row : MenuEntry {
+    val label: String
+    val icon: KetchIcon?
+    val enabled: Boolean
+    val caption: String? get() = null
+    val destructive: Boolean get() = false
+    val checked: Boolean? get() = null
+  }
+
   class Item(
-    val label: String,
+    override val label: String,
     val onClick: () -> Unit,
-    val icon: KetchIcon?,
+    override val icon: KetchIcon?,
     val shortcut: String?,
-    val caption: String?,
-    val enabled: Boolean,
-    val destructive: Boolean,
-    val checked: Boolean?,
+    override val caption: String?,
+    override val enabled: Boolean,
+    override val destructive: Boolean,
+    override val checked: Boolean?,
     val keepOpen: Boolean,
-  ) : MenuEntry
+  ) : Row
 
   class Submenu(
-    val label: String,
-    val icon: KetchIcon?,
-    val enabled: Boolean,
+    override val label: String,
+    override val icon: KetchIcon?,
+    override val enabled: Boolean,
     val entries: List<MenuEntry>,
-  ) : MenuEntry
+  ) : Row
 
   data object Divider : MenuEntry
 
@@ -208,11 +212,7 @@ internal fun buildMenu(content: KetchMenuScope.() -> Unit): List<MenuEntry> {
 
 /** Whether the keyboard can move to [this] entry. */
 internal val MenuEntry.isSelectable: Boolean
-  get() = when (this) {
-    is MenuEntry.Item -> enabled
-    is MenuEntry.Submenu -> enabled
-    else -> false
-  }
+  get() = this is MenuEntry.Row && enabled
 
 /**
  * The next selectable entry after [from] in the direction of [step], wrapping around, or -1
@@ -406,24 +406,13 @@ private fun MenuPopup(
     properties = PopupProperties(focusable = true),
   ) {
     val focus = remember { FocusRequester() }
-    val appear = remember { Animatable(0f) }
-    val motion = KetchTheme.motion
-    LaunchedEffect(Unit) {
-      focus.requestFocus()
-      appear.animateTo(1f, tween(motion.short, easing = motion.easeDecelerate))
-    }
     MenuPanel(
       entries = entries,
       level = root,
       focus = menuFocus,
       onDismiss = onDismiss,
       modifier = modifier
-        .graphicsLayer {
-          alpha = appear.value
-          val scale = APPEAR_SCALE + (1f - APPEAR_SCALE) * appear.value
-          scaleX = scale
-          scaleY = scale
-        }
+        .popupAppear(focus)
         .onPreviewKeyEvent { event ->
           if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
           val key = event.key.toMenuKey() ?: return@onPreviewKeyEvent false
@@ -468,10 +457,7 @@ private fun MenuPanel(
       }
     }
   }
-  val leading = entries.any {
-    it is MenuEntry.Item && (it.icon != null || it.checked != null) ||
-      it is MenuEntry.Submenu && it.icon != null
-  }
+  val leading = entries.any { it is MenuEntry.Row && (it.icon != null || it.checked != null) }
   Column(
     modifier = modifier
       .width(IntrinsicSize.Max)
@@ -488,30 +474,16 @@ private fun MenuPanel(
     entries.forEachIndexed { index, entry ->
       when (entry) {
         is MenuEntry.Item -> MenuRow(
-          label = entry.label,
-          icon = if (entry.checked == true) KetchIcon.Check else entry.icon,
+          row = entry,
           leading = leading,
-          shortcut = entry.shortcut,
-          caption = entry.caption,
-          enabled = entry.enabled,
-          destructive = entry.destructive,
-          checked = entry.checked,
-          submenu = false,
           highlighted = level.highlighted == index,
           onHover = { if (it) level.hover(index) else level.unhover(index) },
           onClick = { level.activate(index, entries, onDismiss) },
         )
         is MenuEntry.Submenu -> Box {
           MenuRow(
-            label = entry.label,
-            icon = entry.icon,
+            row = entry,
             leading = leading,
-            shortcut = null,
-            caption = null,
-            enabled = entry.enabled,
-            destructive = false,
-            checked = null,
-            submenu = true,
             highlighted = level.highlighted == index,
             onHover = { if (it) level.hover(index) else level.unhover(index) },
             onClick = { if (level.openIndex != index) level.openSubmenu(index) },
@@ -521,24 +493,8 @@ private fun MenuPanel(
             SubmenuPopup(entry, child, focus, onDismiss)
           }
         }
-        MenuEntry.Divider -> Box(
-          Modifier
-            .padding(vertical = spacing.s1)
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(colors.divider),
-        )
-        is MenuEntry.Header -> Text(
-          text = eyebrowText(entry.text),
-          style = KetchTheme.typography.eyebrow,
-          color = colors.textTertiary,
-          modifier = Modifier.padding(
-            start = spacing.s2,
-            end = spacing.s2,
-            top = spacing.s2,
-            bottom = spacing.s1,
-          ),
-        )
+        MenuEntry.Divider -> MenuDivider(vertical = spacing.s1)
+        is MenuEntry.Header -> MenuHeader(entry.text, horizontal = spacing.s2, top = spacing.s2)
         is MenuEntry.Custom -> {
           val key = level to index
           DisposableEffect(focus, key) { onDispose { focus.update(key, false) } }
@@ -569,17 +525,11 @@ private fun SubmenuPopup(
   }
 }
 
+/** A popup menu's [row]; with [leading], a column for glyphs and checks comes first. */
 @Composable
 private fun MenuRow(
-  label: String,
-  icon: KetchIcon?,
+  row: MenuEntry.Row,
   leading: Boolean,
-  shortcut: String?,
-  caption: String?,
-  enabled: Boolean,
-  destructive: Boolean,
-  checked: Boolean?,
-  submenu: Boolean,
   highlighted: Boolean,
   onHover: (Boolean) -> Unit,
   onClick: () -> Unit,
@@ -594,59 +544,34 @@ private fun MenuRow(
   LaunchedEffect(interactions) {
     snapshotFlow { hovered.value }.drop(1).collect { currentOnHover(it) }
   }
-  val ink = when {
-    !enabled -> colors.textDisabled
-    destructive -> colors.status.failed.color
-    else -> colors.textPrimary
-  }
+  val checked = row.checked
+  val icon = row.glyph
+  val shortcut = (row as? MenuEntry.Item)?.shortcut
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s2),
     modifier = Modifier
       .fillMaxWidth()
       .heightIn(min = KetchTheme.density.menuItem)
-      .background(colors.interactionOverlay(highlighted, enabled && pressed), MenuItemShape)
+      .background(colors.interactionOverlay(highlighted, row.enabled && pressed), MenuItemShape)
       .semantics { if (checked != null) selected = checked }
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      )
-      .padding(horizontal = spacing.s2, vertical = if (caption != null) spacing.s1 else 0.dp),
+      .ketchClickable(interactions, enabled = row.enabled, onClick = onClick)
+      .padding(horizontal = spacing.s2, vertical = if (row.caption != null) spacing.s1 else 0.dp),
   ) {
     if (leading) {
       Box(Modifier.size(glyph), contentAlignment = Alignment.Center) {
-        if (icon != null) {
-          KetchIconImage(
-            icon = icon,
-            size = glyph,
-            tint = when {
-              !enabled -> colors.textDisabled
-              checked == true -> colors.accentText
-              destructive -> ink
-              else -> colors.textSecondary
-            },
-          )
-        }
+        if (icon != null) KetchIconImage(icon, size = glyph, tint = row.glyphTint(colors))
       }
     }
     Column(Modifier.weight(1f)) {
       Text(
-        text = label,
+        text = row.label,
         style = KetchTheme.typography.label,
-        color = ink,
+        color = row.ink(colors),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      if (caption != null) {
-        Text(
-          text = caption,
-          style = KetchTheme.typography.caption,
-          color = if (enabled) colors.textSecondary else colors.textDisabled,
-        )
-      }
+      MenuCaption(row)
     }
     if (shortcut != null) {
       Text(
@@ -657,7 +582,9 @@ private fun MenuRow(
         modifier = Modifier.padding(start = spacing.s4),
       )
     }
-    if (submenu) KetchIconImage(KetchIcon.Chevron, size = glyph, tint = colors.textTertiary)
+    if (row is MenuEntry.Submenu) {
+      KetchIconImage(KetchIcon.Chevron, size = glyph, tint = colors.textTertiary)
+    }
   }
 }
 
@@ -671,10 +598,7 @@ private fun MenuSheet(
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  val sheetState = rememberBottomSheetState(
-    initialValue = SheetValue.Hidden,
-    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-  )
+  val sheetState = rememberKetchSheetState()
   val scope = rememberCoroutineScope()
   val close: () -> Unit = {
     scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
@@ -687,16 +611,7 @@ private fun MenuSheet(
     current = submenu.entries
     heading = submenu.label
   }
-  ModalBottomSheet(
-    onDismissRequest = onDismiss,
-    modifier = modifier,
-    sheetState = sheetState,
-    shape = KetchTheme.shapes.sheetTop,
-    containerColor = colors.surfaceRaised,
-    contentColor = colors.textPrimary,
-    tonalElevation = 0.dp,
-    scrimColor = colors.scrim,
-  ) {
+  KetchBottomSheet(onDismissRequest = onDismiss, modifier = modifier, sheetState = sheetState) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.s4)) {
       if (heading != null || path.isNotEmpty()) {
         Row(
@@ -722,47 +637,13 @@ private fun MenuSheet(
       }
       current.forEachIndexed { index, entry ->
         when (entry) {
-          is MenuEntry.Item -> SheetRow(
-            label = entry.label,
-            icon = if (entry.checked == true) KetchIcon.Check else entry.icon,
-            caption = entry.caption,
-            enabled = entry.enabled,
-            destructive = entry.destructive,
-            checked = entry.checked,
-            submenu = false,
-            onClick = {
-              entry.onClick()
-              if (!entry.keepOpen) close()
-            },
-          )
-          is MenuEntry.Submenu -> SheetRow(
-            label = entry.label,
-            icon = entry.icon,
-            caption = null,
-            enabled = entry.enabled,
-            destructive = false,
-            checked = null,
-            submenu = true,
-            onClick = { path = path + index },
-          )
-          MenuEntry.Divider -> Box(
-            Modifier
-              .padding(vertical = spacing.s2)
-              .fillMaxWidth()
-              .height(1.dp)
-              .background(colors.divider),
-          )
-          is MenuEntry.Header -> Text(
-            text = eyebrowText(entry.text),
-            style = KetchTheme.typography.eyebrow,
-            color = colors.textTertiary,
-            modifier = Modifier.padding(
-              start = spacing.s4,
-              end = spacing.s4,
-              top = spacing.s3,
-              bottom = spacing.s1,
-            ),
-          )
+          is MenuEntry.Item -> SheetRow(entry) {
+            entry.onClick()
+            if (!entry.keepOpen) close()
+          }
+          is MenuEntry.Submenu -> SheetRow(entry) { path = path + index }
+          MenuEntry.Divider -> MenuDivider(vertical = spacing.s2)
+          is MenuEntry.Header -> MenuHeader(entry.text, horizontal = spacing.s4, top = spacing.s3)
           is MenuEntry.Custom -> Box(
             Modifier.padding(horizontal = spacing.s4, vertical = spacing.s2),
           ) { entry.content(close) }
@@ -772,27 +653,16 @@ private fun MenuSheet(
   }
 }
 
+/** A bottom sheet menu's [row], 48 dp tall on touch. */
 @Composable
-private fun SheetRow(
-  label: String,
-  icon: KetchIcon?,
-  caption: String?,
-  enabled: Boolean,
-  destructive: Boolean,
-  checked: Boolean?,
-  submenu: Boolean,
-  onClick: () -> Unit,
-) {
+private fun SheetRow(row: MenuEntry.Row, onClick: () -> Unit) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val glyph = KetchTheme.density.controlGlyph
   val interactions = remember { MutableInteractionSource() }
-  val overlay = rememberInteractionOverlay(interactions, enabled)
-  val ink = when {
-    !enabled -> colors.textDisabled
-    destructive -> colors.status.failed.color
-    else -> colors.textPrimary
-  }
+  val overlay = rememberInteractionOverlay(interactions, row.enabled)
+  val checked = row.checked
+  val icon = row.glyph
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s4),
@@ -801,39 +671,74 @@ private fun SheetRow(
       .heightIn(min = KetchTheme.density.menuItem)
       .background(overlay)
       .semantics { if (checked != null) selected = checked }
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, enabled = row.enabled, onClick = onClick)
       .padding(horizontal = spacing.s4, vertical = spacing.s2),
   ) {
-    if (icon != null) {
-      KetchIconImage(
-        icon = icon,
-        size = glyph,
-        tint = when {
-          !enabled -> colors.textDisabled
-          checked == true -> colors.accentText
-          destructive -> ink
-          else -> colors.textSecondary
-        },
-      )
-    }
+    if (icon != null) KetchIconImage(icon, size = glyph, tint = row.glyphTint(colors))
     Column(Modifier.weight(1f)) {
-      Text(label, style = KetchTheme.typography.body, color = ink)
-      if (caption != null) {
-        Text(
-          text = caption,
-          style = KetchTheme.typography.caption,
-          color = if (enabled) colors.textSecondary else colors.textDisabled,
-        )
-      }
+      Text(row.label, style = KetchTheme.typography.body, color = row.ink(colors))
+      MenuCaption(row)
     }
-    if (submenu) KetchIconImage(KetchIcon.Chevron, size = glyph, tint = colors.textTertiary)
+    if (row is MenuEntry.Submenu) {
+      KetchIconImage(KetchIcon.Chevron, size = glyph, tint = colors.textTertiary)
+    }
   }
+}
+
+/** A row's glyph: a check while it is checked, else its icon. */
+private val MenuEntry.Row.glyph: KetchIcon?
+  get() = if (checked == true) KetchIcon.Check else icon
+
+/** Color of a row's label: disabled, destructive or plain. */
+private fun MenuEntry.Row.ink(colors: KetchColors): Color = when {
+  !enabled -> colors.textDisabled
+  destructive -> colors.status.failed.color
+  else -> colors.textPrimary
+}
+
+/** Color of a row's glyph: the accent while checked, else as its label but quieter. */
+private fun MenuEntry.Row.glyphTint(colors: KetchColors): Color = when {
+  !enabled -> colors.textDisabled
+  checked == true -> colors.accentText
+  destructive -> colors.status.failed.color
+  else -> colors.textSecondary
+}
+
+/** The second line of [row], when it has a caption. */
+@Composable
+private fun MenuCaption(row: MenuEntry.Row) {
+  val caption = row.caption ?: return
+  Text(
+    text = caption,
+    style = KetchTheme.typography.caption,
+    color = if (row.enabled) KetchTheme.colors.textSecondary else KetchTheme.colors.textDisabled,
+  )
+}
+
+/** A divider between groups of entries, with [vertical] space above and below it. */
+@Composable
+private fun MenuDivider(vertical: Dp) {
+  Box(
+    Modifier
+      .padding(vertical = vertical)
+      .fillMaxWidth()
+      .height(1.dp)
+      .background(KetchTheme.colors.divider),
+  )
+}
+
+/** A section label, such as "Recent", inset by [horizontal] on both sides and [top] above. */
+@Composable
+private fun MenuHeader(text: String, horizontal: Dp, top: Dp) {
+  KetchEyebrow(
+    text = text,
+    modifier = Modifier.padding(
+      start = horizontal,
+      end = horizontal,
+      top = top,
+      bottom = KetchTheme.spacing.s1,
+    ),
+  )
 }
 
 /**
@@ -908,7 +813,6 @@ private fun inWindow(position: Int, size: Int, window: Int, margin: Int): Int {
 }
 
 private const val SUBMENU_DELAY_MILLIS = 150L
-private const val APPEAR_SCALE = 0.96f
 private val MenuInset = 4.dp
 private val MenuGap = 4.dp
 private val MenuMinWidth = 180.dp

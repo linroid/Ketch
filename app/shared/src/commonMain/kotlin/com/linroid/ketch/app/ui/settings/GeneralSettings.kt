@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
@@ -61,11 +62,8 @@ private val log = KetchLogger("GeneralSettings")
  *   device of this app's own to name (the web app).
  */
 @Composable
-fun GeneralSettings(
-  state: AppState,
-  appSettings: AppSettingsController,
-  systemDeviceName: String?,
-) {
+fun GeneralSettings(state: AppState, systemDeviceName: String?) {
+  val appSettings = state.appSettings
   val ui = appSettings.ui
   if (systemDeviceName != null) {
     SettingsGroup(title = "This device") {
@@ -86,8 +84,8 @@ fun GeneralSettings(
     SettingsRow(
       title = "Theme",
       trailing = {
-        SettingsSegmented(
-          value = appSettings.themeMode,
+        KetchSegmented(
+          selected = appSettings.themeMode,
           options = ThemeMode.entries,
           label = { it.label },
           onSelect = { appSettings.saveThemeMode(it) },
@@ -104,8 +102,8 @@ fun GeneralSettings(
       title = "Density",
       description = "Auto: compact with a mouse, roomier with touch.",
       trailing = {
-        SettingsSegmented(
-          value = ui.density,
+        KetchSegmented(
+          selected = ui.density,
           options = DensityMode.entries,
           label = { it.label },
           onSelect = { mode -> appSettings.saveUi { it.copy(density = mode) } },
@@ -121,8 +119,8 @@ fun GeneralSettings(
         else -> "Auto follows your system's setting."
       },
       trailing = {
-        SettingsSegmented(
-          value = ui.reduceMotion,
+        KetchSegmented(
+          selected = ui.reduceMotion,
           options = listOf(false, true),
           label = { if (it) "On" else "Auto" },
           onSelect = { on -> appSettings.saveUi { it.copy(reduceMotion = on) } },

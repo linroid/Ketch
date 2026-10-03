@@ -9,6 +9,7 @@ import com.linroid.ketch.app.state.IntakeSource
 import com.linroid.ketch.app.state.IntakeStatus
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.formatBytes
+import com.linroid.ketch.app.util.shortName
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration
@@ -142,8 +143,7 @@ internal fun relativeAge(
     age < 7.days -> "${age.inWholeDays} days ago"
     else -> {
       val date = at.toLocalDateTime(zone).date
-      val month = MONTHS[date.month.ordinal]
-      "$month ${date.day}"
+      "${date.month.shortName} ${date.day}"
     }
   }
 }
@@ -171,6 +171,3 @@ private fun percent(progress: DownloadProgress): String {
 
 private const val SEPARATOR = " · "
 private const val TORRENT = "torrent"
-private val MONTHS = listOf(
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-)

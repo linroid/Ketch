@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.sp
  * @property caption row meta, hints and reasons.
  * @property label buttons, sidebar items and tabs.
  * @property labelS chips, pills and menu shortcut hints.
- * @property eyebrow group headers, the table header and card labels; uppercase the text with
- *   [eyebrowText].
+ * @property eyebrow group headers, the table header and card labels, which `KetchEyebrow`
+ *   draws in capitals through [eyebrowText].
  * @property numeralXL device-card speed and the phone Pulse sheet.
  * @property numeralL inspector speed.
  * @property numeral row speed, size, ETA and percentage, and the Pulse bar speed.
@@ -93,11 +93,7 @@ fun ketchTypography(
     largeTitle = style(display, FontWeight.Bold, 28, 34, (-0.5).sp),
     titleL = style(sans, FontWeight.SemiBold, 20, 26, (-0.3).sp),
     titleM = style(sans, FontWeight.SemiBold, 15, 20, (-0.1).sp),
-    bodyStrong = if (comfortable) {
-      style(sans, FontWeight.Medium, 15, 20)
-    } else {
-      style(sans, FontWeight.Medium, 14, 20)
-    },
+    bodyStrong = style(sans, FontWeight.Medium, if (comfortable) 15 else 14, 20),
     body = style(sans, FontWeight.Normal, 14, 20),
     bodyS = style(sans, FontWeight.Normal, 13, 18),
     cell = style(sans, FontWeight.Normal, 13, 18),

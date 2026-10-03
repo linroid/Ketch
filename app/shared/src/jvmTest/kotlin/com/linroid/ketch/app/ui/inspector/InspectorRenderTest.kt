@@ -7,14 +7,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ImageComposeScene
-import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -24,21 +21,20 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.snapshot.SampleData
-import com.linroid.ketch.app.snapshot.SampleEnvironment
-import com.linroid.ketch.app.snapshot.SnapshotHarness
 import com.linroid.ketch.app.snapshot.SnapshotTheme
+import com.linroid.ketch.app.snapshot.frames
+import com.linroid.ketch.app.snapshot.nodes
+import com.linroid.ketch.app.snapshot.sendKey
+import com.linroid.ketch.app.snapshot.withSample
+import com.linroid.ketch.app.snapshot.withScene
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -92,7 +88,7 @@ class InspectorRenderTest {
       },
     ) { scene ->
       repeat(3) {
-        scene.key(Key.DirectionRight)
+        scene.sendKey(Key.DirectionRight)
         frames(scene, 50.milliseconds)
       }
       assertEquals(emptyList(), commits)
@@ -125,7 +121,7 @@ class InspectorRenderTest {
       scene.openCustomField()
       scene.typeIntoField("3m")
       frames(scene, 100.milliseconds)
-      scene.key(Key.Escape)
+      scene.sendKey(Key.Escape)
       frames(scene, 1.seconds)
       assertTrue(scene.texts().none { it == "Custom…" }, "The popover closed: ${scene.texts()}")
     }
@@ -166,14 +162,9 @@ class InspectorRenderTest {
     name: String,
     test: suspend (AppState, TaskKey, ImageComposeScene) -> Unit,
   ) {
-    val data = SampleData.downloads()
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SampleEnvironment(data, SnapshotTheme.Light, DensityMode.Compact)
-    }
-    try {
-      runBlocking(SnapshotHarness.ui) { withTimeout(5.seconds) { environment.start() } }
+    withSample(SnapshotTheme.Light) { environment ->
       val state = environment.controller.state
-      val key = data.keyOf(name)
+      val key = environment.data.keyOf(name)
       runScene(
         width = INSPECTOR_WIDTH,
         height = INSPECTOR_HEIGHT,
@@ -183,8 +174,6 @@ class InspectorRenderTest {
           }
         },
       ) { scene -> test(state, key, scene) }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 
@@ -230,36 +219,24 @@ class InspectorRenderTest {
     height: Int = SLIDER_HEIGHT,
     content: @Composable () -> Unit,
     test: suspend (ImageComposeScene) -> Unit,
-  ) {
-    runBlocking(SnapshotHarness.ui) {
-      val scene = ImageComposeScene(
-        width = width,
-        height = height,
-        density = Density(1f),
-        coroutineContext = SnapshotHarness.ui,
-      ) {
-        // The samples' clock, as the app root provides it, so times read the same on any day.
-        CompositionLocalProvider(LocalClock provides SampleData.CLOCK) {
-          KetchTheme(darkTheme = false, density = DensityMode.Compact, reduceMotion = true) {
-            content()
-          }
+  ) = withScene(
+    width = width,
+    height = height,
+    content = {
+      // The samples' clock, as the app root provides it, so times read the same on any day.
+      CompositionLocalProvider(LocalClock provides SampleData.CLOCK) {
+        KetchTheme(darkTheme = false, density = DensityMode.Compact, reduceMotion = true) {
+          content()
         }
       }
-      try {
-        frames(scene, 300.milliseconds)
-        test(scene)
-      } finally {
-        scene.close()
-      }
-    }
+    },
+  ) {
+    frames(this, 300.milliseconds)
+    test(this)
   }
 
-  private suspend fun frames(scene: ImageComposeScene, duration: Duration) {
-    repeat((duration / FRAME).toInt().coerceAtLeast(1)) {
-      scene.render(System.nanoTime())
-      delay(FRAME)
-    }
-  }
+  private suspend fun frames(scene: ImageComposeScene, duration: Duration) =
+    scene.frames((duration / FRAME).toInt().coerceAtLeast(1))
 
   private fun ImageComposeScene.press(at: Offset) {
     sendPointerEvent(PointerEventType.Move, at)
@@ -274,19 +251,6 @@ class InspectorRenderTest {
       button = PointerButton.Primary,
     )
   }
-
-  @OptIn(InternalComposeUiApi::class)
-  private fun ImageComposeScene.key(key: Key) {
-    for (type in listOf(KeyEventType.KeyDown, KeyEventType.KeyUp)) {
-      sendKeyEvent(KeyEvent(key = key, type = type))
-    }
-  }
-
-  private fun ImageComposeScene.nodes(): List<SemanticsNode> =
-    semanticsOwners.flatMap { it.unmergedRootSemanticsNode.all() }
-
-  private fun SemanticsNode.all(): List<SemanticsNode> =
-    listOf(this) + children.flatMap { it.all() }
 
   private fun SemanticsNode.text(): String? =
     config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text }

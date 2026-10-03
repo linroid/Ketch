@@ -207,10 +207,12 @@ sealed class AddedSpan {
  * Tokens of the same facet widen a search: `type:video type:audio` finds either. Size and date
  * bounds and the `urgent`, `stalled` and `limited` flags narrow it: every one must hold.
  */
-sealed class SearchToken {
+sealed class SearchToken(
   /** The key before the colon, such as `is`. */
-  abstract val key: String
-
+  val key: String,
+  /** Tokens with the same non-null facet widen the search instead of narrowing it. */
+  internal val facet: String?,
+) {
   /** The value after the colon, as typed. */
   abstract val value: String
 
@@ -218,37 +220,28 @@ sealed class SearchToken {
   val label: String
     get() = "$key:${quoteIfNeeded(value)}"
 
-  /** Tokens with the same non-null facet widen the search instead of narrowing it. */
-  internal abstract val facet: String?
-
   /** Whether [target] passes this token at [now] in [timeZone]. */
   abstract fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean
 
   /** `is:` with a state or a flag. */
-  data class Is(val status: SearchStatus) : SearchToken() {
-    override val key: String get() = IS
+  data class Is(val status: SearchStatus) : SearchToken(IS, IS.takeIf { status.isState }) {
     override val value: String get() = status.id
-    override val facet: String? get() = if (status.isState) IS else null
 
     override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
       status.matches(target)
   }
 
   /** `type:`, such as `type:video`. A torrent also matches `type:torrent`. */
-  data class Type(val type: FileType) : SearchToken() {
-    override val key: String get() = TYPE
+  data class Type(val type: FileType) : SearchToken(TYPE, TYPE) {
     override val value: String get() = type.id
-    override val facet: String get() = TYPE
 
     override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
       target.fileType == type || (type == FileType.Torrent && target.isTorrent)
   }
 
   /** `host:`, matching the link's host or the page it came from, subdomains included. */
-  data class Host(val host: String) : SearchToken() {
-    override val key: String get() = HOST
+  data class Host(val host: String) : SearchToken(HOST, HOST) {
     override val value: String get() = host
-    override val facet: String get() = HOST
 
     override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
       hostMatches(target.host) || hostMatches(target.refererHost)
@@ -258,20 +251,16 @@ sealed class SearchToken {
   }
 
   /** `origin:`, such as `origin:browser`. Tasks of unknown origin never match. */
-  data class Origin(val origin: TaskOrigin) : SearchToken() {
-    override val key: String get() = ORIGIN
+  data class Origin(val origin: TaskOrigin) : SearchToken(ORIGIN, ORIGIN) {
     override val value: String get() = origin.id
-    override val facet: String get() = ORIGIN
 
     override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
       target.origin == origin
   }
 
   /** `device:`, matching device names that contain [name], ignoring case. */
-  data class Device(val name: String) : SearchToken() {
-    override val key: String get() = DEVICE
+  data class Device(val name: String) : SearchToken(DEVICE, DEVICE) {
     override val value: String get() = name
-    override val facet: String get() = DEVICE
 
     override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean =
       target.deviceName.contains(name, ignoreCase = true)
@@ -288,9 +277,7 @@ sealed class SearchToken {
     val comparison: SizeComparison,
     val bytes: Long,
     override val value: String,
-  ) : SearchToken() {
-    override val key: String get() = SIZE
-    override val facet: String? get() = null
+  ) : SearchToken(SIZE, facet = null) {
 
     override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean {
       val size = target.sizeBytes ?: return false
@@ -299,9 +286,8 @@ sealed class SearchToken {
   }
 
   /** `added:`, such as `added:today` or `added:<7d`; a bare span means "within". */
-  data class Added(val span: AddedSpan, override val value: String) : SearchToken() {
-    override val key: String get() = ADDED
-    override val facet: String? get() = null
+  data class Added(val span: AddedSpan, override val value: String) :
+    SearchToken(ADDED, facet = null) {
 
     override fun matches(target: SearchTarget, now: Instant, timeZone: TimeZone): Boolean {
       val age = now - target.createdAt

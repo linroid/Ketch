@@ -1,22 +1,18 @@
 package com.linroid.ketch.app.snapshot
 
 import androidx.compose.ui.input.key.Key
-import com.linroid.ketch.app.state.StatusFilter
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
 /**
- * The app root at every size in light and dark, over downloads in every state and over none;
- * see [SnapshotHarness] for how to run it.
+ * The app root over no downloads at every size in light and dark, and its add sheet, device
+ * switcher and keyboard focus over downloads in every state; see [SnapshotHarness] for how to
+ * run it.
+ * [TableSnapshots] and [ShellSnapshots] show the downloads themselves at every size.
  */
 class AppSnapshots {
   @BeforeTest
   fun enabled() = requireSnapshots()
-
-  @Test
-  fun downloads_everySizeAndTheme_rendersEveryState() {
-    appSnapshots("downloads")
-  }
 
   @Test
   fun empty_everySizeAndTheme_rendersEmptyState() {
@@ -29,9 +25,7 @@ class AppSnapshots {
     appSnapshots("add-sheet", sizes) {
       openAddSheet("https://download.blender.org/release/Blender4.2/blender-4.2-linux-x64.tar.xz")
     }
-    appSnapshots("settings", sizes) { openSettings() }
     appSnapshots("devices", sizes) { openDevices() }
-    appSnapshots("failed-tab", sizes) { showTab(StatusFilter.Failed) }
     appSnapshots("keyboard-focus", listOf(SnapshotSize.Desktop)) {
       repeat(3) { scene.pressKey(Key.Tab) }
     }

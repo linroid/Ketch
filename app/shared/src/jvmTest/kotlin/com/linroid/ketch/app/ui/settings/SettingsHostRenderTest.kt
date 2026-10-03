@@ -2,28 +2,23 @@ package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ImageComposeScene
-import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.unit.Density
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.snapshot.SettingsEnvironment
 import com.linroid.ketch.app.snapshot.SettingsFrame
-import com.linroid.ketch.app.snapshot.SnapshotHarness
 import com.linroid.ketch.app.snapshot.SnapshotTheme
+import com.linroid.ketch.app.snapshot.frames
+import com.linroid.ketch.app.snapshot.nodes
+import com.linroid.ketch.app.snapshot.sendKey
+import com.linroid.ketch.app.snapshot.withScene
+import com.linroid.ketch.app.snapshot.withSettings
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchDensity
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
 
 /** Settings driven with the keyboard, as the desktop's Settings window shows it. */
 class SettingsHostRenderTest {
@@ -81,28 +76,11 @@ class SettingsHostRenderTest {
     onClose: () -> Unit = {},
     test: suspend (ImageComposeScene) -> Unit,
   ) {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SettingsEnvironment(SnapshotTheme.Light, DensityMode.Compact)
-    }
-    try {
-      runBlocking(SnapshotHarness.ui) {
-        val scene = ImageComposeScene(
-          width = WIDTH,
-          height = HEIGHT,
-          density = Density(1f),
-          coroutineContext = SnapshotHarness.ui,
-        ) {
-          Settings(environment, query, onClose)
-        }
-        try {
-          scene.frames()
-          test(scene)
-        } finally {
-          scene.close()
-        }
+    withSettings(SnapshotTheme.Light, KetchDensity.Compact) { environment ->
+      withScene(WIDTH, HEIGHT, content = { Settings(environment, query, onClose) }) {
+        frames(FRAMES)
+        test(this)
       }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 
@@ -118,35 +96,12 @@ class SettingsHostRenderTest {
     }
   }
 
-  private suspend fun ImageComposeScene.frames() {
-    repeat(FRAMES) {
-      render(System.nanoTime())
-      delay(FRAME)
-    }
-  }
-
   /** Presses [key], with the primary modifier (⌘ on Apple keyboards, Ctrl elsewhere). */
-  @OptIn(InternalComposeUiApi::class)
   private suspend fun ImageComposeScene.key(key: Key, primary: Boolean = false) {
     val apple = KeyboardPlatform.current.isApple
-    for (type in listOf(KeyEventType.KeyDown, KeyEventType.KeyUp)) {
-      sendKeyEvent(
-        KeyEvent(
-          key = key,
-          type = type,
-          isMetaPressed = primary && apple,
-          isCtrlPressed = primary && !apple,
-        ),
-      )
-    }
-    frames()
+    sendKey(key, meta = primary && apple, ctrl = primary && !apple)
+    frames(FRAMES)
   }
-
-  private fun ImageComposeScene.nodes(): List<SemanticsNode> =
-    semanticsOwners.flatMap { it.unmergedRootSemanticsNode.all() }
-
-  private fun SemanticsNode.all(): List<SemanticsNode> =
-    listOf(this) + children.flatMap { it.all() }
 
   /** Every text shown, in lower case. */
   private fun ImageComposeScene.texts(): Set<String> = nodes()
@@ -170,6 +125,5 @@ class SettingsHostRenderTest {
     const val WIDTH = 860
     const val HEIGHT = 640
     const val FRAMES = 12
-    val FRAME = 16.milliseconds
   }
 }

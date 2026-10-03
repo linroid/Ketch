@@ -4,13 +4,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadProgress
@@ -19,13 +17,13 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
-import com.linroid.ketch.app.snapshot.SnapshotHarness
+import com.linroid.ketch.app.snapshot.frames
+import com.linroid.ketch.app.snapshot.nodes
+import com.linroid.ketch.app.snapshot.withScene
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -74,13 +72,10 @@ class FilesTabRenderTest {
   /** The Files tab of [row] in a scrolling column, as the inspector shows it, at 1 px per dp. */
   private fun render(row: TaskRow, maxHeight: Dp = Dp.Unspecified): Rendered {
     var height = -1
-    val texts = runBlocking(SnapshotHarness.ui) {
-      val scene = ImageComposeScene(
-        width = WIDTH,
-        height = WINDOW_HEIGHT,
-        density = Density(1f),
-        coroutineContext = SnapshotHarness.ui,
-      ) {
+    val texts = withScene(
+      width = WIDTH,
+      height = WINDOW_HEIGHT,
+      content = {
         KetchTheme(darkTheme = false, density = DensityMode.Compact, reduceMotion = true) {
           Column(Modifier.verticalScroll(rememberScrollState())) {
             Box(Modifier.onSizeChanged { height = it.height }) {
@@ -88,16 +83,10 @@ class FilesTabRenderTest {
             }
           }
         }
-      }
-      try {
-        repeat(FRAMES) { frame ->
-          scene.render(frame * FRAME_NANOS)
-          delay(FRAME_MILLIS)
-        }
-        scene.semanticsOwners.flatMap { it.unmergedRootSemanticsNode.texts() }
-      } finally {
-        scene.close()
-      }
+      },
+    ) {
+      frames(FRAMES) { it * FRAME_NANOS }
+      nodes().flatMap { it.texts() }
     }
     return Rendered(height, texts)
   }
@@ -105,11 +94,9 @@ class FilesTabRenderTest {
   /** The tab's height in dp and the texts it shows. */
   private data class Rendered(val height: Int, val texts: List<String>)
 
-  private fun SemanticsNode.texts(): List<String> {
-    val own = config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
+  private fun SemanticsNode.texts(): List<String> =
+    config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
       config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
-    return own + children.flatMap { it.texts() }
-  }
 
   private companion object {
     const val FILE_SIZE = 1_000_000L
@@ -118,7 +105,6 @@ class FilesTabRenderTest {
     const val DEFAULT_MAX_HEIGHT = 360
     const val FILL_HEIGHT = 700
     const val FRAMES = 10
-    const val FRAME_MILLIS = 16L
     const val FRAME_NANOS = 16_000_000L
   }
 }

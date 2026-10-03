@@ -11,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * In-process AI discovery using the `ai:discover` module directly.
- * Available on JVM/Desktop where the AI module can run.
+ * Available on Android and JVM/Desktop, where the AI module can run.
  *
  * Searches run one at a time, so the steps the module reports belong to the search that asked
  * for them.

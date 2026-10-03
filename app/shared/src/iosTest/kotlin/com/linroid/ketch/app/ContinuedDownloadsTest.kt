@@ -15,6 +15,7 @@ class ContinuedDownloadsTest {
   private var inFront = true
   private val continued = ContinuedDownloads(processing) { inFront }
   private val progress = BackgroundProgress("Downloading file.bin", "10 B of 100 B", 100)
+  private val downloading = DownloadState.Downloading(RecordingTask.PROGRESS)
 
   @Test
   fun update_downloadStartsInFront_beginsWithItsProgress() {
@@ -100,10 +101,7 @@ class ContinuedDownloadsTest {
 
   @Test
   fun backgroundProgress_oneDownload_namesItsFile() {
-    val api = RecordingKetchApi()
-    api.add(DownloadState.Downloading(RecordingTask.PROGRESS))
-
-    val shown = backgroundProgress(api.tasks.value)
+    val shown = shownFor(downloading)
 
     assertEquals("Downloading file1.bin", shown?.title)
     assertEquals(100, shown?.permille)
@@ -111,18 +109,12 @@ class ContinuedDownloadsTest {
 
   @Test
   fun backgroundProgress_severalDownloads_countsThem() {
-    val api = RecordingKetchApi()
-    repeat(3) { api.add(DownloadState.Downloading(RecordingTask.PROGRESS)) }
-
-    assertEquals("Downloading 3 files", backgroundProgress(api.tasks.value)?.title)
+    assertEquals("Downloading 3 files", shownFor(downloading, downloading, downloading)?.title)
   }
 
   @Test
   fun backgroundProgress_onlyWaiting_isIndeterminate() {
-    val api = RecordingKetchApi()
-    api.add(DownloadState.Queued)
-
-    val shown = backgroundProgress(api.tasks.value)
+    val shown = shownFor(DownloadState.Queued)
 
     assertEquals("Waiting to download 1 file", shown?.title)
     assertEquals("", shown?.subtitle)
@@ -131,10 +123,14 @@ class ContinuedDownloadsTest {
 
   @Test
   fun backgroundProgress_nothingActive_isNull() {
-    val api = RecordingKetchApi()
-    api.add(DownloadState.Paused(RecordingTask.PROGRESS))
+    assertNull(shownFor(DownloadState.Paused(RecordingTask.PROGRESS)))
+  }
 
-    assertNull(backgroundProgress(api.tasks.value))
+  /** What [backgroundProgress] shows for a device with tasks in [states]. */
+  private fun shownFor(vararg states: DownloadState): BackgroundProgress? {
+    val api = RecordingKetchApi()
+    states.forEach { api.add(it) }
+    return backgroundProgress(api.tasks.value)
   }
 
   private class RecordingProcessing : ContinuedProcessing {

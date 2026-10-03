@@ -5,7 +5,6 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.theme.KetchSpacing
-import com.linroid.ketch.app.theme.ketchSpacing
 import com.linroid.ketch.app.ui.downloads.KetchLayoutInfo
 import com.linroid.ketch.app.ui.downloads.LayoutTier
 
@@ -56,7 +55,7 @@ internal data class KetchLayout(
     fun of(
       windowWidth: Dp,
       sidebarCollapsed: Boolean = false,
-      spacing: KetchSpacing = ketchSpacing(),
+      spacing: KetchSpacing = KetchSpacing(),
     ): KetchLayout {
       val tier = KetchLayoutInfo.of(windowWidth).tier
       val navigation = when {

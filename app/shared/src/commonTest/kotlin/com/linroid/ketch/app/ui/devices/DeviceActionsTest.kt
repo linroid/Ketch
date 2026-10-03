@@ -5,9 +5,8 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
-import com.linroid.ketch.app.instance.DevicePresence
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -17,12 +16,12 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
-import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -83,25 +82,8 @@ class DeviceActionsTest {
     return Fixture(controller, manager.instances.value.first { it is RemoteInstance }, speed)
   }
 
-  private fun presence(entry: InstanceEntry) = DevicePresence(
-    entry = entry,
-    name = "This Mac",
-    detail = "MacBook Pro",
-    health = DeviceHealth.Local(),
-    connected = true,
-    watched = true,
-    status = null,
-    statusAt = null,
-    lastSeen = null,
-    speed = 0,
-    counts = PulseCounts(),
-    failures = 0,
-    unseenFailures = 0,
-    cap = SpeedLimit.Unlimited,
-    disk = null,
-    speedMode = SpeedMode.Full,
-    history = emptyList(),
-  )
+  private fun devicesTest(block: suspend TestScope.(Fixture) -> Unit) =
+    fixtureTest({ fixture(RecordingKetchApi("NAS")) }, { it.controller.close() }, block)
 
   @Test
   fun showDeviceTab_failedCountOfTheNas_switchesToItsFailedTab() = runTest {
@@ -150,13 +132,12 @@ class DeviceActionsTest {
   }
 
   @Test
-  fun toggleSlowLane_thisMacWhileTheNasShows_switchesItsModeWithUndo() = runTest {
-    val f = fixture(RecordingKetchApi("NAS"))
+  fun toggleSlowLane_thisMacWhileTheNasShows_switchesItsModeWithUndo() = devicesTest { f ->
     f.state.switchInstance(f.nas)
     runCurrent()
     val local = f.state.instances.value.first { it.deviceId == LOCAL_DEVICE_ID }
 
-    f.state.toggleSlowLane(presence(local))
+    f.state.toggleSlowLane(presence(local, "This Mac", "MacBook Pro", DeviceHealth.Local()))
     runCurrent()
 
     assertEquals(SpeedMode.SlowLane, f.speed.mode.value)
@@ -165,13 +146,10 @@ class DeviceActionsTest {
     message.actions.single { it.label == "Undo" }.onClick()
     runCurrent()
     assertEquals(SpeedMode.Full, f.speed.mode.value)
-    f.controller.close()
   }
 
   @Test
-  fun dropText_onTheNasCard_opensTheAddSheetForTheNas() = runTest {
-    val f = fixture(RecordingKetchApi("NAS"))
-
+  fun dropText_onTheNasCard_opensTheAddSheetForTheNas() = devicesTest { f ->
     f.state.dropText(f.nas, "  https://example.com/ubuntu.iso\n")
 
     assertTrue(f.state.showAddDialog)
@@ -179,7 +157,6 @@ class DeviceActionsTest {
       IntakeRequest(text = "https://example.com/ubuntu.iso", targetDeviceId = f.nas.deviceId),
       f.state.intakeRequest
     )
-    f.controller.close()
   }
 
   @Test
@@ -207,12 +184,9 @@ class DeviceActionsTest {
   }
 
   @Test
-  fun renameDevice_nas_renamesItAtOnce() = runTest {
-    val f = fixture(RecordingKetchApi("NAS"))
-
+  fun renameDevice_nas_renamesItAtOnce() = devicesTest { f ->
     f.state.renameDevice(f.nas, "Basement")
 
     assertEquals("Basement", f.state.instances.value.first { it is RemoteInstance }.label)
-    f.controller.close()
   }
 }

@@ -3,7 +3,6 @@ package com.linroid.ketch.app.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,9 +12,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -26,7 +23,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -34,9 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.theme.KetchTheme
-import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 /** Connection counts a task can ask for. */
 val ConnectionRange: IntRange = 1..32
@@ -98,16 +92,7 @@ fun ConnectionStepper(
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  var requested by remember { mutableStateOf<Int?>(null) }
-  LaunchedEffect(value, pending, requested) {
-    val chosen = requested ?: return@LaunchedEffect
-    if (value == chosen) {
-      requested = null
-    } else if (!pending) {
-      delay(SettleTimeout)
-      requested = null
-    }
-  }
+  var requested by rememberRequested(value, pending)
   val shown = requested ?: value
   val currentOnCommit by rememberUpdatedState(onCommit)
   val currentValue by rememberUpdatedState(value)
@@ -155,11 +140,7 @@ fun ConnectionStepper(
       if (pending) KetchSpinner()
     }
   }
-  if (!enabled && disabledReason != null) {
-    KetchTooltip(text = disabledReason, modifier = modifier) { stepper(Modifier) }
-  } else {
-    stepper(modifier)
-  }
+  OptionalTooltip(disabledReason.takeIf { !enabled }, modifier, content = stepper)
 }
 
 @Composable
@@ -180,14 +161,7 @@ private fun StepButton(plus: Boolean, description: String, enabled: Boolean, onC
       .background(overlay, shape)
       .border(1.dp, colors.borderStrong, shape)
       .semantics { contentDescription = description }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      ),
+      .ketchClickable(interactions, focus, enabled = enabled, onClick = onClick),
   ) {
     StepGlyph(plus, KetchTheme.density.controlGlyph, colors.textPrimary)
   }
@@ -210,5 +184,4 @@ private fun StepGlyph(plus: Boolean, size: Dp, color: Color) {
 private const val GLYPH_GRID = 20f
 private const val GLYPH_STROKE = 1.7f
 private val StepperCommitDelay = 400.milliseconds
-private val SettleTimeout = 2.seconds
 private val ValueMinWidth = 56.dp

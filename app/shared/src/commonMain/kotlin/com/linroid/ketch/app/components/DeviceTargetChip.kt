@@ -2,7 +2,6 @@ package com.linroid.ketch.app.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,7 +56,6 @@ data class DeviceOption(
  * two or more devices.
  *
  * @param selectedId id of the device downloads go to now.
- * @param label what the pill calls the choice.
  */
 @Composable
 fun DeviceTargetChip(
@@ -66,15 +63,13 @@ fun DeviceTargetChip(
   options: List<DeviceOption>,
   onSelect: (DeviceOption) -> Unit,
   modifier: Modifier = Modifier,
-  label: String = "On",
-  enabled: Boolean = true,
 ) {
   val selected = options.firstOrNull { it.id == selectedId } ?: options.firstOrNull() ?: return
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val shape = KetchTheme.shapes.full
   val interactions = remember { MutableInteractionSource() }
-  val overlay = rememberInteractionOverlay(interactions, enabled)
+  val overlay = rememberInteractionOverlay(interactions)
   val focus = rememberFocusVisibility()
   var expanded by remember { mutableStateOf(false) }
   Box(modifier) {
@@ -83,17 +78,14 @@ fun DeviceTargetChip(
       horizontalArrangement = Arrangement.spacedBy(spacing.s1),
       modifier = Modifier
         .focusRing(focus.visible, shape, colors.focusRing)
-        .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
         .height(KetchTheme.density.chip)
         .clip(shape)
         .background(colors.surface)
         .background(overlay)
         .border(1.dp, colors.borderStrong, shape)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
-          enabled = enabled,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           role = Role.DropdownList,
           onClickLabel = "Choose device",
           onClick = { expanded = true },
@@ -101,7 +93,7 @@ fun DeviceTargetChip(
         .padding(start = spacing.s2, end = spacing.s2),
     ) {
       Text(
-        text = "$label:",
+        text = "On:",
         style = KetchTheme.typography.labelS,
         color = colors.textTertiary,
         maxLines = 1,

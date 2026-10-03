@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
@@ -18,6 +17,7 @@ import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.state.AiConnectionTest
+import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
@@ -27,229 +27,217 @@ import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
- * Provider, credentials and web search for AI discovery. Every change
- * is saved as it is made and rebuilds the discovery engine.
- *
- * @param settings currently saved settings.
- * @param supported whether this platform can run discovery locally.
- * @param resolveCredentials fills the blank credentials the platform can
- *   supply (e.g. from the environment), so the form is judged the way
- *   the engine will see it.
- * @param connectionTest result of the last connection test.
- * @param onChange persist edited settings.
- * @param onTest call the provider with the saved settings.
+ * Provider, credentials and web search for AI discovery, from [state]'s AI settings. Every
+ * change is saved as it is made and rebuilds the discovery engine; Test calls the provider with
+ * the saved settings.
  */
 @Composable
-fun AiDiscoverySettings(
-  settings: AiSettings,
-  supported: Boolean,
-  resolveCredentials: (AiSettings) -> AiSettings,
-  connectionTest: AiConnectionTest,
-  onChange: (AiSettings) -> Unit,
-  onTest: () -> Unit,
-) {
+fun AiDiscoverySettings(state: AppState) {
+  val ai = state.aiSettings
+  val settings = ai.settings
+  val supported = ai.supported
+  val connectionTest = ai.connectionTest
+  val onChange = { changed: AiSettings -> ai.save(changed) }
   val focusManager = LocalFocusManager.current
   // What the engine will actually run with: a blank token may still be
-  // supplied by the environment.
-  val effective = resolveCredentials(settings)
+  // supplied by the environment, which the form is judged by.
+  val effective = ai.withPlatformCredentials(settings)
   val llm = settings.llm
   val search = settings.search
   val tokenFromEnvironment = llm.apiKey.isBlank() && effective.llm.apiKey.isNotBlank()
   val testing = connectionTest is AiConnectionTest.Running
 
-  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
-    SettingsGroup {
-      val (status, statusColor) = discoveryStatus(settings, effective, supported)
-      SettingsSwitchRow(
-        title = "AI discovery",
-        description = status,
-        descriptionColor = statusColor,
-        checked = settings.enabled,
-        enabled = supported,
-        onCheckedChange = { onChange(settings.copy(enabled = it)) },
-      )
-    }
+  SettingsGroup {
+    val (status, statusColor) = discoveryStatus(settings, effective, supported)
+    SettingsSwitchRow(
+      title = "AI discovery",
+      description = status,
+      descriptionColor = statusColor,
+      checked = settings.enabled,
+      enabled = supported,
+      onCheckedChange = { onChange(settings.copy(enabled = it)) },
+    )
+  }
 
-    SettingsGroup(title = "Model") {
+  SettingsGroup(title = "Model") {
+    SettingsRow(
+      title = "Provider",
+      description = providerHint(llm.provider),
+      enabled = supported,
+    ) {
+      FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+        verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+      ) {
+        LlmProvider.entries.forEach { provider ->
+          KetchChip(
+            label = provider.buttonLabel,
+            selected = provider == llm.provider,
+            enabled = supported,
+            // Model and endpoint are provider-specific, so switching falls back to the new
+            // provider's defaults. The token is kept: clearing a secret on a stray tap is
+            // worse than a token the connection test will reject.
+            onClick = {
+              if (provider != llm.provider) {
+                onChange(
+                  settings.copy(llm = llm.copy(provider = provider, model = "", baseUrl = "")),
+                )
+              }
+            },
+          )
+        }
+      }
+    }
+    if (llm.provider.requiresApiKey) {
       SettingsRow(
-        title = "Provider",
-        description = providerHint(llm.provider),
+        title = "API key",
+        description = if (tokenFromEnvironment) {
+          "Using the key from the environment. One here overrides it."
+        } else {
+          "Stored as plain text in this device's config file."
+        },
         enabled = supported,
       ) {
+        SettingsTextInput(
+          value = llm.apiKey,
+          onCommit = { onChange(settings.copy(llm = llm.copy(apiKey = it))) },
+          placeholder = tokenPlaceholder(llm.provider),
+          secret = true,
+          mono = true,
+          enabled = supported,
+        )
+      }
+    }
+    SettingsRow(
+      title = "Model",
+      description = if (llm.provider.defaultModel.isBlank()) {
+        "Required. Use a model with tool support."
+      } else {
+        "Any model with tool support works."
+      },
+      enabled = supported,
+    ) {
+      SettingsTextInput(
+        value = llm.model,
+        onCommit = { onChange(settings.copy(llm = llm.copy(model = it))) },
+        placeholder = llm.provider.defaultModel.ifBlank { "Model id" },
+        mono = true,
+        enabled = supported,
+      )
+      val suggestions = modelSuggestions(llm.provider)
+      if (suggestions.isNotEmpty()) {
         FlowRow(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
           verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
         ) {
-          LlmProvider.entries.forEach { provider ->
-            KetchChip(
-              label = provider.buttonLabel,
-              selected = provider == llm.provider,
-              enabled = supported,
-              // Model and endpoint are provider-specific, so switching falls back to the new
-              // provider's defaults. The token is kept: clearing a secret on a stray tap is
-              // worse than a token the connection test will reject.
-              onClick = {
-                if (provider != llm.provider) {
-                  onChange(
-                    settings.copy(llm = llm.copy(provider = provider, model = "", baseUrl = "")),
-                  )
-                }
+          suggestions.forEach { suggestion ->
+            KetchButton(
+              text = suggestion,
+              onClick = { onChange(settings.copy(llm = llm.copy(model = suggestion))) },
+              variant = if (suggestion == llm.effectiveModel) {
+                KetchButtonVariant.Secondary
+              } else {
+                KetchButtonVariant.Ghost
               },
+              size = KetchButtonSize.Small,
+              enabled = supported,
             )
           }
         }
       }
-      if (llm.provider.requiresApiKey) {
-        SettingsRow(
-          title = "API key",
-          description = if (tokenFromEnvironment) {
-            "Using the key from the environment. One here overrides it."
-          } else {
-            "Stored as plain text in this device's config file."
-          },
-          enabled = supported,
-        ) {
-          SettingsTextInput(
-            value = llm.apiKey,
-            onCommit = { onChange(settings.copy(llm = llm.copy(apiKey = it))) },
-            placeholder = tokenPlaceholder(llm.provider),
-            secret = true,
-            mono = true,
-            enabled = supported,
-          )
-        }
-      }
-      SettingsRow(
-        title = "Model",
-        description = if (llm.provider.defaultModel.isBlank()) {
-          "Required. Use a model with tool support."
-        } else {
-          "Any model with tool support works."
-        },
+    }
+    SettingsRow(
+      title = if (llm.provider.requiresBaseUrl) "Endpoint" else "Endpoint (optional)",
+      // The field shows the default endpoint while it is empty.
+      description = if (llm.provider.requiresBaseUrl) {
+        "Any OpenAI-compatible endpoint, with or without /v1."
+      } else {
+        null
+      },
+      enabled = supported,
+    ) {
+      SettingsTextInput(
+        value = llm.baseUrl,
+        onCommit = { onChange(settings.copy(llm = llm.copy(baseUrl = it))) },
+        placeholder = llm.provider.defaultBaseUrl.ifBlank { "https://openrouter.ai/api/v1" },
+        mono = true,
         enabled = supported,
-      ) {
-        SettingsTextInput(
-          value = llm.model,
-          onCommit = { onChange(settings.copy(llm = llm.copy(model = it))) },
-          placeholder = llm.provider.defaultModel.ifBlank { "Model id" },
-          mono = true,
-          enabled = supported,
-        )
-        val suggestions = modelSuggestions(llm.provider)
-        if (suggestions.isNotEmpty()) {
-          FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-            verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-          ) {
-            suggestions.forEach { suggestion ->
-              KetchButton(
-                text = suggestion,
-                onClick = { onChange(settings.copy(llm = llm.copy(model = suggestion))) },
-                variant = if (suggestion == llm.effectiveModel) {
-                  KetchButtonVariant.Secondary
-                } else {
-                  KetchButtonVariant.Ghost
-                },
-                size = KetchButtonSize.Small,
-                enabled = supported,
-              )
-            }
-          }
-        }
-      }
-      SettingsRow(
-        title = if (llm.provider.requiresBaseUrl) "Endpoint" else "Endpoint (optional)",
-        // The field shows the default endpoint while it is empty.
-        description = if (llm.provider.requiresBaseUrl) {
-          "Any OpenAI-compatible endpoint, with or without /v1."
-        } else {
-          null
-        },
-        enabled = supported,
-      ) {
-        SettingsTextInput(
-          value = llm.baseUrl,
-          onCommit = { onChange(settings.copy(llm = llm.copy(baseUrl = it))) },
-          placeholder = llm.provider.defaultBaseUrl.ifBlank { "https://openrouter.ai/api/v1" },
-          mono = true,
-          enabled = supported,
-        )
-      }
-      // How long the last test took, measured from the click.
-      var testStarted by remember { mutableStateOf<TimeMark?>(null) }
-      var testTook by remember { mutableStateOf<Duration?>(null) }
-      LaunchedEffect(connectionTest) {
-        if (connectionTest is AiConnectionTest.Success) {
-          testTook = testStarted?.elapsedNow()
-          testStarted = null
-        }
-      }
-      val model = effective.llm.effectiveModel
-      val (testMessage, testColor) = testStatus(connectionTest, model, testTook)
-      SettingsRow(
-        title = "Test connection",
-        description = testMessage,
-        descriptionColor = testColor,
-        enabled = supported,
-        trailing = {
-          KetchButton(
-            text = if (testing) "Testing…" else "Test",
-            onClick = {
-              // Leaving the field saves what was just typed.
-              focusManager.clearFocus()
-              testStarted = TimeSource.Monotonic.markNow()
-              testTook = null
-              onTest()
-            },
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-            enabled = supported && effective.llm.isComplete && !testing,
-          )
-        },
       )
     }
-
-    SettingsGroup(
-      title = "Web search",
-      footer = "Without a search provider, Discover only reads the pages you give it.",
-    ) {
-      SettingsSelectRow(
-        title = "Search provider",
-        description = searchProviderHint(search.provider),
-        value = search.provider,
-        options = SearchProvider.entries,
-        label = { it.label },
-        enabled = supported,
-        onSelect = { onChange(settings.copy(search = search.copy(provider = it))) },
-      )
-      if (search.provider.requiresApiKey) {
-        SettingsRow(title = "Search API key", enabled = supported) {
-          SettingsTextInput(
-            value = search.apiKey,
-            onCommit = { onChange(settings.copy(search = search.copy(apiKey = it))) },
-            placeholder = "API key",
-            secret = true,
-            mono = true,
-            enabled = supported,
-          )
-        }
+    // How long the last test took, measured from the click.
+    var testStarted by remember { mutableStateOf<TimeMark?>(null) }
+    var testTook by remember { mutableStateOf<Duration?>(null) }
+    LaunchedEffect(connectionTest) {
+      if (connectionTest is AiConnectionTest.Success) {
+        testTook = testStarted?.elapsedNow()
+        testStarted = null
       }
-      if (search.provider.requiresCx) {
-        SettingsRow(
-          title = "Search engine ID",
-          description = "The Programmable Search engine to query.",
+    }
+    val model = effective.llm.effectiveModel
+    val (testMessage, testColor) = testStatus(connectionTest, model, testTook)
+    SettingsRow(
+      title = "Test connection",
+      description = testMessage,
+      descriptionColor = testColor,
+      enabled = supported,
+      trailing = {
+        KetchButton(
+          text = if (testing) "Testing…" else "Test",
+          onClick = {
+            // Leaving the field saves what was just typed.
+            focusManager.clearFocus()
+            testStarted = TimeSource.Monotonic.markNow()
+            testTook = null
+            state.launchCommand { ai.testConnection(ai.settings) }
+          },
+          variant = KetchButtonVariant.Secondary,
+          size = KetchButtonSize.Small,
+          enabled = supported && effective.llm.isComplete && !testing,
+        )
+      },
+    )
+  }
+
+  SettingsGroup(
+    title = "Web search",
+    footer = "Without a search provider, Discover only reads the pages you give it.",
+  ) {
+    SettingsSelectRow(
+      title = "Search provider",
+      description = searchProviderHint(search.provider),
+      value = search.provider,
+      options = SearchProvider.entries,
+      label = { it.label },
+      enabled = supported,
+      onSelect = { onChange(settings.copy(search = search.copy(provider = it))) },
+    )
+    if (search.provider.requiresApiKey) {
+      SettingsRow(title = "Search API key", enabled = supported) {
+        SettingsTextInput(
+          value = search.apiKey,
+          onCommit = { onChange(settings.copy(search = search.copy(apiKey = it))) },
+          placeholder = "API key",
+          secret = true,
+          mono = true,
           enabled = supported,
-        ) {
-          SettingsTextInput(
-            value = search.cx,
-            onCommit = { onChange(settings.copy(search = search.copy(cx = it))) },
-            placeholder = "Engine ID",
-            mono = true,
-            enabled = supported,
-          )
-        }
+        )
+      }
+    }
+    if (search.provider.requiresCx) {
+      SettingsRow(
+        title = "Search engine ID",
+        description = "The Programmable Search engine to query.",
+        enabled = supported,
+      ) {
+        SettingsTextInput(
+          value = search.cx,
+          onCommit = { onChange(settings.copy(search = search.copy(cx = it))) },
+          placeholder = "Engine ID",
+          mono = true,
+          enabled = supported,
+        )
       }
     }
   }

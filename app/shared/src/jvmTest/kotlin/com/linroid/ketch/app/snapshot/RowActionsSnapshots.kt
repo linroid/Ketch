@@ -50,7 +50,6 @@ import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.components.StatusDotDefaults
 import com.linroid.ketch.app.platform.FileActions
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
@@ -71,15 +70,13 @@ import com.linroid.ketch.app.ui.downloads.actions.TaskRowFrame
 import com.linroid.ketch.app.ui.downloads.actions.drawDragPreview
 import com.linroid.ketch.app.ui.downloads.actions.listKeyboard
 import com.linroid.ketch.app.ui.downloads.actions.pageSizeOf
-import com.linroid.ketch.app.ui.downloads.actions.rememberDragPreviewStyle
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.downloads.actions.rubberBand
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.BeforeTest
@@ -236,16 +233,18 @@ class RowActionsSnapshots {
       val size = SnapshotSize(360.dp, 120.dp, KetchDensity.Compact)
       snapshot("row-actions-drag-preview", size, theme) {
         val measurer = rememberTextMeasurer()
-        val style = rememberDragPreviewStyle()
+        val colors = KetchTheme.colors
+        val spacing = KetchTheme.spacing
+        val type = KetchTheme.typography
         Column(
           Modifier.padding(16.dp),
           verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
           Canvas(Modifier.width(320.dp).height(36.dp)) {
-            drawDragPreview(rows.take(1), measurer, style)
+            drawDragPreview(rows.take(1), measurer, colors, spacing, type)
           }
           Canvas(Modifier.width(320.dp).height(36.dp)) {
-            drawDragPreview(rows, measurer, style)
+            drawDragPreview(rows, measurer, colors, spacing, type)
           }
         }
       }
@@ -304,33 +303,6 @@ private class DemoScope(val actions: ListActions, val state: AppState) {
   }
 }
 
-/** Files that exist and can go to the Trash, without touching this machine. */
-private class SnapshotFiles(override val canTrash: Boolean = true) : FileActions {
-  override val revealLabel: String = "Show in Finder"
-  override val canShare: Boolean = false
-
-  override suspend fun open(path: String) {}
-
-  override suspend fun reveal(path: String) {}
-
-  override suspend fun share(path: String) {}
-
-  override suspend fun exists(path: String): Boolean = true
-
-  override suspend fun moveToTrash(path: String) {}
-}
-
-private object SnapshotClipboard : SystemClipboard {
-  override val readsSilently: Boolean = true
-  override val pasteEvents = emptyFlow<String>()
-
-  override suspend fun hasLink(): Boolean = false
-
-  override suspend fun readText(): String? = null
-
-  override suspend fun writeText(text: String) {}
-}
-
 /** The scene of an [actionsSnapshot] with the rows' positions, to hover them. */
 private class ActionsScene(val scene: SnapshotScene, private val controller: AppController) {
   suspend fun hoverRow(name: String, x: Dp = 600.dp) {
@@ -363,15 +335,10 @@ private fun actionsSnapshot(
   interact: suspend ActionsScene.() -> Unit = {},
 ): File {
   val phone = size.density != KetchDensity.Compact
-  val mode = if (phone) DensityMode.Comfortable else DensityMode.Compact
-  val data = SampleData.downloads()
-  val environment = runBlocking(SnapshotHarness.ui) { SampleEnvironment(data, theme, mode) }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(START_TIMEOUT) { environment.start() } ?: error("$name listed no rows")
-    }
-    val controller = environment.controller
-    return SnapshotHarness.capture(
+  val mode = size.density.toMode()
+  return withSample(theme, mode) { env ->
+    val controller = env.controller
+    SnapshotHarness.capture(
       name = "$name-${theme.id}-${size.id}",
       size = size,
       interact = { ActionsScene(this, controller).interact() },
@@ -382,8 +349,6 @@ private fun actionsSnapshot(
         }
       }
     }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
   }
 }
 
@@ -403,8 +368,8 @@ private fun StandInDownloads(
     val rows = view.rows
     val scope = rememberCoroutineScope()
     val runner = remember(state, files) {
-      val commands = RowCommands(state, files, SnapshotClipboard, scope) {}
-      RowActionRunner(state, commands, files, SnapshotClipboard, scope)
+      val commands = RowCommands(state, files, SnapshotClipboard(), scope) {}
+      RowActionRunner(commands)
     }
     val actions = rememberListActions(rows, state, runner)
     val listState = rememberLazyListState()
@@ -649,86 +614,77 @@ private fun PhoneRow(row: TaskRow, actions: ListActions) {
   }
 }
 
-private fun previewRows(data: SampleData): List<TaskRow> = runBlocking(SnapshotHarness.ui) {
-  val environment = SampleEnvironment(data, SnapshotTheme.Light, DensityMode.Compact)
-  try {
-    environment.start()
-    val rows = environment.controller.state.taskList.view.value.rows
-    listOf(PHOTOS, LINUX, PODCAST).map { name -> rows.first { it.name == name } }
-  } finally {
-    environment.close()
+private fun previewRows(data: SampleData): List<TaskRow> =
+  withSample(SnapshotTheme.Light, data = data) { env ->
+    runBlocking(SnapshotHarness.ui) {
+      // The view follows the rows that start() waits for a moment later.
+      val view = env.controller.state.taskList.view.first { it.rows.size == data.tasks.size }
+      listOf(PHOTOS, LINUX, PODCAST).map { name -> view.rows.first { it.name == name } }
+    }
   }
-}
 
 /**
  * Renders the stand-in list at [size] with a rubber band dragged from below the last row up
  * over four rows, the pointer still held, and writes the PNG.
  */
-private fun bandSnapshot(name: String, size: SnapshotSize, theme: SnapshotTheme): File {
-  val data = SampleData.downloads()
-  val environment = runBlocking(SnapshotHarness.ui) {
-    SampleEnvironment(data, theme, DensityMode.Compact)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(START_TIMEOUT) { environment.start() } ?: error("$name listed no rows")
-    }
-    return runBlocking(SnapshotHarness.ui) {
-      val scale = SnapshotHarness.SCALE
-      val scene = ImageComposeScene(
-        width = (size.width.value * scale).toInt(),
-        height = (size.height.value * scale).toInt(),
-        density = Density(scale),
-        coroutineContext = SnapshotHarness.ui,
+private fun bandSnapshot(
+  name: String,
+  size: SnapshotSize,
+  theme: SnapshotTheme,
+): File = withSample(theme) { environment ->
+  runBlocking(SnapshotHarness.ui) {
+    val scale = SnapshotHarness.SCALE
+    val scene = ImageComposeScene(
+      width = (size.width.value * scale).toInt(),
+      height = (size.height.value * scale).toInt(),
+      density = Density(scale),
+      coroutineContext = SnapshotHarness.ui,
+    ) {
+      KetchTheme(
+        darkTheme = theme == SnapshotTheme.Dark,
+        density = DensityMode.Compact,
+        reduceMotion = true,
       ) {
-        KetchTheme(
-          darkTheme = theme == SnapshotTheme.Dark,
-          density = DensityMode.Compact,
-          reduceMotion = true,
-        ) {
-          Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas)) {
-            StandInDownloads(environment.controller, SnapshotFiles(), {}, phone = false)
-          }
+        Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas)) {
+          StandInDownloads(environment.controller, SnapshotFiles(), {}, phone = false)
         }
-      }
-      val start = TimeSource.Monotonic.markNow()
-      suspend fun frames(count: Int) = repeat(count) {
-        scene.render(start.elapsedNow().inWholeNanoseconds)
-        delay(16.milliseconds)
-        Snapshot.sendApplyNotifications()
-      }
-      try {
-        frames(40)
-        val top = CARD_INSET + HEADER + TABS + COLUMN_HEADER
-        val from = Offset(900f * scale, (size.height.value - 40f) * scale)
-        val to = Offset(380f * scale, (top + ROW * 9 + ROW / 2).value * scale)
-        scene.sendPointerEvent(PointerEventType.Move, from)
-        scene.sendPointerEvent(
-          PointerEventType.Press,
-          from,
-          buttons = PointerButtons(isPrimaryPressed = true),
-          button = PointerButton.Primary,
-        )
-        for (step in 1..8) {
-          val point = from + (to - from) * (step / 8f)
-          scene.sendPointerEvent(
-            PointerEventType.Move,
-            point,
-            buttons = PointerButtons(isPrimaryPressed = true),
-          )
-          frames(2)
-        }
-        frames(20)
-        val image = scene.render(start.elapsedNow().inWholeNanoseconds)
-        val bytes = checkNotNull(image.encodeToData(EncodedImageFormat.PNG)).bytes
-        SnapshotHarness.outputDir.mkdirs()
-        File(SnapshotHarness.outputDir, "$name-${theme.id}-${size.id}.png")
-          .apply { writeBytes(bytes) }
-      } finally {
-        scene.close()
       }
     }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
+    val start = TimeSource.Monotonic.markNow()
+    suspend fun frames(count: Int) = repeat(count) {
+      scene.render(start.elapsedNow().inWholeNanoseconds)
+      delay(16.milliseconds)
+      Snapshot.sendApplyNotifications()
+    }
+    try {
+      frames(40)
+      val top = CARD_INSET + HEADER + TABS + COLUMN_HEADER
+      val from = Offset(900f * scale, (size.height.value - 40f) * scale)
+      val to = Offset(380f * scale, (top + ROW * 9 + ROW / 2).value * scale)
+      scene.sendPointerEvent(PointerEventType.Move, from)
+      scene.sendPointerEvent(
+        PointerEventType.Press,
+        from,
+        buttons = PointerButtons(isPrimaryPressed = true),
+        button = PointerButton.Primary,
+      )
+      for (step in 1..8) {
+        val point = from + (to - from) * (step / 8f)
+        scene.sendPointerEvent(
+          PointerEventType.Move,
+          point,
+          buttons = PointerButtons(isPrimaryPressed = true),
+        )
+        frames(2)
+      }
+      frames(20)
+      val image = scene.render(start.elapsedNow().inWholeNanoseconds)
+      val bytes = checkNotNull(image.encodeToData(EncodedImageFormat.PNG)).bytes
+      SnapshotHarness.outputDir.mkdirs()
+      File(SnapshotHarness.outputDir, "$name-${theme.id}-${size.id}.png")
+        .apply { writeBytes(bytes) }
+    } finally {
+      scene.close()
+    }
   }
 }

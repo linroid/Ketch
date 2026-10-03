@@ -10,7 +10,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -62,9 +60,9 @@ import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -74,6 +72,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.folderName
 import com.linroid.ketch.app.theme.FileTypeHue
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.settings.Chevron
 import com.linroid.ketch.app.ui.shell.canvasWash
 import kotlinx.coroutines.launch
 
@@ -116,7 +115,7 @@ internal fun WelcomeFlow(
     horizontalAlignment = Alignment.CenterHorizontally,
     modifier = modifier
       .fillMaxSize()
-      .canvasWash(colors, EmberRadius)
+      .canvasWash(colors)
       .windowInsetsPadding(WindowInsets.safeDrawing),
   ) {
     TopRow(
@@ -520,13 +519,7 @@ private fun ChoiceCard(
       .background(colors.surface)
       .background(overlay)
       .border(HairlineWidth, if (recommended) colors.accent else colors.hairline, shape)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(horizontal = spacing.s4, vertical = spacing.s3),
   ) {
     KetchHueTile(icon = icon, hue = hue, size = KetchHueTileDefaults.Medium)
@@ -541,11 +534,7 @@ private fun ChoiceCard(
       Text(text = title, style = KetchTheme.typography.bodyStrong, color = colors.textPrimary)
       Text(text = detail, style = KetchTheme.typography.caption, color = colors.textSecondary)
     }
-    KetchIconImage(
-      KetchIcon.Chevron,
-      size = KetchTheme.density.controlGlyph,
-      tint = colors.textTertiary,
-    )
+    Chevron()
   }
 }
 
@@ -627,4 +616,3 @@ private const val SLIDE_DIVISOR = 4
 private val ContentMaxWidth = 480.dp
 private val ChoiceMinHeight = 64.dp
 private val HairlineWidth = 1.dp
-private val EmberRadius = 520.dp

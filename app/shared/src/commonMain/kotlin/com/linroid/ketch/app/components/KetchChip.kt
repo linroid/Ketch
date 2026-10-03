@@ -2,7 +2,6 @@ package com.linroid.ketch.app.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -121,13 +120,7 @@ private fun RemoveButton(label: String, onRemove: () -> Unit, enabled: Boolean) 
       .clip(KetchTheme.shapes.full)
       .background(overlay)
       .semantics { contentDescription = "Remove $label" }
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onRemove,
-      ),
+      .ketchClickable(interactions, enabled = enabled, onClick = onRemove),
   ) {
     KetchIconImage(KetchIcon.Close, size = RemoveGlyph, tint = colors.textSecondary)
   }

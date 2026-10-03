@@ -9,21 +9,15 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
-import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
-import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.SystemInfo
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.ListTestTask
@@ -40,24 +34,20 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.math.sin
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 /**
  * The Devices page (W4-DEVICES-PAGE): a card per device with its speed, lane, counts, storage,
@@ -176,32 +166,13 @@ private fun devicesPageSnapshot(
   fleet: DevicesPageFleet = DevicesPageFleet.Mixed,
   history: Int = HISTORY_SAMPLES,
   setup: suspend AppScenario.() -> Unit = {},
-): File {
-  val density = when (size.density) {
-    KetchDensity.Compact -> DensityMode.Compact
-    KetchDensity.Comfortable -> DensityMode.Comfortable
-  }
-  val environment = runBlocking(SnapshotHarness.ui) {
-    DevicesPageEnvironment(fleet, theme, density)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      val timeout = DevicesPageEnvironment.START_TIMEOUT + history.seconds
-      withTimeoutOrNull(timeout) { environment.start(history) }
-        ?: error("The devices of $name never settled")
-    }
-    return SnapshotHarness.capture(
-      name = "$name-${theme.id}-${size.id}",
-      size = size,
-      interact = {
-        openDevicesPage(size)
-        AppScenario(environment.controller, environment.data, this).setup()
-      },
-    ) {
-      App(environment.controller)
-    }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
+): File = withEnvironment(
+  create = { DevicesPageEnvironment(fleet, theme, size.density.toMode(), history) },
+  timeout = DevicesPageEnvironment.START_TIMEOUT + history.seconds,
+) { environment ->
+  captureApp(name, size, theme, environment) {
+    scene.openDevicesPage(size)
+    setup()
   }
 }
 
@@ -233,8 +204,9 @@ private class DevicesPageEnvironment(
   fleet: DevicesPageFleet,
   theme: SnapshotTheme,
   density: DensityMode,
-) {
-  val data = SampleData(
+  private val history: Int,
+) : SnapshotEnvironment {
+  override val data = SampleData(
     tasks = if (fleet == DevicesPageFleet.Idle) emptyList() else SampleData.downloads().tasks,
     remotes = if (fleet == DevicesPageFleet.Mixed) {
       listOf(Nas, DenPc, Seedbox, GaragePi)
@@ -242,7 +214,7 @@ private class DevicesPageEnvironment(
       emptyList()
     },
   )
-  private val clock = DevicesPageClock(SampleData.NOW - OFFLINE_FOR)
+  private val clock = MovableClock(SampleData.NOW - OFFLINE_FOR)
   private val nasTasks = if (fleet == DevicesPageFleet.Mixed) sampleNasTasks() else emptyList()
 
   // The downloading tasks of every device, in the states they start in.
@@ -250,17 +222,13 @@ private class DevicesPageEnvironment(
     .filter { it.state.value is DownloadState.Downloading }
     .associateWith { it.state.value as DownloadState.Downloading }
   private val denPc = MutableStateFlow<ConnectionState>(ConnectionState.Connected)
-  private val local = DevicesPageLocalApi(SampleKetchApi(data))
+  private val local = NetworkedApi(SampleKetchApi(data), en0 = listOf("192.168.1.20"))
   private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
       deviceName = data.deviceName,
       embeddedFactory = { local },
-      localServerFactory = {
-        object : LocalServerHandle {
-          override fun stop() {}
-        }
-      },
+      localServerFactory = PretendServer,
       remoteFactory = { config -> remote(config) },
     ),
     initialRemotes = data.remotes,
@@ -278,8 +246,7 @@ private class DevicesPageEnvironment(
     clock = SampleData.CLOCK,
   )
 
-  /** The controller the app root shows. */
-  val controller = AppController(
+  override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     speedMode = speedMode,
@@ -295,7 +262,7 @@ private class DevicesPageEnvironment(
    * [SampleData.NOW], and lets the speed history gather [history] samples while the speeds
    * wander, so the sparklines have a shape; the sample speeds then return.
    */
-  suspend fun start(history: Int) {
+  override suspend fun start() {
     val presence = instanceManager.presence
     val count = data.remotes.size + 1
     presence.first { devices -> devices.size == count && devices.all { it.ready } }
@@ -329,7 +296,7 @@ private class DevicesPageEnvironment(
     }
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     speedScope.cancel()
     instanceManager.close()
@@ -340,12 +307,12 @@ private class DevicesPageEnvironment(
 
   private fun remote(config: RemoteConfig): RemoteInstance {
     val (api, state) = when (config.host) {
-      Nas.host -> DevicesPageRemoteApi(nasStatus(), nasTasks) to
+      Nas.host -> SampleDeviceApi(nasStatus(), nasTasks, RemoteNetworks) to
         MutableStateFlow<ConnectionState>(ConnectionState.Connected)
-      DenPc.host -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to denPc
-      GaragePi.host -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to
+      DenPc.host -> SampleDeviceApi(denPcStatus(), emptyList(), RemoteNetworks) to denPc
+      GaragePi.host -> SampleDeviceApi(denPcStatus(), emptyList(), RemoteNetworks) to
         MutableStateFlow<ConnectionState>(ConnectionState.Disconnected())
-      else -> DevicesPageRemoteApi(denPcStatus(), emptyList()) to
+      else -> SampleDeviceApi(denPcStatus(), emptyList(), RemoteNetworks) to
         MutableStateFlow<ConnectionState>(ConnectionState.Unauthorized)
     }
     return RemoteInstance(instance = api, remoteConfig = config, connectionState = state)
@@ -364,61 +331,17 @@ private class DevicesPageEnvironment(
   }
 }
 
-/** A clock whose time a scenario moves. */
-private class DevicesPageClock(@Volatile var now: Instant) : Clock {
-  override fun now(): Instant = now
-}
-
-/** [sample] downloading over Wi-Fi and Ethernet, with a VPN it does not use. */
-private class DevicesPageLocalApi(private val sample: SampleKetchApi) : KetchApi by sample {
-  override suspend fun networkInterfaces(): NetworkInterfaces = NetworkInterfaces(
-    supported = true,
-    available = listOf(
-      NetworkInterfaceInfo("en0", "en0", listOf("192.168.1.20")),
-      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
-      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12"))
-    ),
-    config = NetworkInterfaceConfig(listOf("en0", "en7")),
-  )
-}
-
-/** A remote device that answers with [status] and lists [tasks]. */
-private class DevicesPageRemoteApi(
-  private var status: KetchStatus,
-  tasks: List<DownloadTask>,
-) : KetchApi {
-  override val backendLabel: String = status.name
-  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(tasks)
-
-  override suspend fun status(): KetchStatus = status
-
-  override suspend fun updateConfig(config: DownloadConfig) {
-    status = status.copy(config = config)
-  }
-
-  override suspend fun networkInterfaces(): NetworkInterfaces = NetworkInterfaces(
-    supported = true,
-    available = listOf(NetworkInterfaceInfo("eth0", "eth0", listOf("192.168.1.40"))),
-  )
-
-  override suspend fun download(request: DownloadRequest): DownloadTask =
-    throw UnsupportedOperationException("Not in snapshots")
-
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    throw UnsupportedOperationException("Not in snapshots")
-
-  override suspend fun start() {}
-
-  override fun close() {}
-}
+/** The one network a remote device downloads over. */
+private val RemoteNetworks = NetworkInterfaces(
+  supported = true,
+  available = listOf(NetworkInterfaceInfo("eth0", "eth0", listOf("192.168.1.40"))),
+)
 
 private const val GB = 1_000_000_000L
 
-private fun nasStatus(): KetchStatus = KetchStatus(
+private fun nasStatus(): KetchStatus = sampleStatus(
   name = "NAS-Basement",
-  version = KetchApi.VERSION,
-  revision = KetchApi.REVISION,
-  uptime = 12.days.inWholeSeconds,
+  uptime = 12.days,
   config = DownloadConfig(
     defaultDirectory = "/volume1/downloads",
     speedLimit = SpeedLimit.mbps(20),
@@ -432,11 +355,9 @@ private fun nasStatus(): KetchStatus = KetchStatus(
   ),
 )
 
-private fun denPcStatus(): KetchStatus = KetchStatus(
+private fun denPcStatus(): KetchStatus = sampleStatus(
   name = "Den-PC",
-  version = KetchApi.VERSION,
-  revision = KetchApi.REVISION,
-  uptime = 5.hours.inWholeSeconds,
+  uptime = 5.hours,
   config = DownloadConfig(),
   system = system(
     os = "Windows 11",
@@ -448,19 +369,13 @@ private fun denPcStatus(): KetchStatus = KetchStatus(
 )
 
 private fun system(os: String, arch: String, directory: String, total: Long, usable: Long) =
-  SystemInfo(
+  sampleSystem(
     os = os,
+    directory = directory,
+    total = total,
+    usable = usable,
     arch = arch,
     separator = if (os.startsWith("Windows")) "\\" else "/",
-    javaVersion = "21",
-    availableProcessors = 4,
-    maxMemory = 0,
-    totalMemory = 0,
-    freeMemory = 0,
-    downloadDirectory = directory,
-    totalSpace = total,
-    freeSpace = usable,
-    usableSpace = usable,
   )
 
 private fun sampleNasTasks(): List<DownloadTask> = listOf(

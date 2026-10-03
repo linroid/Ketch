@@ -58,7 +58,20 @@ kotlin {
     browser()
   }
 
+  applyDefaultHierarchyTemplate()
+
   sourceSets {
+    // The targets that run the engine inside the app: Android, desktop and iOS.
+    val nonWebMain by creating {
+      dependsOn(commonMain.get())
+    }
+    val jvmAndAndroidMain by creating {
+      dependsOn(nonWebMain)
+    }
+    androidMain.get().dependsOn(jvmAndAndroidMain)
+    jvmMain.get().dependsOn(jvmAndAndroidMain)
+    iosMain.get().dependsOn(nonWebMain)
+
     commonMain.dependencies {
       api(projects.config)
       // FileLogger takes okio paths.
@@ -83,18 +96,22 @@ kotlin {
       implementation(libs.kotlin.test)
       implementation(libs.kotlinx.coroutines.test)
     }
+    nonWebMain.dependencies {
+      implementation(libs.dnssd)
+    }
+    jvmAndAndroidMain.dependencies {
+      implementation(projects.ai.discover)
+    }
     androidMain.dependencies {
       implementation(libs.androidx.core)
       // Result launchers for the folder and file pickers.
       implementation(libs.androidx.activity.compose)
       implementation(projects.library.core)
       implementation(projects.library.ktor)
-      implementation(projects.ai.discover)
       implementation(projects.library.ftp)
       implementation(projects.library.torrent)
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.ktor.client.okhttp)
-      implementation(libs.dnssd)
     }
     iosMain.dependencies {
       implementation(projects.library.core)
@@ -103,18 +120,15 @@ kotlin {
       implementation(projects.library.torrent)
       implementation(projects.library.sqlite)
       implementation(libs.ktor.client.darwin)
-      implementation(libs.dnssd)
     }
     jvmMain.dependencies {
       implementation(projects.library.core)
       implementation(projects.library.ktor)
-      implementation(projects.ai.discover)
       implementation(projects.library.ftp)
       implementation(projects.library.torrent)
       implementation(projects.library.sqlite)
       implementation(libs.kotlinx.coroutinesSwing)
       implementation(libs.ktor.client.cio)
-      implementation(libs.dnssd)
     }
     wasmJsMain.dependencies {
       implementation(libs.ktor.client.js)

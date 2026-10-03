@@ -13,6 +13,7 @@ import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.config.NotificationMode
 import com.linroid.ketch.config.NotificationSettings
+import com.linroid.ketch.config.RemoteConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -221,7 +222,7 @@ class ActivityRoutingTest {
     val manager = InstanceManager(
       factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { FakeKetchApi() }),
     )
-    manager.addRemote("nas.local")
+    manager.addRemote(RemoteConfig("nas.local"))
 
     val devices = ActivityRouting.devices(manager).first()
 
@@ -235,7 +236,7 @@ class ActivityRoutingTest {
       factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { FakeKetchApi() }),
     )
     val remote = completed.copy(taskKey = TaskKey("nas.local:8642", "t1"))
-    manager.addRemote("nas.local")
+    manager.addRemote(RemoteConfig("nas.local"))
 
     assertNull(ActivityRouting.deviceNameOf(completed, manager))
     assertEquals("nas.local:8642", ActivityRouting.deviceNameOf(remote, manager))

@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -36,28 +35,28 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
-import com.linroid.ketch.app.platform.localDeviceNoun
+import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
+import com.linroid.ketch.app.util.clockText
+import com.linroid.ketch.app.util.shortName
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
@@ -182,12 +181,7 @@ internal fun ActivityContent(
   LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = ListMaxHeight)) {
     groups.forEach { (title, messages) ->
       item(key = "group-$title") {
-        Text(
-          text = eyebrowText(title),
-          style = KetchTheme.typography.eyebrow,
-          color = colors.textTertiary,
-          modifier = Modifier.padding(top = spacing.s2, bottom = spacing.s1),
-        )
+        KetchEyebrow(title, Modifier.padding(top = spacing.s2, bottom = spacing.s1))
       }
       items(messages, key = { it.id }) { message ->
         val taskKey = message.taskKey?.takeIf { it.deviceId == activeDeviceId }
@@ -224,13 +218,7 @@ private fun ActivityEntry(
   val focus = rememberFocusVisibility()
   val clickable = if (onClick != null) {
     Modifier
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
   } else {
     Modifier
   }
@@ -389,9 +377,9 @@ internal fun activityTime(at: Instant, now: Instant, timeZone: TimeZone): String
   val time = at.toLocalDateTime(timeZone)
   val today = now.toLocalDateTime(timeZone).date
   return when (time.date) {
-    today -> clock(time)
-    today.minus(1, DateTimeUnit.DAY) -> "Yesterday ${clock(time)}"
-    else -> "${MONTHS[time.month.ordinal]} ${time.day}"
+    today -> time.clockText()
+    today.minus(1, DateTimeUnit.DAY) -> "Yesterday ${time.clockText()}"
+    else -> "${time.month.shortName} ${time.day}"
   }
 }
 
@@ -404,13 +392,8 @@ internal fun showsActions(message: AppMessage, onScreen: Boolean): Boolean =
     (onScreen || message.level == MessageLevel.Error || message.level == MessageLevel.Warning)
 
 /** How the app names the device [deviceId]: "This Mac" for the embedded one. */
-internal fun deviceName(instances: List<InstanceEntry>, deviceId: String): String {
-  val entry = instances.firstOrNull { it.deviceId == deviceId } ?: return deviceId
-  return if (entry is EmbeddedInstance) localDeviceNoun() else entry.label
-}
-
-private fun clock(time: LocalDateTime): String =
-  "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
+internal fun deviceName(instances: List<InstanceEntry>, deviceId: String): String =
+  instances.firstOrNull { it.deviceId == deviceId }?.displayName ?: deviceId
 
 internal val MessageLevel.icon: KetchIcon
   get() = when (this) {
@@ -427,8 +410,6 @@ internal fun MessageLevel.tint(colors: KetchColors): Color = when (this) {
   MessageLevel.Error -> colors.status.failed.color
 }
 
-private val MONTHS =
-  listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 private val UnreadDotSize = 6.dp
 private val PopoverWidth = 380.dp
 private val ListMaxHeight = 440.dp

@@ -99,55 +99,53 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
     manager.stopServer()
     manager.startServer()
   }
-  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
-    PairCard(
-      name = device.label,
-      serverState = serverState,
-      addresses = networks.networks?.let { pairingAddresses(it.available) },
-      addressesReadable = networks.networks?.supported != false,
-      onAllow = {
-        save(
-          config.copy(
-            host = ServerConfig.ANY_HOST,
-            apiToken = config.apiToken ?: newToken(),
-            mdnsEnabled = true,
-          ),
-        )
-        manager.startServer()
-      },
-      onStop = { manager.stopServer() },
-      onNewCode = {
-        save(config.copy(apiToken = newToken()))
-        restart()
-      },
-      onRefresh = { networks.loadNetworks() },
-    )
-    val running = serverState as? ServerState.Running
-    // Starting with Ketch only matters at launch, so it never calls for a restart.
-    if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
-      SettingsNotice(
-        text = "Restart sharing to apply changes. Devices reconnect on their own.",
-        tone = NoticeTone.Warning,
-        action = {
-          KetchButton(
-            text = "Restart",
-            onClick = restart,
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-            leadingIcon = KetchIcon.Retry,
-          )
-        },
+  PairCard(
+    name = device.label,
+    serverState = serverState,
+    addresses = networks.networks?.let { pairingAddresses(it.available) },
+    addressesReadable = networks.networks?.supported != false,
+    onAllow = {
+      save(
+        config.copy(
+          host = ServerConfig.ANY_HOST,
+          apiToken = config.apiToken ?: newToken(),
+          mdnsEnabled = true,
+        ),
       )
-    }
-    AdvancedGroup(
-      config = config,
-      onChange = save,
-      onRotate = {
-        save(config.copy(apiToken = newToken()))
-        if (serverState is ServerState.Running) restart()
+      manager.startServer()
+    },
+    onStop = { manager.stopServer() },
+    onNewCode = {
+      save(config.copy(apiToken = newToken()))
+      restart()
+    },
+    onRefresh = { networks.loadNetworks() },
+  )
+  val running = serverState as? ServerState.Running
+  // Starting with Ketch only matters at launch, so it never calls for a restart.
+  if (running != null && running.config.copy(autoStart = config.autoStart) != config) {
+    SettingsNotice(
+      text = "Restart sharing to apply changes. Devices reconnect on their own.",
+      tone = NoticeTone.Warning,
+      action = {
+        KetchButton(
+          text = "Restart",
+          onClick = restart,
+          variant = KetchButtonVariant.Secondary,
+          size = KetchButtonSize.Small,
+          leadingIcon = KetchIcon.Retry,
+        )
       },
     )
   }
+  AdvancedGroup(
+    config = config,
+    onChange = save,
+    onRotate = {
+      save(config.copy(apiToken = newToken()))
+      if (serverState is ServerState.Running) restart()
+    },
+  )
 }
 
 /**
@@ -582,7 +580,7 @@ private fun newToken(): String = Uuid.random().toHexString()
 private const val COPIED_MILLIS = 2_000L
 
 /** Titles of the rows the Advanced section holds. */
-private val AdvancedRows = setOf(
+internal val AdvancedRows = setOf(
   "Reachable from other devices",
   "Port",
   "Access code",

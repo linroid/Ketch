@@ -5,11 +5,11 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
+import com.linroid.ketch.app.util.clockText
 import com.linroid.ketch.app.util.percentDecode
 import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.Weekday
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
@@ -143,7 +143,7 @@ fun normalizeRuleTime(text: String): String? {
   val hour = hourText.toInt()
   val minute = minuteText.toInt()
   if (hour !in 0..23 || minute !in 0..59 || minuteText.length > 2) return null
-  return "${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}"
+  return clockText(hour, minute)
 }
 
 /**
@@ -167,14 +167,11 @@ private fun changeTime(at: Instant, now: Instant, zone: TimeZone): String {
   val time = at.toLocalDateTime(zone)
   val today = now.toLocalDateTime(zone).date
   return when (time.date) {
-    today -> clock(time)
-    today.plus(1, DateTimeUnit.DAY) -> "tomorrow ${clock(time)}"
-    else -> "${Weekday.entries[time.dayOfWeek.ordinal].shortName} ${clock(time)}"
+    today -> time.clockText()
+    today.plus(1, DateTimeUnit.DAY) -> "tomorrow ${time.clockText()}"
+    else -> "${Weekday.entries[time.dayOfWeek.ordinal].shortName} ${time.clockText()}"
   }
 }
-
-private fun clock(time: LocalDateTime): String =
-  "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
 
 /**
  * Whether [path] lies in Android's app-private storage (`/Android/data`), whose files other apps

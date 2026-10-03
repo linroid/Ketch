@@ -87,9 +87,7 @@ internal class ListActions(
   /** A right-click on [row] at [position] in it: opens the menu of the rows it acts on. */
   fun contextClick(row: TaskRow, position: Offset) {
     keyboard.focusVisible = false
-    val keys = selection.contextClick(row.key, visibleKeys)
-    val byKey = rows.associateBy { it.key }
-    menu.open(row.key, keys.mapNotNull(byKey::get).ifEmpty { listOf(row) }, position)
+    openMenu(row, selection.contextClick(row.key, visibleKeys), position)
   }
 
   /**
@@ -97,9 +95,13 @@ internal class ListActions(
    * reader's long-press does: it acts on the selection when [row] is in it, else on [row] alone.
    */
   fun showMenu(row: TaskRow) {
-    val keys = selection.current.targets(row.key, visibleKeys)
+    openMenu(row, selection.current.targets(row.key, visibleKeys), Offset.Zero)
+  }
+
+  // Opens the menu on row for the rows of keys, or for row alone when none of them is listed.
+  private fun openMenu(row: TaskRow, keys: List<TaskKey>, position: Offset) {
     val byKey = rows.associateBy { it.key }
-    menu.open(row.key, keys.mapNotNull(byKey::get).ifEmpty { listOf(row) }, Offset.Zero)
+    menu.open(row.key, keys.mapNotNull(byKey::get).ifEmpty { listOf(row) }, position)
   }
 
   /** A long-press on [row]: enters selection mode with it, or toggles it. */

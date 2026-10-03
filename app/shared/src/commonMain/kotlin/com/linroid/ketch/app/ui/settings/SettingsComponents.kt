@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -52,10 +51,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -64,20 +63,19 @@ import com.linroid.ketch.app.components.DISABLED_ALPHA
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchMenu
-import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.KetchSwitch
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.elideMiddle
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import kotlinx.coroutines.delay
 
@@ -117,13 +115,12 @@ fun SettingsGroup(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       ) {
-        Text(
-          text = eyebrowText(title.orEmpty()),
-          style = KetchTheme.typography.eyebrow,
+        KetchEyebrow(
+          text = title.orEmpty(),
+          modifier = Modifier.weight(1f),
           color = colors.textSecondary,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.weight(1f),
         )
         action?.invoke()
       }
@@ -288,7 +285,10 @@ fun SettingsSwitchRow(
   )
 }
 
-/** Row with a drop-down of [options] on the right. */
+/**
+ * Row with a compact drop-down button on the right, which lists [options] in a menu with a check
+ * on [value].
+ */
 @Composable
 fun <T> SettingsSelectRow(
   title: String,
@@ -306,143 +306,112 @@ fun <T> SettingsSelectRow(
     enabled = enabled,
     modifier = modifier,
     trailing = {
-      SettingsSelect(
-        value = value,
-        options = options,
-        label = label,
-        onSelect = onSelect,
-        enabled = enabled,
-      )
+      val colors = KetchTheme.colors
+      val spacing = KetchTheme.spacing
+      val shape = KetchTheme.shapes.full
+      val interactions = remember { MutableInteractionSource() }
+      val overlay = rememberInteractionOverlay(interactions, enabled)
+      val focus = rememberFocusVisibility()
+      var expanded by remember { mutableStateOf(false) }
+      Box {
+        Row(
+          modifier = Modifier
+            .focusRing(focus.visible, shape, colors.focusRing)
+            .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
+            .height(KetchTheme.density.buttonMedium)
+            .widthIn(min = SelectMinWidth)
+            .background(colors.surface, shape)
+            .background(overlay, shape)
+            .border(HairlineWidth, colors.borderStrong, shape)
+            .ketchClickable(
+              interactions = interactions,
+              focus = focus,
+              enabled = enabled,
+              role = Role.DropdownList,
+              onClick = { expanded = true },
+            )
+            .padding(start = spacing.s3, end = spacing.s2),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.End),
+        ) {
+          Text(
+            text = label(value),
+            style = KetchTheme.typography.label,
+            color = colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+          )
+          KetchIconImage(
+            icon = KetchIcon.ChevronDown,
+            size = KetchTheme.density.controlGlyph,
+            tint = colors.textTertiary,
+          )
+        }
+        KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+          options.forEach { option ->
+            item(
+              label = label(option),
+              checked = option == value,
+              onClick = { if (option != value) onSelect(option) },
+            )
+          }
+        }
+      }
     },
   )
 }
 
-/** Compact drop-down button listing [options] in a menu, with a check on [value]. */
-@Composable
-fun <T> SettingsSelect(
-  value: T,
-  options: List<T>,
-  label: (T) -> String,
-  onSelect: (T) -> Unit,
-  modifier: Modifier = Modifier,
-  enabled: Boolean = true,
-) {
-  val colors = KetchTheme.colors
-  val spacing = KetchTheme.spacing
-  val shape = KetchTheme.shapes.full
-  val interactions = remember { MutableInteractionSource() }
-  val overlay = rememberInteractionOverlay(interactions, enabled)
-  val focus = rememberFocusVisibility()
-  var expanded by remember { mutableStateOf(false) }
-  Box(modifier) {
-    Row(
-      modifier = Modifier
-        .focusRing(focus.visible, shape, colors.focusRing)
-        .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
-        .height(KetchTheme.density.buttonMedium)
-        .widthIn(min = SelectMinWidth)
-        .background(colors.surface, shape)
-        .background(overlay, shape)
-        .border(HairlineWidth, colors.borderStrong, shape)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
-          enabled = enabled,
-          role = Role.DropdownList,
-          onClick = { expanded = true },
-        )
-        .padding(start = spacing.s3, end = spacing.s2),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.End),
-    ) {
-      Text(
-        text = label(value),
-        style = KetchTheme.typography.label,
-        color = colors.textPrimary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f, fill = false),
-      )
-      KetchIconImage(
-        icon = KetchIcon.ChevronDown,
-        size = KetchTheme.density.controlGlyph,
-        tint = colors.textTertiary,
-      )
-    }
-    KetchMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-      options.forEach { option ->
-        item(
-          label = label(option),
-          checked = option == value,
-          onClick = { if (option != value) onSelect(option) },
-        )
-      }
-    }
-  }
-}
-
-/** Mutually exclusive [options] on a sliding track, for two to four short choices. */
-@Composable
-fun <T> SettingsSegmented(
-  value: T,
-  options: List<T>,
-  label: (T) -> String,
-  onSelect: (T) -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  KetchSegmented(
-    options = options,
-    selected = value,
-    onSelect = onSelect,
-    label = label,
-    modifier = modifier,
-  )
-}
-
 /**
- * `[−] 3 [+]` for a count chosen from [values], in order; each press applies at once.
+ * Row with `[−] 3 [+]` on the right, for a count chosen from [values], in order; each press
+ * applies at once.
  *
  * @param label how a value reads, such as "Unlimited" for 0.
  * @param noun what is counted, for screen readers, such as "downloads at once".
  */
 @Composable
-internal fun SettingsStepper(
+internal fun SettingsStepperRow(
+  title: String,
+  description: String,
   value: Int,
   values: List<Int>,
   label: (Int) -> String,
-  onChange: (Int) -> Unit,
   noun: String,
-  modifier: Modifier = Modifier,
-  enabled: Boolean = true,
+  onChange: (Int) -> Unit,
 ) {
-  val index = values.indexOf(value)
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
-    modifier = modifier.semantics { stateDescription = "${label(value)} $noun" },
-  ) {
-    StepButton(
-      plus = false,
-      description = "Fewer $noun",
-      enabled = enabled && index > 0,
-      onClick = { values.getOrNull(index - 1)?.let(onChange) },
-    )
-    Text(
-      text = label(value),
-      style = KetchTheme.typography.numeral,
-      color = if (enabled) KetchTheme.colors.textPrimary else KetchTheme.colors.textDisabled,
-      textAlign = TextAlign.Center,
-      maxLines = 1,
-      modifier = Modifier.widthIn(min = StepperValueMinWidth),
-    )
-    StepButton(
-      plus = true,
-      description = "More $noun",
-      enabled = enabled && index in 0 until values.lastIndex,
-      onClick = { values.getOrNull(index + 1)?.let(onChange) },
-    )
-  }
+  SettingsRow(
+    title = title,
+    description = description,
+    trailing = {
+      val index = values.indexOf(value)
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1),
+        modifier = Modifier.semantics { stateDescription = "${label(value)} $noun" },
+      ) {
+        StepButton(
+          plus = false,
+          description = "Fewer $noun",
+          enabled = index > 0,
+          onClick = { values.getOrNull(index - 1)?.let(onChange) },
+        )
+        Text(
+          text = label(value),
+          style = KetchTheme.typography.numeral,
+          color = KetchTheme.colors.textPrimary,
+          textAlign = TextAlign.Center,
+          maxLines = 1,
+          modifier = Modifier.widthIn(min = StepperValueMinWidth),
+        )
+        StepButton(
+          plus = true,
+          description = "More $noun",
+          enabled = index in 0 until values.lastIndex,
+          onClick = { values.getOrNull(index + 1)?.let(onChange) },
+        )
+      }
+    },
+  )
 }
 
 @Composable
@@ -462,14 +431,7 @@ private fun StepButton(plus: Boolean, description: String, enabled: Boolean, onC
       .background(overlay, shape)
       .border(HairlineWidth, colors.borderStrong, shape)
       .semantics { contentDescription = description }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.Button,
-        onClick = onClick,
-      ),
+      .ketchClickable(interactions, focus, enabled = enabled, onClick = onClick),
   ) {
     val ink = colors.textPrimary
     Canvas(Modifier.size(KetchTheme.density.controlGlyph)) {
@@ -497,7 +459,6 @@ private fun StepButton(plus: Boolean, description: String, enabled: Boolean, onC
  * @param validate returns why the text cannot be saved, or `null`.
  * @param secret masks the text, with a Show/Hide toggle.
  * @param numeric accepts digits only.
- * @param decimal accepts digits and a decimal point.
  */
 @Composable
 fun SettingsTextInput(
@@ -509,7 +470,6 @@ fun SettingsTextInput(
   validate: (String) -> String? = { null },
   secret: Boolean = false,
   numeric: Boolean = false,
-  decimal: Boolean = false,
   mono: Boolean = false,
   enabled: Boolean = true,
   width: Dp? = null,
@@ -539,11 +499,7 @@ fun SettingsTextInput(
   SettingsTextField(
     value = text,
     onValueChange = { typed ->
-      text = when {
-        numeric -> typed.filter(Char::isDigit)
-        decimal -> typed.filter { it.isDigit() || it == '.' }
-        else -> typed
-      }
+      text = if (numeric) typed.filter(Char::isDigit) else typed
     },
     modifier = modifier,
     placeholder = placeholder,
@@ -555,7 +511,6 @@ fun SettingsTextInput(
     onFocusChange = { focused -> if (!focused) commit() },
     keyboardType = when {
       numeric -> KeyboardType.Number
-      decimal -> KeyboardType.Decimal
       secret -> KeyboardType.Password
       else -> KeyboardType.Text
     },
@@ -816,6 +771,16 @@ internal fun DeviceSettingsError(error: String?, loaded: Boolean, onRetry: () ->
         )
       }
     },
+  )
+}
+
+/** The chevron at the end of a row that opens something. */
+@Composable
+internal fun Chevron() {
+  KetchIconImage(
+    icon = KetchIcon.Chevron,
+    size = KetchTheme.density.controlGlyph,
+    tint = KetchTheme.colors.textTertiary,
   )
 }
 

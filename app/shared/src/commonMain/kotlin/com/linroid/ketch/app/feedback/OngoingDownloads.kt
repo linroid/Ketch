@@ -8,6 +8,7 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.app.util.formatEta
+import com.linroid.ketch.app.util.plural
 
 /**
  * What an ongoing notification says about a device's downloads, such as the one the Android
@@ -75,7 +76,7 @@ internal data class OngoingDownloads(
       val more = downloading.size + queued.size - lines.size
       if (downloading.isEmpty()) {
         return OngoingDownloads(
-          title = "Waiting to download ${files(queued.size)}",
+          title = "Waiting to download ${plural(queued.size, "file")}",
           text = null,
           permille = null,
           lines = lines,
@@ -100,7 +101,7 @@ internal data class OngoingDownloads(
       }
       val single = downloading.singleOrNull()?.takeIf { queued.isEmpty() }
       return OngoingDownloads(
-        title = "Downloading ${files(downloading.size)}" +
+        title = "Downloading ${plural(downloading.size, "file")}" +
           if (speed > 0) " · ${formatBytes(speed)}/s" else "",
         text = text,
         permille = if (total > 0) permilleOf(received, total) else null,
@@ -148,7 +149,5 @@ internal data class OngoingDownloads(
         else -> "about ${formatEta(seconds)} left"
       }
     }
-
-    private fun files(count: Int): String = if (count == 1) "1 file" else "$count files"
   }
 }

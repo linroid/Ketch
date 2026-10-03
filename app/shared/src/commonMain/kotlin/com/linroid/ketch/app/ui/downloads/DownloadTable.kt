@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.downloads
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -44,22 +43,20 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchMenu
@@ -72,8 +69,8 @@ import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.components.StatusDotDefaults
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.platform.HorizontalResizePointerIcon
@@ -85,20 +82,20 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.downloads.actions.ListActions
 import com.linroid.ketch.app.ui.downloads.actions.RowFrameState
 import com.linroid.ketch.app.ui.downloads.actions.SelectionCheckbox
 import com.linroid.ketch.app.ui.downloads.actions.TaskRowFrame
+import com.linroid.ketch.app.ui.inspector.hasControls
 import com.linroid.ketch.app.ui.list.FileNameText
 import com.linroid.ketch.app.ui.list.GroupCollapse
-import com.linroid.ketch.app.ui.list.GroupHeader
 import com.linroid.ketch.app.ui.list.HoverOverlay
 import com.linroid.ketch.app.ui.list.TaskLazyList
-import com.linroid.ketch.app.ui.list.listEntries
+import com.linroid.ketch.app.ui.list.appendError
 import com.linroid.ketch.app.ui.list.placement
 import com.linroid.ketch.app.ui.list.rememberRowCompletion
 import com.linroid.ketch.app.ui.list.rememberStalledLanes
+import com.linroid.ketch.app.ui.list.rowDivider
 import com.linroid.ketch.app.ui.list.showsLanes
 import com.linroid.ketch.app.ui.list.withMissingFile
 import com.linroid.ketch.app.util.RowStatus
@@ -146,8 +143,6 @@ internal fun DownloadTable(
     val columns = shown.fit(maxWidth, TablePadding)
     val namePennant = TableColumn.Device in autoColumns &&
       columns.none { it.column == TableColumn.Device }
-    val groups = view.groups
-    val entries = listEntries(groups, collapse)
     Column(Modifier.fillMaxSize()) {
       TableHeader(
         view = view,
@@ -161,21 +156,14 @@ internal fun DownloadTable(
         onSort = onSort,
       )
       TaskLazyList(
-        entries = entries,
-        groups = groups,
+        groups = view.groups,
         actions = actions,
         collapse = collapse,
         listState = listState,
+        headerHeight = spacing.tableGroupHeaderHeight,
+        headerPadding = TablePadding + spacing.s2,
         modifier = Modifier.weight(1f).fillMaxWidth(),
-        header = { entry ->
-          GroupHeader(
-            entry = entry,
-            onToggle = { collapse.toggle(entry.group) },
-            height = spacing.tableGroupHeaderHeight,
-            padding = TablePadding + spacing.s2,
-            trailing = { groupAction(entry.group) },
-          )
-        },
+        groupAction = groupAction,
         row = { row ->
           TableRow(
             task = row,
@@ -217,7 +205,6 @@ private fun TableHeader(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   var chooserAt by remember { mutableStateOf<Offset?>(null) }
-  val hairline = colors.hairline
   Box {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -225,10 +212,7 @@ private fun TableHeader(
         .fillMaxWidth()
         .height(spacing.tableHeaderHeight)
         .background(colors.surfaceSunken)
-        .drawBehind {
-          val y = size.height - density / 2
-          drawLine(hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = density)
-        }
+        .rowDivider(colors.hairline)
         .pointerInput(Unit) {
           awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -370,11 +354,9 @@ private fun HeaderCell(
       .fillMaxHeight()
       .focusRing(focus.visible, KetchTheme.shapes.xs, colors.focusRing, gap = -spacing.s0_5)
       .hoverable(interactions)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
+      .ketchClickable(
+        interactions = interactions,
+        focus = focus,
         onClickLabel = "Sort by $label",
         onClick = { onSort(sort) },
       )
@@ -384,13 +366,7 @@ private fun HeaderCell(
       .padding(horizontal = CellPadding),
   ) {
     if (numeric && active) SortChevron(arrangement.descending, ink)
-    Text(
-      text = eyebrowText(label),
-      style = KetchTheme.typography.eyebrow,
-      color = ink,
-      maxLines = 1,
-      overflow = TextOverflow.Clip,
-    )
+    KetchEyebrow(label, color = ink, maxLines = 1)
     if (!numeric && active) SortChevron(arrangement.descending, ink)
   }
 }
@@ -417,31 +393,14 @@ private fun ResizeHandle(
   modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
-  val pixels = LocalDensity.current
   val interactions = remember { MutableInteractionSource() }
   val hovered by interactions.collectIsHoveredAsState()
-  var start by remember { mutableStateOf(width) }
-  var moved by remember { mutableStateOf(0f) }
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   val line = if (hovered) colors.borderStrong else colors.hairline
   Box(
     modifier = modifier
       .width(ResizeHandleWidth)
       .fillMaxHeight()
-      .pointerHoverIcon(HorizontalResizePointerIcon)
-      .hoverable(interactions)
-      .draggable(
-        state = rememberDraggableState { delta ->
-          moved += if (rtl) delta else -delta
-          onResize(start + with(pixels) { moved.toDp() })
-        },
-        orientation = Orientation.Horizontal,
-        onDragStarted = {
-          start = width
-          moved = 0f
-        },
-        onDragStopped = { onResizeEnd() },
-      )
+      .widthDragHandle(width, interactions, onResize, onResizeEnd)
       .drawBehind {
         // On the boundary itself, as far from the labels on either side.
         val half = density / 2
@@ -450,6 +409,40 @@ private fun ResizeHandle(
         drawLine(line, Offset(x, inset), Offset(x, size.height - inset), strokeWidth = density)
       },
   )
+}
+
+/**
+ * Lets a pointer drag this handle sideways to resize a pane [width] wide, which dragging toward
+ * the start widens: [onResize] gets each new width and [onResizeEnd] the end of the drag. The
+ * handle reports its hover to [hover], and its drag to [dragInteractions] when given.
+ */
+@Composable
+internal fun Modifier.widthDragHandle(
+  width: Dp,
+  hover: MutableInteractionSource,
+  onResize: (Dp) -> Unit,
+  onResizeEnd: () -> Unit,
+  dragInteractions: MutableInteractionSource? = null,
+): Modifier {
+  val pixels = LocalDensity.current
+  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+  var start by remember { mutableStateOf(width) }
+  var moved by remember { mutableStateOf(0f) }
+  return pointerHoverIcon(HorizontalResizePointerIcon)
+    .hoverable(hover)
+    .draggable(
+      state = rememberDraggableState { delta ->
+        moved += if (rtl) delta else -delta
+        onResize(start + with(pixels) { moved.toDp() })
+      },
+      orientation = Orientation.Horizontal,
+      interactionSource = dragInteractions,
+      onDragStarted = {
+        start = width
+        moved = 0f
+      },
+      onDragStopped = { onResizeEnd() },
+    )
 }
 
 @Composable
@@ -466,24 +459,13 @@ private fun TableRow(
   val row = withMissingFile(task, actions.runner.isFileMissing(task))
   val completion = rememberRowCompletion(row)
   val lanes = showsLanes(row, completion)
-  val divider = colors.divider
-  val dividerInset = TablePadding + TableColumn.StatusDotWidth + CellPadding
   TaskRowFrame(
     row = row,
     actions = actions,
     modifier = modifier
       .fillMaxWidth()
       .height(height)
-      .drawBehind {
-        val y = size.height - density / 2
-        val inset = dividerInset.toPx()
-        val (from, to) = if (layoutDirection == LayoutDirection.Ltr) {
-          inset to size.width
-        } else {
-          0f to size.width - inset
-        }
-        drawLine(divider, Offset(from, y), Offset(to, y), strokeWidth = density)
-      },
+      .rowDivider(colors.divider, TablePadding + TableColumn.StatusDotWidth + CellPadding),
   ) { frame ->
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -593,16 +575,11 @@ private fun NameCell(
     )
     PriorityGlyph(row.request.priority, Modifier.padding(start = spacing.s1))
     val limit = row.request.speedLimit
-    if (!limit.isUnlimited && row.state.isLive) {
+    if (!limit.isUnlimited && row.state.hasControls) {
       CapPill(formatSpeedLimit(limit), Modifier.padding(start = spacing.s1))
     }
   }
 }
-
-/** Whether a task in this state can still download, so a speed cap still applies to it. */
-private val DownloadState.isLive: Boolean
-  get() = this is DownloadState.Downloading || this is DownloadState.Paused ||
-    this is DownloadState.Queued || this is DownloadState.Scheduled
 
 /** A per-task speed cap after the name, such as "2 MB/s". */
 @Composable
@@ -789,13 +766,7 @@ private fun ReasonCell(row: TaskRow, modifier: Modifier) {
 /** A row's reason: a failure's title in the failed color and its hint, else its detail. */
 internal fun reasonText(row: TaskRow, colors: KetchColors): AnnotatedString {
   val error = row.content.error ?: return AnnotatedString(row.content.detail)
-  return buildAnnotatedString {
-    withStyle(SpanStyle(color = colors.status.failed.color)) { append(error.title) }
-    error.shortHint?.let { hint ->
-      append(" · ")
-      append(hint)
-    }
-  }
+  return buildAnnotatedString { appendError(error, colors) }
 }
 
 @Composable

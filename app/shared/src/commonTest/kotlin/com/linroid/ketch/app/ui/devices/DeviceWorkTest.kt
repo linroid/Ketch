@@ -6,9 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
-import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -16,6 +14,7 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,24 +56,14 @@ class DeviceWorkTest {
     counts: PulseCounts = PulseCounts(),
     failures: Int = 0,
     speed: Long = 0,
-  ) = DevicePresence(
+  ) = presence(
     entry = entry,
     name = name,
-    detail = name,
     health = health,
     connected = connected,
-    watched = true,
-    status = null,
-    statusAt = null,
-    lastSeen = null,
     speed = speed,
     counts = counts,
     failures = failures,
-    unseenFailures = 0,
-    cap = SpeedLimit.Unlimited,
-    disk = null,
-    speedMode = SpeedMode.Full,
-    history = emptyList(),
   )
 
   @Test

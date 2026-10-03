@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchCountBadge
 import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchLogoTile
 import com.linroid.ketch.app.components.KetchLogoTileDefaults
@@ -44,9 +45,9 @@ import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.devices.addDevice
 import com.linroid.ketch.app.ui.shell.AppearanceToggle
+import com.linroid.ketch.app.ui.shell.ShellState
 
 /**
  * The sidebar of wide windows, transparent over the canvas wash: the title zone with the
@@ -54,36 +55,31 @@ import com.linroid.ketch.app.ui.shell.AppearanceToggle
  * mark on the web), the destinations, the DEVICES (All devices from two on, then each device with
  * its health and live line, its menu and its drops), and Settings at the bottom.
  *
- * @param destination the destination shown, which sits on the selected pill.
- * @param settingsSelected whether Settings shows, which then takes the pill instead.
- * @param onToggleSidebar collapses the sidebar to the rail.
+ * The destination [shell] shows sits on the selected pill, or Settings while it shows; the toggle
+ * collapses the sidebar to the rail.
  */
 @Composable
 internal fun Sidebar(
-  state: AppState,
+  shell: ShellState,
   destinations: List<AppDestination>,
-  destination: AppDestination,
-  settingsSelected: Boolean,
-  onSelect: (AppDestination) -> Unit,
-  onOpenSettings: () -> Unit,
-  onToggleSidebar: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val state = shell.app
   val spacing = KetchTheme.spacing
   val pulse by state.pulse.state.collectAsState()
   val active by state.activeInstance.collectAsState()
   val scope by state.deviceScope.collectAsState()
   val devices = rememberDevices(state)
   Column(modifier.width(spacing.sidebarWidth).fillMaxHeight()) {
-    TitleZone(state, onToggleSidebar = onToggleSidebar)
+    TitleZone(state, onToggleSidebar = { shell.toggleSidebar() })
     for (entry in destinations) {
       val downloads = entry == AppDestination.Downloads
       KetchTooltip(text = entry.label, shortcut = entry.command.shortcutLabel()) {
         KetchSidebarItem(
           label = entry.label,
           icon = entry.icon,
-          selected = entry == destination && !settingsSelected,
-          onClick = { onSelect(entry) },
+          selected = entry == shell.destination && !shell.settingsOpen,
+          onClick = { shell.show(entry) },
           trailing = if (downloads) {
             { DownloadsMarks(pulse.counts.downloading, pulse.failures > 0) }
           } else {
@@ -124,8 +120,8 @@ internal fun Sidebar(
       KetchSidebarItem(
         label = "Settings",
         icon = KetchIcon.Settings,
-        selected = settingsSelected,
-        onClick = onOpenSettings,
+        selected = shell.settingsOpen,
+        onClick = { state.openSettings() },
         modifier = Modifier.padding(bottom = spacing.s2),
       )
     }
@@ -143,12 +139,7 @@ private fun DevicesEyebrow(showShortcut: Boolean) {
       .fillMaxWidth()
       .padding(start = spacing.s4, end = spacing.s4, top = spacing.s6, bottom = spacing.s1),
   ) {
-    Text(
-      text = eyebrowText("Devices"),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textSecondary,
-      modifier = Modifier.weight(1f),
-    )
+    KetchEyebrow("Devices", Modifier.weight(1f), color = colors.textSecondary)
     val shortcut = KetchCommands.SwitchDevice.shortcutLabel()
     if (shortcut != null) {
       Text(

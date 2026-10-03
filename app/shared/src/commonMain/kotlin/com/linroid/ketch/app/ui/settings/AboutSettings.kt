@@ -34,7 +34,6 @@ import com.linroid.ketch.app.components.KetchLogoTile
 import com.linroid.ketch.app.components.KetchLogoTileDefaults
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
-import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.log.LogFilesAction
 import com.linroid.ketch.app.log.rememberLogFilesAction
 import com.linroid.ketch.app.platform.isMobilePlatform
@@ -51,12 +50,12 @@ private val log = KetchLogger("AboutSettings")
 
 /**
  * Who made Ketch and which version this is, the licenses it ships under, its log files, and
- * ways to see the setup steps again.
- *
- * @param fileLogger the app's log files, or `null` when it keeps none.
+ * ways to see the setup steps again. The log files are the [LocalFileLogger]'s, when the app
+ * keeps them.
  */
 @Composable
-fun AboutSettings(state: AppState, fileLogger: FileLogger? = null) {
+fun AboutSettings(state: AppState) {
+  val fileLogger = LocalFileLogger.current
   var showLicenses by remember { mutableStateOf(false) }
   val logFiles = fileLogger?.let { rememberLogFilesAction(it) }
   val appSettings = state.appSettings
@@ -232,16 +231,6 @@ private fun LogFilesRow(action: LogFilesAction) {
 @Composable
 private fun MonoValue(text: String) {
   Text(text = text, style = KetchTheme.typography.mono, color = KetchTheme.colors.textSecondary)
-}
-
-/** The chevron at the end of a row that opens something. */
-@Composable
-internal fun Chevron() {
-  KetchIconImage(
-    icon = KetchIcon.Chevron,
-    size = KetchTheme.density.controlGlyph,
-    tint = KetchTheme.colors.textTertiary,
-  )
 }
 
 @Composable

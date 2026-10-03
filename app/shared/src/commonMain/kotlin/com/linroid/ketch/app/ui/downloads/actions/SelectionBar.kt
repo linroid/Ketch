@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.downloads.actions
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,69 +37,50 @@ import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
-import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.list.rowDivider
+import com.linroid.ketch.app.util.downloads
 import com.linroid.ketch.app.util.formatBytes
-import kotlinx.datetime.TimeZone
-
-/** What a [BarVerb] does when clicked. */
-internal enum class BarVerbKind {
-  /** Runs the verb's action on its rows. */
-  Run,
-
-  /** Opens the priorities. */
-  Priority,
-
-  /** Opens the speed limits. */
-  Speed,
-
-  /** Opens the devices to send to. */
-  SendTo,
-
-  /** Opens the connection counts. */
-  Connections,
-
-  /** Opens the start times. */
-  StartLater,
-
-  /** Asks to remove the rows, with a box for their files. */
-  RemoveDialog,
-}
+import com.linroid.ketch.app.util.plural
 
 /**
- * A verb of the selection bar.
+ * A verb of the selection bar. Clicking it runs its action on its rows, or opens the choices of
+ * a [dropdown] one.
  *
  * @property action the row action it stands for.
- * @property kind what clicking it does.
  * @property label button text, such as "Pause" or "Copy links".
  * @property rows the selected rows it applies to.
  * @property counted whether the button shows how many rows it applies to, as in "Pause 2".
+ * @property asks whether clicking it asks to remove the rows instead, with a box for their files.
  */
 @Immutable
 internal data class BarVerb(
   val action: RowAction,
-  val kind: BarVerbKind,
   val label: String,
   val rows: List<TaskRow>,
   val counted: Boolean = false,
+  val asks: Boolean = false,
 ) {
   /** How many selected rows it applies to. */
   val count: Int get() = rows.size
 
+  /** Whether clicking it opens its choices, such as the priorities, instead of running it. */
+  val dropdown: Boolean get() = action in DropdownActions
+
   /** Its tooltip over a selection of [total] rows, such as "Pause 2 of 3 selected". */
   fun tooltip(total: Int): String = when {
     counted -> "$label $count of $total selected"
-    kind == BarVerbKind.RemoveDialog -> "Remove ${downloads(count)}…"
-    action == RowAction.CopyLink -> if (count == 1) "Copy 1 link" else "Copy $count links"
+    asks -> "Remove ${downloads(count)}…"
+    action == RowAction.CopyLink -> "Copy ${plural(count, "link")}"
     count < total -> "$label · $count of $total selected"
     else -> label
   }
@@ -120,29 +100,29 @@ internal fun barVerbs(
   revealLabel: String? = null,
 ): Pair<List<BarVerb>, List<BarVerb>> {
   val byAction = batch.associate { it.action to it.rows }
-  fun verb(action: RowAction, kind: BarVerbKind, label: String, counted: Boolean = false) =
-    byAction[action]?.let { BarVerb(action, kind, label, it, counted) }
+  fun verb(action: RowAction, label: String, counted: Boolean = false, asks: Boolean = false) =
+    byAction[action]?.let { BarVerb(action, label, it, counted, asks) }
 
   val bar = listOfNotNull(
-    verb(RowAction.Pause, BarVerbKind.Run, "Pause", counted = true),
-    verb(RowAction.Resume, BarVerbKind.Run, "Resume", counted = true),
-    verb(RowAction.Retry, BarVerbKind.Run, "Retry", counted = true),
-    verb(RowAction.Priority, BarVerbKind.Priority, "Priority"),
-    verb(RowAction.SpeedLimit, BarVerbKind.Speed, "Speed"),
-    verb(RowAction.SendTo, BarVerbKind.SendTo, "Send to").takeIf { canSend },
-    verb(RowAction.CopyLink, BarVerbKind.Run, "Copy links"),
-    verb(RowAction.Remove, BarVerbKind.RemoveDialog, "Remove…"),
+    verb(RowAction.Pause, "Pause", counted = true),
+    verb(RowAction.Resume, "Resume", counted = true),
+    verb(RowAction.Retry, "Retry", counted = true),
+    verb(RowAction.Priority, "Priority"),
+    verb(RowAction.SpeedLimit, "Speed"),
+    verb(RowAction.SendTo, "Send to").takeIf { canSend },
+    verb(RowAction.CopyLink, "Copy links"),
+    verb(RowAction.Remove, "Remove…", asks = true),
   )
   val more = listOfNotNull(
-    verb(RowAction.StartNow, BarVerbKind.Run, "Start now", counted = true),
-    verb(RowAction.Open, BarVerbKind.Run, "Open", counted = true),
-    verb(RowAction.ShowInFolder, BarVerbKind.Run, revealLabel ?: "Show in folder", true),
-    verb(RowAction.Connections, BarVerbKind.Connections, "Connections"),
-    verb(RowAction.StartLater, BarVerbKind.StartLater, "Start later"),
-    verb(RowAction.CopyPath, BarVerbKind.Run, "Copy file paths", counted = true),
-    verb(RowAction.DownloadAgain, BarVerbKind.Run, "Download again", counted = true),
-    verb(RowAction.StopAndDiscard, BarVerbKind.Run, "Discard progress…", counted = true),
-    verb(RowAction.Remove, BarVerbKind.Run, "Remove from list"),
+    verb(RowAction.StartNow, "Start now", counted = true),
+    verb(RowAction.Open, "Open", counted = true),
+    verb(RowAction.ShowInFolder, revealLabel ?: "Show in folder", counted = true),
+    verb(RowAction.Connections, "Connections"),
+    verb(RowAction.StartLater, "Start later"),
+    verb(RowAction.CopyPath, "Copy file paths", counted = true),
+    verb(RowAction.DownloadAgain, "Download again", counted = true),
+    verb(RowAction.StopAndDiscard, "Discard progress…", counted = true),
+    verb(RowAction.Remove, "Remove from list"),
   )
   return bar to more
 }
@@ -181,14 +161,7 @@ internal fun SelectionBar(
   val devices = remember(instances, rows, presence) { sendTargets(instances, rows, presence) }
   val batch = remember(rows) { runner.batch(rows) }
   val (bar, more) = barVerbs(batch, devices.isNotEmpty(), runner.files?.revealLabel)
-  val context = RowMenuContext(
-    revealLabel = runner.files?.revealLabel,
-    devices = devices,
-    now = LocalClock.current.now(),
-    zone = TimeZone.currentSystemDefault(),
-    urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
-    send = rememberSendMode(),
-  )
+  val context = rowMenuContext(rows, runner, devices)
   if (compact) {
     CompactSelectionBar(rows, bar + more, runner, context, onClear, onSelectAll, modifier)
   } else {
@@ -216,10 +189,7 @@ private fun WideSelectionBar(
       .fillMaxWidth()
       .height(spacing.tabRowHeight)
       .background(colors.surfaceRaised)
-      .drawBehind {
-        val y = size.height - density / 2
-        drawLine(colors.hairline, Offset(0f, y), Offset(size.width, y), strokeWidth = density)
-      }
+      .rowDivider(colors.hairline)
       .padding(horizontal = spacing.s2),
   ) { constraints ->
     val loose = constraints.copy(minWidth = 0, minHeight = 0)
@@ -320,7 +290,7 @@ private fun VerbButton(
   context: RowMenuContext,
 ) {
   var open by remember { mutableStateOf(false) }
-  val dropdown = verb.kind != BarVerbKind.Run && verb.kind != BarVerbKind.RemoveDialog
+  val dropdown = verb.dropdown
   val shortcut = verb.action.command?.shortcutLabel(KeyboardPlatform.current)
   Box {
     BarButton(
@@ -382,15 +352,16 @@ private fun KetchMenuScope.moreEntries(
       destructive = true
     }
     val label = if (verb.counted) "${verb.label} (${verb.count})" else verb.label
-    when (verb.kind) {
-      BarVerbKind.Run, BarVerbKind.RemoveDialog -> item(
+    if (verb.dropdown) {
+      submenu(label, verb.action.icon) { verbChoices(verb, runner, context) }
+    } else {
+      item(
         label = label,
         onClick = { runVerb(verb, selected, runner) },
         icon = verb.action.icon,
         shortcut = verb.action.command?.shortcutLabel(KeyboardPlatform.current),
         destructive = verb.action.destructive,
       )
-      else -> submenu(label, verb.action.icon) { verbChoices(verb, runner, context) }
     }
   }
   if (onSelectAll != null) {
@@ -405,23 +376,24 @@ private fun KetchMenuScope.verbChoices(
   runner: RowActionRunner,
   context: RowMenuContext,
 ) {
-  when (verb.kind) {
-    BarVerbKind.Priority -> priorityEntries(verb.rows, runner, context.urgentVictim)
-    BarVerbKind.Speed -> speedEntries(verb.rows, runner)
-    BarVerbKind.SendTo -> sendEntries(verb.rows, runner, context.devices, context.send)
-    BarVerbKind.Connections -> {
+  when (verb.action) {
+    RowAction.Priority -> priorityEntries(verb.rows, runner, context.urgentVictim)
+    RowAction.SpeedLimit -> speedEntries(verb.rows, runner)
+    RowAction.SendTo -> sendEntries(verb.rows, runner, context.devices, context.send)
+    RowAction.Connections -> {
       connectionEntries(verb.rows, runner, peers = verb.rows.all { it.isTorrent })
     }
-    BarVerbKind.StartLater -> startLaterEntries(verb.rows, runner, context)
-    BarVerbKind.Run, BarVerbKind.RemoveDialog -> Unit
+    RowAction.StartLater -> startLaterEntries(verb.rows, runner, context)
+    else -> Unit
   }
 }
 
 /** Runs [verb] on the [selected] rows; batches report the rows it left alone. */
 private fun runVerb(verb: BarVerb, selected: List<TaskRow>, runner: RowActionRunner) {
-  when (verb.kind) {
-    BarVerbKind.RemoveDialog -> runner.requestRemove(verb.rows, withFiles = false)
-    else -> runner.run(verb.action, selected)
+  if (verb.asks) {
+    runner.requestRemove(verb.rows, withFiles = false)
+  } else {
+    runner.run(verb.action, selected)
   }
 }
 
@@ -455,10 +427,9 @@ private fun BarButton(
         .heightIn(min = density.buttonSmall)
         .clip(shape)
         .background(overlay)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           role = if (dropdown) Role.DropdownList else Role.Button,
           onClick = onClick,
         )
@@ -511,9 +482,8 @@ private fun CompactSelectionBar(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val total = rows.size
-  val direct = verbs.filter { it.kind == BarVerbKind.Run || it.kind == BarVerbKind.RemoveDialog }
-  val shown = (direct.filter { it.kind == BarVerbKind.Run }.take(COMPACT_VERBS - 1) +
-    direct.filter { it.kind == BarVerbKind.RemoveDialog })
+  val direct = verbs.filterNot { it.dropdown }
+  val shown = direct.filterNot { it.asks }.take(COMPACT_VERBS - 1) + direct.filter { it.asks }
   val overflow = verbs - shown.toSet()
   Column(
     modifier
@@ -596,13 +566,7 @@ private fun LabelledVerb(
       .heightIn(min = KetchTheme.density.iconButtonTarget + spacing.s4)
       .clip(shape)
       .background(overlay)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClickLabel = description,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, onClickLabel = description, onClick = onClick)
       .padding(vertical = spacing.s2),
   ) {
     KetchIconImage(icon, size = KetchTheme.density.controlGlyph, tint = colors.textSecondary)
@@ -630,9 +594,7 @@ private fun TextAction(text: String, onClick: () -> Unit) {
       .widthIn(min = KetchTheme.density.iconButtonTarget)
       .clip(shape)
       .background(overlay)
-      .clickable(interactionSource = interactions, indication = null, role = Role.Button) {
-        onClick()
-      }
+      .ketchClickable(interactions) { onClick() }
       .padding(horizontal = spacing.s3),
   ) {
     Text(
@@ -646,3 +608,12 @@ private fun TextAction(text: String, onClick: () -> Unit) {
 
 /** Verbs the phone bar shows as icons before "More", Remove included. */
 private const val COMPACT_VERBS = 3
+
+/** Actions whose verbs open their choices instead of running. */
+private val DropdownActions = setOf(
+  RowAction.Priority,
+  RowAction.SpeedLimit,
+  RowAction.SendTo,
+  RowAction.Connections,
+  RowAction.StartLater,
+)

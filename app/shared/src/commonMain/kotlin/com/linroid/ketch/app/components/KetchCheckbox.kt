@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
@@ -171,7 +172,7 @@ fun KetchSwitch(
       contentAlignment = Alignment.CenterStart,
       modifier = Modifier
         .focusRing(focus.visible, shape, colors.focusRing)
-        .size(track.width, track.height)
+        .size(track)
         .background(fill, shape)
         .padding(SwitchInset),
     ) {
@@ -267,10 +268,8 @@ private fun CheckBox(
   }
 }
 
-private class TrackSize(val width: Dp, val height: Dp)
-
-private val KetchDensity.switchTrack: TrackSize
-  get() = if (this == KetchDensity.Comfortable) TrackSize(40.dp, 24.dp) else TrackSize(32.dp, 18.dp)
+private val KetchDensity.switchTrack: DpSize
+  get() = if (this == KetchDensity.Comfortable) DpSize(40.dp, 24.dp) else DpSize(32.dp, 18.dp)
 
 private val KetchDensity.checkbox: Dp
   get() = if (this == KetchDensity.Comfortable) 20.dp else 16.dp

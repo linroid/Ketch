@@ -32,6 +32,7 @@ import com.linroid.ketch.app.ui.common.AdaptiveModal
 import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.dialog.RemoveTasksDialog
 import com.linroid.ketch.app.util.displayName
+import com.linroid.ketch.app.util.downloads
 
 /**
  * Shows the dialog [runner] asks for, if any: Remove with its files, Stop and discard progress,

@@ -2,7 +2,6 @@ package com.linroid.ketch.app.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +18,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -88,12 +86,8 @@ fun KetchButton(
   tooltip: String? = null,
   shortcut: String? = null,
 ) {
-  if (tooltip != null || shortcut != null) {
-    KetchTooltip(text = tooltip ?: text, shortcut = shortcut, modifier = modifier) {
-      ButtonBody(text, onClick, Modifier, variant, size, leadingIcon, enabled, loading)
-    }
-  } else {
-    ButtonBody(text, onClick, modifier, variant, size, leadingIcon, enabled, loading)
+  OptionalTooltip(tooltip ?: text.takeIf { shortcut != null }, modifier, shortcut) {
+    ButtonBody(text, onClick, it, variant, size, leadingIcon, enabled, loading)
   }
 }
 
@@ -132,14 +126,7 @@ private fun ButtonBody(
       .background(style.fill)
       .background(overlay)
       .then(if (style.border != null) Modifier.border(1.dp, style.border, shape) else Modifier)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = active,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, enabled = active, onClick = onClick)
       .padding(horizontal = size.padding(density)),
   ) {
     Row(
@@ -209,14 +196,7 @@ fun KetchIconButton(
           this.contentDescription = contentDescription
           this.selected = selected
         }
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
-          enabled = enabled,
-          role = Role.Button,
-          onClick = onClick,
-        ),
+        .ketchClickable(interactions, focus, enabled = enabled, onClick = onClick),
     ) {
       Box(
         contentAlignment = Alignment.Center,
@@ -248,18 +228,14 @@ fun KetchIconButton(
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   icon: KetchIcon = checkNotNull(command.icon) { "${command.id} has no icon" },
-  size: KetchButtonSize = KetchButtonSize.Medium,
   enabled: Boolean = true,
-  tint: Color = KetchTheme.colors.textSecondary,
   selected: Boolean = false,
 ) {
   KetchIconButton(
     icon = icon,
     onClick = onClick,
     modifier = modifier,
-    size = size,
     enabled = enabled,
-    tint = tint,
     contentDescription = command.label,
     shortcut = command.shortcutLabel(),
     selected = selected,

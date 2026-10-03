@@ -32,7 +32,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -50,9 +49,9 @@ import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.healthColor
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -302,19 +301,26 @@ private fun DiskReadout(label: String, used: Float, short: Boolean, tooltip: Str
       modifier = Modifier.padding(horizontal = KetchTheme.spacing.s1),
     ) {
       Text(label, style = KetchTheme.typography.caption, color = ink, maxLines = 1)
+      DiskBar(used, short, colors.borderStrong, Modifier.size(DiskBarWidth, DiskBarHeight))
+    }
+  }
+}
+
+/**
+ * The [used] share of a disk on a [track] sized by [modifier], amber while the space is [short];
+ * an unknown share shows the track alone.
+ */
+@Composable
+internal fun DiskBar(used: Float?, short: Boolean, track: Color, modifier: Modifier) {
+  val colors = KetchTheme.colors
+  Box(modifier.clip(KetchTheme.shapes.full).background(track)) {
+    if (used != null) {
       Box(
         Modifier
-          .size(DiskBarWidth, DiskBarHeight)
-          .clip(KetchTheme.shapes.full)
-          .background(colors.borderStrong)
-      ) {
-        Box(
-          Modifier
-            .fillMaxHeight()
-            .fillMaxWidth(used)
-            .background(if (short) colors.status.paused.color else colors.textTertiary)
-        )
-      }
+          .fillMaxHeight()
+          .fillMaxWidth(used)
+          .background(if (short) colors.status.paused.color else colors.textTertiary)
+      )
     }
   }
 }
@@ -359,7 +365,8 @@ private fun HealthBadge(
 private fun ActivityBell(unread: Int, onClick: () -> Unit) {
   val colors = KetchTheme.colors
   val description = if (unread > 0) "Activity, $unread unread" else "Activity"
-  KetchTooltip(command = KetchCommands.Activity) {
+  val command = KetchCommands.Activity
+  KetchTooltip(text = command.label, shortcut = command.shortcutLabel()) {
     BarButton(onClick = onClick, description = description) {
       KetchIconImage(
         icon = KetchIcon.Bell,
@@ -416,13 +423,7 @@ private fun BarButton(
       .clip(shape)
       .background(overlay)
       .semantics(mergeDescendants = true) { contentDescription = description }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(horizontal = KetchTheme.spacing.s1),
     content = content,
   )

@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.ui.onboarding
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -8,12 +7,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
 import com.linroid.ketch.app.platform.SystemAppearance
 import com.linroid.ketch.app.state.toKetchAccent
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.shell.canvasWash
 import com.linroid.ketch.config.AppearanceConfig
 import com.linroid.ketch.config.ThemeMode
@@ -27,18 +26,14 @@ fun KetchSplash(
   appearance: AppearanceConfig = AppearanceConfig(),
   modifier: Modifier = Modifier,
 ) {
-  val dark = when (appearance.theme) {
-    ThemeMode.System -> isSystemInDarkTheme()
-    ThemeMode.Light -> false
-    ThemeMode.Dark -> true
-  }
+  val dark = appearance.theme.isDark()
   SystemAppearance(dark.takeIf { appearance.theme != ThemeMode.System })
   KetchTheme(darkTheme = dark, accent = appearance.accent.toKetchAccent()) {
     Box(
       contentAlignment = Alignment.Center,
       modifier = modifier
         .fillMaxSize()
-        .canvasWash(KetchTheme.colors, EmberRadius)
+        .canvasWash(KetchTheme.colors)
         .semantics { contentDescription = "Loading Ketch" },
     ) {
       // The host may hold the main thread while it starts, so the lanes do not animate.
@@ -46,5 +41,3 @@ fun KetchSplash(
     }
   }
 }
-
-private val EmberRadius = 520.dp

@@ -25,7 +25,9 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.util.clockText
 import com.linroid.ketch.app.util.formatEta
+import com.linroid.ketch.app.util.shortName
 import com.linroid.ketch.config.SpeedRule
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -80,7 +82,7 @@ fun startTimeOptions(
     ),
     offPeak?.let {
       val at = it.toLocalDateTime(zone)
-      StartTimeOption("Off-peak · ${clock(at)}", DownloadSchedule.AtTime(it))
+      StartTimeOption("Off-peak · ${at.clockText()}", DownloadSchedule.AtTime(it))
     },
   )
 }
@@ -115,7 +117,7 @@ fun startTimeLabel(schedule: DownloadSchedule, now: Instant, zone: TimeZone): St
   val today = now.toLocalDateTime(zone).date
   val tomorrow = today.plus(1, DateTimeUnit.DAY)
   val night = start.hour < NIGHT_ENDS_HOUR
-  val time = clock(start)
+  val time = start.clockText()
   return when {
     start.date == today && (night || start.hour >= EVENING_HOUR) -> "Starts $time tonight"
     start.date == today -> "Starts $time today"
@@ -124,7 +126,7 @@ fun startTimeLabel(schedule: DownloadSchedule, now: Instant, zone: TimeZone): St
     start.date < today.plus(WEEK_DAYS, DateTimeUnit.DAY) -> {
       "Starts ${WEEKDAYS[start.dayOfWeek.ordinal]} $time"
     }
-    else -> "Starts ${MONTHS[start.month.ordinal]} ${start.date.day} $time"
+    else -> "Starts ${start.month.shortName} ${start.date.day} $time"
   }
 }
 
@@ -168,11 +170,7 @@ fun StartTimePicker(
       )
     }
   }
-  if (!enabled && disabledReason != null) {
-    KetchTooltip(text = disabledReason, modifier = modifier) { chip(Modifier) }
-  } else {
-    chip(modifier)
-  }
+  OptionalTooltip(disabledReason.takeIf { !enabled }, modifier, content = chip)
 }
 
 /**
@@ -296,15 +294,9 @@ fun StartTimeDialog(
   }
 }
 
-private fun clock(time: LocalDateTime): String =
-  "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}"
-
 private val Night = LocalTime(1, 0)
 private val Morning = LocalTime(8, 0)
 private const val NIGHT_ENDS_HOUR = 6
 private const val EVENING_HOUR = 18
 private const val WEEK_DAYS = 7
 private val WEEKDAYS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-private val MONTHS = listOf(
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-)

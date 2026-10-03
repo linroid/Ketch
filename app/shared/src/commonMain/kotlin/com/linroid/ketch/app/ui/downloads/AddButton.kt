@@ -34,7 +34,7 @@ internal fun AddButton(state: AppState, modifier: Modifier = Modifier) {
   val mode = addButtonMode(link, dragging = windowDrop?.active == true, over = over)
   KetchAddButton(
     mode = mode,
-    onAdd = { state.requestAddDownload() },
+    onAdd = { state.openIntake() },
     onAddClip = { (link as? ClipboardLink.Found)?.let { addClipboardLink(state, it) } },
     onOpenSheet = { state.openIntake() },
     addTooltip = KetchCommands.Add.label,

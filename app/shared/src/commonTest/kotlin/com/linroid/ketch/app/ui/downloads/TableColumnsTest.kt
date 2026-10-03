@@ -82,7 +82,7 @@ class TableColumnsTest {
     val layout = TableLayout.decode("speed:100,bogus,-size")
 
     assertEquals(TableColumn.Speed, layout.columns.first().column)
-    assertEquals(100.dp, layout.widthOf(TableColumn.Speed))
+    assertEquals(100.dp, layout.columns.first().width)
     assertFalse(layout.columns.first { it.column == TableColumn.Size }.visible)
     assertEquals(TableColumn.entries.toSet(), layout.columns.map { it.column }.toSet())
   }
@@ -101,8 +101,9 @@ class TableColumnsTest {
       .withWidth(TableColumn.Size, 10.dp)
       .withWidth(TableColumn.Source, 1000.dp)
 
-    assertEquals(TableColumn.MinWidth, layout.widthOf(TableColumn.Size))
-    assertEquals(TableColumn.MaxWidth, layout.widthOf(TableColumn.Source))
+    val widths = layout.columns.associate { it.column to it.width }
+    assertEquals(TableColumn.MinWidth, widths[TableColumn.Size])
+    assertEquals(TableColumn.MaxWidth, widths[TableColumn.Source])
   }
 
   @Test

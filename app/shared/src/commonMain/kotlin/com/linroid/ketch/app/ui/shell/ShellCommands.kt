@@ -12,7 +12,6 @@ import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
-import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
@@ -94,19 +93,21 @@ internal class ShellCommands(
 
   /** Whether [run] does anything for [command]. */
   fun binds(command: KetchCommand): Boolean =
-    command in bound || tabOf(command) != null || deviceOf(command) != null
+    command in bound ||
+      KetchCommands.tabFilter(command) != null ||
+      KetchCommands.deviceNumber(command) != null
 
   /**
    * Runs [command]; returns whether it did, so a key it leaves alone reaches the rest of the
    * window. On the web the paste key is left to the browser, whose paste event brings the text.
    */
   fun run(command: KetchCommand): Boolean {
-    tabOf(command)?.let { filter ->
+    KetchCommands.tabFilter(command)?.let { filter ->
       shell.show(AppDestination.Downloads)
       state.showDownloads(filter)
       return true
     }
-    deviceOf(command)?.let { number ->
+    KetchCommands.deviceNumber(command)?.let { number ->
       val device = state.instances.value.getOrNull(number - 1) ?: return false
       state.switchInstance(device)
       return true
@@ -198,15 +199,7 @@ internal class ShellCommands(
     }
   }
 
-  private fun tabOf(command: KetchCommand): StatusFilter? =
-    StatusFilter.entries.firstOrNull { KetchCommands.tab(it) == command }
-
-  private fun deviceOf(command: KetchCommand): Int? =
-    (1..MAX_DEVICE_SHORTCUTS).firstOrNull { KetchCommands.device(it) == command }
-
   private companion object {
-    const val MAX_DEVICE_SHORTCUTS = 9
-
     val bound: Set<KetchCommand> = setOf(
       KetchCommands.Add,
       KetchCommands.PasteLinks,

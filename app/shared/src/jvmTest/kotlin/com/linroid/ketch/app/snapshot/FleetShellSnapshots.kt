@@ -18,18 +18,14 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchStatus
-import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.components.KetchMenuPanel
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -51,21 +47,16 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 /**
  * The fleet in the shell (W4-FLEET-SHELL): live device rows and All devices in the sidebar, the
@@ -223,19 +214,13 @@ private fun fleetSnapshots(
   setup: suspend AppScenario.() -> Unit = {},
 ): List<File> = sizes.flatMap { size ->
   themes.map { theme ->
-    withFleet(theme, size.density.fleetDensity(), collapsed) { environment ->
-      SnapshotHarness.capture(
-        name = "$name-${theme.id}-${size.id}",
-        size = size,
-        interact = {
-          // The All devices ring and the sidebar's lines follow the first readings.
-          delay(READINGS_WAIT)
-          AppScenario(environment.controller, environment.data, this).setup()
-          // The pointer rests in the window's corner, away from rows it would light up.
-          hover(size.width - 2.dp, 2.dp)
-        },
-      ) {
-        App(environment.controller)
+    withFleet(theme, size.density.toMode(), collapsed) { environment ->
+      captureApp(name, size, theme, environment) {
+        // The All devices ring and the sidebar's lines follow the first readings.
+        delay(READINGS_WAIT)
+        setup()
+        // The pointer rests in the window's corner, away from rows it would light up.
+        scene.hover(size.width - 2.dp, 2.dp)
       }
     }
   }
@@ -253,7 +238,7 @@ private fun berthSnapshot(
   hovered: String? = null,
   single: Boolean = false,
 ) {
-  withFleet(theme, size.density.fleetDensity(), single = single) { environment ->
+  withFleet(theme, size.density.toMode(), single = single) { environment ->
     val hover = DropHoverState().apply {
       enter(Unit)
       hovered?.let { enter(BerthKey(it)) }
@@ -267,7 +252,7 @@ private fun berthSnapshot(
         App(environment.controller)
         KetchTheme(
           darkTheme = theme == SnapshotTheme.Dark,
-          density = size.density.fleetDensity(),
+          density = size.density.toMode(),
           reduceMotion = true,
         ) {
           CompositionLocalProvider(LocalClock provides SampleData.CLOCK) {
@@ -299,20 +284,11 @@ private fun <T> withFleet(
   collapsed: Boolean = false,
   single: Boolean = false,
   block: (FleetEnvironment) -> T,
-): T {
-  val environment = runBlocking(SnapshotHarness.ui) {
-    FleetEnvironment(theme, density, collapsed, single)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(FleetEnvironment.START_TIMEOUT) { environment.start() }
-        ?: error("The fleet's devices never settled")
-    }
-    return block(environment)
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
-  }
-}
+): T = withEnvironment(
+  create = { FleetEnvironment(theme, density, collapsed, single) },
+  timeout = FleetEnvironment.START_TIMEOUT,
+  block = block,
+)
 
 /**
  * This Mac over the sample downloads, NAS-Basement connected and downloading with a failure,
@@ -324,13 +300,13 @@ private class FleetEnvironment(
   density: DensityMode,
   collapsed: Boolean,
   single: Boolean,
-) {
-  val data = SampleData(
+) : SnapshotEnvironment {
+  override val data = SampleData(
     tasks = SampleData.downloads().tasks,
     remotes = if (single) emptyList() else listOf(Nas, DenPc),
     ui = { it.copy(sidebarCollapsed = collapsed) },
   )
-  private val clock = FleetClock(SampleData.NOW - OFFLINE_FOR)
+  private val clock = MovableClock(SampleData.NOW - OFFLINE_FOR)
   private val nasTasks = fleetNasTasks()
   private val denPc = MutableStateFlow<ConnectionState>(ConnectionState.Connected)
   private val instanceManager = InstanceManager(
@@ -338,20 +314,16 @@ private class FleetEnvironment(
       deviceName = data.deviceName,
       embeddedFactory = { SampleKetchApi(data) },
       // This Mac can share its downloads, as on the desktop.
-      localServerFactory = {
-        object : LocalServerHandle {
-          override fun stop() {}
-        }
-      },
+      localServerFactory = PretendServer,
       remoteFactory = { config ->
         if (config.host == Nas.host) {
           RemoteInstance(
-            instance = FleetRemoteApi(fleetStatus("NAS-Basement", "Linux"), nasTasks),
+            instance = SampleDeviceApi(fleetStatus("NAS-Basement", "Linux"), nasTasks),
             remoteConfig = config,
             connectionState = MutableStateFlow(ConnectionState.Connected),
           )
         } else {
-          val api = FleetRemoteApi(fleetStatus("Den-PC", "Windows 11"), emptyList())
+          val api = SampleDeviceApi(fleetStatus("Den-PC", "Windows 11"), emptyList())
           RemoteInstance(api, config, denPc)
         }
       },
@@ -361,8 +333,7 @@ private class FleetEnvironment(
     clock = clock,
   )
 
-  /** The controller the app root shows. */
-  val controller = AppController(
+  override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     clock = SampleData.CLOCK,
@@ -376,7 +347,7 @@ private class FleetEnvironment(
    * Waits for every device's first status and the rows of This Mac and the NAS, then takes
    * Den-PC offline [OFFLINE_FOR] before [SampleData.NOW].
    */
-  suspend fun start() {
+  override suspend fun start() {
     repeat(STARTUP_YIELDS) { yield() }
     val presence = instanceManager.presence
     val count = data.remotes.size + 1
@@ -392,7 +363,7 @@ private class FleetEnvironment(
     clock.now = SampleData.NOW
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     instanceManager.close()
   }
@@ -406,56 +377,11 @@ private class FleetEnvironment(
   }
 }
 
-/** A clock whose time a scenario moves. */
-private class FleetClock(@Volatile var now: Instant) : Clock {
-  override fun now(): Instant = now
-}
-
-/** A remote device that answers with [status] and lists [tasks]. */
-private class FleetRemoteApi(
-  private var status: KetchStatus,
-  tasks: List<DownloadTask>,
-) : KetchApi {
-  override val backendLabel: String = status.name
-  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(tasks)
-
-  override suspend fun status(): KetchStatus = status
-
-  override suspend fun updateConfig(config: DownloadConfig) {
-    status = status.copy(config = config)
-  }
-
-  override suspend fun download(request: DownloadRequest): DownloadTask =
-    throw UnsupportedOperationException("Not in snapshots")
-
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    throw UnsupportedOperationException("Not in snapshots")
-
-  override suspend fun start() {}
-
-  override fun close() {}
-}
-
-private fun fleetStatus(name: String, os: String): KetchStatus = KetchStatus(
+private fun fleetStatus(name: String, os: String): KetchStatus = sampleStatus(
   name = name,
-  version = KetchApi.VERSION,
-  revision = KetchApi.REVISION,
-  uptime = 12.days.inWholeSeconds,
+  uptime = 12.days,
   config = DownloadConfig(defaultDirectory = "/volume1/downloads"),
-  system = SystemInfo(
-    os = os,
-    arch = "amd64",
-    separator = "/",
-    javaVersion = "21",
-    availableProcessors = 4,
-    maxMemory = 0,
-    totalMemory = 0,
-    freeMemory = 0,
-    downloadDirectory = "/volume1/downloads",
-    totalSpace = 4_000_787_030_016,
-    freeSpace = 1_979_120_929_996,
-    usableSpace = 1_979_120_929_996,
-  ),
+  system = sampleSystem(os, "/volume1/downloads", 4_000_787_030_016, 1_979_120_929_996),
 )
 
 private fun fleetNasTasks(): List<DownloadTask> = listOf(
@@ -487,11 +413,6 @@ private fun fleetNasTask(id: String, url: String, state: DownloadState, ago: Dur
     request = DownloadRequest(url = url, destination = Destination("/volume1/downloads/")),
     createdAt = SampleData.NOW - ago,
   )
-
-private fun KetchDensity.fleetDensity(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
-}
 
 private const val NAS_ID = "nas.local:8642"
 private const val DEN_PC_ID = "den-pc.local:8642"

@@ -13,19 +13,19 @@ class SegmentRateTrackerTest {
 
   @Test
   fun update_firstSnapshot_reportsZeroWithoutStall() {
-    val rates = tracker.update(listOf(segment(0, 999, 100)), downloading = true)
+    val rates = tracker.update(listOf(segment(0, 999, 100)))
 
     assertEquals(listOf(SegmentRate(0, 0)), rates)
   }
 
   @Test
   fun update_steadyProgress_smoothsWithMovingAverage() {
-    tracker.update(listOf(segment(0, 9999, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 9999, 0)))
     time += 1.seconds
-    assertEquals(100, tracker.update(listOf(segment(0, 9999, 100)), true).single().bytesPerSecond)
+    assertEquals(100, tracker.update(listOf(segment(0, 9999, 100))).single().bytesPerSecond)
     time += 1.seconds
 
-    val rate = tracker.update(listOf(segment(0, 9999, 300)), true).single()
+    val rate = tracker.update(listOf(segment(0, 9999, 300))).single()
 
     // 0.35 × 200 + 0.65 × 100
     assertEquals(135, rate.bytesPerSecond)
@@ -34,34 +34,34 @@ class SegmentRateTrackerTest {
 
   @Test
   fun update_halfSecondApart_measuresPerSecond() {
-    tracker.update(listOf(segment(0, 9999, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 9999, 0)))
     time += 0.5.seconds
 
-    assertEquals(200, tracker.update(listOf(segment(0, 9999, 100)), true).single().bytesPerSecond)
+    assertEquals(200, tracker.update(listOf(segment(0, 9999, 100))).single().bytesPerSecond)
   }
 
   @Test
   fun update_sameInstant_waitsForTimeToPass() {
-    tracker.update(listOf(segment(0, 9999, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 9999, 0)))
     time += 1.seconds
-    tracker.update(listOf(segment(0, 9999, 100)), true)
-    tracker.update(listOf(segment(0, 9999, 150)), true)
+    tracker.update(listOf(segment(0, 9999, 100)))
+    tracker.update(listOf(segment(0, 9999, 150)))
     time += 1.seconds
 
     // 0.35 × 100 + 0.65 × 100: the 50 bytes of the same instant count in the next second.
-    assertEquals(100, tracker.update(listOf(segment(0, 9999, 200)), true).single().bytesPerSecond)
+    assertEquals(100, tracker.update(listOf(segment(0, 9999, 200))).single().bytesPerSecond)
   }
 
   @Test
   fun update_bytesGoDown_ignoresNegativeDelta() {
-    tracker.update(listOf(segment(0, 9999, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 9999, 0)))
     time += 1.seconds
-    tracker.update(listOf(segment(0, 9999, 500)), true)
+    tracker.update(listOf(segment(0, 9999, 500)))
     time += 1.seconds
 
-    val restarted = tracker.update(listOf(segment(0, 9999, 100)), true).single()
+    val restarted = tracker.update(listOf(segment(0, 9999, 100))).single()
     time += 1.seconds
-    val next = tracker.update(listOf(segment(0, 9999, 600)), true).single()
+    val next = tracker.update(listOf(segment(0, 9999, 600))).single()
 
     assertEquals(500, restarted.bytesPerSecond)
     assertEquals(500, next.bytesPerSecond)
@@ -69,19 +69,17 @@ class SegmentRateTrackerTest {
 
   @Test
   fun update_resegment_finishedPartStopsAndNewLanesStartFresh() {
-    tracker.update(listOf(segment(0, 999, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 999, 0)))
     time += 1.seconds
-    tracker.update(listOf(segment(0, 999, 500)), true)
+    tracker.update(listOf(segment(0, 999, 500)))
     time += 1.seconds
     // The engine keeps the received part and splits the rest into two new segments.
     val split = listOf(segment(0, 499, 500), segment(500, 749, 0), segment(750, 999, 0))
 
-    val afterSplit = tracker.update(split, true)
+    val afterSplit = tracker.update(split)
     time += 1.seconds
-    val later = tracker.update(
-      listOf(segment(0, 499, 500), segment(500, 749, 80), segment(750, 999, 60)),
-      true
-    )
+    val later =
+      tracker.update(listOf(segment(0, 499, 500), segment(500, 749, 80), segment(750, 999, 60)))
 
     assertEquals(listOf(0L, 0L, 0L), afterSplit.map { it.bytesPerSecond })
     assertEquals(listOf(0L, 80L, 60L), later.map { it.bytesPerSecond })
@@ -90,15 +88,15 @@ class SegmentRateTrackerTest {
 
   @Test
   fun update_noDataWhileDownloading_stallsAfterThreeSeconds() {
-    tracker.update(listOf(segment(0, 9999, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 9999, 0)))
     time += 1.seconds
-    tracker.update(listOf(segment(0, 9999, 100)), true)
+    tracker.update(listOf(segment(0, 9999, 100)))
     time += 2.seconds
-    val moving = tracker.update(listOf(segment(0, 9999, 100)), true).single()
+    val moving = tracker.update(listOf(segment(0, 9999, 100))).single()
     time += 1.seconds
-    val stalled = tracker.update(listOf(segment(0, 9999, 100)), true).single()
+    val stalled = tracker.update(listOf(segment(0, 9999, 100))).single()
     time += 3.seconds
-    val longer = tracker.update(listOf(segment(0, 9999, 100)), true).single()
+    val longer = tracker.update(listOf(segment(0, 9999, 100))).single()
 
     assertNull(moving.stalledFor)
     assertEquals(3.seconds, stalled.stalledFor)
@@ -107,44 +105,30 @@ class SegmentRateTrackerTest {
 
   @Test
   fun update_dataArrivesAgain_clearsStall() {
-    tracker.update(listOf(segment(0, 9999, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 9999, 0)))
     time += 4.seconds
-    tracker.update(listOf(segment(0, 9999, 0)), true)
+    tracker.update(listOf(segment(0, 9999, 0)))
     time += 1.seconds
 
-    assertNull(tracker.update(listOf(segment(0, 9999, 50)), true).single().stalledFor)
-  }
-
-  @Test
-  fun update_notDownloading_neitherMovesNorStalls() {
-    tracker.update(listOf(segment(0, 9999, 0)), downloading = true)
-    time += 1.seconds
-    tracker.update(listOf(segment(0, 9999, 100)), true)
-    time += 10.seconds
-    val paused = tracker.update(listOf(segment(0, 9999, 100)), downloading = false).single()
-    time += 2.seconds
-    val resumed = tracker.update(listOf(segment(0, 9999, 100)), downloading = true).single()
-
-    assertEquals(SegmentRate(0, 0), paused)
-    assertNull(resumed.stalledFor)
+    assertNull(tracker.update(listOf(segment(0, 9999, 50))).single().stalledFor)
   }
 
   @Test
   fun update_finishedSegment_reportsZero() {
-    tracker.update(listOf(segment(0, 99, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 99, 0)))
     time += 10.seconds
 
-    assertEquals(SegmentRate(0, 0), tracker.update(listOf(segment(0, 99, 100)), true).single())
+    assertEquals(SegmentRate(0, 0), tracker.update(listOf(segment(0, 99, 100))).single())
   }
 
   @Test
   fun update_segmentGone_forgetsItsLane() {
-    tracker.update(listOf(segment(0, 9999, 0), segment(10000, 19999, 0)), downloading = true)
+    tracker.update(listOf(segment(0, 9999, 0), segment(10000, 19999, 0)))
     time += 1.seconds
-    tracker.update(listOf(segment(0, 9999, 100)), true)
+    tracker.update(listOf(segment(0, 9999, 100)))
     time += 1.seconds
 
-    val back = tracker.update(listOf(segment(0, 9999, 200), segment(10000, 19999, 500)), true)
+    val back = tracker.update(listOf(segment(0, 9999, 200), segment(10000, 19999, 500)))
 
     assertEquals(listOf(100L, 0L), back.map { it.bytesPerSecond })
   }

@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.components.AddButtonMode
 import com.linroid.ketch.app.components.KetchAddButton
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
@@ -35,9 +34,6 @@ import com.linroid.ketch.app.ui.downloads.LocalPageClipboard
 import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.DensityMode
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 import java.io.File
@@ -45,7 +41,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 /**
@@ -162,83 +157,59 @@ private fun addAppSnapshot(
   motion: Boolean = false,
   size: SnapshotSize = SnapshotSize.Desktop,
   setup: suspend AppScenario.() -> Unit = {},
-): File {
-  val data = SampleData.downloads()
-  val environment = runBlocking(SnapshotHarness.ui) {
-    SampleEnvironment(data, theme, DensityMode.Compact)
-  }
-  val clipboard = CopiedLinkClipboard(clip)
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(5.seconds) { environment.start() }
-        ?: error("The task list of $name never listed every sample task")
-    }
-    return SnapshotHarness.capture(
-      name = "$name-${theme.id}-${size.id}",
-      size = size,
-      interact = {
-        val scenario = AppScenario(environment.controller, data, this)
-        scenario.state.appSettings.saveUi {
-          it.copy(
-            reduceMotion = !motion,
-            clipboardMode = if (clip != null) ClipboardMode.Suggest else it.clipboardMode,
-          )
-        }
-        scenario.setup()
-      },
-    ) {
-      CompositionLocalProvider(LocalPageClipboard provides clipboard) {
-        App(environment.controller)
+): File = withSample(theme) { env ->
+  val clipboard = SnapshotClipboard(clip)
+  SnapshotHarness.capture(
+    name = "$name-${theme.id}-${size.id}",
+    size = size,
+    interact = {
+      val scenario = AppScenario(env.controller, env.data, this)
+      scenario.state.appSettings.saveUi {
+        it.copy(
+          reduceMotion = !motion,
+          clipboardMode = if (clip != null) ClipboardMode.Suggest else it.clipboardMode,
+        )
       }
+      scenario.setup()
+    },
+  ) {
+    CompositionLocalProvider(LocalPageClipboard provides clipboard) {
+      App(env.controller)
     }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
   }
 }
 
 /** Renders the Downloads page alone in a card while a drag hovers the window. */
-private fun pageSnapshot(name: String, theme: SnapshotTheme): File {
+private fun pageSnapshot(name: String, theme: SnapshotTheme): File = withSample(theme) { env ->
   val size = SnapshotSize.Desktop
-  val data = SampleData.downloads()
-  val environment = runBlocking(SnapshotHarness.ui) {
-    SampleEnvironment(data, theme, DensityMode.Compact)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(5.seconds) { environment.start() }
-        ?: error("The task list of $name never listed every sample task")
-    }
-    return SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) {
-      val drop = remember { DropHoverState().apply { enter(Unit) } }
-      KetchTheme(
-        darkTheme = theme == SnapshotTheme.Dark,
-        density = DensityMode.Compact,
-        reduceMotion = true,
+  SnapshotHarness.capture("$name-${theme.id}-${size.id}", size) {
+    val drop = remember { DropHoverState().apply { enter(Unit) } }
+    KetchTheme(
+      darkTheme = theme == SnapshotTheme.Dark,
+      density = DensityMode.Compact,
+      reduceMotion = true,
+    ) {
+      CompositionLocalProvider(
+        LocalClock provides SampleData.CLOCK,
+        LocalWindowDrop provides drop,
+        LocalPageClipboard provides SnapshotClipboard(null),
       ) {
-        CompositionLocalProvider(
-          LocalClock provides SampleData.CLOCK,
-          LocalWindowDrop provides drop,
-          LocalPageClipboard provides CopiedLinkClipboard(null),
-        ) {
-          Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas).padding(8.dp)) {
-            Box(
-              Modifier
-                .fillMaxSize()
-                .ketchSurface(
-                  level = KetchElevationLevel.E1,
-                  shape = KetchTheme.shapes.card,
-                  fill = KetchTheme.colors.surface,
-                  border = KetchTheme.colors.hairline,
-                ),
-            ) {
-              DownloadsScreen(environment.controller.state, KetchLayoutInfo.of(1264.dp))
-            }
+        Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas).padding(8.dp)) {
+          Box(
+            Modifier
+              .fillMaxSize()
+              .ketchSurface(
+                level = KetchElevationLevel.E1,
+                shape = KetchTheme.shapes.card,
+                fill = KetchTheme.colors.surface,
+                border = KetchTheme.colors.hairline,
+              ),
+          ) {
+            DownloadsScreen(env.controller.state, KetchLayoutInfo.of(1264.dp))
           }
         }
       }
     }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
   }
 }
 
@@ -329,14 +300,3 @@ private fun writeFrame(name: String, image: Image) {
   File(SnapshotHarness.outputDir, "$name.png").writeBytes(data.bytes)
 }
 
-/** A clipboard holding [text], read without a notice, as on Windows and Linux. */
-private class CopiedLinkClipboard(private val text: String?) : SystemClipboard {
-  override val readsSilently: Boolean = true
-  override val pasteEvents = emptyFlow<String>()
-
-  override suspend fun hasLink(): Boolean = text != null
-
-  override suspend fun readText(): String? = text
-
-  override suspend fun writeText(text: String) {}
-}
