@@ -45,7 +45,6 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.ui.onboarding.KetchSplash
 import com.linroid.ketch.config.AppearanceConfig
-import com.linroid.ketch.config.FileConfigStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
@@ -252,9 +251,8 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
 
   /** The saved theme and accent, read once for the splash shown until the service binds. */
   val appearance: AppearanceConfig by lazy {
-    val path = application.filesDir.resolve(CONFIG_FILE).absolutePath
     try {
-      FileConfigStore(path).load().appearance
+      getApplication<KetchApplication>().configStore.load().appearance
     } catch (e: Exception) {
       log.d { "Couldn't read the appearance for the splash: ${e.describeCauses()}" }
       AppearanceConfig()
@@ -267,11 +265,13 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
     override fun onServiceConnected(name: ComponentName, binder: IBinder) {
       val connected = (binder as KetchService.LocalBinder).service
       controller?.close()
+      val app = getApplication<KetchApplication>()
       controller = AppController(
         instanceManager = connected.instanceManager,
         aiProviderFactory = connected.aiProviderFactory,
-        incoming = getApplication<KetchApplication>().incoming,
+        incoming = app.incoming,
         speedMode = connected.speedMode,
+        unreadableFiles = app.unreadableFiles,
       )
       service = connected
     }
@@ -298,11 +298,6 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
     if (!bound) return
     bound = false
     getApplication<Application>().unbindService(connection)
-  }
-
-  private companion object {
-    // Where the service keeps the app's settings.
-    const val CONFIG_FILE = "config.toml"
   }
 }
 

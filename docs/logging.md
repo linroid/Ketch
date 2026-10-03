@@ -162,6 +162,9 @@ console, and earlier runs are kept. Before a record would take `ketch.log` past 
 is renamed to `ketch.1.log`, the previous `ketch.1.log` becomes `ketch.2.log` and the previous
 `ketch.2.log` is deleted, so the logs never take much more than 15 MiB.
 
+The desktop app also logs exceptions nothing caught, on any thread, at error level, including
+one that stops it from starting: it then quits rather than run without a window.
+
 To attach them to a bug report, open **Settings → About → Troubleshooting**:
 
 - **Desktop**: *Open log folder* shows the folder in Finder, Explorer or the file manager.

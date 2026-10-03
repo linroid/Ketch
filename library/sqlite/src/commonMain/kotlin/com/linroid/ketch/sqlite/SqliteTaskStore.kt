@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
@@ -90,10 +91,18 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
   }
 
   /**
-   * Loads all [TaskRecord]s from the database.
+   * Loads all [TaskRecord]s from the database. A row that cannot be read, such as one whose
+   * request a newer version wrote, is skipped and logged but stays in the database.
    */
   override suspend fun loadAll(): List<TaskRecord> = mutex.withLock {
-    val records = queries.loadAll().executeAsList().map { it.toTaskRecord() }
+    val records = queries.loadAll().executeAsList().mapNotNull { row ->
+      try {
+        row.toTaskRecord()
+      } catch (e: Exception) {
+        log.w { "Skipping a task that can't be read: taskId=${row.task_id}, ${e.describeCauses()}" }
+        null
+      }
+    }
     log.d { "Loaded all tasks: ${records.size} records" }
     records
   }

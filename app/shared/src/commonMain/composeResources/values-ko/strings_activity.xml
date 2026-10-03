@@ -72,6 +72,9 @@
   <string name="feedback_reconnect_failed">%1$s에 다시 연결할 수 없음</string>
   <string name="feedback_remove_device_failed">%1$s을(를) 제거할 수 없음</string>
   <string name="feedback_discovery_failed">LAN 서버를 찾지 못했습니다</string>
+  <string name="feedback_settings_unreadable">설정을 읽을 수 없어 기본 설정으로 Ketch를 시작했습니다</string>
+  <string name="feedback_downloads_unreadable">다운로드 목록을 읽을 수 없어 빈 목록으로 Ketch를 시작했습니다</string>
+  <string name="feedback_unreadable_kept">이전 파일은 %1$s(으)로 보관했습니다</string>
 
   <plurals name="feedback_part_failed">
     <item quantity="other">%1$d개 실패</item>

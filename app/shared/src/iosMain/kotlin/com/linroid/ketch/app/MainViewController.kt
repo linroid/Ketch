@@ -12,6 +12,8 @@ import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.IosNotifier
+import com.linroid.ketch.app.feedback.UnreadableFile
+import com.linroid.ketch.app.feedback.UnreadableFiles
 import com.linroid.ketch.app.feedback.reportActivity
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -77,7 +79,8 @@ private val appLogger: Logger by lazy {
  */
 @Suppress("unused", "FunctionName")
 fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
-  val instanceManager = remember { createInstanceManager() }
+  val unreadableFiles = remember { UnreadableFiles() }
+  val instanceManager = remember { createInstanceManager(unreadableFiles) }
   DisposableEffect(Unit) {
     onDispose { instanceManager.close() }
   }
@@ -89,6 +92,7 @@ fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
     instanceManager = instanceManager,
     incoming = incoming,
     speedMode = speedMode.controller,
+    unreadableFiles = unreadableFiles,
   )
   LaunchedEffect(controller) { speedMode.follow(controller.pulse) }
   val fileActions by rememberUpdatedState(rememberFileActions())
@@ -176,7 +180,7 @@ private class LocalSpeedMode(manager: InstanceManager) {
   }
 }
 
-private fun createInstanceManager(): InstanceManager {
+private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceManager {
   KetchLogger.setLogger(appLogger)
   // Before any download resumes into a folder picked outside the app's container.
   FolderBookmarks().restore()
@@ -185,7 +189,9 @@ private fun createInstanceManager(): InstanceManager {
   val supportDir = userDirectory(NSApplicationSupportDirectory)
   val configPath = "$supportDir/config.toml"
   moveConfig(from = "$docsDir/config.toml", to = configPath)
-  val configStore = FileConfigStore(configPath)
+  val configStore = FileConfigStore(configPath) { unreadable ->
+    unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Settings, unreadable.movedTo))
+  }
   val config = configStore.load()
   val download = config.download.inDownloadsFolder("$docsDir/Downloads")
   val taskStore = createSqliteTaskStore(DriverFactory())
