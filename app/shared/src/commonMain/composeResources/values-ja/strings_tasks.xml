@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="status_tab_all">すべて</string>
+  <string name="status_tab_downloading">ダウンロード中</string>
+  <string name="status_tab_waiting">待機中</string>
+  <string name="status_tab_paused">一時停止中</string>
+  <string name="status_tab_done">完了</string>
+  <string name="status_tab_failed">失敗</string>
+
+  <string name="row_status_downloading">ダウンロード中</string>
+  <string name="row_status_stalled">停滞中</string>
+  <string name="row_status_paused">一時停止中</string>
+  <string name="row_status_queued">キュー待ち</string>
+  <string name="row_status_scheduled">予約済み</string>
+  <string name="row_status_done">完了</string>
+  <string name="row_status_file_missing">ファイルなし</string>
+  <string name="row_status_failed">失敗</string>
+  <string name="row_status_canceled">キャンセル済み</string>
+
+  <string name="row_stalled_for">停滞中 · %1$s間データなし</string>
+  <string name="row_paused">一時停止中</string>
+  <string name="row_canceled">キャンセル済み</string>
+  <string name="row_saved_on">%1$sに保存済み</string>
+  <string name="row_missing_file">ファイルが移動または削除されました</string>
+  <string name="row_completed">完了</string>
+  <string name="row_took">所要時間：%1$s</string>
+  <plurals name="row_files">
+    <item quantity="other">%1$d個のファイル</item>
+  </plurals>
+  <plurals name="row_connections">
+    <item quantity="other">接続数%1$d</item>
+  </plurals>
+  <string name="row_speed_limit">速度制限：%1$s</string>
+  <string name="row_limited_by_slow_lane">スローレーンで制限中</string>
+  <string name="row_starts_today">今日%1$sに開始</string>
+  <string name="row_starts_tomorrow">明日%1$sに開始</string>
+  <string name="row_starts_on">%1$s %2$sに開始</string>
+  <string name="row_starts_in">%1$s後</string>
+  <string name="row_starts_after">%1$s後に開始</string>
+  <string name="row_waiting_for_conditions">条件を満たすまで待機中</string>
+
+  <string name="summary_size_of_total">%1$s / %2$s</string>
+  <string name="summary_average_speed">平均%1$s</string>
+
+  <string name="sort_smart">スマート</string>
+  <string name="sort_name">名前</string>
+  <string name="sort_size">サイズ</string>
+  <string name="sort_progress">進捗</string>
+  <string name="sort_speed">速度</string>
+  <string name="sort_time_left">残り時間</string>
+  <string name="sort_added">追加日時</string>
+  <string name="sort_status">状態</string>
+  <string name="sort_connections">接続数</string>
+  <string name="sort_source">ソース</string>
+  <string name="sort_origin">追加元</string>
+  <string name="sort_priority">優先度</string>
+  <string name="sort_device">デバイス</string>
+  <string name="group_smart">スマート</string>
+  <string name="group_status">状態</string>
+  <string name="group_day">日付</string>
+  <string name="group_device">デバイス</string>
+  <string name="group_site">サイト</string>
+  <string name="group_type">種類</string>
+  <string name="group_none">なし</string>
+  <string name="group_title_downloading">ダウンロード中</string>
+  <string name="group_title_waiting">待機中</string>
+  <string name="group_title_paused">一時停止中</string>
+  <string name="group_title_attention">対応が必要</string>
+  <string name="group_title_other_site">その他</string>
+  <string name="group_title_today">今日追加</string>
+  <string name="group_title_yesterday">昨日追加</string>
+  <string name="group_title_week">今週追加</string>
+  <string name="group_title_earlier">それ以前に追加</string>
+  <string name="group_all_done_at">%1$sごろにすべて完了</string>
+  <string name="group_in_start_order">開始順</string>
+
+  <string name="origin_browser">ブラウザ</string>
+  <string name="origin_discover">ディスカバー</string>
+  <string name="origin_agent">エージェント</string>
+  <string name="origin_app">アプリ</string>
+  <string name="origin_cli">CLI</string>
+  <string name="file_type_video">動画</string>
+  <string name="file_type_audio">音声</string>
+  <string name="file_type_image">画像</string>
+  <string name="file_type_doc">書類</string>
+  <string name="file_type_archive">アーカイブ</string>
+  <string name="file_type_app">アプリ</string>
+  <string name="file_type_torrent">トレント</string>
+  <string name="file_type_other">その他</string>
+
+  <string name="queue_waiting_slot">空き枠を待機中（%2$d件中%1$d件が使用中）</string>
+  <string name="queue_waiting_host">%1$sを待機中（サイトごとに%2$d件）</string>
+  <string name="queue_waiting_start">開始を待機中</string>
+
+  <string name="action_row_pause">一時停止</string>
+  <string name="action_row_resume">再開</string>
+  <string name="action_row_reconnect">再接続</string>
+  <string name="action_row_start_now">今すぐ開始</string>
+  <string name="action_row_speed_limit">速度制限</string>
+  <string name="action_row_connections">接続数</string>
+  <string name="action_row_priority">優先度</string>
+  <string name="action_row_start_later">あとで開始</string>
+  <string name="action_row_send_to">送信先</string>
+  <string name="action_row_copy_link">リンクをコピー</string>
+  <string name="action_row_details">詳細</string>
+  <string name="action_row_open">開く</string>
+  <string name="action_row_show_in_folder">フォルダに表示</string>
+  <string name="action_row_copy_path">ファイルパスをコピー</string>
+  <string name="action_row_download_again">もう一度ダウンロード</string>
+  <string name="action_row_retry">再試行</string>
+  <string name="action_row_retry_with_options">オプションを指定して再試行…</string>
+  <string name="action_row_edit_link">リンクを編集…</string>
+  <string name="action_row_enter_credentials">認証情報を入力…</string>
+  <string name="action_row_find_another_source">別のソースを探す</string>
+  <string name="action_row_open_source_page">ソースページを開く</string>
+  <string name="action_row_copy_error">エラーをコピー</string>
+  <string name="action_row_copy_details">詳細をコピー</string>
+  <string name="action_row_stop_and_discard">停止して進捗を破棄…</string>
+  <string name="action_row_remove">リストから削除</string>
+  <string name="action_row_remove_and_trash">リストから削除してファイルをゴミ箱へ…</string>
+  <string name="action_row_remove_and_delete">リストから削除してファイルも削除…</string>
+  <plurals name="batch_pause">
+    <item quantity="other">%1$d件のダウンロードを一時停止</item>
+  </plurals>
+  <plurals name="batch_resume">
+    <item quantity="other">%1$d件のダウンロードを再開</item>
+  </plurals>
+  <plurals name="batch_start_now">
+    <item quantity="other">%1$d件のダウンロードを今すぐ開始</item>
+  </plurals>
+  <plurals name="batch_retry">
+    <item quantity="other">%1$d件のダウンロードを再試行</item>
+  </plurals>
+  <plurals name="batch_open">
+    <item quantity="other">%1$d個のファイルを開く</item>
+  </plurals>
+  <string name="batch_show_in_folder">%1$s（%2$d）</string>
+  <plurals name="batch_copy_link">
+    <item quantity="other">%1$d件のリンクをコピー</item>
+  </plurals>
+  <plurals name="batch_copy_path">
+    <item quantity="other">%1$d件のファイルパスをコピー</item>
+  </plurals>
+  <plurals name="batch_download_again">
+    <item quantity="other">%1$d個のファイルをもう一度ダウンロード</item>
+  </plurals>
+  <plurals name="batch_discard">
+    <item quantity="other">%1$d件のダウンロードの進捗を破棄…</item>
+  </plurals>
+  <plurals name="batch_remove">
+    <item quantity="other">%1$d件のダウンロードをリストから削除</item>
+  </plurals>
+  <plurals name="batch_remove_files">
+    <item quantity="other">%1$d件のダウンロードとファイルを削除…</item>
+  </plurals>
+  <string name="bar_speed">速度</string>
+  <string name="bar_copy_links">リンクをコピー</string>
+  <string name="bar_remove">削除…</string>
+  <string name="bar_copy_paths">ファイルパスをコピー</string>
+  <string name="bar_discard">進捗を破棄…</string>
+  <string name="bar_label_count">%1$s（%2$d）</string>
+  <string name="bar_label_number">%1$s %2$d</string>
+  <string name="bar_tooltip_counted">選択した%3$d件中%2$d件を%1$s</string>
+  <string name="bar_tooltip_partial">%1$s · 選択した%3$d件中%2$d件</string>
+  <plurals name="bar_tooltip_remove">
+    <item quantity="other">%1$d件のダウンロードを削除…</item>
+  </plurals>
+  <string name="row_menu_peer_limit">ピア数の上限</string>
+  <string name="send_move_to">%1$sに移動</string>
+  <string name="reveal_in_finder">Finderに表示</string>
+  <string name="reveal_in_explorer">エクスプローラーに表示</string>
+  <string name="reveal_in_folder">フォルダに表示</string>
+  <string name="reveal_in_files">ファイルに表示</string>
+  <plurals name="action_row_retry_with_connections">
+    <item quantity="other">接続数%1$dで再試行</item>
+  </plurals>
+</resources>
