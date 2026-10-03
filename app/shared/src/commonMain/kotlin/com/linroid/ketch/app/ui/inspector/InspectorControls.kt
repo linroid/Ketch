@@ -309,15 +309,22 @@ internal fun urgentVictim(state: AppState, rows: List<TaskRow>): TaskRow? {
 }
 
 /**
- * The connections Auto gives [rows]: one per segment of a single row that has some, as its lanes
- * show, else the default of the settings of their device; `null` while that is unknown or the
- * rows are on several devices.
+ * The connections Auto gives [rows]: one per segment of a single row on Auto that has some, as
+ * its lanes show (see [autoSegmentsOf]), else the default of the settings of their device; `null`
+ * while that is unknown or the rows are on several devices.
  */
 internal fun autoConnectionsOf(state: AppState, rows: List<TaskRow>): Int? {
-  rows.singleOrNull()?.segments?.size?.takeIf { it > 0 }?.let { return it }
+  rows.singleOrNull()?.let(::autoSegmentsOf)?.let { return it }
   val deviceId = rows.map { it.key.deviceId }.distinct().singleOrNull() ?: return null
   return state.settingsOf(deviceId)?.download?.maxConnectionsPerDownload?.takeIf { it > 0 }
 }
+
+/**
+ * The segments of [row] when it is on Auto, which is what Auto gives it; `null` when it has none
+ * or its own count, whose segments say nothing about what Auto would give.
+ */
+internal fun autoSegmentsOf(row: TaskRow): Int? =
+  row.segments.size.takeIf { it > 0 && row.request.connections == 0 }
 
 /**
  * Whether the devices of every one of [rows] take 0 (Auto) connections; older devices only take

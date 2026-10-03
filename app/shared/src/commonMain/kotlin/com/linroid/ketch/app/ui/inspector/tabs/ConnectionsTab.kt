@@ -66,6 +66,7 @@ import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
 import com.linroid.ketch.app.ui.inspector.autoConnectionsSupported
+import com.linroid.ketch.app.ui.inspector.autoSegmentsOf
 import com.linroid.ketch.app.ui.inspector.hasControls
 import com.linroid.ketch.app.ui.inspector.rememberServerLimited
 import com.linroid.ketch.app.ui.list.RowCommands
@@ -138,8 +139,8 @@ fun ConnectionsTab(
  * [ConnectionsTab] for [row] with the [rates] of its connections, without the app state. A
  * place that shows different tasks in turn keys it by task.
  *
- * @param autoValue the count Auto stands for on the task's device; the task's segments when
- *   `null`.
+ * @param autoValue the count Auto stands for on the task's device; when `null`, the task's
+ *   segments if it is on Auto.
  * @param allowAuto whether the task's device takes Auto, which the stepper then offers.
  * @param onConnectionsChange asks for a new number of connections; `null` hides the stepper.
  */
@@ -193,7 +194,7 @@ internal fun ConnectionsTabContent(
         ConnectionStepper(
           value = requested,
           onCommit = onConnectionsChange,
-          autoValue = autoValue ?: row.segments.size.takeIf { it > 0 },
+          autoValue = autoValue ?: autoSegmentsOf(row),
           enabled = !serverLimited,
           pending = connectionsPending,
           disabledReason = if (serverLimited) {
