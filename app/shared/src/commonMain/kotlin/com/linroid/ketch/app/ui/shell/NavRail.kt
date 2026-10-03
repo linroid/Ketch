@@ -57,6 +57,7 @@ import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -67,6 +68,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.devices.systemName
 import com.linroid.ketch.app.ui.sidebar.DeviceMenu
 import com.linroid.ketch.app.ui.sidebar.PennantCluster
 import com.linroid.ketch.app.ui.sidebar.allDevicesLine
@@ -309,7 +311,9 @@ private fun RailDeviceCell(
   Box {
     RailCell(
       selected = selected,
-      tooltip = listOf(device.name, line.text).joinText().resolve(),
+      tooltip = listOfNotNull(device.name, device.systemName?.let(::verbatim), line.text)
+        .joinText()
+        .resolve(),
       shortcut = deviceShortcut(number),
       description = stringResource(
         Res.string.shell_device_described,

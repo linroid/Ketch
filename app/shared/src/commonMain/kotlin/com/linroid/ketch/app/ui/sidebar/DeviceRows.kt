@@ -53,9 +53,11 @@ import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.speedText
 import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -67,6 +69,7 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.devices.systemName
 import com.linroid.ketch.app.ui.shell.DeviceDrag
 import com.linroid.ketch.app.ui.shell.DropHint
 import com.linroid.ketch.app.ui.shell.deviceDropTarget
@@ -228,7 +231,7 @@ internal fun DeviceRowContent(
     selected = active,
     onClick = onClick,
     onSecondaryClick = onSecondaryClick,
-    tooltip = device.detail,
+    tooltip = listOfNotNull(device.detail, device.systemName).map(::verbatim).joinText().resolve(),
     shortcut = shortcut,
     dropping = hint != null,
     accepting = hint?.accepts == true,

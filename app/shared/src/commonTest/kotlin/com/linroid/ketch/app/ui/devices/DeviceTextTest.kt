@@ -75,6 +75,27 @@ class DeviceTextTest {
   )
 
   @Test
+  fun systemName_reportedSystems_readAsTheAppsNameThem() {
+    assertEquals("macOS", systemName("Mac OS X"))
+    assertEquals("Windows", systemName("Windows 11"))
+    assertEquals("iOS 18.0", systemName("iOS Version 18.0 (Build 22A3354)"))
+    assertEquals("Android 15", systemName(" Android 15 "))
+  }
+
+  @Test
+  fun systemName_ofDevice_prefersItsStatusToTheSavedSystem() {
+    val saved = RemoteInstance(
+      instance = FakeKetchApi("NAS"),
+      remoteConfig = RemoteConfig(host = "nas.local", os = "Windows 11"),
+      connectionState = MutableStateFlow(ConnectionState.Disconnected("Offline")),
+    )
+
+    assertEquals("Linux", device(entry = saved, status = status("Linux")).systemName)
+    assertEquals("Windows", device(entry = saved).systemName)
+    assertNull(device().systemName)
+  }
+
+  @Test
   fun systemLabel_jvmNames_readAsTheSystemCallsThem() {
     assertEquals("macOS arm64", systemLabel("Mac OS X", "aarch64"))
     assertEquals("Linux x64", systemLabel("Linux", "amd64"))

@@ -9,6 +9,7 @@ import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.DevicePresence
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
@@ -40,16 +41,36 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /**
+ * The system [os] a device reports as the apps name it: "macOS" for the "Mac OS X" a JVM
+ * reports, "Windows" for any Windows and "iOS 18.0" for "iOS Version 18.0 (Build 22A3354)";
+ * names it does not know are kept as they are.
+ */
+internal fun systemName(os: String): String {
+  val name = os.trim()
+  return when {
+    name.startsWith("mac", ignoreCase = true) || name.startsWith("darwin", ignoreCase = true) ->
+      "macOS"
+    name.startsWith("windows", ignoreCase = true) -> "Windows"
+    else -> IosVersion.matchEntire(name)?.let { "iOS ${it.groupValues[1]}" } ?: name
+  }
+}
+
+/**
+ * The [systemName] of what the device runs, from its last status or, for a remote device not
+ * read since the app started, the system saved for it; `null` while unknown.
+ */
+internal val DevicePresence.systemName: String?
+  get() {
+    val os = status?.system?.os ?: (entry as? RemoteInstance)?.remoteConfig?.os
+    return os?.let { systemName(it) }?.ifEmpty { null }
+  }
+
+/**
  * A device's system as its card names it, "macOS arm64" for the "Mac OS X" and "aarch64" a JVM
- * reports; names it does not know are kept as they are.
+ * reports; see [systemName].
  */
 internal fun systemLabel(os: String, arch: String): String {
-  val name = when {
-    os.startsWith("mac", ignoreCase = true) || os.startsWith("darwin", ignoreCase = true) ->
-      "macOS"
-    os.startsWith("windows", ignoreCase = true) -> "Windows"
-    else -> os.trim()
-  }
+  val name = systemName(os)
   val cpu = when (arch.trim().lowercase()) {
     "aarch64", "arm64" -> "arm64"
     "amd64", "x86_64", "x64" -> "x64"
@@ -223,3 +244,6 @@ internal fun styledPart(text: String, part: String, style: SpanStyle): Annotated
 internal const val SERVER_COMMAND = "ketch\u00A0server"
 
 private const val MAX_NAME_LENGTH = 20
+
+// What iOS reports as its version, after the "iOS " the engine adds.
+private val IosVersion = Regex("""iOS\sVersion\s([\d.]+)\b.*""")

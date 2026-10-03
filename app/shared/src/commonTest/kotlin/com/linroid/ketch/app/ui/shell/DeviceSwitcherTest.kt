@@ -1,19 +1,52 @@
 package com.linroid.ketch.app.ui.shell
 
+import com.linroid.ketch.app.FakeKetchApi
+import com.linroid.ketch.app.i18n.isEmpty
 import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.ui.shell.FleetFixtures.NAS_ID
 import com.linroid.ketch.app.ui.shell.FleetFixtures.mac
 import com.linroid.ketch.app.ui.shell.FleetFixtures.nas
+import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
+import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.remote.ConnectionState
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 class DeviceSwitcherTest {
   private val now = Instant.parse("2026-10-01T14:30:00Z")
+
+  private fun remote(config: RemoteConfig, name: String = "NAS-Basement") = presence(
+    entry = RemoteInstance(
+      instance = FakeKetchApi(),
+      remoteConfig = config,
+      connectionState = MutableStateFlow(ConnectionState.Disconnected("Offline")),
+    ),
+    name = name,
+    detail = NAS_ID,
+  )
+
+  @Test
+  fun switcherSubtitle_savedSystem_followsTheAddress() = runTest {
+    val nas = remote(RemoteConfig(host = "nas.local", name = "NAS-Basement", os = "Linux"))
+
+    assertEquals("nas.local:8642 · Linux", switcherSubtitle(nas).load())
+  }
+
+  @Test
+  fun switcherSubtitle_namedByItsAddressOfUnknownSystem_isEmpty() = runTest {
+    val unnamed = remote(RemoteConfig(host = "nas.local"), name = NAS_ID)
+
+    assertTrue(switcherSubtitle(unnamed).isEmpty())
+  }
 
   @Test
   fun switcherDetail_downloading_showsSpeedActivityAndFailures() = runTest {
