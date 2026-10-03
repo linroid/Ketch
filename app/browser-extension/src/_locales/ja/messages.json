@@ -166,13 +166,13 @@
     "message": "Ketchを開いて、もう一度お試しください。"
   },
   "hint_local_server": {
-    "message": "Ketchを開いて「設定 → リモートアクセス → サーバー」をオンにするか、「ketch server」を実行してください。"
+    "message": "Ketchを開いて「設定 → 共有」で「別のデバイスを許可」を選ぶか、「ketch server」を実行してください。"
   },
   "hint_remote_server": {
     "message": "サーバーが実行中で、ここからこのアドレスにアクセスできることを確認してください。"
   },
   "hint_access_token": {
-    "message": "Ketchの「設定 → リモートアクセス」に表示されているアクセストークンを入力してください。"
+    "message": "Ketchの「設定 → 共有 → 詳細」に表示されているアクセスコードを入力してください。"
   },
   "task_magnet_link": {
     "message": "マグネットリンク"
@@ -515,7 +515,7 @@
     "message": "別のデバイスで"
   },
   "options_help_other_device_detail": {
-    "message": "そのデバイスで「設定 → リモートアクセス」を開き、<b>サーバー</b>と<b>他のデバイスを許可</b>をオンにしてから、アクセストークンを生成します。ここで<b>サーバーを追加</b>を選び、そのアドレス（例：<code>http://192.168.1.20:8642</code>）とトークンを入力してデバイスを追加します。<code>ketch server</code>の場合は、そのconfig.tomlで<code>apiToken</code>を設定します。"
+    "message": "そのデバイスで「設定 → 共有」を開き、<b>別のデバイスを許可</b>を選びます。ここで<b>サーバーを追加</b>を選び、Ketchに表示されるアドレス（例：<code>http://192.168.1.20:8642</code>）と、アクセストークンとして<b>詳細</b>にある<b>アクセスコード</b>を入力してデバイスを追加します。<code>ketch server</code>の場合は、そのconfig.tomlで<code>apiToken</code>を設定します。"
   },
   "options_help_command_line": {
     "message": "コマンドラインまたはサンドボックス化されたブラウザ"

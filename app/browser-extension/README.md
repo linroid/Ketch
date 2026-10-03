@@ -48,12 +48,14 @@ extension is in the browser stores:
   after Ketch, open Ketch once more.
 - **CLI, or a browser installed as a Flatpak or Snap** (which can't start other apps): run
   `ketch server`, or in the app open **Settings → Sharing** and choose **Allow another device**.
-  Then choose **Add server** in the extension's settings and enter `http://127.0.0.1:8642`, with
-  the access code from **Settings → Sharing → Advanced** when there is one.
+  Then choose **Add server** in the extension's settings and enter `http://127.0.0.1:8642`.
+  Sharing from the app always has an access code: enter the one under **Advanced** as the access
+  token. For `ketch server`, enter its `apiToken`, if it has one.
 - **Another device**: on that device, open **Settings → Sharing** and choose **Allow another
   device**; the access code is under **Advanced** (for `ketch server`, set `apiToken` in
-  `config.toml`). In the extension's settings, choose **Add server** and enter its address, such
-  as `http://192.168.1.20:8642`, and the code. A bare host such as `nas.local` gets port 8642.
+  `config.toml`). In the extension's settings, choose **Add server** and enter the address Ketch
+  shows, such as `http://192.168.1.20:8642`, and the code as the access token. A bare host such
+  as `nas.local` gets port 8642.
 
 ## Instances
 

@@ -166,13 +166,13 @@
     "message": "Öffne Ketch und versuche es erneut."
   },
   "hint_local_server": {
-    "message": "Öffne Ketch und aktiviere Einstellungen → Fernzugriff → Server, oder führe „ketch server“ aus."
+    "message": "Öffne Ketch und wähle unter Einstellungen → Freigabe „Anderes Gerät zulassen“, oder führe „ketch server“ aus."
   },
   "hint_remote_server": {
     "message": "Prüfe, ob der Server läuft und diese Adresse von hier aus erreichbar ist."
   },
   "hint_access_token": {
-    "message": "Gib das Zugriffstoken ein, das Ketch unter Einstellungen → Fernzugriff anzeigt."
+    "message": "Gib den Zugriffscode ein, den Ketch unter Einstellungen → Freigabe → Erweitert anzeigt."
   },
   "task_magnet_link": {
     "message": "Magnet-Link"
@@ -515,7 +515,7 @@
     "message": "Auf einem anderen Gerät"
   },
   "options_help_other_device_detail": {
-    "message": "Öffne auf diesem Gerät Einstellungen → Fernzugriff, aktiviere <b>Server</b> und <b>Andere Geräte zulassen</b> und erzeuge ein Zugriffstoken. Füge das Gerät hier mit <b>Server hinzufügen</b> hinzu, mit seiner Adresse, etwa <code>http://192.168.1.20:8642</code>, und dem Token. Für <code>ketch server</code> setze <code>apiToken</code> in dessen config.toml."
+    "message": "Öffne auf diesem Gerät Einstellungen → Freigabe und wähle <b>Anderes Gerät zulassen</b>. Füge das Gerät hier mit <b>Server hinzufügen</b> hinzu, mit der Adresse, die Ketch anzeigt, etwa <code>http://192.168.1.20:8642</code>, und dem <b>Zugriffscode</b> unter <b>Erweitert</b> als Zugriffstoken. Für <code>ketch server</code> setze <code>apiToken</code> in dessen config.toml."
   },
   "options_help_command_line": {
     "message": "Kommandozeile oder isolierte Browser"

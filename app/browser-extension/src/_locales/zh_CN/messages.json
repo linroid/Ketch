@@ -166,13 +166,13 @@
     "message": "请打开 Ketch 后重试。"
   },
   "hint_local_server": {
-    "message": "请打开 Ketch 并开启“设置 → 远程访问 → 服务器”，或运行“ketch server”。"
+    "message": "请打开 Ketch，在“设置 → 共享”中选择“允许其他设备”，或运行“ketch server”。"
   },
   "hint_remote_server": {
     "message": "请检查服务器是否正在运行，以及从这里能否访问此地址。"
   },
   "hint_access_token": {
-    "message": "请输入 Ketch 中“设置 → 远程访问”下显示的访问令牌。"
+    "message": "请输入 Ketch 中“设置 → 共享 → 高级”下显示的访问码。"
   },
   "task_magnet_link": {
     "message": "磁力链接"
@@ -515,7 +515,7 @@
     "message": "在其他设备上"
   },
   "options_help_other_device_detail": {
-    "message": "在该设备上打开“设置 → 远程访问”，开启<b>服务器</b>和<b>允许其他设备</b>，然后生成访问令牌。再在这里通过<b>添加服务器</b>添加该设备，填入其地址（例如 <code>http://192.168.1.20:8642</code>）和令牌。如果使用 <code>ketch server</code>，请在其 config.toml 中设置 <code>apiToken</code>。"
+    "message": "在该设备上打开“设置 → 共享”，选择<b>允许其他设备</b>。再在这里通过<b>添加服务器</b>添加该设备，填入 Ketch 显示的地址（例如 <code>http://192.168.1.20:8642</code>），并将<b>高级</b>中的<b>访问码</b>作为访问令牌填入。如果使用 <code>ketch server</code>，请在其 config.toml 中设置 <code>apiToken</code>。"
   },
   "options_help_command_line": {
     "message": "命令行或沙盒浏览器"

@@ -166,13 +166,13 @@
     "message": "Ketch를 열고 다시 시도하세요."
   },
   "hint_local_server": {
-    "message": "Ketch를 열고 설정 → 원격 액세스 → 서버를 켜거나 “ketch server”를 실행하세요."
+    "message": "Ketch를 열고 설정 → 공유에서 다른 기기 허용을 선택하거나 “ketch server”를 실행하세요."
   },
   "hint_remote_server": {
     "message": "서버가 실행 중이고 여기에서 이 주소에 접속할 수 있는지 확인하세요."
   },
   "hint_access_token": {
-    "message": "Ketch의 설정 → 원격 액세스에 표시된 액세스 토큰을 입력하세요."
+    "message": "Ketch의 설정 → 공유 → 고급에 표시된 액세스 코드를 입력하세요."
   },
   "task_magnet_link": {
     "message": "마그넷 링크"
@@ -515,7 +515,7 @@
     "message": "다른 기기에서"
   },
   "options_help_other_device_detail": {
-    "message": "해당 기기에서 설정 → 원격 액세스를 열고 <b>서버</b>와 <b>다른 기기 허용</b>을 켠 다음 액세스 토큰을 생성하세요. 여기에서 <b>서버 추가</b>를 선택하고 기기의 주소(예: <code>http://192.168.1.20:8642</code>)와 토큰을 입력해 기기를 추가하세요. <code>ketch server</code>의 경우 config.toml에서 <code>apiToken</code>을 설정하세요."
+    "message": "해당 기기에서 설정 → 공유를 열고 <b>다른 기기 허용</b>을 선택하세요. 여기에서 <b>서버 추가</b>를 선택하고 Ketch에 표시된 주소(예: <code>http://192.168.1.20:8642</code>)와 <b>고급</b>에 있는 <b>액세스 코드</b>를 액세스 토큰으로 입력해 기기를 추가하세요. <code>ketch server</code>의 경우 config.toml에서 <code>apiToken</code>을 설정하세요."
   },
   "options_help_command_line": {
     "message": "명령줄 또는 샌드박스 브라우저"
