@@ -10,10 +10,18 @@ prompts AI discovery sends to the model and the bug report "Copy details" puts o
 | Language | Shared UI and desktop | Android | iOS | Browser extension |
 | --- | --- | --- | --- | --- |
 | English (source) | `values` | `values` | `en.lproj` | `en` |
+| Chinese, Simplified | `values-zh` | `values-zh-rCN` | `zh-Hans.lproj` | `zh_CN` |
+| Chinese, Traditional | `values-zh-rTW` | `values-zh-rTW` | `zh-Hant.lproj` | `zh_TW` |
 | Russian | `values-ru` | `values-ru` | `ru.lproj` | `ru` |
 
 [The glossary](translation-glossary.md) fixes how each language names the app's features and
 units; keep translations to it.
+
+Chinese is written once per script: Simplified in `values-zh`, Traditional in `values-zh-rTW`.
+The build copies Traditional for Hong Kong and Macau, which browsers and Windows report without a
+script, and each script under its tag (`zh-Hans`, `zh-Hant`) for systems that report one, so
+Simplified Chinese set up with a Hong Kong region still reads Simplified; see
+`app/shared/build.gradle.kts` and `LocaleFallbackTest`.
 
 Right-to-left languages are not supported yet: nothing has been checked in mirrored layouts.
 

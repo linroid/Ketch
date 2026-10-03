@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="error_title_hint">%1$s。%2$s</string>
+  <string name="error_connection_lost">连接已断开</string>
+  <string name="error_network_hint">无法连接 %1$s。</string>
+  <string name="error_network_hint_short">无法连接 %1$s</string>
+  <string name="error_network_hint_server">无法连接服务器。</string>
+  <string name="error_network_hint_server_short">无法连接服务器</string>
+  <string name="error_retried_once">Ketch 已重试 1 次。</string>
+  <plurals name="error_retried">
+    <item quantity="other">Ketch 已重试 %1$d 次。</item>
+  </plurals>
+  <string name="error_check_connection">请检查网络连接后重试。</string>
+  <string name="error_check_connection_short">请检查网络连接后重试</string>
+  <string name="error_not_supported">此设备不支持</string>
+  <string name="error_something_went_wrong">出现问题</string>
+
+  <string name="error_disk">无法写入文件</string>
+  <string name="error_disk_hint">请检查可用空间和文件夹权限。</string>
+  <string name="error_disk_hint_short">请检查可用空间和文件夹权限</string>
+  <string name="error_disk_hint_on">请检查 %1$s 上的可用空间和文件夹权限。</string>
+  <string name="error_disk_hint_on_short">请检查 %1$s 上的可用空间和文件夹权限</string>
+  <string name="error_disk_hint_free">%2$s 上可用 %1$s。请检查空间和文件夹权限。</string>
+  <string name="error_disk_hint_free_short">%2$s 上可用 %1$s</string>
+
+  <string name="error_unsupported">此服务器无法完成这个下载</string>
+  <string name="error_unsupported_hint">它未提供文件大小，也不支持分段下载。</string>
+  <string name="error_unsupported_hint_short">它未提供文件大小，也不支持分段下载</string>
+  <string name="error_file_changed">服务器上的文件已更改</string>
+  <string name="error_file_changed_hint">继续下载会损坏文件（%1$s）。</string>
+  <string name="error_file_changed_hint_short">继续下载会损坏文件（%1$s）</string>
+  <string name="error_corrupt_resume">保存的进度已损坏</string>
+  <string name="error_corrupt_resume_hint">已下载的部分无法再使用。</string>
+  <string name="error_corrupt_resume_hint_short">已下载的部分无法再使用</string>
+  <string name="error_canceled">已取消</string>
+  <string name="error_wrong_credentials">用户名或密码错误</string>
+  <string name="error_wrong_credentials_hint">%1$s 服务器拒绝了登录。</string>
+  <string name="error_wrong_credentials_hint_short">%1$s 服务器拒绝了登录</string>
+  <string name="error_torrent_stopped">种子已停止</string>
+  <string name="error_torrent_stopped_hint">没有可连接的节点或 Tracker。</string>
+  <string name="error_torrent_stopped_hint_short">没有可连接的节点或 Tracker</string>
+  <string name="error_source">%1$s 服务器报告了错误</string>
+
+  <string name="error_http_sign_in">需要登录（%1$d）</string>
+  <string name="error_http_sign_in_hint">%1$s 要求登录。请通过 Ketch 浏览器扩展发送，以便一并带上 Cookie。</string>
+  <string name="error_http_sign_in_hint_short">%1$s 要求登录</string>
+  <string name="error_http_sign_in_hint_server">服务器要求登录。请通过 Ketch 浏览器扩展发送，以便一并带上 Cookie。</string>
+  <string name="error_http_sign_in_hint_server_short">服务器要求登录</string>
+  <string name="error_http_forbidden">拒绝访问（403）</string>
+  <string name="error_http_forbidden_hint">链接可能已过期。</string>
+  <string name="error_http_forbidden_hint_browser">链接可能已过期。是从 %1$s 捕获的吗？请在网页上重新捕获。</string>
+  <string name="error_http_forbidden_hint_short">链接可能已过期</string>
+  <string name="error_browser_yours">你的浏览器</string>
+  <string name="error_http_not_found">找不到文件（%1$d）</string>
+  <string name="error_http_not_found_hint">服务器上已没有这个文件。</string>
+  <string name="error_http_not_found_hint_short">服务器上已没有这个文件</string>
+  <string name="error_http_range">服务器拒绝继续下载</string>
+  <string name="error_http_range_hint">保存的位置已失效。</string>
+  <string name="error_http_range_hint_short">保存的位置已失效</string>
+  <string name="error_http_rate_limited">服务器正在限流</string>
+  <string name="error_http_rate_limited_hint_in">请在%1$d秒后减少连接数重试。</string>
+  <string name="error_http_rate_limited_hint_in_short">请在%1$d秒后减少连接数重试</string>
+  <string name="error_http_rate_limited_hint">请稍后减少连接数重试。</string>
+  <string name="error_http_rate_limited_hint_short">请稍后减少连接数重试</string>
+  <string name="error_http_server">服务器错误（%1$d）</string>
+  <string name="error_http_server_hint">通常是暂时的。</string>
+  <string name="error_http_server_hint_short">通常是暂时的</string>
+  <string name="error_http_other">服务器返回 %1$d</string>
+</resources>
