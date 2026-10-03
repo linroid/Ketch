@@ -1,0 +1,526 @@
+{
+  "extension_name": {
+    "message": "Ketch"
+  },
+  "extension_description": {
+    "message": "Sende Downloads, Links und Magnet-Links an Ketch auf diesem Computer oder einem entfernten Server."
+  },
+  "extension_action_title": {
+    "message": "Ketch"
+  },
+  "language_tag": {
+    "message": "de"
+  },
+  "menu_download_link": {
+    "message": "Link mit Ketch herunterladen"
+  },
+  "menu_download_image": {
+    "message": "Bild mit Ketch herunterladen"
+  },
+  "menu_download_video": {
+    "message": "Video mit Ketch herunterladen"
+  },
+  "menu_download_audio": {
+    "message": "Audio mit Ketch herunterladen"
+  },
+  "notify_sent_to": {
+    "message": "An $NAME$ gesendet",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_sent_to_ketch": {
+    "message": "An Ketch gesendet"
+  },
+  "notify_download_added": {
+    "message": "Download hinzugefügt"
+  },
+  "notify_fallback_browser": {
+    "message": "Wird stattdessen im Browser heruntergeladen"
+  },
+  "notify_fallback_magnet": {
+    "message": "Magnet-Link wird in einer anderen App geöffnet"
+  },
+  "notify_send_failed": {
+    "message": "Senden an $NAME$ nicht möglich",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_unsupported": {
+    "message": "Ketch kann das nicht herunterladen"
+  },
+  "notify_unsupported_stream": {
+    "message": "Die Seite streamt dieses Medium selbst, daher gibt es keinen Link zum Herunterladen."
+  },
+  "notify_unsupported_scheme": {
+    "message": "Nur http-, https-, ftp- und Magnet-Links können an Ketch gesendet werden."
+  },
+  "error_with_hint": {
+    "message": "$ERROR$. $HINT$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      },
+      "hint": {
+        "content": "$2"
+      }
+    }
+  },
+  "error_no_response": {
+    "message": "Ketch unter $ADDRESS$ hat nicht geantwortet",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_unreachable": {
+    "message": "Ketch unter $ADDRESS$ ist nicht erreichbar",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_token_rejected": {
+    "message": "Ketch hat das Zugriffstoken abgelehnt"
+  },
+  "error_token_required": {
+    "message": "Ketch benötigt ein Zugriffstoken"
+  },
+  "error_http_status": {
+    "message": "Ketch hat mit HTTP $STATUS$ geantwortet",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_start_timeout": {
+    "message": "Ketch wurde nicht rechtzeitig gestartet"
+  },
+  "error_app_not_installed": {
+    "message": "Die Ketch-App ist auf diesem Computer nicht eingerichtet"
+  },
+  "error_app_unreachable": {
+    "message": "Die Ketch-App ist nicht erreichbar"
+  },
+  "error_app_not_running": {
+    "message": "Ketch ist nicht geöffnet"
+  },
+  "error_app_connect_failed": {
+    "message": "Die Ketch-App konnte keine Verbindung herstellen"
+  },
+  "error_app_invalid_reply": {
+    "message": "Die Ketch-App hat eine ungültige Antwort gesendet"
+  },
+  "error_unsupported_link": {
+    "message": "Ketch kann diese Art von Link nicht herunterladen"
+  },
+  "error_torrent_http": {
+    "message": "Die Torrent-Datei konnte nicht abgerufen werden (HTTP $STATUS$)",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_torrent_timeout": {
+    "message": "Zeitüberschreitung beim Abrufen der Torrent-Datei"
+  },
+  "error_torrent_too_large": {
+    "message": "Die Torrent-Datei ist zu groß"
+  },
+  "error_address_required": {
+    "message": "Gib die Adresse eines Ketch-Servers ein"
+  },
+  "error_address_invalid": {
+    "message": "„$ADDRESS$“ ist keine gültige Adresse",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_address_scheme": {
+    "message": "Die Adresse muss mit http:// oder https:// beginnen"
+  },
+  "error_address_credentials": {
+    "message": "Gib das Zugriffstoken im Token-Feld ein, nicht in der Adresse"
+  },
+  "error_not_ketch": {
+    "message": "Diese Adresse scheint kein Ketch-Server zu sein"
+  },
+  "hint_app_not_installed": {
+    "message": "Installiere die Ketch-Desktop-App, öffne sie einmal und versuche es dann erneut. Mit „ketch server“ oder einem als Flatpak oder Snap installierten Browser füge Ketch stattdessen als Server hinzu."
+  },
+  "hint_app_not_running": {
+    "message": "Ketch öffnet sich von selbst, wenn du einen Download sendest."
+  },
+  "hint_open_app": {
+    "message": "Öffne Ketch und versuche es erneut."
+  },
+  "hint_local_server": {
+    "message": "Öffne Ketch und aktiviere Einstellungen → Fernzugriff → Server, oder führe „ketch server“ aus."
+  },
+  "hint_remote_server": {
+    "message": "Prüfe, ob der Server läuft und diese Adresse von hier aus erreichbar ist."
+  },
+  "hint_access_token": {
+    "message": "Gib das Zugriffstoken ein, das Ketch unter Einstellungen → Fernzugriff anzeigt."
+  },
+  "task_magnet_link": {
+    "message": "Magnet-Link"
+  },
+  "task_torrent": {
+    "message": "Torrent"
+  },
+  "task_downloading_of": {
+    "message": "$DOWNLOADED$ von $TOTAL$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "speed": {
+        "content": "$3"
+      }
+    }
+  },
+  "task_downloading": {
+    "message": "$DOWNLOADED$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "speed": {
+        "content": "$2"
+      }
+    }
+  },
+  "task_paused": {
+    "message": "Pausiert"
+  },
+  "task_paused_percent": {
+    "message": "Pausiert · $PERCENT$ %",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_queued": {
+    "message": "In Warteschlange"
+  },
+  "task_scheduled": {
+    "message": "Geplant"
+  },
+  "task_completed": {
+    "message": "Fertig"
+  },
+  "task_failed": {
+    "message": "Fehlgeschlagen: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_unknown_error": {
+    "message": "unbekannter Fehler"
+  },
+  "task_canceled": {
+    "message": "Abgebrochen"
+  },
+  "task_pause": {
+    "message": "Pausieren"
+  },
+  "task_resume": {
+    "message": "Fortsetzen"
+  },
+  "size_bytes": {
+    "message": "$SIZE$ B",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_kilobytes": {
+    "message": "$SIZE$ KB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_megabytes": {
+    "message": "$SIZE$ MB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_gigabytes": {
+    "message": "$SIZE$ GB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_terabytes": {
+    "message": "$SIZE$ TB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "speed_per_second": {
+    "message": "$SIZE$/s",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected": {
+    "message": "Verbunden · Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected_to": {
+    "message": "Verbunden mit $NAME$ · Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_on": {
+    "message": "Verbunden · Ketch $VERSION$ auf $OS$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      },
+      "os": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_to_on": {
+    "message": "Verbunden mit $NAME$ · Ketch $VERSION$ auf $OS$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      },
+      "os": {
+        "content": "$3"
+      }
+    }
+  },
+  "status_connecting": {
+    "message": "Verbindung wird hergestellt…"
+  },
+  "status_opening_app": {
+    "message": "Ketch wird geöffnet…"
+  },
+  "instance_this_computer": {
+    "message": "Dieser Computer"
+  },
+  "instance_name_default": {
+    "message": "$NAME$ (Standard)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "instance_name": {
+    "message": "Name"
+  },
+  "instance_default": {
+    "message": "Standard"
+  },
+  "instance_app_detail": {
+    "message": "Die Ketch-App auf diesem Computer. Die Erweiterung öffnet sie, wenn ein Download sie braucht."
+  },
+  "instance_address": {
+    "message": "Adresse"
+  },
+  "instance_token": {
+    "message": "Zugriffstoken"
+  },
+  "instance_token_placeholder": {
+    "message": "Optional"
+  },
+  "instance_insecure": {
+    "message": "Diese Adresse ist nicht verschlüsselt: Das Zugriffstoken und alle mit Downloads gesendeten Cookies werden im Klartext über das Netzwerk übertragen. Verwende besser https oder nutze sie nur in einem Netzwerk, dem du vertraust."
+  },
+  "instance_test": {
+    "message": "Verbindung testen"
+  },
+  "instance_remove": {
+    "message": "Entfernen"
+  },
+  "instance_enter_address": {
+    "message": "Gib die Adresse eines Ketch-Servers ein."
+  },
+  "popup_instance_picker": {
+    "message": "Ketch-Instanz"
+  },
+  "popup_settings": {
+    "message": "Einstellungen"
+  },
+  "popup_open_app": {
+    "message": "Ketch öffnen"
+  },
+  "popup_add_placeholder": {
+    "message": "Link oder Magnet-Link einfügen"
+  },
+  "popup_add_label": {
+    "message": "Link zum Herunterladen"
+  },
+  "popup_add_button": {
+    "message": "Herunterladen"
+  },
+  "popup_added": {
+    "message": "$NAME$ hinzugefügt",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_unsupported_link": {
+    "message": "Gib einen http-, https-, ftp- oder Magnet-Link ein."
+  },
+  "popup_capture": {
+    "message": "Browser-Downloads abfangen"
+  },
+  "popup_capture_target": {
+    "message": "Werden an $NAME$ gesendet",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_recent": {
+    "message": "Neueste"
+  },
+  "popup_no_downloads": {
+    "message": "Noch keine Downloads."
+  },
+  "options_title": {
+    "message": "Einstellungen der Ketch-Erweiterung"
+  },
+  "options_intro": {
+    "message": "Sende Downloads aus diesem Browser an Ketch auf diesem Computer oder einem entfernten Server."
+  },
+  "options_saved": {
+    "message": "Gespeichert"
+  },
+  "options_permission": {
+    "message": "Ketch braucht Zugriff auf Websites, um deren Downloads abzufangen, ihre Cookies zu senden und deine Ketch-Server zu erreichen."
+  },
+  "options_allow_access": {
+    "message": "Zugriff erlauben"
+  },
+  "options_instances": {
+    "message": "Ketch-Instanzen"
+  },
+  "options_instances_detail": {
+    "message": "Abgefangene Downloads und Magnet-Links gehen an die Standardinstanz. Klicke mit der rechten Maustaste auf einen Link, ein Bild oder ein Video, um es an eine beliebige Instanz zu senden."
+  },
+  "options_add_app": {
+    "message": "Ketch auf diesem Computer hinzufügen"
+  },
+  "options_add_server": {
+    "message": "Server hinzufügen"
+  },
+  "options_browser_downloads": {
+    "message": "Browser-Downloads"
+  },
+  "options_capture": {
+    "message": "Downloads abfangen"
+  },
+  "options_capture_detail": {
+    "message": "Downloads, die du im Browser startest, gehen stattdessen an Ketch. Ist Ketch nicht erreichbar, lädt der Browser sie wie gewohnt herunter."
+  },
+  "options_min_size": {
+    "message": "Kleine Dateien dem Browser überlassen"
+  },
+  "options_min_size_detail": {
+    "message": "Kleinere Dateien bleiben im Browser. Dateien unbekannter Größe gehen immer an Ketch. Bei 0 wird alles gesendet."
+  },
+  "options_min_size_unit": {
+    "message": "MB"
+  },
+  "options_excluded": {
+    "message": "Websites, die dem Browser überlassen bleiben"
+  },
+  "options_excluded_detail": {
+    "message": "Eine pro Zeile. Subdomains sind eingeschlossen, example.com umfasst also auch downloads.example.com."
+  },
+  "options_cookies": {
+    "message": "Cookies und Referrer senden"
+  },
+  "options_cookies_detail": {
+    "message": "Damit kann Ketch Dateien herunterladen, für die du angemeldet sein musst. Ketch speichert sie mit der Aufgabe, um sie später fortsetzen zu können."
+  },
+  "options_links_notifications": {
+    "message": "Links und Benachrichtigungen"
+  },
+  "options_magnet": {
+    "message": "Angeklickte Magnet-Links an Ketch senden"
+  },
+  "options_magnet_detail": {
+    "message": "Mit Alt+Klick öffnest du einen Magnet-Link stattdessen in einer anderen App."
+  },
+  "options_notify": {
+    "message": "Benachrichtigen, wenn ein Download gesendet wurde"
+  },
+  "options_notify_detail": {
+    "message": "Probleme werden immer angezeigt."
+  },
+  "options_help": {
+    "message": "Ketch einrichten"
+  },
+  "options_help_this_computer": {
+    "message": "Auf diesem Computer"
+  },
+  "options_help_this_computer_detail": {
+    "message": "Installiere die Ketch-Desktop-App und öffne sie einmal, damit deine Browser sie finden. Danach öffnet die Erweiterung Ketch, sobald ein Download es braucht; du musst keinen Server einschalten und kein Token kopieren."
+  },
+  "options_help_other_device": {
+    "message": "Auf einem anderen Gerät"
+  },
+  "options_help_other_device_detail": {
+    "message": "Öffne auf diesem Gerät Einstellungen → Fernzugriff, aktiviere <b>Server</b> und <b>Andere Geräte zulassen</b> und erzeuge ein Zugriffstoken. Füge das Gerät hier mit <b>Server hinzufügen</b> hinzu, mit seiner Adresse, etwa <code>http://192.168.1.20:8642</code>, und dem Token. Für <code>ketch server</code> setze <code>apiToken</code> in dessen config.toml."
+  },
+  "options_help_command_line": {
+    "message": "Kommandozeile oder isolierte Browser"
+  },
+  "options_help_command_line_detail": {
+    "message": "Um <code>ketch server</code> auf diesem Computer oder Ketch aus einem als Flatpak oder Snap installierten Browser zu nutzen, der keine anderen Apps starten kann, füge es als Server unter <code>http://127.0.0.1:8642</code> hinzu."
+  }
+}

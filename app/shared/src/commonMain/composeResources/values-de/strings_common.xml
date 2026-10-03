@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="size_bytes">%1$s B</string>
+  <string name="size_kb">%1$s KB</string>
+  <string name="size_mb">%1$s MB</string>
+  <string name="size_gb">%1$s GB</string>
+  <string name="size_tb">%1$s TB</string>
+  <string name="size_progress">%1$s von %2$s</string>
+  <string name="size_progress_compact">%1$s/%2$s</string>
+  <string name="speed_per_second">%1$s/s</string>
+  <string name="percent">%1$d %</string>
+
+  <string name="duration_days_hours">%1$d Tg. %2$d h</string>
+  <string name="duration_days">%1$d Tg.</string>
+  <string name="duration_hours_minutes">%1$d h %2$d min</string>
+  <string name="duration_hours">%1$d h</string>
+  <string name="duration_minutes_seconds">%1$d min %2$d s</string>
+  <string name="duration_minutes">%1$d min</string>
+  <string name="duration_seconds">%1$d s</string>
+  <string name="duration_under_second">&lt;1 s</string>
+
+  <string name="date_month_day">%3$d. %1$s</string>
+  <string name="date_month_day_year">%3$d. %1$s %4$d</string>
+  <string name="date_today">Heute</string>
+  <string name="date_yesterday">Gestern</string>
+  <string name="date_today_at">Heute, %1$s</string>
+  <string name="date_yesterday_at">Gestern, %1$s</string>
+  <string name="date_tomorrow_at">Morgen, %1$s</string>
+  <string name="date_at_time">%1$s, %2$s</string>
+
+  <string name="month_jan">Jan.</string>
+  <string name="month_feb">Feb.</string>
+  <string name="month_mar">März</string>
+  <string name="month_apr">Apr.</string>
+  <string name="month_may">Mai</string>
+  <string name="month_jun">Juni</string>
+  <string name="month_jul">Juli</string>
+  <string name="month_aug">Aug.</string>
+  <string name="month_sep">Sep.</string>
+  <string name="month_oct">Okt.</string>
+  <string name="month_nov">Nov.</string>
+  <string name="month_dec">Dez.</string>
+
+  <string name="weekday_mon">Mo</string>
+  <string name="weekday_tue">Di</string>
+  <string name="weekday_wed">Mi</string>
+  <string name="weekday_thu">Do</string>
+  <string name="weekday_fri">Fr</string>
+  <string name="weekday_sat">Sa</string>
+  <string name="weekday_sun">So</string>
+
+  <plurals name="count_downloads">
+    <item quantity="one">%1$d Download</item>
+    <item quantity="other">%1$d Downloads</item>
+  </plurals>
+
+  <string name="priority_low">Niedrig</string>
+  <string name="priority_normal">Normal</string>
+  <string name="priority_high">Hoch</string>
+  <string name="priority_urgent">Dringend</string>
+
+  <string name="action_cancel">Abbrechen</string>
+  <string name="action_done">Fertig</string>
+  <string name="action_close">Schließen</string>
+  <string name="action_back">Zurück</string>
+  <string name="action_next">Weiter</string>
+  <string name="action_continue">Weiter</string>
+  <string name="action_skip">Überspringen</string>
+  <string name="action_add">Hinzufügen</string>
+  <string name="action_remove">Entfernen</string>
+  <string name="action_open">Öffnen</string>
+  <string name="action_show">Anzeigen</string>
+  <string name="action_undo">Rückgängig</string>
+  <string name="action_retry">Erneut versuchen</string>
+  <string name="action_try_again">Erneut versuchen</string>
+  <string name="action_dismiss">Ausblenden</string>
+  <string name="action_review">Prüfen</string>
+  <string name="action_connect">Verbinden</string>
+</resources>
