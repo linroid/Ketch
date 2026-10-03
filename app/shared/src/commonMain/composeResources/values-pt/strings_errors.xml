@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="error_title_hint">%1$s. %2$s</string>
+  <string name="error_connection_lost">Conexão perdida</string>
+  <string name="error_network_hint">Não foi possível acessar %1$s.</string>
+  <string name="error_network_hint_short">não foi possível acessar %1$s</string>
+  <string name="error_network_hint_server">Não foi possível acessar o servidor.</string>
+  <string name="error_network_hint_server_short">não foi possível acessar o servidor</string>
+  <string name="error_retried_once">O Ketch tentou novamente uma vez.</string>
+  <plurals name="error_retried">
+    <item quantity="one">O Ketch tentou novamente %1$d vez.</item>
+    <item quantity="other">O Ketch tentou novamente %1$d vezes.</item>
+  </plurals>
+  <string name="error_check_connection">Verifique a conexão e tente novamente.</string>
+  <string name="error_check_connection_short">verifique a conexão e tente novamente</string>
+  <string name="error_not_supported">Não disponível neste dispositivo</string>
+  <string name="error_something_went_wrong">Algo deu errado</string>
+
+  <string name="error_disk">Não foi possível gravar o arquivo</string>
+  <string name="error_disk_hint">Verifique o espaço livre e as permissões da pasta.</string>
+  <string name="error_disk_hint_short">verifique o espaço livre e as permissões da pasta</string>
+  <string name="error_disk_hint_on">Verifique o espaço livre e as permissões da pasta em %1$s.</string>
+  <string name="error_disk_hint_on_short">verifique o espaço livre e as permissões da pasta em %1$s</string>
+  <string name="error_disk_hint_free">%1$s livres em %2$s. Verifique o espaço e as permissões da pasta.</string>
+  <string name="error_disk_hint_free_short">%1$s livres em %2$s</string>
+
+  <string name="error_unsupported">Este servidor não consegue fazer este download</string>
+  <string name="error_unsupported_hint">Ele não informa o tamanho nem aceita downloads em partes.</string>
+  <string name="error_unsupported_hint_short">ele não informa o tamanho nem aceita downloads em partes</string>
+  <string name="error_file_changed">O arquivo mudou no servidor</string>
+  <string name="error_file_changed_hint">Retomar corromperia o arquivo (%1$s).</string>
+  <string name="error_file_changed_hint_short">retomar corromperia o arquivo (%1$s)</string>
+  <string name="error_corrupt_resume">O progresso salvo está danificado</string>
+  <string name="error_corrupt_resume_hint">A parte baixada não pode ser reaproveitada.</string>
+  <string name="error_corrupt_resume_hint_short">a parte baixada não pode ser reaproveitada</string>
+  <string name="error_canceled">Cancelado</string>
+  <string name="error_wrong_credentials">Nome de usuário ou senha incorretos</string>
+  <string name="error_wrong_credentials_hint">O servidor %1$s recusou o login.</string>
+  <string name="error_wrong_credentials_hint_short">o servidor %1$s recusou o login</string>
+  <string name="error_torrent_stopped">O torrent parou</string>
+  <string name="error_torrent_stopped_hint">Nenhum peer ou tracker acessível.</string>
+  <string name="error_torrent_stopped_hint_short">nenhum peer ou tracker acessível</string>
+  <string name="error_source">O servidor %1$s informou um erro</string>
+
+  <string name="error_http_sign_in">Login necessário (%1$d)</string>
+  <string name="error_http_sign_in_hint">%1$s exige login. Envie pela extensão do navegador do Ketch para que seus cookies sigam junto.</string>
+  <string name="error_http_sign_in_hint_short">%1$s exige login</string>
+  <string name="error_http_sign_in_hint_server">O servidor exige login. Envie pela extensão do navegador do Ketch para que seus cookies sigam junto.</string>
+  <string name="error_http_sign_in_hint_server_short">o servidor exige login</string>
+  <string name="error_http_forbidden">Acesso negado (403)</string>
+  <string name="error_http_forbidden_hint">O link pode ter expirado.</string>
+  <string name="error_http_forbidden_hint_browser">O link pode ter expirado. Foi capturado do %1$s? Capture-o novamente na página.</string>
+  <string name="error_http_forbidden_hint_short">o link pode ter expirado</string>
+  <string name="error_browser_yours">seu navegador</string>
+  <string name="error_http_not_found">Arquivo não encontrado (%1$d)</string>
+  <string name="error_http_not_found_hint">O servidor não tem mais este arquivo.</string>
+  <string name="error_http_not_found_hint_short">o servidor não tem mais este arquivo</string>
+  <string name="error_http_range">O servidor recusou retomar</string>
+  <string name="error_http_range_hint">A posição salva não é mais válida.</string>
+  <string name="error_http_range_hint_short">a posição salva não é mais válida</string>
+  <string name="error_http_rate_limited">O servidor está limitando as solicitações</string>
+  <string name="error_http_rate_limited_hint_in">Tente novamente em %1$d s com menos conexões.</string>
+  <string name="error_http_rate_limited_hint_in_short">tente novamente em %1$d s com menos conexões</string>
+  <string name="error_http_rate_limited_hint">Tente novamente mais tarde com menos conexões.</string>
+  <string name="error_http_rate_limited_hint_short">tente novamente mais tarde com menos conexões</string>
+  <string name="error_http_server">Erro do servidor (%1$d)</string>
+  <string name="error_http_server_hint">Geralmente é temporário.</string>
+  <string name="error_http_server_hint_short">geralmente é temporário</string>
+  <string name="error_http_other">O servidor respondeu %1$d</string>
+</resources>

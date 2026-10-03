@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="downloads_title">Descargas</string>
+  <plurals name="downloads_count_downloading">
+    <item quantity="one">%1$d descargando de %2$d</item>
+    <item quantity="other">%1$d descargando de %2$d</item>
+  </plurals>
+  <string name="downloads_view_list">Lista</string>
+  <string name="downloads_view_table">Tabla</string>
+  <string name="downloads_close_search">Cerrar la búsqueda</string>
+  <string name="downloads_switch_device">Cambiar de dispositivo</string>
+  <string name="downloads_all_devices">Todos los dispositivos</string>
+  <string name="downloads_search_placeholder">Busca o pega un enlace</string>
+  <string name="downloads_more">Más</string>
+  <string name="downloads_more_actions">Más acciones</string>
+  <string name="downloads_copy_all_links">Copiar todos los enlaces</string>
+  <string name="downloads_columns">Columnas</string>
+  <string name="downloads_row_density">Densidad de filas</string>
+  <string name="downloads_density_default">Predeterminada</string>
+  <string name="downloads_density_compact">Compacta</string>
+  <string name="downloads_resolving">Resolviendo %1$d</string>
+  <string name="downloads_resolving_tooltip">Obteniendo las listas de archivos de los pares · haz clic para elegir archivos</string>
+  <string name="downloads_show_add_sheet">Mostrar el panel de añadir</string>
+  <plurals name="downloads_clear_finished_count">
+    <item quantity="one">Quitar %1$d completada</item>
+    <item quantity="other">Quitar %1$d completadas</item>
+  </plurals>
+  <string name="downloads_clear_finished">Quitar las completadas</string>
+  <plurals name="downloads_clear_missing_count">
+    <item quantity="one">Quitar %1$d sin archivo</item>
+    <item quantity="other">Quitar %1$d sin archivo</item>
+  </plurals>
+  <string name="downloads_clear_missing">Quitar las que no tienen archivo</string>
+  <string name="downloads_clear_missing_caption">Archivo movido o eliminado</string>
+  <string name="downloads_clear_missing_tooltip">Quita las descargas completadas cuyos archivos se movieron o eliminaron</string>
+  <string name="downloads_select_all">Seleccionar todo</string>
+  <string name="downloads_clear_selection">Anular la selección</string>
+  <string name="downloads_retry_all_count">Reintentar todo (%1$d)</string>
+
+  <plurals name="downloads_tab_failed">
+    <item quantity="one">%1$d con error</item>
+    <item quantity="other">%1$d con error</item>
+  </plurals>
+  <string name="downloads_tab_retry_all">Reintentar todo</string>
+  <plurals name="downloads_tab_needs_link">
+    <item quantity="one">%1$d necesita un enlace nuevo</item>
+    <item quantity="other">%1$d necesitan un enlace nuevo</item>
+  </plurals>
+  <string name="downloads_sort">Ordenar</string>
+  <string name="downloads_group">Agrupar</string>
+  <string name="downloads_label_value">%1$s: %2$s</string>
+  <string name="downloads_sort_by">Ordenar por</string>
+  <string name="downloads_group_by">Agrupar por</string>
+
+  <string name="downloads_facet_type">Tipo</string>
+  <string name="downloads_facet_site">Sitio</string>
+  <string name="downloads_facet_device">Dispositivo</string>
+  <string name="downloads_facet_origin">Origen</string>
+  <string name="downloads_facet_matched">%1$d de %2$d</string>
+
+  <string name="downloads_table_connections_short">Con.</string>
+  <string name="downloads_table_column_auto">Se muestra en Todos los dispositivos</string>
+  <string name="downloads_table_reset_columns">Restablecer columnas</string>
+  <string name="downloads_table_sort_by">Ordenar por %1$s</string>
+  <string name="downloads_table_sorted_ascending">%1$s, en orden ascendente</string>
+  <string name="downloads_table_sorted_descending">%1$s, en orden descendente</string>
+  <string name="downloads_table_capped_at">Limitada a %1$s</string>
+  <string name="downloads_table_source_magnet">Magnet</string>
+  <string name="downloads_table_origin_unknown">Desconocido</string>
+  <string name="downloads_table_speed_limited">Un límite de velocidad restringe esta descarga</string>
+
+  <string name="downloads_group_show">Mostrar %1$s</string>
+  <string name="downloads_group_hide">Ocultar %1$s</string>
+  <string name="downloads_group_collapsed">Contraído</string>
+  <string name="downloads_group_expanded">Expandido</string>
+  <string name="downloads_row_select">Seleccionar</string>
+  <string name="downloads_row_show_actions">Mostrar acciones</string>
+  <string name="downloads_inspector_resize">Cambiar el tamaño del inspector</string>
+
+  <string name="downloads_empty_clear_search">Borrar la búsqueda</string>
+  <string name="downloads_empty_add_link">Añadir este enlace</string>
+  <string name="downloads_empty_add_links">Añadir estos enlaces</string>
+  <string name="downloads_empty_show_all">Mostrar todas las descargas</string>
+  <string name="downloads_empty_add">Añadir un enlace</string>
+  <string name="downloads_empty_link_missing">Este enlace no está en tus descargas</string>
+  <string name="downloads_empty_links_missing">Estos enlaces no están en tus descargas</string>
+  <string name="downloads_empty_add_it_to">Añádelo a %1$s en su lugar.</string>
+  <string name="downloads_empty_add_them_to">Añádelos a %1$s en su lugar.</string>
+  <string name="downloads_empty_no_match">Ninguna descarga coincide con «%1$s»</string>
+  <string name="downloads_empty_no_match_hint">La búsqueda mira nombres, sitios, carpetas y errores.</string>
+  <string name="downloads_empty_all">Aún no hay descargas</string>
+  <string name="downloads_empty_downloading">No se está descargando nada</string>
+  <string name="downloads_empty_downloading_hint">Aquí aparecen las descargas en curso.</string>
+  <string name="downloads_empty_waiting">Nada en espera</string>
+  <string name="downloads_empty_waiting_hint_one">%1$s ejecuta una descarga a la vez.</string>
+  <plurals name="downloads_empty_waiting_hint">
+    <item quantity="one">%1$s ejecuta %2$d a la vez.</item>
+    <item quantity="other">%1$s ejecuta %2$d a la vez.</item>
+  </plurals>
+  <string name="downloads_empty_paused">No hay descargas en pausa</string>
+  <string name="downloads_empty_paused_hint">Aquí aparecen las descargas que pausas.</string>
+  <string name="downloads_empty_done">No hay descargas completadas</string>
+  <string name="downloads_empty_done_hint">Las descargas aparecen aquí cuando terminan.</string>
+  <string name="downloads_empty_failed">Nada requiere atención</string>
+  <string name="downloads_empty_failed_hint">Aquí aparecen las descargas con error y las canceladas.</string>
+  <string name="downloads_empty_fleet">No hay descargas en ningún dispositivo</string>
+  <string name="downloads_empty_fleet_hint">Aquí aparecen las descargas de todos tus dispositivos.</string>
+  <string name="downloads_empty_add_to">Añadir un enlace a %1$s</string>
+  <string name="downloads_empty_remote">Las descargas de %1$s aparecerán aquí</string>
+  <string name="downloads_empty_unauthorized">%1$s necesita un token de acceso nuevo</string>
+  <string name="downloads_empty_offline">No se puede conectar con %1$s</string>
+  <string name="downloads_empty_offline_hint">Sus descargas aparecerán aquí cuando se conecte.</string>
+  <string name="downloads_empty_loading">Cargando descargas</string>
+
+  <string name="launchpad_title">Aún no hay descargas</string>
+  <string name="launchpad_subtitle">Pega un enlace, suelta un archivo o envía uno desde tu navegador.</string>
+  <string name="launchpad_subtitle_phone">Pega un enlace, abre un archivo .torrent o añade descargas desde tu equipo.</string>
+  <string name="launchpad_paste_title">Pega un enlace</string>
+  <string name="launchpad_paste_download">Descargarlo</string>
+  <string name="launchpad_paste_maybe">Hay un enlace en el portapapeles.</string>
+  <string name="launchpad_paste">Pegar</string>
+  <string name="launchpad_paste_hint_phone">Copia un enlace en cualquier app y pégalo aquí.</string>
+  <string name="launchpad_paste_hint">Copia un enlace y pulsa %1$s en cualquier parte de Ketch.</string>
+  <string name="launchpad_paste_hint_plain">Copia un enlace y pégalo en cualquier parte de Ketch.</string>
+  <string name="launchpad_torrent_title">Suelta un enlace, un magnet o un .torrent</string>
+  <string name="launchpad_torrent_title_phone">Abre un archivo .torrent</string>
+  <string name="launchpad_torrent_hint">En cualquier parte de esta ventana, o elige un archivo .torrent.</string>
+  <string name="launchpad_torrent_hint_phone">O abre un enlace magnet desde tu navegador.</string>
+  <string name="launchpad_browser_title">Captura desde tu navegador</string>
+  <string name="launchpad_browser_none">Envía descargas a Ketch desde Chrome, Edge o Firefox.</string>
+  <string name="launchpad_browser_connected">%1$s ✓</string>
+  <string name="launchpad_browser_get">%1$s: Obtener</string>
+  <string name="launchpad_pair_title">Controla las descargas de tu equipo</string>
+  <string name="launchpad_pair_hint">Conéctate a Ketch en tu equipo y añade descargas desde aquí.</string>
+  <string name="launchpad_discover">O describe lo que quieres · Descubrir</string>
+  <string name="launchpad_checklist_title">Configura Ketch</string>
+  <string name="launchpad_checklist_close">Cerrar la lista de configuración</string>
+  <string name="launchpad_checklist_folder">Las descargas van a %1$s</string>
+  <string name="launchpad_checklist_folder_choose">Elige dónde van las descargas</string>
+  <string name="launchpad_checklist_change">Cambiar…</string>
+  <string name="launchpad_checklist_extension">Extensión del navegador</string>
+  <string name="launchpad_checklist_detected">%1$s detectado</string>
+  <string name="launchpad_checklist_connected">Conectada</string>
+  <string name="launchpad_checklist_get_it">Obtener</string>
+  <string name="launchpad_checklist_phone">Controla %1$s desde tu teléfono</string>
+  <string name="launchpad_checklist_show_qr">Mostrar QR</string>
+
+  <string name="downloads_clip_download">Descargar %1$s</string>
+  <string name="downloads_clip_download_from">Descargar %1$s de %2$s</string>
+  <string name="downloads_clip_copied">Descargar el enlace copiado</string>
+  <string name="downloads_clip_dismiss">No ofrecer este enlace</string>
+
+  <plurals name="downloads_selected">
+    <item quantity="one">%1$d seleccionada</item>
+    <item quantity="other">%1$d seleccionadas</item>
+  </plurals>
+
+  <string name="downloads_menu_file_missing">Archivo movido o eliminado</string>
+  <string name="downloads_menu_hold_to_move">Mantén %1$s para mover en su lugar</string>
+  <string name="downloads_menu_moving">Se quita del dispositivo anterior una vez enviada</string>
+  <string name="downloads_menu_speed_custom">Personalizado…</string>
+  <plurals name="downloads_menu_speed_share">
+    <item quantity="one">Repartir entre estas %1$d</item>
+    <item quantity="other">Repartir entre estas %1$d</item>
+  </plurals>
+  <string name="downloads_menu_speed_each">%1$s cada una</string>
+  <string name="downloads_menu_urgent_may_pause">Empieza ahora · puede pausar %1$s</string>
+  <string name="downloads_menu_urgent_starts_now">Empieza ahora</string>
+  <string name="downloads_menu_pick_start">Elegir fecha y hora…</string>
+  <string name="downloads_menu_clear_schedule">Quitar programación</string>
+
+  <string name="downloads_discard_title">¿Detener y descartar el progreso?</string>
+  <plurals name="downloads_discard_title_many">
+    <item quantity="one">¿Descartar el progreso de %1$d descarga?</item>
+    <item quantity="other">¿Descartar el progreso de %1$d descargas?</item>
+  </plurals>
+  <string name="downloads_discard_body">%1$s no se podrá reanudar después.</string>
+  <string name="downloads_discard_body_many">No se podrán reanudar después.</string>
+  <string name="downloads_discard_keep">Conservar</string>
+  <string name="downloads_discard_confirm">Descartar el progreso</string>
+  <string name="downloads_speed_title">Límite de velocidad</string>
+  <string name="downloads_speed_invalid">Escribe una velocidad como 2m o 500k</string>
+  <string name="downloads_speed_placeholder">2m, 500k o sin límite</string>
+  <string name="downloads_speed_set">Establecer límite</string>
+  <string name="downloads_speed_caps">Limita %1$s; el límite global se sigue aplicando.</string>
+  <plurals name="downloads_speed_caps_many">
+    <item quantity="one">Limita %1$d descarga; el límite global se sigue aplicando.</item>
+    <item quantity="other">Limita cada una de las %1$d descargas; el límite global se sigue aplicando.</item>
+  </plurals>
+  <string name="downloads_speed_limit">Límite</string>
+  <string name="downloads_speed_limit_each">Límite para cada una</string>
+  <string name="downloads_send_title">¿Enviar %1$s a %2$s?</string>
+  <string name="downloads_move_title">¿Mover %1$s a %2$s?</string>
+  <string name="downloads_send_confirm">Enviar</string>
+  <string name="downloads_move_confirm">Mover</string>
+  <string name="downloads_send_note">Se guardan allí con la descarga, donde cualquiera que controle ese dispositivo puede verlos.</string>
+
+  <string name="downloads_remove_title">¿Quitar «%1$s»?</string>
+  <plurals name="downloads_remove_title_many">
+    <item quantity="one">¿Quitar %1$d descarga?</item>
+    <item quantity="other">¿Quitar %1$d descargas?</item>
+  </plurals>
+  <string name="downloads_remove_subtitle">De la lista de %1$s.</string>
+  <string name="downloads_remove_trash_files">Mover también los archivos a la papelera</string>
+  <string name="downloads_remove_trash_file">Mover también el archivo a la papelera</string>
+  <string name="downloads_remove_trash_partial">Mover también el archivo parcial a la papelera</string>
+  <plurals name="downloads_remove_trash_all">
+    <item quantity="one">Mover también los %1$d archivos a la papelera</item>
+    <item quantity="other">Mover también los %1$d archivos a la papelera</item>
+  </plurals>
+  <string name="downloads_remove_delete_files">Eliminar también los archivos de forma permanente</string>
+  <string name="downloads_remove_delete_file">Eliminar también el archivo de forma permanente</string>
+  <string name="downloads_remove_delete_partial">Eliminar también el archivo parcial de forma permanente</string>
+  <plurals name="downloads_remove_delete_all">
+    <item quantity="one">Eliminar también los %1$d archivos de forma permanente</item>
+    <item quantity="other">Eliminar también los %1$d archivos de forma permanente</item>
+  </plurals>
+  <string name="downloads_remove_size_of">%1$s de %2$s</string>
+  <string name="downloads_remove_and_trash">Quitar y mover a la papelera</string>
+  <string name="downloads_remove_and_delete">Quitar y eliminar</string>
+  <string name="downloads_remove_and_trash_size">Quitar y mover %1$s a la papelera</string>
+  <string name="downloads_remove_and_delete_size">Quitar y eliminar %1$s</string>
+  <string name="downloads_remove_note_partial">El archivo parcial se elimina de forma permanente</string>
+  <plurals name="downloads_remove_note_partials">
+    <item quantity="one">%1$d archivo parcial se elimina de forma permanente</item>
+    <item quantity="other">%1$d archivos parciales se eliminan de forma permanente</item>
+  </plurals>
+  <string name="downloads_remove_note_frees">Libera %1$s</string>
+  <string name="downloads_remove_note_frees_after">libera %1$s</string>
+  <string name="downloads_remove_note_free_on">%1$s libres en %2$s</string>
+
+  <string name="downloads_failed_pause">Error al pausar %1$s en %2$s</string>
+  <string name="downloads_failed_resume">Error al reanudar %1$s en %2$s</string>
+  <string name="downloads_failed_retry">Error al reintentar %1$s en %2$s</string>
+  <string name="downloads_failed_reconnect">Error al reconectar %1$s en %2$s</string>
+  <string name="downloads_failed_open">Error al abrir %1$s en %2$s</string>
+  <string name="downloads_failed_reveal">Error al mostrar %1$s en su carpeta en %2$s</string>
+  <string name="downloads_failed_speed_limit">Error al establecer el límite de velocidad de %1$s en %2$s</string>
+  <string name="downloads_failed_priority">Error al establecer la prioridad de %1$s en %2$s</string>
+  <string name="downloads_failed_connections">Error al establecer las conexiones de %1$s en %2$s</string>
+  <string name="downloads_failed_reschedule">Error al reprogramar %1$s en %2$s</string>
+
+  <plurals name="downloads_batch_paused">
+    <item quantity="one">Se pausó %1$d descarga</item>
+    <item quantity="other">Se pausaron %1$d descargas</item>
+  </plurals>
+  <plurals name="downloads_batch_resumed">
+    <item quantity="one">Se reanudó %1$d descarga</item>
+    <item quantity="other">Se reanudaron %1$d descargas</item>
+  </plurals>
+  <plurals name="downloads_batch_retrying">
+    <item quantity="one">Reintentando %1$d descarga</item>
+    <item quantity="other">Reintentando %1$d descargas</item>
+  </plurals>
+  <plurals name="downloads_batch_rescheduled">
+    <item quantity="one">Se reprogramó %1$d descarga</item>
+    <item quantity="other">Se reprogramaron %1$d descargas</item>
+  </plurals>
+  <plurals name="downloads_batch_unlimited">
+    <item quantity="one">Se quitó el límite de velocidad de %1$d descarga</item>
+    <item quantity="other">Se quitó el límite de velocidad de %1$d descargas</item>
+  </plurals>
+  <plurals name="downloads_batch_limited">
+    <item quantity="one">Se limitó %1$d descarga a %2$s</item>
+    <item quantity="other">Se limitaron %1$d descargas a %2$s</item>
+  </plurals>
+  <plurals name="downloads_batch_shared">
+    <item quantity="one">Repartiendo %2$s entre %1$d descarga</item>
+    <item quantity="other">Repartiendo %2$s entre %1$d descargas</item>
+  </plurals>
+  <plurals name="downloads_batch_priority">
+    <item quantity="one">Prioridad %2$s para %1$d descarga</item>
+    <item quantity="other">Prioridad %2$s para %1$d descargas</item>
+  </plurals>
+  <plurals name="downloads_batch_connections">
+    <item quantity="one">%2$d conexiones para %1$d descarga</item>
+    <item quantity="other">%2$d conexiones para %1$d descargas</item>
+  </plurals>
+  <plurals name="downloads_batch_failed">
+    <item quantity="one">%1$d con error</item>
+    <item quantity="other">%1$d con error</item>
+  </plurals>
+  <plurals name="downloads_skipped_finished">
+    <item quantity="one">%1$d ya terminada</item>
+    <item quantity="other">%1$d ya terminadas</item>
+  </plurals>
+  <plurals name="downloads_skipped_running">
+    <item quantity="one">%1$d ya en curso</item>
+    <item quantity="other">%1$d ya en curso</item>
+  </plurals>
+  <plurals name="downloads_skipped_already_paused">
+    <item quantity="one">%1$d ya en pausa</item>
+    <item quantity="other">%1$d ya en pausa</item>
+  </plurals>
+  <plurals name="downloads_skipped_paused">
+    <item quantity="one">%1$d en pausa</item>
+    <item quantity="other">%1$d en pausa</item>
+  </plurals>
+  <plurals name="downloads_skipped_scheduled">
+    <item quantity="one">%1$d programada</item>
+    <item quantity="other">%1$d programadas</item>
+  </plurals>
+  <plurals name="downloads_skipped_failed">
+    <item quantity="one">%1$d con error</item>
+    <item quantity="other">%1$d con error</item>
+  </plurals>
+  <plurals name="downloads_skipped_canceled">
+    <item quantity="one">%1$d cancelada</item>
+    <item quantity="other">%1$d canceladas</item>
+  </plurals>
+
+  <string name="downloads_trash_removed">Quitado: %1$s</string>
+  <string name="downloads_trash_its_file">Su archivo va a la papelera</string>
+  <string name="downloads_trash_their_files">Sus archivos van a la papelera</string>
+  <plurals name="downloads_trash_moved">
+    <item quantity="one">Se movió %1$d archivo a la papelera</item>
+    <item quantity="other">Se movieron %1$d archivos a la papelera</item>
+  </plurals>
+  <string name="downloads_trash_failed">No se pudo mover %1$s a la papelera</string>
+  <plurals name="downloads_trash_failed_many">
+    <item quantity="one">No se pudo mover %1$d archivo a la papelera</item>
+    <item quantity="other">No se pudieron mover %1$d archivos a la papelera</item>
+  </plurals>
+  <string name="downloads_trash_stays">La descarga sigue en la lista</string>
+  <string name="downloads_trash_stay">Las descargas siguen en la lista</string>
+  <string name="downloads_remove_failed">Error al quitar %1$s</string>
+
+  <string name="downloads_copied_link">Enlace copiado</string>
+  <plurals name="downloads_copied_links">
+    <item quantity="one">%1$d enlace copiado</item>
+    <item quantity="other">%1$d enlaces copiados</item>
+  </plurals>
+  <string name="downloads_copied_path">Ruta del archivo copiada</string>
+  <plurals name="downloads_copied_paths">
+    <item quantity="one">%1$d ruta de archivo copiada</item>
+    <item quantity="other">%1$d rutas de archivo copiadas</item>
+  </plurals>
+  <string name="downloads_copied_error">Error copiado</string>
+  <string name="downloads_copied_details">Detalles copiados</string>
+  <string name="downloads_copy_failed_link">No se pudo copiar el enlace</string>
+  <string name="downloads_copy_failed_links">No se pudieron copiar los enlaces</string>
+  <string name="downloads_copy_failed_path">No se pudo copiar la ruta del archivo</string>
+  <string name="downloads_copy_failed_paths">No se pudieron copiar las rutas de archivo</string>
+  <string name="downloads_copy_failed_error">No se pudo copiar el error</string>
+  <string name="downloads_copy_failed_details">No se pudieron copiar los detalles</string>
+  <string name="downloads_open_source_failed">No se pudo abrir la página de origen</string>
+</resources>

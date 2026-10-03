@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <plurals name="pulse_downloading">
+    <item quantity="one">Descargando %1$d archivo</item>
+    <item quantity="other">Descargando %1$d archivos</item>
+  </plurals>
+  <plurals name="pulse_downloading_on_devices">
+    <item quantity="one">Descargando %1$d archivo en %2$d dispositivos</item>
+    <item quantity="other">Descargando %1$d archivos en %2$d dispositivos</item>
+  </plurals>
+  <plurals name="pulse_attention">
+    <item quantity="one">%1$d descarga requiere atención</item>
+    <item quantity="other">%1$d descargas requieren atención</item>
+  </plurals>
+  <string name="pulse_all_quiet">Todo tranquilo</string>
+  <string name="pulse_all_quiet_free">Todo tranquilo · %1$s libres en %2$s</string>
+  <string name="pulse_connecting">Conectando con %1$s</string>
+  <string name="pulse_needs_token">%1$s necesita un token</string>
+  <string name="pulse_offline">%1$s está sin conexión · reintentando</string>
+  <string name="pulse_slow_lane">Carril lento</string>
+  <string name="pulse_slow_lane_until">Carril lento hasta %1$s</string>
+  <string name="pulse_disk_tooltip">%1$s en %2$s · %3$s</string>
+  <string name="pulse_downloading_count">%1$d descargando</string>
+  <string name="pulse_tab_progress">↓ %1$s</string>
+
+  <plurals name="pulse_count_downloading">
+    <item quantity="one">%1$d descargando</item>
+    <item quantity="other">%1$d descargando</item>
+  </plurals>
+  <plurals name="pulse_count_waiting">
+    <item quantity="one">%1$d en espera</item>
+    <item quantity="other">%1$d en espera</item>
+  </plurals>
+  <plurals name="pulse_count_failed">
+    <item quantity="one">%1$d con error</item>
+    <item quantity="other">%1$d con error</item>
+  </plurals>
+  <string name="pulse_count_description">%1$s, mostrar la pestaña %2$s</string>
+  <string name="pulse_speed_offline">Velocidad desconocida sin conexión</string>
+  <string name="pulse_speed_downloading">Descargando a %1$s, mostrar los últimos 5 minutos</string>
+  <string name="pulse_speed_idle">Inactivo, mostrar los últimos 5 minutos</string>
+  <string name="pulse_idle">Inactivo</string>
+  <string name="pulse_disk_short">no basta para las descargas en espera</string>
+  <plurals name="pulse_activity_unread">
+    <item quantity="one">Actividad, %1$d sin leer</item>
+    <item quantity="other">Actividad, %1$d sin leer</item>
+  </plurals>
+  <plurals name="pulse_selected">
+    <item quantity="one">%1$d seleccionada</item>
+    <item quantity="other">%1$d seleccionadas</item>
+  </plurals>
+
+  <string name="pulse_health_sharing">Compartiendo :%1$d</string>
+  <string name="pulse_health_not_shared">Sin compartir</string>
+  <string name="pulse_health_live">En línea</string>
+  <string name="pulse_health_connecting">Conectando</string>
+  <string name="pulse_health_offline">Sin conexión</string>
+  <string name="pulse_health_needs_token">Necesita un token</string>
+  <string name="pulse_health_description">%1$s: %2$s</string>
+
+  <string name="pulse_mode_full">Velocidad máxima</string>
+  <string name="pulse_mode_auto_name">Automático</string>
+  <string name="pulse_mode_capped">Limitada · %1$s</string>
+  <string name="pulse_mode_slow_lane">Carril lento · %1$s</string>
+  <string name="pulse_mode_auto">Automático · %1$s</string>
+  <string name="pulse_full_speed_until">Velocidad máxima hasta %1$s</string>
+  <string name="pulse_mode_full_short">Máxima</string>
+
+  <string name="pulse_subtitle_speed">↓ %1$s</string>
+  <plurals name="pulse_active">
+    <item quantity="one">%1$d activa</item>
+    <item quantity="other">%1$d activas</item>
+  </plurals>
+  <string name="pulse_subtitle_description">%1$s, mostrar la velocidad</string>
+  <string name="pulse_last_minute">Último minuto</string>
+
+  <string name="pulse_speed">Velocidad</string>
+  <string name="pulse_last_5_minutes">Últimos 5 minutos</string>
+  <string name="pulse_history_empty">No se descargó nada en los últimos 5 minutos.</string>
+  <string name="pulse_no_limit">Sin límite</string>
+  <string name="pulse_limit">Límite: %1$s</string>
+
+  <string name="pulse_slow_lane_turn_on">Activar el Carril lento</string>
+  <string name="pulse_slow_lane_turn_off">Desactivar el Carril lento</string>
+  <string name="pulse_speed_limit">Límite de velocidad</string>
+  <string name="pulse_limited">Limitada</string>
+  <string name="pulse_not_limited">Sin limitar</string>
+  <string name="pulse_speed_options">Opciones de velocidad</string>
+  <string name="pulse_speed_mode">Modo de velocidad</string>
+  <string name="pulse_slow_lane_speed">Velocidad del Carril lento</string>
+  <string name="pulse_use_as_slow_lane">Usar como velocidad del Carril lento</string>
+  <string name="pulse_speed_settings">Ajustes de velocidad…</string>
+  <string name="pulse_update_failed">No se pudo actualizar %1$s · %2$s</string>
+  <string name="pulse_caption_full">Las descargas van tan rápido como lo permite la red.</string>
+  <string name="pulse_caption_capped">Las descargas están limitadas a %1$s.</string>
+  <string name="pulse_caption_slow_lane">Las descargas comparten %1$s y dejan ancho de banda para todo lo demás.</string>
+  <string name="pulse_caption_no_rules">Aún no hay reglas de velocidad. Añádelas en Ajustes de velocidad.</string>
+  <string name="pulse_caption_rule_slow_lane">Una regla mantiene activado el Carril lento.</string>
+  <string name="pulse_caption_rule_full">Velocidad máxima hasta que una regla active el Carril lento.</string>
+  <string name="pulse_caption_slow_lane_until">Carril lento hasta %1$s; después deciden tus reglas.</string>
+  <string name="pulse_caption_full_until">Velocidad máxima hasta %1$s; después deciden tus reglas.</string>
+  <string name="pulse_limit_for_slow_lane">Se usa siempre que el Carril lento está activado.</string>
+  <string name="pulse_limit_for_device">Se aplica a todas las descargas de %1$s.</string>
+  <string name="pulse_limit_after_slow_lane">Se aplica cuando se desactiva el Carril lento.</string>
+
+  <string name="pulse_slow_lane_on">Carril lento activado · %1$s</string>
+  <string name="pulse_slow_lane_off">Carril lento desactivado</string>
+  <string name="pulse_speed_follows_rules">La velocidad sigue tus reglas</string>
+  <string name="pulse_switch_failed">No se pudo cambiar a %1$s</string>
+  <string name="pulse_limit_failed">No se pudo establecer el límite de velocidad</string>
+
+  <string name="pulse_timeline_added">Añadida</string>
+  <string name="pulse_timeline_started">Iniciada</string>
+  <string name="pulse_timeline_resumed">Reanudada</string>
+  <string name="pulse_timeline_retried">Reintentada</string>
+  <string name="pulse_timeline_paused">En pausa</string>
+  <string name="pulse_timeline_queued">En cola</string>
+  <string name="pulse_timeline_scheduled">Programada</string>
+  <string name="pulse_timeline_completed">Completada</string>
+  <string name="pulse_timeline_failed">Con error</string>
+  <string name="pulse_timeline_canceled">Cancelada</string>
+  <string name="pulse_timeline_connections">Conexiones %1$s → %2$s</string>
+  <string name="pulse_timeline_auto">Auto</string>
+  <string name="pulse_timeline_limit">Límite → %1$s</string>
+  <string name="pulse_timeline_limit_removed">Límite eliminado</string>
+  <string name="pulse_timeline_priority">Prioridad → %1$s</string>
+</resources>

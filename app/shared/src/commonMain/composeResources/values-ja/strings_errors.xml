@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="error_title_hint">%1$s。%2$s</string>
+  <string name="error_connection_lost">接続が切断されました</string>
+  <string name="error_network_hint">%1$sに接続できませんでした。</string>
+  <string name="error_network_hint_short">%1$sに接続できませんでした</string>
+  <string name="error_network_hint_server">サーバーに接続できませんでした。</string>
+  <string name="error_network_hint_server_short">サーバーに接続できませんでした</string>
+  <string name="error_retried_once">Ketchは1回再試行しました。</string>
+  <plurals name="error_retried">
+    <item quantity="other">Ketchは%1$d回再試行しました。</item>
+  </plurals>
+  <string name="error_check_connection">接続を確認して、もう一度お試しください。</string>
+  <string name="error_check_connection_short">接続を確認して、もう一度お試しください</string>
+  <string name="error_not_supported">このデバイスではサポートされていません</string>
+  <string name="error_something_went_wrong">問題が発生しました</string>
+
+  <string name="error_disk">ファイルを書き込めませんでした</string>
+  <string name="error_disk_hint">空き容量とフォルダのアクセス権を確認してください。</string>
+  <string name="error_disk_hint_short">空き容量とフォルダのアクセス権を確認してください</string>
+  <string name="error_disk_hint_on">%1$sの空き容量とフォルダのアクセス権を確認してください。</string>
+  <string name="error_disk_hint_on_short">%1$sの空き容量とフォルダのアクセス権を確認してください</string>
+  <string name="error_disk_hint_free">%2$sの空き容量は%1$sです。容量とフォルダのアクセス権を確認してください。</string>
+  <string name="error_disk_hint_free_short">%2$sの空き容量：%1$s</string>
+
+  <string name="error_unsupported">このサーバーではこのダウンロードを実行できません</string>
+  <string name="error_unsupported_hint">サーバーがサイズを返さず、範囲指定にも対応していません。</string>
+  <string name="error_unsupported_hint_short">サーバーがサイズを返さず、範囲指定にも対応していません</string>
+  <string name="error_file_changed">サーバー上のファイルが変更されました</string>
+  <string name="error_file_changed_hint">再開するとファイルが破損します（%1$s）。</string>
+  <string name="error_file_changed_hint_short">再開するとファイルが破損します（%1$s）</string>
+  <string name="error_corrupt_resume">保存された進捗が破損しています</string>
+  <string name="error_corrupt_resume_hint">ダウンロード済みの部分は再利用できません。</string>
+  <string name="error_corrupt_resume_hint_short">ダウンロード済みの部分は再利用できません</string>
+  <string name="error_canceled">キャンセル済み</string>
+  <string name="error_wrong_credentials">ユーザー名またはパスワードが正しくありません</string>
+  <string name="error_wrong_credentials_hint">%1$sサーバーがサインインを拒否しました。</string>
+  <string name="error_wrong_credentials_hint_short">%1$sサーバーがサインインを拒否しました</string>
+  <string name="error_torrent_stopped">トレントが停止しました</string>
+  <string name="error_torrent_stopped_hint">接続できるピアやトラッカーがありません。</string>
+  <string name="error_torrent_stopped_hint_short">接続できるピアやトラッカーがありません</string>
+  <string name="error_source">%1$sサーバーがエラーを返しました</string>
+
+  <string name="error_http_sign_in">サインインが必要です（%1$d）</string>
+  <string name="error_http_sign_in_hint">%1$sへのサインインが必要です。Cookieも一緒に送られるよう、Ketchのブラウザ拡張機能から送信してください。</string>
+  <string name="error_http_sign_in_hint_short">%1$sへのサインインが必要です</string>
+  <string name="error_http_sign_in_hint_server">サーバーへのサインインが必要です。Cookieも一緒に送られるよう、Ketchのブラウザ拡張機能から送信してください。</string>
+  <string name="error_http_sign_in_hint_server_short">サーバーへのサインインが必要です</string>
+  <string name="error_http_forbidden">アクセスが拒否されました（403）</string>
+  <string name="error_http_forbidden_hint">リンクの有効期限が切れている可能性があります。</string>
+  <string name="error_http_forbidden_hint_browser">リンクの有効期限が切れている可能性があります。%1$sから取り込んだ場合は、ページからもう一度取り込んでください。</string>
+  <string name="error_http_forbidden_hint_short">リンクの有効期限が切れている可能性があります</string>
+  <string name="error_browser_yours">お使いのブラウザ</string>
+  <string name="error_http_not_found">ファイルが見つかりません（%1$d）</string>
+  <string name="error_http_not_found_hint">このファイルはサーバー上にもうありません。</string>
+  <string name="error_http_not_found_hint_short">このファイルはサーバー上にもうありません</string>
+  <string name="error_http_range">サーバーが再開を拒否しました</string>
+  <string name="error_http_range_hint">保存された位置は無効になっています。</string>
+  <string name="error_http_range_hint_short">保存された位置は無効になっています</string>
+  <string name="error_http_rate_limited">サーバーがアクセスを制限しています</string>
+  <string name="error_http_rate_limited_hint_in">%1$d秒後に、接続数を減らしてもう一度お試しください。</string>
+  <string name="error_http_rate_limited_hint_in_short">%1$d秒後に、接続数を減らしてもう一度お試しください</string>
+  <string name="error_http_rate_limited_hint">しばらくしてから、接続数を減らしてもう一度お試しください。</string>
+  <string name="error_http_rate_limited_hint_short">しばらくしてから、接続数を減らしてもう一度お試しください</string>
+  <string name="error_http_server">サーバーエラー（%1$d）</string>
+  <string name="error_http_server_hint">通常は一時的な問題です。</string>
+  <string name="error_http_server_hint_short">通常は一時的な問題です</string>
+  <string name="error_http_other">サーバーの応答：%1$d</string>
+</resources>

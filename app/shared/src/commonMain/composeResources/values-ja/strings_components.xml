@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="component_chip_remove">%1$sを削除</string>
+
+  <string name="component_field_paste">貼り付け</string>
+  <string name="component_field_clear">テキストを消去</string>
+
+  <string name="component_priority_low">優先度：低</string>
+  <string name="component_priority_high">優先度：高</string>
+  <string name="component_priority_urgent">優先度：緊急</string>
+
+  <plurals name="component_pennant_failures">
+    <item quantity="other">%1$d件失敗</item>
+  </plurals>
+
+  <string name="component_speed_chart">速度%1$s、ピーク%2$s</string>
+
+  <string name="component_add_clip">%1$sを追加</string>
+  <string name="component_add_link">リンクを追加</string>
+  <string name="component_add_drop">ドロップしてダウンロード</string>
+
+  <plurals name="component_lanes_connections">
+    <item quantity="other">接続数%1$d</item>
+  </plurals>
+  <plurals name="component_lanes_active">
+    <item quantity="other">アクティブ%1$d</item>
+  </plurals>
+  <plurals name="component_lanes_percent">
+    <item quantity="other">%1$dパーセント</item>
+  </plurals>
+  <string name="component_lanes_size_unknown">サイズ不明</string>
+  <plurals name="component_lanes_stalled">
+    <item quantity="other">停滞%1$d</item>
+  </plurals>
+
+  <string name="component_limit_applies">%1$s（%2$s）がすべてのダウンロードに適用されます</string>
+  <string name="component_limit_custom">カスタム…</string>
+  <string name="component_limit_custom_hint">例：750k、1.5m</string>
+  <string name="component_limit_unit_tooltip">kやmを付けずに入力した数値の単位</string>
+
+  <string name="component_stepper_auto">自動</string>
+  <string name="component_stepper_auto_count">自動（%1$d）</string>
+  <string name="component_stepper_fewer_connections">接続数を減らす</string>
+  <string name="component_stepper_more_connections">接続数を増やす</string>
+  <plurals name="component_stepper_connections">
+    <item quantity="other">接続数%1$d</item>
+  </plurals>
+  <string name="component_stepper_connections_auto">接続数：自動</string>
+  <string name="component_stepper_connections_auto_count">接続数：自動（%1$d）</string>
+  <string name="component_stepper_fewer_peers">ピア数を減らす</string>
+  <string name="component_stepper_more_peers">ピア数を増やす</string>
+  <plurals name="component_stepper_peers">
+    <item quantity="other">ピア数%1$d</item>
+  </plurals>
+  <string name="component_stepper_peers_auto">ピア数：自動</string>
+  <string name="component_stepper_peers_auto_count">ピア数：自動（%1$d）</string>
+
+  <string name="component_start_now">今すぐ開始</string>
+  <string name="component_start_in_hour">1時間後</string>
+  <string name="component_start_tonight">今夜 %1$s</string>
+  <string name="component_start_off_peak">オフピーク · %1$s</string>
+  <string name="component_start_label_now">今すぐ</string>
+  <string name="component_start_after">%1$s後に開始</string>
+  <string name="component_start_tonight_at">今夜%1$sに開始</string>
+  <string name="component_start_today_at">今日%1$sに開始</string>
+  <string name="component_start_tomorrow_at">明日%1$sに開始</string>
+  <string name="component_start_weekday_at">%1$s曜 %2$sに開始</string>
+  <string name="component_start_date_at">%1$s %2$sに開始</string>
+  <string name="component_start_follow_now">すぐに開始します</string>
+  <string name="component_start_follow_after">%1$s後に開始します</string>
+  <string name="component_start_follow_tonight">今夜%1$sに開始します</string>
+  <string name="component_start_follow_today">今日%1$sに開始します</string>
+  <string name="component_start_follow_tomorrow">明日%1$sに開始します</string>
+  <string name="component_start_follow_weekday">%1$s曜 %2$sに開始します</string>
+  <string name="component_start_follow_date">%1$s %2$sに開始します</string>
+  <string name="component_start_menu_title">開始</string>
+  <string name="component_start_pick">日時を選択…</string>
+  <string name="component_start_clear">クリア</string>
+  <string name="component_start_dialog_title">開始時刻</string>
+  <string name="component_start_schedule">予約</string>
+  <string name="component_start_passed">その時刻はすでに過ぎています</string>
+</resources>
