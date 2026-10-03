@@ -54,8 +54,14 @@ class AppSettingsController(
   val picksLanguageInApp: Boolean get() = PlatformLanguage.pickInApp
 
   init {
-    // A language kept in config.toml is the app's to apply; the system applies its own.
-    if (!PlatformLanguage.systemKeepsChoice) language?.let(PlatformLanguage::apply)
+    if (!PlatformLanguage.systemKeepsChoice) {
+      // A language kept in config.toml is the app's to apply; the system applies its own.
+      language?.let(PlatformLanguage::apply)
+    } else if (config.appearance.language != null) {
+      // Saved before the system kept the choice (an Android update): it moved into the
+      // system's per-app setting as the app started, so the config no longer holds it.
+      update { it.copy(appearance = it.appearance.copy(language = null)) }
+    }
   }
 
   /** UI state remembered between launches. */

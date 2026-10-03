@@ -1,10 +1,14 @@
 package com.linroid.ketch.app.i18n
 
+import android.app.Activity
+import android.app.Application
 import android.app.LocaleManager
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
+import android.os.Bundle
 import android.os.LocaleList
+import androidx.annotation.RequiresApi
 import java.util.Locale
 
 /**
@@ -20,6 +24,9 @@ internal actual object PlatformLanguage {
 
   // The process's own language, before the app set one.
   private val system: Locale = Locale.getDefault()
+
+  // The app's live activities before Android 13, recreated in a new language.
+  private val activities = mutableSetOf<Activity>()
 
   actual val systemKeepsChoice: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
@@ -38,15 +45,55 @@ internal actual object PlatformLanguage {
         LocaleList.forLanguageTags(tag.orEmpty())
       return
     }
-    chosen = tag?.let(Locale::forLanguageTag)
+    val locale = tag?.let(Locale::forLanguageTag)
+    val changed = locale != chosen
+    chosen = locale
     reapply()
+    // An activity reads the language it was created with, so a new one recreates them.
+    if (changed) activities.toList().forEach(Activity::recreate)
   }
 
   actual fun openSystemSettings() = Unit
 
   fun init(context: Context, saved: String?) {
     this.context = context.applicationContext
-    if (!systemKeepsChoice) apply(saved)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      moveIntoSystem(saved)
+      return
+    }
+    (context.applicationContext as? Application)?.registerActivityLifecycleCallbacks(Tracker)
+    apply(saved)
+  }
+
+  // A language saved before Android 13, on the first launch after the device updated, moves into
+  // the per-app setting while that is empty; AppSettingsController then clears it from the config.
+  @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+  private fun moveIntoSystem(saved: String?) {
+    val manager = context?.getSystemService(LocaleManager::class.java) ?: return
+    if (saved != null && manager.applicationLocales.isEmpty) {
+      manager.applicationLocales = LocaleList.forLanguageTags(saved)
+    }
+  }
+
+  // Keeps [activities] to the ones alive.
+  private object Tracker : Application.ActivityLifecycleCallbacks {
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+      activities += activity
+    }
+
+    override fun onActivityDestroyed(activity: Activity) {
+      activities -= activity
+    }
+
+    override fun onActivityStarted(activity: Activity) = Unit
+
+    override fun onActivityResumed(activity: Activity) = Unit
+
+    override fun onActivityPaused(activity: Activity) = Unit
+
+    override fun onActivityStopped(activity: Activity) = Unit
+
+    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
   }
 
   /**
