@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="error_title_hint">%1$s。%2$s</string>
+  <string name="error_connection_lost">連線中斷</string>
+  <string name="error_network_hint">無法連線至 %1$s。</string>
+  <string name="error_network_hint_short">無法連線至 %1$s</string>
+  <string name="error_network_hint_server">無法連線至伺服器。</string>
+  <string name="error_network_hint_server_short">無法連線至伺服器</string>
+  <string name="error_retried_once">Ketch 已重試 1 次。</string>
+  <plurals name="error_retried">
+    <item quantity="other">Ketch 已重試 %1$d 次。</item>
+  </plurals>
+  <string name="error_check_connection">請檢查網路連線後再試一次。</string>
+  <string name="error_check_connection_short">請檢查網路連線後再試一次</string>
+  <string name="error_not_supported">此裝置不支援</string>
+  <string name="error_something_went_wrong">發生錯誤</string>
+
+  <string name="error_disk">無法寫入檔案</string>
+  <string name="error_disk_hint">請檢查可用空間和資料夾權限。</string>
+  <string name="error_disk_hint_short">請檢查可用空間和資料夾權限</string>
+  <string name="error_disk_hint_on">請檢查 %1$s 上的可用空間和資料夾權限。</string>
+  <string name="error_disk_hint_on_short">請檢查 %1$s 上的可用空間和資料夾權限</string>
+  <string name="error_disk_hint_free">%2$s 上可用 %1$s。請檢查空間和資料夾權限。</string>
+  <string name="error_disk_hint_free_short">%2$s 上可用 %1$s</string>
+
+  <string name="error_unsupported">此伺服器無法完成這個下載</string>
+  <string name="error_unsupported_hint">它未提供檔案大小，也不支援範圍請求。</string>
+  <string name="error_unsupported_hint_short">它未提供檔案大小，也不支援範圍請求</string>
+  <string name="error_file_changed">伺服器上的檔案已變更</string>
+  <string name="error_file_changed_hint">繼續下載會損壞檔案（%1$s）。</string>
+  <string name="error_file_changed_hint_short">繼續下載會損壞檔案（%1$s）</string>
+  <string name="error_corrupt_resume">已儲存的進度已損壞</string>
+  <string name="error_corrupt_resume_hint">已下載的部分無法再使用。</string>
+  <string name="error_corrupt_resume_hint_short">已下載的部分無法再使用</string>
+  <string name="error_canceled">已取消</string>
+  <string name="error_wrong_credentials">使用者名稱或密碼錯誤</string>
+  <string name="error_wrong_credentials_hint">%1$s 伺服器拒絕登入。</string>
+  <string name="error_wrong_credentials_hint_short">%1$s 伺服器拒絕登入</string>
+  <string name="error_torrent_stopped">種子已停止</string>
+  <string name="error_torrent_stopped_hint">沒有可連線的對等端或 Tracker。</string>
+  <string name="error_torrent_stopped_hint_short">沒有可連線的對等端或 Tracker</string>
+  <string name="error_source">%1$s 伺服器回報錯誤</string>
+
+  <string name="error_http_sign_in">需要登入（%1$d）</string>
+  <string name="error_http_sign_in_hint">%1$s 要求你登入。請改從 Ketch 瀏覽器擴充功能傳送，以一併帶上你的 Cookie。</string>
+  <string name="error_http_sign_in_hint_short">%1$s 要求你登入</string>
+  <string name="error_http_sign_in_hint_server">伺服器要求你登入。請改從 Ketch 瀏覽器擴充功能傳送，以一併帶上你的 Cookie。</string>
+  <string name="error_http_sign_in_hint_server_short">伺服器要求你登入</string>
+  <string name="error_http_forbidden">拒絕存取（403）</string>
+  <string name="error_http_forbidden_hint">連結可能已過期。</string>
+  <string name="error_http_forbidden_hint_browser">連結可能已過期。是從 %1$s 擷取的嗎？請從該網頁重新擷取。</string>
+  <string name="error_http_forbidden_hint_short">連結可能已過期</string>
+  <string name="error_browser_yours">你的瀏覽器</string>
+  <string name="error_http_not_found">找不到檔案（%1$d）</string>
+  <string name="error_http_not_found_hint">伺服器上已沒有這個檔案。</string>
+  <string name="error_http_not_found_hint_short">伺服器上已沒有這個檔案</string>
+  <string name="error_http_range">伺服器拒絕繼續下載</string>
+  <string name="error_http_range_hint">已儲存的位置已失效。</string>
+  <string name="error_http_range_hint_short">已儲存的位置已失效</string>
+  <string name="error_http_rate_limited">伺服器正在限制請求頻率</string>
+  <string name="error_http_rate_limited_hint_in">請在 %1$d 秒後以較少的連線數再試一次。</string>
+  <string name="error_http_rate_limited_hint_in_short">請在 %1$d 秒後以較少的連線數再試一次</string>
+  <string name="error_http_rate_limited_hint">請稍後以較少的連線數再試一次。</string>
+  <string name="error_http_rate_limited_hint_short">請稍後以較少的連線數再試一次</string>
+  <string name="error_http_server">伺服器錯誤（%1$d）</string>
+  <string name="error_http_server_hint">通常是暫時性的問題。</string>
+  <string name="error_http_server_hint_short">通常是暫時性的問題</string>
+  <string name="error_http_other">伺服器回應 %1$d</string>
+</resources>

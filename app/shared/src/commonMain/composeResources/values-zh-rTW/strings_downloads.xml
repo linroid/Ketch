@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="downloads_title">下載</string>
+  <plurals name="downloads_count_downloading">
+    <item quantity="other">%1$d 個正在下載，共 %2$d 個</item>
+  </plurals>
+  <string name="downloads_view_list">清單</string>
+  <string name="downloads_view_table">表格</string>
+  <string name="downloads_close_search">關閉搜尋</string>
+  <string name="downloads_switch_device">切換裝置</string>
+  <string name="downloads_all_devices">所有裝置</string>
+  <string name="downloads_search_placeholder">搜尋或貼上連結</string>
+  <string name="downloads_more">更多</string>
+  <string name="downloads_more_actions">更多動作</string>
+  <string name="downloads_copy_all_links">複製所有連結</string>
+  <string name="downloads_columns">欄位</string>
+  <string name="downloads_row_density">列密度</string>
+  <string name="downloads_density_default">預設</string>
+  <string name="downloads_density_compact">緊湊</string>
+  <string name="downloads_resolving">正在解析 %1$d 個</string>
+  <string name="downloads_resolving_tooltip">正在從對等端取得檔案清單 · 按一下以選擇檔案</string>
+  <string name="downloads_show_add_sheet">顯示新增面板</string>
+  <plurals name="downloads_clear_finished_count">
+    <item quantity="other">清除 %1$d 個已完成項目</item>
+  </plurals>
+  <string name="downloads_clear_finished">清除已完成項目</string>
+  <plurals name="downloads_clear_missing_count">
+    <item quantity="other">清除 %1$d 個檔案遺失項目</item>
+  </plurals>
+  <string name="downloads_clear_missing">清除檔案遺失項目</string>
+  <string name="downloads_clear_missing_caption">檔案已移動或刪除</string>
+  <string name="downloads_clear_missing_tooltip">移除檔案已被移動或刪除的已完成下載項目</string>
+  <string name="downloads_select_all">全選</string>
+  <string name="downloads_clear_selection">取消選取</string>
+  <string name="downloads_retry_all_count">全部重試（%1$d）</string>
+
+  <plurals name="downloads_tab_failed">
+    <item quantity="other">%1$d 個失敗</item>
+  </plurals>
+  <string name="downloads_tab_retry_all">全部重試</string>
+  <plurals name="downloads_tab_needs_link">
+    <item quantity="other">%1$d 個需要新連結</item>
+  </plurals>
+  <string name="downloads_sort">排序</string>
+  <string name="downloads_group">分組</string>
+  <string name="downloads_label_value">%1$s：%2$s</string>
+  <string name="downloads_sort_by">排序方式</string>
+  <string name="downloads_group_by">分組方式</string>
+
+  <string name="downloads_facet_type">類型</string>
+  <string name="downloads_facet_site">網站</string>
+  <string name="downloads_facet_device">裝置</string>
+  <string name="downloads_facet_origin">新增方式</string>
+  <string name="downloads_facet_matched">%1$d / %2$d</string>
+
+  <string name="downloads_table_connections_short">連線</string>
+  <string name="downloads_table_column_auto">在「所有裝置」中顯示</string>
+  <string name="downloads_table_reset_columns">重設欄位</string>
+  <string name="downloads_table_sort_by">依「%1$s」排序</string>
+  <string name="downloads_table_sorted_ascending">%1$s，遞增排序</string>
+  <string name="downloads_table_sorted_descending">%1$s，遞減排序</string>
+  <string name="downloads_table_capped_at">上限 %1$s</string>
+  <string name="downloads_table_source_magnet">磁力連結</string>
+  <string name="downloads_table_origin_unknown">不明</string>
+  <string name="downloads_table_speed_limited">此下載項目設有速度限制</string>
+
+  <string name="downloads_group_show">顯示「%1$s」</string>
+  <string name="downloads_group_hide">隱藏「%1$s」</string>
+  <string name="downloads_group_collapsed">已收合</string>
+  <string name="downloads_group_expanded">已展開</string>
+  <string name="downloads_row_select">選取</string>
+  <string name="downloads_row_show_actions">顯示動作</string>
+  <string name="downloads_inspector_resize">調整詳細面板大小</string>
+
+  <string name="downloads_empty_clear_search">清除搜尋</string>
+  <string name="downloads_empty_add_link">新增此連結</string>
+  <string name="downloads_empty_add_links">新增這些連結</string>
+  <string name="downloads_empty_show_all">顯示所有下載項目</string>
+  <string name="downloads_empty_add">新增連結</string>
+  <string name="downloads_empty_link_missing">這個連結不在你的下載項目中</string>
+  <string name="downloads_empty_links_missing">這些連結不在你的下載項目中</string>
+  <string name="downloads_empty_add_it_to">改為將它新增至 %1$s。</string>
+  <string name="downloads_empty_add_them_to">改為將它們新增至 %1$s。</string>
+  <string name="downloads_empty_no_match">沒有符合「%1$s」的下載項目</string>
+  <string name="downloads_empty_no_match_hint">搜尋範圍包括名稱、網站、資料夾和錯誤訊息。</string>
+  <string name="downloads_empty_all">尚無下載項目</string>
+  <string name="downloads_empty_downloading">沒有正在下載的項目</string>
+  <string name="downloads_empty_downloading_hint">正在執行的下載會顯示在這裡。</string>
+  <string name="downloads_empty_waiting">沒有等待中的項目</string>
+  <string name="downloads_empty_waiting_hint_one">%1$s 一次只執行一個下載。</string>
+  <plurals name="downloads_empty_waiting_hint">
+    <item quantity="other">%1$s 一次最多執行 %2$d 個下載。</item>
+  </plurals>
+  <string name="downloads_empty_paused">沒有已暫停的下載</string>
+  <string name="downloads_empty_paused_hint">你暫停的下載會顯示在這裡。</string>
+  <string name="downloads_empty_done">沒有已完成的下載</string>
+  <string name="downloads_empty_done_hint">下載完成後會顯示在這裡。</string>
+  <string name="downloads_empty_failed">沒有需要處理的項目</string>
+  <string name="downloads_empty_failed_hint">失敗和已取消的下載會顯示在這裡。</string>
+  <string name="downloads_empty_fleet">所有裝置上都沒有下載項目</string>
+  <string name="downloads_empty_fleet_hint">你所有裝置上的下載都會顯示在這裡。</string>
+  <string name="downloads_empty_add_to">新增連結至 %1$s</string>
+  <string name="downloads_empty_remote">%1$s 上的下載會顯示在這裡</string>
+  <string name="downloads_empty_unauthorized">%1$s 需要新的存取權杖</string>
+  <string name="downloads_empty_offline">無法連線至 %1$s</string>
+  <string name="downloads_empty_offline_hint">連線後，它的下載會顯示在這裡。</string>
+  <string name="downloads_empty_loading">正在載入下載項目</string>
+
+  <string name="launchpad_title">尚無下載項目</string>
+  <string name="launchpad_subtitle">貼上連結、拖放檔案，或從瀏覽器傳送下載。</string>
+  <string name="launchpad_subtitle_phone">貼上連結、開啟 .torrent 檔案，或從電腦新增下載。</string>
+  <string name="launchpad_paste_title">貼上連結</string>
+  <string name="launchpad_paste_download">下載</string>
+  <string name="launchpad_paste_maybe">剪貼簿中有一個連結。</string>
+  <string name="launchpad_paste">貼上</string>
+  <string name="launchpad_paste_hint_phone">在任何應用程式中複製連結，然後貼到這裡。</string>
+  <string name="launchpad_paste_hint">複製連結後，在 Ketch 的任何地方按下 %1$s。</string>
+  <string name="launchpad_paste_hint_plain">複製連結後，在 Ketch 的任何地方貼上。</string>
+  <string name="launchpad_torrent_title">拖放連結、磁力連結或 .torrent 檔案</string>
+  <string name="launchpad_torrent_title_phone">開啟 .torrent 檔案</string>
+  <string name="launchpad_torrent_hint">拖放到此視窗的任何地方，或選擇 .torrent 檔案。</string>
+  <string name="launchpad_torrent_hint_phone">或從瀏覽器開啟磁力連結。</string>
+  <string name="launchpad_browser_title">從瀏覽器擷取</string>
+  <string name="launchpad_browser_none">從 Chrome、Edge 或 Firefox 將下載傳送到 Ketch。</string>
+  <string name="launchpad_browser_connected">%1$s ✓</string>
+  <string name="launchpad_browser_get">%1$s：取得</string>
+  <string name="launchpad_pair_title">控制電腦上的下載</string>
+  <string name="launchpad_pair_hint">連線至電腦上的 Ketch，從這裡新增下載。</string>
+  <string name="launchpad_discover">或描述你想要的內容 · 探索</string>
+  <string name="launchpad_checklist_title">設定 Ketch</string>
+  <string name="launchpad_checklist_close">關閉設定清單</string>
+  <string name="launchpad_checklist_folder">下載項目會存到 %1$s</string>
+  <string name="launchpad_checklist_folder_choose">選擇下載位置</string>
+  <string name="launchpad_checklist_change">更改…</string>
+  <string name="launchpad_checklist_extension">瀏覽器擴充功能</string>
+  <string name="launchpad_checklist_detected">已偵測到 %1$s</string>
+  <string name="launchpad_checklist_connected">已連線</string>
+  <string name="launchpad_checklist_get_it">取得</string>
+  <string name="launchpad_checklist_phone">用手機控制%1$s</string>
+  <string name="launchpad_checklist_show_qr">顯示 QR 碼</string>
+
+  <string name="downloads_clip_download">下載 %1$s</string>
+  <string name="downloads_clip_download_from">從 %2$s 下載 %1$s</string>
+  <string name="downloads_clip_copied">下載已複製的連結</string>
+  <string name="downloads_clip_dismiss">不再提示這個連結</string>
+
+  <plurals name="downloads_selected">
+    <item quantity="other">已選取 %1$d 個</item>
+  </plurals>
+
+  <string name="downloads_menu_file_missing">檔案已移動或刪除</string>
+  <string name="downloads_menu_hold_to_move">按住 %1$s 改為移動</string>
+  <string name="downloads_menu_moving">傳送後將從原本的裝置移除</string>
+  <string name="downloads_menu_speed_custom">自訂…</string>
+  <plurals name="downloads_menu_speed_share">
+    <item quantity="other">由這 %1$d 個共用</item>
+  </plurals>
+  <string name="downloads_menu_speed_each">每個 %1$s</string>
+  <string name="downloads_menu_urgent_may_pause">立即開始 · 可能會暫停 %1$s</string>
+  <string name="downloads_menu_urgent_starts_now">立即開始</string>
+  <string name="downloads_menu_pick_start">選擇日期與時間…</string>
+  <string name="downloads_menu_clear_schedule">清除</string>
+
+  <string name="downloads_discard_title">要停止並捨棄進度嗎？</string>
+  <plurals name="downloads_discard_title_many">
+    <item quantity="other">要捨棄 %1$d 個下載項目的進度嗎？</item>
+  </plurals>
+  <string name="downloads_discard_body">之後將無法繼續下載 %1$s。</string>
+  <string name="downloads_discard_body_many">之後將無法繼續下載這些項目。</string>
+  <string name="downloads_discard_keep">保留</string>
+  <string name="downloads_discard_confirm">捨棄進度</string>
+  <string name="downloads_speed_title">速度限制</string>
+  <string name="downloads_speed_invalid">請輸入速度，例如 2m 或 500k</string>
+  <string name="downloads_speed_placeholder">2m、500k 或無限制</string>
+  <string name="downloads_speed_set">設定限制</string>
+  <string name="downloads_speed_caps">限制 %1$s 的速度；全域限制仍然適用。</string>
+  <plurals name="downloads_speed_caps_many">
+    <item quantity="other">分別限制 %1$d 個下載項目的速度；全域限制仍然適用。</item>
+  </plurals>
+  <string name="downloads_speed_limit">限制</string>
+  <string name="downloads_speed_limit_each">個別限制</string>
+  <string name="downloads_send_title">要將 %1$s 傳送至 %2$s 嗎？</string>
+  <string name="downloads_move_title">要將 %1$s 移至 %2$s 嗎？</string>
+  <string name="downloads_send_confirm">傳送</string>
+  <string name="downloads_move_confirm">移動</string>
+  <string name="downloads_send_note">這些資訊會與下載項目一起儲存在該裝置上，任何能控制該裝置的人都能看到。</string>
+
+  <string name="downloads_remove_title">要移除「%1$s」嗎？</string>
+  <plurals name="downloads_remove_title_many">
+    <item quantity="other">要移除 %1$d 個下載項目嗎？</item>
+  </plurals>
+  <string name="downloads_remove_subtitle">從 %1$s 的清單中移除。</string>
+  <string name="downloads_remove_trash_files">同時將檔案移到垃圾桶</string>
+  <string name="downloads_remove_trash_file">同時將檔案移到垃圾桶</string>
+  <string name="downloads_remove_trash_partial">同時將未完成的檔案移到垃圾桶</string>
+  <plurals name="downloads_remove_trash_all">
+    <item quantity="other">同時將全部 %1$d 個檔案移到垃圾桶</item>
+  </plurals>
+  <string name="downloads_remove_delete_files">同時永久刪除檔案</string>
+  <string name="downloads_remove_delete_file">同時永久刪除檔案</string>
+  <string name="downloads_remove_delete_partial">同時永久刪除未完成的檔案</string>
+  <plurals name="downloads_remove_delete_all">
+    <item quantity="other">同時永久刪除全部 %1$d 個檔案</item>
+  </plurals>
+  <string name="downloads_remove_size_of">%1$s / %2$s</string>
+  <string name="downloads_remove_and_trash">移除並移到垃圾桶</string>
+  <string name="downloads_remove_and_delete">移除並刪除</string>
+  <string name="downloads_remove_and_trash_size">移除並將 %1$s 移到垃圾桶</string>
+  <string name="downloads_remove_and_delete_size">移除並刪除 %1$s</string>
+  <string name="downloads_remove_note_partial">未完成的檔案將被永久刪除</string>
+  <plurals name="downloads_remove_note_partials">
+    <item quantity="other">%1$d 個未完成的檔案將被永久刪除</item>
+  </plurals>
+  <string name="downloads_remove_note_frees">可釋放 %1$s</string>
+  <string name="downloads_remove_note_frees_after">可釋放 %1$s</string>
+  <string name="downloads_remove_note_free_on">%2$s 上可用 %1$s</string>
+
+  <string name="downloads_failed_pause">無法在 %2$s 上暫停 %1$s</string>
+  <string name="downloads_failed_resume">無法在 %2$s 上繼續 %1$s</string>
+  <string name="downloads_failed_retry">無法在 %2$s 上重試 %1$s</string>
+  <string name="downloads_failed_reconnect">無法在 %2$s 上重新連線 %1$s</string>
+  <string name="downloads_failed_open">無法在 %2$s 上開啟 %1$s</string>
+  <string name="downloads_failed_reveal">無法在 %2$s 上於資料夾中顯示 %1$s</string>
+  <string name="downloads_failed_speed_limit">無法在 %2$s 上設定 %1$s 的速度限制</string>
+  <string name="downloads_failed_priority">無法在 %2$s 上設定 %1$s 的優先順序</string>
+  <string name="downloads_failed_connections">無法在 %2$s 上設定 %1$s 的連線數</string>
+  <string name="downloads_failed_reschedule">無法在 %2$s 上重新排程 %1$s</string>
+
+  <plurals name="downloads_batch_paused">
+    <item quantity="other">已暫停 %1$d 個下載項目</item>
+  </plurals>
+  <plurals name="downloads_batch_resumed">
+    <item quantity="other">已繼續 %1$d 個下載項目</item>
+  </plurals>
+  <plurals name="downloads_batch_retrying">
+    <item quantity="other">正在重試 %1$d 個下載項目</item>
+  </plurals>
+  <plurals name="downloads_batch_rescheduled">
+    <item quantity="other">已重新排程 %1$d 個下載項目</item>
+  </plurals>
+  <plurals name="downloads_batch_unlimited">
+    <item quantity="other">已移除 %1$d 個下載項目的速度限制</item>
+  </plurals>
+  <plurals name="downloads_batch_limited">
+    <item quantity="other">已將 %1$d 個下載項目的速度限制為 %2$s</item>
+  </plurals>
+  <plurals name="downloads_batch_shared">
+    <item quantity="other">%1$d 個下載項目共用 %2$s</item>
+  </plurals>
+  <plurals name="downloads_batch_priority">
+    <item quantity="other">已將 %1$d 個下載項目的優先順序設為「%2$s」</item>
+  </plurals>
+  <plurals name="downloads_batch_connections">
+    <item quantity="other">已將 %1$d 個下載項目的連線數設為 %2$d</item>
+  </plurals>
+  <plurals name="downloads_batch_failed">
+    <item quantity="other">%1$d 個失敗</item>
+  </plurals>
+  <plurals name="downloads_skipped_finished">
+    <item quantity="other">%1$d 個已完成</item>
+  </plurals>
+  <plurals name="downloads_skipped_running">
+    <item quantity="other">%1$d 個已在執行</item>
+  </plurals>
+  <plurals name="downloads_skipped_already_paused">
+    <item quantity="other">%1$d 個原本就已暫停</item>
+  </plurals>
+  <plurals name="downloads_skipped_paused">
+    <item quantity="other">%1$d 個已暫停</item>
+  </plurals>
+  <plurals name="downloads_skipped_scheduled">
+    <item quantity="other">%1$d 個已排程</item>
+  </plurals>
+  <plurals name="downloads_skipped_failed">
+    <item quantity="other">%1$d 個發生錯誤</item>
+  </plurals>
+  <plurals name="downloads_skipped_canceled">
+    <item quantity="other">%1$d 個已取消</item>
+  </plurals>
+
+  <string name="downloads_trash_removed">已移除 %1$s</string>
+  <string name="downloads_trash_its_file">其檔案將移到垃圾桶</string>
+  <string name="downloads_trash_their_files">其檔案將移到垃圾桶</string>
+  <plurals name="downloads_trash_moved">
+    <item quantity="other">已將 %1$d 個檔案移到垃圾桶</item>
+  </plurals>
+  <string name="downloads_trash_failed">無法將 %1$s 移到垃圾桶</string>
+  <plurals name="downloads_trash_failed_many">
+    <item quantity="other">無法將 %1$d 個檔案移到垃圾桶</item>
+  </plurals>
+  <string name="downloads_trash_stays">此下載項目仍保留在清單中</string>
+  <string name="downloads_trash_stay">這些下載項目仍保留在清單中</string>
+  <string name="downloads_remove_failed">無法移除 %1$s</string>
+
+  <string name="downloads_copied_link">已複製連結</string>
+  <plurals name="downloads_copied_links">
+    <item quantity="other">已複製 %1$d 個連結</item>
+  </plurals>
+  <string name="downloads_copied_path">已複製檔案路徑</string>
+  <plurals name="downloads_copied_paths">
+    <item quantity="other">已複製 %1$d 個檔案路徑</item>
+  </plurals>
+  <string name="downloads_copied_error">已複製錯誤訊息</string>
+  <string name="downloads_copied_details">已複製詳細資料</string>
+  <string name="downloads_copy_failed_link">無法複製連結</string>
+  <string name="downloads_copy_failed_links">無法複製這些連結</string>
+  <string name="downloads_copy_failed_path">無法複製檔案路徑</string>
+  <string name="downloads_copy_failed_paths">無法複製這些檔案路徑</string>
+  <string name="downloads_copy_failed_error">無法複製錯誤訊息</string>
+  <string name="downloads_copy_failed_details">無法複製詳細資料</string>
+  <string name="downloads_open_source_failed">無法開啟來源網頁</string>
+</resources>
