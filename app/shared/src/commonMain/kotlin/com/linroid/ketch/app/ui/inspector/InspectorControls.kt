@@ -46,6 +46,7 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.connectionEntries
+import com.linroid.ketch.app.ui.downloads.actions.connectionTargets
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.util.SegmentRateTracker
 import com.linroid.ketch.app.util.priorityLabel
@@ -126,8 +127,7 @@ private fun ConnectionsRow(
   pending: Boolean,
 ) {
   val torrent = rows.all { it.isTorrent }
-  // A torrent's count is its peer limit, so a mixed selection sets the HTTP and FTP ones only.
-  val targets = if (torrent) rows else rows.filter { !it.isTorrent }
+  val targets = connectionTargets(rows)
   val value = if (targets.size == rows.size) {
     shared.connections
   } else {
@@ -150,7 +150,6 @@ private fun ConnectionsRow(
         val single = rows.singleOrNull()
         val limited = single != null && rememberServerLimited(single)
         val auto = autoConnectionsOf(state, targets)
-          ?: single?.segments?.size?.takeIf { it > 0 }
         ConnectionStepper(
           value = value,
           onCommit = { runner.setConnections(targets, it) },
@@ -257,10 +256,12 @@ private fun victimFor(state: AppState, rows: List<TaskRow>): TaskRow? {
 }
 
 /**
- * The connections Auto gives [rows] on their device, from its settings; `null` while they are
- * unknown or the rows are on several devices.
+ * The connections Auto gives [rows]: one per segment of a single row that has some, as its lanes
+ * show, else the default of the settings of their device; `null` while that is unknown or the
+ * rows are on several devices.
  */
 internal fun autoConnectionsOf(state: AppState, rows: List<TaskRow>): Int? {
+  rows.singleOrNull()?.segments?.size?.takeIf { it > 0 }?.let { return it }
   val deviceId = rows.map { it.key.deviceId }.distinct().singleOrNull() ?: return null
   return state.settingsOf(deviceId)?.download?.maxConnectionsPerDownload?.takeIf { it > 0 }
 }

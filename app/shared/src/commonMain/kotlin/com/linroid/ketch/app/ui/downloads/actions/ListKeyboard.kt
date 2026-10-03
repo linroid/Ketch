@@ -32,7 +32,7 @@ import com.linroid.ketch.app.input.ShortcutMatcher
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
-import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 
@@ -179,7 +179,7 @@ internal class ListKeyboard(
       val torrent = row.isTorrent
       val current = row.request.connections
       // Auto (0) steps from what it resolved to; a torrent's peer default is the device's own.
-      val auto = if (torrent) null else autoConnections(row)
+      val auto = if (torrent) null else autoConnectionsOf(runner.state, listOf(row))
       if (current == 0 && auto == null) continue
       val count = stepConnections(
         current = current,
@@ -190,13 +190,6 @@ internal class ListKeyboard(
       )
       if (count != current) runner.setConnections(listOf(row), count)
     }
-  }
-
-  // The connections Auto gives the row: one per segment once it has some, else the default of
-  // the settings of its device.
-  private fun autoConnections(row: TaskRow): Int? {
-    row.segments.size.takeIf { it > 0 }?.let { return it }
-    return runner.state.settingsOf(row.key.deviceId)?.download?.maxConnectionsPerDownload
   }
 
   /** Moves the focus into the list. */

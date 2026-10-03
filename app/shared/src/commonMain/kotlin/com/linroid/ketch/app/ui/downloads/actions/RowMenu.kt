@@ -257,9 +257,7 @@ internal fun KetchMenuScope.rowMenuEntries(
       RowAction.Connections -> {
         val peers = targets.all { it.isTorrent }
         val name = if (single != null && peers) "Peer limit" else label
-        // A connection count is no peer limit, so a mixed selection leaves its torrents alone.
-        val counted = if (peers) targets else targets.filterNot { it.isTorrent }
-        submenu(name, action.icon) { connectionEntries(counted, runner, peers) }
+        submenu(name, action.icon) { connectionEntries(connectionTargets(targets), runner, peers) }
       }
       RowAction.Priority -> submenu(label, action.icon) {
         priorityEntries(targets, runner, context.urgentVictim)
@@ -336,6 +334,13 @@ internal fun KetchMenuScope.speedEntries(rows: List<TaskRow>, runner: RowActionR
 }
 
 /** Adds the connection counts, or the peer limits when [peers], for [rows]. */
+/**
+ * The rows a connection count applies to: all of them when they are torrents, whose count is
+ * their peer limit, and otherwise the others, so a mixed selection leaves its torrents alone.
+ */
+internal fun connectionTargets(rows: List<TaskRow>): List<TaskRow> =
+  if (rows.all { it.isTorrent }) rows else rows.filterNot { it.isTorrent }
+
 internal fun KetchMenuScope.connectionEntries(
   rows: List<TaskRow>,
   runner: RowActionRunner,

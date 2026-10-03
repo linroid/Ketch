@@ -381,7 +381,8 @@ private fun KetchMenuScope.verbChoices(
     RowAction.SpeedLimit -> speedEntries(verb.rows, runner)
     RowAction.SendTo -> sendEntries(verb.rows, runner, context.devices, context.send)
     RowAction.Connections -> {
-      connectionEntries(verb.rows, runner, peers = verb.rows.all { it.isTorrent })
+      val peers = verb.rows.all { it.isTorrent }
+      connectionEntries(connectionTargets(verb.rows), runner, peers)
     }
     RowAction.StartLater -> startLaterEntries(verb.rows, runner, context)
     else -> Unit

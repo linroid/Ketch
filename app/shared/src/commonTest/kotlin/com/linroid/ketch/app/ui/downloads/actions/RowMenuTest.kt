@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.MenuEntry
@@ -13,6 +14,7 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.rowOf
+import com.linroid.ketch.app.ui.inspector.autoConnectionsOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
@@ -146,6 +148,28 @@ class RowMenuTest {
 
     assertEquals(emptyList(), torrent.calls)
     assertEquals(listOf("connections 16"), http.calls)
+  }
+
+  @Test
+  fun connectionTargets_leaveTorrentsOutOfAMixedSelectionOnly() = actionsTest { f ->
+    val magnet = DownloadRequest("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567")
+    val torrents = List(2) { rowOf(f.add(downloading, magnet)) }
+    val http = rowOf(f.add(downloading))
+
+    assertEquals(listOf(http), connectionTargets(torrents + http))
+    assertEquals(torrents, connectionTargets(torrents))
+  }
+
+  @Test
+  fun autoConnectionsOf_rowWithSegments_countsThemBeforeTheDeviceDefault() = actionsTest { f ->
+    val task = f.add(downloading)
+    val fresh = rowOf(task)
+    task.segments.value = List(3) { Segment(it, it * 100L, it * 100L + 99) }
+    val opened = rowOf(task)
+
+    assertEquals(3, autoConnectionsOf(f.state, listOf(opened)))
+    assertEquals(4, autoConnectionsOf(f.state, listOf(fresh)))
+    assertEquals(4, autoConnectionsOf(f.state, listOf(opened, fresh)))
   }
 
   @Test
