@@ -161,9 +161,9 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Pause / Resume with server identity validation (ETag, Last-Modified)
 - File integrity check on resume (validates local file size vs. claimed progress)
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
-  execution); a failure, `close()` or `remove(deleteFiles = false)` keeps it and its segments.
-  For files the engine writes (not torrents), an empty segment list is no progress: it is never
-  saved, and resuming one starts from zero
+  execution); a failure, `close()` or `remove(deleteFiles = false)` keeps it and its segments, but
+  a failed final flush resets their progress. For files the engine writes (not torrents), an empty
+  segment list is no progress: it is never saved, and resuming one starts from zero
 - `DownloadState.Completed` reports the size and the download time, summed over every run and
   excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records),
   and `completedAt`, stamped once in whole milliseconds and saved as `TaskRecord.completedAt`

@@ -30,6 +30,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
@@ -56,6 +57,7 @@ import okio.Path.Companion.toPath
  *   calls apply to the next start or resume
  * @param timeSource measures download speed and the time added to [TaskRecord.downloadTime]
  * @param clock stamps [TaskRecord.completedAt] when the download completes
+ * @param openFile opens the output file of a source that does not write its own files
  */
 internal class DownloadExecution(
   private val handle: TaskHandle,
@@ -66,6 +68,8 @@ internal class DownloadExecution(
   private val dispatchers: KetchDispatchers,
   private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
   private val clock: Clock = Clock.System,
+  private val openFile: (path: String, ioDispatcher: CoroutineDispatcher) -> FileAccessor =
+    ::createFileAccessor,
 ) {
   private val log = KetchLogger("Execution")
 
@@ -277,7 +281,7 @@ internal class DownloadExecution(
     val fa = if (selfManagedIo) {
       NoOpFileAccessor
     } else {
-      createFileAccessor(outputPath, dispatchers.io)
+      openFile(outputPath, dispatchers.io)
     }
     fileAccessor = fa
 
@@ -348,6 +352,8 @@ internal class DownloadExecution(
           if (total < 0) finalTotal = fa.size()
         } catch (e: Exception) {
           if (e is CancellationException) throw e
+          // The written bytes may not have reached the disk, so none of them count as progress.
+          withContext(NonCancellable) { discardProgress() }
           if (e is KetchError) throw e
           throw KetchError.Disk(e)
         }
@@ -382,12 +388,19 @@ internal class DownloadExecution(
     }
   }
 
+  /** Keeps the segment layout but drops its progress, so a resume downloads every byte again. */
+  private suspend fun discardProgress() {
+    val reset = handle.mutableSegments.value.map { it.copy(downloadedBytes = 0) }
+    handle.mutableSegments.value = reset
+    handle.record.update { it.copy(segments = reset, updatedAt = Clock.System.now()) }
+  }
+
   private suspend fun completeZeroByteFile(
     outputPath: String,
     sourceType: String,
   ) {
     log.i { "Zero-byte file for taskId=$taskId, completing" }
-    val fa = createFileAccessor(outputPath, dispatchers.io)
+    val fa = openFile(outputPath, dispatchers.io)
     try {
       // Create or truncate the destination; flushing a lazy accessor alone is insufficient.
       fa.preallocate(0)
