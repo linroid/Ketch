@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="language_tag">ko</string>
+  <string name="size_bytes">%1$s B</string>
+  <string name="size_kb">%1$s KB</string>
+  <string name="size_mb">%1$s MB</string>
+  <string name="size_gb">%1$s GB</string>
+  <string name="size_tb">%1$s TB</string>
+  <string name="size_progress">%1$s / %2$s</string>
+  <string name="size_progress_compact">%1$s/%2$s</string>
+  <string name="speed_per_second">%1$s/s</string>
+  <string name="percent">%1$d%</string>
+
+  <string name="duration_days_hours">%1$d일 %2$d시간</string>
+  <string name="duration_days">%1$d일</string>
+  <string name="duration_hours_minutes">%1$d시간 %2$d분</string>
+  <string name="duration_hours">%1$d시간</string>
+  <string name="duration_minutes_seconds">%1$d분 %2$d초</string>
+  <string name="duration_minutes">%1$d분</string>
+  <string name="duration_seconds">%1$d초</string>
+  <string name="duration_under_second">&lt;1초</string>
+
+  <string name="date_month_day">%1$s %3$d일</string>
+  <string name="date_month_day_year">%4$d년 %1$s %3$d일</string>
+  <string name="date_today">오늘</string>
+  <string name="date_yesterday">어제</string>
+  <string name="date_today_at">오늘 %1$s</string>
+  <string name="date_yesterday_at">어제 %1$s</string>
+  <string name="date_tomorrow_at">내일 %1$s</string>
+  <string name="date_at_time">%1$s %2$s</string>
+
+  <string name="month_jan">1월</string>
+  <string name="month_feb">2월</string>
+  <string name="month_mar">3월</string>
+  <string name="month_apr">4월</string>
+  <string name="month_may">5월</string>
+  <string name="month_jun">6월</string>
+  <string name="month_jul">7월</string>
+  <string name="month_aug">8월</string>
+  <string name="month_sep">9월</string>
+  <string name="month_oct">10월</string>
+  <string name="month_nov">11월</string>
+  <string name="month_dec">12월</string>
+
+  <string name="weekday_mon">월</string>
+  <string name="weekday_tue">화</string>
+  <string name="weekday_wed">수</string>
+  <string name="weekday_thu">목</string>
+  <string name="weekday_fri">금</string>
+  <string name="weekday_sat">토</string>
+  <string name="weekday_sun">일</string>
+
+  <plurals name="count_downloads">
+    <item quantity="other">다운로드 %1$d개</item>
+  </plurals>
+
+  <string name="priority_low">낮음</string>
+  <string name="priority_normal">보통</string>
+  <string name="priority_high">높음</string>
+  <string name="priority_urgent">긴급</string>
+
+  <string name="action_cancel">취소</string>
+  <string name="action_done">완료</string>
+  <string name="action_close">닫기</string>
+  <string name="action_back">뒤로</string>
+  <string name="action_next">다음</string>
+  <string name="action_continue">계속</string>
+  <string name="action_skip">건너뛰기</string>
+  <string name="action_add">추가</string>
+  <string name="action_remove">제거</string>
+  <string name="action_open">열기</string>
+  <string name="action_show">보기</string>
+  <string name="action_undo">실행 취소</string>
+  <string name="action_retry">재시도</string>
+  <string name="action_try_again">다시 시도</string>
+  <string name="action_dismiss">닫기</string>
+  <string name="action_review">검토</string>
+  <string name="action_connect">연결</string>
+</resources>
