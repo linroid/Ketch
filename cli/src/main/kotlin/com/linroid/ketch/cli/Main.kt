@@ -363,7 +363,7 @@ private fun runServer(args: Array<String>) {
   File(downloadConfig.defaultDirectory).mkdirs()
 
   val dbPath = defaultDbPath()
-  val taskStore = openTaskStore(dbPath) ?: return
+  val taskStore = openTaskStore(dbPath)
 
   val ketch = Ketch(
     httpEngine = KtorHttpEngine.withNetworkInterfaces(),
@@ -602,8 +602,9 @@ private fun runMcp(args: List<String>) {
     try {
       FileConfigStore(configPath).load()
     } catch (e: Exception) {
+      // A failing status, so the MCP client reports the server as failed rather than closed
       System.err.println("Error loading config from $configPath: ${e.message}")
-      return
+      exitProcess(1)
     }
   } else {
     readDefaultConfig()
@@ -619,7 +620,7 @@ private fun runMcp(args: List<String>) {
 
   File(downloadConfig.defaultDirectory!!).mkdirs()
 
-  val taskStore = openTaskStore(defaultDbPath()) ?: return
+  val taskStore = openTaskStore(defaultDbPath())
 
   val ketch = Ketch(
     httpEngine = KtorHttpEngine.withNetworkInterfaces(),
@@ -699,10 +700,11 @@ private fun readDefaultConfig(): KetchConfig {
 
 /**
  * Opens the task database at [dbPath], which the desktop app shares. A file SQLite cannot read
- * is moved aside, which stderr reports, and an empty database replaces it. Returns `null` after
- * reporting why when the database cannot be opened at all.
+ * is moved aside, which stderr reports, and an empty database replaces it. When the database
+ * cannot be opened at all, such as when it is locked, the process exits with status 1 after
+ * reporting why, so a service manager or MCP client sees the failure.
  */
-private fun openTaskStore(dbPath: String): SqliteTaskStore? {
+private fun openTaskStore(dbPath: String): SqliteTaskStore {
   val driverFactory = DriverFactory(dbPath) { unreadable ->
     System.err.println(
       "Moved $dbPath aside to ${unreadable.movedTo}, as it can't be read " +
@@ -713,7 +715,7 @@ private fun openTaskStore(dbPath: String): SqliteTaskStore? {
     SqliteTaskStore(driverFactory.createDriver())
   } catch (e: Exception) {
     System.err.println("Error opening $dbPath: ${e.message}")
-    null
+    exitProcess(1)
   }
 }
 

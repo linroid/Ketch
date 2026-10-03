@@ -4,6 +4,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import okio.FileSystem
 import okio.IOException
+import okio.Path
 import okio.Path.Companion.toPath
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -14,24 +15,33 @@ private val log = KetchLogger("SqliteDriver")
 private val SIDECAR_SUFFIXES = listOf("-journal", "-wal", "-shm")
 
 /**
- * Moves the database at [path], and the files SQLite keeps next to it, to [brokenPath], and
- * returns where it went. A companion file that cannot be moved is deleted, so SQLite never
- * applies an old journal to the new database.
+ * Moves the database at [path], and the files SQLite keeps next to it, to [brokenPath] together,
+ * and returns where they went. They move all or none: a journal left behind would be applied to
+ * the new database, and a database moved without being reported would hide its tasks.
  *
- * @throws IOException when the database itself cannot be moved.
+ * @throws IOException when one of them cannot be moved, after putting back those that had.
  */
 internal fun moveDatabaseAside(fileSystem: FileSystem, path: String): String {
   val target = brokenPath(path, exists = { fileSystem.exists(it.toPath()) })
-  fileSystem.atomicMove(path.toPath(), target.toPath())
-  for (suffix in SIDECAR_SUFFIXES) {
-    val sidecar = "$path$suffix".toPath()
-    if (!fileSystem.exists(sidecar)) continue
-    try {
-      fileSystem.atomicMove(sidecar, "$target$suffix".toPath())
-    } catch (e: IOException) {
-      log.w { "Couldn't move $sidecar aside, deleting it: ${e.describeCauses()}" }
-      fileSystem.delete(sidecar, mustExist = false)
+  val moved = mutableListOf<Pair<Path, Path>>()
+  try {
+    for (suffix in listOf("") + SIDECAR_SUFFIXES) {
+      val source = "$path$suffix".toPath()
+      if (suffix.isNotEmpty() && !fileSystem.exists(source)) continue
+      val destination = "$target$suffix".toPath()
+      fileSystem.atomicMove(source, destination)
+      moved += source to destination
     }
+  } catch (e: IOException) {
+    for ((source, destination) in moved.asReversed()) {
+      try {
+        fileSystem.atomicMove(destination, source)
+      } catch (putBack: IOException) {
+        log.w { "Couldn't put $destination back to $source: ${putBack.describeCauses()}" }
+        e.addSuppressed(putBack)
+      }
+    }
+    throw e
   }
   return target
 }

@@ -1,11 +1,15 @@
 package com.linroid.ketch.sqlite
 
 import okio.FileSystem
+import okio.ForwardingFileSystem
+import okio.IOException
+import okio.Path
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.time.Instant
 
@@ -28,6 +32,25 @@ class MoveAsideTest {
     assertFalse(journal.exists())
     assertEquals("db", File(movedTo).readText())
     assertEquals("journal", File("$movedTo-journal").readText())
+  }
+
+  @Test
+  fun moveDatabaseAside_journalCannotMove_putsTheDatabaseBack() {
+    val db = File(dir, "ketch.db").apply { writeText("db") }
+    val journal = File(dir, "ketch.db-journal").apply { writeText("journal") }
+    // Such as a journal another process holds open on Windows.
+    val lockedJournal = object : ForwardingFileSystem(FileSystem.SYSTEM) {
+      override fun atomicMove(source: Path, target: Path) {
+        if (source.name.endsWith("-journal")) throw IOException("locked")
+        super.atomicMove(source, target)
+      }
+    }
+
+    assertFailsWith<IOException> { moveDatabaseAside(lockedJournal, db.path) }
+
+    assertEquals(setOf("ketch.db", "ketch.db-journal"), dir.list()?.toSet())
+    assertEquals("db", db.readText())
+    assertEquals("journal", journal.readText())
   }
 
   @Test
