@@ -80,7 +80,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   `SegmentedDownloadHelper`
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
   `PathFileAccessor`, `ContentUriFileAccessor` (Android), `NoOpFileAccessor`,
-  `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`
+  `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`,
+  `sanitizeFileName()`, `OutputPathReservations`
 - `com.linroid.ketch.core.task` -- `RealDownloadTask`, `TaskHandle`, `TaskController`,
   `TaskStore`, `InMemoryTaskStore`, `TaskRecord`, `TaskState`
 
@@ -159,6 +160,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Content of unknown size (no `Content-Length`, e.g. generated archives) streams over one
   connection; a retry or resume restarts it, and the completed task records the file's size
 - Pause / Resume with server identity validation (ETag, Last-Modified)
+- Names from a server (`Content-Disposition`), a URL or an FTP path pass through
+  `sanitizeFileName()` (last `/` or `\` segment, no control, bidi or Windows-reserved characters
+  or device names, at most 255 UTF-8 bytes, `null` when nothing is left), in the sources and again
+  in `DownloadExecution` for any name not from a `Destination`; the joined path must stay inside
+  the folder (`KetchError.Disk` otherwise). A file `Destination` is used as it is.
+  `OutputPathReservations` holds every running download's path for the process, so `name (n)`
+  deduplication also avoids files other downloads have not created yet
 - File integrity check on resume (validates local file size vs. claimed progress)
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
   execution); a failure, `close()` or `remove(deleteFiles = false)` keeps it and its segments, but
