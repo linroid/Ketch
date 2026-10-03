@@ -75,7 +75,8 @@ class KtorHttpEngine(
       if (logRequests) log.d { "HEAD request: ${redactUrl(url)}" }
       send(HttpMethod.Head, url, requestHeaders, range = null, reuseTarget = false) { response ->
         logResponse("HEAD", response)
-        if (!response.status.isSuccess()) throw httpError("HEAD", response)
+        // Callers may still reach the resource with a GET (probe), so this is no failure yet.
+        if (!response.status.isSuccess()) throw httpError("HEAD", response, fatal = false)
         serverInfo(
           response,
           contentLength = response.contentLength(),
@@ -105,7 +106,8 @@ class KtorHttpEngine(
           }
           // An empty resource has no first byte to send.
           status == HttpStatusCode.RequestedRangeNotSatisfiable &&
-            response.headers[HttpHeaders.ContentRange]?.trim() == "bytes */0" ->
+            response.headers[HttpHeaders.ContentRange]?.trim()
+              .equals("bytes */0", ignoreCase = true) ->
             serverInfo(response, contentLength = 0, acceptRanges = false)
           // The server ignored the range and started sending the whole resource.
           status.isSuccess() ->
@@ -298,12 +300,20 @@ class KtorHttpEngine(
     }
   }
 
-  /** The error for a non-success [response], with the rate limit it reports on 429. */
-  private fun httpError(method: String, response: HttpResponse): KetchError.Http {
+  /**
+   * The error for a non-success [response], with the rate limit it reports on 429. Logged as an
+   * error when [fatal], else at debug level for callers that may still recover.
+   */
+  private fun httpError(
+    method: String,
+    response: HttpResponse,
+    fatal: Boolean = true,
+  ): KetchError.Http {
     val status = response.status
-    if (logRequests) log.e {
-      "HTTP error ${status.value}: ${status.description} " +
+    if (logRequests) {
+      val message = "HTTP error ${status.value}: ${status.description} " +
         "for $method ${redactUrl(response.request.url.toString())}"
+      if (fatal) log.e { message } else log.d { message }
     }
     if (status.value != 429) return KetchError.Http(status.value, status.description)
     val retryAfter = parseRetryAfter(response.headers[HttpHeaders.RetryAfter])

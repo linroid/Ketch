@@ -409,10 +409,37 @@ class KtorHttpEngineTest {
 
   @Test
   fun probe_emptyResource_reportsZeroLength() = runTest {
-    val headers = headersOf(HttpHeaders.ContentRange, "bytes */0")
-    withServer({ respond("", HttpStatusCode.RequestedRangeNotSatisfiable, headers) }) { engine, _ ->
-      assertEquals(0, engine.probe(URL, emptyMap()).contentLength)
+    // Range units ignore case.
+    for (contentRange in listOf("bytes */0", "Bytes */0")) {
+      val headers = headersOf(HttpHeaders.ContentRange, contentRange)
+      withServer({ respond("", HttpStatusCode.RequestedRangeNotSatisfiable, headers) }) {
+        engine, _ ->
+        assertEquals(0, engine.probe(URL, emptyMap()).contentLength, contentRange)
+      }
     }
+  }
+
+  @Test
+  fun head_refused_isNotLoggedAsError() = runTest {
+    val errors = mutableListOf<String>()
+    KetchLogger.setLogger(object : Logger {
+      override fun v(message: String) {}
+      override fun d(message: String) {}
+      override fun i(message: String) {}
+      override fun w(message: String, throwable: Throwable?) {}
+      override fun e(message: String, throwable: Throwable?) {
+        errors += message
+      }
+    })
+    try {
+      withServer({ respond("", HttpStatusCode.Forbidden) }) { engine, _ ->
+        assertFailsWith<KetchError.Http> { engine.head(URL, emptyMap()) }
+      }
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+
+    assertEquals(emptyList(), errors)
   }
 
   @Test
