@@ -1,6 +1,6 @@
 # Multi-instance cooperative downloads
 
-Status: **Proposal** — not implemented. Prepared 2026-10-03 against `ec52a306`.
+Status: **Proposal** — not implemented. Prepared 2026-10-03 against `2f274a45`.
 
 One Ketch instance, the task's **owner**, stays the only scheduler, writer and persister of a
 download. Other paired instances, **helpers**, are stateless range relays: the owner asks a helper
@@ -14,8 +14,11 @@ victim at most ends its current request early. The same scheduler replaces
 resegmentation, sibling cancellation and whole-download retry for users who never pair a second
 device. Cooperation only makes a download faster when a helper brings a different egress (another
 WAN, public IP or cellular path); for the common laptop-plus-NAS-on-one-LAN case the answer stays
-"Move to device". This document authorizes no implementation by itself. Its claims about library
-code were rechecked at `5fb13b3f`, which streams HTTP content of unknown size (§6.11).
+"Move to device", which [task transfer](../plans/task-transfer.md) (#355) makes carry the
+downloaded data; §5.1 lists what the two proposals share. This document authorizes no
+implementation by itself. Its claims about existing code were checked at `2f274a45`, which
+includes #352 (approving a device found on the network), #353 (pause reasons, queue positions,
+finish times, Auto connections) and #354 (`c81f35dc`: HTTP content of unknown size, §6.11).
 
 ## 1 Summary and decision
 
@@ -25,12 +28,13 @@ code were rechecked at `5fb13b3f`, which streams HTTP content of unknown size (�
 | Lease | The owner-opened stream plus the owner's 5 s heartbeat. Revoke = lower an in-memory limit or cancel a coroutine | Late bytes cannot arrive; no TTLs or epochs on forward lanes |
 | Scheduler | `LaneScheduler` + `RangeLedger` in `library:core`, default for HTTP and FTP after a soak and a benchmark gate | Needed for instant join anyway; fixes today's batch defects for everyone |
 | Integrity | Every ranged GET pinned (strong validator in `If-Range` and `If-Match`, checked on every 206, identity encoding); backends that disagree are aliased by comparing committed bytes; `FileChanged` only on positive evidence that the pin is gone from every path; audits; origin digests | Combining bytes from several egresses is only safe on one representation |
-| Persistence | `TaskRecord`, `Segment` and the SQLite schema unchanged; canonical segment export; snapshot → sync → persist, with a real `fsync` on Apple targets | No migration, no wire break, resume path unchanged |
+| Persistence | `TaskRecord`, `Segment` and the SQLite schema (version 5 since #353) unchanged; canonical segment export; snapshot → sync → persist, with a real `fsync` on Apple targets | No migration, no wire break, resume path unchanged |
 | Trust | Explicit pairing by single-use helper link; P-256 ECDH plus the link's key, with key confirmation; ECDH per session (forward secrecy); per-message keys; AES-256-CTR + HMAC-SHA256 from platform crypto | No new dependency; access tokens never become key material |
 | Exposure | Relay plane on its own listener (`[helping] port`, default 8643, LAN interfaces only); admin helper routes need the API token, or a loopback caller without forwarding headers | A phone can help without exposing its admin API |
 | Default | Auto over helpers the user set to Auto; eligible tasks ≥ 32 MiB; same-LAN helpers default to "shares this connection" and are skipped; executables need an origin digest; a helper adding < 10% is retired | Most same-LAN helpers add nothing; measure instead of guessing |
 | Names | "Helper" in every public API, config key, route and string; "relay" for the wire | "Peer" already means BitTorrent peers in `library:api` |
 | Out of scope | Owner failover, multi-consumer dedup, BitTorrent relay, origins the owner itself cannot reach | §2, §17 |
+| Task transfer | Moving a task with its data is task-transfer.md's; identity, the store lock, sign-in classification and output reads are shared and owned per §5.1 | One definition of each |
 
 ## 2 Goals and non-goals
 
@@ -54,8 +58,9 @@ Goals:
 7. Owners need no inbound port for forward relays, so an iPhone, or an Android device with its
    server off, can own a helped task.
 
-Non-goals: ownership migration or failover (a task waits for its owner; "Move to device" restarts
-it on the target; **hand-off** with the partial file is open question 8); several devices
+Non-goals: automatic ownership migration or failover (a task waits for its owner; the user hands
+it off with "Move to device", which restarts it on the target until task transfer carries the
+partial file, task-transfer.md M1 for HTTP and FTP, M2 for torrents); several devices
 consuming one file; relaying BitTorrent, which cooperates natively; a browser-local engine; NAT
 traversal beyond the reverse lane; origins the owner cannot reach itself (resolve and pin always
 come from the owner's egress; use Send to); unknown-length or range-less sources, since one
@@ -96,11 +101,15 @@ hold distinct global addresses, but most limiters key on the /64. Users rarely k
 they are in, so the owner measures: the gain controller (§6.9) retires a helper that does not
 raise throughput and says why.
 
-**Move to device** (`AppState.sendTo` with move, which restarts the task on the target) stays the
-answer when the owner will sleep or leave, when the other device's connection is as good and the
-origin has no per-IP cap, or when the link carries sign-ins the user will not share. When an
-always-on helper (CLI daemon, or a desktop with `[server] autoStart`) is retired as "no gain", the
-inspector offers "Move to <device>" beside the reason.
+**Move to device** (`AppState.sendTo` with move) stays the answer when the owner will sleep or
+leave, when the other device's connection is as good and the origin has no per-IP cap, or when the
+link carries sign-ins the user will not share. Today it re-adds the request on the target and
+starts over; task transfer's M1 makes it carry the partial file, segments and validators
+(task-transfer.md §12.1). When an always-on helper (CLI daemon, or a desktop with
+`[server] autoStart`) is retired as "no gain", the inspector offers "Move to <device>" beside the
+reason, but only when that helper is also a fleet device (its `RemoteConfig.instanceId` equals the
+helper's `instanceId`): a helper pairing gives the app no access to the device, and Move to needs
+it.
 
 ## 4 Terminology
 
@@ -108,10 +117,14 @@ Aligned with `docs/design/ux-redesign.md` ("Lanes & Fleet") and
 `docs/development/translation-glossary.md`. User-facing text says "device"; code says "instance".
 Public API, config, routes and copy say "helper"; "relay" names the wire. "Peer" stays reserved for
 BitTorrent (`DownloadTask.setConnections` already means "peer connection limit" for torrents).
+task-transfer.md uses "relay" for an app passing chunks between two devices, "seal" for a
+destination's fsync and content root, and "owner token" for the access token; here "relay" is only
+the helper wire, "sealed" means encrypted under session keys (§10.2), and the access token is
+`ServerConfig.apiToken`, unrelated to a task's owner (§18 lists the renames).
 
 | Term | Meaning | User-facing |
 | --- | --- | --- |
-| Fleet | Devices the app controls through controller pairing (`RemoteConfig`, `ketch://pair`). Unchanged | Devices |
+| Fleet | Devices the app controls through controller pairing (`RemoteConfig`): a typed access code, a `ketch://pair` link or, since #352, a request the device's user allows (`RemotePairing`, `/api/pairing`, `PairingApprover`); each hands over the access token. Unchanged | Devices |
 | Owner | Instance whose `Ketch.download` created the task. Only scheduler, writer and persister | the task's device |
 | Helper | Paired instance that relays byte ranges for an owner | helper; "Help from NAS" |
 | Helper pairing | Instance-to-instance trust with a per-pair key; separate from controller pairing | "Add helper" |
@@ -168,6 +181,30 @@ Bytes land only in the owner's output file. Helpers stage nothing on disk and ho
 Module direction: `library:core` ← `library:relay` (android, ios, jvm) ← `library:server` (JVM);
 apps and the CLI wire them. Core never depends on relay, remote or server, and relay's crypto and
 Ktor client stay out of core's `js(nodejs)` and `wasmWasi` targets.
+
+### 5.1 Shared with task transfer
+
+[task-transfer.md](../plans/task-transfer.md) (#355) moves or copies a whole task with its data
+between devices, driven by an app that holds both devices' access tokens; helpers fetch ranges for
+a task that never leaves its owner. Each piece both need has one owner, and the other proposal
+uses it instead of defining its own:
+
+| Piece | Owner | Use here |
+| --- | --- | --- |
+| `instanceId` (`instance_meta`, `KetchStatus.instanceId`, `RemoteConfig.instanceId`, refusing the app's own server by id) | Task transfer, F7 (M0) | The only identity; pairings are bound to it (§7.1) |
+| One participating process per store on the JVM | Task transfer, §7.9 (`<db>.transfer-lock`) | Helper roles take the same lock (§14.5) |
+| Sign-in classification (`isSensitiveHeader`, F11) | Task transfer, §5.5 | Gains §11's signed-URL keys; the forwarding allowlist and `SIGN_INS` build on it |
+| Reading a task's output (`FileReader`, `openFileReader`) | Task transfer, §7.4 | Alias windows (§9.4) and digests (§9.6) read through it; `FileAccessor` stays write-only |
+| Durable file sync (`F_FULLFSYNC` on Apple, else `fsync`) | PR1 item 2 or task transfer's F3, whichever lands first | One `expect` function behind `FileAccessor.flush()` and transfer's `durableSync` |
+| Segment export, unplanned `[]`, `HttpResumeState` | This design (§6.10, §9.8); PR1 item 1 is F2 | Manifests take their segments from the export, a contiguous cover in position order |
+| `KetchServer` opt-in routes | One route set, off by default like #352's `pairingApprover = null` | Transfer's `transfers = false` and the helper routes; `BrowserExtensionServer` serves neither |
+| Error bodies (F10a), constant-time compare and server `coerceInputValues` (F10b, PR1 item 8) | Whichever stack lands first | — |
+
+A task frozen for a transfer is paused (task-transfer.md K4): its lanes stop as in §8.6, and
+`setHelpers` and `stopHelp` persist like speed and priority changes. A transfer never carries
+`DownloadRequest.helpers`, which names this device's pairings: like `forDevice()` it resets them to
+`Auto()`, and relayed bytes travel only per §9.6. The data planes stay separate: transfer chunks run
+on the admin plane under access tokens, relays between paired instances with no app involved.
 
 ## 6 Range scheduler and lanes
 
@@ -281,13 +318,17 @@ of finishing in 200 s.
 
 ### 6.6 Lane counts
 
-- Local lanes: `DownloadContext.effectiveConnections()` with its meaning unchanged (live override,
-  then `request.connections`, then `config.maxConnectionsPerDownload`), capped by the local
-  group's throttle cap. With several bound networks the target is dealt round-robin over their
-  groups.
+- Local lanes: `DownloadContext.effectiveConnections()` as #353 defines it: `maxConnections` when
+  positive, else (Auto, 0) the `maxConnectionsPerDownload` of the run's `config` snapshot.
+  `maxConnections` starts at the persisted `DownloadRequest.connections` and only `setConnections`
+  writes it. The local group's throttle cap (§6.7) bounds the target; with several bound networks
+  the target is dealt round-robin over their groups. Auto is this device's default for its own
+  lanes: helper lanes neither count toward it nor change it, and a helper that shares the
+  connection joins the local group's cap, which the owner's own lanes take first.
 - Per helper: `min(lanesPerHelper = 2, helper freeSlots, maxStreamsPerOwner)`; FTP helpers 1.
-- Per task: `maxTotalLanes = 16`. More parallel requests from one download start to look like
-  abuse to origins, and the Connections tab's densest mode covers 17–32, so 16 leaves room.
+- Per task: helper lanes fill up to `maxTotalLanes = 16` minus the local lanes; the local target is
+  never cut for helpers. More parallel requests from one download start to look like abuse to
+  origins, and the Connections tab's densest mode covers 17–32, so 16 leaves room.
 - Faster lanes steal more by construction; nothing else allocates bandwidth.
 
 ### 6.7 Egress groups and lane errors
@@ -299,7 +340,7 @@ networks can reach different origin edges.
 | Class | Triggers | Action |
 | --- | --- | --- |
 | Retryable | network error, 5xx except 503, short read, helper EOF, helper unresponsive | Release, per-lane backoff 1 s × 2^n (cap 30 s, ±20% jitter), claim again; n resets on commit |
-| Throttled | 429; 503 with `Retry-After`; FTP 421 | Group paused until `Retry-After` (≤ 120 s) or 5 s × 2^n; group cap halves (min 1); +1 lane per 60 s clean. Replaces today's task-wide halving in `DownloadExecution.reduceConnections` |
+| Throttled | 429; 503 with `Retry-After`; FTP 421 | Group paused until `Retry-After` (≤ 120 s) or 5 s × 2^n; group cap halves (min 1); +1 lane per 60 s clean. The local group's cap starts at the lower of the local target and `RateLimit-Remaining` (`HttpDownloadSource.applyRateLimit`) and never writes `DownloadContext.maxConnections`, so an Auto task stays Auto and `setConnections` cannot lift a back-off. Replaces today's task-wide halving in `DownloadExecution.reduceConnections` (§6.11) |
 | Excluded | origin 401/403/407/410/451, policy denied, different content, integrity, no gain, busy | The group leaves this task, permanently or until `until` |
 | Pin evidence | 200 or 412 to a conditional request, 206 with another strong validator, another complete length, 416 | `PinAdjudicator` (§9.4) |
 | Drained | DRAIN frame, owner retirement, rebalance, request ended at a lowered limit | Exit with no backoff and no health penalty |
@@ -331,8 +372,10 @@ The task fails on:
 
 `DownloadConfig.retryCount` keeps its meaning, "retries before giving up". For scheduler-backed
 executions (HTTP, FTP) `downloadWithRetry` wraps only the pre-scheduler work (resolve, resume
-probe, local file check); self-managed sources keep whole-source retry, which BitTorrent relies on
-for its transient `KetchError.Network` failures.
+probe, local file check). Whole-source retry stays for self-managed sources, which BitTorrent relies
+on for its transient `KetchError.Network` failures, and for unknown-size streams
+(`HttpDownloadSource.downloadUnknownSize`, #354), whose every attempt empties the file and starts
+again at byte zero.
 
 ### 6.9 Gain controller
 
@@ -364,7 +407,11 @@ instead."
 - The scheduler publishes `onProgress(committed, total)` and the export into `context.segments`
   every `progressIntervalMs`, and `TaskLanes` at most once per second.
 - Speed is the sum of lane EWMAs passed through the existing `DownloadContext.reportedSpeed`
-  override, which also removes today's post-resume spike.
+  override, which also removes today's post-resume spike. Time left needs no new field: the apps
+  divide the remaining bytes by `DownloadProgress.bytesPerSecond` (`RowContent.timeLeft`), relayed
+  bytes included, so the estimate jumps only when the gain controller adds or retires a group.
+  `Completed.completedAt` and `downloadTime` (#353) are stamped by the owner's
+  `DownloadExecution`; helpers report no times.
 - Export: one `Segment` per claim (`start = claim.start`, `end = limit − 1`, `downloadedBytes` =
   the length of `done` contiguous from `claim.start`) plus one per maximal "done prefix + free
   gap" run outside claims, re-indexed so `index == position`. Typically at most `2L + 2` entries;
@@ -374,22 +421,24 @@ instead."
 - "Unplanned" is an explicit `planned` flag on `TaskHandle`, mapped to `segments = null` at
   persistence: `DownloadContext.segments`, `TaskHandle.mutableSegments` and
   `DownloadTask.segments` are non-null lists. The export is never `[]` before completion when
-  `totalBytes > 0` and the source plans byte segments.
+  `totalBytes > 0` and the source plans byte segments. `downloadUnknownSize` (#354) sets `planned`
+  as it empties `segments`: `[]` is its whole plan, persists as `[]` and restarts in place through
+  `HttpDownloadSource.resume`.
 - Segments are progress, not connections: from PR5 the apps draw lanes from `LaneInfo` (§14.4),
   so free runs never show as stalled connections in `ConnectionsTab` or `LaneStrip`.
 
 ### 6.11 Relation to today's code
 
-| Today (`5fb13b3f`) | With `LaneScheduler` |
+| Today (`2f274a45`) | With `LaneScheduler` |
 | --- | --- |
 | `SegmentedDownloadHelper.downloadAll` launches every incomplete segment at once under `coroutineScope` + `awaitAll`; one failure cancels all | Lanes are `supervisorScope` children; failures are values interpreted per §6.7 |
-| A `maxConnections` change cancels the whole batch and resegments (`SegmentedDownloadHelper`, `pendingResegment`) | Adding a lane splits one victim; removing one drains it |
+| A `maxConnections` value whose effective count differs from the baseline the source sized from (`requestedConnections`, #353) cancels the whole batch and resegments (`SegmentedDownloadHelper.downloadBatch`, `pendingResegment`) | Adding a lane splits one victim; removing one drains it, until the local count matches `effectiveConnections()`; with no batch there is no baseline |
 | `SegmentCalculator.resegment` grows the list and floors connections at the gap count | Bounded export; any lane count is honoured |
 | `DownloadExecution.downloadWithRetry` re-runs the whole source with one budget | Per-lane retry; §6.8 decides task failure |
-| 429 halves `ctx.maxConnections` task-wide, not persisted | Per-group AIMD |
+| 429 writes half of `effectiveConnections()` (or `RateLimit-Remaining`) into `ctx.maxConnections` (`DownloadExecution.reduceConnections`), not persisted: an Auto task runs an explicit count for the rest of the run, and any `setConnections` lifts the back-off | Per-group AIMD cap; `maxConnections` stays the user's request |
 | `SegmentDownloader`: one unconditional request per segment | `HttpRangeFetcher`: conditional requests of bounded span per claim |
 | FTP cuts segments with `SegmentCompleteException` (`FtpDownloadSource.downloadSegment`) | `FtpRangeFetcher` re-reads `admit()` per chunk and cuts at the live limit |
-| `DownloadContext.maxConnections` | Unchanged: the local lane target; `TorrentDownloadSource` keeps collecting it as its peer limit |
+| `DownloadContext.maxConnections` (0 = Auto since #353) | Unchanged: the requested local lane count, resolved by `effectiveConnections()`; `TorrentDownloadSource` keeps collecting it as its peer limit |
 | `DownloadContext.pendingResegment` | Deleted with the legacy path |
 
 Rollout: `Ketch(laneMode = LaneMode.LEGACY | LANES)`, a constructor parameter behind
@@ -397,34 +446,46 @@ Rollout: `Ketch(laneMode = LaneMode.LEGACY | LANES)`, a constructor parameter be
 and the scheduler from PR5; the integration suite runs in both modes until the default flips and
 the legacy path is deleted (PR7). BitTorrent is untouched: it manages its own file I/O
 (`TorrentDownloadSource.managesOwnFileIo`) and its segments are synthetic per-file progress. Tasks
-with `totalBytes < 0` never enter `LaneScheduler`: `HttpDownloadSource.downloadUnknownSize`
-(since `5fb13b3f`) streams them from byte zero over one connection with empty segments, and every
-retry or resume restarts it. That path stays as it is.
+with `totalBytes < 0` never enter `LaneScheduler`: `HttpDownloadSource.downloadUnknownSize` (#354,
+`c81f35dc`) streams them from byte zero over one un-ranged `HttpEngine.download` with
+`segments = []`, emptying the file first, so every retry or resume restarts it (resume without
+probing the server), and `DownloadExecution` then records the file's size as `totalBytes`.
+`DownloadExecution.executeFresh` still fails an unknown size with `SourceError` before a
+`managesOwnFileIo` source runs, and FTP rejects one itself. The size comes from the resolve HEAD
+alone (`RangeSupportDetector`). That path stays as it is: whole-source retry (§6.8), `planned`
+with `[]` (§6.10), no pin and no helpers (`UNKNOWN_SIZE`, §14.1).
 
 ## 7 Membership
 
 ### 7.1 Identity
 
-`instanceId` is a UUIDv4 generated on first start and kept in `device.json` (mode 0600, written
-like `SingleInstance`'s files) next to the task database: `defaultDbPath()`'s directory on the CLI,
-the app data directory elsewhere. It does not go in `config.toml`, which the CLI only ever loads
-and users may keep read-only. It is passed as `Ketch(instanceId = …)` and exposed as
-`KetchStatus.instanceId` (additive, default `null`) on the admin API, never in mDNS. The apps
-persist `RemoteConfig.instanceId` learned on connect (the pattern `RemoteConfig.os` follows since
-#345, merged after `ec52a306`) and key `KetchColors.deviceHue` by it from then on, falling back to
-`InstanceEntry.deviceId` until it is known, so one machine keeps one hue across DHCP changes. The
-Add device sheet hides its own advertisement by a per-process random `boot` TXT value instead of
-the port-and-name heuristic in `ui/connect/AddDeviceSheet.kt`.
+`instanceId` is task transfer's (task-transfer.md K14, F7): a random id in the task store's
+`instance_meta`, read through `TransferStore.instanceId()` and exposed as `KetchStatus.instanceId`
+(additive, default `null`) on the admin API, never in mDNS. This design defines no second
+identity. Pairings are bound to it, so it must not change while a device keeps its store (§18).
+With a store that keeps no identity, such as `InMemoryTaskStore`, `Ketch.helpers` is `null`. The
+desktop app, `ketch server` and `ketch mcp` share `ketch.db` in `defaultConfigDir()` and so one
+id; only the holder of the store lock takes part in helping (§14.5). The apps persist
+`RemoteConfig.instanceId` learned on connect (F7, the pattern `RemoteConfig.os` follows since
+#345) and key `KetchColors.deviceHue` by it from then on, falling back to `InstanceEntry.deviceId`
+until it is known, so one machine keeps one hue across DHCP changes. The Add device sheet hides
+its own advertisement by a per-process random `boot` TXT value instead of the port-and-name
+heuristic in `ui/connect/AddDeviceSheet.kt`, which F7 keeps for the nearby list.
 
-`device.json` also holds the pairings (§7.3). On Android it is excluded from backup and
+Pairings (§7.3) live in `pairings.json` beside the task database (mode 0600, written like
+`SingleInstance`'s files), not in `config.toml`, which the CLI only ever loads and users may keep
+read-only. The file records the `instanceId` it was made under and is dropped when that differs
+from the store's, so a re-minted id never inherits keys. On Android it is excluded from backup and
 device-to-device transfer (`dataExtractionRules`, `fullBackupContent`; the manifest sets
 `allowBackup="true"` today), and on Android and iOS pairing keys are wrapped by an Android Keystore
-or Keychain (`ThisDeviceOnly`) key. A copy restored elsewhere fails to unwrap; the device then
-generates a new `instanceId` and drops its pairings instead of cloning another device's identity.
+or Keychain (`ThisDeviceOnly`) key; a copy restored elsewhere fails to unwrap and its pairings are
+dropped instead of cloning another device's trust.
 
 ### 7.2 Discovery
 
-Discovery is never on the join path and never admits anyone. `RelayServer` registers
+Discovery never admits a helper and is never on the join path. Since #352 a device found with
+`pairing=1` on `_ketch._tcp` can ask for controller pairing (`/api/pairing`), which hands over the
+access token; helper pairing has no such route (§17, open question 11). `RelayServer` registers
 `_ketch-relay._tcp` with TXT `pv` and `name` (no identifier; `instanceId` appears only in admin API
 and relay-session responses). `MdnsDiscoverer` gains `browse(): Flow` over dns-sd-kt's Discovered,
 Resolved and Removed events. Apps browse only while an Add helper sheet is open, or while a paired
@@ -442,7 +503,8 @@ ketch://helper?host=192.168.1.20&port=8643&name=NAS&role=helper#id=<inviteId>&ke
 Single use, valid 15 min, at most 4 pending, burned after 3 failed attempts, shown as a code and a
 link. The secrets sit in the fragment, as `ketch://pair` keeps its token (`util/PairingLink.kt`),
 and `host` comes from the same `pairingAddresses`, which leaves out VM bridges, VPN tunnels and
-mobile data.
+mobile data unless no other interface has an address (a Hyper-V external switch moves the LAN
+address onto a virtual adapter).
 Either side can create one, provided its relay listener runs (helping on for the helper role,
 `acceptReverse` for the owner role):
 
@@ -454,34 +516,41 @@ Either side can create one, provided its relay listener runs (helping on for the
 
 In the controller route, the app calls the creating device's admin `POST /api/helpers/invites`
 with the bearer it already holds, then gives the link to the other device in-process or through
-that device's admin `POST /api/helpers/pair`. Access tokens never leave their own admin API, never
-become key material, and `pair()` refuses `ketch://pair` links. The link crosses an admin plane
-that today already carries the bearer itself in cleartext, so this adds no exposure.
+that device's admin `POST /api/helpers/pair`. The bearer may have been typed, read from a
+`ketch://pair` link or, since #352, handed over by `GET /api/pairing/{id}` after that device's user
+allowed a request. Helper pairing never moves a token: tokens are used only against their own
+admin API, never become key material, and `pair()` refuses `ketch://pair` links. The link crosses
+an admin plane that already carries the bearer in cleartext, in every request and in #352's
+answer, so this adds no exposure.
 
-The OS-level intake that handles `ketch://pair` (Android intent filter, iOS `onOpenURL`, desktop
-`isPairingLink`) also accepts `ketch://helper`. A link that arrives that way opens a confirmation
-sheet naming the device and endpoint, warning when the endpoint is not on a local network, and
-stating "<Helper> will see the links it helps with and could change their content."
+The OS-level intake that handles `ketch://pair` also accepts `ketch://helper`: the Android intent
+filter, today limited to `android:host="pair"`, gains `helper`, and `isPairingLink`
+(`state/IncomingDownloads.kt`), through which `IncomingDownloads` and the desktop's `OpenedFiles`
+route links from Android, iOS `onOpenURL` and launch arguments, gains a `ketch://helper` sibling.
+A link that arrives that way opens a confirmation sheet naming the device and endpoint, warning
+when the endpoint is not on a local network, and stating "<Helper> will see the links it helps
+with and could change their content."
 
 Pairing runs on the creator's (C) relay listener; the dialer is D. `LP(…)` prefixes every field
 with its u32 length; `e` are ephemeral P-256 keys as uncompressed points, rejected unless on the
 curve:
 
 ```
-m1  D -> POST /api/relay/v1/pair          {v:1, inviteId, idD, nameD, endpointsD, eD, nD}
-m2  C -> {idC, nameC, endpointsC, eC, nC, confC}
-m3  D -> POST /api/relay/v1/pair/confirm  {inviteId, confD}                       -> 204
-th     = SHA-256( LP("ketch-pair-v1", m1 fields, m2 fields except confC) )
+m1  D -> POST /api/relay/v1/pair          {v:1, inviteId, nameD, eD, nD}
+m2  C -> {nameC, eC, nC, sealC(idC, endpointsC), confC}
+m3  D -> POST /api/relay/v1/pair/confirm  {inviteId, sealD(idD, endpointsD), confD}  -> 204
+th     = SHA-256( LP("ketch-pair-v1", m1 fields, nameC, eC, nC) )
 kC‖kD‖pairKey = HKDF-SHA256( ikm = ECDH(eD, eC) ‖ inviteKey, salt = th, info = "ketch-pair-v1" )
 confC  = HMAC(kC, th)    confD = HMAC(kD, th)    sas = 6 digits of HMAC(pairKey, "sas")
+sealX  = AES-256-CTR + HMAC-SHA256 tag under HKDF(kX, info = "ketch-pair-seal"), tag checked first
 ```
 
-A passive observer learns nothing, since the keys depend on the ECDH secret; an active attacker
-needs the invite key. C commits the pair only after verifying m3. When the creator's user copied or
-shared the link instead of only showing the code, both devices show the 6-digit `sas` and C
-commits only after its user confirms that they match. `/pair` limits: 3 failures burn the invite,
-5 failures per minute per source address, and 20 failures per minute in total lock the route for
-10 min.
+A passive observer learns nothing, since the keys depend on the ECDH secret and identifiers and
+endpoints travel sealed; an active attacker needs the invite key. C commits the pair only after
+verifying m3. When the creator's user copied or shared the link instead of only showing the code,
+both devices show the 6-digit `sas` and C commits only after its user confirms that they match.
+`/pair` limits: 3 failures burn the invite, 5 failures per minute per source address, and 20
+failures per minute in total lock the route for 10 min.
 
 Each pairing has flags on both sides. Owner side: `helpsThisDevice` = `PICKED` (only tasks the user
 picks for it) until the user sets `AUTO` on the Devices page; `shareSignIns` off, asked once with
@@ -492,9 +561,9 @@ themselves grant access." On the owner: "NAS will see the links it helps with an
 their content; Ketch checks samples of its bytes against the site."
 
 Revocation is per pairing: **Unpair** (drain, delete the key) or **Block** (immediate, delete the
-key, refuse that key's fingerprint and endpoint for 24 h). The Block copy adds: "Anyone with this
-device's access code can invite it again; change the code to stop that." A failed audit Blocks
-the helper (§9.6).
+key, refuse that key's fingerprint and endpoint for 24 h). The Block copy adds: "Devices that were
+given this device's access code, or that you allowed to connect, can invite it again; choose New
+code in Settings › Sharing to stop that." A failed audit Blocks the helper (§9.6).
 
 ### 7.4 Session and capability handshake
 
@@ -611,12 +680,19 @@ overwrites of the same pinned representation; a graceful quit loses nothing (`Ke
 
 ### 8.6 Pause, resume, cancel and remove with helpers active
 
-- **Pause** (also URGENT preemption): `DownloadCoordinator.pause` cancels the execution, the
+- **Pause, preemption, close**: every stop that keeps progress cancels the execution:
+  `DownloadCoordinator.pause` for `PauseReason.User` and for `Preempted(byTaskId)` when an URGENT
+  task takes the slot (`DownloadQueue.tryPreemptAndStart`; the record stays `QUEUED`), and
+  `DownloadCoordinator.close` (from `Ketch.close()`, with `closing` set) for `Shutdown`. The
   scheduler cancels every lane, relayed sockets close, and helpers stop their origin GET within
   one frame (≤ 1 RTT); pending reverse orders are withdrawn and open reverse streams get 409
   `task_paused`. Lanes release in their `finally`; the final checkpoint runs snapshot → sync →
-  persist (§9.7). Pause before the first byte already works at HEAD (`RealDownloadTask.pause`
-  accepts `Queued`).
+  persist (§9.7), which `Ketch.shutdown` waits for and plain `close()` does not (§15). Pause
+  before the first byte already works at HEAD (`RealDownloadTask.pause` accepts `Queued`). A
+  preempted task keeps its `queuePosition` and resumes on its own through `DownloadQueue.startTask`
+  → `DownloadCoordinator.resume`, as a Resume below; meanwhile its helper slots go to other tasks
+  (§12). Helpers add no `PauseReason`: one leaving, draining, failing or being excluded only
+  removes lanes, and a task left with no eligible group fails (§6.8).
 - **Resume**: a new execution and nonce; helpers rejoin without a new `hello` while the session
   lives, and abort the paused execution's streams on the first new relay request.
 - **Cancel, remove**: as pause, then `CANCELED` and deletion after every lane has joined;
@@ -632,7 +708,7 @@ overwrites of the same pinned representation; a graceful quit loses nothing (`Ke
 | Helper crash | none | 0 | in-flight |
 | Silent partition | none; tail freed after 15 s | 0 | in-flight |
 | Owner crash | — | ≤ 5 s of progress refetched | — |
-| Pause, cancel | all stop by design | 0 | in-flight |
+| Pause (user, preemption, close), cancel | all stop by design | 0 (≤ 5 s refetched after `close()` without `shutdown`) | in-flight |
 
 ## 9 Correctness and integrity
 
@@ -711,9 +787,10 @@ when it last saw a response matching the pin. `PinAdjudicator` resolves every pi
    `Connection: close`, fetch four 64 KiB windows of committed bytes in responses that carry `v'`
    (`If-Match: v'` for an ETag; up to 8 attempts per window, since a balancer may route to a pin
    backend): the committed windows nearest the start and the end of the file and two random ones.
-   Compare them with `FileAccessor.readAt`. All equal: `v'` joins `pin.aliases` (persisted) and the
-   group continues. The windows near the ends are always compared because container formats keep
-   version fields and indexes there (a zip's central directory holds every entry's CRC-32).
+   Compare them with the committed bytes, read through `FileReader` (§5.1). All equal: `v'` joins
+   `pin.aliases` (persisted) and the group continues. The windows near the ends are always
+   compared because container formats keep version fields and indexes there (a zip's central
+   directory holds every entry's CRC-32).
 3. **Otherwise** (windows differ, another length, no or weak `v'`, or evidence from a helper): the
    reporting group's lanes park, and the task fails with `FileChanged` only when all of these hold:
    - no response matching the pin or an alias on any group since the first evidence;
@@ -740,7 +817,9 @@ Helpers never create aliases: alias windows are fetched through local groups onl
 
 Residual: an alias check can pass for two versions that differ only outside the compared windows
 while both are served. Today's solo path has no check at all. The resume check in
-`HttpDownloadSource.resume` becomes a conditional probe through the same adjudicator.
+`HttpDownloadSource.resume` becomes a conditional probe through the same adjudicator, and so should
+task transfer's origin preflight (`SourceTransfer.probeOrigin`), which that proposal extracts from
+the same HEAD check (§18).
 
 ### 9.5 Commit rule and fencing
 
@@ -782,7 +861,7 @@ helper with another egress cross-audits (never the supplier); audits wait out a 
   match the site. It was blocked."). In one mutex section its live claims are revoked (cancelled;
   their release frees `[cursor, limit)`), every interval it supplied to this task returns to
   `free`, and provenance is updated; progress steps back.
-- **Digests.** A helped task verifies the whole file at completion with `FileAccessor.readAt`
+- **Digests.** A helped task verifies the whole file at completion through `FileReader` (§5.1)
   when the origin states a digest of the full representation. Explicit digests: `Repr-Digest`
   (RFC 9530; `sha-256`, `sha-512`), legacy `Digest` (`SHA-256`, `MD5`), `x-goog-hash` (`md5`),
   `x-amz-checksum-sha256` unless `x-amz-checksum-type` is `COMPOSITE`, and `Content-Digest` or
@@ -796,6 +875,11 @@ helper with another egress cross-audits (never the supplier); audits wait out a 
   `.apk`, `.deb`, `.rpm`, `.AppImage`, `.jar`, `.sh`, `.iso`) unless the origin offers an explicit
   digest (`NEEDS_DIGEST`); the user can still add a helper to such a task, and the copy states the
   trust.
+- **Task transfer.** A task moved or copied with its data carries only bytes its owner vouches
+  for. With `pendingAudits` empty every committed byte travels; otherwise the HTTP export cuts each
+  segment's `downloadedBytes` at its first relayed byte, so the destination fetches those spans from
+  the origin. `relayed` and `pendingAudits` name this device's helpers and stay behind; `aliases`
+  travel as a defaulted field of the HTTP portable state (task-transfer.md §5.2).
 
 Sampling catches broken or wholesale-lying helpers, not a targeted patch of a few bytes: one 64 KiB
 window per 32 MiB finds a single patched window with about 0.2% probability. Only a digest gives
@@ -822,10 +906,13 @@ drive cache. After an OS crash at most `saveIntervalMs` of committed bytes are r
 
 ### 9.8 Persisted format and migration
 
-- `TaskRecord` unchanged; no SQLite migration; `TaskRecords.sq` untouched. `TaskRecord.segments`
-  holds the export (§6.10): `null` while unplanned, never `[]` before completion for sources that
-  plan byte segments, prefix semantics, `index == position`. Legacy fragmented lists restore
-  exactly.
+- `TaskRecord` and `TaskRecords.sq` stay as #353 left them (schema 5: `4.sqm` added
+  `completed_at`); this proposal adds no migration, and `instanceId` comes with task transfer's
+  `instance_meta`. `TaskLanes.bytesByDevice` is runtime-only, so a finished task shows no
+  per-device split after a restart. `TaskRecord.segments` holds the export (§6.10): `null` while
+  unplanned, `[]` for an unknown-size stream (#354) and otherwise never before completion for
+  sources that plan byte segments, prefix semantics, `index == position`. Legacy fragmented lists
+  restore exactly.
 - `Segment` unchanged; its KDoc changes from "one connection" to "a file region with a committed
   prefix". Per-connection data moves to `LaneInfo`, which supersedes the
   `Segment.bytesPerSecond`/`retryCount`/`networkInterfaceId` plan of ux-redesign
@@ -836,12 +923,17 @@ drive cache. After an OS crash at most `saveIntervalMs` of committed bytes are r
   `ignoreUnknownKeys` (today strict `Json.decodeFromString`). Old JSON decodes; a downgrade to a
   strict build fails resume with `CorruptResumeState`, acceptable before the first release.
 - `DownloadRequest.helpers` is additive in the request JSON column, which `SqliteTaskStore`
-  already decodes with `ignoreUnknownKeys`. Claims, lanes, sessions and fences are runtime-only.
+  already decodes with `ignoreUnknownKeys`. That flag does not cover an unknown subtype of a sealed
+  class, and `SqliteTaskStore.toTaskRecord` decodes the request uncaught, so one newer policy would
+  fail `loadAll` for every task after a downgrade. `HelperPolicy`, the one new sealed type on the
+  wire, therefore follows `PauseReason` (#353): a hand-written serializer that reads `type` and its
+  own fields under any `Json` and decodes an unknown `type` as `Off`, which never shares more than
+  the user chose. Claims, lanes, sessions and fences are runtime-only.
 - No new `DownloadState` or `KetchError` subtypes (`KetchError.isRetryable` is an exhaustive
-  `when`, and old `RemoteKetch` clients could not decode them). Every new wire property has a
-  default, enums included, so `coerceInputValues` (set in `RemoteKetch`'s `Json`; `KetchServer`'s
-  gains it) maps an unknown enum value to its default instead of failing a whole task list.
-  Lanes go only to clients that ask (`?lanes=1`).
+  `when`, and old `RemoteKetch` clients could not decode them), and no new `PauseReason` (§8.6).
+  Every new wire property has a default, enums included, so `coerceInputValues` (set in
+  `RemoteKetch`'s `Json`; `KetchServer`'s gains it) maps an unknown enum value to its default
+  instead of failing a whole task list. Lanes go only to clients that ask (`?lanes=1`).
 
 ## 10 Protocol
 
@@ -850,14 +942,18 @@ drive cache. After an OS crash at most `saveIntervalMs` of committed bytes are r
 | Plane | Where | Auth | Callers |
 | --- | --- | --- | --- |
 | Admin: `/api/helpers*`, task helper routes, lane data | Existing `KetchServer` | Bearer `apiToken`; without a token, loopback callers whose request carries no `Origin`, `Forwarded`, `X-Forwarded-For` or `X-Real-IP` | Apps, web, CLI |
-| Relay: `/api/relay/v1/*` | New `RelayServer` on `[helping] port` (default 8643), CIO; binds the addresses `pairingAddresses` picks (no VM bridges, VPN tunnels or mobile data) unless `[helping] host` is set (a VPS) | Sealed session; pairing by invite proof; any `Origin` refused; ≤ 64 unauthenticated sockets, 10 s idle | Owner and helper instances |
+| Relay: `/api/relay/v1/*` | New `RelayServer` on `[helping] port` (default 8643), CIO; binds the LAN addresses `pairingAddresses` picks, without its fallback to virtual and mobile-data interfaces when nothing else has an address, unless `[helping] host` is set (a VPS) | Sealed session; pairing by invite proof; any `Origin` refused; ≤ 64 unauthenticated sockets, 10 s idle | Owner and helper instances |
 
 Keeping the relay plane off the admin port lets a phone help without running its admin API, and a
-tokenless admin server never gains a remotely reachable pairing route. `KetchServer` gains a
-route-set parameter so `BrowserExtensionServer` (a full `KetchServer` with a per-run token) serves
-neither the helper routes nor the task helper route. On a tokenless server a non-loopback
-`POST /api/tasks` has its `helpers` field reset to the default, so a LAN caller cannot pick
-helpers or spend them.
+tokenless admin server never gains a remotely reachable pairing route. Since #352 the apps'
+token-holding servers answer `/api/pairing` without the token and hand that token to a device
+their user allows; it exists only with a token and a `PairingApprover`, adds a device to the
+fleet, and never pairs a helper. `KetchServer` gains a route-set parameter, shared with task
+transfer's `transfers` flag (§5.1) and off by default as `pairingApprover = null` already leaves
+`/api/pairing` off, so `BrowserExtensionServer` (a full `KetchServer` with a per-run token and no
+approver) serves neither the helper routes nor the task helper route. On a tokenless server a
+non-loopback `POST /api/tasks` has its `helpers` field reset to the default, so a LAN caller cannot
+pick helpers or spend them.
 
 | Method | Path | Body | Response |
 | --- | --- | --- | --- |
@@ -883,7 +979,13 @@ helpers or spend them.
 Resources and models live in `library:endpoints` (`Api.Helpers`, `Api.Relay`). `KetchServer`
 implements the admin routes over `ketch.helpers`. `lanes_changed` is a new `TaskEvent` subtype sent
 only to clients that ask with `?lanes=1`, because today's `RemoteKetch` logs an error for every
-event it cannot decode; `TaskSnapshot` gains `lanes: TaskLanes = TaskLanes()`.
+event it cannot decode; `TaskSnapshot` gains `lanes: TaskLanes = TaskLanes()` beside #353's
+`queuePosition`. A command response (`PUT /api/tasks/{id}/helpers`, the stop route) carries the
+lanes the server read when it answered, so `RemoteDownloadTask` applies them only when no SSE event
+arrived while the request was in flight, through the `appliedEvents` count #353 added for
+`queuePosition`; `lanes_changed` events count too. Lanes are a flow of their own, sampled at 1/s,
+outside `EventRoutes.taskEvents`' `combine` of state, request, segments and queue position, so
+other clients' `progress` and `state_changed` traffic does not grow.
 
 ### 10.2 Relay request and frames
 
@@ -961,15 +1063,19 @@ The relay client is a dedicated Ktor `HttpClient` with these finite timeouts, se
 `RemoteKetch`'s `Long.MAX_VALUE` ones. Versioning: `/v1` in the path; `hello` negotiates the
 highest common protocol and lists `features` (`drain`, `reverse`, `ftp`); frame types 0x00–0x7F
 are must-understand; JSON uses `ignoreUnknownKeys` and `encodeDefaults` as `KetchServer` already
-does; mDNS `pv=1`. `RemoteKetch.helpers` is never null: its `supported` flow is probed on connect
-(404 or 501 → `false`, as `resolveContent` and network interfaces already treat those codes per
-call), and its calls throw `UnsupportedOperationException` against an older server.
+does; mDNS `pv=1`. `RemoteKetch.helpers` is never null: its `supported` flow follows
+`KetchStatus.features` (`helpers`, §14.1), read on connect and reconnect in the `status()` call
+that also yields `instanceId`, as the apps already gate Auto connections and queue positions
+(`AppState.featuresOf`): `null` until read, `false` for a server that does not list it, so no
+probe is needed. A server whose route set leaves out the helper routes drops `helpers` from the
+status it serves. Against an older server its calls throw `UnsupportedOperationException`, a 404
+or 501 included.
 
 ## 11 Security and trust
 
 | Threat | Mitigation |
 | --- | --- |
-| A LAN host or web page pairs itself | Pairing needs a single-use 128-bit invite created explicitly; admin helper routes need the bearer, or a loopback caller without forwarding headers; tokenless servers already refuse foreign pages (`CrossOriginGuard`) and rebound hosts (`HostValidator`) |
+| A LAN host or web page pairs itself | Pairing needs a single-use 128-bit invite created explicitly; the bearer that unlocks admin helper routes reaches a LAN host only when typed, through a `ketch://pair` link, or when the owner allows its `/api/pairing` request (#352; web pages refused); admin helper routes need the bearer, or a loopback caller without forwarding headers; tokenless servers already refuse foreign pages (`CrossOriginGuard`) and rebound hosts (`HostValidator`) |
 | Passive observer, now or after a key leak | ECDH in pairing and in every session; access tokens are never key material; no identifier in cleartext |
 | Active attacker on the path | Needs the invite during pairing (SAS when the link was shared), the pair key afterwards |
 | Replay | 1024-entry window per session; nonce caches for `hello` and `/pair` |
@@ -977,7 +1083,7 @@ call), and its calls throw `UnsupportedOperationException` against an older serv
 | A paired helper lies | Audits, fail closed without an audit path, digests, executables need a digest, Block on failure |
 | Helper as open relay or SSRF | Paired owners only; GET with one range inside `[0, totalBytes)`; URL policy enforced at connect time; no proxy |
 | Helper bandwidth abuse | Caps and budgets below |
-| A lost device keeps access | Unpair or Block per pairing; Block refuses the key fingerprint and endpoint |
+| A lost device keeps access | Unpair or Block per pairing; Block refuses the key fingerprint and endpoint; a controller that holds the device's access code (typed, linked or allowed through #352) can invite it again until New code replaces it |
 | Credential or key in a log | `redactUrl` masks fragment secrets; ERROR frames carry codes; parsers never echo links |
 
 **Realms.** `HostValidator` and `CrossOriginGuard` are application plugins that
@@ -1077,12 +1183,13 @@ user's limit, including the Slow lane speed mode.
   per origin host across owners, no duplicate requests, `[helpers] excludeHosts` (matched on the
   request and final host) and per-task Off for origins that forbid multi-IP fetching. Helpers that
   share the owner's connection join the local group.
-- **Queue**: a helped task holds one `DownloadQueue` slot and counts once toward the per-host task
-  limit (`DownloadQueue.hasHostCapacity`); helper lanes are not tasks, and relays take no slot on
-  the helper.
+- **Queue**: a helped task holds one `DownloadQueue` slot, counts once toward the per-host task
+  limit (`DownloadQueue.hasHostCapacity`) and reports `queuePosition` (#353) like any task; helper
+  lanes are not tasks and never move positions, and relays take no slot on the helper. A task
+  waiting for a slot (`Queued`, or `Paused(Preempted)`) runs no lanes.
 - **Across the owner's tasks**: `HelperManager` deals each helper's `freeSlots` round-robin over
   active helped tasks in priority order (URGENT first), at most `lanesPerHelper` each, rebalancing
-  by drain when tasks start or finish.
+  by drain when tasks start, finish or pause for any `PauseReason`.
 
 ## 13 Source and platform support
 
@@ -1091,7 +1198,7 @@ user's limit, including the Slow lane speed mode.
 | HTTP(S), ranges, known length, strong validator | yes | yes, ≥ 32 MiB | ETag or strong LM, aliases | The main case |
 | HTTP(S), ranges, weak or no validator | yes (`LENIENT`) | no (`UNPINNED`) | exact range + length | Still gains per-lane retry and live connection changes |
 | HTTP without ranges, or 200 to Range | one lane, restart from zero | no | — | Today's `rangeLimitedConnections` path |
-| Unknown length | one streamed connection from byte zero (`downloadUnknownSize`); retries restart | no | — | Never enters `LaneScheduler` |
+| Unknown length (resolve HEAD without `Content-Length`) | one un-ranged stream from byte zero (`downloadUnknownSize`, #354); retries and resumes restart it in place | no (`UNKNOWN_SIZE`) | — | Never enters `LaneScheduler`; HTTP only: FTP and `managesOwnFileIo` sources fail |
 | FTP/FTPS with REST + SIZE | yes (PR6) | PR14: MDTM required, 1 lane per helper, sign-ins for userinfo | SIZE + MDTM | 421 → Throttled; FTPS relay only on JVM/Android helpers |
 | BitTorrent | own scheduler, unchanged | never; greyed with a reason | piece hashes | Native multi-source; synthetic segments |
 | HLS, media (roadmap) | per ranged sub-fetch | possible | per sub-fetch | Only fetchers and pin are HTTP-specific |
@@ -1108,7 +1215,8 @@ user's limit, including the Slow lane speed mode.
 Android: while `RelayServer` listens the service stays in the foreground with "Ready to help
 MacBook" (`ForegroundStatus.isRequired` gains `helperPort != null`, as `serverPort` keeps it today)
 and counts against the daily dataSync limit; it holds a `WifiLock` while relaying and drains on
-`onTimeout`. The listener binds LAN addresses only (`pairingAddresses`). The phone-as-second-WAN
+`onTimeout`. The listener binds LAN addresses only (the `pairingAddresses` filter without its
+fallback, §10.1), so none while only mobile data has an address. The phone-as-second-WAN
 case needs "Help over mobile data", one control that sets `[helping] network = cellular` and allows
 metered relays together and shows the daily cap left (2 GiB by default, adjustable); radios throttle
 when the phone is hot, and helping stops below 20% battery. iOS: the engine closes on view dispose
@@ -1127,8 +1235,8 @@ PR12 is scheduled.
 ### 14.1 `library:api` (additive, default-valued)
 
 ```kotlin
-/** Which helper devices may fetch parts of this download. */
-@Serializable
+/** Which helper devices may fetch parts of this download. An unknown `type` decodes as [Off]. */
+@Serializable(with = HelperPolicySerializer::class)   // hand-written, like PauseReasonSerializer
 sealed class HelperPolicy {
   /** Never use helpers. */
   @Serializable @SerialName("off") data object Off : HelperPolicy()
@@ -1141,7 +1249,9 @@ sealed class HelperPolicy {
   data class Only(val instanceIds: Set<String>, val signIns: Boolean = true) : HelperPolicy()
 }
 // DownloadRequest.helpers: HelperPolicy = HelperPolicy.Auto()
-// KetchStatus.instanceId: String? = null
+// KetchStatus.instanceId: String? = null (task transfer's F7)
+// KetchFeatures.TASK_LANES = "task.lanes": DownloadTask.lanes reports and ?lanes=1 is honoured
+// KetchFeatures.HELPERS = "helpers": KetchApi.helpers works and /api/helpers* answer
 
 /** One connection of a download on this device ([instanceId] null) or through a helper. */
 @Serializable
@@ -1165,8 +1275,8 @@ data class TaskLanes(
 @Serializable
 data class ExcludedHelper(val instanceId: String = "",
   val reason: ExclusionReason = ExclusionReason.UNKNOWN, val until: Instant? = null)
-// LaneErrorCode, HelpersUnavailableReason (OFF, NO_HELPERS, TOO_SMALL, NO_RANGES, UNPINNED,
-// SIGN_INS, SOURCE_TYPE, EXCLUDED_HOST, LIMITED, NEEDS_DIGEST) and ExclusionReason
+// LaneErrorCode, HelpersUnavailableReason (OFF, NO_HELPERS, TOO_SMALL, UNKNOWN_SIZE, NO_RANGES,
+// UNPINNED, SIGN_INS, SOURCE_TYPE, EXCLUDED_HOST, LIMITED, NEEDS_DIGEST) and ExclusionReason
 // (ORIGIN_DENIED, DIFFERENT_CONTENT, THROTTLED, NO_GAIN, SLOW, AUDIT_FAILED, INTEGRITY, METERED,
 // BUSY) each start with UNKNOWN, the value an older client decodes a newer one to.
 
@@ -1205,9 +1315,14 @@ bytesToday, lastSeen)`, `HelperChange` (nullable fields), `HelperRole { HELPER, 
 `RemovalMode { DRAIN, NOW, BLOCK }`, `HelperInvite(link, expiresAt)`, `HelpingStatus(enabled,
 draining, owners: List<HelpedOwner>, bytesPerSecond)` and `HelperSettings` (the `[helpers]` and
 `[helping]` keys) are `@Serializable` classes in `com.linroid.ketch.api.helper`, each with a
-one-line KDoc and defaults on every property. `DownloadConfig` is unchanged. `Ketch` (not
-`KetchApi`) gains `suspend fun shutdown(grace: Duration = 5.seconds)`, which stops downloads
-keeping partial files and records restorable, then closes.
+one-line KDoc and defaults on every property. `DownloadConfig` is unchanged. `Ketch.features`
+(what `status()` lists) adds `task.lanes` under `LaneMode.LANES` and `helpers` while a
+`helperController` is set; both stay out of `KetchFeatures.ALL` until `task.lanes` joins it at the
+PR7 flip, so `AppState.featuresOf` reads them from the embedded engine instead of assuming `ALL`.
+Since #353 `Ketch.close()` pauses running tasks for `PauseReason.Shutdown` and keeps their files
+and records, but returns without waiting for their final checkpoints. `Ketch` (not `KetchApi`)
+gains `suspend fun shutdown(grace: Duration = 5.seconds)`: the same pause, then, within `grace`,
+each execution's snapshot → sync → persist (§9.7) and a `goodbye` to helpers, then `close()`.
 
 ### 14.2 Core SPI (`@KetchInternalApi`, a new `RequiresOptIn` for `library:ftp` and `library:relay`)
 
@@ -1229,8 +1344,8 @@ fun interface RangeSink { suspend fun accept(offset: Long, data: ByteArray, leng
 class LaneSpec(val laneId: String, val group: String, val fetcher: RangeFetcher,
                val audited: Boolean)
 fun interface LaneProvider { fun lanesFor(task: HelpedTask): Flow<List<LaneSpec>> }
-// FileAccessor.readAt(offset, length): ByteArray, default UnsupportedOperationException
-// Ketch(instanceId: String? = null, laneMode: LaneMode = …, laneTuning: LaneTuning = …),
+// Output reads go through task transfer's internal FileReader (§5.1); FileAccessor is unchanged
+// Ketch(laneMode: LaneMode = …, laneTuning: LaneTuning = …), instanceId from the task store,
 // var laneProvider, var helperController (returned by Ketch.helpers),
 // val helperRuntime: HelperRuntime // acquireGlobal(bytes), newLimiter(bps), localActiveTasks
 ```
@@ -1242,59 +1357,74 @@ convention (`KtorHttpEngine.download` does), so stopping is never logged or clas
 `ConfigurableNetworkHttpEngine` override it; the network engines honour and report
 `RangeRequest.network` (interface id), which makes per-network egress groups possible.
 `TorrentHttp`'s un-ranged `download(url, null, …)` for tracker announce, scrape and `.torrent`
-metainfo keeps today's semantics. Every existing `HttpEngine` compiles unchanged, but Kotlin `by`
-delegation forwards default-bodied members to the delegate, so a wrapper that overrides only
-`download` silently bypasses its hook once callers use `fetch`. PR3 makes the four such wrappers
-override `fetch` (`HttpDownloadIntegrationTest`'s PAUSE_FIRST engine, `SegmentDownloaderTest`,
-`DownloadQueueTest.BlockingHeadEngine`, `TorrentPublicV2WorkflowTest`) and states the rule in
-`HttpEngine`'s KDoc. `Ketch.httpEngine` is never wrapped, so `networkInterfaces()` keeps its
-`as? ConfigurableNetworkHttpEngine` cast. `core.hash.Sha256` is public under
-`@KetchInternalApi` so `library:torrent` can import it. The helper's relay engine is
-`library:relay`'s guarded client (§11); the private `globalLimiter` and the helper's local activity
-are reached only through `helperRuntime`.
+metainfo, and `HttpDownloadSource.downloadUnknownSize`'s (#354) for content of unknown size, keep
+today's semantics. Every existing `HttpEngine` compiles unchanged, but Kotlin `by` delegation
+forwards default-bodied members to the delegate, so a wrapper that overrides only `download`
+silently bypasses its hook once callers use `fetch`. PR3 makes the three such wrappers override
+`fetch` as well (`HttpDownloadIntegrationTest`'s pausing engine for the `*PAUSE_FIRST` modes, which
+keeps its `download` hook for #354's `STREAMED_PAUSE_FIRST`, `SegmentDownloaderTest` and
+`TorrentPublicV2WorkflowTest`) and states the rule in `HttpEngine`'s KDoc.
+`DownloadQueueTest.BlockingHeadEngine` overrides only `head`, which resolve keeps calling.
+`Ketch.httpEngine` is never wrapped, so `networkInterfaces()` keeps its
+`as? ConfigurableNetworkHttpEngine` cast. `core.hash.Sha256` is public under `@KetchInternalApi`
+so `library:torrent` can import it. The helper's relay engine is `library:relay`'s guarded client
+(§11); the private `globalLimiter` and the helper's local activity are reached only through
+`helperRuntime`.
 
 ### 14.3 Configuration
 
-`config.toml` holds settings only (`ConfigStore` ignores unknown names); identity and pairings live
-in `device.json` (§7.1), which the CLI daemon and the apps write.
+`config.toml` holds settings only (`ConfigStore` ignores unknown names); the identity lives in the
+task store (task transfer's `instance_meta`) and pairings in `pairings.json` (§7.1), which the CLI
+daemon and the apps write.
 
 | Section | Keys and defaults |
 | --- | --- |
 | `[helpers]` (owner side) | `mode = "auto"` (`off`, `auto`), `maxTotalLanes = 16`, `lanesPerHelper = 2`, `minBytes = 33554432`, `excludeHosts = []`, `acceptReverse = true` (desktop, CLI) |
 | `[helping]` (helper side) | `enabled = false`, `host = ""` (LAN interfaces; `0.0.0.0` for a VPS), `port = 8643`, `network = ""` (`cellular` for "Help over mobile data"), `maxStreams = 4`, `maxStreamsPerOwner = 4`, `maxStreamsPerOriginHost = 4`, `maxBytesPerSecond = 0`, `dailyBytesPerOwner = 53687091200` (mobile defaults per §11), `allowMetered = false`, `minBatteryPercent = 20`, `yieldToLocalDownloads = true` |
-| `device.json` | `instanceId`; `pairings[]`: `id`, `name`, `endpoints`, wrapped `key`, `helpsThisDevice`, `allowHelpFor`, `sharesConnection`, `shareSignIns`, `allowPrivateCidrs`, `blocked[]` (key fingerprint, endpoint, until) |
+| `pairings.json` | `instanceId` the pairings were made under; `pairings[]`: `id`, `name`, `endpoints`, wrapped `key`, `helpsThisDevice`, `allowHelpFor`, `sharesConnection`, `shareSignIns`, `allowPrivateCidrs`, `blocked[]` (key fingerprint, endpoint, until) |
 
 ### 14.4 Apps (Lanes & Fleet)
 
 - **Inspector → Connections**: lanes grouped by device ("This Mac · 4 connections · 12 MB/s",
   "NAS · 2 · 8 MB/s"), each group headed by its `DevicePennant`, labelled "#n" from
   `LaneInfo.number`. Exclusions read plainly with an action: "NAS can't open this link (403)",
-  "Not faster with NAS" (+ "Move to NAS" when it is always on), "Helpers aren't used: this link
-  carries sign-ins · Share with NAS…". "Add help ▸" lists eligible helpers and adds one to the
-  task (`Auto.added`, or `Only` when the task already has picked helpers); each group has Stop
-  (`stopHelp`). A parked lane reads "Too little left to split"; the live caption becomes "+ adds a
-  connection when enough is left to split".
+  "Not faster with NAS" (+ "Move to NAS" when it is always on and a fleet device, §3), "Helpers
+  aren't used: this link carries sign-ins · Share with NAS…". "Add help ▸" lists eligible helpers
+  and adds one to the task (`Auto.added`, or `Only` when the task already has picked helpers); each
+  group has Stop (`stopHelp`). A parked lane reads "Too little left to split"; the live caption
+  becomes "+ adds a connection when enough is left to split".
+- **Connections control**: the stepper, row menus and selection bar, which offer Auto since #353,
+  set this device's lanes only; helper groups change through "Add help" and Stop.
+  `autoSegmentsOf` (`InspectorControls.kt`) takes Auto's value from the count of local `LaneInfo`
+  (`instanceId == null`) on devices that list `task.lanes`, since the export (§6.10) is no longer
+  one segment per connection; other devices keep the segment count.
 - **Colour**: an explicit amendment of ux-redesign §3.2.5. Local lanes keep the accent ramp;
   relayed lanes use the helper's `deviceHue` with the same alpha ramp, and group headers carry the
   pennant. `LaneStrip` colours by `LaneInfo.instanceId` only when helpers are present.
 - **Activity tab**: stacked bands per device in pennant hue, as the Pulse sparkline already does
   under All devices. **Task row**: a small stack of helper pennants.
 - **Devices page** (owner role): a Helpers section with "Add helper" (shows an owner-role code and
-  link), each paired helper with "Helps This Mac download: Off · Picked downloads · Auto", "Share
-  sign-ins with NAS", "Shares this connection", Unpair and Block; other devices' cards show
-  "Helps This Mac download" only when the owner is the embedded device. Remote owners get the same
-  section through their own controller.
+  link), each paired helper with "Helps This Mac download: Off · Picked downloads ·
+  Automatically", "Share sign-ins with NAS", "Shares this connection", Unpair and Block; other
+  devices' cards show "Helps This Mac download" only when the owner is the embedded device.
+  Remote owners get the same section through their own controller.
 - **Sharing page** (helper role): "Help other devices download", a helper-role code and link
   (15-minute countdown), devices this one helps with Stop, and limits. iOS has no Sharing page, so
   its helper role sits on the Devices page. Android adds "Help over mobile data". The card chip
   reads "Sharing :8642 · Helping :8643".
 - **Presence**: `DevicePresence` reads `HelpingStatus`, so a helper's live line reads "Helping ·
   3 MB/s" in the sidebar, switcher and Pulse bar; All devices counts speed once, at the owner.
-- `KetchCommands` gains "Get help from ▸ device" and "Stop help". Send to keeps whole-task
-  dispatch; `forDevice()` resets `helpers`.
+- `KetchCommands` gains "Get help from ▸ device" and "Stop help". Send to and Move to stay the
+  whole-task tools, carrying data once task transfer's keyed `AppState.sendTo` lands
+  (task-transfer.md §12.1); `forDevice()` and the transfer manifest reset `helpers` (§5.1). While
+  a transfer runs, the row and inspector show its progress overlay instead of lanes: a frozen task
+  has none.
 - Copy: glossary rows for "helper", "help (with a download)" and "helper link"; strings in
   `strings_helpers.xml` as `UiText`, passing `HardcodedTextTest` and `LocalizationResourcesTest`;
   colours only from `KetchColors.deviceHue`. Android's lane `ProgressStyle` takes device hues.
+  "Auto" already names the speed mode and, since #353, the connection count ("Auto (4)"), so
+  helper modes read "Picked downloads" and "Automatically" and the Connections tab never shows two
+  different Autos.
 
 ### 14.5 CLI
 
@@ -1306,68 +1436,78 @@ ketch server [--helping]                  # starts RelayServer per [helping]
 ```
 
 `ketch helpers` is a client of the running daemon's admin API through `RemoteKetch` (loopback and
-the configured token by default). The one-shot `ketch <url> --helpers` loads identity and pairings
-from `device.json` under an exclusive file lock; when a daemon holds it, it exits with "Helpers
-are in use by the Ketch daemon here; add the download there", since two processes with one
-`instanceId` would abort each other's sessions.
+the configured token by default). The desktop app, `ketch server` and `ketch mcp` share `ketch.db`
+and so one `instanceId`, and two processes using it would abort each other's sessions, so helper
+roles take task transfer's store lock (task-transfer.md §7.9), generalized to every
+instance-to-instance feature and taken by whichever process first uses one; `ketch mcp` never
+takes it. The one-shot `ketch <url> --helpers` takes it to load the pairings and, when the desktop
+app or a daemon holds it, exits with "Helpers are in use by Ketch here; add the download there".
 
 ## 15 Code changes by module
 
 | Module | Changes |
 | --- | --- |
-| `library:api` | `HelperPolicy`, `LaneInfo`, `TaskLanes`, `api.helper.*`; `DownloadRequest.helpers`; `KetchStatus.instanceId`; `DownloadTask.lanes`/`setHelpers`/`stopHelp`; `KetchApi.helpers`; `@KetchInternalApi`; shared sign-in classifier; `redactUrl` fragment masking |
-| `library:core` | `core.lane`: `RangeLedger`, `LaneScheduler`, `LaneTuning`, `EgressGroup`, `LaneFailure`, SPI, `HttpRangeFetcher`, `RepresentationPin`, `RangeResponseValidator`, `PinAdjudicator`, `AuditSampler`; `core.hash.Sha256` (moved, public opt-in); `HttpEngine.fetch`; `FileAccessor.readAt`; durable Apple flush; `ServerInfo.date`/`contentEncoding`; network engines' `fetch`; `HttpDownloadSource` pin + scheduler; `DownloadExecution` checkpoints and narrowed retry; `DownloadContext.lanes`/`executionNonce`; `TaskHandle.planned`; `Ketch(instanceId, laneMode, laneTuning)`, `laneProvider`, `helperController`, `helperRuntime`, `shutdown`; `DownloadCoordinator` closing flag; later delete `SegmentedDownloadHelper`, `SegmentDownloader`, `resegment`, `pendingResegment` |
+| `library:api` | `HelperPolicy` with `HelperPolicySerializer`, `LaneInfo`, `TaskLanes`, `api.helper.*`; `DownloadRequest.helpers`; `KetchFeatures.TASK_LANES`/`HELPERS`; `HelpersUnavailableReason.UNKNOWN_SIZE`; `DownloadTask.lanes`/`setHelpers`/`stopHelp`; `KetchApi.helpers`; `@KetchInternalApi`; signed-URL keys in task transfer's sign-in classifier (`KetchStatus.instanceId` is its F7); `redactUrl` fragment masking |
+| `library:core` | `core.lane`: `RangeLedger`, `LaneScheduler`, `LaneTuning`, `EgressGroup`, `LaneFailure`, SPI, `HttpRangeFetcher`, `RepresentationPin`, `RangeResponseValidator`, `PinAdjudicator`, `AuditSampler`; `core.hash.Sha256` (moved, public opt-in); `HttpEngine.fetch`; core `FileReader` in task-transfer.md §7.4's shape unless its M1 added it; durable Apple flush; `ServerInfo.date`/`contentEncoding`; network engines' `fetch`; `HttpDownloadSource` pin + scheduler; `DownloadExecution` checkpoints and narrowed retry; `DownloadContext.lanes`/`executionNonce`; `TaskHandle.planned`; `Ketch(laneMode, laneTuning)`, `Ketch.instanceId` from the store, `Ketch.features`, `laneProvider`, `helperController`, `helperRuntime`, `shutdown` joining executions (the `DownloadCoordinator.closing` flag exists since #353); later delete `SegmentedDownloadHelper`, `SegmentDownloader`, `resegment`, `pendingResegment` |
 | `library:ktor` | `KtorHttpEngine.fetch` with metadata, preconditions, identity encoding and stop |
 | `library:ftp` | `FtpRangeFetcher`; leaves `SegmentedDownloadHelper`; 421 → Throttled |
 | `library:torrent` | Imports core `Sha256`; nothing else |
 | `library:relay` (new; android, ios, jvm) | `RelayCrypto` (expect/actual HMAC, AES-CTR, ECDH, digests, random; HKDF), `InviteCodec`, pairing and session handshakes, `KeyWrapper` actuals, `RelayFrameCodec`, `RelayClient`, `RemoteRelayFetcher`, `ReverseRelayFetcher`, `HelperManager` (`LaneProvider` + `HelperController`; eligibility, gain, slots, audits path, digests), `RelayService`, `RelayUrlPolicy` + guarded engine, `ReverseLaneClient` |
-| `library:server` | `RelayServer` (CIO, sealed realm, `Origin` refusal, socket caps, LAN binding through `pairingAddresses` and its interface filter, moved here from `app/shared/util/PairingLink.kt` so the CLI daemon binds the same addresses); `/api/helpers` admin routes over `ketch.helpers` with the loopback rule; task helper routes; `?lanes=1`; route-set parameter; `coerceInputValues`; constant-time bearer compare; blank token treated as none |
+| `library:server` | `RelayServer` (CIO, sealed realm, `Origin` refusal, socket caps, LAN binding through `pairingAddresses`' interface filter without its virtual-interface fallback, moved here from `app/shared/util/PairingLink.kt` so the CLI daemon binds the same addresses); `/api/helpers` admin routes over `ketch.helpers` with the loopback rule; task helper routes; `?lanes=1`; one opt-in route set shared with task transfer's `transfers` flag; `coerceInputValues` and constant-time bearer compare (its F10b, whichever lands first); blank token treated as none |
 | `library:endpoints` | `Api.Helpers`, `Api.Relay`, models, `TaskEvent.LanesChanged`, `TaskSnapshot.lanes` |
-| `library:remote` | `RemoteHelperController` (non-null, `supported` probed on connect); `RemoteDownloadTask.lanes`/`setHelpers`/`stopHelp`; `?lanes=1` |
-| `config` | `HelpersSettings`, `HelpingSettings`; `DeviceStore` (`device.json`, 0600, pluggable `KeyWrapper`) |
-| `app/shared`, platforms | Devices and Sharing helper sections, confirmation sheet, inspector lanes by device, `LaneInfo`-driven `ConnectionsTab`/`LaneStrip`, `deviceHue` by instance id, `RemoteConfig.instanceId`, `DevicePresence` helping line, `MdnsDiscoverer.browse`, `ketch://helper` intake, `ForegroundPolicy`, Android backup rules, `InstanceFactory` wiring of `HelperManager` and `RelayServer` |
+| `library:remote` | `RemoteHelperController` (non-null, `supported` from `KetchStatus.features`); `RemoteDownloadTask.lanes`/`setHelpers`/`stopHelp`, response lanes guarded by `appliedEvents` (#353); `?lanes=1` |
+| `config` | `HelpersSettings`, `HelpingSettings`; `PairingStore` (`pairings.json`, 0600, bound to the store's `instanceId`, pluggable `KeyWrapper`) |
+| `app/shared`, platforms | Devices and Sharing helper sections, confirmation sheet, inspector lanes by device, `LaneInfo`-driven `ConnectionsTab`/`LaneStrip`, `deviceHue` by instance id (`RemoteConfig.instanceId` comes with task transfer's F7), `autoSegmentsOf` from local lanes, `DevicePresence` helping line, Move to <device> from the inspector, `MdnsDiscoverer.browse`, `ketch://helper` intake (manifest host, `isPairingLink` sibling), `ForegroundPolicy`, Android backup rules, `InstanceFactory` wiring of `HelperManager` and `RelayServer` |
 | `cli` | `helpers` client commands, `--helpers`, `RelayServer` in `server` |
 | `docs` | `architecture.md` (lanes), ux-redesign §3.2.5 and W5 amendments, glossary rows, new `docs/helpers.md` |
 
-Prerequisite fixes (PR1), each verified at `ec52a306` and rechecked at `5fb13b3f`:
+Prerequisite fixes (PR1), each verified at `ec52a306` and rechecked at `2f274a45` (after #353 and
+#354). Items 1, 7 and 8 are task transfer's M0 or hardening fixes F2, F6 and F10b, and item 2
+contains its F3; whichever stack lands first carries them:
 
 | # | Hazard | Evidence at HEAD | Fix |
 | --- | --- | --- | --- |
-| 1 | Pausing or crashing before an HTTP or FTP source plans segments persists `[]`; resume then completes a zero-filled file | `DownloadExecution.runDownload`'s final save persists `handle.mutableSegments.value` (initially `[]`); `DownloadCoordinator.resume` accepts `[]` (`segments ?: return false`); `HttpDownloadSource.resume` → `validateLocalFile` preallocates and returns `[]`; `SegmentedDownloadHelper.downloadAll` reports total/total. Reachable through the `applyRateLimit` delay | For sources that plan byte segments (`!managesOwnFileIo`): a `planned` flag maps to `null` at persistence; `[]` with `totalBytes > 0` is unplanned; a fresh restart reuses `record.outputPath`. A torrent paused while waiting for an active slot (`TorrentDownloadSource.withActiveSlot`) legitimately persists `[]` and keeps resuming through `TorrentDownloadSource.resume`; so does an unknown-size stream (`totalBytes < 0`), which restarts through `HttpDownloadSource.resume` |
+| 1 | Pausing or crashing before an HTTP or FTP source plans segments persists `[]`; resume then completes a zero-filled file | `DownloadExecution.runDownload`'s final save persists `handle.mutableSegments.value` (initially `[]`); `DownloadCoordinator.resume` accepts `[]` (`segments ?: return false`); `HttpDownloadSource.resume` → `validateLocalFile` preallocates and returns `[]`; `SegmentedDownloadHelper.downloadAll` reports total/total. Reachable through the `applyRateLimit` delay, also with no user action: an URGENT task that preempts the victim there resumes it on its own (`DownloadQueue.startTask` → `DownloadCoordinator.resume`; `Paused(Preempted)` since #353) | For sources that plan byte segments (`!managesOwnFileIo`): a `planned` flag maps to `null` at persistence; `[]` with `totalBytes > 0` is unplanned; a fresh restart reuses `record.outputPath`. A torrent paused while waiting for an active slot (`TorrentDownloadSource.withActiveSlot`) legitimately persists `[]` and keeps resuming through `TorrentDownloadSource.resume`; so does an unknown-size stream (`HttpResumeState.totalBytes < 0`, #354), whose `downloadUnknownSize` sets `planned` with `[]` and restarts in place through `HttpDownloadSource.resume`. `DownloadQueue.startTask` already falls back to `start` when `resume` returns `false`, so preempted tasks need no queue change |
 | 2 | Checkpoints can exceed durable bytes | `saveJob` and the `NonCancellable` final save never flush; `DownloadCoordinator.pause` flushes right after `job.cancel()`, before the final save; on Apple targets okio's flush is `fflush` | Snapshot → sync → persist; `F_FULLFSYNC` on Apple (§9.7) |
-| 3 | `Ketch.close()` deletes partial files and does not wait | `close()` cancels the coordinator scope and closes the dispatchers; `cleanupAfterExecution` still sees `Downloading` and deletes | `Ketch.shutdown(grace)`; `close()` marks closing so cleanup never deletes; records stay restorable |
+| 3 | `Ketch.close()` does not wait for final checkpoints | Since #353 `DownloadCoordinator.close` sets `closing`: tasks pause for `Shutdown`, `cleanupAfterExecution` keeps the file (`shuttingDown`) and records stay `DOWNLOADING` or `QUEUED`. But `Ketch.close` then cancels the coordinator scope and closes the engine and dispatchers at once, so nothing joins each execution's `NonCancellable` final save or `FileAccessor.close`, and the record keeps the last periodic save | `Ketch.shutdown(grace)` joins the executions (snapshot → sync → persist, §9.7) before `close()`. Deleting after a failure or `remove(false)` stays task transfer's F1 |
 | 4 | Writes after close recreate the file | `PathFileAccessor.getOrCreateHandle` reopens and creates parents | Closed flag; `writeAt` after `close()` throws |
 | 5 | One execution's `Error` can cancel every execution | `DownloadCoordinator.scope = CoroutineScope(dispatchers.network)` | Add `SupervisorJob()` |
 | 6 | Speed spike after resume | `buildContext` starts `lastBytes` at 0 | Seed it from the first report |
 | 7 | Strict resume-state decode | `Json.decodeFromString<HttpResumeState>` | `ignoreUnknownKeys` + old-JSON tests |
-| 8 | Bearer compared with `==`; a blank token half-applied | `KetchServer.configureServer` (`apiToken != null`) vs `startMdnsRegistration` (`isNullOrBlank`) | Constant-time compare; blank → `null` |
+| 8 | Bearer compared with `==`; a blank token half-applied | `KetchServer.configureServer` (`apiToken != null`, `credential.token == expectedToken`) vs `startMdnsRegistration` and #352's `pairing` field (`isNullOrBlank`): a blank token installs `Authentication` and skips `HostValidator`/`CrossOriginGuard` while mDNS says `token=none` and pairing is off | Constant-time compare; blank → `null` |
 
 Already fixed at HEAD and dropped: pause before the first byte (`RealDownloadTask.pause` accepts
-`Queued`); `setConnections`/`setSpeedLimit` on inactive tasks (persisted under `settingsMutex`);
-CLI `server` restoring tasks and advertising mDNS (`Main.kt` listens, then `ketch.start()`;
-`KetchServer.start` registers before `awaitStop`); `updateConfig` promoting queued tasks
-(`DownloadQueue.updateLimits`); the stale `supervisorScope` claim in `docs/architecture.md`; CORS
-`*` on tokenless servers (`HostValidator`, `CrossOriginGuard`). The mDNS self-filter is PR2.
+`Queued`); `Ketch.close()` deleting partial files (#353: `DownloadCoordinator.closing`,
+`PauseReason.Shutdown`); `setConnections`/`setSpeedLimit` on inactive tasks (persisted under
+`settingsMutex`); CLI `server` restoring tasks and advertising mDNS (`Main.kt` listens, then
+`ketch.start()`; `KetchServer.start` registers before `awaitStop`); `updateConfig` promoting queued
+tasks (`DownloadQueue.updateLimits`); the stale `supervisorScope` claim in `docs/architecture.md`;
+CORS `*` on tokenless servers (`HostValidator`, `CrossOriginGuard`). The mDNS self-filter is PR2.
 
 ## 16 Delivery plan and testing
 
 Each PR ships on its own. Helpers stay invisible in the apps until PR10; PR8 and PR9 are reachable
 only through the CLI and `[helping] enabled`.
 
-1. **PR1 prerequisite fixes** (§15). Exit: one regression test per item, including
-   `pause_beforeSegmentsPlanned_persistsNull`, `resume_emptySegments_startsFresh`,
-   `torrent_pausedWhileWaitingForSlot_resumesThroughSource`,
-   `close_duringDownload_keepsPartialFile`, and a `FakeFileAccessor` whose `crash()` drops
-   unsynced writes, proving persisted segments never exceed synced bytes.
-2. **PR2 identity**: `DeviceStore` with `instanceId`, `Ketch(instanceId)`, `KetchStatus.instanceId`,
-   `RemoteConfig.instanceId`, mDNS `boot` nonce and `pv`, app self-filter and `deviceHue` by
-   instance id, Android backup rules. Exit: old status JSON decodes; Add device hides this device
-   by its nonce; a store restored without its wrapping key yields a new id.
+1. **PR1 prerequisite fixes** (§15), minus those task transfer's M0 already shipped. Exit: one
+   regression test per item, including `pause_beforeSegmentsPlanned_persistsNull`,
+   `resume_emptySegments_startsFresh`, `preempt_beforeSegmentsPlanned_downloadsOriginBytes` (an
+   URGENT task preempts a victim in `applyRateLimit`'s delay; the victim resumes on its own and
+   completes with the origin's bytes), `torrent_pausedWhileWaitingForSlot_resumesThroughSource`,
+   #354's `resume_unknownSize_restartsFromZero` unchanged,
+   `shutdown_duringDownload_joinsFinalCheckpoint` (#353's `KetchCloseTest` already covers the kept
+   partial file), and a `FakeFileAccessor` whose `crash()` drops unsynced writes, proving persisted
+   segments never exceed synced bytes.
+2. **PR2 identity in the apps**, after task transfer's F7 (M0), which adds `instanceId`,
+   `KetchStatus.instanceId`, `RemoteConfig.instanceId` and refusal of the app's own server: mDNS
+   `boot` nonce and `pv`, the Add device self-filter by nonce, `deviceHue` by instance id. Exit:
+   Add device hides this device by its nonce; a device keeps its hue across an address change.
 3. **PR3 range correctness** under `LaneMode.LANES`: `HttpEngine.fetch` with stop and network,
    validator, pin with aliases, `If-Range` + `If-Match`/`If-Unmodified-Since`, identity encoding,
-   adjudicator, re-pin, resume through the adjudicator, `FileAccessor.readAt`, `Sha256` to core,
-   wrappers overriding `fetch`. Exit: `RangeResponseValidatorTest` (exact 206, `*` locally and
-   relayed, wrong total, weak ETag, gzip, 416, 200 with and without the pinned validator);
+   adjudicator, re-pin, resume through the adjudicator, core `FileReader` in the shape of
+   task-transfer.md §7.4 unless its M1 added it, `Sha256` to core, wrappers overriding `fetch`.
+   Exit: `RangeResponseValidatorTest` (exact 206, `*` locally and relayed, wrong total, weak ETag,
+   gzip, 416, 200 with and without the pinned validator);
    `PinAdjudicatorTest` (alias on equal windows, no alias on a changed first or last window,
    FileChanged only after consistent probes, no FileChanged while any group still sees the pin,
    re-pin before the first commit, probes deferred during `Retry-After`). Integration in both
@@ -1386,7 +1526,9 @@ only through the CLI and `[helping] enabled`.
 5. **PR5 `LaneScheduler` for HTTP, local lanes**, under `LaneMode.LANES`, plus `LaneInfo`,
    `TaskLanes`, `DownloadTask.lanes`, `TaskSnapshot.lanes`, `?lanes=1` and the apps'
    `ConnectionsTab`/`LaneStrip` reading `LaneInfo`. Exit: `HttpDownloadIntegrationTest` in both
-   modes, its PAUSE_FIRST engine hooking `fetch`.
+   modes, its PAUSE_FIRST engine hooking `fetch`; #354's
+   `download_unknownSize_streamsAndRecordsSize` and `resume_unknownSize_restartsFromZero` keep their
+   request lists (`none`; `none`, `none`).
    `setConnections_restartsActiveTransferWithoutLosingBytes` keeps 3 requests in legacy mode; in
    lanes mode its 65,539-byte file is below every split floor, so with a short `LaneTuning` stall
    bound the new lane parks and the blocked lane is stall-revoked: 2 requests. A new 16 MiB case
@@ -1396,8 +1538,13 @@ only through the CLI and `[helping] enabled`.
    cancels siblings nor ends the task while others progress; 429 halves only its group; a solo task
    told `Retry-After: 120` completes; fast-failing helper lanes during a local pause do not fail the
    task; streak and watchdog failures; progress never exceeds bytes written; truncation writes only
-   the allowed prefix and logs no error. An old-client decode of a `TaskSnapshot` carrying an
-   unknown `LaneState` falls back to the default instead of failing the task list.
+   the allowed prefix and logs no error; twins of #353's Auto cases in
+   `SegmentedDownloadHelperTest` (`setConnections(0)` converges to the run config's
+   `maxConnectionsPerDownload`, an equal effective count changes nothing, a change made while a
+   lane drains still applies), except that Auto never lifts a cap set by 429 or
+   `RateLimit-Remaining` and a 429 leaves `maxConnections` untouched. An old-client decode of a
+   `TaskSnapshot` carrying an unknown `LaneState` falls back to the default instead of failing the
+   task list.
 6. **PR6 FTP on the scheduler**. Exit: `:library:ftp:jvmTest` green; a live connection change that
    restarts no other lane.
 7. **PR7 flip and delete**: default `LANES` once both modes pass and a loopback benchmark (1 GiB
@@ -1406,7 +1553,9 @@ only through the CLI and `[helping] enabled`.
 8. **PR8 `library:relay` foundation + `RelayServer`**, CLI only: crypto actuals, ECDH, helper links
    in both roles, the three-message pairing with SAS, sessions and replay window, `hello`/`status`,
    admin `/api/helpers` with the loopback and forwarding-header rules, route-set parameter,
-   `DeviceStore` pairings and key wrapping, `redactUrl` fragments, CLI `ketch helpers`. Exit: RFC
+   `PairingStore` with key wrapping and Android backup exclusion, dropping pairings restored
+   without their key or made under another `instanceId`, the shared store lock (§14.5),
+   `redactUrl` fragments, CLI `ketch helpers`. Exit: RFC
    4231 HMAC, RFC 5869 HKDF, AES-CTR and P-256 ECDH vectors on JVM and `iosSimulatorArm64`, plus a
    JVM↔iOS handshake transcript; off-curve key rejected; replay, stale timestamp and wrong-hint
    rejection; known-answer vectors for both directions and for a multi-order `orders` response, each
@@ -1433,9 +1582,11 @@ only through the CLI and `[helping] enabled`.
    a task; output SHA-256 equal to the origin's every time.
 10. **PR10 apps**: Devices and Sharing helper sections, confirmation sheet with SAS, inspector by
     device with per-task Add help and Stop, exclusion copy, colour amendment, presence line,
-    remote-device rules, glossary and strings. Auto becomes reachable in the apps here. Exit:
-    `RemoteKetch` MockEngine tests (lanes decode, an unknown enum value decodes to `UNKNOWN`, 404 →
-    `supported == false`); snapshot scenarios under `-Psnapshots`.
+    remote-device rules, glossary and strings. `HelperPolicy.Auto` becomes reachable in the apps
+    here. Exit: `RemoteKetch` MockEngine tests (lanes decode, an unknown enum value decodes to
+    `UNKNOWN`, a status without the `helpers` feature gives `supported == false`, a command
+    response never overwrites lanes from a newer `lanes_changed`); snapshot scenarios under
+    `-Psnapshots`.
 11. **PR11 Android helper (second WAN)**, gated on the PR9 harness and one real VPS measurement:
     `RelayServer` in `KetchService`, cellular-bound relay engine, "Help over mobile data",
     `WifiLock`, `ForegroundPolicy`, metered and battery gates, drain on `onTimeout`. Exit:
@@ -1447,13 +1598,23 @@ only through the CLI and `[helping] enabled`.
     localization.
 14. **PR14 optional**: FTP relay.
 
+Order against task transfer (task-transfer.md §14): its F7 (M0) lands before PR2, which builds on
+its `instanceId`; the fixes PR1 shares with M0 (§15) ship with whichever lands first. PR3 and M1
+are independent: the later one adds `FileReader` in the agreed shape or moves
+`SourceTransfer.probeOrigin` onto the conditional probe (§9.4). M1 and PR5 change the same files
+(`DownloadCoordinator`, `DownloadExecution`, `HttpDownloadSource`) but not the same behaviour;
+once both are in, transfer's core integration tests run in both `LaneMode`s, and after PR9
+`CooperativeDownloadIntegrationTest` moves a helped task with pending audits (§9.6).
+
 Testing follows `docs/development/testing.md`: `kotlin.test` and `kotlinx-coroutines-test` only;
 hand-written fakes (`FakeRangeFetcher`, `FakeHttpEngine` with `fetch`, `FakeFileAccessor` with
 written and synced interval sets and `crash()`, a fake `TimeSource`, a `FakeRelayTransport` that
 drops, delays, duplicates, reorders and partitions); `commonTest` by default, jvmTest only for
 sockets, `testApplication`, SQLite and platform crypto; algorithms tested through production code
 (the split formula through `RangeLedger`); no data-class or plain serialization tests, but
-old-JSON decode tests for `HttpResumeState`, `KetchStatus`, `DownloadRequest` and `TaskSnapshot`;
+old-JSON decode tests for `HttpResumeState`, `KetchStatus`, `DownloadRequest` and `TaskSnapshot`
+(extending #353's `KetchStatusTest` and `TaskSnapshotCompatibilityTest`), and an unknown
+`HelperPolicy` type decoding as `Off`;
 every integration case bounded by a timeout and cleaning up servers, clients and temp files.
 
 ## 17 Alternatives considered
@@ -1463,7 +1624,8 @@ every integration case bounded by a timeout and cleaning up servers, clients and
 | **Swarm**: every instance a peer over hash-sealed pieces, an elected soft-state tracker, multiple consumers | Taxes solo downloads (2 MiB runs, SHA-256 per piece, frequent fsync), redefines `Segment` and `maxConnectionsPerHost`, needs a state directory core lacks, tracker epochs collide under partition, a pause can trigger adoption | Signed-query classification; secrets in memory only; owner cross-checks of helper bytes (audits); per-URL origin byte cap; `Sha256` moved to core; `shutdown(grace)`; deterministic churn simulator; constant-time bearer compare |
 | **Leased workers**: helpers dial out, take TTL leases on piece runs and push verified 1 MiB slices | The owner must listen (no iPhone owners; Android owners expose a server), stop-and-wait slices cap WAN lanes, content staged on phones, the largest protocol surface | Reverse-lane fencing (verify-then-write, fence re-checked under the write lock, nonce per execution); snapshot → sync → persist; task-level watchdog; session counters with a sliding replay window; DRAIN/NOW/BLOCK; daily budgets, metered and battery gates; benchmark gate; a finite-timeout relay client |
 | **Incremental**: same topology, opt-in scheduler, bearer tokens between devices, engine overload | Cleartext bearer tokens on the relay plane; two schedulers and two retry layers without a removal date; writes under the slot lock; no adjudication | Admin-route hardening; additive `HttpEngine` overload; a constructor switch with the suite in both modes; a helper hook (`helperRuntime`); manual redirects in a guarded relay engine; `excludeHosts`; draining low contributors; "create it on the daemon" guidance |
-| Keys derived from a device access token | The token is a user-chosen cleartext bearer that grants full admin; one sniffed proof allows an offline guess, and the owner would receive another device's admin rights | Controller-minted invites through the admin API |
+| Keys derived from a device access token | The token is a cleartext bearer that grants full admin (user-chosen on the CLI or in `config.toml`, a random UUID in the apps, which since #352 also hand it to every device their user allows); one sniffed proof allows an offline guess of a chosen one, and the owner would receive another device's admin rights | Controller-minted invites through the admin API |
+| Admit helpers through `/api/pairing` (#352): fetch the helper's access token, then use the controller route | Grants control where only help was asked, and an offer of help would give the helper control of its owner; needs a token-holding admin server with an approver on the asked device (none on iOS or the CLI daemon); its four digits are chosen by the requester and sent in cleartext, so they authenticate no key | Open question 11 |
 | Static PSK keys without ECDH | No forward secrecy; a leaked key decrypts recorded traffic | — |
 | Demote a task to unpinned after validator flaps | Drops validator checks exactly where versions can mix | Aliasing by comparing committed windows |
 | Relay `HttpEngine` inside `MultiNetworkHttpEngine` | Global, not per task; round-robin by request count, HEAD included; removal only by drain; a new relay idles until a resegment; a lost one triggers a whole-download retry | Per-network egress groups |
@@ -1509,7 +1671,8 @@ Risks:
 Open questions for the owner:
 
 1. Which use case is primary: aggregating different WANs (VPS, cellular) or offloading to an
-   always-on daemon? The second is better served by hand-off. Settle before PR8.
+   always-on daemon? The second is task transfer's MOVE (task-transfer.md), which keeps the partial
+   file. Settle before PR8.
 2. Should relayed bytes count against the owner's global speed limit? (Proposed: yes, §12.)
 3. Sealing from platform primitives (proposed), or `cryptography-kotlin` for AES-GCM?
 4. Never relay unpinned origins (proposed), or allow it behind a per-task flag?
@@ -1517,7 +1680,35 @@ Open questions for the owner:
 6. Helper defaults: yield to its own downloads, refuse metered networks, 2 GiB per owner per day
    on phones, 50 GiB on desktops and daemons?
 7. Is FTP relay (PR14) worth building?
-8. Should hand-off of a task with its partial file and ledger be designed next?
+8. Hand-off with the partial file is task transfer's (§9.6 covers relayed bytes). Should "Move to
+   <device>" also be offered for a helper that is not a fleet device, by first adding it as a
+   device through #352's approval when it advertises `pairing=1`?
 9. Should desktop and CLI owners run the relay listener by default (`acceptReverse`), which
    owner-role helper links and reverse lanes need?
 10. Is a second listening port (8643) acceptable on desktop and Android helpers?
+11. Should helper pairing also take a request from a device found on the network, as controller
+    pairing does since #352, but on the relay plane and authenticated by a 6-digit code both users
+    compare, committed before either ECDH key is seen, so no link or camera is needed?
+12. Should a fleet device whose access code the app holds become a helper through the controller
+    route without asking its user (proposed, as that code already grants control), or should every
+    helper pairing ask the helper's user? Since #352 more devices hold codes.
+
+Alignment with [task-transfer.md](../plans/task-transfer.md), which needs these changes to match
+this document (not made here):
+
+1. **Identity (F7).** Pairings and device hues are keyed by its `instanceId`, so its fingerprint
+   must not change while a device keeps its store: a platform machine id instead of the host name,
+   which macOS may take from DHCP; on Android and iOS, where a restored backup repeats the database
+   path and user, a non-exportable Keystore or Keychain key whose absence marks a restored store.
+2. **Store lock.** `<db>.transfer-lock` becomes the lock every instance-to-instance feature takes
+   (§14.5); a holder with transfers disabled leaves transfer rows alone.
+3. **Manifest.** `DownloadRequest.helpers` is reset to `Auto()`; the HTTP portable state gains a
+   defaulted `aliases`; exports follow §9.6 for relayed bytes with pending audits.
+4. **Origin preflight.** After PR3, HTTP `probeOrigin` is the conditional ranged probe through
+   `PinAdjudicator`, not HEAD: a different strong validator with the same length answers `weak`,
+   not `origin_changed` (§9.4).
+5. **Sign-ins and routes.** `isSensitiveHeader` covers §11's signed-URL keys; `transfers` and the
+   helper routes form one opt-in route set (§5.1).
+6. **Words.** "Peer" is BitTorrent's (§4): `TransferPeer`, `detail.peer` and `peer_unreachable`
+   take device wording; the RELAY route and `allowRelay` collide with the relay plane, and "owner
+   token" reads as the task owner's.
