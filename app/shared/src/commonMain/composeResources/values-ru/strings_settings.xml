@@ -441,14 +441,13 @@
   <string name="settings_sharing_off_hint">Ketch откроет доступ к загрузкам %1$s в вашей сети под защитой кода.</string>
   <string name="settings_sharing_allow">Разрешить другое устройство</string>
   <string name="settings_sharing_looking">Определяется сетевой адрес Ketch %1$s…</string>
-  <string name="settings_sharing_unreadable_address">Ketch %1$s не может определить свой адрес. На другом устройстве откройте http://&lt;его адрес&gt;:%2$s и введите код из раздела «Дополнительно».</string>
+  <string name="settings_sharing_unreadable_address">Ketch %1$s не может определить свой адрес. На другом устройстве введите в Ketch &lt;его адрес&gt;:%2$s и код из раздела «Дополнительно».</string>
   <string name="settings_sharing_no_address">%1$s не имеет сетевого адреса. Подключитесь к Wi-Fi или Ethernet.</string>
-  <string name="settings_sharing_scan_other">Отсканируйте камерой другого устройства или откройте</string>
-  <string name="settings_sharing_scan_phone">Отсканируйте камерой телефона или откройте</string>
+  <string name="settings_sharing_scan_other">Отсканируйте камерой другого устройства или введите этот адрес в Ketch</string>
+  <string name="settings_sharing_scan_phone">Отсканируйте камерой телефона или введите этот адрес в Ketch</string>
   <string name="settings_sharing_also">а также %1$s</string>
   <string name="settings_sharing_copy_link">Копировать ссылку для сопряжения</string>
   <string name="settings_sharing_copied">Скопировано</string>
-  <string name="settings_sharing_open_web">Открыть веб-приложение</string>
   <string name="settings_sharing_anyone">Любой, у кого она есть, может управлять загрузками %1$s.</string>
   <string name="settings_sharing_new_code">Новый код</string>
   <string name="settings_sharing_new_code_hint">Отключает все уже сопряжённые устройства</string>

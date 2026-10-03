@@ -419,14 +419,13 @@
   <string name="settings_sharing_off_hint">Ketch comparte %1$s en tu red, protegido con un código.</string>
   <string name="settings_sharing_allow">Permitir otro dispositivo</string>
   <string name="settings_sharing_looking">Buscando la dirección de red de %1$s…</string>
-  <string name="settings_sharing_unreadable_address">Ketch no puede leer la dirección de %1$s. En el otro dispositivo, abre http://&lt;su dirección&gt;:%2$s con el código de Avanzado.</string>
+  <string name="settings_sharing_unreadable_address">Ketch no puede leer la dirección de %1$s. En el otro dispositivo, introduce &lt;su dirección&gt;:%2$s en Ketch con el código de Avanzado.</string>
   <string name="settings_sharing_no_address">%1$s no tiene dirección de red. Conéctate a una red Wi-Fi o Ethernet.</string>
-  <string name="settings_sharing_scan_other">Escanea con la cámara de otro dispositivo o abre</string>
-  <string name="settings_sharing_scan_phone">Escanea con la cámara de tu teléfono o abre</string>
+  <string name="settings_sharing_scan_other">Escanea con la cámara de otro dispositivo o introduce esta dirección en Ketch</string>
+  <string name="settings_sharing_scan_phone">Escanea con la cámara de tu teléfono o introduce esta dirección en Ketch</string>
   <string name="settings_sharing_also">también %1$s</string>
   <string name="settings_sharing_copy_link">Copiar enlace de vinculación</string>
   <string name="settings_sharing_copied">Copiado</string>
-  <string name="settings_sharing_open_web">Abrir la app web</string>
   <string name="settings_sharing_anyone">Cualquiera que lo tenga puede controlar %1$s.</string>
   <string name="settings_sharing_new_code">Código nuevo</string>
   <string name="settings_sharing_new_code_hint">Desconecta los dispositivos vinculados hasta ahora</string>

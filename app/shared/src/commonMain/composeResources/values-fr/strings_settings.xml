@@ -419,14 +419,13 @@
   <string name="settings_sharing_off_hint">Ketch partage %1$s sur votre réseau, protégé par un code.</string>
   <string name="settings_sharing_allow">Autoriser un autre appareil</string>
   <string name="settings_sharing_looking">Recherche de l'adresse réseau de %1$s…</string>
-  <string name="settings_sharing_unreadable_address">Ketch ne peut pas lire l'adresse de %1$s. Sur l'autre appareil, ouvrez http://&lt;son adresse&gt;:%2$s avec le code indiqué dans Avancé.</string>
+  <string name="settings_sharing_unreadable_address">Ketch ne peut pas lire l'adresse de %1$s. Sur l'autre appareil, saisissez &lt;son adresse&gt;:%2$s dans Ketch avec le code indiqué dans Avancé.</string>
   <string name="settings_sharing_no_address">%1$s n'a pas d'adresse réseau. Connectez-vous au Wi-Fi ou à Ethernet.</string>
-  <string name="settings_sharing_scan_other">Scannez avec l'appareil photo d'un autre appareil, ou ouvrez</string>
-  <string name="settings_sharing_scan_phone">Scannez avec l'appareil photo de votre téléphone, ou ouvrez</string>
+  <string name="settings_sharing_scan_other">Scannez avec l'appareil photo d'un autre appareil, ou saisissez cette adresse dans Ketch</string>
+  <string name="settings_sharing_scan_phone">Scannez avec l'appareil photo de votre téléphone, ou saisissez cette adresse dans Ketch</string>
   <string name="settings_sharing_also">également %1$s</string>
   <string name="settings_sharing_copy_link">Copier le lien d'appairage</string>
   <string name="settings_sharing_copied">Copié</string>
-  <string name="settings_sharing_open_web">Ouvrir l'app web</string>
   <string name="settings_sharing_anyone">Toute personne qui possède ce lien peut contrôler %1$s.</string>
   <string name="settings_sharing_new_code">Nouveau code</string>
   <string name="settings_sharing_new_code_hint">Déconnecte les appareils appairés jusqu'ici</string>

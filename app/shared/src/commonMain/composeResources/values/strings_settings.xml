@@ -554,18 +554,17 @@
   <string name="settings_sharing_off_hint">Ketch shares %1$s on your network, protected by a code.</string>
   <string name="settings_sharing_allow">Allow another device</string>
   <string name="settings_sharing_looking">Looking for the network address of %1$s…</string>
-  <!-- %2$s is the port Ketch listens on. Keep "http://" and ":" as they are. -->
-  <string name="settings_sharing_unreadable_address">Ketch can't read the address of %1$s. On the other device, open http://&lt;its address&gt;:%2$s with the code from Advanced.</string>
+  <!-- %2$s is the port Ketch listens on. Keep ":" as it is. -->
+  <string name="settings_sharing_unreadable_address">Ketch can't read the address of %1$s. On the other device, enter &lt;its address&gt;:%2$s in Ketch with the code from Advanced.</string>
   <!-- %1$s names this device on its own, such as "This Mac". -->
   <string name="settings_sharing_no_address">%1$s has no network address. Connect to Wi-Fi or Ethernet.</string>
-  <!-- Over the address of the web app, which shows on the next line. -->
-  <string name="settings_sharing_scan_other">Scan with another device's camera, or open</string>
-  <string name="settings_sharing_scan_phone">Scan with your phone's camera, or open</string>
+  <!-- Over this device's address, such as 192.168.1.20:8642, which shows on the next line. -->
+  <string name="settings_sharing_scan_other">Scan with another device's camera, or enter this address in Ketch</string>
+  <string name="settings_sharing_scan_phone">Scan with your phone's camera, or enter this address in Ketch</string>
   <!-- Follows the device's name and address after " · ". %1$s lists its other addresses. -->
   <string name="settings_sharing_also">also %1$s</string>
   <string name="settings_sharing_copy_link">Copy pairing link</string>
   <string name="settings_sharing_copied">Copied</string>
-  <string name="settings_sharing_open_web">Open web app</string>
   <!-- Under the pairing link: whoever has the link. -->
   <string name="settings_sharing_anyone">Anyone with it can control %1$s.</string>
   <string name="settings_sharing_new_code">New code</string>

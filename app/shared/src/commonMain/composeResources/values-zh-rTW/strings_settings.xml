@@ -408,14 +408,13 @@
   <string name="settings_sharing_off_hint">Ketch 會在你的網路上共享%1$s，並以存取碼保護。</string>
   <string name="settings_sharing_allow">允許其他裝置</string>
   <string name="settings_sharing_looking">正在尋找%1$s的網路位址…</string>
-  <string name="settings_sharing_unreadable_address">Ketch 無法讀取%1$s的位址。請在另一台裝置上，使用「進階」中的存取碼開啟 http://&lt;其位址&gt;:%2$s。</string>
+  <string name="settings_sharing_unreadable_address">Ketch 無法讀取%1$s的位址。請在另一台裝置的 Ketch 中，使用「進階」中的存取碼輸入 &lt;其位址&gt;:%2$s。</string>
   <string name="settings_sharing_no_address">%1$s 沒有網路位址。請連上 Wi-Fi 或乙太網路。</string>
-  <string name="settings_sharing_scan_other">用另一台裝置的相機掃描，或開啟</string>
-  <string name="settings_sharing_scan_phone">用手機的相機掃描，或開啟</string>
+  <string name="settings_sharing_scan_other">用另一台裝置的相機掃描，或在 Ketch 中輸入此位址</string>
+  <string name="settings_sharing_scan_phone">用手機的相機掃描，或在 Ketch 中輸入此位址</string>
   <string name="settings_sharing_also">還有 %1$s</string>
   <string name="settings_sharing_copy_link">複製配對連結</string>
   <string name="settings_sharing_copied">已複製</string>
-  <string name="settings_sharing_open_web">開啟網頁版</string>
   <string name="settings_sharing_anyone">任何擁有此連結的人都能控制%1$s。</string>
   <string name="settings_sharing_new_code">新存取碼</string>
   <string name="settings_sharing_new_code_hint">會中斷目前已配對的裝置</string>

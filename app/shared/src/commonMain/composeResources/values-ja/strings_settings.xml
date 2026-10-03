@@ -408,14 +408,13 @@
   <string name="settings_sharing_off_hint">Ketchは%1$sをコードで保護して、ネットワークに共有します。</string>
   <string name="settings_sharing_allow">別のデバイスを許可</string>
   <string name="settings_sharing_looking">%1$sのネットワークアドレスを確認中…</string>
-  <string name="settings_sharing_unreadable_address">Ketchは%1$sのアドレスを取得できません。もう一方のデバイスで http://&lt;このデバイスのアドレス&gt;:%2$s を開き、「詳細」にあるコードを使ってください。</string>
+  <string name="settings_sharing_unreadable_address">Ketchは%1$sのアドレスを取得できません。もう一方のデバイスの Ketch に &lt;このデバイスのアドレス&gt;:%2$s を入力し、「詳細」にあるコードを使ってください。</string>
   <string name="settings_sharing_no_address">%1$sにはネットワークアドレスがありません。Wi-Fiまたはイーサネットに接続してください。</string>
-  <string name="settings_sharing_scan_other">別のデバイスのカメラでスキャンするか、次のアドレスを開いてください</string>
-  <string name="settings_sharing_scan_phone">スマートフォンのカメラでスキャンするか、次のアドレスを開いてください</string>
+  <string name="settings_sharing_scan_other">別のデバイスのカメラでスキャンするか、Ketch に次のアドレスを入力してください</string>
+  <string name="settings_sharing_scan_phone">スマートフォンのカメラでスキャンするか、Ketch に次のアドレスを入力してください</string>
   <string name="settings_sharing_also">ほかに%1$s</string>
   <string name="settings_sharing_copy_link">ペアリングリンクをコピー</string>
   <string name="settings_sharing_copied">コピーしました</string>
-  <string name="settings_sharing_open_web">Webアプリを開く</string>
   <string name="settings_sharing_anyone">このリンクを持っている人は誰でも%1$sを操作できます。</string>
   <string name="settings_sharing_new_code">新しいコード</string>
   <string name="settings_sharing_new_code_hint">これまでにペアリングしたデバイスは切断されます</string>

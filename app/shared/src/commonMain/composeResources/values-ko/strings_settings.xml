@@ -408,14 +408,13 @@
   <string name="settings_sharing_off_hint">Ketch가 코드로 보호된 상태로 %1$s을(를) 네트워크에 공유합니다.</string>
   <string name="settings_sharing_allow">다른 기기 허용</string>
   <string name="settings_sharing_looking">%1$s의 네트워크 주소를 찾는 중…</string>
-  <string name="settings_sharing_unreadable_address">Ketch가 %1$s의 주소를 읽을 수 없습니다. 다른 기기에서 http://&lt;이 기기의 주소&gt;:%2$s 주소를 열고 고급에 있는 코드를 입력하세요.</string>
+  <string name="settings_sharing_unreadable_address">Ketch가 %1$s의 주소를 읽을 수 없습니다. 다른 기기의 Ketch에 &lt;이 기기의 주소&gt;:%2$s 주소와 고급에 있는 코드를 입력하세요.</string>
   <string name="settings_sharing_no_address">%1$s에 네트워크 주소가 없습니다. Wi-Fi나 이더넷에 연결하세요.</string>
-  <string name="settings_sharing_scan_other">다른 기기의 카메라로 스캔하거나 다음 주소를 여세요</string>
-  <string name="settings_sharing_scan_phone">휴대폰 카메라로 스캔하거나 다음 주소를 여세요</string>
+  <string name="settings_sharing_scan_other">다른 기기의 카메라로 스캔하거나 Ketch에 다음 주소를 입력하세요</string>
+  <string name="settings_sharing_scan_phone">휴대폰 카메라로 스캔하거나 Ketch에 다음 주소를 입력하세요</string>
   <string name="settings_sharing_also">%1$s도 사용 가능</string>
   <string name="settings_sharing_copy_link">페어링 링크 복사</string>
   <string name="settings_sharing_copied">복사됨</string>
-  <string name="settings_sharing_open_web">웹 앱 열기</string>
   <string name="settings_sharing_anyone">이 링크가 있는 사람은 누구나 %1$s을(를) 제어할 수 있습니다.</string>
   <string name="settings_sharing_new_code">새 코드</string>
   <string name="settings_sharing_new_code_hint">지금까지 페어링된 기기의 연결이 끊어집니다</string>
