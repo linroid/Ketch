@@ -1,6 +1,6 @@
 # Cross-device task transfer
 
-**Status:** Proposed, revision 2 · 2026-10-03 · line numbers checked against `main` @ `466e5580`
+**Status:** Proposed, revision 3 · 2026-10-03 · line numbers checked against `main` @ `466e5580`
 
 This plan makes **Send to** and **Move to** carry a task's downloaded data between Ketch instances
 ("devices"): partial bytes, per-segment progress, source resume state and finished files, so the
@@ -35,7 +35,7 @@ to a visible duplicate, never to loss.
 | K4 | S is **frozen** for the whole export: a gate checked **before any state write** (queue `enqueue`/`startTask`, scheduler, top of coordinator `start`/`resume`), a persisted row and a `PAUSED` record. | One runnable owner despite preemption, `setPriority`, restarts or other clients. |
 | K5 | Imports are **invisible** until commit (a row plus reserved files, no `TaskRecord`) and every later import call needs the per-import key. | Queue, scheduler, `remove()`, failure cleanup and LAN strangers cannot touch staged bytes. |
 | K6 | D's commit point is **one SQLite transaction** strict-inserting a freshly minted task id. | One durable decision; no id collisions. |
-| K7 | MOVE release needs a **hash-lock**: D mints the key at `beginImport` and returns its hash to the owner; S stores it at `prepare`; `release` must show the key, is valid **only from `PREPARED`**, and D stops revealing it once its task is removed. | No confused driver, late redelivery or "Keep both" can delete the last copy. |
+| K7 | MOVE release needs a **hash-lock**: D mints the commit key at `beginImport` and returns its hash to the owner; S stores it at `prepare`; `release` must show the key and is valid **only from `PREPARED`**. D's imported task cannot be removed, canceled or exported until D **settles**, which needs a key S reveals only once it has left `PREPARED`. | A revealed key cannot be revoked, so D's copy must outlive every possible release; no confused driver, late redelivery or "Keep both" can delete the last copy. |
 | K8 | S **prepares** only if D's content root (hash of chunk digests) equals its own. | The source confirms equality before it can delete. |
 | K9 | Per-chunk SHA-256 before writing; chunks in any order into a persisted received set; write → fsync → ledger. | Simple drivers, no reorder livelock; the manifest stays core-internal. |
 | K10 | `PREPARED` never expires by clock: release, the user's "Keep here", or D's confirmed abort ends it. | No lease-expiry duplicates, no clock-jump hazard. |
@@ -68,7 +68,7 @@ tasks land paused).
 | S / D | Instance holding the task before / receiving it. |
 | Orchestrator, driver | The app that plans, drives and recovers a transfer (holds owner tokens; id = its embedded `instanceId`) / its code pumping chunks between two handles. |
 | MOVE / COPY | D becomes the only owner and S deletes after a proven commit / both keep independent tasks. |
-| Freeze, seal, prepare, commit, release | S's export lock; D's fsync + root; S's vote; D's atomic insert; S's gated deletion (§9). |
+| Freeze, seal, prepare, commit, release, settle | S's export lock; D's fsync + root; S's vote; D's atomic insert; S's gated deletion; D's unlock once S has left `PREPARED` (§9). |
 | Hold | The Undo window after commit, during which S refuses `release` from other orchestrators. |
 | Import key | Capability from `beginImport`, required by later import calls unless the caller holds D's owner token. |
 | Fallback / metadata-only | Today's request-only send (§12.2) / a protocol export without payload. |
@@ -184,6 +184,8 @@ because the planner reads `instanceId` in the same call. `TorrentCapability.IMPO
   suspend fun seal(transferId: String, key: String? = null): Sealed
   /** One-transaction insert, adoption, then the commit key. */
   suspend fun commit(transferId: String, prepared: Prepared, key: String? = null): Committed
+  /** Unlocks the committed task once S proves it left PREPARED; [settleKey] comes from S. */
+  suspend fun settle(transferId: String, settleKey: String, key: String? = null): TransferInfo
   /** Discards staging (only files this import created); refused after commit. */
   suspend fun abortImport(transferId: String, key: String? = null): TransferInfo
 }
@@ -202,12 +204,12 @@ exceptions, never booleans inside a success.
 |---|---|
 | `ExportRequest` / `ExportOpened` | `transferId` (driver-minted UUID), `taskId`, `mode`, `destination` and `orchestrator: TransferPeer(instanceId, name)`, `credentials` (`AUTO`/`INCLUDE`/`STRIP`), `chunkBytes` / `manifestSha256`, `displayName`, `kind` (`data`/`metadata-only`), `chunkCount`, `payloadBytes`, `totalBytes`, `disclosures` |
 | `ManifestEnvelope` | `json` (exact bytes, opaque to orchestrators), `sha256` |
-| `ImportRequest` / `ImportOpened` | `manifest`, `folder?` (relative for remote callers) / `taskId`, `outputName`, `importKey`, `commitLock` (sha256 of the commit key), `ledger`, `origin` (`match`/`weak`/`skipped`/`needs_credentials`), `warnings` |
+| `ImportRequest` / `ImportOpened` | `manifest`, `folder?` (relative for remote callers), `credentials?` (a sign-in for D only, §7.5) / `taskId`, `outputName`, `importKey`, `commitLock` (sha256 of the commit key), `ledger`, `origin` (`match`/`weak`/`skipped`), `warnings` |
 | `Ledger`, `Sealed` | `phase`, `chunkCount`, `missing` (index runs), `bytes`; `Ready(contentRoot, taskId)` or `Missing(runs)` |
 | `TransferChunk` / `ChunkAck` | `index`, `bytes`, `sha256` / `index`, `status` (`accepted`/`duplicate`), `durable` |
-| `PrepareRequest` / `Prepared` | `manifestSha256`, `contentRoot`, `commitLock`, `hold` (≤ 60 s) / `sourceInstanceId`, `contentRoot` |
-| `ReleaseRequest` / `Released` / `Committed` | `commitKey`, `orchestratorId` / `kept` (files S could not prove it owned, left in place) / `taskId`, `commitKey` |
-| `TransferInfo` | `transferId`, `role`, `mode`, `phase`, `taskId?`, `displayName`, `peer?`, `orchestrator?`, `holdUntil?`, `bytesDone`, `bytesTotal`, `reason?`, `error?`, `updatedAt` |
+| `PrepareRequest` / `Prepared` | `manifestSha256`, `contentRoot`, `commitLock`, `hold` (≤ 60 s) / `sourceInstanceId`, `contentRoot`, `settleLock` (sha256 of S's settle key) |
+| `ReleaseRequest` / `Released` / `Committed` | `commitKey`, `orchestratorId` / `kept` (files S could not prove it owned, left in place), `settleKey` / `taskId`, `commitKey` |
+| `TransferInfo` | `transferId`, `role`, `mode`, `phase`, `taskId?`, `displayName`, `peer?`, `orchestrator?`, `holdUntil?`, `settleKey?` (S, once it left `PREPARED`), `bytesDone`, `bytesTotal`, `reason?`, `error?`, `updatedAt` |
 
 ### 4.3 Errors
 
@@ -222,11 +224,12 @@ The wire body is the existing `ErrorResponse(error = code, message)`
 | `digest_mismatch` | 412 | 3× | body ≠ `Content-Digest`, or a replay ≠ the first receipt |
 | `chunk_too_large` | 413 | no | proxy body limit; the message names `client_max_body_size` |
 | `same_instance`, `not_durable`, `store_busy` | 409 | no | self; `InMemoryTaskStore`; another process holds the transfer lock |
-| `task_locked` | 409 | no | action on a frozen source, existing task routes included |
+| `task_locked` | 409 | no | remove, cancel or export of a frozen source or an unsettled import (`detail.phase`), existing task routes included |
+| `needs_credentials` | 409 | no | D's origin probe needs a sign-in the manifest does not carry; nothing created (§7.5) |
 | `transfer_conflict`, `phase` | 409 | no | same `tid`, other parameters; call invalid now (`detail.phase`) |
 | `source_data_changed`, `content_mismatch`, `origin_changed` | 409 | no | frozen file changed; roots differ; origin no longer matches S's validators |
-| `held`, `expired`, `revoked`, `committed` | 409 | `held` | inside another holder's hold; S left `PREPARED`; D's task removed; abort after commit |
-| `bad_commit_key`, `bad_import_key`, `path_rejected`, `not_exportable` | 403 | no | wrong key; unsafe folder; output identity unproven for a remote caller |
+| `held`, `expired`, `committed` | 409 | `held` | inside another holder's hold; S left `PREPARED`; abort after commit |
+| `bad_commit_key`, `bad_settle_key`, `bad_import_key`, `path_rejected`, `not_exportable` | 403 | no | wrong key; unsafe folder; output identity unproven for a remote caller |
 | `not_transferable`, `source_data_missing`, `manifest_invalid`, `version_unsupported`, `unsupported_source` | 422 | no | S cannot describe the task; D rejects the manifest |
 | `unsupported`, `closed`, `peer_unreachable`, `insecure_route` | client | — | 404/405/501 from old servers; closed client; no route; credentials over public plaintext |
 
@@ -272,7 +275,7 @@ interface TransferHandle {
   suspend fun await(): TransferOutcome
   suspend fun cancel()                        // before commit only; after: `committed`
   suspend fun release()                       // end the hold now
-  suspend fun undo()                          // during the hold: keep S, remove D's copy
+  suspend fun undo()                          // during the hold: keep S, settle, remove D's copy
 }
 
 /** Plans, runs and recovers transfers for one orchestrator in a long-lived scope. */
@@ -287,8 +290,8 @@ class TaskTransfers(scope: CoroutineScope, orchestrator: TransferPeer) {
 ```
 
 `TransferDriver` runs `ledger` → pump `missing` (≤ 4 in flight, AIMD on 429) → `seal` (re-pump
-`Missing`) → `prepare` → `commit` → hold → `release`. The driver never parses the manifest; it
-forwards the envelope and works from indices. Cancellation order is §9.6.
+`Missing`) → `prepare` → `commit` → hold → `release` → `settle`. The driver never parses the
+manifest; it forwards the envelope and works from indices. Cancellation order is §9.6.
 
 ### 4.5 Implementations
 
@@ -411,13 +414,14 @@ One predicate, `isSensitiveHeader(name)` in `api/log/LogFormat.kt`, covers `Cook
 | Item | AUTO (default) | INCLUDE | STRIP |
 |---|---|---|---|
 | Sensitive headers | carried for partial and metadata-only tasks; stripped for completed ones | carried | stripped |
-| URL userinfo (FTP `user:pass@`) | as headers | carried | stripped; D lands the task PAUSED and the existing credential prompt asks (§7.5) |
+| URL userinfo (FTP `user:pass@`) | as headers | carried | stripped; a partial task asks for a sign-in for D before bytes move (§7.5) |
 | Signed query values | carried (the URL is the identity) and disclosed | | |
 
 - **Public destinations**: when D is reached without a token (`TransferParty.publicAccess`, i.e.
   `RemoteConfig.apiToken == null`), AUTO behaves as STRIP and the confirmation says why ("anyone
-  on <network> can read sign-ins sent to <D>"); INCLUDE needs an explicit choice. The fallback
-  follows the same rule.
+  on <network> can read sign-ins sent to <D>"); INCLUDE needs an explicit choice. A partial task
+  whose origin needs a sign-in then offers INCLUDE, a sign-in typed for D (the same exposure) or
+  the fallback. The fallback follows the same rule.
 - Credentials never cross plaintext HTTP to a non-private address (private: loopback, RFC 1918,
   ULA, link-local, `.local`, 100.64/10) without explicit consent.
 - Carried items are listed in `disclosures` and confirmed in the UI. Manifests and keys are never
@@ -451,7 +455,7 @@ import key is then optional). On token-less servers, import calls after `beginIm
 | `POST /{tid}/export/prepare`, `/release`, `/abort?force&undo` | S | `Prepared`, `Released`, `TransferInfo` |
 | `PUT /{tid}/import`, `GET /{tid}/import` | D | `ImportOpened` / `Ledger` |
 | `PUT /{tid}/import/chunks/{i}` | D | `ChunkAck`; 411 without `Content-Length` |
-| `POST /{tid}/import/seal`, `/commit`, `/abort` | D | `Sealed`, `Committed`, `TransferInfo` |
+| `POST /{tid}/import/seal`, `/commit`, `/settle`, `/abort` | D | `Sealed`, `Committed`, `TransferInfo`, `TransferInfo` |
 
 ### 6.3 Chunks
 
@@ -558,8 +562,9 @@ CREATE TABLE instance_meta(key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE transfers(
   transfer_id TEXT NOT NULL PRIMARY KEY,           -- one role per store (self-transfer refused)
   role TEXT NOT NULL, task_id TEXT NOT NULL, mode TEXT NOT NULL, phase TEXT NOT NULL,
-  state_json TEXT NOT NULL,   -- S: prior state, stat, lock, hold, orchestrator;
-                              -- D: received runs, output, identity, commitKey, importKey hash
+  state_json TEXT NOT NULL,   -- S: prior state, stat, lock, hold, orchestrator, settle key;
+                              -- D: received runs, output, identity, commitKey,
+                              --    importKey hash, settleLock
   manifest_json TEXT, manifest_sha256 TEXT,        -- write-once; compacted when terminal
   expires_at INTEGER,                              -- OPEN lease / staging TTL; null for PREPARED
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
@@ -605,6 +610,11 @@ start the task.
 `scheduler.schedule`; QUEUED/DOWNLOADING → `queue.enqueue(preferResume = true)` (safe after F2).
 Row → `DONE`, `ABORTED`, `EXPIRED` or `FORCE_ABORTED` (with `undo` when Undo asked).
 
+**Settle key** (MOVE): `prepare` mints a random settle key, stores it in the row and returns
+`sha256(key)` as `Prepared.settleLock`. S reveals the key (`Released.settleKey`,
+`TransferInfo.settleKey`) only once it has left `PREPARED` for good, as `RELEASED` or
+`FORCE_ABORTED`; after that no `release` can succeed, so the key carries no further power.
+
 **Release** (MOVE): only from `PREPARED` (or a redo from `RELEASING`, an answer from `RELEASED`);
 any other phase answers `expired` or `phase`. `sha256(key) == lock`, else `bad_commit_key`. Before
 `holdUntil`, only the holding orchestrator may release (`held` otherwise). Persist `RELEASING`,
@@ -641,8 +651,13 @@ and does not queue behind the writer's `limitedParallelism(1)`.
    HEAD/MDTM checks in `HttpDownloadSource.kt:132-184` and FTP resume): validators equal,
    `Content-Length == totalBytes`, ranges supported → `match`; no validators → `weak`; changed →
    409 `origin_changed` with nothing created (the app offers the fallback). An authentication
-   failure (stripped cookies or FTP login) → `needs_credentials`: validators are not compared and
-   the task lands PAUSED, so the existing credential prompt runs on first resume.
+   failure (stripped cookies or FTP login) → 409 `needs_credentials`, also with nothing created:
+   the app asks for a sign-in before any bytes move (§12.1) and calls `beginImport` again with
+   `ImportRequest.credentials`, which only D receives and which go into D's copy of the request.
+   Partial data never lands without working credentials, because today's way to add them, Enter
+   credentials, reopens the add sheet, and a changed header or URL starts the task over
+   (`IntakeState.startsOver`, `app/state/IntakeState.kt:848-853`), removing it with its file
+   (`:1516`).
 3. Mint a fresh task id (MOVE and COPY alike), `importKey` and `commitKey`.
 4. Folder and name (§7.6), space (§7.7).
 5. Persist row `RECEIVING` (task id, output, keys, empty received set) **before** any file.
@@ -665,8 +680,15 @@ Then `Ketch.adoptRecord` (`createTaskFromRecord` + append under `tasksMutex`, as
 does, `core/Ketch.kt:182-186`), then the row is marked adopted, and only then is the key returned.
 If adoption throws, the call fails retryably with the key still hidden; the next `commit()` or
 `start()` adopts idempotently (`loadTasks` restores the record anyway). A repeated commit returns
-the same key while the row is `COMMITTED`. Removing, canceling or releasing the imported task on D
-first moves the row to `REVOKED` (same mutex); `commit()` then answers `revoked`.
+the same key while the row is `COMMITTED`.
+
+**Settle lock.** A revealed commit key cannot be taken back, so D keeps its copy until S can no
+longer release. `commit` stores `prepared.settleLock`; until the row is `SETTLED`, D refuses to
+remove, cancel or export the task (`task_locked`, `detail.phase = settling`), in process and on the
+existing routes alike (F10a), while it runs, pauses and resumes normally. `settle(settleKey)` with
+`sha256(settleKey) == settleLock` moves the row to `SETTLED`. A COPY commits with no lock. If S is
+gone for good, D offers [Stop waiting for MacBook], which settles after warning that MacBook may
+still delete its copy.
 
 ### 7.6 Destination path policy and export confinement
 
@@ -765,7 +787,7 @@ third-party source may keep machine-bound resume state.
 | Source | Export (S) | Import (D) | D resumes with |
 |---|---|---|---|
 | HTTP | Valid prefixes (completed: whole file); `HttpResumeState` fields | Reserve, preallocate, any-order writes, seal; segments = manifest segments | `resume()`: HEAD with carried headers, size check passes, resegments to D's connections |
-| FTP | Same; `{totalBytes, mdtm}` | Same | MDTM re-probe; stripped credentials → the existing prompt |
+| FTP | Same; `{totalBytes, mdtm}` | Same | MDTM re-probe; stripped credentials are asked for before bytes move |
 | Source without `SourceTransfer` (torrents until M2, third-party) | — | — | fallback (§12.2) |
 
 ### 8.2 By state
@@ -783,8 +805,9 @@ third-party source may keep machine-bound resume state.
 | Completed with missing file, Canceled | — | none | QUEUED, fresh ("Download again on D") | unchanged |
 | Zero-byte completed | — | one empty range | COMPLETED, empty file created | unchanged |
 
-`hadConditions` and `needs_credentials` land PAUSED. Metadata-only exports happen only when S
-holds no usable data, so their release deletes nothing of value.
+`hadConditions` lands PAUSED; `needs_credentials` is resolved before bytes move (§7.5).
+Metadata-only exports happen only when S holds no usable data, so their release deletes nothing
+of value.
 
 ### 8.3 Torrents (M2)
 
@@ -827,7 +850,8 @@ piece above the chunk size travels in parts that D buffers until whole (≤ 64 M
 
 - **I1 No loss**: the data always exists with a durable record on an instance where it is runnable
   or frozen. S deletes only from `PREPARED`, after D's commit transaction over fsynced bytes whose
-  root S matched, and only while D's task still exists.
+  root S matched; D cannot remove its task until S has left `PREPARED`, so D's copy outlives every
+  possible release.
 - **I2 One runnable owner**: before commit D has no task; S is frozen from freeze to release;
   after commit only D runs. Two runnable copies arise only from an explicit "Keep here" or an
   interrupted Undo, and both are shown.
@@ -861,10 +885,10 @@ DESTINATION row (no task until COMMITTED)
   SEALED ----abort, or idle 24 h---+
      | commit (one transaction)
      v
-  COMMITTED (key revealable; purged after 30 days)
-     | D's task removed, canceled or moved on
+  COMMITTED (key revealable; MOVE: D's task cannot be removed, canceled or exported)
+     | settle(key S reveals once it leaves PREPARED), or the user's "Stop waiting"
      v
-  REVOKED
+  SETTLED (purged after 30 days)
 ```
 
 Orchestrator phases (`planning → exporting → copying → sealing → preparing → committing → holding
@@ -881,19 +905,21 @@ Driver (app)                Source S (embedded)                Destination D (NA
   | seal ----------------------------------------------------------->| fsync, root, SEALED (c1)
   | prepare{manifest sha, root, lock, hold 6 s} ->|                   |
   |                             | root == pins? sha == own?         |
-  |                             | PREPARED{lock, holdUntil}, frozen (c2)
-  |<------------ Prepared(S.id, root) -------|                      |
+  |                             | PREPARED{lock, holdUntil}, mints settle key, frozen (c2)
+  |<----- Prepared(S.id, root, settleLock) --|                      |
   | commit{prepared} ----------------------------------------------->| check root, S.id; one tx:
   |                             |                                   | TaskRecord + COMMITTED;
   |<-------------------------------------- Committed(taskId, key) --| adopt, then reveal   (c3)
   | [Undo window: hold]         |                                   |
   | release{key, orch} -------->| PREPARED? sha256(key)==lock? -> RELEASING (c4)
   |                             | stop, identity-checked delete, remove -> RELEASED (c5)
-  |<------------- Released(kept)|                                   |
+  |<---- Released(kept, settleKey)                                  |
+  | settle{settleKey} ---------------------------------------------->| SETTLED; task removable (c6)
 
 c1  seal is idempotent; S is OPEN and frozen.   c2  PREPARED survives restarts; retries get
-the stored answer.   c3  SEALED (retry) or COMMITTED with the task (retry returns the key;
-REVOKED answers `revoked`).   c4/c5  RELEASING is redone on restart; later calls get Released.
+the stored answer.   c3  SEALED (retry) or COMMITTED with the task (retry returns the key);
+from here D refuses to remove the task.   c4/c5  RELEASING is redone on restart; later calls get
+Released.   c6  settle is idempotent; recovery settles with the key from S's row.
 Driver dies after c3: S stays PREPARED; recovery (§9.7) re-obtains the key or the user keeps S.
 ```
 
@@ -906,7 +932,8 @@ Driver dies after c3: S stays PREPARED; recovery (§9.7) re-obtains the key or t
 | Copying | Reads fail, driver backs off; gate re-armed by recovery, pins rebuilt on demand; a changed file aborts | Chunks after the persisted set are resent | Pump stops; recovery resumes from D's ledger |
 | Prepare | Re-evaluated before `PREPARED`, same answer after | Re-seal, re-prepare | S PREPARED, D SEALED: recovery commits or, if D discarded, forces S |
 | Commit | — (frozen) | Atomic; retry idempotent | D committed or not, nothing between |
-| Release | `RELEASING` redone | — | Recovery re-obtains the key and releases (unless D revoked) |
+| Release | `RELEASING` redone | — | Recovery re-obtains the key, releases, then settles D |
+| Settle | — (key kept in S's row) | Lock survives restarts | D stays unremovable until recovery settles it, or the user stops waiting |
 
 Also: ENOSPC on D → 507, retried 10 min; digest mismatch → chunk retried 3×, then
 `digest_mismatch`; root mismatch → `content_mismatch`, the driver retries once with a new id,
@@ -925,7 +952,8 @@ Concurrent drivers of one transfer are harmless; the hold protects Undo.
   answers `committed`, the transfer can only finish.
 - **After commit**: `cancel()` fails with `committed`.
 - **Undo** (during the hold): `abortExport(force = true, undo = true)` on S; only once S answers
-  `FORCE_ABORTED` does the app remove D's task and files (revoking D's row). Already released →
+  `FORCE_ABORTED` does the app settle D with the revealed key and remove D's task and files.
+  Already released →
   "Already moved". If removing D's copy fails, `MessageCenter` shows "Undo didn't finish: X is on
   both MacBook and NAS" [Remove from NAS] [Keep both]; `PendingOps` alone only logs
   (`app/state/PendingOps.kt:109`).
@@ -943,10 +971,9 @@ on every reachable transfer-capable device, pairs rows by `transferId` and acts 
 | S | D | Action |
 |---|---|---|
 | OPEN | RECEIVING/SEALED | resume the pump, seal, prepare |
-| PREPARED | COMMITTED | after `holdUntil`: `commit()` re-obtains the key, then `release` |
-| PREPARED | REVOKED | force S ("the copy on NAS was removed") |
+| PREPARED | COMMITTED | after `holdUntil`: `commit()` re-obtains the key, `release`, `settle` |
+| RELEASED, or FORCE_ABORTED | COMMITTED | `settle` with S's key; after an Undo, ask: [Remove from NAS] [Keep both] |
 | PREPARED | ABORTED, or D reachable without the row | force S |
-| FORCE_ABORTED (undo) | COMMITTED | ask: [Remove from NAS] [Keep both] |
 | any | unreachable | "Waiting for NAS" on the task, with [Keep here] |
 
 Other orchestrators' rows show on S's device as "Being moved to NAS by Pixel"; after 10 minutes
@@ -972,7 +999,8 @@ import expires and S's "Keep here" leaves, at worst, a visible duplicate.
 ## 10. Security and privacy
 
 - **Early deletion** by a confused or replaying driver: hash-lock from D's owner-channel
-  `ImportOpened`, release only from `PREPARED`, `revoked` on D (§7.3, §7.5).
+  `ImportOpened`, release only from `PREPARED`, and D's copy locked until S proves it left
+  `PREPARED` (§7.3, §7.5).
 - **LAN host vs token-less D**: import key on every later call; S checks the root before deleting.
   **vs token-less S**: no export routes.
 - **Token holder reading arbitrary files** via `resume?destination=`: output identity (§7.6).
@@ -1020,7 +1048,8 @@ ends `deviceOf(task)`'s fallback to the active device for a stale handle (`:1513
 2. confirms once per batch, queued (F11), extending `SendConfirmationDialog`
    (`app/ui/downloads/actions/RowActionDialogs.kt:237`) with the data size ("1.9 GB of downloaded
    data will be copied to NAS"), itemized credentials with a "Don't send sign-ins" toggle (forced
-   on for a public D), "starts over" items, relay and metered warnings, and free space from
+   on for a public D), a sign-in field for partial tasks whose origin needs one on D, "starts
+   over" items, relay and metered warnings, and free space from
    `DevicePresence.status.system.usableSpace`;
 3. starts transfers (≤ 2 per destination) and `claimAdds` D's keys so arrivals are not reported
    twice.
@@ -1145,9 +1174,10 @@ by address; `F_FULLFSYNC` from the JVM via FFM on JDK 22+.
   torn writes.
 - **Crash-point harness (gate for M1)**: a `FaultInjector` at each durable step kills S, D or the
   driver, rebuilds, recovers and runs to quiescence asserting I1–I5, while dropping, duplicating
-  and reordering messages. Named cases: release after "Keep here"; release re-delivered after D's
-  task was removed; Undo racing another orchestrator; adoption failing after the commit
-  transaction; calls while `starting`; a second JVM process on the store.
+  and reordering messages. Named cases: release after "Keep here"; removing D's task during the
+  hold (refused until settled); release re-delivered after settle; Undo racing another
+  orchestrator; adoption failing after the commit transaction; calls while `starting`; a second
+  JVM process on the store.
 - **Races**: freeze vs URGENT preemption, `promoteNext`, `setPriority`, `updateLimits`, scheduler
   triggers and remote resume; release vs `setPriority` (F4).
 - **SQLite**: `4.sqm` under `verifyMigrations`; commit atomicity and strict insert; pragmas; the
@@ -1185,6 +1215,10 @@ by address; `F_FULLFSYNC` from the JVM via FFM on JDK 22+.
 13. *Task ids on D*: keep vs mint → always mint (HANDOFF in M4 keeps them).
 14. *M1 scope*: every state stays (one freeze path); `LandingPolicy`, CLI, MCP, badge, touch Move
     groups and verify-at-rest leave M1.
+15. *Release vs removal on D* (PR review): revoke D's row vs lock D's task until settled → the
+    lock, unlocked by a key S mints at `prepare`; a revealed commit key cannot be revoked.
+16. *Missing credentials on D* (PR review): land paused and prompt vs ask before bytes move → ask
+    first, because Enter credentials restarts a task today; see open question 8.
 
 **Rejected**: (1) serving files as HTTP ranges for D's `HttpDownloadSource`: single files only,
 no sparse ranges or integrity, and the peer credential in persisted request headers; (2) shipping
@@ -1219,3 +1253,6 @@ abort or a kept file, never a deletion of D's copy.
    (printing a pairing link; `--no-token` opts out; existing configs untouched): **yes**, as a
    separate change.
 7. Transfers from JS/WASI core engines: **not advertised** (no `HttpEngine` ships there).
+8. An in-place credential update on `DownloadTask`, which would also keep progress when cookies
+   expire today and let partial imports land paused without a sign-in: **yes**, as a separate
+   change.
