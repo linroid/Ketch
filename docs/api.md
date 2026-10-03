@@ -1,5 +1,8 @@
 # API Reference
 
+The reference for Ketch's Kotlin library. For an overview of the modules, a quick start and the
+REST API, see the [developer guide](developers.md).
+
 ## Installation
 
 Add the dependencies to your `build.gradle.kts`:

@@ -243,7 +243,7 @@ ketch ai-discover <query> [options]
 | `--max-results <n>` | Max candidates to return (default: 5) |
 
 The command reads the `[ai]` section of the default [config file](#config-file-locations), which
-the apps edit under Settings → AI discovery. Blank API keys are filled from `OPENAI_API_KEY`,
+the apps edit under Settings → Discover. Blank API keys are filled from `OPENAI_API_KEY`,
 `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`; without an `[ai]` section, exporting one of them is
 enough. See [AI discovery](../docs/ai-discovery.md) for providers, web search keys, and how
 settings and environment variables combine.

@@ -1,7 +1,7 @@
 # Ketch Architecture
 
 This document describes the internal architecture of Ketch, covering module boundaries,
-core abstractions, the download pipeline, and the example app's multi-instance design.
+core abstractions, the download pipeline, and how the apps work with several devices.
 
 ## Module Dependency Graph
 
@@ -236,35 +236,39 @@ backoff on disconnection, and stops retrying when the server rejects the API tok
 [browser extension](../app/browser-extension/README.md) is another REST client: it sends
 downloads to `POST /api/tasks` and `.torrent` content to `POST /api/resolve/content`.
 
-## Example App: Multi-Instance Design
+## Apps: Devices
 
-The example app (`app/shared`) works with Ketch instances, all through `KetchApi`:
+The apps (`app/shared`) show downloads of Ketch instances, which the UI calls **devices**, all
+through `KetchApi`:
 
-1. **Embedded** (default) -- in-process `Ketch` on Android, iOS and desktop. Android and
-   desktop can also start a `KetchServer` that exposes it to other devices.
-2. **Remote** -- connects to a daemon or another device's app via `RemoteKetch`. The web app
-   has no embedded instance and only works with remote ones.
+1. **Embedded** -- in-process `Ketch` on Android, iOS and desktop. Android and desktop can also
+   share it with other devices through a `KetchServer` (Settings → Sharing).
+2. **Remote** -- another device's app or a `ketch server` daemon, reached with `RemoteKetch`. The
+   web app has no embedded instance and only works with remote ones.
 
 ### Key design decisions
 
-- **`KetchApi` is the only abstraction the UI needs.** Instance switching is transparent.
+- **`KetchApi` is the only abstraction the UI needs.** Switching devices is transparent.
 - **Lambda injection over expect/actual.** Each platform entry point wires the engine and passes
   it to `InstanceFactory` as `embeddedFactory`, so `app/shared` commonMain does not depend on
   `library:core`. Android and desktop also pass a `localServerFactory`; commonMain checks
-  `isLocalServerSupported` to show the server controls.
-- **Instance list model.** Users manage a list of instances (like bookmarks). The embedded
-  instance is always present when the platform has one. Remote servers can be added, found on
-  the LAN over mDNS, and removed.
+  `isLocalServerSupported` to show the sharing controls.
+- **Devices are places, not settings.** Every device is listed in the sidebar with its live
+  presence, and watched devices stay connected, so switching to one is instant. Users add
+  devices with a pairing link or QR code, an address, or from those found on the LAN over mDNS.
 
 ### Architecture
 
 ```
 InstanceManager
   |-- instances: StateFlow<List<InstanceEntry>>   (EmbeddedInstance, RemoteInstance)
-  |-- activeInstance: StateFlow<InstanceEntry?>
+  |-- activeInstance: StateFlow<InstanceEntry?>   (the device new downloads go to)
   |-- activeApi: StateFlow<KetchApi>
+  |-- deviceScope: StateFlow<DeviceScope>         (Single(deviceId) or All)
+  |-- presence: StateFlow<List<DevicePresence>>   (what each device is doing)
   |-- serverState: StateFlow<ServerState>         (Stopped, Running, Failed)
   |
+  +-- KeepAlivePolicy(maxWatched, backgroundGrace)
   +-- InstanceFactory(deviceName, embeddedFactory, localServerFactory, applyTorrentSettings)
         |-- createEmbedded(): invokes embeddedFactory (null on web)
         |-- createRemote(RemoteConfig): creates RemoteKetch
@@ -292,26 +296,39 @@ InstanceFactory(deviceName = instanceName, embeddedFactory = { Ketch(...) })
 InstanceFactory()
 ```
 
-### Instance switching flow
+### Connections
 
-1. User selects an instance in the selector sheet
-2. `InstanceManager.switchTo(instance)` closes the previous `RemoteKetch`, if any (the embedded
-   instance stays alive)
-3. `activeApi` StateFlow updates and the new instance's `start()` runs
-4. UI recomposes with the new task list
+- The active device is always connected. Remote devices marked as watched
+  (`RemoteConfig.watch`) stay connected too, the first `KeepAlivePolicy.maxWatched` of them, while
+  the app is in front; `backgroundGrace` after it leaves, only the active one stays.
+- A device that leaves that set disconnects and gets a fresh, unstarted client, which connects
+  again when it is needed.
+- A device without a name takes the one it announces in `status()` once connected.
+
+### Switching devices
+
+1. The user picks a device in the sidebar, the rail or the device switcher, or with a shortcut
+2. `InstanceManager.switchTo(device)` makes it active and shows it alone; the device shown before
+   stays connected while it is watched
+3. `activeApi` updates, and a device that was not connected starts
+4. The UI recomposes with the new task list
+
+`showAllDevices()` switches `deviceScope` to `All`, from two devices on: the downloads list shows
+every device's tasks with a Device column, while new downloads still go to the active device.
 
 ### Constraints
 
-- Only one active instance at a time; the local server keeps serving the embedded instance
-  whichever instance is active
-- Embedded instance cannot be removed
-- Removing the active instance switches to the embedded one (or to disconnected on web)
-- Remote servers are saved in the app configuration (`remotes` in `config.toml`, browser
-  storage on web) and restored on the next launch
-- The local server starts on launch when `[server] autoStart` is set
+- New downloads go to one active device at a time, unless the user picks another one for them;
+  the local server keeps serving the embedded instance whichever device is active
+- The embedded instance cannot be removed
+- Removing the active device switches to the embedded one (or to disconnected on web)
+- Remote devices are saved in the app configuration (`remotes` in `config.toml`, browser storage
+  on web) and restored on the next launch, with the device that was active
+- Sharing starts on launch when `[server] autoStart` is set
 
 ## See Also
 
+- [Developer guide](developers.md)
 - [API Reference](api.md)
 - [CLI Documentation](../cli/README.md)
 - [BitTorrent downloads](torrent.md)
