@@ -94,19 +94,21 @@ class KetchMcpServer(
 internal suspend fun serveStdio(tools: ToolRegistry, input: RawSource, output: RawSink) {
   val server = configureMcpServer(tools)
   val transport = StdioTransport(input, output)
-  // Server.onClose only fires on Server.close(), so wait for the transport instead. The listener
-  // is registered before createSession starts reading, so input that has already ended cannot
-  // close the transport unobserved.
+  // Server.onClose only fires on Server.close(), so wait for the transport instead
   val closed = Job()
   transport.onClose { closed.complete() }
   try {
     server.createSession(transport)
+    // createSession subscribes the session to the server's notifications after it starts the
+    // transport. Closing the transport unsubscribes it, so the input may only end it from now on.
+    transport.startReading()
     closed.join()
   } finally {
     withContext(NonCancellable) {
-      server.close()
-      // In case cancellation interrupted createSession before the server tracked the session
+      // Server.close() waits until each subscribed session sees an end event, which one that has
+      // not started collecting yet misses. Closing the transport first unsubscribes the session.
       transport.close()
+      server.close()
     }
   }
 }

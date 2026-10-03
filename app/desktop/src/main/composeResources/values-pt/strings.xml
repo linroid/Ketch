@@ -11,6 +11,7 @@
   <string name="menu_resume">Retomar</string>
   <string name="menu_add_device">Adicionar dispositivo…</string>
   <string name="menu_pair_device">Parear um dispositivo…</string>
+  <string name="menu_check_updates">Verificar atualizações…</string>
   <string name="menu_item_keys">%1$s (%2$s)</string>
 
 
@@ -59,6 +60,15 @@
   <string name="message_switch_speed_failed">Não foi possível mudar %1$s para %2$s</string>
   <string name="message_try_again">Tentar novamente</string>
   <string name="message_undo">Desfazer</string>
+  <string name="message_update_available">Ketch %1$s disponível</string>
+  <string name="message_update_ready">Ketch %1$s pronto para instalar</string>
+  <string name="message_update_installed">Ketch atualizado para %1$s</string>
+  <string name="message_update_failed">Não foi possível atualizar para o Ketch %1$s</string>
+  <string name="message_update_failed_hint">O update.log, na pasta de logs, explica o que deu errado.</string>
+  <string name="message_update">Atualizar</string>
+  <string name="message_restart">Reiniciar</string>
+  <string name="message_open_installer">Abrir instalador</string>
+  <string name="message_whats_new">Novidades</string>
   <string name="message_slow_lane_on">%1$s: Faixa lenta ativada · %2$s</string>
   <string name="message_slow_lane_off">%1$s: Faixa lenta desativada</string>
   <string name="message_speed_follows_rules">%1$s: a velocidade segue suas regras</string>

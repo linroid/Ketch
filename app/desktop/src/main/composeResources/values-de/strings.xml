@@ -11,6 +11,7 @@
   <string name="menu_resume">Fortsetzen</string>
   <string name="menu_add_device">Gerät hinzufügen…</string>
   <string name="menu_pair_device">Gerät koppeln…</string>
+  <string name="menu_check_updates">Nach Updates suchen…</string>
   <string name="menu_item_keys">%1$s (%2$s)</string>
 
 
@@ -59,6 +60,15 @@
   <string name="message_switch_speed_failed">%1$s konnte nicht auf %2$s umgestellt werden</string>
   <string name="message_try_again">Erneut versuchen</string>
   <string name="message_undo">Rückgängig</string>
+  <string name="message_update_available">Ketch %1$s ist verfügbar</string>
+  <string name="message_update_ready">Ketch %1$s ist bereit zur Installation</string>
+  <string name="message_update_installed">Auf Ketch %1$s aktualisiert</string>
+  <string name="message_update_failed">Ketch %1$s konnte nicht installiert werden</string>
+  <string name="message_update_failed_hint">Was schiefging, steht in update.log im Protokollordner.</string>
+  <string name="message_update">Aktualisieren</string>
+  <string name="message_restart">Neu starten</string>
+  <string name="message_open_installer">Installationsprogramm öffnen</string>
+  <string name="message_whats_new">Neuerungen</string>
   <string name="message_slow_lane_on">%1$s: Kriechspur an · %2$s</string>
   <string name="message_slow_lane_off">%1$s: Kriechspur aus</string>
   <string name="message_speed_follows_rules">%1$s: Geschwindigkeit folgt deinen Regeln</string>

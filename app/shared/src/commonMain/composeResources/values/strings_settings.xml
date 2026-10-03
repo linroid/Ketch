@@ -331,6 +331,41 @@
   <string name="settings_about_welcome_done">Done. The welcome screens show next time you open Ketch.</string>
   <string name="settings_about_troubleshooting">Troubleshooting</string>
   <string name="settings_about_logs_footer">Logs include download names and links. Check them before posting.</string>
+  <!-- Updates of the desktop app itself, on the About page. -->
+  <string name="settings_about_updates">Updates</string>
+  <string name="settings_about_update_idle">Check for updates</string>
+  <string name="settings_about_update_idle_hint">See whether a newer version of Ketch is out.</string>
+  <string name="settings_about_update_checking">Checking for updates…</string>
+  <string name="settings_about_update_current">Ketch is up to date</string>
+  <!-- %1$s is the running version. -->
+  <string name="settings_about_update_current_hint">%1$s is the latest release.</string>
+  <!-- %1$s is the newer version, such as 0.0.2. -->
+  <string name="settings_about_update_available">Ketch %1$s is available</string>
+  <!-- %1$s is the running version. -->
+  <string name="settings_about_update_available_hint">You have %1$s.</string>
+  <!-- When the app runs from source code and cannot install the update itself. -->
+  <string name="settings_about_update_source_hint">This copy runs from source. The release page has the installers.</string>
+  <string name="settings_about_update_downloading">Downloading Ketch %1$s…</string>
+  <!-- Downloaded and total size of the update, such as "12.4 MB of 70.1 MB". -->
+  <string name="settings_about_update_progress">%1$s of %2$s</string>
+  <string name="settings_about_update_ready">Ketch %1$s is ready to install</string>
+  <!-- Installing quits the app, installs the update and opens the app again. -->
+  <string name="settings_about_update_ready_hint">Ketch restarts to install it. Downloads continue where they left off.</string>
+  <!-- When the app hands the installer over instead, as on Linux without a password prompt. -->
+  <string name="settings_about_update_ready_open_hint">Open the installer and follow its steps.</string>
+  <string name="settings_about_update_check_failed">Couldn't check for updates</string>
+  <string name="settings_about_update_download_failed">Couldn't download the update</string>
+  <string name="settings_about_update_install_failed">Couldn't install the update</string>
+  <string name="settings_about_update_auto">Check for updates automatically</string>
+  <string name="settings_about_update_auto_hint">Once a day, from Ketch's releases on GitHub.</string>
+  <!-- Opens the release notes. %1$s is the version. -->
+  <string name="settings_about_update_notes">What's new in %1$s</string>
+  <string name="settings_about_update_check">Check now</string>
+  <!-- Button: downloads the update. -->
+  <string name="settings_about_update_install">Update</string>
+  <string name="settings_about_update_restart">Restart to update</string>
+  <string name="settings_about_update_open_installer">Open installer</string>
+  <string name="settings_about_update_release_page">Release page</string>
   <!-- How the desktop app hands over its log files. -->
   <string name="settings_logs_open">Open log folder</string>
   <!-- When the folder could not be opened. %1$s is why. -->
@@ -554,18 +589,17 @@
   <string name="settings_sharing_off_hint">Ketch shares %1$s on your network, protected by a code.</string>
   <string name="settings_sharing_allow">Allow another device</string>
   <string name="settings_sharing_looking">Looking for the network address of %1$s…</string>
-  <!-- %2$s is the port Ketch listens on. Keep "http://" and ":" as they are. -->
-  <string name="settings_sharing_unreadable_address">Ketch can't read the address of %1$s. On the other device, open http://&lt;its address&gt;:%2$s with the code from Advanced.</string>
+  <!-- %2$s is the port Ketch listens on. Keep ":" as it is. -->
+  <string name="settings_sharing_unreadable_address">Ketch can't read the address of %1$s. On the other device, enter &lt;its address&gt;:%2$s in Ketch with the code from Advanced.</string>
   <!-- %1$s names this device on its own, such as "This Mac". -->
   <string name="settings_sharing_no_address">%1$s has no network address. Connect to Wi-Fi or Ethernet.</string>
-  <!-- Over the address of the web app, which shows on the next line. -->
-  <string name="settings_sharing_scan_other">Scan with another device's camera, or open</string>
-  <string name="settings_sharing_scan_phone">Scan with your phone's camera, or open</string>
+  <!-- Over this device's address, such as 192.168.1.20:8642, which shows on the next line. -->
+  <string name="settings_sharing_scan_other">Scan with another device's camera, or enter this address in Ketch</string>
+  <string name="settings_sharing_scan_phone">Scan with your phone's camera, or enter this address in Ketch</string>
   <!-- Follows the device's name and address after " · ". %1$s lists its other addresses. -->
   <string name="settings_sharing_also">also %1$s</string>
   <string name="settings_sharing_copy_link">Copy pairing link</string>
   <string name="settings_sharing_copied">Copied</string>
-  <string name="settings_sharing_open_web">Open web app</string>
   <!-- Under the pairing link: whoever has the link. -->
   <string name="settings_sharing_anyone">Anyone with it can control %1$s.</string>
   <string name="settings_sharing_new_code">New code</string>

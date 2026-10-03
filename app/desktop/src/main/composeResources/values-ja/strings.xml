@@ -11,6 +11,7 @@
   <string name="menu_resume">再開</string>
   <string name="menu_add_device">デバイスを追加…</string>
   <string name="menu_pair_device">デバイスをペアリング…</string>
+  <string name="menu_check_updates">アップデートを確認…</string>
   <string name="menu_item_keys">%1$s（%2$s）</string>
 
 
@@ -53,6 +54,15 @@
   <string name="message_switch_speed_failed">%1$sを%2$sに切り替えられませんでした</string>
   <string name="message_try_again">もう一度試す</string>
   <string name="message_undo">取り消す</string>
+  <string name="message_update_available">Ketch %1$sを利用できます</string>
+  <string name="message_update_ready">Ketch %1$sをインストールする準備ができました</string>
+  <string name="message_update_installed">Ketch %1$sにアップデートしました</string>
+  <string name="message_update_failed">Ketch %1$sにアップデートできませんでした</string>
+  <string name="message_update_failed_hint">ログフォルダのupdate.logに原因が記録されています。</string>
+  <string name="message_update">アップデート</string>
+  <string name="message_restart">再起動</string>
+  <string name="message_open_installer">インストーラを開く</string>
+  <string name="message_whats_new">新機能</string>
   <string name="message_slow_lane_on">%1$sのスローレーンをオンにしました · %2$s</string>
   <string name="message_slow_lane_off">%1$sのスローレーンをオフにしました</string>
   <string name="message_speed_follows_rules">%1$sの速度はルールに従います</string>

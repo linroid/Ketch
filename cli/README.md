@@ -31,6 +31,8 @@ You can also download an archive from
 | `linux` | `x64`, `arm64` |
 | `windows` | `x64` |
 
+Once installed, `ketch update` keeps the binary current; see [Update](#update).
+
 ## Build & Run
 
 ```bash
@@ -253,6 +255,37 @@ settings and environment variables combine.
 ```bash
 ketch ai-discover "latest Ubuntu 24.04 ISO"
 ketch ai-discover "ffmpeg release" --sites ffmpeg.org
+```
+
+### Update
+
+Replace the `ketch` binary with the latest release from GitHub. The archive is checked against the
+SHA-256 digest GitHub published for it before anything is replaced, and the license notices next
+to the binary are updated too.
+
+```bash
+ketch update [options]
+```
+
+| Option | Description |
+|---|---|
+| `--check` | Only report whether a newer release exists |
+| `--version <version>` | Install this release instead, also an older one (e.g. `0.0.1-rc15`) |
+| `--help`, `-h` | Show help message |
+
+On macOS and Linux the new binary is renamed over the old one, so a `ketch server` that is running
+keeps working until you restart it. Windows cannot replace a running program, so the old binary
+is renamed to `ketch.exe.old` and removed the next time `ketch` runs. A binary installed in a
+folder you cannot write to, such as `/usr/local/bin`, needs `sudo ketch update` (on Windows, a
+terminal opened as administrator). Only the native binary updates itself; `./gradlew :cli:run`
+and `installDist` builds can still run `ketch update --check`.
+
+**Examples:**
+
+```bash
+ketch update --check
+sudo ketch update
+ketch update --version 0.0.1-rc15
 ```
 
 ## Configuration File

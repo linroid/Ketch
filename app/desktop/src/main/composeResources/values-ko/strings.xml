@@ -11,6 +11,7 @@
   <string name="menu_resume">재개</string>
   <string name="menu_add_device">기기 추가…</string>
   <string name="menu_pair_device">기기 페어링…</string>
+  <string name="menu_check_updates">업데이트 확인…</string>
   <string name="menu_item_keys">%1$s(%2$s)</string>
 
 
@@ -53,6 +54,15 @@
   <string name="message_switch_speed_failed">%1$s에서 %2$s 모드로 전환할 수 없음</string>
   <string name="message_try_again">다시 시도</string>
   <string name="message_undo">실행 취소</string>
+  <string name="message_update_available">Ketch %1$s 사용 가능</string>
+  <string name="message_update_ready">Ketch %1$s 설치 준비 완료</string>
+  <string name="message_update_installed">Ketch %1$s(으)로 업데이트됨</string>
+  <string name="message_update_failed">Ketch %1$s(으)로 업데이트할 수 없음</string>
+  <string name="message_update_failed_hint">로그 폴더의 update.log에서 원인을 확인할 수 있습니다.</string>
+  <string name="message_update">업데이트</string>
+  <string name="message_restart">재시작</string>
+  <string name="message_open_installer">설치 프로그램 열기</string>
+  <string name="message_whats_new">새로운 기능</string>
   <string name="message_slow_lane_on">%1$s에서 저속 차로 켜짐 · %2$s</string>
   <string name="message_slow_lane_off">%1$s에서 저속 차로 꺼짐</string>
   <string name="message_speed_follows_rules">%1$s의 속도를 규칙에 따라 조절</string>

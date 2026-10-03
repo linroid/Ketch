@@ -21,6 +21,8 @@
   <string name="menu_add_device">Add device…</string>
   <!-- Opens Settings at Sharing, where another device pairs with this one. -->
   <string name="menu_pair_device">Pair a device…</string>
+  <!-- The Help menu's item: opens Settings at About and looks for a newer release. -->
+  <string name="menu_check_updates">Check for Updates…</string>
   <!--
     A menu item whose keys stay with the focused control, so the menu shows them as text.
     %1$s is the item, %2$s the keys: "Copy link (⌘C)".
@@ -89,6 +91,21 @@
   <string name="message_switch_speed_failed">Couldn't switch %1$s to %2$s</string>
   <string name="message_try_again">Try again</string>
   <string name="message_undo">Undo</string>
+  <!-- Toast when the daily check finds a newer release. %1$s is its version. -->
+  <string name="message_update_available">Ketch %1$s is available</string>
+  <!-- Toast when the update is downloaded and checked. -->
+  <string name="message_update_ready">Ketch %1$s is ready to install</string>
+  <!-- Toast after the app restarted on the version it installed. -->
+  <string name="message_update_installed">Updated to Ketch %1$s</string>
+  <!-- Toast after a restart that should have installed version %1$s did not. -->
+  <string name="message_update_failed">Couldn't update to Ketch %1$s</string>
+  <string name="message_update_failed_hint">update.log in the log folder says what went wrong.</string>
+  <string name="message_update">Update</string>
+  <!-- Button: quits Ketch, installs the update and opens Ketch again. -->
+  <string name="message_restart">Restart</string>
+  <string name="message_open_installer">Open installer</string>
+  <!-- Button: opens the release notes. -->
+  <string name="message_whats_new">What's new</string>
   <!-- %1$s is a device, such as "This Mac", %2$s the slow lane's speed, such as "1 MB/s". -->
   <string name="message_slow_lane_on">Slow lane on for %1$s · %2$s</string>
   <!-- %1$s is a device, such as "This Mac". -->

@@ -61,7 +61,8 @@ home server, and you can watch and control the downloads on all of them from any
 | Command line and server | macOS, Linux and Windows: [install script](#run-ketch-on-a-server) or the [latest release][release] |
 
 The desktop apps bring their own runtime, and the command line is a single native binary: neither
-needs Java.
+needs Java. Both update themselves from the releases here: the desktop app from Settings → About,
+the command line with `ketch update` ([how updates work](docs/updates.md)).
 
 [release]: https://github.com/linroid/Ketch/releases/latest
 

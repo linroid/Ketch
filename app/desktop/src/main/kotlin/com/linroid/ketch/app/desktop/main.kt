@@ -28,6 +28,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
@@ -54,6 +55,7 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.rememberFileActions
@@ -87,6 +89,10 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.updater.GitHubReleases
+import com.linroid.ketch.updater.ReleaseDownloader
+import com.linroid.ketch.updater.ReleasePlatform
+import com.linroid.ketch.updater.ReleaseVersion
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.message_window_error
 import ketch.app.desktop.generated.resources.notify_added
@@ -346,6 +352,8 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   LaunchedEffect(settingsWindowState) {
     settingsStateStore.saveChanges(settingsWindowState, savedSettingsBounds)
   }
+  val updater = remember { createUpdater(launch, controller, behavior, scope) }
+  LaunchedEffect(updater) { updater.start(desktopSettings.checkForUpdates) }
   // The Settings window closes and minimizes itself, from its own menu bar or keys.
   val actions = remember {
     DesktopActions(
@@ -353,6 +361,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       closeWindow = behavior::closeWindow,
       quit = { behavior.requestQuit() },
       openFiles = launch.openFiles,
+      checkForUpdates = updater::check,
     )
   }
   val active by controller.state.activeInstance.collectAsState()
@@ -404,7 +413,8 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     key(language) {
       DockMenu(commands, status.pulse.counts)
       val instances by controller.state.instances.collectAsState()
-      val menus = menuBar(menuBarContext(controller, status, speedMode, files, instances))
+      val context = menuBarContext(controller, status, speedMode, files, instances, updates = true)
+      val menus = menuBar(context)
       DefaultMenuBar(menus, commands::perform)
     }
   }
@@ -452,6 +462,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
         LocalIntegrationStatus provides launch.integration.status,
         LocalWindowChrome provides windowChrome(fullWindowContent, windowState.placement),
         LocalHostShortcuts provides shellSkips,
+        LocalAppUpdates provides updater,
       ) {
         val app = @Composable {
           App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
@@ -467,6 +478,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       hooks = providedHooks,
       integration = launch.integration,
       fileLogger = launch.fileLogger,
+      updates = updater,
       onQuit = { behavior.requestQuit() },
     )
   }
@@ -533,6 +545,34 @@ private fun createInstanceManager(
     initialRemotes = config.remotes,
     configStore = configStore,
   )
+}
+
+/**
+ * The app's [DesktopUpdater], which keeps its files in the `updates` folder, logs its
+ * installers to `logs/update.log`, quits through [behavior] to install and tells the user what
+ * it finds in toasts.
+ */
+private fun createUpdater(
+  launch: LaunchContext,
+  controller: AppController,
+  behavior: CloseBehavior,
+  scope: CoroutineScope,
+): DesktopUpdater {
+  val workDir = File(launch.configDir, UPDATES_DIR)
+  val log = File(File(launch.configDir, LOGS_DIR), UPDATE_LOG)
+  lateinit var updater: DesktopUpdater
+  updater = DesktopUpdater(
+    scope = scope,
+    feed = GitHubReleases({ KtorHttpEngine() }),
+    current = ReleaseVersion.parse(KetchApi.VERSION),
+    platform = ReleasePlatform.current(),
+    installer = UpdateInstaller.forThisApp(workDir, log),
+    workDir = workDir,
+    download = ReleaseDownloader({ KtorHttpEngine() }, launch.logger)::download,
+    quit = behavior::quitWithoutAsking,
+    onEvent = { event -> postUpdateNotice(event, controller.messages, updater) },
+  )
+  return updater
 }
 
 /** What the app closes when it quits: the controller, then the engine; once. */
@@ -853,6 +893,8 @@ private fun logLevel(): LogLevel {
 
 private const val APP_NAME = "Ketch"
 private const val LOGS_DIR = "logs"
+private const val UPDATES_DIR = "updates"
+private const val UPDATE_LOG = "update.log"
 private const val ADDED_NAMES_SHOWN = 3
 private val ADDED_COALESCE_WINDOW = 1.seconds
 private val PEAK_SAVE_DELAY = 10.seconds

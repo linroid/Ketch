@@ -15,7 +15,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.util.pairingAddresses
+import com.linroid.ketch.app.util.ipv4Addresses
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_action_refresh
 import ketch.app.shared.generated.resources.settings_network_gone
@@ -115,6 +115,6 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
 @Composable
 private fun chipLabel(info: NetworkInterfaceInfo, gone: Boolean): String {
   if (gone) return stringResource(Res.string.settings_network_gone, info.name)
-  val address = pairingAddresses(listOf(info)).firstOrNull()
+  val address = ipv4Addresses(listOf(info)).firstOrNull()
   return if (address == null) info.name else info.name + SEPARATOR + address
 }
