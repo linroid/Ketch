@@ -40,6 +40,8 @@
   <string name="row_starts_in">dans %1$s</string>
   <string name="row_starts_after">Démarre dans %1$s</string>
   <string name="row_waiting_for_conditions">En attente des conditions</string>
+  <string name="row_paused_preempted">Mis en pause pour un téléchargement urgent · reprendra automatiquement</string>
+  <string name="row_paused_shutdown">Mis en pause à la fermeture de Ketch · reprendra à sa réouverture</string>
 
   <string name="summary_size_of_total">%1$s / %2$s</string>
   <string name="summary_average_speed">moy. %1$s</string>
@@ -51,6 +53,7 @@
   <string name="sort_speed">Vitesse</string>
   <string name="sort_time_left">Restant</string>
   <string name="sort_added">Ajouté</string>
+  <string name="sort_finished">Terminé</string>
   <string name="sort_status">État</string>
   <string name="sort_connections">Connexions</string>
   <string name="sort_source">Source</string>
@@ -73,6 +76,10 @@
   <string name="group_title_yesterday">Ajoutés hier</string>
   <string name="group_title_week">Ajoutés cette semaine</string>
   <string name="group_title_earlier">Ajoutés plus tôt</string>
+  <string name="group_title_finished_today">Terminés aujourd'hui</string>
+  <string name="group_title_finished_yesterday">Terminés hier</string>
+  <string name="group_title_finished_week">Terminés cette semaine</string>
+  <string name="group_title_finished_earlier">Terminés plus tôt</string>
   <string name="group_all_done_at">tout terminé ≈ %1$s</string>
   <string name="group_in_start_order">dans l'ordre de démarrage</string>
 
@@ -93,6 +100,12 @@
   <string name="queue_waiting_slot">En attente d'un emplacement libre (%1$d sur %2$d utilisés)</string>
   <string name="queue_waiting_host">En attente de %1$s (%2$d par site)</string>
   <string name="queue_waiting_start">En attente de démarrage</string>
+  <string name="queue_position_next">le prochain</string>
+  <plurals name="queue_position_ahead">
+    <item quantity="one">%1$d devant</item>
+    <item quantity="other">%1$d devant</item>
+  </plurals>
+  <string name="queue_starting">Démarrage</string>
 
   <string name="action_row_pause">Mettre en pause</string>
   <string name="action_row_resume">Reprendre</string>

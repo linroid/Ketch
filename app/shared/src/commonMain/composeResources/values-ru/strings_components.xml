@@ -55,6 +55,7 @@
 
   <string name="component_stepper_auto">Авто</string>
   <string name="component_stepper_auto_count">Авто (%1$d)</string>
+  <string name="component_stepper_use_auto">Использовать значение устройства по умолчанию</string>
   <string name="component_stepper_fewer_connections">Меньше подключений</string>
   <string name="component_stepper_more_connections">Больше подключений</string>
   <plurals name="component_stepper_connections">

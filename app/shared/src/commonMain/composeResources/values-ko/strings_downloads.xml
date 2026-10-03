@@ -253,6 +253,9 @@
   <plurals name="downloads_batch_connections">
     <item quantity="other">다운로드 %1$d개의 연결을 %2$d개로 설정함</item>
   </plurals>
+  <plurals name="downloads_batch_connections_auto">
+    <item quantity="other">다운로드 %1$d개의 연결을 자동으로 설정함</item>
+  </plurals>
   <plurals name="downloads_batch_failed">
     <item quantity="other">%1$d개 실패</item>
   </plurals>

@@ -276,6 +276,10 @@
     <item quantity="one">%1$d Download auf %2$d Verbindungen gesetzt</item>
     <item quantity="other">%1$d Downloads auf %2$d Verbindungen gesetzt</item>
   </plurals>
+  <plurals name="downloads_batch_connections_auto">
+    <item quantity="one">Verbindungen von %1$d Download auf Automatisch gesetzt</item>
+    <item quantity="other">Verbindungen von %1$d Downloads auf Automatisch gesetzt</item>
+  </plurals>
   <plurals name="downloads_batch_failed">
     <item quantity="one">%1$d fehlgeschlagen</item>
     <item quantity="other">%1$d fehlgeschlagen</item>

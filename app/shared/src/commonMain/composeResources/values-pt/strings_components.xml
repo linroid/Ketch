@@ -45,6 +45,7 @@
 
   <string name="component_stepper_auto">Auto</string>
   <string name="component_stepper_auto_count">Auto (%1$d)</string>
+  <string name="component_stepper_use_auto">Usar o padrão do dispositivo</string>
   <string name="component_stepper_fewer_connections">Menos conexões</string>
   <string name="component_stepper_more_connections">Mais conexões</string>
   <plurals name="component_stepper_connections">

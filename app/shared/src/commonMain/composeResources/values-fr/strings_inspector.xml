@@ -96,6 +96,7 @@
   <string name="inspector_detail_path">Enregistré dans</string>
   <string name="inspector_detail_size">Taille</string>
   <string name="inspector_detail_added">Ajouté</string>
+  <string name="inspector_detail_finished">Terminé</string>
   <string name="inspector_detail_time">Durée</string>
   <string name="inspector_detail_average">Vitesse moy.</string>
   <string name="inspector_detail_connections">Connexions</string>
@@ -112,6 +113,7 @@
   <string name="inspector_copy_failed_path">Impossible de copier l'emplacement d'enregistrement</string>
   <string name="inspector_copy_failed_size">Impossible de copier la taille</string>
   <string name="inspector_copy_failed_added">Impossible de copier la date d'ajout</string>
+  <string name="inspector_copy_failed_finished">Impossible de copier la date de fin</string>
   <string name="inspector_copy_failed_time">Impossible de copier la durée</string>
   <string name="inspector_copy_failed_average">Impossible de copier la vitesse moyenne</string>
   <string name="inspector_copy_failed_connections">Impossible de copier les connexions</string>

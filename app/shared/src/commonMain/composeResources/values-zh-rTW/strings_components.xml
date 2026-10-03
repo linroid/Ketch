@@ -40,6 +40,7 @@
 
   <string name="component_stepper_auto">自動</string>
   <string name="component_stepper_auto_count">自動（%1$d）</string>
+  <string name="component_stepper_use_auto">使用裝置預設值</string>
   <string name="component_stepper_fewer_connections">減少連線數</string>
   <string name="component_stepper_more_connections">增加連線數</string>
   <plurals name="component_stepper_connections">

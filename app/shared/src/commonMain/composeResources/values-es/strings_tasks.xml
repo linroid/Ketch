@@ -40,6 +40,8 @@
   <string name="row_starts_in">dentro de %1$s</string>
   <string name="row_starts_after">Empieza dentro de %1$s</string>
   <string name="row_waiting_for_conditions">Esperando a que se cumplan las condiciones</string>
+  <string name="row_paused_preempted">En pausa por una descarga urgente · se reanuda automáticamente</string>
+  <string name="row_paused_shutdown">En pausa al cerrarse Ketch · se reanuda cuando se inicie</string>
 
   <string name="summary_size_of_total">%1$s / %2$s</string>
   <string name="summary_average_speed">media de %1$s</string>
@@ -51,6 +53,7 @@
   <string name="sort_speed">Velocidad</string>
   <string name="sort_time_left">Restante</string>
   <string name="sort_added">Añadida</string>
+  <string name="sort_finished">Completada</string>
   <string name="sort_status">Estado</string>
   <string name="sort_connections">Conexiones</string>
   <string name="sort_source">Fuente</string>
@@ -73,6 +76,10 @@
   <string name="group_title_yesterday">Añadidas ayer</string>
   <string name="group_title_week">Añadidas esta semana</string>
   <string name="group_title_earlier">Añadidas antes</string>
+  <string name="group_title_finished_today">Completadas hoy</string>
+  <string name="group_title_finished_yesterday">Completadas ayer</string>
+  <string name="group_title_finished_week">Completadas esta semana</string>
+  <string name="group_title_finished_earlier">Completadas antes</string>
   <string name="group_all_done_at">todo listo ≈ %1$s</string>
   <string name="group_in_start_order">en orden de inicio</string>
 
@@ -93,6 +100,12 @@
   <string name="queue_waiting_slot">Esperando un hueco libre (%1$d de %2$d en uso)</string>
   <string name="queue_waiting_host">Esperando a %1$s (%2$d por sitio)</string>
   <string name="queue_waiting_start">Esperando para empezar</string>
+  <string name="queue_position_next">la siguiente</string>
+  <plurals name="queue_position_ahead">
+    <item quantity="one">%1$d por delante</item>
+    <item quantity="other">%1$d por delante</item>
+  </plurals>
+  <string name="queue_starting">Empezando</string>
 
   <string name="action_row_pause">Pausar</string>
   <string name="action_row_resume">Reanudar</string>

@@ -91,6 +91,7 @@
   <string name="inspector_detail_path">儲存位置</string>
   <string name="inspector_detail_size">大小</string>
   <string name="inspector_detail_added">新增時間</string>
+  <string name="inspector_detail_finished">完成時間</string>
   <string name="inspector_detail_time">花費時間</string>
   <string name="inspector_detail_average">平均速度</string>
   <string name="inspector_detail_connections">連線數</string>
@@ -107,6 +108,7 @@
   <string name="inspector_copy_failed_path">無法複製儲存位置</string>
   <string name="inspector_copy_failed_size">無法複製大小</string>
   <string name="inspector_copy_failed_added">無法複製新增時間</string>
+  <string name="inspector_copy_failed_finished">無法複製完成時間</string>
   <string name="inspector_copy_failed_time">無法複製花費時間</string>
   <string name="inspector_copy_failed_average">無法複製平均速度</string>
   <string name="inspector_copy_failed_connections">無法複製連線數</string>
