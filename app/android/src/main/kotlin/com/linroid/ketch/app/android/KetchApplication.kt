@@ -6,6 +6,8 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.feedback.UnreadableFile
+import com.linroid.ketch.app.feedback.UnreadableFiles
 import com.linroid.ketch.app.i18n.initAppLanguage
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.state.IncomingDownloads
@@ -41,6 +43,24 @@ class KetchApplication : Application() {
     )
   }
 
+  /** Files the app or the service could not read and moved aside, which the app reports. */
+  val unreadableFiles = UnreadableFiles()
+
+  /**
+   * The app's settings in `config.toml`, shared by the app and the service. Whichever reads a file
+   * that cannot be read first, usually [onCreate] for the language, moves it aside and reports it
+   * to [unreadableFiles].
+   */
+  val configStore: FileConfigStore by lazy {
+    FileConfigStore(filesDir.resolve("config.toml").absolutePath) { unreadable ->
+      fileLogger.w(
+        "[KetchApplication] Moved unreadable settings aside to ${unreadable.movedTo}: " +
+          unreadable.cause.describeCauses()
+      )
+      unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Settings, unreadable.movedTo))
+    }
+  }
+
   // Reads outlive the activity that received the file, so a rotation cannot cancel them.
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -59,8 +79,7 @@ class KetchApplication : Application() {
 
   // The language chosen in Settings, which the app applies itself before Android 13.
   private fun savedLanguage(): String? = try {
-    FileConfigStore(filesDir.resolve("config.toml").absolutePath).load()
-      .appearance.language
+    configStore.load().appearance.language
   } catch (e: Exception) {
     fileLogger.w("[KetchApplication] Couldn't read the language: ${e.describeCauses()}")
     null

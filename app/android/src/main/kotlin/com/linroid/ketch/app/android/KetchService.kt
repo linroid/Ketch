@@ -22,6 +22,7 @@ import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.ActivitySource
 import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.NotificationCopy
+import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.pairingNotificationCopy
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -36,7 +37,6 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.pauseActiveTasks
 import com.linroid.ketch.app.state.toKetchAccent
-import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
@@ -131,12 +131,14 @@ class KetchService : Service() {
     }
     enterForeground(first)
 
-    val configStore = FileConfigStore(
-      filesDir.resolve("config.toml").absolutePath,
-    )
+    val app = application as KetchApplication
+    val configStore = app.configStore
     val config = configStore.load()
     notifier.accent = config.appearance.accent.toKetchAccent()
-    val taskStore = createSqliteTaskStore(DriverFactory(this))
+    val driverFactory = DriverFactory(this) { unreadable ->
+      app.unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Downloads, unreadable.movedTo))
+    }
+    val taskStore = createSqliteTaskStore(driverFactory)
     val instanceName = config.name ?: deviceName()
     val torrentSource = TorrentDownloadSource(
       TorrentConfig(
@@ -157,7 +159,7 @@ class KetchService : Service() {
             name = instanceName,
             logger = Logger.combine(
               Logger.console(LogLevel.DEBUG),
-              (application as KetchApplication).fileLogger
+              app.fileLogger
             ),
             additionalSources = listOf(FtpDownloadSource(), torrentSource),
           )

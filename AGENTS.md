@@ -88,7 +88,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 ### `library:ktor`, `library:kermit`, `library:sqlite`
 - `com.linroid.ketch.engine` -- `KtorHttpEngine` (`withNetworkInterfaces()` on Android/JVM)
 - `com.linroid.ketch.log` -- `KermitLogger`
-- `com.linroid.ketch.sqlite` -- `SqliteTaskStore`, `DriverFactory` (expect/actual)
+- `com.linroid.ketch.sqlite` -- `SqliteTaskStore`, `DriverFactory` (expect/actual),
+  `UnreadableDatabase`
 
 ### `library:ftp`
 - `com.linroid.ketch.ftp` -- `FtpDownloadSource` (implements `DownloadSource`), `FtpClient`,
@@ -114,17 +115,18 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### `config`
 - `com.linroid.ketch.config` -- `KetchConfig`, `ConfigStore`, `FileConfigStore`,
-  `WebConfigStore` (WasmJs, localStorage), `ServerConfig`, `RemoteConfig`, `AiSettings`,
-  `LlmSettings`, `LlmProvider`, `SearchSettings`, `SearchProvider`, `TorrentSettings`,
-  `AppearanceConfig`, `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`,
-  `UiPreferences`, `DesktopSettings`, `NotificationSettings`, `IntegrationSettings`
+  `UnreadableConfig`, `WebConfigStore` (WasmJs, localStorage), `ServerConfig`, `RemoteConfig`,
+  `AiSettings`, `LlmSettings`, `LlmProvider`, `SearchSettings`, `SearchProvider`,
+  `TorrentSettings`, `AppearanceConfig`, `AccentColor`, `ThemeMode`, `SpeedSettings`,
+  `SpeedRule`, `UiPreferences`, `DesktopSettings`, `NotificationSettings`, `IntegrationSettings`
 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
   `IntakeState`, `SpeedModeController`, `PendingOps`), `instance` (`InstanceManager`,
   `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme` tokens),
   `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
-  `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`) and `util`
+  `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`, `UnreadableFiles`) and
+  `util`
 - `ui` -- `AppShell` and `shell` (layout, navigation, device switcher, drop berths), `sidebar`,
   `downloads` and `list` (table, list rows, launchpad), `inspector`, `intake` (add sheet),
   `palette`, `devices`, `connect`, `discover`, `settings`, `pulse`, `feedback`, `onboarding`
@@ -185,6 +187,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`)
 - Retry with exponential backoff for transient errors
 - Persistent task metadata via `TaskStore` interface
+- Unreadable storage never stops a start: `SqliteTaskStore.loadAll` skips (and logs) rows it
+  cannot decode, leaving them in the table, and `DriverFactory` (JVM and Android) moves a
+  database SQLite reports corrupt or not a database aside to `<name>.broken-<UTC time>`, with its
+  journal, and starts an empty one (on Android also when corruption shows up later, instead of
+  Android deleting it), telling its `onUnreadable` callback
 - Duplicate download guards in `DownloadCoordinator.start()` and `resume()`
 - HTTP requests can be spread round-robin over selected network interfaces
   (`KetchApi.updateNetworkInterfaces`, `MultiNetworkHttpEngine`); see
@@ -329,6 +336,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
   `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
   uses `WebConfigStore` (TOML in localStorage)
+- A `config.toml` that does not parse, or holds a value no setting takes, makes `load()` throw
+  unless the store has an `onUnreadable` callback: the apps pass one, so the file moves aside to
+  `config.toml.broken-<UTC time>` and they start with the defaults. They report it, and a
+  database moved aside, through `UnreadableFiles`, which the app shows once as a sticky warning.
+  The CLI never moves the file it shares with the desktop app: `ketch server` refuses to start
+  (defaults would serve on every interface without the token), `ketch mcp` and `ai-discover`
+  warn on stderr and use the defaults, and an unreadable `--config` file stops `ketch mcp`
 
 ### Apps (`app/`)
 - One Compose Multiplatform UI (`app:shared`) for Android, desktop, iOS and the web, laid out
@@ -504,6 +518,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 - Desktop, Android and iOS apps also write `logs/ketch.log` in their data directory
   (`FileLogger` in `app/shared`, rotated at 5 MiB, 3 files kept, combined with the console via
   `Logger.combine`); Settings → About opens the folder (desktop) or shares a copy (phones)
+- The desktop app logs uncaught exceptions on any thread there, and quits with status 1 when
+  `application {}` fails, rather than linger without a window holding the single-instance lock
 - `Ketch` logs every task state transition; torrent swarms log a debug summary every 30s
 - See [logging](docs/logging.md) for the format, troubleshooting and sensitive-data rules
 - `KetchLogger` uses `inline` functions with `Logger.None` fast-path for zero-cost disabled logging
@@ -575,8 +591,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
   "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
   "TorrentTracker", "RemoteKetch", "RemoteTask", "RemotePairing", "TokenBucket", "SqliteStore",
-  "SqliteDriver", "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes", "Pairing",
-  "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
+  "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "EventRoutes",
+  "Pairing", "McpStdio", "GitHubReleases"; `ai:discover`, mDNS
   and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
