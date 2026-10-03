@@ -340,15 +340,19 @@ private fun addLinks(page: DownloadsPage): Boolean {
 
 /**
  * The "⋯" menu. Its items stay in place, disabled when they cannot run, so the menu never
- * changes shape: Pause all, Resume all, Retry failed, Clear finished, Select all, Copy all
- * links, the table's columns and its row density.
+ * changes shape: Pause all, Resume all, Retry failed, Clear finished, Clear missing (where files
+ * can be checked), Select all, Copy all links, the table's columns and its row density. Opening
+ * it checks the finished files again, so Clear missing counts the ones gone since.
  */
 @Composable
 private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
   val state = page.state
   val actions = page.actions
+  val runner = actions.runner
   val rows by state.taskList.rows.collectAsState()
   var open by remember { mutableStateOf(false) }
+  val finishedRows = rows.filter { it.state is DownloadState.Completed }
+  LaunchedEffect(open) { if (open) runner.checkFiles(finishedRows) }
   val visible = actions.rows
   val auto = if (LocalShownDevices.current.several) setOf(TableColumn.Device) else emptySet()
   Box {
@@ -374,13 +378,22 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
         onClick = { state.retryFailed() },
         enabled = rows.any { it.state is DownloadState.Failed },
       )
-      val finished = rows.count { it.state is DownloadState.Completed }
       item(
-        label = clearFinishedLabel(finished),
+        label = clearFinishedLabel(finishedRows.size),
         icon = KetchIcon.Trash,
         onClick = { state.clearCompleted() },
-        enabled = finished > 0,
+        enabled = finishedRows.isNotEmpty(),
       )
+      if (runner.files != null) {
+        val missing = finishedRows.count(runner::isFileMissing)
+        item(
+          label = clearMissingLabel(missing),
+          icon = KetchIcon.Warning,
+          caption = CLEAR_MISSING_CAPTION,
+          onClick = { runner.clearMissing(finishedRows) },
+          enabled = missing > 0,
+        )
+      }
       divider()
       item(
         command = KetchCommands.SelectAll,
@@ -464,6 +477,13 @@ private val DownloadState.isPausable: Boolean
 /** "Clear 4 finished", or "Clear finished" when there are none. */
 internal fun clearFinishedLabel(count: Int): String =
   if (count > 0) "Clear $count finished" else "Clear finished"
+
+/** "Clear 2 missing", or "Clear missing" when no finished file is known to be gone. */
+internal fun clearMissingLabel(count: Int): String =
+  if (count > 0) "Clear $count missing" else "Clear missing"
+
+/** What "Clear missing" removes, for its caption in menus. */
+internal const val CLEAR_MISSING_CAPTION: String = "Files moved or deleted"
 
 private fun copyLinks(page: DownloadsPage, rows: List<TaskRow>) {
   page.actions.runner.run(RowAction.CopyLink, rows)

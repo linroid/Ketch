@@ -55,6 +55,7 @@ import com.linroid.ketch.app.ui.downloads.actions.RowActionDialogs
 import com.linroid.ketch.app.ui.downloads.actions.SelectionBar
 import com.linroid.ketch.app.ui.downloads.actions.SendConfirmationDialog
 import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
+import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.list.GroupCollapse
@@ -225,6 +226,8 @@ internal class DownloadsPage(val state: AppState, val actions: ListActions) {
  * Keeps the page in step with the list: each tab shows its saved order, a new tab or search
  * starts at the top, removed tasks leave the selection and the inspector, the inspector follows
  * the selection and closes with it, and the order holds still while the user works in the list.
+ * On the Done tab it checks the finished files, as it shows and whenever they change, so their
+ * rows say "File missing" without being hovered first.
  */
 @Composable
 private fun PageEffects(page: DownloadsPage, view: TaskListView) {
@@ -235,6 +238,12 @@ private fun PageEffects(page: DownloadsPage, view: TaskListView) {
   val tasks by state.tasks.collectAsState()
   LaunchedEffect(filter) { state.listArrangement = page.arrangementOf(filter) }
   LaunchedEffect(filter, view.query) { page.listState.scrollToItem(0) }
+  if (filter == StatusFilter.Done) {
+    val finished = rows.filter { it.outputFile != null }
+    LaunchedEffect(actions.runner, finished.map { it.key to it.outputFile }) {
+      actions.runner.checkFiles(finished)
+    }
+  }
   LaunchedEffect(rows, tasks) {
     // Rows trail the tasks by a moment; prune only once they caught up.
     if (rows.size != tasks.size) return@LaunchedEffect
@@ -419,12 +428,17 @@ private fun WideDownloads(
   }
 }
 
-/** The status tabs, or the selection bar in their place while two or more rows are selected. */
+/**
+ * The status tabs, or the selection bar in their place while two or more rows are selected. On
+ * the Done tab it offers to clear the finished downloads whose files are gone.
+ */
 @Composable
 private fun TabArea(page: DownloadsPage, view: TaskListView, showsTable: Boolean) {
   val state = page.state
   val actions = page.actions
+  val runner = actions.runner
   val counts by state.taskList.counts.collectAsState()
+  val finished = if (view.filter == StatusFilter.Done) finishedRows(state) else emptyList()
   val selected = actions.selectedRows
   val motion = KetchTheme.motion
   Crossfade(
@@ -449,7 +463,9 @@ private fun TabArea(page: DownloadsPage, view: TaskListView, showsTable: Boolean
           filter = view.filter,
           counts = counts,
           needsLink = view.rows.count { it.content.error?.primary == RowAction.EditLink },
+          missing = finished.count(runner::isFileMissing),
           onClearFinished = { state.clearCompleted() },
+          onClearMissing = { runner.clearMissing(finished) },
           onRetryAll = { page.retry(view.rows.filter { it.state.needsAttention }) },
         )
         ArrangementMenu(
@@ -460,6 +476,13 @@ private fun TabArea(page: DownloadsPage, view: TaskListView, showsTable: Boolean
       }
     }
   }
+}
+
+/** The finished rows of the shown devices, those whose files can be checked. */
+@Composable
+private fun finishedRows(state: AppState): List<TaskRow> {
+  val rows by state.taskList.rows.collectAsState()
+  return rows.filter { it.outputFile != null }
 }
 
 /** The content under the tabs: the rows, or what stands in for them. */
