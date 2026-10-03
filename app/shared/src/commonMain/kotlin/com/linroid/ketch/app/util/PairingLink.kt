@@ -146,18 +146,49 @@ data class PairingLink(
 }
 
 /**
- * The addresses another device on the network can reach this one at: the IPv4 addresses of
- * [interfaces], private ones (`10/8`, `172.16/12`, `192.168/16`) first, without loopback and
- * link-local ones. IPv6 addresses are left out, since a phone on the same Wi-Fi reaches IPv4
- * reliably and a link-local IPv6 address needs an interface name.
+ * The addresses another device on the network can reach this one at: the [ipv4Addresses] of
+ * [interfaces] that join the local network (see [isLocalNetwork]). Virtual machine, container
+ * and VPN interfaces and mobile data are left out, since a phone on the same Wi-Fi cannot reach
+ * them; so are IPv6 addresses, since that phone reaches IPv4 reliably and a link-local IPv6
+ * address needs an interface name.
  */
-fun pairingAddresses(interfaces: List<NetworkInterfaceInfo>): List<String> {
+fun pairingAddresses(interfaces: List<NetworkInterfaceInfo>): List<String> =
+  ipv4Addresses(interfaces.filter(::isLocalNetwork))
+
+/**
+ * The IPv4 addresses of [interfaces], private ones (`10/8`, `172.16/12`, `192.168/16`) first,
+ * without loopback and link-local ones.
+ */
+fun ipv4Addresses(interfaces: List<NetworkInterfaceInfo>): List<String> {
   val ipv4 = interfaces.flatMap { it.addresses }
     .mapNotNull { address -> ipv4Octets(address)?.let { address to it } }
     .filterNot { (_, octets) -> octets[0] == LOOPBACK || isLinkLocal(octets) }
     .distinctBy { it.first }
   return ipv4.sortedBy { (_, octets) -> if (isPrivate(octets)) 0 else 1 }.map { it.first }
 }
+
+/**
+ * Whether [network] probably joins the local network other devices are on, judged by its name:
+ * not a virtual machine or container bridge such as macOS's `bridge100` (OrbStack, Docker, UTM)
+ * or Linux's `docker0`, not a VPN such as `utun3` or `wg0`, and not Android's mobile data.
+ */
+private fun isLocalNetwork(network: NetworkInterfaceInfo): Boolean {
+  val id = network.id.lowercase()
+  val name = network.name.lowercase()
+  return VIRTUAL_PREFIXES.none { id.startsWith(it) || name.startsWith(it) } &&
+    VIRTUAL_WORDS.none { it in name }
+}
+
+/** Interface names of VM and container bridges, VPN tunnels and mobile data. */
+private val VIRTUAL_PREFIXES = listOf(
+  "bridge", "vmenet", "vmnet", "vboxnet", "docker", "br-", "veth", "virbr", "utun", "tun", "tap",
+  "wg", "zt", "mobile data",
+)
+
+/** Words in the Windows names of virtual adapters, such as "vEthernet (WSL)", and Android's VPN. */
+private val VIRTUAL_WORDS = listOf(
+  "virtual", "vmware", "vethernet", "hyper-v", "vpn", "wintun", "wireguard", "tailscale",
+)
 
 /** Whether [address] is an IPv4 address of a private network. */
 fun isPrivateIpv4(address: String): Boolean = ipv4Octets(address)?.let(::isPrivate) == true
