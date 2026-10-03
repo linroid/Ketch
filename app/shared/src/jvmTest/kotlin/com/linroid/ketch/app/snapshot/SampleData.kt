@@ -10,6 +10,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
@@ -194,17 +195,20 @@ private fun sampleTasks(): List<ListTestTask> = listOf(
     ago = 12.minutes,
     speedLimit = SpeedLimit.mbps(5),
   ),
+  // Waiting behind the three running downloads, in the engine's order: priority, then age.
   task(
     id = "imagenet-04",
     url = "https://image-net.org/data/train/imagenet-part04.tar",
     state = DownloadState.Queued,
     ago = 41.minutes,
+    queuePosition = 1,
   ),
   task(
     id = "blender",
     url = "https://download.blender.org/release/Blender4.2/blender-4.2-macos-arm64.dmg",
     state = DownloadState.Queued,
     ago = 3.minutes,
+    queuePosition = 2,
   ),
   task(
     id = "llama",
@@ -274,6 +278,7 @@ internal fun task(
   priority: DownloadPriority = DownloadPriority.NORMAL,
   speedLimit: SpeedLimit = SpeedLimit.Unlimited,
   dir: String = SampleData.DOWNLOAD_DIR,
+  queuePosition: Int? = null,
 ): ListTestTask = ListTestTask(
   taskId = id,
   state = state,
@@ -286,6 +291,7 @@ internal fun task(
   ),
   createdAt = SampleData.NOW - ago,
   segments = segments,
+  queuePosition = MutableStateFlow(queuePosition),
 )
 
 /** A segmented HTTP download whose segment `i` is `lanes[i]` done. */
@@ -364,11 +370,19 @@ internal class SampleKetchApi(
   override val tasks: StateFlow<List<DownloadTask>> = taskList
 
   override suspend fun download(request: DownloadRequest): DownloadTask {
+    // Nothing starts in the snapshots: the new task starts while a slot is free, else it waits
+    // behind the others, as the newest task of its priority would.
+    val tasks = taskList.value
+    val running = tasks.count { it.state.value is DownloadState.Downloading }
+    val waiting = tasks.count { it.queuePosition.value != null }
     val task = ListTestTask(
-      taskId = "added-${taskList.value.size}",
+      taskId = "added-${tasks.size}",
       state = DownloadState.Queued,
       request = request,
       createdAt = SampleData.NOW,
+      queuePosition = MutableStateFlow(
+        (waiting + 1).takeIf { running >= config.maxConcurrentDownloads },
+      ),
     )
     taskList.update { it + task }
     return task
@@ -407,6 +421,8 @@ internal class SampleKetchApi(
       freeSpace = 412_316_860_416,
       usableSpace = 412_316_860_416,
     ),
+    // A device on this version, like the embedded one, whose features the app gets without asking.
+    features = KetchFeatures.ALL,
   )
 
   override suspend fun updateConfig(config: DownloadConfig) {

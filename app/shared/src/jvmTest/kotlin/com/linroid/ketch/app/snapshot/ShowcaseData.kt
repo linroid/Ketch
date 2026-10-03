@@ -126,12 +126,14 @@ internal object ShowcaseData {
       speedLimit = SpeedLimit.mbps(5),
       dir = STUDIO_DIR,
     ),
+    // Waiting behind the three running downloads, in the engine's order: priority, then age.
     task(
       id = "shard-04",
       url = "https://data.example.net/corpus/dataset-shard-04.tar",
       state = DownloadState.Queued,
       ago = 41.minutes,
       dir = STUDIO_DIR,
+      queuePosition = 1,
     ),
     task(
       id = "assets",
@@ -139,6 +141,7 @@ internal object ShowcaseData {
       state = DownloadState.Queued,
       ago = 3.minutes,
       dir = STUDIO_DIR,
+      queuePosition = 2,
     ),
     task(
       id = "model",

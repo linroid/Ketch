@@ -21,7 +21,8 @@ import kotlin.time.Instant
 /**
  * A task that records its commands and changes state roughly like the engine: pausing a
  * download frees its slot for the next queued task, and an urgent waiting task preempts one,
- * which then waits paused for it (or queued, like an older daemon's).
+ * which then waits paused for it (or queued, like an older daemon's). Tasks waiting behind full
+ * slots report their [queuePosition].
  */
 internal class RecordingTask(
   override val taskId: String,
@@ -35,7 +36,6 @@ internal class RecordingTask(
   override val state = MutableStateFlow(initial)
   override val segments = MutableStateFlow(emptyList<Segment>())
 
-  // The fake keeps no queue order of its own, so it reports no positions.
   override val queuePosition = MutableStateFlow<Int?>(null)
 
   /** Commands received, in order, such as "pause" or "remove deleteFiles=false". */
@@ -53,7 +53,7 @@ internal class RecordingTask(
     record("pause")
     val wasRunning = state.value is DownloadState.Downloading
     state.value = DownloadState.Paused(PROGRESS)
-    if (wasRunning) api.promoteNext()
+    if (wasRunning) api.promoteNext() else api.publishPositions()
   }
 
   override suspend fun resume(destination: Destination?) {
@@ -108,7 +108,9 @@ internal class RecordingTask(
 
 /**
  * A device whose tasks are [RecordingTask]s. At most [maxActive] tasks download at once; the
- * rest of the added ones wait in the queue.
+ * rest of the added ones wait in the queue. While every slot is taken, the waiting tasks report
+ * positions 1, 2, ... in list order, the order [promoteNext] starts them in; with a slot free a
+ * waiting task reports none, as the engine's does while it starts.
  *
  * @param preemptsToPaused whether a task an urgent one pushes out of its slot waits paused for
  *   it, as this version of the engine does; `false` sends it back to the queue as an older
@@ -137,6 +139,7 @@ internal class RecordingKetchApi(
   ): RecordingTask {
     val task = RecordingTask("t${nextId++}", request, state, this)
     taskList.update { it + task }
+    publishPositions()
     return task
   }
 
@@ -149,11 +152,12 @@ internal class RecordingKetchApi(
   /** Starts waiting tasks, queued or preempted, in list order while a slot is free. */
   fun promoteNext() {
     for (task in taskList.value.filterIsInstance<RecordingTask>()) {
-      if (activeCount() >= maxActive) return
+      if (activeCount() >= maxActive) break
       if (task.state.value.waitsInQueue) {
         task.state.value = DownloadState.Downloading(RecordingTask.PROGRESS)
       }
     }
+    publishPositions()
   }
 
   /** Starts [task] at once, making a running task wait for it when no slot is free. */
@@ -168,10 +172,22 @@ internal class RecordingKetchApi(
       }
     }
     task.state.value = DownloadState.Downloading(RecordingTask.PROGRESS)
+    publishPositions()
   }
 
   fun removeTask(task: DownloadTask) {
     taskList.update { it - task }
+    (task as? RecordingTask)?.queuePosition?.value = null
+    publishPositions()
+  }
+
+  /** Numbers the tasks waiting behind full slots, and clears the others' positions. */
+  fun publishPositions() {
+    val full = activeCount() >= maxActive
+    var next = 1
+    for (task in taskList.value.filterIsInstance<RecordingTask>()) {
+      task.queuePosition.value = if (full && task.state.value.waitsInQueue) next++ else null
+    }
   }
 
   private fun activeCount(): Int =
