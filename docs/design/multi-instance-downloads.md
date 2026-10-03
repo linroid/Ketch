@@ -1,6 +1,7 @@
 # Multi-instance cooperative downloads
 
-Status: **Proposal** — not implemented. Prepared 2026-10-03 against `2f274a45`.
+Status: **Proposal** — not implemented. Prepared 2026-10-03 against `2f274a45`, rechecked at
+`d76c7460`.
 
 One Ketch instance, the task's **owner**, stays the only scheduler, writer and persister of a
 download. Other paired instances, **helpers**, are stateless range relays: the owner asks a helper
@@ -16,9 +17,10 @@ device. Cooperation only makes a download faster when a helper brings a differen
 WAN, public IP or cellular path); for the common laptop-plus-NAS-on-one-LAN case the answer stays
 "Move to device", which [task transfer](../plans/task-transfer.md) (#355) makes carry the
 downloaded data; §5.1 lists what the two proposals share. This document authorizes no
-implementation by itself. Its claims about existing code were checked at `2f274a45`, which
+implementation by itself. Its claims about existing code were checked at `d76c7460`, which
 includes #352 (approving a device found on the network), #353 (pause reasons, queue positions,
-finish times, Auto connections) and #354 (`c81f35dc`: HTTP content of unknown size, §6.11).
+finish times, Auto connections), #354 (`c81f35dc`: HTTP content of unknown size, §6.11) and #359
+(`d76c7460`: partial files kept unless discarded, empty segments restarted, §6.10, §15).
 
 ## 1 Summary and decision
 
@@ -196,7 +198,8 @@ uses it instead of defining its own:
 | Sign-in classification (`isSensitiveHeader`, F11) | Task transfer, §5.5 | Gains §11's signed-URL keys; the forwarding allowlist and `SIGN_INS` build on it |
 | Reading a task's output (`FileReader`, `openFileReader`) | Task transfer, §7.4 | Alias windows (§9.4) and digests (§9.6) read through it; `FileAccessor` stays write-only |
 | Durable file sync (`F_FULLFSYNC` on Apple, else `fsync`) | PR1 item 2 or task transfer's F3, whichever lands first | One `expect` function behind `FileAccessor.flush()` and transfer's `durableSync` |
-| Segment export, unplanned `[]`, `HttpResumeState` | This design (§6.10, §9.8); PR1 item 1 is F2 | Manifests take their segments from the export, a contiguous cover in position order |
+| Segment export, `HttpResumeState` | This design (§6.10, §9.8); empty segments as no progress shipped in #359 (transfer's F2) | Manifests take their segments from the export, a contiguous cover in position order |
+| Partial file kept unless discarded | #359 (transfer's F1): only `cancel()` and `remove(deleteFiles = true)` delete | Lanes, helpers and task failures never delete (§8.6) |
 | `KetchServer` opt-in routes | One route set, off by default like #352's `pairingApprover = null` | Transfer's `transfers = false` and the helper routes; `BrowserExtensionServer` serves neither |
 | Error bodies (F10a), constant-time compare and server `coerceInputValues` (F10b, PR1 item 8) | Whichever stack lands first | — |
 
@@ -418,18 +421,28 @@ instead."
   audit invalidation and fragmented legacy lists can raise it, so the export is capped at 64
   entries by merging adjacent runs and dropping the later run's done bytes from the persisted
   prefix (refetched on resume, never over-counted). A claim keeps its `start` for life.
-- "Unplanned" is an explicit `planned` flag on `TaskHandle`, mapped to `segments = null` at
-  persistence: `DownloadContext.segments`, `TaskHandle.mutableSegments` and
-  `DownloadTask.segments` are non-null lists. The export is never `[]` before completion when
-  `totalBytes > 0` and the source plans byte segments. `downloadUnknownSize` (#354) sets `planned`
-  as it empties `segments`: `[]` is its whole plan, persists as `[]` and restarts in place through
-  `HttpDownloadSource.resume`.
+- "Unplanned" needs no flag: since #359 a file of known size that Ketch writes keeps no saved
+  segments until its source publishes some. `DownloadExecution.runDownload`'s `savedSegments` saves
+  a `[]` snapshot with `total > 0` and no `managesOwnFileIo` as `segments = null`, in the periodic
+  and the final save; `DownloadCoordinator.resume` returns `false` for `null` and for a legacy `[]`
+  of known size, so `DownloadQueue.startTask` starts the task again; and `HttpDownloadSource.resume`
+  and `FtpDownloadSource.resume` split a `[]` resume of known size into fresh segments.
+  `DownloadContext.segments`, `TaskHandle.mutableSegments` and `DownloadTask.segments` stay non-null
+  lists. The scheduler runs inside `runDownload`, so `savedSegments` applies to its export
+  unchanged, and the export keeps #359's guarantees: the seed is published into `context.segments`
+  before `preallocate` and the first `writeAt`, as both sources publish theirs today, so every save
+  after a write persists a layout covering it; from the seed until completion the export covers
+  `[0, totalBytes)` and is never `[]`; restoring `[]` with `totalBytes > 0` seeds like a fresh
+  download, never as done; a failed final sync zeroes the export's prefixes and keeps its layout
+  (`discardProgress`, §9.7); and the scheduler never deletes the file (§8.6). Content of unknown
+  size keeps `[]`, saved as is and restarted in place by `HttpDownloadSource.resume`
+  (`downloadUnknownSize`, #354), and a torrent's `[]` stays `[]`; neither enters the scheduler.
 - Segments are progress, not connections: from PR5 the apps draw lanes from `LaneInfo` (§14.4),
   so free runs never show as stalled connections in `ConnectionsTab` or `LaneStrip`.
 
 ### 6.11 Relation to today's code
 
-| Today (`2f274a45`) | With `LaneScheduler` |
+| Today (`d76c7460`) | With `LaneScheduler` |
 | --- | --- |
 | `SegmentedDownloadHelper.downloadAll` launches every incomplete segment at once under `coroutineScope` + `awaitAll`; one failure cancels all | Lanes are `supervisorScope` children; failures are values interpreted per §6.7 |
 | A `maxConnections` value whose effective count differs from the baseline the source sized from (`requestedConnections`, #353) cancels the whole batch and resegments (`SegmentedDownloadHelper.downloadBatch`, `pendingResegment`) | Adding a lane splits one victim; removing one drains it, until the local count matches `effectiveConnections()`; with no batch there is no baseline |
@@ -440,6 +453,7 @@ instead."
 | FTP cuts segments with `SegmentCompleteException` (`FtpDownloadSource.downloadSegment`) | `FtpRangeFetcher` re-reads `admit()` per chunk and cuts at the live limit |
 | `DownloadContext.maxConnections` (0 = Auto since #353) | Unchanged: the requested local lane count, resolved by `effectiveConnections()`; `TorrentDownloadSource` keeps collecting it as its peer limit |
 | `DownloadContext.pendingResegment` | Deleted with the legacy path |
+| `DownloadExecution.cleanupAfterExecution` deletes the file only when the coordinator called `discardPartialFile` (#359: `cancel()`, `remove(deleteFiles = true)`) | Unchanged; it runs after every lane has released, and no lane, helper exit or task failure deletes |
 
 Rollout: `Ketch(laneMode = LaneMode.LEGACY | LANES)`, a constructor parameter behind
 `@KetchInternalApi`, never a `@Serializable DownloadConfig` field. `LANES` enables pinning from PR3
@@ -452,8 +466,9 @@ with `totalBytes < 0` never enter `LaneScheduler`: `HttpDownloadSource.downloadU
 probing the server), and `DownloadExecution` then records the file's size as `totalBytes`.
 `DownloadExecution.executeFresh` still fails an unknown size with `SourceError` before a
 `managesOwnFileIo` source runs, and FTP rejects one itself. The size comes from the resolve HEAD
-alone (`RangeSupportDetector`). That path stays as it is: whole-source retry (§6.8), `planned`
-with `[]` (§6.10), no pin and no helpers (`UNKNOWN_SIZE`, §14.1).
+alone (`RangeSupportDetector`). That path stays as it is: whole-source retry (§6.8), `[]` saved
+as is (#359's `savedSegments` leaves it alone, §6.10), no pin and no helpers (`UNKNOWN_SIZE`,
+§14.1).
 
 ## 7 Membership
 
@@ -684,19 +699,27 @@ overwrites of the same pinned representation; a graceful quit loses nothing (`Ke
   `DownloadCoordinator.pause` for `PauseReason.User` and for `Preempted(byTaskId)` when an URGENT
   task takes the slot (`DownloadQueue.tryPreemptAndStart`; the record stays `QUEUED`), and
   `DownloadCoordinator.close` (from `Ketch.close()`, with `closing` set) for `Shutdown`. The
-  scheduler cancels every lane, relayed sockets close, and helpers stop their origin GET within
-  one frame (≤ 1 RTT); pending reverse orders are withdrawn and open reverse streams get 409
+  scheduler cancels every lane, relayed sockets close, and helpers stop their origin GET within one
+  frame (≤ 1 RTT); pending reverse orders are withdrawn and open reverse streams get 409
   `task_paused`. Lanes release in their `finally`; the final checkpoint runs snapshot → sync →
-  persist (§9.7), which `Ketch.shutdown` waits for and plain `close()` does not (§15). Pause
-  before the first byte already works at HEAD (`RealDownloadTask.pause` accepts `Queued`). A
-  preempted task keeps its `queuePosition` and resumes on its own through `DownloadQueue.startTask`
-  → `DownloadCoordinator.resume`, as a Resume below; meanwhile its helper slots go to other tasks
-  (§12). Helpers add no `PauseReason`: one leaving, draining, failing or being excluded only
-  removes lanes, and a task left with no eligible group fails (§6.8).
+  persist (§9.7), which `Ketch.shutdown` waits for and plain `close()` does not (§15). The file and
+  its saved export stay: only a stop the coordinator marks as a discard deletes (#359). Pause before
+  the first byte already works at HEAD (`RealDownloadTask.pause` accepts `Queued`). A preempted task
+  keeps its `queuePosition` and resumes on its own through `DownloadQueue.startTask` →
+  `DownloadCoordinator.resume`, as a Resume below; meanwhile its helper slots go to other tasks
+  (§12). Helpers add no `PauseReason`: one leaving, draining, failing or being excluded only removes
+  lanes, and a task left with no eligible group fails (§6.8).
 - **Resume**: a new execution and nonce; helpers rejoin without a new `hello` while the session
   lives, and abort the paused execution's streams on the first new relay request.
-- **Cancel, remove**: as pause, then `CANCELED` and deletion after every lane has joined;
-  `PathFileAccessor` rejects writes after `close()` (§15), so nothing can recreate the file.
+- **Cancel, remove**: only `cancel()` and `remove(deleteFiles = true)` discard the file (#359):
+  `DownloadCoordinator.cancel(handle, deletePartialFile)` calls `discardPartialFile()` on the
+  running execution before cancelling it. Lanes stop as for pause and the task becomes
+  `CANCELED`; `cleanupAfterExecution` deletes the file after every lane has released and
+  `FileAccessor.close` ran, and `PathFileAccessor` rejects writes after `close()` (§15 item 4),
+  so nothing can recreate it. `remove(deleteFiles = false)` stops the lanes the same way and keeps
+  the file. No helper event and no task failure (§6.8) discards: the file and the saved export
+  stay for a resume. A task canceled while not running has no execution to mark and keeps its
+  file, as at HEAD; `remove(deleteFiles = true)` deletes it through `DownloadSource.cleanup`.
 - Pause and cancel never trigger failover, adoption or staging; there is none.
 
 | Event | Other lanes disturbed | Committed bytes lost | Origin bytes wasted |
@@ -708,7 +731,10 @@ overwrites of the same pinned representation; a graceful quit loses nothing (`Ke
 | Helper crash | none | 0 | in-flight |
 | Silent partition | none; tail freed after 15 s | 0 | in-flight |
 | Owner crash | — | ≤ 5 s of progress refetched | — |
-| Pause (user, preemption, close), cancel | all stop by design | 0 (≤ 5 s refetched after `close()` without `shutdown`) | in-flight |
+| Pause (user, preemption, close) | all stop by design | 0 (≤ 5 s refetched after `close()` without `shutdown`) | in-flight |
+| Task failure (§6.8) | all stop | 0: the file and export stay for a resume (#359) | in-flight |
+| `remove(deleteFiles = false)` | all stop | 0: the task goes, its partial file stays (#359) | in-flight |
+| `cancel()`, `remove(deleteFiles = true)` | all stop by design | all, as asked: the file is deleted once every lane has released | in-flight |
 
 ## 9 Correctness and integrity
 
@@ -896,6 +922,17 @@ the `NonCancellable` final save (no flush today) and shutdown. `DownloadCoordina
 right after `job.cancel()`, before the execution's final save, so writes still in flight can land
 after that flush yet be counted; fixing the final save fixes pause.
 
+#359 covers one case: when the flush after a finished transfer throws, `discardProgress` keeps the
+file and the segment layout, zeroes every prefix in memory and in the record, and the task fails
+with `Disk`, so a resume refetches every byte into the same file instead of completing over bytes
+that may not be on disk. It cannot do more, since no earlier checkpoint was synced either, and it
+leaves the rest open: the final save still persists before that flush, so a crash between the two,
+or after any periodic save, keeps progress beyond durable bytes (§15 item 2). Under this rule a
+failed sync, periodic or final, persists nothing from its snapshot and fails the task with `Disk`
+as #359 does, and #359's reset stays: it runs on the export (§6.10), keeping the layout. Falling
+back to the previous, synced checkpoint instead would save that refetch, but a disk that failed a
+sync is not worth the extra path.
+
 `flush()` becomes durable on Android, JVM and Apple targets, the engines that run helped tasks. On
 the JVM okio's `JvmFileHandle.protectedFlush` already calls `fd.sync()` and Android SAF's
 `ContentUriFileAccessor.flush` calls `fileDescriptor.sync()`. On Apple targets okio 3.18.2's
@@ -909,9 +946,10 @@ drive cache. After an OS crash at most `saveIntervalMs` of committed bytes are r
 - `TaskRecord` and `TaskRecords.sq` stay as #353 left them (schema 5: `4.sqm` added
   `completed_at`); this proposal adds no migration, and `instanceId` comes with task transfer's
   `instance_meta`. `TaskLanes.bytesByDevice` is runtime-only, so a finished task shows no
-  per-device split after a restart. `TaskRecord.segments` holds the export (§6.10): `null` while
-  unplanned, `[]` for an unknown-size stream (#354) and otherwise never before completion for
-  sources that plan byte segments, prefix semantics, `index == position`. Legacy fragmented lists
+  per-device split after a restart. `TaskRecord.segments` holds the export (§6.10) with prefix
+  semantics and `index == position`: `null` until a source or the scheduler publishes segments
+  (#359's `savedSegments`), `[]` only for an unknown-size stream (#354) or a `managesOwnFileIo`
+  source, and a legacy `[]` of known size restarts from zero (#359). Legacy fragmented lists
   restore exactly.
 - `Segment` unchanged; its KDoc changes from "one connection" to "a file region with a committed
   prefix". Per-connection data moves to `LaneInfo`, which supersedes the
@@ -1320,9 +1358,11 @@ one-line KDoc and defaults on every property. `DownloadConfig` is unchanged. `Ke
 `helperController` is set; both stay out of `KetchFeatures.ALL` until `task.lanes` joins it at the
 PR7 flip, so `AppState.featuresOf` reads them from the embedded engine instead of assuming `ALL`.
 Since #353 `Ketch.close()` pauses running tasks for `PauseReason.Shutdown` and keeps their files
-and records, but returns without waiting for their final checkpoints. `Ketch` (not `KetchApi`)
-gains `suspend fun shutdown(grace: Duration = 5.seconds)`: the same pause, then, within `grace`,
-each execution's snapshot → sync → persist (§9.7) and a `goodbye` to helpers, then `close()`.
+and records (since #359 because only `cancel()` and `remove(deleteFiles = true)` discard a file,
+no longer through a shutdown check), but returns without waiting for their final checkpoints.
+`Ketch` (not `KetchApi`) gains `suspend fun shutdown(grace: Duration = 5.seconds)`: the same
+pause, then, within `grace`, each execution's snapshot → sync → persist (§9.7) and a `goodbye` to
+helpers, then `close()`.
 
 ### 14.2 Core SPI (`@KetchInternalApi`, a new `RequiresOptIn` for `library:ftp` and `library:relay`)
 
@@ -1448,7 +1488,7 @@ app or a daemon holds it, exits with "Helpers are in use by Ketch here; add the 
 | Module | Changes |
 | --- | --- |
 | `library:api` | `HelperPolicy` with `HelperPolicySerializer`, `LaneInfo`, `TaskLanes`, `api.helper.*`; `DownloadRequest.helpers`; `KetchFeatures.TASK_LANES`/`HELPERS`; `HelpersUnavailableReason.UNKNOWN_SIZE`; `DownloadTask.lanes`/`setHelpers`/`stopHelp`; `KetchApi.helpers`; `@KetchInternalApi`; signed-URL keys in task transfer's sign-in classifier (`KetchStatus.instanceId` is its F7); `redactUrl` fragment masking |
-| `library:core` | `core.lane`: `RangeLedger`, `LaneScheduler`, `LaneTuning`, `EgressGroup`, `LaneFailure`, SPI, `HttpRangeFetcher`, `RepresentationPin`, `RangeResponseValidator`, `PinAdjudicator`, `AuditSampler`; `core.hash.Sha256` (moved, public opt-in); `HttpEngine.fetch`; core `FileReader` in task-transfer.md §7.4's shape unless its M1 added it; durable Apple flush; `ServerInfo.date`/`contentEncoding`; network engines' `fetch`; `HttpDownloadSource` pin + scheduler; `DownloadExecution` checkpoints and narrowed retry; `DownloadContext.lanes`/`executionNonce`; `TaskHandle.planned`; `Ketch(laneMode, laneTuning)`, `Ketch.instanceId` from the store, `Ketch.features`, `laneProvider`, `helperController`, `helperRuntime`, `shutdown` joining executions (the `DownloadCoordinator.closing` flag exists since #353); later delete `SegmentedDownloadHelper`, `SegmentDownloader`, `resegment`, `pendingResegment` |
+| `library:core` | `core.lane`: `RangeLedger`, `LaneScheduler`, `LaneTuning`, `EgressGroup`, `LaneFailure`, SPI, `HttpRangeFetcher`, `RepresentationPin`, `RangeResponseValidator`, `PinAdjudicator`, `AuditSampler`; `core.hash.Sha256` (moved, public opt-in); `HttpEngine.fetch`; core `FileReader` in task-transfer.md §7.4's shape unless its M1 added it; durable Apple flush; `ServerInfo.date`/`contentEncoding`; network engines' `fetch`; `HttpDownloadSource` pin + scheduler; `DownloadExecution` checkpoints and narrowed retry; `DownloadContext.lanes`/`executionNonce`; `Ketch(laneMode, laneTuning)`, `Ketch.instanceId` from the store, `Ketch.features`, `laneProvider`, `helperController`, `helperRuntime`, `shutdown` joining executions (the `DownloadCoordinator.closing` flag exists since #353); later delete `SegmentedDownloadHelper`, `SegmentDownloader`, `resegment`, `pendingResegment` |
 | `library:ktor` | `KtorHttpEngine.fetch` with metadata, preconditions, identity encoding and stop |
 | `library:ftp` | `FtpRangeFetcher`; leaves `SegmentedDownloadHelper`; 421 → Throttled |
 | `library:torrent` | Imports core `Sha256`; nothing else |
@@ -1461,15 +1501,16 @@ app or a daemon holds it, exits with "Helpers are in use by Ketch here; add the 
 | `cli` | `helpers` client commands, `--helpers`, `RelayServer` in `server` |
 | `docs` | `architecture.md` (lanes), ux-redesign §3.2.5 and W5 amendments, glossary rows, new `docs/helpers.md` |
 
-Prerequisite fixes (PR1), each verified at `ec52a306` and rechecked at `2f274a45` (after #353 and
-#354). Items 1, 7 and 8 are task transfer's M0 or hardening fixes F2, F6 and F10b, and item 2
+Prerequisite fixes (PR1), verified at `ec52a306` and rechecked at `d76c7460` (after #353, #354
+and #359). #359 shipped transfer's M0 fixes F1 and F2; item 1 is the part of the empty-segments
+hazard it left open. Items 7 and 8 are task transfer's hardening fixes F6 and F10b and item 2
 contains its F3; whichever stack lands first carries them:
 
 | # | Hazard | Evidence at HEAD | Fix |
 | --- | --- | --- | --- |
-| 1 | Pausing or crashing before an HTTP or FTP source plans segments persists `[]`; resume then completes a zero-filled file | `DownloadExecution.runDownload`'s final save persists `handle.mutableSegments.value` (initially `[]`); `DownloadCoordinator.resume` accepts `[]` (`segments ?: return false`); `HttpDownloadSource.resume` → `validateLocalFile` preallocates and returns `[]`; `SegmentedDownloadHelper.downloadAll` reports total/total. Reachable through the `applyRateLimit` delay, also with no user action: an URGENT task that preempts the victim there resumes it on its own (`DownloadQueue.startTask` → `DownloadCoordinator.resume`; `Paused(Preempted)` since #353) | For sources that plan byte segments (`!managesOwnFileIo`): a `planned` flag maps to `null` at persistence; `[]` with `totalBytes > 0` is unplanned; a fresh restart reuses `record.outputPath`. A torrent paused while waiting for an active slot (`TorrentDownloadSource.withActiveSlot`) legitimately persists `[]` and keeps resuming through `TorrentDownloadSource.resume`; so does an unknown-size stream (`HttpResumeState.totalBytes < 0`, #354), whose `downloadUnknownSize` sets `planned` with `[]` and restarts in place through `HttpDownloadSource.resume`. `DownloadQueue.startTask` already falls back to `start` when `resume` returns `false`, so preempted tasks need no queue change |
-| 2 | Checkpoints can exceed durable bytes | `saveJob` and the `NonCancellable` final save never flush; `DownloadCoordinator.pause` flushes right after `job.cancel()`, before the final save; on Apple targets okio's flush is `fflush` | Snapshot → sync → persist; `F_FULLFSYNC` on Apple (§9.7) |
-| 3 | `Ketch.close()` does not wait for final checkpoints | Since #353 `DownloadCoordinator.close` sets `closing`: tasks pause for `Shutdown`, `cleanupAfterExecution` keeps the file (`shuttingDown`) and records stay `DOWNLOADING` or `QUEUED`. But `Ketch.close` then cancels the coordinator scope and closes the engine and dispatchers at once, so nothing joins each execution's `NonCancellable` final save or `FileAccessor.close`, and the record keeps the last periodic save | `Ketch.shutdown(grace)` joins the executions (snapshot → sync → persist, §9.7) before `close()`. Deleting after a failure or `remove(false)` stays task transfer's F1 |
+| 1 | A record without segments restarts under a new name beside its own file | `HttpDownloadSource.download` and `FtpDownloadSource.download` publish their segments and then `preallocate` the full size, but `runDownload` first saves after `saveIntervalMs` (5 s). A crash in between, or `Ketch.close()` before the final save runs (item 3), leaves `segments = null` (#359) beside a full-size file. On restart `DownloadCoordinator.resume` returns `false`, and `start` → `DownloadExecution.executeFresh` → `resolveDestPath(deduplicate = true)` picks "name (1).ext" for a folder or default destination, leaving the preallocated file (#359's `pause_unknownSizeStream_resumesIntoSameFile` names the same rename). A legacy `[]` record beside a preallocated file, which #359 restarts, does the same | `executeFresh` reuses `record.outputPath` when the record has one, so a restart overwrites its own file |
+| 2 | Checkpoints can exceed durable bytes | `saveJob` and the `NonCancellable` final save never flush; the flush after a finished transfer runs after the final save, and #359's `discardProgress` resets progress only when that flush throws, not when the process dies between the two; `DownloadCoordinator.pause` flushes right after `job.cancel()`, before the final save; on Apple targets okio's flush is `fflush` | Snapshot → sync → persist; `F_FULLFSYNC` on Apple; a failed sync persists nothing and keeps #359's reset (§9.7) |
+| 3 | `Ketch.close()` does not wait for final checkpoints | `DownloadCoordinator.close` sets `closing`, so tasks pause for `Shutdown` and records stay `DOWNLOADING` or `QUEUED` (#353), and files stay because nothing marked the execution as a discard (#359). But `Ketch.close` then cancels the coordinator scope and closes the source resolver, engine and dispatchers at once, so nothing joins each execution's `NonCancellable` final save or `FileAccessor.close`, and the record keeps the last periodic save | `Ketch.shutdown(grace)` joins the executions (snapshot → sync → persist, §9.7) before `close()` |
 | 4 | Writes after close recreate the file | `PathFileAccessor.getOrCreateHandle` reopens and creates parents | Closed flag; `writeAt` after `close()` throws |
 | 5 | One execution's `Error` can cancel every execution | `DownloadCoordinator.scope = CoroutineScope(dispatchers.network)` | Add `SupervisorJob()` |
 | 6 | Speed spike after resume | `buildContext` starts `lastBytes` at 0 | Seed it from the first report |
@@ -1477,8 +1518,17 @@ contains its F3; whichever stack lands first carries them:
 | 8 | Bearer compared with `==`; a blank token half-applied | `KetchServer.configureServer` (`apiToken != null`, `credential.token == expectedToken`) vs `startMdnsRegistration` and #352's `pairing` field (`isNullOrBlank`): a blank token installs `Authentication` and skips `HostValidator`/`CrossOriginGuard` while mDNS says `token=none` and pairing is off | Constant-time compare; blank → `null` |
 
 Already fixed at HEAD and dropped: pause before the first byte (`RealDownloadTask.pause` accepts
-`Queued`); `Ketch.close()` deleting partial files (#353: `DownloadCoordinator.closing`,
-`PauseReason.Shutdown`); `setConnections`/`setSpeedLimit` on inactive tasks (persisted under
+`Queued`); a known-size download stopped before its first segments completing as a zero-filled
+file, also after an URGENT preemption in `applyRateLimit`'s delay (#359, transfer's F2:
+`runDownload`'s `savedSegments` keeps `null` until the source publishes segments,
+`DownloadCoordinator.resume` starts a legacy `[]` of known size from zero, and
+`HttpDownloadSource.resume` and `FtpDownloadSource.resume` split such a resume into fresh
+segments; unknown-size streams and torrents keep `[]`); partial files deleted after a failure or
+`remove(deleteFiles = false)` (#359, transfer's F1: `DownloadCoordinator.cancel` marks the
+execution through `discardPartialFile()` for `cancel()` and `remove(deleteFiles = true)` only,
+which also keeps them on `Ketch.close()`, where #353's `shuttingDown` check is gone); a failed
+final flush completing over bytes that may not be on disk (#359: `discardProgress`);
+`setConnections`/`setSpeedLimit` on inactive tasks (persisted under
 `settingsMutex`); CLI `server` restoring tasks and advertising mDNS (`Main.kt` listens, then
 `ketch.start()`; `KetchServer.start` registers before `awaitStop`); `updateConfig` promoting queued
 tasks (`DownloadQueue.updateLimits`); the stale `supervisorScope` claim in `docs/architecture.md`;
@@ -1489,15 +1539,21 @@ CORS `*` on tokenless servers (`HostValidator`, `CrossOriginGuard`). The mDNS se
 Each PR ships on its own. Helpers stay invisible in the apps until PR10; PR8 and PR9 are reachable
 only through the CLI and `[helping] enabled`.
 
-1. **PR1 prerequisite fixes** (§15), minus those task transfer's M0 already shipped. Exit: one
-   regression test per item, including `pause_beforeSegmentsPlanned_persistsNull`,
-   `resume_emptySegments_startsFresh`, `preempt_beforeSegmentsPlanned_downloadsOriginBytes` (an
-   URGENT task preempts a victim in `applyRateLimit`'s delay; the victim resumes on its own and
-   completes with the origin's bytes), `torrent_pausedWhileWaitingForSlot_resumesThroughSource`,
-   #354's `resume_unknownSize_restartsFromZero` unchanged,
-   `shutdown_duringDownload_joinsFinalCheckpoint` (#353's `KetchCloseTest` already covers the kept
-   partial file), and a `FakeFileAccessor` whose `crash()` drops unsynced writes, proving persisted
-   segments never exceed synced bytes.
+1. **PR1 prerequisite fixes** (§15), minus those task transfer already shipped. Exit: one
+   regression test per item, including `crash_afterPreallocate_restartsIntoSameFile` (a folder
+   destination; the restart writes the origin's bytes into the first file and creates no
+   "name (1).ext"), `shutdown_duringDownload_joinsFinalCheckpoint` (#353's `KetchCloseTest` and
+   #359's `close_midDownload_keepsPartialFileAndRestartResumes` already cover the kept partial
+   file), a `FakeFileAccessor` whose `crash()` drops unsynced writes, proving persisted segments
+   never exceed synced bytes, and a failed periodic sync that persists nothing and fails the task
+   with `Disk`. Two cases of #359's behaviour that it left untested join them:
+   `preempt_beforeFirstSegments_downloadsOriginBytes` (an URGENT task preempts a victim in
+   `applyRateLimit`'s delay; the victim resumes on its own through `DownloadQueue.startTask`'s
+   fallback to `start` and completes with the origin's bytes) and
+   `torrent_pausedWhileWaitingForSlot_resumesThroughSource` (`[]` kept for a `managesOwnFileIo`
+   source). #359's `DownloadCoordinatorResumeTest`, `DownloadExecutionCleanupTest` and
+   `resume_emptySegmentsWithFullSizeFile_downloadsFromZero` (HTTP and FTP), and #354's
+   `resume_unknownSize_restartsFromZero`, pass unchanged.
 2. **PR2 identity in the apps**, after task transfer's F7 (M0), which adds `instanceId`,
    `KetchStatus.instanceId`, `RemoteConfig.instanceId` and refusal of the app's own server: mDNS
    `boot` nonce and `pv`, the Add device self-filter by nonce, `deviceHue` by instance id. Exit:
@@ -1519,16 +1575,21 @@ only through the CLI and `[helping] enabled`.
 4. **PR4 `RangeLedger`** (pure, `commonTest`). Exit: seeding, lowest-offset claim, weighted split
    with setup term, request-end snapping, alignment, floors, endgame waiver and slow-victim
    takeover, victim cooldown, un-split, admit truncation, rejected commit at `offset != cursor` or
-   past `limit`, release, legacy restore, export cap and never `[]`; a seeded 10k-step simulator
-   (join, leave, commit, stall, audit invalidation, provenance overflow) asserting no byte in two
-   claims, export ≤ 64, monotone done outside invalidation, and a 2 KB/s lane holding the last
-   400 KiB being taken over.
+   past `limit`, release, legacy restore, `[]` of known size restoring as all free, export cap and
+   never `[]` after seeding; a seeded 10k-step simulator (join, leave, commit, stall, audit
+   invalidation, provenance overflow) asserting no byte in two claims, export ≤ 64, monotone done
+   outside invalidation, and a 2 KB/s lane holding the last 400 KiB being taken over.
 5. **PR5 `LaneScheduler` for HTTP, local lanes**, under `LaneMode.LANES`, plus `LaneInfo`,
    `TaskLanes`, `DownloadTask.lanes`, `TaskSnapshot.lanes`, `?lanes=1` and the apps'
    `ConnectionsTab`/`LaneStrip` reading `LaneInfo`. Exit: `HttpDownloadIntegrationTest` in both
    modes, its PAUSE_FIRST engine hooking `fetch`; #354's
    `download_unknownSize_streamsAndRecordsSize` and `resume_unknownSize_restartsFromZero` keep their
-   request lists (`none`; `none`, `none`).
+   request lists (`none`; `none`, `none`). #359's `DownloadCoordinatorResumeTest` and
+   `DownloadExecutionCleanupTest`, with PR1's `preempt_beforeFirstSegments_downloadsOriginBytes`,
+   run in both modes: a pause before the seed saves no segments; a failure, `close()` or
+   `remove(deleteFiles = false)` keeps the file and the export; `cancel()` deletes the file only
+   after every lane has released; and an HTTP twin of `flushFailure_keepsFileButResetsProgress`
+   keeps the export's layout with no progress.
    `setConnections_restartsActiveTransferWithoutLosingBytes` keeps 3 requests in legacy mode; in
    lanes mode its 65,539-byte file is below every split floor, so with a short `LaneTuning` stall
    bound the new lane parks and the blocked lane is stall-revoked: 2 requests. A new 16 MiB case
@@ -1538,13 +1599,12 @@ only through the CLI and `[helping] enabled`.
    cancels siblings nor ends the task while others progress; 429 halves only its group; a solo task
    told `Retry-After: 120` completes; fast-failing helper lanes during a local pause do not fail the
    task; streak and watchdog failures; progress never exceeds bytes written; truncation writes only
-   the allowed prefix and logs no error; twins of #353's Auto cases in
-   `SegmentedDownloadHelperTest` (`setConnections(0)` converges to the run config's
-   `maxConnectionsPerDownload`, an equal effective count changes nothing, a change made while a
-   lane drains still applies), except that Auto never lifts a cap set by 429 or
-   `RateLimit-Remaining` and a 429 leaves `maxConnections` untouched. An old-client decode of a
-   `TaskSnapshot` carrying an unknown `LaneState` falls back to the default instead of failing the
-   task list.
+   the allowed prefix and logs no error; twins of #353's Auto cases in `SegmentedDownloadHelperTest`
+   (`setConnections(0)` converges to the run config's `maxConnectionsPerDownload`, an equal
+   effective count changes nothing, a change made while a lane drains still applies), except that
+   Auto never lifts a cap set by 429 or `RateLimit-Remaining` and a 429 leaves `maxConnections`
+   untouched. An old-client decode of a `TaskSnapshot` carrying an unknown `LaneState` falls back to
+   the default instead of failing the task list.
 6. **PR6 FTP on the scheduler**. Exit: `:library:ftp:jvmTest` green; a live connection change that
    restarts no other lane.
 7. **PR7 flip and delete**: default `LANES` once both modes pass and a loopback benchmark (1 GiB
@@ -1599,12 +1659,13 @@ only through the CLI and `[helping] enabled`.
 14. **PR14 optional**: FTP relay.
 
 Order against task transfer (task-transfer.md §14): its F7 (M0) lands before PR2, which builds on
-its `instanceId`; the fixes PR1 shares with M0 (§15) ship with whichever lands first. PR3 and M1
-are independent: the later one adds `FileReader` in the agreed shape or moves
-`SourceTransfer.probeOrigin` onto the conditional probe (§9.4). M1 and PR5 change the same files
-(`DownloadCoordinator`, `DownloadExecution`, `HttpDownloadSource`) but not the same behaviour;
-once both are in, transfer's core integration tests run in both `LaneMode`s, and after PR9
-`CooperativeDownloadIntegrationTest` moves a helped task with pending audits (§9.6).
+its `instanceId`; the hardening fixes PR1 shares with it (F3, F6, F10b; §15) ship with whichever
+lands first, and #359 already shipped M0's F1 and F2. PR3 and M1 are independent: the later one adds
+`FileReader` in the agreed shape or moves `SourceTransfer.probeOrigin` onto the conditional probe
+(§9.4). M1 and PR5 change the same files (`DownloadCoordinator`, `DownloadExecution`,
+`HttpDownloadSource`) but not the same behaviour; once both are in, transfer's core integration
+tests run in both `LaneMode`s, and after PR9 `CooperativeDownloadIntegrationTest` moves a helped
+task with pending audits (§9.6).
 
 Testing follows `docs/development/testing.md`: `kotlin.test` and `kotlinx-coroutines-test` only;
 hand-written fakes (`FakeRangeFetcher`, `FakeHttpEngine` with `fetch`, `FakeFileAccessor` with
@@ -1712,3 +1773,7 @@ this document (not made here):
 6. **Words.** "Peer" is BitTorrent's (§4): `TransferPeer`, `detail.peer` and `peer_unreachable`
    take device wording; the RELAY route and `allowRelay` collide with the relay plane, and "owner
    token" reads as the task owner's.
+7. **M0 after #359.** F1 and F2 shipped in #359 (the `deletePartialFile` parameter of
+   `DownloadCoordinator.cancel`, `runDownload`'s `savedSegments`, the sources' split of a `[]`
+   resume), so M0 keeps F4, F5, F7, F10a and F11. Its `segments == null` row (no progress, fresh
+   on the target) and its manifest check rejecting `[]` with `totalBytes > 0` already match #359.
