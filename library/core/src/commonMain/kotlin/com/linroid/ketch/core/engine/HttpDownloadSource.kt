@@ -196,7 +196,12 @@ internal class HttpDownloadSource(
       serverInfo.rateLimitReset
     )
     val incompleteCount = segments.count { !it.isComplete }
-    if (incompleteCount > 0 && !serverInfo.supportsResume) {
+    if (segments.isEmpty() && totalBytes > 0) {
+      // Stopped before any segments were saved: nothing was downloaded, whatever the file size.
+      log.w { "No saved segments for taskId=${context.taskId}, restarting from zero" }
+      segments = SegmentCalculator.calculateSegments(totalBytes, connections)
+      context.segments.value = segments
+    } else if (incompleteCount > 0 && !serverInfo.supportsResume) {
       // Without range support every transfer starts at byte zero, so saved progress cannot be used.
       log.w { "Server does not support ranges, restarting taskId=${context.taskId} from zero" }
       segments = SegmentCalculator.singleSegment(totalBytes)

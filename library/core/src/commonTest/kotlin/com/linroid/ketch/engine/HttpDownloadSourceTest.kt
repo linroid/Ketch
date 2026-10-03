@@ -131,6 +131,20 @@ class HttpDownloadSourceTest {
   }
 
   @Test
+  fun resume_emptySegmentsWithFullSizeFile_downloadsFromZero() = runTest {
+    val engine = FakeHttpEngine()
+    // A zero-filled file of the full size passes the local file check.
+    val file = MemoryFile(ByteArray(1000))
+    val context = context(fileAccessor = file)
+    val resumeState = HttpDownloadSource.buildResumeState(null, null, totalBytes = 1000)
+
+    HttpDownloadSource(engine).resume(context, resumeState)
+
+    assertContentEquals(engine.content, file.bytes)
+    assertTrue(context.segments.value.all { it.isComplete })
+  }
+
+  @Test
   fun resolve_withConfig_reportsDefaultConnectionsAsMaxSegments() = runTest {
     val source = HttpDownloadSource(FakeHttpEngine())
 

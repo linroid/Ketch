@@ -262,7 +262,7 @@ class Ketch(
     override suspend fun cancel(handle: TaskHandle) {
       val taskId = handle.taskId
       scheduler.cancel(taskId)
-      coordinator.cancel(handle)
+      coordinator.cancel(handle, deletePartialFile = true)
       queue.dequeue(taskId)
     }
 
@@ -270,7 +270,7 @@ class Ketch(
       val taskId = handle.taskId
       log.i { "Removing task: taskId=$taskId, deleteFiles=$deleteFiles" }
       scheduler.cancel(taskId)
-      coordinator.cancel(handle)
+      coordinator.cancel(handle, deletePartialFile = deleteFiles)
       queue.dequeue(taskId)
       try {
         coordinator.release(handle)

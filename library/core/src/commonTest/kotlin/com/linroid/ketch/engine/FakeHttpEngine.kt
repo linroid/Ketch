@@ -3,10 +3,12 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import kotlinx.coroutines.awaitCancellation
 
 /**
  * A fake HttpEngine for unit testing. Simulates a server with configurable behavior
- * including range support, ETags, and content delivery.
+ * including range support, ETags, and content delivery. A transfer that reaches
+ * [stallAfterBytes] stops sending until it is cancelled.
  */
 class FakeHttpEngine(
   var serverInfo: ServerInfo = ServerInfo(
@@ -18,6 +20,7 @@ class FakeHttpEngine(
   var content: ByteArray = ByteArray(1000) { (it % 256).toByte() },
   var chunkSize: Int = 100,
   var failAfterBytes: Long = -1,
+  var stallAfterBytes: Long = -1,
   var failOnHead: Boolean = false,
   var httpErrorCode: Int = 0,
   var retryAfterSeconds: Long? = null,
@@ -31,6 +34,8 @@ class FakeHttpEngine(
   var lastHeadHeaders: Map<String, String> = emptyMap()
     private set
   var lastDownloadHeaders: Map<String, String> = emptyMap()
+    private set
+  var lastDownloadRange: LongRange? = null
     private set
   var closed = false
     private set
@@ -58,6 +63,7 @@ class FakeHttpEngine(
   ) {
     downloadCallCount++
     lastDownloadHeaders = headers
+    lastDownloadRange = range
 
     if (httpErrorCode > 0) {
       throw KetchError.Http(
@@ -82,6 +88,7 @@ class FakeHttpEngine(
       if (failAfterBytes in 0..totalSent) {
         throw KetchError.Network(RuntimeException("Simulated failure after $failAfterBytes bytes"))
       }
+      if (stallAfterBytes in 0..totalSent) awaitCancellation()
       val chunkEnd = minOf(offset + chunkSize, rangeContent.size)
       val chunk = rangeContent.sliceArray(offset until chunkEnd)
       onData(chunk)

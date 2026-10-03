@@ -133,7 +133,7 @@ class DownloadCoordinatorCancelTest {
         coordinator.start(handle)
         withTimeout(5.seconds) { source.downloadStarted.await() }
 
-        coordinator.cancel(handle)
+        coordinator.cancel(handle, deletePartialFile = true)
 
         assertTrue(
           source.downloadFinallyRan,
