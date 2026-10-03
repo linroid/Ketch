@@ -101,13 +101,14 @@ interface DownloadTask {
   val createdAt: Instant
   val state: StateFlow<DownloadState>
   val segments: StateFlow<List<Segment>>
+  val queuePosition: StateFlow<Int?>  // 1 = starts next; null when not waiting for a slot
 
   suspend fun pause()
   suspend fun resume(destination: Destination? = null)
   suspend fun cancel()
   suspend fun setSpeedLimit(limit: SpeedLimit)
   suspend fun setPriority(priority: DownloadPriority)
-  suspend fun setConnections(connections: Int)
+  suspend fun setConnections(connections: Int)  // 0 = Auto, the configured default
   suspend fun reschedule(
     schedule: DownloadSchedule,
     conditions: List<DownloadCondition> = emptyList(),
@@ -128,6 +129,20 @@ interface DownloadTask {
   suspend fun await(): Result<String>
 }
 ```
+
+`DownloadState.Paused.reason` is a `PauseReason`: `User` for `pause()` (and tasks restored
+paused), `Preempted(byTaskId)` for a task that gave its slot to an URGENT one and still waits in
+the queue, `Shutdown` for a task that was downloading when its `Ketch` closed (its partial file
+is kept and it resumes on the next `start()`), and `WaitingForCondition`. A reason the client
+does not know decodes as `User`. `DownloadState.Completed.completedAt` is when the task
+finished, in whole milliseconds; it is `null` for tasks that finished before Ketch recorded it.
+`queuePosition` counts the tasks that wait for a slot (`Queued`, or `Paused` for `Preempted`)
+in the order the queue starts them, priority first, then age.
+
+`KetchStatus.features` lists the optional behaviors an instance supports, from
+`KetchFeatures`: `AUTO_CONNECTIONS` (`setConnections(0)`) and `QUEUE_POSITION`. Older servers
+send none, so their tasks report no position and `setConnections(0)` on them throws
+`UnsupportedOperationException`.
 
 ### `library:core`
 
@@ -221,6 +236,8 @@ Magnet links, `torrent:` identifiers and local files are not counted.
 `maxConnectionsPerDownload` and `DownloadRequest.connections` split HTTP(S) and FTP(S)
 downloads into parallel ranges when the server supports HTTP Range or FTP REST; otherwise a
 single connection is used. BitTorrent treats a per-task connection count as its peer limit.
+A count of 0 (Auto) uses the configured default of the run: `maxConnectionsPerDownload`, or a
+torrent's own peer limit; `setConnections(0)` returns a running task to it.
 `bufferSize` sets the FTP read buffer; HTTP buffering is up to the `HttpEngine`.
 
 ### Priority & Scheduling
@@ -228,7 +245,8 @@ single connection is used. BitTorrent treats a per-task connection count as its 
 `task.setPriority(priority)` persists the change and updates `task.requestState`, including
 for active, paused, and scheduled tasks. LOW, NORMAL, and HIGH determine which queued task
 starts next. Changing a queued task to URGENT can immediately pause a lower-priority active
-task to make room. The interrupted task is requeued and resumes when a slot opens.
+task to make room. The interrupted task becomes `Paused` with `PauseReason.Preempted`, keeps
+its place in the queue and resumes on its own when a slot opens.
 Concurrency and per-host limits still apply; other URGENT tasks cannot be preempted.
 Priority changes do not resume manually paused tasks or bypass schedules and conditions.
 
@@ -263,8 +281,8 @@ ketch.updateConfig(config.copy(speedLimit = SpeedLimit.kbps(500))) // global
 A per-task limit applies in addition to the global one, so a task never exceeds the lower of
 the two. `setSpeedLimit`, `setConnections` and `setPriority` are persisted for queued, scheduled,
 paused and failed tasks and take effect when the task starts or resumes; `reschedule` is
-persisted too (conditions are not). `pause()` also works on a queued task: it leaves the queue
-until `resume()` is called.
+persisted too (conditions are not). `pause()` also works on a queued or preempted task: it
+leaves the queue until `resume()` is called.
 
 ## Error Handling
 

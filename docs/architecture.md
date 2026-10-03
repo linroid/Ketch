@@ -119,7 +119,8 @@ DownloadRequest
 [2. Queue]  DownloadQueue orders tasks by priority, then creation time, and starts
   |         them while maxConcurrentDownloads and the per-host limit allow; the
   |         rest stay Queued. URGENT can preempt a lower-priority active download,
-  |         which is paused and requeued.
+  |         which is Paused(Preempted), keeps its place in the queue and resumes
+  |         on its own. Each waiting task reports its queuePosition.
   |
   v
 [3. Resolve]  SourceResolver finds the right DownloadSource for the URL, unless
@@ -156,6 +157,11 @@ DownloadRequest
 
 - **Pause**: Cancels the execution. The source stops its segments and the execution saves
   their final progress to TaskStore. A queued task can be paused too; it leaves the queue.
+  `Paused.reason` says who paused it: `User`, `Preempted` for an URGENT task's victim (still
+  queued; resuming it changes nothing, pausing it makes it a `User` pause) or `Shutdown`.
+- **Close**: `Ketch.close()` pauses every downloading task for `Shutdown` instead of
+  canceling it. Its partial file and `DOWNLOADING` record are kept, so the next `start()`
+  resumes it.
 - **Resume**: Probes the server again. An ETag or Last-Modified mismatch fails the task with
   `KetchError.FileChanged`. A server that no longer supports ranges restarts the download from
   byte zero on one connection. Otherwise the remaining bytes are resegmented to the current
@@ -170,6 +176,8 @@ DownloadRequest
   guards progress aggregation and queue and coordinator bookkeeping.
 - Structured concurrency ensures cleanup on cancel/pause.
 - `DownloadQueue` enforces the concurrent-download limit and the per-host download limit.
+  Its mutex also guards the queue positions: every queue change republishes them before it
+  releases the lock, so positions are always those of one queue state.
 
 ## Error Classification
 

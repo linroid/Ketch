@@ -1,6 +1,7 @@
 package com.linroid.ketch.server
 
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
@@ -42,6 +43,18 @@ class ServerRoutesTest {
     )
     assertEquals(KetchApi.VERSION, status.version)
     assertNotNull(status.revision)
+  }
+
+  @Test
+  fun status_listsFeatures() = testApplication {
+    application {
+      val server = createTestServer()
+      with(server) { configureServer() }
+    }
+    val response = client.get("/api/status")
+    val status = json.decodeFromString<KetchStatus>(response.bodyAsText())
+    assertTrue(KetchFeatures.AUTO_CONNECTIONS in status.features)
+    assertTrue(KetchFeatures.QUEUE_POSITION in status.features)
   }
 
   @Test

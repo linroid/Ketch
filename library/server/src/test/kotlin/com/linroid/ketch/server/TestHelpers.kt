@@ -116,6 +116,7 @@ private class RecordingTask(
   override val createdAt = delegate.createdAt
   override val state: StateFlow<DownloadState> get() = delegate.state
   override val segments: StateFlow<List<Segment>> get() = delegate.segments
+  override val queuePosition: StateFlow<Int?> get() = delegate.queuePosition
 
   override suspend fun pause() = delegate.pause()
   override suspend fun resume(destination: Destination?) =

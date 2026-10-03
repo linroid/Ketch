@@ -117,7 +117,7 @@ as `Authorization: Bearer <token>`.
 
 | Method and path | What it does |
 |---|---|
-| `GET /api/status` | Name, version, uptime, configuration, download folder and free space |
+| `GET /api/status` | Name, version, uptime, configuration, download folder, free space and supported `features` |
 | `PUT /api/config` | Replace the `DownloadConfig` |
 | `GET`, `PUT /api/network-interfaces` | List the network interfaces, choose the ones to use |
 | `POST /api/resolve` | Probe a URL: size, file name, resume support, files of a torrent |
@@ -126,7 +126,7 @@ as `Authorization: Bearer <token>`.
 | `POST /api/tasks` | Add a download; the body is a `DownloadRequest` |
 | `GET /api/tasks/{id}` | One task |
 | `POST /api/tasks/{id}/pause`, `/resume`, `/cancel` | Control a task |
-| `PUT /api/tasks/{id}/speed-limit`, `/priority`, `/connections` | Change a task while it runs |
+| `PUT /api/tasks/{id}/speed-limit`, `/priority`, `/connections` | Change a task while it runs; `connections` 0 means Auto |
 | `DELETE /api/tasks/{id}?deleteFiles=true` | Remove a task, and its files if asked |
 | `GET /api/events`, `/api/events/{id}` | Server-sent events: `task_added`, `task_removed`, `state_changed`, `progress` |
 

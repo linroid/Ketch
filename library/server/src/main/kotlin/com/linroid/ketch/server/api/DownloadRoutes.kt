@@ -195,12 +195,14 @@ internal fun Route.downloadRoutes(ketch: KetchApi) {
       return@put
     }
     val body = call.receive<ConnectionsRequest>()
-    if (body.connections < 1) {
+    // 0 means Auto (the task's default); older servers answered 400 for it, which
+    // RemoteDownloadTask turns into UnsupportedOperationException.
+    if (body.connections < 0) {
       call.respond(
         HttpStatusCode.BadRequest,
         ErrorResponse(
           "invalid_connections",
-          "Connections must be greater than 0",
+          "Connections must not be negative",
         ),
       )
       return@put

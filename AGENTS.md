@@ -352,9 +352,13 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### Daemon Server (`library:server`)
 - Ktor-based REST API (`library:endpoints`): create, list, pause, resume, cancel, remove tasks;
-  per-task speed limit, priority and connections; status, config, network interfaces, and
-  resolving URLs or uploaded file content
-- SSE event stream for real-time state updates
+  per-task speed limit, priority and connections (0 is Auto; older servers answer 400
+  `invalid_connections`, which `RemoteDownloadTask` turns into `UnsupportedOperationException`);
+  status (with `KetchStatus.features`), config, network interfaces, and resolving URLs or
+  uploaded file content
+- SSE event stream for real-time state updates; `TaskSnapshot` and `state_changed` carry the
+  task's `queuePosition` (a queue change sends `state_changed` for every waiting task whose
+  position moved), `progress` carries none
 - Optional bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`)
 - Without an API token, `HostValidator` answers 403 to requests whose `Host` is not a loopback
   name, an interface IP, the machine's host name or `<host>.local`, or in `allowedHosts`

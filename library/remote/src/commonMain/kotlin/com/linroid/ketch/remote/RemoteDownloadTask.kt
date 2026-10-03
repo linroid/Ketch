@@ -12,6 +12,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ConnectionsRequest
+import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.PriorityRequest
 import com.linroid.ketch.endpoints.model.SpeedLimitRequest
 import com.linroid.ketch.endpoints.model.TaskSnapshot
@@ -23,6 +24,7 @@ import io.ktor.client.plugins.resources.put
 import io.ktor.client.request.parameter
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +38,7 @@ internal class RemoteDownloadTask(
   override val createdAt: Instant,
   initialState: DownloadState,
   initialSegments: List<Segment>,
+  initialQueuePosition: Int?,
   private val httpClient: HttpClient,
   private val onRemoved: suspend (String) -> Unit,
 ) : DownloadTask {
@@ -52,13 +55,23 @@ internal class RemoteDownloadTask(
   override val segments: StateFlow<List<Segment>> =
     _segments.asStateFlow()
 
+  private val _queuePosition = MutableStateFlow(initialQueuePosition)
+  override val queuePosition: StateFlow<Int?> = _queuePosition.asStateFlow()
+
+  /**
+   * Applies what the server reported. Null [request] or [segments] come from an older server
+   * that omitted them and keep the current values; a null [queuePosition] means the task does
+   * not wait (or the server does not report positions), so it is always applied.
+   */
   internal fun updateState(
     newState: DownloadState,
-    request: DownloadRequest? = null,
-    segments: List<Segment>? = null,
+    request: DownloadRequest?,
+    segments: List<Segment>?,
+    queuePosition: Int?,
   ) {
     request?.let { mutableRequest.value = it }
     segments?.let { _segments.value = it }
+    _queuePosition.value = queuePosition
     val previous = _state.value
     if (previous::class != newState::class) {
       log.d {
@@ -133,11 +146,19 @@ internal class RemoteDownloadTask(
   }
 
   override suspend fun setConnections(connections: Int) {
+    require(connections >= 0) { "Connections must not be negative" }
     val response = httpClient.put(
       Api.Tasks.ById.Connections(parent = byId),
     ) {
       contentType(ContentType.Application.Json)
       setBody(ConnectionsRequest(connections))
+    }
+    // Servers that predate Auto reject 0 like any other invalid count.
+    if (connections == 0 && response.status == HttpStatusCode.BadRequest) {
+      val code = runCatching { response.body<ErrorResponse>().error }.getOrNull()
+      if (code == "invalid_connections") {
+        throw UnsupportedOperationException("This server does not support Auto connections")
+      }
     }
     checkSuccess(response)
     update(response.body())
@@ -153,7 +174,7 @@ internal class RemoteDownloadTask(
   }
 
   private fun update(response: TaskSnapshot) {
-    updateState(response.state, response.request, response.segments)
+    updateState(response.state, response.request, response.segments, response.queuePosition)
   }
 
   private fun checkSuccess(
