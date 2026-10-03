@@ -1,7 +1,9 @@
 package com.linroid.ketch.app.desktop
 
 import androidx.compose.ui.window.WindowState
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.config.CloseAction
+import kotlinx.coroutines.test.runTest
 import java.awt.desktop.QuitResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -267,49 +269,49 @@ class CloseBehaviorTest {
   }
 
   @Test
-  fun dialogCopy_keepRunningOnMac_namesTheMenuBarAndTheShortcut() {
+  fun dialogCopy_keepRunningOnMac_namesTheMenuBarAndTheShortcut() = runTest {
     val copy = dialogCopy(LifecycleDialog.KeepRunning(3), DesktopOs.MAC, traySupported = true)
 
-    assertEquals("Keep downloading in the background?", copy.title)
+    assertEquals("Keep downloading in the background?", copy.title.load())
     assertEquals(
       "Ketch stays in the menu bar and finishes 3 downloads. " +
         "Quit any time from the menu bar icon or with ⌘Q.",
-      copy.body,
+      copy.body.load(),
     )
-    assertEquals("Keep Running", copy.confirm)
-    assertEquals("Quit Ketch", copy.dismiss)
+    assertEquals("Keep Running", copy.confirm.load())
+    assertEquals("Quit Ketch", copy.dismiss.load())
     assertTrue(copy.dontAskAgain)
   }
 
   @Test
-  fun dialogCopy_keepRunningOnWindows_namesTheNotificationArea() {
+  fun dialogCopy_keepRunningOnWindows_namesTheNotificationArea() = runTest {
     val copy = dialogCopy(LifecycleDialog.KeepRunning(1), DesktopOs.WINDOWS, traySupported = true)
 
     assertEquals(
       "Ketch stays in the notification area and finishes 1 download. " +
         "Quit any time from the notification area icon or with Ctrl+Q.",
-      copy.body,
+      copy.body.load(),
     )
   }
 
   @Test
-  fun dialogCopy_keepRunningWithoutTray_staysMinimized() {
+  fun dialogCopy_keepRunningWithoutTray_staysMinimized() = runTest {
     val copy = dialogCopy(LifecycleDialog.KeepRunning(2), DesktopOs.LINUX, traySupported = false)
 
     assertEquals(
       "Ketch stays minimized and finishes 2 downloads. Quit any time with Ctrl+Q.",
-      copy.body,
+      copy.body.load(),
     )
   }
 
   @Test
-  fun dialogCopy_confirmQuit_saysTheDownloadsPause() {
+  fun dialogCopy_confirmQuit_saysTheDownloadsPause() = runTest {
     val copy = dialogCopy(LifecycleDialog.ConfirmQuit(3), DesktopOs.MAC, traySupported = true)
 
-    assertEquals("Quit Ketch?", copy.title)
-    assertEquals("3 downloads will pause and resume next time you open Ketch.", copy.body)
-    assertEquals("Quit", copy.confirm)
-    assertEquals("Cancel", copy.dismiss)
+    assertEquals("Quit Ketch?", copy.title.load())
+    assertEquals("3 downloads will pause and resume next time you open Ketch.", copy.body.load())
+    assertEquals("Quit", copy.confirm.load())
+    assertEquals("Cancel", copy.dismiss.load())
     assertFalse(copy.dontAskAgain)
   }
 

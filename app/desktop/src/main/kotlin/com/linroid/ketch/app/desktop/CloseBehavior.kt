@@ -35,6 +35,10 @@ import androidx.compose.ui.window.rememberDialogState
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchCheckbox
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyChord
@@ -44,10 +48,31 @@ import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.CloseAction
 import com.linroid.ketch.config.ThemeMode
+import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.close_cancel
+import ketch.app.desktop.generated.resources.close_dont_ask_again
+import ketch.app.desktop.generated.resources.close_keep_running
+import ketch.app.desktop.generated.resources.close_keep_running_title
+import ketch.app.desktop.generated.resources.close_quit
+import ketch.app.desktop.generated.resources.close_quit_body
+import ketch.app.desktop.generated.resources.close_quit_from_menu_bar
+import ketch.app.desktop.generated.resources.close_quit_from_notification_area
+import ketch.app.desktop.generated.resources.close_quit_from_system_tray
+import ketch.app.desktop.generated.resources.close_quit_ketch
+import ketch.app.desktop.generated.resources.close_quit_title
+import ketch.app.desktop.generated.resources.close_quit_with_keys
+import ketch.app.desktop.generated.resources.close_sentences
+import ketch.app.desktop.generated.resources.close_stays_menu_bar
+import ketch.app.desktop.generated.resources.close_stays_minimized
+import ketch.app.desktop.generated.resources.close_stays_notification_area
+import ketch.app.desktop.generated.resources.close_stays_system_tray
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import org.jetbrains.compose.resources.PluralStringResource
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import java.awt.Desktop
 import java.awt.EventQueue
 import java.awt.MenuItem
@@ -120,50 +145,59 @@ internal sealed interface LifecycleDialog {
  * @property dontAskAgain whether it offers "Don't ask again".
  */
 internal data class DialogCopy(
-  val title: String,
-  val body: String,
-  val confirm: String,
-  val dismiss: String,
+  val title: UiText,
+  val body: UiText,
+  val confirm: UiText,
+  val dismiss: UiText,
   val dontAskAgain: Boolean = false,
 )
+
+/** Where Ketch stays while its window is closed, which the keep running question names. */
+private enum class StayPlace(val stays: PluralStringResource, val quitFrom: StringResource?) {
+  MenuBar(Res.plurals.close_stays_menu_bar, Res.string.close_quit_from_menu_bar),
+  NotificationArea(
+    Res.plurals.close_stays_notification_area,
+    Res.string.close_quit_from_notification_area,
+  ),
+  SystemTray(Res.plurals.close_stays_system_tray, Res.string.close_quit_from_system_tray),
+
+  /** Without a tray the window minimizes, and only the keys quit. */
+  Minimized(Res.plurals.close_stays_minimized, null),
+}
 
 /** The copy of [dialog] on [os], whose tray Ketch stays in when there is one. */
 internal fun dialogCopy(
   dialog: LifecycleDialog,
   os: DesktopOs,
   traySupported: Boolean,
-): DialogCopy {
-  val downloads = if (dialog.downloads == 1) "1 download" else "${dialog.downloads} downloads"
-  return when (dialog) {
-    is LifecycleDialog.KeepRunning -> {
-      val platform = if (os == DesktopOs.MAC) KeyboardPlatform.Mac else KeyboardPlatform.Pc
-      val quit = KetchCommands.Quit.shortcutLabel(platform)
-      val tray = when {
-        !traySupported -> null
-        os == DesktopOs.MAC -> "the menu bar"
-        os == DesktopOs.WINDOWS -> "the notification area"
-        else -> "the system tray"
-      }
-      val stays = if (tray == null) "stays minimized" else "stays in $tray"
-      val from = tray?.let { "from the ${it.removePrefix("the ")} icon" }
-      val how = listOfNotNull(from, quit?.let { "with $it" }).joinToString(" or ")
-      val body = "Ketch $stays and finishes $downloads." +
-        if (how.isEmpty()) "" else " Quit any time $how."
-      DialogCopy(
-        title = "Keep downloading in the background?",
-        body = body,
-        confirm = "Keep Running",
-        dismiss = "Quit Ketch",
-        dontAskAgain = true,
-      )
+): DialogCopy = when (dialog) {
+  is LifecycleDialog.KeepRunning -> {
+    val platform = if (os == DesktopOs.MAC) KeyboardPlatform.Mac else KeyboardPlatform.Pc
+    val place = when {
+      !traySupported -> StayPlace.Minimized
+      os == DesktopOs.MAC -> StayPlace.MenuBar
+      os == DesktopOs.WINDOWS -> StayPlace.NotificationArea
+      else -> StayPlace.SystemTray
     }
-    is LifecycleDialog.ConfirmQuit -> DialogCopy(
-      title = "Quit Ketch?",
-      body = "$downloads will pause and resume next time you open Ketch.",
-      confirm = "Quit",
-      dismiss = "Cancel",
+    val stays = place.stays.text(dialog.downloads)
+    // Quit always has keys on the desktop; the question leaves out how to quit otherwise.
+    val quit = KetchCommands.Quit.shortcutLabel(platform)?.let { keys ->
+      (place.quitFrom ?: Res.string.close_quit_with_keys).text(keys)
+    }
+    DialogCopy(
+      title = Res.string.close_keep_running_title.text(),
+      body = if (quit == null) stays else Res.string.close_sentences.text(stays, quit),
+      confirm = Res.string.close_keep_running.text(),
+      dismiss = Res.string.close_quit_ketch.text(),
+      dontAskAgain = true,
     )
   }
+  is LifecycleDialog.ConfirmQuit -> DialogCopy(
+    title = Res.string.close_quit_title.text(),
+    body = Res.plurals.close_quit_body.text(dialog.downloads),
+    confirm = Res.string.close_quit.text(),
+    dismiss = Res.string.close_cancel.text(),
+  )
 }
 
 /**
@@ -377,13 +411,13 @@ internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsControll
       ) {
         val colors = KetchTheme.colors
         val typography = KetchTheme.typography
-        BasicText(copy.title, style = typography.titleL.copy(color = colors.textPrimary))
-        BasicText(copy.body, style = typography.body.copy(color = colors.textSecondary))
+        BasicText(copy.title.resolve(), style = typography.titleL.copy(color = colors.textPrimary))
+        BasicText(copy.body.resolve(), style = typography.body.copy(color = colors.textSecondary))
         if (copy.dontAskAgain) {
           KetchCheckbox(
             checked = dontAskAgain,
             onCheckedChange = { dontAskAgain = it },
-            label = "Don't ask again",
+            label = stringResource(Res.string.close_dont_ask_again),
           )
         }
         Row(
@@ -392,11 +426,11 @@ internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsControll
           verticalAlignment = Alignment.CenterVertically,
         ) {
           KetchButton(
-            text = copy.dismiss,
+            text = copy.dismiss.resolve(),
             onClick = { behavior.dismiss(dontAskAgain) },
             variant = KetchButtonVariant.Secondary,
           )
-          KetchButton(text = copy.confirm, onClick = { behavior.confirm(dontAskAgain) })
+          KetchButton(text = copy.confirm.resolve(), onClick = { behavior.confirm(dontAskAgain) })
         }
       }
     }
@@ -444,36 +478,45 @@ internal fun installAppHandlers(behavior: CloseBehavior): () -> Unit {
 @Composable
 internal fun DockMenu(commands: DesktopCommands, counts: PulseCounts) {
   val menu = remember(commands) { DockMenuItems.install(commands) } ?: return
-  SideEffect { menu.update(counts) }
+  val labels = DockMenuItems.COMMANDS.map { it.label.resolve() }
+  SideEffect { menu.update(counts, labels) }
   DisposableEffect(menu) {
     onDispose { menu.uninstall() }
   }
 }
 
 private class DockMenuItems(private val taskbar: Taskbar, commands: DesktopCommands) {
-  private val pauseAll = item(KetchCommands.PauseAll, commands)
-  private val resumeAll = item(KetchCommands.ResumeAll, commands)
+  private val items = COMMANDS.associateWith { command ->
+    MenuItem().apply { addActionListener { commands.run(command) } }
+  }
   val menu = PopupMenu().apply {
-    add(item(KetchCommands.Add, commands))
-    add(item(KetchCommands.AddClipboardLink, commands))
+    add(items.getValue(KetchCommands.Add))
+    add(items.getValue(KetchCommands.AddClipboardLink))
     addSeparator()
-    add(pauseAll)
-    add(resumeAll)
+    add(items.getValue(KetchCommands.PauseAll))
+    add(items.getValue(KetchCommands.ResumeAll))
   }
 
-  fun update(counts: PulseCounts) {
-    pauseAll.isEnabled = counts.downloading + counts.waiting > 0
-    resumeAll.isEnabled = counts.paused > 0
+  /** Enables the items for [counts] and names them with [labels], in the order of [COMMANDS]. */
+  fun update(counts: PulseCounts, labels: List<String>) {
+    COMMANDS.zip(labels).forEach { (command, label) -> items.getValue(command).label = label }
+    items.getValue(KetchCommands.PauseAll).isEnabled = counts.downloading + counts.waiting > 0
+    items.getValue(KetchCommands.ResumeAll).isEnabled = counts.paused > 0
   }
 
   fun uninstall() {
     if (taskbar.menu === menu) taskbar.menu = null
   }
 
-  private fun item(command: KetchCommand, commands: DesktopCommands) =
-    MenuItem(command.label).apply { addActionListener { commands.run(command) } }
-
   companion object {
+    /** The commands the Dock menu runs. */
+    val COMMANDS: List<KetchCommand> = listOf(
+      KetchCommands.Add,
+      KetchCommands.AddClipboardLink,
+      KetchCommands.PauseAll,
+      KetchCommands.ResumeAll,
+    )
+
     fun install(commands: DesktopCommands): DockMenuItems? {
       if (DesktopOs.current != DesktopOs.MAC || !Taskbar.isTaskbarSupported()) return null
       val taskbar = Taskbar.getTaskbar()
@@ -506,33 +549,37 @@ internal fun DefaultMenuBar(menus: List<MenuBarMenu>, onAction: (MenuAction) -> 
   }
 }
 
-private fun swingMenu(
-  title: String,
+// Swing menus live outside composition, so their text is loaded here.
+private suspend fun swingMenu(
+  title: UiText,
   entries: List<MenuEntry>,
   onAction: (MenuAction) -> Unit,
-): JMenu = JMenu(title).apply {
+): JMenu {
+  val menu = JMenu(title.load())
   for (entry in entries) {
     when (entry) {
-      MenuEntry.Separator -> addSeparator()
-      is MenuEntry.Header -> add(JMenuItem(entry.text).apply { isEnabled = false })
+      MenuEntry.Separator -> menu.addSeparator()
+      is MenuEntry.Header -> menu.add(JMenuItem(entry.text.load()).apply { isEnabled = false })
       is MenuEntry.Item -> {
+        val label = entry.label.load()
         val item = if (entry.checked == null) {
-          JMenuItem(entry.label)
+          JMenuItem(label)
         } else {
-          JCheckBoxMenuItem(entry.label, entry.checked)
+          JCheckBoxMenuItem(label, entry.checked)
         }
         item.isEnabled = entry.enabled
         item.accelerator = entry.shortcut?.toKeyStroke()
         item.addActionListener { onAction(entry.action) }
-        add(item)
+        menu.add(item)
       }
       is MenuEntry.Submenu -> {
         val submenu = swingMenu(entry.label, entry.entries, onAction)
         submenu.isEnabled = entry.enabled
-        add(submenu)
+        menu.add(submenu)
       }
     }
   }
+  return menu
 }
 
 private fun KeyChord.toKeyStroke(): KeyStroke {

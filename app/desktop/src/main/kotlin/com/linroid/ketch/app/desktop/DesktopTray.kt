@@ -29,6 +29,12 @@ import androidx.compose.ui.window.rememberTrayState
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.SpeedLimitPickerPresets
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.speedText
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
@@ -50,12 +56,34 @@ import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.darkKetchColors
 import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.app.util.formatBytes
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.app_title_status
+import ketch.app.desktop.generated.resources.tray_active
+import ketch.app.desktop.generated.resources.tray_add_clipboard_link_here
+import ketch.app.desktop.generated.resources.tray_connecting
+import ketch.app.desktop.generated.resources.tray_device_line
+import ketch.app.desktop.generated.resources.tray_devices
+import ketch.app.desktop.generated.resources.tray_enter_token
+import ketch.app.desktop.generated.resources.tray_failed
+import ketch.app.desktop.generated.resources.tray_idle
+import ketch.app.desktop.generated.resources.tray_needs_token
+import ketch.app.desktop.generated.resources.tray_not_connected
+import ketch.app.desktop.generated.resources.tray_offline
+import ketch.app.desktop.generated.resources.tray_paused
+import ketch.app.desktop.generated.resources.tray_recent
+import ketch.app.desktop.generated.resources.tray_retry_failed
+import ketch.app.desktop.generated.resources.tray_retry_now
+import ketch.app.desktop.generated.resources.tray_show
+import ketch.app.desktop.generated.resources.tray_show_ketch
+import ketch.app.desktop.generated.resources.tray_speed
+import ketch.app.desktop.generated.resources.tray_stay_connected
+import ketch.app.desktop.generated.resources.tray_tooltip_downloading
+import ketch.app.desktop.generated.resources.tray_waiting
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -260,7 +288,7 @@ fun ApplicationScope.KetchTray(
   Tray(
     icon = rememberTrayIcon(fleet, status.unseenFailures),
     state = state,
-    tooltip = trayTooltip(fleet, now),
+    tooltip = trayTooltip(fleet, now).resolve(),
     onAction = actions.showWindow,
   ) {
     MenuEntries(entries, KeyboardPlatform.current, commands::perform)
@@ -350,18 +378,18 @@ internal fun trayMenu(context: TrayContext): List<MenuEntry> = buildList {
   add(resumeAll(targets, counts))
   context.speed?.let { add(speedMenu(it)) }
   add(MenuEntry.Separator)
-  add(MenuEntry.Submenu("Devices", devicesMenu(context.devices)))
+  add(MenuEntry.Submenu(Res.string.tray_devices.text(), devicesMenu(context.devices)))
   add(
     MenuEntry.Submenu(
-      label = "Recent",
+      label = Res.string.tray_recent.text(),
       entries = context.recent.map {
-        MenuEntry.Item(MenuAction.OpenFile(it.path, it.name), it.name)
+        MenuEntry.Item(MenuAction.OpenFile(it.path, it.name), verbatim(it.name))
       },
       enabled = context.recent.isNotEmpty(),
     ),
   )
   add(MenuEntry.Separator)
-  add(MenuEntry.Item(MenuAction.ShowWindow, "Show Ketch"))
+  add(MenuEntry.Item(MenuAction.ShowWindow, Res.string.tray_show_ketch.text()))
   add(command(KetchCommands.Settings))
   add(command(KetchCommands.Quit))
 }
@@ -379,30 +407,30 @@ internal val PulseState.onlineCounts: PulseCounts
  * "2 waiting", "3 paused" or "Idle", then "Slow lane" and "1 failed" when they apply; or why it
  * cannot be reached.
  */
-internal fun trayDeviceStatus(device: DevicePresence): String {
+internal fun trayDeviceStatus(device: DevicePresence): UiText {
   val health = device.health
   return when {
-    health == DeviceHealth.Unauthorized -> "Needs token"
-    !device.connected -> "Not connected"
-    health is DeviceHealth.Offline -> "Offline"
-    health == DeviceHealth.Connecting -> "Connecting"
+    health == DeviceHealth.Unauthorized -> Res.string.tray_needs_token.text()
+    !device.connected -> Res.string.tray_not_connected.text()
+    health is DeviceHealth.Offline -> Res.string.tray_offline.text()
+    health == DeviceHealth.Connecting -> Res.string.tray_connecting.text()
     else -> {
       val counts = device.counts
       val parts = buildList {
         when {
           counts.downloading > 0 -> {
-            add(formatSpeed(device.speed))
-            add("${counts.downloading} active")
+            add(speedText(device.speed))
+            add(Res.plurals.tray_active.text(counts.downloading))
           }
-          counts.waiting > 0 -> add("${counts.waiting} waiting")
-          counts.paused > 0 -> add("${counts.paused} paused")
+          counts.waiting > 0 -> add(Res.plurals.tray_waiting.text(counts.waiting))
+          counts.paused > 0 -> add(Res.plurals.tray_paused.text(counts.paused))
         }
         if (device.speedMode.isSlowLane && counts.downloading + counts.waiting > 0) {
           add(speedModeName(SpeedLimitMode.SlowLane))
         }
-        if (device.failures > 0) add("${device.failures} failed")
+        if (device.failures > 0) add(Res.plurals.tray_failed.text(device.failures))
       }
-      parts.joinToString(" · ").ifEmpty { "Idle" }
+      if (parts.isEmpty()) Res.string.tray_idle.text() else parts.joinText()
     }
   }
 }
@@ -420,13 +448,15 @@ private fun deviceMenu(device: TrayDevice): MenuEntry.Submenu {
   val id = presence.deviceId
   val health = presence.health
   val entries = buildList {
-    add(MenuEntry.Item(MenuAction.ShowDevice(id), "Show"))
+    add(MenuEntry.Item(MenuAction.ShowDevice(id), Res.string.tray_show.text()))
     when {
       health == DeviceHealth.Unauthorized -> {
-        add(MenuEntry.Item(MenuAction.EnterToken(id), "Enter token…"))
+        add(MenuEntry.Item(MenuAction.EnterToken(id), Res.string.tray_enter_token.text()))
       }
       !presence.connected -> Unit
-      health is DeviceHealth.Offline -> add(MenuEntry.Item(MenuAction.Reconnect(id), "Retry now"))
+      health is DeviceHealth.Offline -> {
+        add(MenuEntry.Item(MenuAction.Reconnect(id), Res.string.tray_retry_now.text()))
+      }
       health.isOnline -> addAll(onlineEntries(device))
     }
     if (presence.entry is RemoteInstance) {
@@ -434,13 +464,14 @@ private fun deviceMenu(device: TrayDevice): MenuEntry.Submenu {
       add(
         MenuEntry.Item(
           action = MenuAction.StayConnected(id, watch = !presence.watched),
-          label = "Stay connected",
+          label = Res.string.tray_stay_connected.text(),
           checked = presence.watched,
         ),
       )
     }
   }
-  return MenuEntry.Submenu("${presence.name} — ${trayDeviceStatus(presence)}", entries)
+  val label = Res.string.tray_device_line.text(presence.name, trayDeviceStatus(presence))
+  return MenuEntry.Submenu(label, entries)
 }
 
 private fun onlineEntries(device: TrayDevice): List<MenuEntry> = buildList {
@@ -450,12 +481,14 @@ private fun onlineEntries(device: TrayDevice): List<MenuEntry> = buildList {
   add(pauseAll(listOf(id), presence.counts))
   add(resumeAll(listOf(id), presence.counts))
   if (presence.failures > 0) {
-    add(MenuEntry.Item(MenuAction.RetryFailed(listOf(id)), "Retry ${presence.failures} failed"))
+    val retry = Res.plurals.tray_retry_failed.text(presence.failures)
+    add(MenuEntry.Item(MenuAction.RetryFailed(listOf(id)), retry))
   }
   device.speed?.let { add(speedMenu(it)) }
   device.limit?.let { add(limitMenu(id, it)) }
   add(MenuEntry.Separator)
-  add(MenuEntry.Item(MenuAction.AddClipboardLink(id), "Add clipboard link here"))
+  val addHere = Res.string.tray_add_clipboard_link_here.text()
+  add(MenuEntry.Item(MenuAction.AddClipboardLink(id), addHere))
 }
 
 private fun pauseAll(deviceIds: List<String>, counts: PulseCounts) = MenuEntry.Item(
@@ -474,11 +507,11 @@ private fun resumeAll(deviceIds: List<String>, counts: PulseCounts) = MenuEntry.
 private fun limitMenu(deviceId: String, limit: SpeedLimit): MenuEntry.Submenu {
   val choices = (SpeedLimitPickerPresets + limit).distinct().sortedBy { it.bytesPerSecond }
   return MenuEntry.Submenu(
-    label = "Speed",
+    label = Res.string.tray_speed.text(),
     entries = choices.map { choice ->
       MenuEntry.Item(
         action = MenuAction.SetSpeedLimit(deviceId, choice),
-        label = formatSpeedLimit(choice),
+        label = speedLimitText(choice),
         checked = choice == limit,
       )
     },
@@ -486,15 +519,16 @@ private fun limitMenu(deviceId: String, limit: SpeedLimit): MenuEntry.Submenu {
 }
 
 private fun speedMenu(speed: TraySpeed): MenuEntry.Submenu {
-  fun choice(mode: SpeedLimitMode, label: String, enabled: Boolean = true) = MenuEntry.Item(
+  fun choice(mode: SpeedLimitMode, label: UiText, enabled: Boolean = true) = MenuEntry.Item(
     action = MenuAction.SetSpeedMode(mode),
     label = label,
     enabled = enabled,
     checked = speed.mode == mode,
   )
-  val slowLane = "${speedModeName(SpeedLimitMode.SlowLane)} · ${formatSpeedLimit(speed.slowLane)}"
+  val slowLane = listOf(speedModeName(SpeedLimitMode.SlowLane), speedLimitText(speed.slowLane))
+    .joinText()
   return MenuEntry.Submenu(
-    label = "Speed",
+    label = Res.string.tray_speed.text(),
     entries = listOf(
       choice(SpeedLimitMode.Full, speedModeName(SpeedLimitMode.Full)),
       choice(SpeedLimitMode.SlowLane, slowLane),
@@ -508,17 +542,19 @@ private fun speedMenu(speed: TraySpeed): MenuEntry.Submenu {
 }
 
 /** "Ketch — ↓ 4.2 MB/s · 3 active" while downloading, else "Ketch — " and the sentence. */
-internal fun trayTooltip(pulse: PulseState, now: Instant): String {
+internal fun trayTooltip(pulse: PulseState, now: Instant): UiText {
   val downloading = pulse.onlineCounts.downloading
   val summary = if (downloading > 0) {
-    "↓ ${formatSpeed(pulse.totalSpeed)} · $downloading active"
+    Res.plurals.tray_tooltip_downloading.text(
+      downloading,
+      downloading,
+      speedText(pulse.totalSpeed),
+    )
   } else {
     pulse.sentence(now = now)
   }
-  return "Ketch — $summary"
+  return Res.string.app_title_status.text(summary)
 }
-
-private fun formatSpeed(bytesPerSecond: Long): String = "${formatBytes(bytesPerSecond)}/s"
 
 @Composable
 private fun traySpeed(speedMode: SpeedModeController): TraySpeed {

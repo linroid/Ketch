@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the desktop app says outside its windows' content: the macOS menu bar, the tray menu, the
+  Dock menu, the close and quit questions, window titles and notifications.
+  See docs/development/localization.md.
+-->
+<resources>
+  <!-- Menus of the macOS menu bar. -->
+  <string name="menu_file">File</string>
+  <string name="menu_edit">Edit</string>
+  <string name="menu_view">View</string>
+  <string name="menu_downloads">Downloads</string>
+  <string name="menu_device">Device</string>
+  <string name="menu_window">Window</string>
+  <string name="menu_help">Help</string>
+  <!-- The Downloads menu's item for the selected downloads, while one of them runs. -->
+  <string name="menu_pause">Pause</string>
+  <!-- The Downloads menu's item for the selected downloads, while none of them runs. -->
+  <string name="menu_resume">Resume</string>
+  <!-- Opens the sheet that connects to another device: in the File menu and the tray's Devices. -->
+  <string name="menu_add_device">Add device…</string>
+  <!-- Opens Settings at Sharing, where another device pairs with this one. -->
+  <string name="menu_pair_device">Pair a device…</string>
+  <!--
+    A menu item whose keys stay with the focused control, so the menu shows them as text.
+    %1$s is the item, %2$s the keys: "Copy link (⌘C)".
+  -->
+  <string name="menu_item_keys">%1$s (%2$s)</string>
+
+  <!-- The speed modes, in the tray's Speed menus and in messages. -->
+  <string name="speed_full">Full speed</string>
+  <string name="speed_slow_lane">Slow lane</string>
+  <string name="speed_auto">Auto</string>
+
+  <!-- The tray icon's menu. -->
+  <string name="tray_devices">Devices</string>
+  <!-- Submenu of the downloads that finished last on this computer. -->
+  <string name="tray_recent">Recent</string>
+  <string name="tray_show_ketch">Show Ketch</string>
+  <string name="tray_speed">Speed</string>
+  <!-- First item of a device's submenu: shows the window on that device. -->
+  <string name="tray_show">Show</string>
+  <!-- Asks for a new access token for a device that rejected its token. -->
+  <string name="tray_enter_token">Enter token…</string>
+  <!-- Connects to an offline device now rather than at its next attempt. -->
+  <string name="tray_retry_now">Retry now</string>
+  <!-- Check item: whether the app stays connected to the device while another one shows. -->
+  <string name="tray_stay_connected">Stay connected</string>
+  <plurals name="tray_retry_failed">
+    <item quantity="one">Retry %1$d failed</item>
+    <item quantity="other">Retry %1$d failed</item>
+  </plurals>
+  <!-- Downloads the links on the clipboard on the device whose submenu this is. -->
+  <string name="tray_add_clipboard_link_here">Add clipboard link here</string>
+  <!-- A device in the tray's Devices menu. %1$s is its name, %2$s what it is doing: "NAS — Idle". -->
+  <string name="tray_device_line">%1$s — %2$s</string>
+  <!-- What a device in the tray's Devices menu is doing, after its name. -->
+  <string name="tray_needs_token">Needs token</string>
+  <string name="tray_not_connected">Not connected</string>
+  <string name="tray_offline">Offline</string>
+  <string name="tray_connecting">Connecting</string>
+  <string name="tray_idle">Idle</string>
+  <!-- Downloads running on a device, after its speed: "6.4 MB/s · 2 active". -->
+  <plurals name="tray_active">
+    <item quantity="one">%1$d active</item>
+    <item quantity="other">%1$d active</item>
+  </plurals>
+  <plurals name="tray_waiting">
+    <item quantity="one">%1$d waiting</item>
+    <item quantity="other">%1$d waiting</item>
+  </plurals>
+  <plurals name="tray_paused">
+    <item quantity="one">%1$d paused</item>
+    <item quantity="other">%1$d paused</item>
+  </plurals>
+  <plurals name="tray_failed">
+    <item quantity="one">%1$d failed</item>
+    <item quantity="other">%1$d failed</item>
+  </plurals>
+  <!-- The tray icon's tooltip while downloading. %2$s is the speed, such as "4.2 MB/s". -->
+  <plurals name="tray_tooltip_downloading">
+    <item quantity="one">↓ %2$s · %1$d active</item>
+    <item quantity="other">↓ %2$s · %1$d active</item>
+  </plurals>
+  <!--
+    The main window's title and the tray icon's tooltip. %1$s is what the downloads are doing,
+    such as "3 downloading · 45%" or "All quiet".
+  -->
+  <string name="app_title_status">Ketch — %1$s</string>
+
+  <!-- Messages from the menu bar's and the tray's commands. -->
+  <string name="message_clipboard_no_link">The clipboard holds no link</string>
+  <!-- %1$s is a device, such as "This Mac", %2$s a speed mode, such as "Slow lane". -->
+  <string name="message_switch_speed_failed">Couldn't switch %1$s to %2$s</string>
+  <string name="message_try_again">Try again</string>
+  <string name="message_undo">Undo</string>
+  <!-- %1$s is a device, such as "This Mac", %2$s the slow lane's speed, such as "1 MB/s". -->
+  <string name="message_slow_lane_on">Slow lane on for %1$s · %2$s</string>
+  <!-- %1$s is a device, such as "This Mac". -->
+  <string name="message_slow_lane_off">Slow lane off for %1$s</string>
+  <!-- The device follows its speed rules. %1$s is a device, such as "This Mac". -->
+  <string name="message_speed_follows_rules">Speed on %1$s follows your rules</string>
+  <!-- %1$s is a device, such as "NAS-Basement". -->
+  <string name="message_speed_limit_failed">Couldn't set the speed limit on %1$s</string>
+  <!-- %1$s is a device, such as "NAS-Basement". -->
+  <string name="message_reconnect_failed">Couldn't reconnect to %1$s</string>
+  <!-- %1$s is a downloaded file, such as "ubuntu.iso". -->
+  <string name="message_open_failed">Couldn't open %1$s</string>
+  <!-- Showing a downloaded file in the file manager failed. %1$s is the file, such as "ubuntu.iso". -->
+  <string name="message_show_failed">Couldn't show %1$s</string>
+  <!-- Pausing a selected download failed. %1$s is the file, %2$s the device, such as "NAS-Basement". -->
+  <string name="message_pause_failed">Couldn't pause %1$s on %2$s</string>
+  <string name="message_copy_links_failed">Couldn't copy the links</string>
+  <plurals name="message_links_copied">
+    <item quantity="one">Copied link</item>
+    <item quantity="other">Copied %1$d links</item>
+  </plurals>
+  <!-- A failure the window could not handle; its error message follows. -->
+  <string name="message_window_error">Something went wrong</string>
+  <!-- Title of the dialog that picks .torrent files to add. -->
+  <string name="open_torrent_title">Open torrent file</string>
+
+  <!-- The question asked when the window closes while downloads run. -->
+  <string name="close_keep_running_title">Keep downloading in the background?</string>
+  <plurals name="close_stays_menu_bar">
+    <item quantity="one">Ketch stays in the menu bar and finishes %1$d download.</item>
+    <item quantity="other">Ketch stays in the menu bar and finishes %1$d downloads.</item>
+  </plurals>
+  <plurals name="close_stays_notification_area">
+    <item quantity="one">Ketch stays in the notification area and finishes %1$d download.</item>
+    <item quantity="other">Ketch stays in the notification area and finishes %1$d downloads.</item>
+  </plurals>
+  <plurals name="close_stays_system_tray">
+    <item quantity="one">Ketch stays in the system tray and finishes %1$d download.</item>
+    <item quantity="other">Ketch stays in the system tray and finishes %1$d downloads.</item>
+  </plurals>
+  <!-- Where the system has no tray, the window minimizes instead of hiding. -->
+  <plurals name="close_stays_minimized">
+    <item quantity="one">Ketch stays minimized and finishes %1$d download.</item>
+    <item quantity="other">Ketch stays minimized and finishes %1$d downloads.</item>
+  </plurals>
+  <!-- %1$s is the keys that quit, such as "⌘Q" or "Ctrl+Q". -->
+  <string name="close_quit_from_menu_bar">Quit any time from the menu bar icon or with %1$s.</string>
+  <!-- %1$s is the keys that quit, such as "Ctrl+Q". -->
+  <string name="close_quit_from_notification_area">Quit any time from the notification area icon or with %1$s.</string>
+  <!-- %1$s is the keys that quit, such as "Ctrl+Q". -->
+  <string name="close_quit_from_system_tray">Quit any time from the system tray icon or with %1$s.</string>
+  <!-- %1$s is the keys that quit, such as "Ctrl+Q". -->
+  <string name="close_quit_with_keys">Quit any time with %1$s.</string>
+  <!--
+    The question's two sentences, where Ketch stays and how to quit, in a row. Languages that
+    write sentences without a space between them leave it out.
+  -->
+  <string name="close_sentences">%1$s %2$s</string>
+  <string name="close_keep_running">Keep Running</string>
+  <string name="close_quit_ketch">Quit Ketch</string>
+  <string name="close_dont_ask_again">Don't ask again</string>
+  <!-- The question asked when quitting while downloads run. -->
+  <string name="close_quit_title">Quit Ketch?</string>
+  <plurals name="close_quit_body">
+    <item quantity="one">%1$d download will pause and resume next time you open Ketch.</item>
+    <item quantity="other">%1$d downloads will pause and resume next time you open Ketch.</item>
+  </plurals>
+  <string name="close_quit">Quit</string>
+  <string name="close_cancel">Cancel</string>
+
+  <!-- Notifications. -->
+  <!-- Posted on Windows the first time the window closes, as its close button usually quits. -->
+  <string name="notify_still_running">Ketch is still running in the notification area</string>
+  <!-- Downloads added while the window was not in front, such as from the browser extension. -->
+  <plurals name="notify_added">
+    <item quantity="one">Download added</item>
+    <item quantity="other">%1$d downloads added</item>
+  </plurals>
+  <!-- A notification's title about another device. %1$s is the device, %2$s the title. -->
+  <string name="notify_on_device">On %1$s: %2$s</string>
+  <!-- The names of two downloads added together. -->
+  <string name="notify_names_two">%1$s, %2$s</string>
+  <!-- The names of three downloads added together. -->
+  <string name="notify_names_three">%1$s, %2$s, %3$s</string>
+  <!--
+    The first names of downloads added together, then how many more were added. %1$s is the
+    names, such as "a.iso, b.iso, c.iso", %2$d the number of the others.
+  -->
+  <plurals name="notify_names_more">
+    <item quantity="one">%1$s and %2$d more</item>
+    <item quantity="other">%1$s and %2$d more</item>
+  </plurals>
+
+  <!-- Title of the Settings window. -->
+  <string name="settings_window_title">Settings</string>
+</resources>

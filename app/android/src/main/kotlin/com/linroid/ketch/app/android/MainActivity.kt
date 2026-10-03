@@ -190,13 +190,13 @@ class MainActivity : ComponentActivity() {
       }
     }
     notificationRationale = AlertDialog.Builder(this, dialogTheme())
-      .setTitle("Get notified when downloads finish")
-      .setMessage("Ketch can tell you when a download finishes or fails while you use other apps.")
-      .setPositiveButton("Allow") { _, _ ->
+      .setTitle(R.string.notifications_offer_title)
+      .setMessage(R.string.notifications_offer_message)
+      .setPositiveButton(R.string.notifications_offer_allow) { _, _ ->
         answered()
         requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
       }
-      .setNegativeButton("Not now") { _, _ -> answered() }
+      .setNegativeButton(R.string.notifications_offer_not_now) { _, _ -> answered() }
       .setOnCancelListener { answered() }
       .show()
   }

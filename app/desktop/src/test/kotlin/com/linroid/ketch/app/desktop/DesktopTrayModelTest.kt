@@ -13,6 +13,8 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.NotificationCopy
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyChord
@@ -33,6 +35,7 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -90,39 +93,42 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun trayMenu_idleOrFailing_headerIsTheStatusSentence() {
+  fun trayMenu_idleOrFailing_headerIsTheStatusSentence() = runTest {
     val idle = pulse(PulseCounts(done = 4))
     val failing = pulse(PulseCounts(failed = 1), failures = 1)
 
-    val idleHeader = trayMenu(tray(idle)).first()
-    val failingHeader = trayMenu(tray(failing)).first()
+    val idleHeader = trayMenu(tray(idle)).first() as MenuEntry.Header
+    val failingHeader = trayMenu(tray(failing)).first() as MenuEntry.Header
 
-    assertEquals(MenuEntry.Header("All quiet"), idleHeader)
-    assertEquals(MenuEntry.Header("1 download needs attention"), failingHeader)
+    assertEquals("All quiet", idleHeader.text.load())
+    assertEquals("1 download needs attention", failingHeader.text.load())
     assertEquals(MenuEntry.Header(failing.sentence(now = now)), failingHeader)
   }
 
   @Test
-  fun trayMenu_withoutSpeedController_leavesOutSpeed() {
+  fun trayMenu_withoutSpeedController_leavesOutSpeed() = runTest {
     val menu = trayMenu(tray(pulse(PulseCounts())))
 
-    assertTrue(menu.none { it is MenuEntry.Submenu && it.label == "Speed" })
+    assertTrue(menu.none { it is MenuEntry.Submenu && it.label.load() == "Speed" })
   }
 
   @Test
-  fun trayMenu_slowLane_checksSlowLaneWithItsSpeed() {
+  fun trayMenu_slowLane_checksSlowLaneWithItsSpeed() = runTest {
     val speed = TraySpeed(SpeedLimitMode.SlowLane, SpeedLimit.mbps(1), hasRules = false)
 
     val menu = trayMenu(tray(pulse(PulseCounts()), speed = speed))
     val choices = menu.submenu("Speed").entries.filterIsInstance<MenuEntry.Item>()
 
-    assertEquals(listOf("Full speed", "Slow lane · 1 MB/s", "Auto"), choices.map { it.label })
+    assertEquals(
+      listOf("Full speed", "Slow lane · 1 MB/s", "Auto"),
+      choices.map { it.label.load() },
+    )
     assertEquals(listOf(false, true, false), choices.map { it.checked })
     assertFalse(choices.last().enabled)
   }
 
   @Test
-  fun trayMenu_recentDownloads_openTheirFiles() {
+  fun trayMenu_recentDownloads_openTheirFiles() = runTest {
     val recent = listOf(RecentDownload("ubuntu.iso", "/Downloads/ubuntu.iso"))
 
     val empty = trayMenu(tray(pulse(PulseCounts()))).submenu("Recent")
@@ -132,6 +138,7 @@ class DesktopTrayModelTest {
     assertTrue(listed.enabled)
     val item = listed.entries.single() as MenuEntry.Item
     assertEquals(MenuAction.OpenFile("/Downloads/ubuntu.iso", "ubuntu.iso"), item.action)
+    assertEquals("ubuntu.iso", item.label.load())
   }
 
   @Test
@@ -151,7 +158,7 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun trayMenu_devices_listEachWithWhatItIsDoing() {
+  fun trayMenu_devices_listEachWithWhatItIsDoing() = runTest {
     val devices = listOf(
       TrayDevice(presence(counts = PulseCounts(downloading = 2), speed = 6_710_886)),
       TrayDevice(presence(NAS_NAME, remote = true, counts = PulseCounts(failed = 1))),
@@ -159,7 +166,7 @@ class DesktopTrayModelTest {
     )
 
     val labels = trayMenu(tray(pulse(PulseCounts()), devices = devices))
-      .submenu("Devices").entries.filterIsInstance<MenuEntry.Submenu>().map { it.label }
+      .submenu("Devices").entries.filterIsInstance<MenuEntry.Submenu>().map { it.label.load() }
 
     assertEquals(
       listOf("This Mac — 6.4 MB/s · 2 active", "NAS-Basement — 1 failed", "Den-PC — Offline"),
@@ -168,14 +175,15 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun trayMenu_noDevices_offersToAddOne() {
+  fun trayMenu_noDevices_offersToAddOne() = runTest {
     val devices = trayMenu(tray(pulse(PulseCounts()))).submenu("Devices").entries
 
-    assertEquals(listOf(MenuEntry.Item(MenuAction.AddDevice, "Add device…")), devices)
+    assertEquals(listOf(MenuEntry.Item(MenuAction.AddDevice, ADD_DEVICE)), devices)
+    assertEquals("Add device…", ADD_DEVICE.load())
   }
 
   @Test
-  fun trayMenu_onlineDevice_actsOnThatDevice() {
+  fun trayMenu_onlineDevice_actsOnThatDevice() = runTest {
     val counts = PulseCounts(downloading = 1, failed = 2)
     val nas = TrayDevice(presence(NAS_NAME, remote = true, counts = counts, speed = 2_831_155))
 
@@ -195,12 +203,12 @@ class DesktopTrayModelTest {
       items.map { it.action },
     )
     assertEquals(listOf(true, true, false, true, true, true), items.map { it.enabled })
-    assertEquals("Retry 2 failed", items[3].label)
+    assertEquals("Retry 2 failed", items[3].label.load())
     assertEquals(true, items.last().checked)
   }
 
   @Test
-  fun trayMenu_thisComputer_switchesItsSpeedModeAndCannotBeDisconnected() {
+  fun trayMenu_thisComputer_switchesItsSpeedModeAndCannotBeDisconnected() = runTest {
     val speed = TraySpeed(SpeedLimitMode.Full, SpeedLimit.mbps(1), hasRules = true)
     val mac = TrayDevice(presence(), speed = speed)
 
@@ -217,7 +225,7 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun trayMenu_deviceWithoutSpeedMode_picksItsSpeedLimit() {
+  fun trayMenu_deviceWithoutSpeedMode_picksItsSpeedLimit() = runTest {
     val custom = SpeedLimit.mbps(3)
     val nas = TrayDevice(presence(NAS_NAME, remote = true), limit = custom)
 
@@ -227,14 +235,14 @@ class DesktopTrayModelTest {
 
     assertEquals(
       listOf("Unlimited", "512 KB/s", "1 MB/s", "2 MB/s", "3 MB/s", "5 MB/s", "10 MB/s"),
-      limits.map { it.label },
+      limits.map { it.label.load() },
     )
-    assertEquals(listOf("3 MB/s"), limits.filter { it.checked == true }.map { it.label })
+    assertEquals(listOf("3 MB/s"), limits.filter { it.checked == true }.map { it.label.load() })
     assertEquals(MenuAction.SetSpeedLimit(NAS, custom), limits[4].action)
   }
 
   @Test
-  fun trayMenu_offlineDevice_offersRetryNow() {
+  fun trayMenu_offlineDevice_offersRetryNow() = runTest {
     val den = TrayDevice(presence(DEN_NAME, remote = true, health = DeviceHealth.Offline()))
 
     val entries = trayMenu(tray(pulse(PulseCounts()), devices = listOf(den)))
@@ -251,7 +259,7 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun trayMenu_deviceRejectedItsToken_asksForANewOne() {
+  fun trayMenu_deviceRejectedItsToken_asksForANewOne() = runTest {
     val nas = presence(NAS_NAME, remote = true, health = DeviceHealth.Unauthorized)
 
     val entries = trayMenu(tray(pulse(PulseCounts()), devices = listOf(TrayDevice(nas))))
@@ -262,7 +270,7 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun trayMenu_deviceNotKeptConnected_offersToStayConnected() {
+  fun trayMenu_deviceNotKeptConnected_offersToStayConnected() = runTest {
     val den = presence(
       DEN_NAME,
       remote = true,
@@ -283,30 +291,32 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun trayDeviceStatus_onlineDevice_saysWhatItIsDoing() {
+  fun trayDeviceStatus_onlineDevice_saysWhatItIsDoing() = runTest {
     val slowLane = presence(
       counts = PulseCounts(downloading = 1, waiting = 2),
       speed = 1_048_576,
       speedMode = SpeedMode.SlowLane,
     )
 
-    assertEquals("Idle", trayDeviceStatus(presence(counts = PulseCounts(done = 3))))
-    assertEquals("2 waiting", trayDeviceStatus(presence(counts = PulseCounts(waiting = 2))))
-    assertEquals("3 paused", trayDeviceStatus(presence(counts = PulseCounts(paused = 3))))
-    assertEquals("1.0 MB/s · 1 active · Slow lane", trayDeviceStatus(slowLane))
-    assertEquals("Connecting", trayDeviceStatus(presence(health = DeviceHealth.Connecting)))
+    suspend fun status(device: DevicePresence) = trayDeviceStatus(device).load()
+
+    assertEquals("Idle", status(presence(counts = PulseCounts(done = 3))))
+    assertEquals("2 waiting", status(presence(counts = PulseCounts(waiting = 2))))
+    assertEquals("3 paused", status(presence(counts = PulseCounts(paused = 3))))
+    assertEquals("1.0 MB/s · 1 active · Slow lane", status(slowLane))
+    assertEquals("Connecting", status(presence(health = DeviceHealth.Connecting)))
   }
 
   @Test
-  fun trayTooltip_downloading_showsSpeedAndActiveCount() {
+  fun trayTooltip_downloading_showsSpeedAndActiveCount() = runTest {
     val pulse = pulse(PulseCounts(downloading = 3, waiting = 2), speed = 4_404_019)
 
-    assertEquals("Ketch — ↓ 4.2 MB/s · 3 active", trayTooltip(pulse, now))
+    assertEquals("Ketch — ↓ 4.2 MB/s · 3 active", trayTooltip(pulse, now).load())
   }
 
   @Test
-  fun trayTooltip_idle_showsTheSentence() {
-    assertEquals("Ketch — All quiet", trayTooltip(pulse(PulseCounts()), now))
+  fun trayTooltip_idle_showsTheSentence() = runTest {
+    assertEquals("Ketch — All quiet", trayTooltip(pulse(PulseCounts()), now).load())
   }
 
   @Test
@@ -386,17 +396,17 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun commandItem_chordTheMenuCannotOwn_showsItAsText() {
+  fun commandItem_chordTheMenuCannotOwn_showsItAsText() = runTest {
     val copy = commandItem(KetchCommands.CopyLink, KeyboardPlatform.Mac)
     val add = commandItem(KetchCommands.Add, KeyboardPlatform.Mac)
 
-    assertEquals("Copy link (⌘C)", copy.label)
+    assertEquals("Copy link (⌘C)", copy.label.load())
     assertNull(copy.shortcut)
-    assertEquals("New download…", add.label)
+    assertEquals("New download…", add.label.load())
   }
 
   @Test
-  fun menuBar_nothingRuns_disablesPauseAll() {
+  fun menuBar_nothingRuns_disablesPauseAll() = runTest {
     val menus = menuBar(context(counts = PulseCounts(done = 2)))
     val downloads = menus.menu("Downloads")
 
@@ -406,17 +416,17 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun menuBar_pendingOperation_namesItInUndo() {
-    val pending = menuBar(context(undoLabel = "Pause All")).menu("Edit")
-    val none = menuBar(context(undoLabel = null)).menu("Edit")
+  fun menuBar_pendingOperation_namesItInUndo() = runTest {
+    val pending = menuBar(context(undoTitle = "Undo pause all")).menu("Edit")
+    val none = menuBar(context(undoTitle = null)).menu("Edit")
 
-    assertEquals("Undo Pause All (⌘Z)", pending.item(KetchCommands.Undo).label)
+    assertEquals("Undo pause all (⌘Z)", pending.item(KetchCommands.Undo).label.load())
     assertTrue(pending.item(KetchCommands.Undo).enabled)
     assertFalse(none.item(KetchCommands.Undo).enabled)
   }
 
   @Test
-  fun menuBar_selection_namesTheToggleAndEnablesItsActions() {
+  fun menuBar_selection_namesTheToggleAndEnablesItsActions() = runTest {
     val running = menuBar(context(selection = listOf(selected(TaskPhase.Running))))
       .menu("Downloads")
     val paused = menuBar(context(selection = listOf(selected(TaskPhase.Paused))))
@@ -426,8 +436,8 @@ class DesktopTrayModelTest {
     val remoteDone = menuBar(context(selection = listOf(selected(TaskPhase.Completed, false))))
       .menu("Downloads")
 
-    assertEquals("Pause (Space)", running.item(KetchCommands.TogglePause).label)
-    assertEquals("Resume (Space)", paused.item(KetchCommands.TogglePause).label)
+    assertEquals("Pause (Space)", running.item(KetchCommands.TogglePause).label.load())
+    assertEquals("Resume (Space)", paused.item(KetchCommands.TogglePause).label.load())
     assertFalse(done.item(KetchCommands.TogglePause).enabled)
     assertTrue(paused.item(KetchCommands.Retry).enabled)
     assertFalse(running.item(KetchCommands.Retry).enabled)
@@ -436,7 +446,7 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun menuBar_noSelection_disablesTaskActions() {
+  fun menuBar_noSelection_disablesTaskActions() = runTest {
     val downloads = menuBar(context()).menu("Downloads")
 
     val actions = listOf(
@@ -451,7 +461,7 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun menuBar_tabsAndDevices_checkTheActiveOnes() {
+  fun menuBar_tabsAndDevices_checkTheActiveOnes() = runTest {
     val menus = menuBar(
       context(filter = StatusFilter.Failed, devices = listOf("This Mac", "NAS"), activeDevice = 1),
     )
@@ -461,14 +471,14 @@ class DesktopTrayModelTest {
     assertEquals(StatusFilter.entries.map { it == StatusFilter.Failed }, tabs.map { it.checked })
     assertEquals(
       listOf("All devices", "This Mac (⌥⌘1)", "NAS (⌥⌘2)", "Pair a device…"),
-      devices.map { it.label },
+      devices.map { it.label.load() },
     )
     assertEquals(listOf(false, false, true, null), devices.map { it.checked })
     assertEquals(MenuAction.PairDevice, devices.last().action)
   }
 
   @Test
-  fun menuBar_allDevicesShown_checksAllDevicesAlone() {
+  fun menuBar_allDevicesShown_checksAllDevicesAlone() = runTest {
     val menus = menuBar(
       context(devices = listOf("This Mac", "NAS"), activeDevice = 1, allDevices = true),
     )
@@ -479,14 +489,14 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun menuBar_oneDevice_disablesAllDevices() {
+  fun menuBar_oneDevice_disablesAllDevices() = runTest {
     val device = menuBar(context(devices = listOf("This Mac"))).menu("Device")
 
     assertFalse(device.item(KetchCommands.AllDevices).enabled)
   }
 
   @Test
-  fun menuBar_editViewAndHelp_offerThePaletteDestinationsAndShortcuts() {
+  fun menuBar_editViewAndHelp_offerThePaletteDestinationsAndShortcuts() = runTest {
     val menus = menuBar(context())
 
     assertEquals(
@@ -500,14 +510,14 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun menuBar_fileMenu_addsADevice() {
+  fun menuBar_fileMenu_addsADevice() = runTest {
     val file = menuBar(context()).menu("File")
 
     assertTrue(file.any { it is MenuEntry.Item && it.action == MenuAction.AddDevice })
   }
 
   @Test
-  fun menuBar_withoutSpeed_leavesOutSlowLane() {
+  fun menuBar_withoutSpeed_leavesOutSlowLane() = runTest {
     val menus = menuBar(context(devices = emptyList(), slowLane = null))
 
     assertTrue(menus.menu("Downloads").none { it.runs(KetchCommands.SlowLane) })
@@ -523,7 +533,7 @@ class DesktopTrayModelTest {
   }
 
   @Test
-  fun taskbarModel_offlineDevice_leavesOutTheTasksItLastReported() {
+  fun taskbarModel_offlineDevice_leavesOutTheTasksItLastReported() = runTest {
     val pulse = PulseState(
       devices = listOf(
         device(PulseCounts(waiting = 1), failures = 0),
@@ -534,7 +544,7 @@ class DesktopTrayModelTest {
     val model = taskbarModel(pulse, unseenFailures = 0, DockBadgeMode.ActiveCount)
 
     assertEquals(TaskbarModel("1", -1, TaskbarProgress.Off), model)
-    assertEquals("Ketch — NAS-Basement is offline · retrying", trayTooltip(pulse, now))
+    assertEquals("Ketch — NAS-Basement is offline · retrying", trayTooltip(pulse, now).load())
   }
 
   @Test
@@ -743,7 +753,7 @@ class DesktopTrayModelTest {
     }
     return DevicePresence(
       entry = entry,
-      name = name,
+      name = verbatim(name),
       detail = entry.detail,
       health = health,
       connected = connected,
@@ -794,7 +804,7 @@ class DesktopTrayModelTest {
     name: String = if (deviceId == LOCAL) "This Mac" else NAS_NAME,
   ): DevicePulse = DevicePulse(
     deviceId = deviceId,
-    name = name,
+    name = verbatim(name),
     health = health,
     counts = counts,
     failures = failures,
@@ -814,17 +824,17 @@ class DesktopTrayModelTest {
     devices: List<String> = listOf("This Mac"),
     activeDevice: Int? = 0,
     selection: List<SelectedTask> = emptyList(),
-    undoLabel: String? = null,
+    undoTitle: String? = null,
     slowLane: Boolean? = false,
     allDevices: Boolean = false,
   ): MenuBarContext = MenuBarContext(
     counts = counts,
     failures = counts.failed,
     filter = filter,
-    devices = devices,
+    devices = devices.map(::verbatim),
     activeDevice = activeDevice,
     selection = selection,
-    undoLabel = undoLabel,
+    undoTitle = undoTitle?.let(::verbatim),
     slowLane = slowLane,
     allDevices = allDevices,
     platform = KeyboardPlatform.Mac,
@@ -838,10 +848,11 @@ class DesktopTrayModelTest {
   private fun List<MenuEntry>.item(command: KetchCommand): MenuEntry.Item =
     filterIsInstance<MenuEntry.Item>().single { it.runs(command) }
 
-  private fun List<MenuEntry>.submenu(label: String): MenuEntry.Submenu =
-    filterIsInstance<MenuEntry.Submenu>().single { it.label == label }
+  private suspend fun List<MenuEntry>.submenu(label: String): MenuEntry.Submenu =
+    filterIsInstance<MenuEntry.Submenu>().single { it.label.load() == label }
 
-  private fun MenuEntry.Submenu.submenu(label: String): MenuEntry.Submenu = entries.submenu(label)
+  private suspend fun MenuEntry.Submenu.submenu(label: String): MenuEntry.Submenu =
+    entries.submenu(label)
 
   private fun List<MenuEntry>.pauseAll(): MenuEntry.Item =
     filterIsInstance<MenuEntry.Item>().single { it.action is MenuAction.PauseAll }
@@ -852,8 +863,8 @@ class DesktopTrayModelTest {
   private fun List<MenuEntry>.flatten(): List<MenuEntry> =
     flatMap { if (it is MenuEntry.Submenu) it.entries.flatten() else listOf(it) }
 
-  private fun List<MenuBarMenu>.menu(title: String): List<MenuEntry> =
-    single { it.title == title }.entries
+  private suspend fun List<MenuBarMenu>.menu(title: String): List<MenuEntry> =
+    single { it.title.load() == title }.entries
 
   private companion object {
     const val LOCAL = "local"

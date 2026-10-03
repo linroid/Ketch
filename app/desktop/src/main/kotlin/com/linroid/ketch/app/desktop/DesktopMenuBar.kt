@@ -16,6 +16,11 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
@@ -40,8 +45,8 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
-import com.linroid.ketch.app.state.formatSpeedLimit
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
@@ -49,6 +54,37 @@ import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.links
 import com.linroid.ketch.config.SpeedLimitMode
+import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.menu_add_device
+import ketch.app.desktop.generated.resources.menu_device
+import ketch.app.desktop.generated.resources.menu_downloads
+import ketch.app.desktop.generated.resources.menu_edit
+import ketch.app.desktop.generated.resources.menu_file
+import ketch.app.desktop.generated.resources.menu_help
+import ketch.app.desktop.generated.resources.menu_item_keys
+import ketch.app.desktop.generated.resources.menu_pair_device
+import ketch.app.desktop.generated.resources.menu_pause
+import ketch.app.desktop.generated.resources.menu_resume
+import ketch.app.desktop.generated.resources.menu_view
+import ketch.app.desktop.generated.resources.menu_window
+import ketch.app.desktop.generated.resources.message_clipboard_no_link
+import ketch.app.desktop.generated.resources.message_copy_links_failed
+import ketch.app.desktop.generated.resources.message_links_copied
+import ketch.app.desktop.generated.resources.message_open_failed
+import ketch.app.desktop.generated.resources.message_pause_failed
+import ketch.app.desktop.generated.resources.message_reconnect_failed
+import ketch.app.desktop.generated.resources.message_show_failed
+import ketch.app.desktop.generated.resources.message_slow_lane_off
+import ketch.app.desktop.generated.resources.message_slow_lane_on
+import ketch.app.desktop.generated.resources.message_speed_follows_rules
+import ketch.app.desktop.generated.resources.message_speed_limit_failed
+import ketch.app.desktop.generated.resources.message_switch_speed_failed
+import ketch.app.desktop.generated.resources.message_try_again
+import ketch.app.desktop.generated.resources.message_undo
+import ketch.app.desktop.generated.resources.open_torrent_title
+import ketch.app.desktop.generated.resources.speed_auto
+import ketch.app.desktop.generated.resources.speed_full
+import ketch.app.desktop.generated.resources.speed_slow_lane
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -129,7 +165,7 @@ fun FrameWindowScope.KetchMenuBar(
       devices = instances.map { it.displayName },
       activeDevice = instances.indexOf(active).takeIf { it >= 0 },
       selection = selection,
-      undoLabel = ops.lastOrNull()?.label,
+      undoTitle = ops.lastOrNull()?.undoTitle,
       slowLane = mode?.isSlowLane,
       allDevices = shown == DeviceScope.All,
       revealLabel = files?.revealLabel,
@@ -138,7 +174,7 @@ fun FrameWindowScope.KetchMenuBar(
   )
   MenuBar {
     for (menu in menus) {
-      Menu(menu.title) { MenuEntries(menu.entries, platform, commands::perform) }
+      Menu(menu.title.resolve()) { MenuEntries(menu.entries, platform, commands::perform) }
     }
   }
 }
@@ -149,7 +185,7 @@ internal sealed interface MenuEntry {
   data object Separator : MenuEntry
 
   /** A line of text that cannot be clicked, such as the tray's status sentence. */
-  data class Header(val text: String) : MenuEntry
+  data class Header(val text: UiText) : MenuEntry
 
   /**
    * A clickable item.
@@ -159,7 +195,7 @@ internal sealed interface MenuEntry {
    */
   data class Item(
     val action: MenuAction,
-    val label: String,
+    val label: UiText,
     val enabled: Boolean = true,
     val checked: Boolean? = null,
     val shortcut: KeyChord? = null,
@@ -167,7 +203,7 @@ internal sealed interface MenuEntry {
 
   /** A submenu. */
   data class Submenu(
-    val label: String,
+    val label: UiText,
     val entries: List<MenuEntry>,
     val enabled: Boolean = true,
   ) : MenuEntry
@@ -222,7 +258,7 @@ internal sealed interface MenuAction {
 }
 
 /** A menu of the menu bar. */
-internal data class MenuBarMenu(val title: String, val entries: List<MenuEntry>)
+internal data class MenuBarMenu(val title: UiText, val entries: List<MenuEntry>)
 
 /** What a selected task allows, as far as the menus need it. */
 internal enum class TaskPhase {
@@ -262,7 +298,8 @@ internal data class SelectedTask(val phase: TaskPhase, val local: Boolean)
  * @property devices names of the devices, in the order ⌥⌘1 to ⌥⌘9 switch to them.
  * @property activeDevice index of the active device in [devices], or `null`.
  * @property selection the selected tasks.
- * @property undoLabel label of the operation ⌘Z undoes, or `null` when there is none.
+ * @property undoTitle what ⌘Z undoes, such as "Undo clear finished"; `null` when nothing can be
+ *   undone.
  * @property slowLane whether the slow lane is on; `null` when speed modes are unavailable.
  * @property allDevices whether the window shows every device rather than the active one.
  * @property revealLabel label of Reveal, such as "Show in Finder"; `null` keeps the command's.
@@ -271,13 +308,13 @@ internal data class MenuBarContext(
   val counts: PulseCounts,
   val failures: Int,
   val filter: StatusFilter,
-  val devices: List<String>,
+  val devices: List<UiText>,
   val activeDevice: Int?,
   val selection: List<SelectedTask>,
-  val undoLabel: String?,
+  val undoTitle: UiText?,
   val slowLane: Boolean?,
   val allDevices: Boolean = false,
-  val revealLabel: String? = null,
+  val revealLabel: UiText? = null,
   val platform: KeyboardPlatform = KeyboardPlatform.Mac,
 )
 
@@ -286,7 +323,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
   val platform = context.platform
   fun item(
     command: KetchCommand,
-    label: String = command.label,
+    label: UiText = command.label,
     enabled: Boolean = true,
     checked: Boolean? = null,
   ): MenuEntry.Item = commandItem(command, platform, label, enabled, checked)
@@ -301,14 +338,14 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
     it.phase == TaskPhase.Failed || it.phase == TaskPhase.Paused || it.phase == TaskPhase.Canceled
   }
   val togglePause = when {
-    running > 0 -> "Pause"
-    resumable > 0 -> "Resume"
+    running > 0 -> Res.string.menu_pause.text()
+    resumable > 0 -> Res.string.menu_resume.text()
     else -> KetchCommands.TogglePause.label
   }
   val counts = context.counts
   return listOf(
     MenuBarMenu(
-      "File",
+      Res.string.menu_file.text(),
       listOf(
         item(KetchCommands.Add),
         item(KetchCommands.AddClipboardLink),
@@ -319,12 +356,12 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
       ),
     ),
     MenuBarMenu(
-      "Edit",
+      Res.string.menu_edit.text(),
       listOf(
         item(
           KetchCommands.Undo,
-          label = context.undoLabel?.let { "Undo $it" } ?: KetchCommands.Undo.label,
-          enabled = context.undoLabel != null,
+          label = context.undoTitle ?: KetchCommands.Undo.label,
+          enabled = context.undoTitle != null,
         ),
         MenuEntry.Separator,
         item(KetchCommands.PasteLinks),
@@ -335,7 +372,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
       ),
     ),
     MenuBarMenu(
-      "View",
+      Res.string.menu_view.text(),
       buildList {
         for (filter in StatusFilter.entries) {
           add(item(KetchCommands.tab(filter), checked = filter == context.filter))
@@ -349,7 +386,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
       },
     ),
     MenuBarMenu(
-      "Downloads",
+      Res.string.menu_downloads.text(),
       listOfNotNull(
         item(KetchCommands.TogglePause, label = togglePause, enabled = running + resumable > 0),
         item(KetchCommands.Open, enabled = selection.isNotEmpty()),
@@ -370,7 +407,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
       ),
     ),
     MenuBarMenu(
-      "Device",
+      Res.string.menu_device.text(),
       buildList {
         val devices = context.devices.take(MAX_DEVICE_ITEMS)
         add(
@@ -386,16 +423,16 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
           add(item(KetchCommands.device(index + 1), label = name, checked = shown))
         }
         add(MenuEntry.Separator)
-        add(MenuEntry.Item(MenuAction.PairDevice, "Pair a device…"))
+        add(MenuEntry.Item(MenuAction.PairDevice, Res.string.menu_pair_device.text()))
       },
     ),
-    MenuBarMenu("Window", listOf(item(KetchCommands.Minimize))),
-    MenuBarMenu("Help", listOf(item(KetchCommands.Shortcuts))),
+    MenuBarMenu(Res.string.menu_window.text(), listOf(item(KetchCommands.Minimize))),
+    MenuBarMenu(Res.string.menu_help.text(), listOf(item(KetchCommands.Shortcuts))),
   )
 }
 
 /** Label of the item that connects to another device: in the File menu and the tray's Devices. */
-internal const val ADD_DEVICE = "Add device…"
+internal val ADD_DEVICE: UiText = Res.string.menu_add_device.text()
 
 /**
  * An item that runs [command]. A chord the menu may own becomes its shortcut; any other chord is
@@ -404,13 +441,17 @@ internal const val ADD_DEVICE = "Add device…"
 internal fun commandItem(
   command: KetchCommand,
   platform: KeyboardPlatform,
-  label: String = command.label,
+  label: UiText = command.label,
   enabled: Boolean = true,
   checked: Boolean? = null,
 ): MenuEntry.Item {
   val chord = command.chords(platform).firstOrNull()
   val shortcut = menuShortcut(command, platform)
-  val text = if (chord != null && shortcut == null) "$label (${chord.label(platform)})" else label
+  val text = if (chord != null && shortcut == null) {
+    Res.string.menu_item_keys.text(label, chord.label(platform))
+  } else {
+    label
+  }
   return MenuEntry.Item(MenuAction.Run(command), text, enabled, checked, shortcut)
 }
 
@@ -464,19 +505,20 @@ internal fun MenuScope.MenuEntries(
   for (entry in entries) {
     when (entry) {
       MenuEntry.Separator -> Separator()
-      is MenuEntry.Header -> Item(entry.text, enabled = false, onClick = {})
+      is MenuEntry.Header -> Item(entry.text.resolve(), enabled = false, onClick = {})
       is MenuEntry.Item -> {
+        val label = entry.label.resolve()
         val shortcut = entry.shortcut?.toKeyShortcut(platform)
         val checked = entry.checked
         if (checked == null) {
-          Item(entry.label, enabled = entry.enabled, shortcut = shortcut) { onAction(entry.action) }
+          Item(label, enabled = entry.enabled, shortcut = shortcut) { onAction(entry.action) }
         } else {
-          CheckboxItem(entry.label, checked, enabled = entry.enabled, shortcut = shortcut) {
+          CheckboxItem(label, checked, enabled = entry.enabled, shortcut = shortcut) {
             onAction(entry.action)
           }
         }
       }
-      is MenuEntry.Submenu -> Menu(entry.label, enabled = entry.enabled) {
+      is MenuEntry.Submenu -> Menu(entry.label.resolve(), enabled = entry.enabled) {
         MenuEntries(entry.entries, platform, onAction)
       }
     }
@@ -658,7 +700,7 @@ internal class DesktopCommands(
       when {
         text == null -> {
           actions.showWindow()
-          state.messages.post(MessageLevel.Warning, "The clipboard holds no link")
+          state.messages.post(MessageLevel.Warning, Res.string.message_clipboard_no_link.text())
         }
         links.isEmpty() || links.any { it.headers.isNotEmpty() } -> {
           // Text without a link, or a cURL command whose headers the add sheet keeps.
@@ -706,23 +748,28 @@ internal class DesktopCommands(
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        log.w { "Couldn't switch $device to ${speedModeName(mode)}: ${e.describeCauses()}" }
+        log.w { "Couldn't switch this computer to ${mode.name}: ${e.describeCauses()}" }
+        val retry = MessageAction(Res.string.message_try_again.text()) {
+          switchSpeedMode(mode, undoable)
+        }
         state.messages.post(
           level = MessageLevel.Error,
-          title = "Couldn't switch $device to ${speedModeName(mode)}",
-          actions = listOf(MessageAction("Try again") { switchSpeedMode(mode, undoable) }),
+          title = Res.string.message_switch_speed_failed.text(device, speedModeName(mode)),
+          actions = listOf(retry),
           cause = e,
         )
         return@launch
       }
       val title = when (mode) {
         SpeedLimitMode.SlowLane -> {
-          "Slow lane on for $device · ${formatSpeedLimit(speedMode.slowLaneSpeed)}"
+          Res.string.message_slow_lane_on.text(device, speedLimitText(speedMode.slowLaneSpeed))
         }
-        SpeedLimitMode.Full -> "Slow lane off for $device"
-        SpeedLimitMode.Auto -> "Speed on $device follows your rules"
+        SpeedLimitMode.Full -> Res.string.message_slow_lane_off.text(device)
+        SpeedLimitMode.Auto -> Res.string.message_speed_follows_rules.text(device)
       }
-      val undo = MessageAction("Undo") { switchSpeedMode(previous, undoable = false) }
+      val undo = MessageAction(Res.string.message_undo.text()) {
+        switchSpeedMode(previous, undoable = false)
+      }
       state.messages.post(
         level = MessageLevel.Success,
         title = title,
@@ -750,7 +797,7 @@ internal class DesktopCommands(
         log.w { "Couldn't read the settings of $deviceId: ${e.describeCauses()}" }
         state.messages.post(
           level = MessageLevel.Error,
-          title = "Couldn't set the speed limit on ${entry.displayName}",
+          title = Res.string.message_speed_limit_failed.text(entry.displayName),
           cause = e,
         )
         return@launch
@@ -770,7 +817,7 @@ internal class DesktopCommands(
         log.w { "Couldn't reconnect to $deviceId: ${e.describeCauses()}" }
         state.messages.post(
           level = MessageLevel.Error,
-          title = "Couldn't reconnect to ${remote.displayName}",
+          title = Res.string.message_reconnect_failed.text(remote.displayName),
           cause = e,
         )
       }
@@ -794,26 +841,36 @@ internal class DesktopCommands(
   // Picked files go where files opened from the file manager go, so several open one by one.
   private fun openTorrentFiles() {
     actions.showWindow()
-    val dialog = FileDialog(null as Frame?, "Open torrent file", FileDialog.LOAD).apply {
-      isMultipleMode = true
-      filenameFilter = FilenameFilter { _, name -> name.endsWith(".torrent", ignoreCase = true) }
-      // Windows ignores the filter but matches the name pattern.
-      if (isWindows) file = "*.torrent"
+    controller.scope.launch {
+      val title = Res.string.open_torrent_title.text().load()
+      val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
+        isMultipleMode = true
+        filenameFilter = FilenameFilter { _, name -> name.endsWith(".torrent", ignoreCase = true) }
+        // Windows ignores the filter but matches the name pattern.
+        if (isWindows) file = "*.torrent"
+      }
+      val picked = try {
+        dialog.isVisible = true
+        dialog.files.filter { it.isFile }
+      } finally {
+        dialog.dispose()
+      }
+      if (picked.isNotEmpty()) actions.openFiles(picked)
     }
-    val picked = try {
-      dialog.isVisible = true
-      dialog.files.filter { it.isFile }
-    } finally {
-      dialog.dispose()
-    }
-    if (picked.isNotEmpty()) actions.openFiles(picked)
   }
 
   private fun togglePause() {
     val tasks = selectedTasks()
     val running = tasks.filter { TaskPhase.of(it.state.value) == TaskPhase.Running }
     if (running.isNotEmpty()) {
-      running.forEach { state.runTaskCommand(it, "pause ${nameOf(it)}") { pause() } }
+      for (task in running) {
+        val name = nameOf(task)
+        state.runTaskCommand(
+          task = task,
+          pendingKey = "pause",
+          failure = { device -> Res.string.message_pause_failed.text(name, device) },
+        ) { pause() }
+      }
       return
     }
     for (task in tasks) state.retry(task)
@@ -840,15 +897,17 @@ internal class DesktopCommands(
   private fun revealSelected() {
     for (task in selectedTasks()) {
       val path = localPath(task) ?: continue
-      onFile("show ${nameOf(task)}") { it.reveal(path) }
+      val name = nameOf(task)
+      onFile("show $name", Res.string.message_show_failed.text(name)) { it.reveal(path) }
     }
   }
 
   private fun openFile(path: String, name: String) {
-    onFile("open $name") { it.open(path) }
+    onFile("open $name", Res.string.message_open_failed.text(name)) { it.open(path) }
   }
 
-  private fun onFile(what: String, block: suspend (FileActions) -> Unit) {
+  // [what] names the action in the log, [failure] is the message shown when it fails.
+  private fun onFile(what: String, failure: UiText, block: suspend (FileActions) -> Unit) {
     val files = files ?: return
     controller.scope.launch {
       try {
@@ -858,7 +917,12 @@ internal class DesktopCommands(
       } catch (e: Exception) {
         log.w { "Couldn't $what: ${e.describeCauses()}" }
         actions.showWindow()
-        state.messages.post(MessageLevel.Error, "Couldn't $what", detail = e.message, cause = e)
+        state.messages.post(
+          level = MessageLevel.Error,
+          title = failure,
+          detail = e.message?.let(::verbatim),
+          cause = e,
+        )
       }
     }
   }
@@ -873,11 +937,14 @@ internal class DesktopCommands(
         throw e
       } catch (e: Exception) {
         log.w { "Couldn't copy links: ${e.describeCauses()}" }
-        state.messages.post(MessageLevel.Error, "Couldn't copy the links", cause = e)
+        state.messages.post(
+          level = MessageLevel.Error,
+          title = Res.string.message_copy_links_failed.text(),
+          cause = e,
+        )
         return@launch
       }
-      val title = if (urls.size == 1) "Copied link" else "Copied ${urls.size} links"
-      state.messages.post(MessageLevel.Success, title)
+      state.messages.post(MessageLevel.Success, Res.plurals.message_links_copied.text(urls.size))
     }
   }
 
@@ -898,8 +965,8 @@ internal class DesktopCommands(
 }
 
 /** Name of [mode] in sentence case, as menus and messages show it. */
-internal fun speedModeName(mode: SpeedLimitMode): String = when (mode) {
-  SpeedLimitMode.Full -> "Full speed"
-  SpeedLimitMode.SlowLane -> "Slow lane"
-  SpeedLimitMode.Auto -> "Auto"
+internal fun speedModeName(mode: SpeedLimitMode): UiText = when (mode) {
+  SpeedLimitMode.Full -> Res.string.speed_full.text()
+  SpeedLimitMode.SlowLane -> Res.string.speed_slow_lane.text()
+  SpeedLimitMode.Auto -> Res.string.speed_auto.text()
 }

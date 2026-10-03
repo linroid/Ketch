@@ -41,12 +41,17 @@ import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
 import com.linroid.ketch.app.ui.settings.SettingsHost
+import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.menu_file
+import ketch.app.desktop.generated.resources.menu_window
+import ketch.app.desktop.generated.resources.settings_window_title
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.stringResource
 import java.awt.Dimension
 
 /**
@@ -153,7 +158,7 @@ internal fun SettingsWindow(
   Window(
     onCloseRequest = settings::close,
     state = windowState,
-    title = "Settings",
+    title = stringResource(Res.string.settings_window_title),
     icon = icon,
     onPreviewKeyEvent = { event ->
       val command = settingsShortcuts?.match(event, ShortcutContext())
@@ -227,10 +232,10 @@ private fun FrameWindowScope.SettingsMenuBar(onClose: () -> Unit, onMinimize: ()
     }
   }
   MenuBar {
-    Menu("File") {
+    Menu(stringResource(Res.string.menu_file)) {
       MenuEntries(listOf(commandItem(KetchCommands.CloseWindow, platform)), platform, onAction)
     }
-    Menu("Window") {
+    Menu(stringResource(Res.string.menu_window)) {
       MenuEntries(listOf(commandItem(KetchCommands.Minimize, platform)), platform, onAction)
     }
   }

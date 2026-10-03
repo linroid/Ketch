@@ -16,6 +16,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.app.feedback.reportWebActivity
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -45,6 +46,7 @@ fun main() {
   val body = document.body ?: return
   // No embedded Ketch installs a logger here, so the remote client's logs need one.
   KetchLogger.setLogger(Logger.console(LogLevel.INFO))
+  setPageLanguage()
   val incoming = IncomingDownloads()
   // The server that serves this page. A pairing link to it (`http://host:port/#token=…`) holds
   // the access code in the fragment, which leaves the address before anything can show or keep
@@ -83,7 +85,7 @@ fun main() {
   // Removals and other undoable operations still pending commit when the tab closes.
   window.addEventListener("pagehide", { controller.state.pendingOps.flush() })
   controller.scope.launch {
-    controller.pulse.state.collect { document.title = it.tabTitle() }
+    controller.pulse.state.collect { document.title = it.tabTitle().load() }
   }
   ComposeViewport(body) {
     // The installed app's title bar takes the canvas color of the theme the app shows.
@@ -115,6 +117,26 @@ fun main() {
 }
 
 private val FONT_WAIT_LIMIT = 5.seconds
+
+/**
+ * Sets the page's `lang` to the language the app shows, the browser's, so screen readers read it
+ * in that language and the browser does not offer to translate the page; `en` where the app is
+ * not translated to the browser's language.
+ *
+ * The bundled fonts only cover Latin, Greek and Cyrillic. For Chinese, Japanese, Korean and
+ * other scripts, Compose (1.12 and later) downloads Noto fonts from Google Fonts as text needs
+ * them, choosing the Simplified Chinese, Traditional Chinese, Hong Kong, Japanese or Korean
+ * variant by the browser's language, so the app ships no font for them.
+ */
+private fun setPageLanguage() {
+  val language = window.navigator.language
+  val translated = language.substringBefore('-').lowercase() in UI_LANGUAGES
+  document.documentElement?.setAttribute("lang", if (translated) language else "en")
+}
+
+// The languages the app is translated to, by their primary subtag; see
+// docs/development/localization.md.
+private val UI_LANGUAGES = setOf("en", "zh", "ja", "ko", "es", "pt", "de", "fr", "ru")
 
 /** [this] as `#RRGGBB`. */
 private fun Color.toHex(): String = "#" + (toArgb() and RGB_MASK).toString(HEX).padStart(6, '0')

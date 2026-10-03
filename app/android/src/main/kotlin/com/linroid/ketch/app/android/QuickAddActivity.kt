@@ -27,6 +27,7 @@ import androidx.lifecycle.AndroidViewModel
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
+import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.platform.SystemAppearance
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AppController
@@ -70,7 +71,7 @@ class QuickAddActivity : ComponentActivity() {
         incoming.complete(pairing)
       }
       if (incoming.pendingLinks.value.isEmpty()) {
-        if (!offered) Toast.makeText(this, "No link to download", Toast.LENGTH_SHORT).show()
+        if (!offered) Toast.makeText(this, R.string.quick_add_no_link, Toast.LENGTH_SHORT).show()
         finish()
         return
       }
@@ -196,8 +197,11 @@ internal class QuickAddModel(application: Application) : AndroidViewModel(applic
     }
   }
 
-  private fun AppMessage.toastText(): String =
-    if (level == MessageLevel.Error) listOfNotNull(title, detail).joinToString("\n") else title
+  private suspend fun AppMessage.toastText(): String = if (level == MessageLevel.Error) {
+    listOfNotNull(title, detail).map { it.load() }.joinToString("\n")
+  } else {
+    title.load()
+  }
 
   private fun AppMessage.toastLength(): Int =
     if (level == MessageLevel.Error) Toast.LENGTH_LONG else Toast.LENGTH_SHORT

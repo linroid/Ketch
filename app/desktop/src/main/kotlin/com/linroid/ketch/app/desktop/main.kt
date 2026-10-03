@@ -38,6 +38,10 @@ import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.SystemNotifier
+import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -84,6 +88,14 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.message_window_error
+import ketch.app.desktop.generated.resources.notify_added
+import ketch.app.desktop.generated.resources.notify_names_more
+import ketch.app.desktop.generated.resources.notify_names_three
+import ketch.app.desktop.generated.resources.notify_names_two
+import ketch.app.desktop.generated.resources.notify_on_device
+import ketch.app.desktop.generated.resources.notify_still_running
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -203,6 +215,9 @@ fun main(args: Array<String>) {
     fileLogger = fileLogger,
     openFiles = { files -> open(OpenedArguments(files = files), LinkSource.Arguments) },
   )
+  // The UI shows the language of the JVM's default locale, which the JDK takes from the system:
+  // the first of the user's preferred languages on macOS, which includes a language picked for
+  // Ketch in System Settings, the display language on Windows, and LANG or LC_MESSAGES on Linux.
   application { KetchApp(launch) }
 }
 
@@ -297,7 +312,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       saveCloseAction = { action ->
         saveConfig(configStore) { it.copy(desktop = it.desktop.copy(closeAction = action)) }
       },
-      onFirstHide = { announceBackground(trayState) },
+      onFirstHide = { scope.launch { announceBackground(trayState) } },
       quit = { response ->
         scope.launch { quit(controller, resources, response) { exitApplication() } }
       },
@@ -395,7 +410,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       onCloseRequest = behavior::closeWindow,
       state = windowState,
       visible = behavior.windowVisible,
-      title = windowTitle(status.pulse),
+      title = windowTitle(status.pulse).resolve(),
       icon = icon,
       onPreviewKeyEvent = { event ->
         val command = windowShortcuts.match(event, ShortcutContext())
@@ -555,9 +570,9 @@ private fun activeDownloads(manager: InstanceManager): Int =
   }
 
 // Windows users expect the close button to quit, so the first hide says where Ketch went.
-private fun announceBackground(trayState: TrayState) {
+private suspend fun announceBackground(trayState: TrayState) {
   if (DesktopOs.current != DesktopOs.WINDOWS || !isTraySupported) return
-  val notice = Notification("Ketch", "Ketch is still running in the notification area")
+  val notice = Notification(APP_NAME, Res.string.notify_still_running.text().load())
   trayState.sendNotification(notice)
 }
 
@@ -596,7 +611,7 @@ internal fun hostShortcuts(os: DesktopOs, slowLane: Boolean): Set<KetchCommand> 
       devices = emptyList(),
       activeDevice = null,
       selection = emptyList(),
-      undoLabel = null,
+      undoTitle = null,
       slowLane = if (slowLane) false else null,
     ),
   )
@@ -623,8 +638,8 @@ private fun windowExceptionHandlers(controller: AppController) =
       log.e(e) { "Uncaught failure in the window: ${e.describeCauses()}" }
       controller.messages.post(
         level = MessageLevel.Error,
-        title = "Something went wrong",
-        detail = e.message,
+        title = Res.string.message_window_error.text(),
+        detail = e.message?.let(::verbatim),
         cause = e,
       )
     }
@@ -652,7 +667,7 @@ private fun defaultMenus(
       devices = instances.map { it.displayName },
       activeDevice = instances.indexOf(active).takeIf { it >= 0 },
       selection = emptyList(),
-      undoLabel = ops.lastOrNull()?.label,
+      undoTitle = ops.lastOrNull()?.undoTitle,
       slowLane = mode?.isSlowLane,
       allDevices = shown == DeviceScope.All,
       revealLabel = files?.revealLabel,
@@ -716,7 +731,7 @@ internal fun announcesAdded(
 internal class AddedNotices(
   private val scope: CoroutineScope,
   private val window: Duration = ADDED_COALESCE_WINDOW,
-  private val notify: (List<ActivityEvent.Added>) -> Unit,
+  private val notify: suspend (List<ActivityEvent.Added>) -> Unit,
 ) {
   private val held = ArrayList<ActivityEvent.Added>()
   private var announcing: Job? = null
@@ -736,19 +751,27 @@ internal class AddedNotices(
 }
 
 /**
- * The notification for downloads [added] while the window was not in front.
+ * The notification for downloads [added] while the window was not in front, in the language of
+ * the app's window.
  *
  * @param deviceName device to name in the title; `null` for the device the app shows.
  */
-internal fun addedCopy(added: List<ActivityEvent.Added>, deviceName: String?): NotificationCopy {
-  val title = if (added.size == 1) "Download added" else "${added.size} downloads added"
+internal suspend fun addedCopy(
+  added: List<ActivityEvent.Added>,
+  deviceName: String?,
+): NotificationCopy {
+  val title = Res.plurals.notify_added.text(added.size)
   val names = added.map { displayName(it.request) }
   val shown = names.take(ADDED_NAMES_SHOWN)
   val more = names.size - shown.size
-  return NotificationCopy(
-    title = if (deviceName == null) title else "On $deviceName: $title",
-    body = shown.joinToString(", ") + if (more > 0) " and $more more" else "",
-  )
+  val listed = when (shown.size) {
+    0, 1 -> verbatim(shown.firstOrNull().orEmpty())
+    2 -> Res.string.notify_names_two.text(shown[0], shown[1])
+    else -> Res.string.notify_names_three.text(shown[0], shown[1], shown[2])
+  }
+  val body = if (more > 0) Res.plurals.notify_names_more.text(more, listed, more) else listed
+  val heading = deviceName?.let { Res.string.notify_on_device.text(it, title) } ?: title
+  return NotificationCopy(title = heading.load(), body = body.load())
 }
 
 /**
@@ -832,6 +855,7 @@ private fun logLevel(): LogLevel {
     ?: LogLevel.DEBUG
 }
 
+private const val APP_NAME = "Ketch"
 private const val LOGS_DIR = "logs"
 private const val ADDED_NAMES_SHOWN = 3
 private val ADDED_COALESCE_WINDOW = 1.seconds

@@ -60,6 +60,13 @@ android {
     compose = true
   }
 
+  // Android 13+ lists the languages of res/values-* in Ketch's language setting. Each translation
+  // adds the app's own strings there, beside the shared UI's Compose resources; English, the
+  // unqualified values, is named in res/resources.properties.
+  androidResources {
+    generateLocaleConfig = true
+  }
+
   packaging {
     resources {
       // AI discovery reads two resources at runtime, so neither "kotlin/**" nor every

@@ -3,9 +3,9 @@ package com.linroid.ketch.app.android
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.Service
-import android.net.ConnectivityManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
@@ -65,6 +65,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeMark
@@ -120,10 +121,14 @@ class KetchService : Service() {
       service = KetchService::class.java,
       smallIcon = R.drawable.ic_stat_ketch,
     )
-    notifier.createChannels()
-    // Call startForeground() immediately to avoid ANR from
-    // startForegroundService() timeout. The monitor updates it later.
-    enterForeground(notifier.ongoing(emptyList(), serverPort = null, slowLane = false))
+    // Call startForeground() before onCreate returns, to avoid an ANR from the
+    // startForegroundService() timeout, so the channels and the first notification, whose text
+    // is read from the string resources, are made here. The monitor updates it later.
+    val first = runBlocking {
+      notifier.setUpChannels()
+      notifier.ongoingNotification(emptyList(), serverPort = null, slowLane = false)
+    }
+    enterForeground(first)
 
     val configStore = FileConfigStore(
       filesDir.resolve("config.toml").absolutePath,
@@ -211,7 +216,7 @@ class KetchService : Service() {
     isStarted = true
     lastStartId = startId
     when (intent?.action) {
-      AndroidNotifier.ACTION_REPOST_NOTIFICATION -> {
+      AndroidNotifier.ACTION_REPOST_NOTIFICATION -> scope.launch {
         if (isForeground && latestStatus.isRequired) enterForeground(ongoing(latestStatus))
       }
       AndroidNotifier.ACTION_PAUSE_ALL -> pauseAll()
@@ -322,7 +327,7 @@ class KetchService : Service() {
   }
 
   /** Sends [event] to the app if it shows as a toast, and returns its notification, if any. */
-  private fun route(event: ActivityEvent): NotificationCopy? {
+  private suspend fun route(event: ActivityEvent): NotificationCopy? {
     val config = loadConfig()
     notifier.accent = config.appearance.accent.toKetchAccent()
     val settings = config.notifications
@@ -402,11 +407,12 @@ class KetchService : Service() {
     }
   }
 
-  private fun ongoing(status: ForegroundStatus): Notification = notifier.ongoing(
-    tasks = instanceManager.embedded?.tasks?.value.orEmpty(),
-    serverPort = status.serverPort,
-    slowLane = speedMode.mode.value.isSlowLane,
-  )
+  private suspend fun ongoing(status: ForegroundStatus): Notification =
+    notifier.ongoingNotification(
+      tasks = instanceManager.embedded?.tasks?.value.orEmpty(),
+      serverPort = status.serverPort,
+      slowLane = speedMode.mode.value.isSlowLane,
+    )
 
   private fun totalSpeed(tasks: List<DownloadTask>): Long =
     tasks.sumOf { (it.state.value as? DownloadState.Downloading)?.progress?.bytesPerSecond ?: 0L }
