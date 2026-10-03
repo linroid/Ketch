@@ -448,6 +448,11 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   waits for the transport). The SDK's `StdioServerTransport` drops those replies. `ketch mcp`
   then calls `exitProcess`, so a non-daemon thread cannot keep it alive; its shutdown hook closes
   `Ketch`
+- Stdio builds its SDK `Server` itself (adding tools with Koog's `addTool`) without
+  `tools.listChanged`. With Koog's `configureMcpServer`, which announces it, the SDK sent
+  `notifications/tools/list_changed` for the tools it registered to a session starting in the same
+  millisecond, at times after the session closed, and threw "Not connected". SSE still uses Koog's
+  `startMcpServer`, whose sessions start later
 
 ### Browser Extension (`app/browser-extension`)
 - Manifest V3 extension for Chromium browsers and Firefox; plain JavaScript modules with no

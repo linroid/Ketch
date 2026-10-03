@@ -2,10 +2,14 @@ package com.linroid.ketch.mcp
 
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.mcp.server.McpServerTransportType
-import ai.koog.agents.mcp.server.configureMcpServer
+import ai.koog.agents.mcp.server.addTool
 import ai.koog.agents.mcp.server.startMcpServer
 import com.linroid.ketch.api.KetchApi
 import io.ktor.server.engine.ApplicationEngineFactory
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -92,7 +96,7 @@ class KetchMcpServer(
  * ends and the replies to the requests read before then are written.
  */
 internal suspend fun serveStdio(tools: ToolRegistry, input: RawSource, output: RawSink) {
-  val server = configureMcpServer(tools)
+  val server = stdioServer(tools)
   val transport = StdioTransport(input, output)
   // Server.onClose only fires on Server.close(), so wait for the transport instead
   val closed = Job()
@@ -111,4 +115,19 @@ internal suspend fun serveStdio(tools: ToolRegistry, input: RawSource, output: R
       server.close()
     }
   }
+}
+
+/**
+ * An MCP server offering [tools], which never change, so it does not announce tool list changes.
+ * Koog's `configureMcpServer` does: the SDK then notifies sessions of each tool it registers from a
+ * coroutine of its own, and a session that starts in the same millisecond can get the notification
+ * after it closed, which throws "Not connected".
+ */
+private fun stdioServer(tools: ToolRegistry): Server {
+  val server = Server(
+    Implementation(name = "ketch", version = KetchApi.VERSION),
+    ServerOptions(ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = false))),
+  )
+  tools.tools.forEach { server.addTool(it) }
+  return server
 }
