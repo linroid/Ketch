@@ -444,14 +444,13 @@
   <string name="settings_sharing_off_hint">Ketch gibt %1$s in deinem Netzwerk frei, geschützt durch einen Code.</string>
   <string name="settings_sharing_allow">Anderes Gerät zulassen</string>
   <string name="settings_sharing_looking">Netzwerkadresse für %1$s wird gesucht…</string>
-  <string name="settings_sharing_unreadable_address">Ketch kann die Adresse für %1$s nicht ermitteln. Öffne auf dem anderen Gerät http://&lt;Adresse&gt;:%2$s mit dem Code aus „Erweitert“.</string>
+  <string name="settings_sharing_unreadable_address">Ketch kann die Adresse für %1$s nicht ermitteln. Gib auf dem anderen Gerät &lt;Adresse&gt;:%2$s mit dem Code aus „Erweitert“ in Ketch ein.</string>
   <string name="settings_sharing_no_address">%1$s hat keine Netzwerkadresse. Verbinde dich mit WLAN oder Ethernet.</string>
-  <string name="settings_sharing_scan_other">Scanne mit der Kamera eines anderen Geräts oder öffne</string>
-  <string name="settings_sharing_scan_phone">Scanne mit der Kamera deines Telefons oder öffne</string>
+  <string name="settings_sharing_scan_other">Scanne mit der Kamera eines anderen Geräts oder gib diese Adresse in Ketch ein</string>
+  <string name="settings_sharing_scan_phone">Scanne mit der Kamera deines Telefons oder gib diese Adresse in Ketch ein</string>
   <string name="settings_sharing_also">außerdem %1$s</string>
   <string name="settings_sharing_copy_link">Kopplungslink kopieren</string>
   <string name="settings_sharing_copied">Kopiert</string>
-  <string name="settings_sharing_open_web">Web-App öffnen</string>
   <string name="settings_sharing_anyone">Jeder mit dem Link kann %1$s steuern.</string>
   <string name="settings_sharing_new_code">Neuer Code</string>
   <string name="settings_sharing_new_code_hint">Trennt die bisher gekoppelten Geräte</string>

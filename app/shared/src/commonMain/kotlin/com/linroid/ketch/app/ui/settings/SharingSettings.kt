@@ -26,7 +26,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -91,7 +90,6 @@ import ketch.app.shared.generated.resources.settings_sharing_no_address
 import ketch.app.shared.generated.resources.settings_sharing_no_code
 import ketch.app.shared.generated.resources.settings_sharing_off_hint
 import ketch.app.shared.generated.resources.settings_sharing_open_no_code
-import ketch.app.shared.generated.resources.settings_sharing_open_web
 import ketch.app.shared.generated.resources.settings_sharing_pair
 import ketch.app.shared.generated.resources.settings_sharing_port
 import ketch.app.shared.generated.resources.settings_sharing_qr
@@ -299,7 +297,6 @@ private fun PairDetails(
   val noun = localDeviceNounInSentence().resolve()
   val port = (serverState as? ServerState.Running)?.port
   val clipboard = rememberSystemClipboard()
-  val uriHandler = LocalUriHandler.current
   val scope = rememberCoroutineScope()
   var copied by remember { mutableStateOf(false) }
   LaunchedEffect(copied) {
@@ -389,7 +386,7 @@ private fun PairDetails(
             color = colors.textSecondary,
           )
           Text(
-            text = link.webAppUrl().substringBefore('#').removeSuffix("/"),
+            text = link.address,
             style = type.mono,
             color = colors.accentText,
           )
@@ -432,19 +429,6 @@ private fun PairDetails(
             variant = KetchButtonVariant.Tonal,
             size = KetchButtonSize.Small,
             leadingIcon = if (copied) KetchIcon.Check else KetchIcon.Copy,
-          )
-          KetchButton(
-            text = stringResource(Res.string.settings_sharing_open_web),
-            onClick = {
-              try {
-                uriHandler.openUri(link.webAppUrl())
-              } catch (e: Exception) {
-                log.w { "Couldn't open the web app: ${e.describeCauses()}" }
-              }
-            },
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-            leadingIcon = KetchIcon.Open,
           )
         }
         Row(
