@@ -181,6 +181,8 @@ the [CLI documentation](cli/README.md) lists every command.
 - **Resource sniffer** — Find the downloadable files on a web page
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
   other device continues instead of starting over ([plan](docs/plans/task-transfer.md))
+- **Helper devices** — Let your other devices download parts of the same file over their own
+  connection, added or removed while it runs ([proposal](docs/design/multi-instance-downloads.md))
 
 ## For developers
 

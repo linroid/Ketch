@@ -606,3 +606,6 @@ Planned features not yet implemented:
 6. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
    bytes, segment progress, resume state, finished files) between instances, so the destination
    continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
+7. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+   own network and IP, joining or leaving mid-download without pausing it; see the
+   [proposal](docs/design/multi-instance-downloads.md)
