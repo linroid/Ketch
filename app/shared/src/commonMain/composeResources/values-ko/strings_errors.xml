@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="error_title_hint">%1$s. %2$s</string>
+  <string name="error_connection_lost">연결 끊김</string>
+  <string name="error_network_hint">%1$s에 연결할 수 없습니다.</string>
+  <string name="error_network_hint_short">%1$s에 연결할 수 없음</string>
+  <string name="error_network_hint_server">서버에 연결할 수 없습니다.</string>
+  <string name="error_network_hint_server_short">서버에 연결할 수 없음</string>
+  <string name="error_retried_once">Ketch가 한 번 재시도했습니다.</string>
+  <plurals name="error_retried">
+    <item quantity="other">Ketch가 %1$d번 재시도했습니다.</item>
+  </plurals>
+  <string name="error_check_connection">연결을 확인하고 다시 시도하세요.</string>
+  <string name="error_check_connection_short">연결을 확인하고 다시 시도</string>
+  <string name="error_not_supported">이 기기에서 지원되지 않음</string>
+  <string name="error_something_went_wrong">문제가 발생했습니다</string>
+
+  <string name="error_disk">파일을 쓸 수 없음</string>
+  <string name="error_disk_hint">여유 공간과 폴더 권한을 확인하세요.</string>
+  <string name="error_disk_hint_short">여유 공간과 폴더 권한 확인</string>
+  <string name="error_disk_hint_on">%1$s의 여유 공간과 폴더 권한을 확인하세요.</string>
+  <string name="error_disk_hint_on_short">%1$s의 여유 공간과 폴더 권한 확인</string>
+  <string name="error_disk_hint_free">%2$s에 %1$s 남음. 공간과 폴더 권한을 확인하세요.</string>
+  <string name="error_disk_hint_free_short">%2$s에 %1$s 남음</string>
+
+  <string name="error_unsupported">이 서버에서는 이 다운로드를 할 수 없음</string>
+  <string name="error_unsupported_hint">서버가 크기를 알려 주지 않고 범위 요청도 지원하지 않습니다.</string>
+  <string name="error_unsupported_hint_short">크기 정보 없음, 범위 요청 미지원</string>
+  <string name="error_file_changed">서버의 파일이 변경됨</string>
+  <string name="error_file_changed_hint">재개하면 파일이 손상됩니다(%1$s).</string>
+  <string name="error_file_changed_hint_short">재개하면 파일이 손상됨(%1$s)</string>
+  <string name="error_corrupt_resume">저장된 진행 상황이 손상됨</string>
+  <string name="error_corrupt_resume_hint">다운로드한 부분을 다시 사용할 수 없습니다.</string>
+  <string name="error_corrupt_resume_hint_short">다운로드한 부분을 다시 사용할 수 없음</string>
+  <string name="error_canceled">취소됨</string>
+  <string name="error_wrong_credentials">사용자 이름 또는 비밀번호가 잘못됨</string>
+  <string name="error_wrong_credentials_hint">%1$s 서버가 로그인을 거부했습니다.</string>
+  <string name="error_wrong_credentials_hint_short">%1$s 서버가 로그인을 거부함</string>
+  <string name="error_torrent_stopped">토렌트가 중지됨</string>
+  <string name="error_torrent_stopped_hint">연결할 수 있는 피어나 트래커가 없습니다.</string>
+  <string name="error_torrent_stopped_hint_short">연결할 수 있는 피어나 트래커 없음</string>
+  <string name="error_source">%1$s 서버가 오류를 보고함</string>
+
+  <string name="error_http_sign_in">로그인 필요(%1$d)</string>
+  <string name="error_http_sign_in_hint">%1$s에 로그인해야 합니다. 쿠키가 함께 전달되도록 Ketch 브라우저 확장 프로그램에서 보내세요.</string>
+  <string name="error_http_sign_in_hint_short">%1$s에 로그인 필요</string>
+  <string name="error_http_sign_in_hint_server">서버에 로그인해야 합니다. 쿠키가 함께 전달되도록 Ketch 브라우저 확장 프로그램에서 보내세요.</string>
+  <string name="error_http_sign_in_hint_server_short">서버에 로그인 필요</string>
+  <string name="error_http_forbidden">접근 거부됨(403)</string>
+  <string name="error_http_forbidden_hint">링크가 만료되었을 수 있습니다.</string>
+  <string name="error_http_forbidden_hint_browser">링크가 만료되었을 수 있습니다. %1$s에서 보낸 링크라면 페이지에서 다시 보내세요.</string>
+  <string name="error_http_forbidden_hint_short">링크가 만료되었을 수 있음</string>
+  <string name="error_browser_yours">사용 중인 브라우저</string>
+  <string name="error_http_not_found">파일을 찾을 수 없음(%1$d)</string>
+  <string name="error_http_not_found_hint">서버에 더 이상 이 파일이 없습니다.</string>
+  <string name="error_http_not_found_hint_short">서버에 더 이상 파일이 없음</string>
+  <string name="error_http_range">서버가 재개를 거부함</string>
+  <string name="error_http_range_hint">저장된 위치가 더 이상 유효하지 않습니다.</string>
+  <string name="error_http_range_hint_short">저장된 위치가 더 이상 유효하지 않음</string>
+  <string name="error_http_rate_limited">서버가 요청 속도를 제한하는 중</string>
+  <string name="error_http_rate_limited_hint_in">%1$d초 후 더 적은 연결로 다시 시도하세요.</string>
+  <string name="error_http_rate_limited_hint_in_short">%1$d초 후 더 적은 연결로 다시 시도</string>
+  <string name="error_http_rate_limited_hint">나중에 더 적은 연결로 다시 시도하세요.</string>
+  <string name="error_http_rate_limited_hint_short">나중에 더 적은 연결로 다시 시도</string>
+  <string name="error_http_server">서버 오류(%1$d)</string>
+  <string name="error_http_server_hint">대개 일시적인 문제입니다.</string>
+  <string name="error_http_server_hint_short">대개 일시적인 문제</string>
+  <string name="error_http_other">서버 응답 %1$d</string>
+</resources>

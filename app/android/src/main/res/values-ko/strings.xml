@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="process_text_label">Ketch로 다운로드</string>
+  <string name="quick_add_no_link">다운로드할 링크가 없습니다</string>
+
+  <string name="notifications_offer_title">다운로드가 끝나면 알림 받기</string>
+  <string name="notifications_offer_message">다른 앱을 사용하는 동안 다운로드가 완료되거나 실패하면 Ketch가 알려 줍니다.</string>
+  <string name="notifications_offer_allow">허용</string>
+  <string name="notifications_offer_not_now">나중에</string>
+</resources>

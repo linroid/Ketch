@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="shell_destination_downloads">다운로드</string>
+  <string name="shell_destination_discover">찾기</string>
+  <string name="shell_destination_devices">기기</string>
+  <string name="shell_settings">설정</string>
+  <string name="shell_devices">기기</string>
+  <string name="shell_show_sidebar">사이드바 보기</string>
+  <string name="shell_hide_sidebar">사이드바 숨기기</string>
+  <string name="shell_appearance_light">밝은 모드로 전환</string>
+  <string name="shell_appearance_dark">어두운 모드로 전환</string>
+  <plurals name="shell_rail_downloading">
+    <item quantity="other">%1$s, %2$d개 다운로드 중</item>
+  </plurals>
+  <string name="shell_device_described">%1$s, %2$s</string>
+
+  <string name="shell_device_needs_token">토큰 필요</string>
+  <string name="shell_device_needs_a_token">토큰 필요</string>
+  <string name="shell_device_needs_new_token">새 액세스 토큰 필요</string>
+  <string name="shell_device_off">꺼짐</string>
+  <string name="shell_device_not_connected">연결되지 않음</string>
+  <string name="shell_device_offline">오프라인</string>
+  <string name="shell_device_last_seen">마지막 접속 %1$s 전</string>
+  <string name="shell_device_connecting">연결 중</string>
+  <string name="shell_device_connecting_now">연결 중…</string>
+  <string name="shell_device_idle">유휴</string>
+  <string name="shell_device_slow_lane">저속 차로</string>
+  <plurals name="shell_device_active">
+    <item quantity="other">%1$d개 진행 중</item>
+  </plurals>
+  <plurals name="shell_device_waiting">
+    <item quantity="other">%1$d개 대기 중</item>
+  </plurals>
+  <plurals name="shell_device_failed">
+    <item quantity="other">%1$d개 실패</item>
+  </plurals>
+  <string name="shell_devices_speed">↓ %1$s</string>
+  <string name="shell_devices_online">%2$d대 중 %1$d대 온라인</string>
+
+  <string name="sidebar_all_devices_tooltip">모든 기기의 다운로드</string>
+  <string name="sidebar_add_device">기기 추가</string>
+  <string name="sidebar_device_menu">기기 메뉴</string>
+  <string name="sidebar_menu_pause_all">이 기기에서 모두 일시정지</string>
+  <string name="sidebar_menu_resume_all">이 기기에서 모두 재개</string>
+  <string name="sidebar_menu_retry_failed">이 기기에서 실패한 항목 재시도</string>
+  <string name="sidebar_menu_retry_failed_count">이 기기에서 실패한 항목 재시도(%1$d)</string>
+  <string name="sidebar_menu_speed">속도</string>
+  <string name="sidebar_menu_settings">이 기기 설정…</string>
+  <string name="sidebar_menu_full_speed">최대 속도</string>
+  <string name="sidebar_menu_slow_lane">저속 차로 · %1$s</string>
+  <string name="sidebar_menu_no_limit">제한 없음</string>
+
+  <string name="switcher_overview">개요</string>
+  <string name="switcher_add_device">기기 추가…</string>
+  <string name="switcher_find_on_network">네트워크에서 찾기</string>
+  <string name="switcher_share">%1$s 공유…</string>
+
+  <string name="shell_device_button">%1$s, 기기 전환</string>
+  <string name="shell_device_button_back">이전 기기로 돌아가기</string>
+  <string name="shell_more">더 보기</string>
+  <string name="shell_clear_finished">완료 항목 지우기</string>
+  <string name="shell_search_close">검색 닫기</string>
+  <string name="shell_search_placeholder">검색하거나 링크 붙여넣기</string>
+  <string name="shell_search_download_on">%1$s에서 다운로드</string>
+  <plurals name="shell_search_download_links_on">
+    <item quantity="other">%2$s에서 링크 %1$d개 다운로드</item>
+  </plurals>
+  <string name="shell_discover_query">“%1$s” 찾기</string>
+
+  <plurals name="shell_activity_unread">
+    <item quantity="other">읽지 않음 %1$d개</item>
+  </plurals>
+
+  <string name="shell_clipboard_no_link">클립보드에 링크가 없습니다</string>
+  <string name="shell_file_picker_failed">파일 선택기를 열 수 없음</string>
+
+  <string name="banner_connecting">%1$s에 연결 중…</string>
+  <string name="banner_offline">%1$s 오프라인</string>
+  <string name="banner_retrying">재시도 중</string>
+  <string name="banner_retry_now">지금 재시도</string>
+  <string name="banner_switch_to">%1$s(으)로 전환</string>
+  <string name="banner_unauthorized">%1$s에 새 액세스 토큰 필요</string>
+  <string name="banner_enter_token">토큰 입력</string>
+  <string name="toast_subject_reason">%1$s: %2$s</string>
+
+  <string name="drop_to_download">놓아서 다운로드</string>
+  <string name="drop_kinds">링크, 마그넷 링크, .torrent 파일, 링크 목록</string>
+  <string name="drop_unreachable">지금 연결할 수 없음</string>
+  <string name="drop_here">여기에 놓기</string>
+  <string name="drop_already_here">이미 여기에 있음</string>
+  <string name="drop_move_it">여기로 이동</string>
+  <string name="drop_send_it">여기로 보내기</string>
+  <string name="drop_move_count">%1$d개를 여기로 이동</string>
+  <string name="drop_send_count">%1$d개를 여기로 보내기</string>
+  <string name="drop_key_moves">%1$s 키를 누르면 이동</string>
+  <string name="berth_drop_on">%1$s에 놓기</string>
+  <string name="berth_ready">준비됨</string>
+
+  <string name="palette_placeholder">링크를 붙여넣거나 다운로드를 검색하거나 명령을 입력하세요</string>
+  <string name="palette_placeholder_short">링크 붙여넣기, 검색 또는 명령 입력</string>
+  <string name="palette_clear">지우기</string>
+  <string name="palette_no_matches">“%1$s”에 대한 결과 없음</string>
+  <string name="palette_no_matches_hint">파일 이름, “일시정지” 같은 명령, 링크 또는 /speed를 입력해 보세요</string>
+  <string name="palette_hint_move">이동</string>
+  <string name="palette_hint_run">실행</string>
+  <string name="palette_hint_alternate">대체</string>
+  <string name="palette_hint_discover">찾기</string>
+  <string name="palette_hint_close">닫기</string>
+  <string name="palette_section_recent">최근</string>
+  <string name="palette_section_links">다운로드</string>
+  <string name="palette_section_speed">속도</string>
+  <string name="palette_section_commands">명령</string>
+  <string name="palette_section_downloads">다운로드</string>
+  <string name="palette_section_navigation">이동</string>
+  <string name="palette_section_devices">기기</string>
+  <string name="palette_section_search">검색</string>
+
+  <plurals name="palette_links">
+    <item quantity="other">링크 %1$d개</item>
+  </plurals>
+  <string name="palette_download">%1$s 다운로드</string>
+  <string name="palette_on_device">%1$s에서</string>
+  <string name="palette_verb_download">다운로드</string>
+  <string name="palette_add_with_options">옵션을 지정해 추가…</string>
+  <string name="palette_add_with_options_detail">폴더, 속도, 우선순위, 시작 시간</string>
+  <string name="palette_limit_to">다운로드를 %1$s 이하로 제한</string>
+  <string name="palette_slow_lane_to">저속 차로 속도를 %1$s(으)로 설정</string>
+  <string name="palette_slow_lane_turns_on">저속 차로가 켜집니다</string>
+  <string name="palette_slow_lane_is_on">저속 차로 켜져 있음</string>
+  <string name="palette_slow_lane_now">현재 %1$s</string>
+  <string name="palette_limit_while_off">저속 차로가 꺼져 있을 때 적용</string>
+
+  <plurals name="palette_pause_count">
+    <item quantity="other">다운로드 %1$d개 일시정지</item>
+  </plurals>
+  <string name="palette_nothing_to_pause">일시정지할 항목 없음</string>
+  <plurals name="palette_resume_count">
+    <item quantity="other">일시정지된 %1$d개 재개</item>
+  </plurals>
+  <string name="palette_nothing_paused">일시정지된 항목 없음</string>
+  <plurals name="palette_retry_count">
+    <item quantity="other">실패한 다운로드 %1$d개 재시도</item>
+  </plurals>
+  <string name="palette_nothing_failed">실패한 항목 없음</string>
+  <string name="palette_slow_lane_off">저속 차로 끄기</string>
+  <string name="palette_slow_lane_on">저속 차로 켜기</string>
+  <string name="palette_nothing_to_undo">실행 취소할 항목 없음</string>
+  <string name="palette_full_speed">최대 속도</string>
+  <string name="palette_full_speed_slow_lane">저속 차로가 꺼집니다</string>
+  <string name="palette_full_speed_rules">속도 규칙이 꺼집니다</string>
+  <string name="palette_full_speed_cap">%1$s 제한이 해제됩니다</string>
+  <string name="palette_full_speed_already">이미 최대 속도입니다</string>
+  <string name="palette_full_speed_keywords">무제한, 제한 없음, 최고 속도, 풀스피드, 최대</string>
+  <string name="palette_speed_not_loaded">속도 제한을 아직 불러오지 못했습니다</string>
+
+  <string name="palette_downloads_tab">다운로드 › %1$s</string>
+  <string name="palette_none">없음</string>
+  <string name="palette_settings_page">설정 › %1$s</string>
+  <string name="palette_pause_all_on">%1$s에서 모두 일시정지</string>
+  <string name="palette_resume_all_on">%1$s에서 모두 재개</string>
+  <string name="palette_retry_failed_on">%1$s에서 실패한 항목 재시도</string>
+  <string name="palette_show_in_downloads">다운로드에서 “%1$s” 보기</string>
+  <plurals name="palette_matches">
+    <item quantity="other">%1$d개 일치</item>
+  </plurals>
+  <string name="palette_discover_detail">웹에서 다운로드 찾기</string>
+</resources>
