@@ -12,6 +12,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -30,6 +31,7 @@ import kotlinx.io.writeString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -44,10 +46,13 @@ import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 // Each test also checks that serveStdio returns before the timeout: the MCP stdio transport
@@ -175,15 +180,47 @@ class KetchMcpServerTest {
   @Test
   fun `startStdio answers a call to a KetchToolSet tool`() =
     runTest(timeout = 10.seconds) {
-      val requests = listOf(INITIALIZE, INITIALIZED, LIST_DOWNLOADS)
-      val output = ByteArrayOutputStream()
-      KetchMcpServer(FakeKetchApi())
-        .startStdio(requests.joinToString("\n", postfix = "\n").byteInputStream(), output)
+      val mcp = KetchMcpServer(FakeKetchApi())
+      val replies = exchange(mcp, INITIALIZE, INITIALIZED, LIST_DOWNLOADS)
 
-      val replies = replies(Buffer().apply { write(output.toByteArray()) })
       assertEquals(listOf(1, 2).map(::JsonPrimitive), replies.map { it["id"] })
       val result = replies[1].getValue("result").jsonObject
       assertNull(result["isError"], "listDownloads failed: $result")
+    }
+
+  // The SDK announced each tool registered as the session started to a session that subscribed
+  // within the same millisecond, sometimes after the session had closed: it then threw "Not
+  // connected" from a coroutine of its own, which runTest reports.
+  @Test
+  fun `startStdio writes only the replies every time a session with tools ends`() =
+    runTest(timeout = 30.seconds) {
+      val mcp = KetchMcpServer(FakeKetchApi())
+      repeat(RACE_ROUNDS) { round ->
+        val replies = exchange(mcp, INITIALIZE, INITIALIZED, LIST_DOWNLOADS)
+
+        assertEquals(listOf(1, 2).map(::JsonPrimitive), replies.map { it["id"] }, "Round $round")
+      }
+    }
+
+  // Its tools never change, and announcing changes is what made the SDK notify a session of the
+  // tools registered as it started
+  @Test
+  fun `initialize does not announce changes to the tool list`() =
+    runTest(timeout = 10.seconds) {
+      val result = exchange(KetchMcpServer(FakeKetchApi()), INITIALIZE).single()
+        .getValue("result").jsonObject
+      val tools = result.getValue("capabilities").jsonObject.getValue("tools").jsonObject
+
+      assertNotEquals(true, tools["listChanged"]?.jsonPrimitive?.booleanOrNull)
+    }
+
+  @Test
+  fun `tools call answers a tool that is still running when the input ends`() =
+    runTest(timeout = 10.seconds) {
+      val ketch = FakeKetchApi(statusDelay = 300.milliseconds)
+      val status = Json.parseToJsonElement(toolText(ketch, "getStatus"))
+
+      assertEquals("Ketch", assertIs<JsonObject>(status)["name"]?.jsonPrimitive?.content)
     }
 
   @Test
@@ -240,13 +277,15 @@ class KetchMcpServerTest {
 
   /** The result a [KetchMcpServer] for [ketch] gives [request], sent after the handshake. */
   private suspend fun result(ketch: KetchApi, request: String): JsonObject {
-    val requests = listOf(INITIALIZE, INITIALIZED, request)
-    val output = ByteArrayOutputStream()
-    KetchMcpServer(ketch)
-      .startStdio(requests.joinToString("\n", postfix = "\n").byteInputStream(), output)
-
-    val reply = replies(Buffer().apply { write(output.toByteArray()) }).last()
+    val reply = exchange(KetchMcpServer(ketch), INITIALIZE, INITIALIZED, request).last()
     return assertNotNull(reply["result"], "Request failed: $reply").jsonObject
+  }
+
+  /** Sends [requests] to [mcp] over stdio, ends its input and returns the messages it wrote. */
+  private suspend fun exchange(mcp: KetchMcpServer, vararg requests: String): List<JsonObject> {
+    val output = ByteArrayOutputStream()
+    mcp.startStdio(requests.joinToString("\n", postfix = "\n").byteInputStream(), output)
+    return replies(Buffer().apply { write(output.toByteArray()) })
   }
 
   /** Calls the tool [name] of a [KetchMcpServer] for [ketch] and returns the text of its result. */
@@ -307,7 +346,7 @@ class KetchMcpServerTest {
     }
   }
 
-  private class FakeKetchApi : KetchApi {
+  private class FakeKetchApi(private val statusDelay: Duration = Duration.ZERO) : KetchApi {
     var config = DownloadConfig()
       private set
 
@@ -325,27 +364,30 @@ class KetchMcpServerTest {
 
     override suspend fun start() {}
 
-    override suspend fun status() = KetchStatus(
-      name = "Ketch",
-      version = "1.0.0",
-      revision = "abc1234",
-      uptime = 0,
-      config = config,
-      system = SystemInfo(
-        os = "TestOS",
-        arch = "test",
-        separator = "/",
-        javaVersion = "21",
-        availableProcessors = 1,
-        maxMemory = 0,
-        totalMemory = 0,
-        freeMemory = 0,
-        downloadDirectory = "/downloads",
-        totalSpace = 0,
-        freeSpace = 0,
-        usableSpace = 0,
-      ),
-    )
+    override suspend fun status(): KetchStatus {
+      delay(statusDelay)
+      return KetchStatus(
+        name = "Ketch",
+        version = "1.0.0",
+        revision = "abc1234",
+        uptime = 0,
+        config = config,
+        system = SystemInfo(
+          os = "TestOS",
+          arch = "test",
+          separator = "/",
+          javaVersion = "21",
+          availableProcessors = 1,
+          maxMemory = 0,
+          totalMemory = 0,
+          freeMemory = 0,
+          downloadDirectory = "/downloads",
+          totalSpace = 0,
+          freeSpace = 0,
+          usableSpace = 0,
+        ),
+      )
+    }
 
     override suspend fun updateConfig(config: DownloadConfig) {
       this.config = config
