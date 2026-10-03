@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="inspector_tab_overview">개요</string>
+  <string name="inspector_tab_connections">연결</string>
+  <string name="inspector_tab_files">파일</string>
+  <string name="inspector_tab_activity">활동</string>
+
+  <string name="inspector_stalled_seconds">%1$d초째 멈춤</string>
+  <string name="inspector_stalled_minutes">%1$d분째 멈춤</string>
+  <string name="inspector_size_of">%1$s / %2$s</string>
+
+  <string name="inspector_metric_left">%1$s 남음</string>
+  <string name="inspector_metric_done_at">≈ %1$s 완료</string>
+
+  <string name="inspector_reason_reconnect">다시 연결</string>
+  <string name="inspector_reason_full_speed">최대 속도</string>
+  <string name="inspector_reason_remove_limit">제한 해제</string>
+  <string name="inspector_reason_speed_settings">속도 설정</string>
+  <string name="inspector_reason_paused_resumes">일시정지됨 · 멈춘 곳부터 재개</string>
+  <string name="inspector_reason_paused_restarts">일시정지됨 · 재개하면 처음부터 다시 시작</string>
+  <string name="inspector_file_missing">파일이 이동되었거나 삭제됨</string>
+  <string name="inspector_reason_slow_lane">저속 차로로 제한됨(%1$s)</string>
+  <string name="inspector_reason_global_limit">전체 제한으로 제한됨(%1$s)</string>
+  <string name="inspector_reason_own_limit">%1$s 이하로 제한됨</string>
+
+  <string name="inspector_source_magnet">BitTorrent · 마그넷 링크</string>
+  <string name="inspector_source_torrent_file">BitTorrent · 토렌트 파일</string>
+  <string name="inspector_source_link">링크</string>
+
+  <string name="inspector_origin_browser">브라우저에서</string>
+  <string name="inspector_origin_discover">찾기에서</string>
+  <string name="inspector_origin_agent">AI 에이전트에서</string>
+  <string name="inspector_origin_app">Ketch에서 추가함</string>
+  <string name="inspector_origin_cli">명령줄에서</string>
+  <string name="inspector_with_cookies">쿠키 포함</string>
+  <string name="inspector_with_referrer">리퍼러 포함</string>
+  <string name="inspector_with_cookies_referrer">쿠키 및 리퍼러 포함</string>
+  <string name="inspector_with_cookies_alone">쿠키 포함</string>
+  <string name="inspector_with_referrer_alone">리퍼러 포함</string>
+  <string name="inspector_with_cookies_referrer_alone">쿠키 및 리퍼러 포함</string>
+  <string name="inspector_captured">%1$s, %2$s</string>
+
+  <string name="inspector_urgent_note">지금 시작합니다. 일시정지될 수 있는 항목: “%1$s”(%2$s)</string>
+  <plurals name="inspector_urgent_note_count">
+    <item quantity="other">%1$d개를 지금 시작합니다. 일시정지될 수 있는 항목: “%2$s”(%3$s)</item>
+  </plurals>
+  <string name="inspector_reschedule_note">지금 일시정지하고 %1$s</string>
+
+  <plurals name="inspector_selected">
+    <item quantity="other">%1$d개 선택됨</item>
+  </plurals>
+  <plurals name="inspector_selection_more">
+    <item quantity="other">외 %1$d개</item>
+  </plurals>
+  <plurals name="inspector_controls_apply_to">
+    <item quantity="other">제어는 %2$d개 중 %1$d개에 적용됩니다. 나머지는 이미 종료되었습니다.</item>
+  </plurals>
+
+  <string name="inspector_close">인스펙터 닫기</string>
+  <string name="inspector_copy_name">이름 복사</string>
+  <string name="inspector_copied_name">이름 복사됨</string>
+  <string name="inspector_copy_failed_name">이름을 복사할 수 없음</string>
+  <string name="inspector_share">공유</string>
+  <string name="inspector_share_failed">%2$s에서 %1$s을(를) 공유할 수 없음</string>
+  <string name="inspector_more_actions">기타 작업</string>
+
+  <string name="inspector_section_controls">제어</string>
+  <string name="inspector_control_speed">속도</string>
+  <string name="inspector_control_connections">연결</string>
+  <string name="inspector_control_peer_limit">피어 제한</string>
+  <string name="inspector_control_priority">우선순위</string>
+  <string name="inspector_control_start">시작</string>
+  <string name="inspector_global_slow_lane">저속 차로</string>
+  <string name="inspector_global_limit">전체 제한</string>
+  <string name="inspector_limit_marker">%1$s %2$s</string>
+  <string name="inspector_speed_limit">속도 제한</string>
+  <string name="inspector_speed_more">다른 속도 제한</string>
+  <string name="inspector_mixed_limits">선택한 다운로드의 제한이 서로 다릅니다</string>
+  <string name="inspector_mixed_priorities">선택한 다운로드의 우선순위가 서로 다릅니다</string>
+  <string name="inspector_server_one_connection">이 서버는 연결을 1개만 허용합니다</string>
+  <string name="inspector_remote_schedule">원격 다운로드 예약은 아직 지원되지 않습니다</string>
+  <string name="inspector_start_now">지금 시작</string>
+  <plurals name="inspector_start_count_now">
+    <item quantity="other">%1$d개 지금 시작</item>
+  </plurals>
+  <string name="inspector_reschedule">일정 변경</string>
+
+  <string name="inspector_section_details">세부 정보</string>
+  <string name="inspector_detail_source">소스</string>
+  <string name="inspector_detail_link">링크</string>
+  <string name="inspector_detail_path">저장 위치</string>
+  <string name="inspector_detail_size">크기</string>
+  <string name="inspector_detail_added">추가일</string>
+  <string name="inspector_detail_time">소요 시간</string>
+  <string name="inspector_detail_average">평균 속도</string>
+  <string name="inspector_detail_connections">연결</string>
+  <string name="inspector_detail_device">기기</string>
+  <string name="inspector_detail_captured">출처</string>
+  <string name="inspector_section_advanced">고급</string>
+  <string name="inspector_detail_task_id">작업 ID</string>
+  <string name="inspector_detail_headers">헤더</string>
+  <string name="inspector_detail_property">속성</string>
+  <string name="inspector_copy_detail">%1$s 복사</string>
+  <string name="inspector_copied">복사됨</string>
+  <string name="inspector_copy_failed_source">소스를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_link">링크를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_path">저장 위치를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_size">크기를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_added">추가일을 복사할 수 없음</string>
+  <string name="inspector_copy_failed_time">소요 시간을 복사할 수 없음</string>
+  <string name="inspector_copy_failed_average">평균 속도를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_connections">연결을 복사할 수 없음</string>
+  <string name="inspector_copy_failed_device">기기를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_captured">출처를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_task_id">작업 ID를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_headers">헤더를 복사할 수 없음</string>
+  <string name="inspector_copy_failed_property">속성을 복사할 수 없음</string>
+  <string name="inspector_show_full_link">전체 링크 보기</string>
+  <string name="inspector_hide_full_link">전체 링크 숨기기</string>
+  <string name="inspector_hide">숨기기</string>
+
+  <string name="inspector_technical_details">기술 세부 정보</string>
+  <string name="inspector_copy_details">세부 정보 복사</string>
+  <string name="inspector_open_logs">로그 열기</string>
+  <string name="inspector_share_logs">로그 공유</string>
+  <string name="inspector_open_logs_failed">로그를 열 수 없음</string>
+
+  <string name="inspector_activity_empty">다운로드가 시작되면 속도와 이벤트가 여기에 표시됩니다.</string>
+  <string name="inspector_activity_now">지금</string>
+  <string name="inspector_activity_since">Ketch를 연 이후</string>
+  <plurals name="inspector_activity_show_earlier">
+    <item quantity="other">이전 항목 %1$d개 보기</item>
+  </plurals>
+  <string name="inspector_limit_task">작업 %1$s</string>
+  <string name="inspector_limit_global">전체</string>
+  <string name="inspector_stat_peak">최고</string>
+  <string name="inspector_stat_average">평균</string>
+  <string name="inspector_stat_connections">연결</string>
+
+  <plurals name="inspector_connections_unfinished">
+    <item quantity="other">미완료 %1$d개 · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active_speed">
+    <item quantity="other">%1$d개 활성 · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active">
+    <item quantity="other">%1$d개 활성</item>
+  </plurals>
+  <plurals name="inspector_connections_finished">
+    <item quantity="other">%1$d개 완료 · %2$s</item>
+  </plurals>
+  <string name="inspector_single_connection">단일 연결</string>
+  <string name="inspector_connections_live">연결 수를 바꾸면 남은 바이트를 즉시 다시 나눕니다.</string>
+  <string name="inspector_connections_on_resume">바꾼 연결 수는 다운로드를 재개할 때 적용됩니다.</string>
+  <string name="inspector_lane_description">연결 %1$d, %2$s, %3$s</string>
+  <string name="inspector_percent_spoken">%1$d퍼센트</string>
+
+  <string name="inspector_files_waiting">토렌트 메타데이터를 받으면 파일 목록이 표시됩니다.</string>
+  <plurals name="inspector_files_done_of">
+    <item quantity="other">파일 %2$d개 중 %1$d개 완료</item>
+  </plurals>
+  <string name="inspector_files_one_done">파일 1개 완료</string>
+  <plurals name="inspector_files_all_done">
+    <item quantity="other">파일 %1$d개 모두 완료</item>
+  </plurals>
+  <plurals name="inspector_files_not_selected">
+    <item quantity="other">%1$d개 선택 안 됨</item>
+  </plurals>
+  <plurals name="inspector_files_map">
+    <item quantity="other">파일 %1$d개, %2$d개 완료, %3$d퍼센트</item>
+  </plurals>
+  <string name="inspector_files_filter">파일 필터</string>
+  <string name="inspector_files_no_match">“%1$s”에 해당하는 파일 없음</string>
+  <string name="inspector_files_sort">파일 정렬</string>
+  <string name="inspector_sort_incomplete">미완료 항목 먼저</string>
+  <string name="inspector_sort_name">이름</string>
+  <string name="inspector_sort_size">크기</string>
+  <string name="inspector_file_unnamed">파일 %1$d</string>
+  <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
+  <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+</resources>

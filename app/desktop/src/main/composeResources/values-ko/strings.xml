@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="menu_file">파일</string>
+  <string name="menu_edit">편집</string>
+  <string name="menu_view">보기</string>
+  <string name="menu_downloads">다운로드</string>
+  <string name="menu_device">기기</string>
+  <string name="menu_window">윈도우</string>
+  <string name="menu_help">도움말</string>
+  <string name="menu_pause">일시정지</string>
+  <string name="menu_resume">재개</string>
+  <string name="menu_add_device">기기 추가…</string>
+  <string name="menu_pair_device">기기 페어링…</string>
+  <string name="menu_item_keys">%1$s(%2$s)</string>
+
+
+  <string name="tray_devices">기기</string>
+  <string name="tray_recent">최근</string>
+  <string name="tray_show_ketch">Ketch 보기</string>
+  <string name="tray_speed">속도</string>
+  <string name="tray_show">보기</string>
+  <string name="tray_enter_token">토큰 입력…</string>
+  <string name="tray_retry_now">지금 재시도</string>
+  <string name="tray_stay_connected">연결 유지</string>
+  <plurals name="tray_retry_failed">
+    <item quantity="other">실패한 %1$d개 재시도</item>
+  </plurals>
+  <string name="tray_add_clipboard_link_here">클립보드 링크를 여기에 추가</string>
+  <string name="tray_device_line">%1$s — %2$s</string>
+  <string name="tray_needs_token">토큰 필요</string>
+  <string name="tray_not_connected">연결되지 않음</string>
+  <string name="tray_offline">오프라인</string>
+  <string name="tray_connecting">연결 중</string>
+  <string name="tray_idle">유휴</string>
+  <plurals name="tray_active">
+    <item quantity="other">%1$d개 진행 중</item>
+  </plurals>
+  <plurals name="tray_waiting">
+    <item quantity="other">%1$d개 대기 중</item>
+  </plurals>
+  <plurals name="tray_paused">
+    <item quantity="other">%1$d개 일시정지됨</item>
+  </plurals>
+  <plurals name="tray_failed">
+    <item quantity="other">%1$d개 실패</item>
+  </plurals>
+  <plurals name="tray_tooltip_downloading">
+    <item quantity="other">↓ %2$s · %1$d개 진행 중</item>
+  </plurals>
+  <string name="app_title_status">Ketch — %1$s</string>
+
+  <string name="message_clipboard_no_link">클립보드에 링크가 없습니다</string>
+  <string name="message_switch_speed_failed">%1$s에서 %2$s 모드로 전환할 수 없음</string>
+  <string name="message_try_again">다시 시도</string>
+  <string name="message_undo">실행 취소</string>
+  <string name="message_slow_lane_on">%1$s에서 저속 차로 켜짐 · %2$s</string>
+  <string name="message_slow_lane_off">%1$s에서 저속 차로 꺼짐</string>
+  <string name="message_speed_follows_rules">%1$s의 속도를 규칙에 따라 조절</string>
+  <string name="message_speed_limit_failed">%1$s의 속도 제한을 설정할 수 없음</string>
+  <string name="message_reconnect_failed">%1$s에 다시 연결할 수 없음</string>
+  <string name="message_open_failed">%1$s을(를) 열 수 없음</string>
+  <string name="message_show_failed">폴더에서 %1$s을(를) 보여 줄 수 없음</string>
+  <string name="message_pause_failed">%2$s에서 %1$s을(를) 일시정지할 수 없음</string>
+  <string name="message_copy_links_failed">링크를 복사할 수 없음</string>
+  <plurals name="message_links_copied">
+    <item quantity="other">링크 %1$d개 복사됨</item>
+  </plurals>
+  <string name="message_window_error">문제가 발생했습니다</string>
+  <string name="open_torrent_title">토렌트 파일 열기</string>
+
+  <string name="close_keep_running_title">백그라운드에서 계속 다운로드할까요?</string>
+  <plurals name="close_stays_menu_bar">
+    <item quantity="other">Ketch가 메뉴 막대에 남아 다운로드 %1$d개를 마칩니다.</item>
+  </plurals>
+  <plurals name="close_stays_notification_area">
+    <item quantity="other">Ketch가 알림 영역에 남아 다운로드 %1$d개를 마칩니다.</item>
+  </plurals>
+  <plurals name="close_stays_system_tray">
+    <item quantity="other">Ketch가 시스템 트레이에 남아 다운로드 %1$d개를 마칩니다.</item>
+  </plurals>
+  <plurals name="close_stays_minimized">
+    <item quantity="other">Ketch가 최소화된 상태로 다운로드 %1$d개를 마칩니다.</item>
+  </plurals>
+  <string name="close_quit_from_menu_bar">메뉴 막대 아이콘이나 %1$s 키로 언제든 종료할 수 있습니다.</string>
+  <string name="close_quit_from_notification_area">알림 영역 아이콘이나 %1$s 키로 언제든 종료할 수 있습니다.</string>
+  <string name="close_quit_from_system_tray">시스템 트레이 아이콘이나 %1$s 키로 언제든 종료할 수 있습니다.</string>
+  <string name="close_quit_with_keys">%1$s 키로 언제든 종료할 수 있습니다.</string>
+  <string name="close_sentences">%1$s %2$s</string>
+  <string name="close_keep_running">계속 실행</string>
+  <string name="close_quit_ketch">Ketch 종료</string>
+  <string name="close_dont_ask_again">다시 묻지 않기</string>
+  <string name="close_quit_title">Ketch를 종료할까요?</string>
+  <plurals name="close_quit_body">
+    <item quantity="other">다운로드 %1$d개가 일시정지되며, 다음에 Ketch를 열면 재개됩니다.</item>
+  </plurals>
+  <string name="close_quit">종료</string>
+  <string name="close_cancel">취소</string>
+
+  <string name="notify_still_running">Ketch가 알림 영역에서 계속 실행 중입니다</string>
+  <plurals name="notify_added">
+    <item quantity="other">다운로드 %1$d개 추가됨</item>
+  </plurals>
+  <string name="notify_on_device">%1$s: %2$s</string>
+  <string name="notify_names_two">%1$s, %2$s</string>
+  <string name="notify_names_three">%1$s, %2$s, %3$s</string>
+  <plurals name="notify_names_more">
+    <item quantity="other">%1$s 외 %2$d개</item>
+  </plurals>
+
+  <string name="settings_window_title">설정</string>
+</resources>
