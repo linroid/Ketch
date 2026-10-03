@@ -4,6 +4,8 @@
   labels. See docs/development/localization.md before adding or changing strings.
 -->
 <resources>
+  <!-- This translation's language as a BCP 47 tag, such as de, pt-BR or zh-Hant. The web app marks its page with it, so screen readers read it in that language. -->
+  <string name="language_tag">en</string>
   <!-- Data sizes. %1$s is a number already formatted for the locale, such as 1.5 or 1,5. -->
   <string name="size_bytes">%1$s B</string>
   <string name="size_kb">%1$s KB</string>
