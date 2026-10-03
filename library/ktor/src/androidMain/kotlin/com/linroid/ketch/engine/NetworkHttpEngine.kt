@@ -19,10 +19,12 @@ import okhttp3.ConnectionPool
  *
  * @param network an available network chosen by the caller
  * @param logRequests whether request and transport details may be logged
+ * @param userAgent the `User-Agent` of requests whose headers name none, or `null` for none
  */
 fun KtorHttpEngine.Companion.forNetwork(
   network: Network,
   logRequests: Boolean = true,
+  userAgent: String? = KtorHttpEngine.DEFAULT_USER_AGENT,
 ): KtorHttpEngine {
   val client = HttpClient(OkHttp) {
     engine {
@@ -38,5 +40,5 @@ fun KtorHttpEngine.Companion.forNetwork(
       requestTimeoutMillis = Long.MAX_VALUE
     }
   }
-  return KtorHttpEngine(client, logRequests)
+  return KtorHttpEngine(client, logRequests, userAgent)
 }

@@ -40,6 +40,8 @@ import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.SystemNotifier
+import com.linroid.ketch.app.feedback.UnreadableFile
+import com.linroid.ketch.app.feedback.UnreadableFiles
 import com.linroid.ketch.app.feedback.pairingNotificationCopy
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.resolve
@@ -129,6 +131,7 @@ import java.awt.desktop.QuitResponse
 import java.io.File
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
+import kotlin.system.exitProcess
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -136,7 +139,9 @@ import kotlin.time.TimeSource
 private val log = KetchLogger("DesktopApp")
 
 fun main(args: Array<String>) {
-  val configDir = File(defaultConfigDir())
+  // A portable copy keeps its data in its own folder, and so does its browser extension host.
+  val portable = PortableApp.detect()
+  val configDir = portable?.writableDataDir() ?: File(defaultConfigDir())
   if (args.firstOrNull() == NativeMessagingHost.FLAG) {
     // Started by a browser for the Ketch extension, not by the user.
     runNativeMessagingHost(configDir)
@@ -195,6 +200,17 @@ fun main(args: Array<String>) {
   val logger = Logger.combine(Logger.console(logLevel), fileLogger)
   // Ketch installs it too, but the host name below is resolved before Ketch exists.
   KetchLogger.setLogger(logger)
+  // Failures nothing catches, on any thread, go to logs/ketch.log for bug reports.
+  Thread.setDefaultUncaughtExceptionHandler { thread, e ->
+    log.e(e) { "Uncaught exception in thread ${thread.name}: ${e.describeCauses()}" }
+  }
+  if (portable != null) {
+    if (configDir == portable.dataDir) {
+      log.i { "Portable copy: data is kept in $configDir" }
+    } else {
+      log.w { "Portable copy: can't write to ${portable.dataDir}, so data is kept in $configDir" }
+    }
+  }
   installOpenFileHandler { files ->
     open(OpenedArguments(files = files), LinkSource.Arguments)
     windowRequests.trySend(Unit)
@@ -224,7 +240,14 @@ fun main(args: Array<String>) {
   // The UI shows the language of the JVM's default locale, which the JDK takes from the system:
   // the first of the user's preferred languages on macOS, which includes a language picked for
   // Ketch in System Settings, the display language on Windows, and LANG or LC_MESSAGES on Linux.
-  application { KetchApp(launch) }
+  try {
+    application { KetchApp(launch) }
+  } catch (e: Throwable) {
+    // Quit rather than linger without a window, holding the single-instance lock that would
+    // hand every later launch to this process. The shutdown hook flushes the log file.
+    log.e(e) { "The app failed: ${e.describeCauses()}" }
+    exitProcess(1)
+  }
 }
 
 /**
@@ -276,17 +299,21 @@ private fun registerNativeHost(
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ApplicationScope.KetchApp(launch: LaunchContext) {
+  val unreadableFiles = remember { UnreadableFiles() }
   val configStore = remember {
-    FileConfigStore(File(launch.configDir, "config.toml").path)
+    FileConfigStore(File(launch.configDir, "config.toml").path) { unreadable ->
+      unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Settings, unreadable.movedTo))
+    }
   }
   val localSpeed = remember { LocalSpeedMode(configStore) }
   val controller = remember {
-    val manager = createInstanceManager(launch, configStore)
+    val manager = createInstanceManager(launch, configStore, unreadableFiles)
     AppController(
       instanceManager = manager,
       aiProviderFactory = EmbeddedAiDiscoveryProviderFactory(),
       incoming = launch.incoming,
       speedMode = localSpeed.attach(manager),
+      unreadableFiles = unreadableFiles,
     ).also { localSpeed.follow(it.pulse) }
   }
   val resources = remember { AppResources(controller, localSpeed, launch) }
@@ -488,10 +515,14 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
 private fun createInstanceManager(
   launch: LaunchContext,
   configStore: ConfigStore,
+  unreadableFiles: UnreadableFiles,
 ): InstanceManager {
   val configDir = launch.configDir
   val config = configStore.load()
-  val taskStore = createSqliteTaskStore(DriverFactory(File(configDir, "ketch.db").path))
+  val driverFactory = DriverFactory(File(configDir, "ketch.db").path) { unreadable ->
+    unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Downloads, unreadable.movedTo))
+  }
+  val taskStore = createSqliteTaskStore(driverFactory)
   val instanceName = config.name?.ifEmpty { null } ?: launch.hostName
   val torrentSource = TorrentDownloadSource(
     TorrentConfig(

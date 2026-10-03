@@ -22,7 +22,14 @@ import kotlinx.serialization.Serializable
  *   does not support HTTP Range requests or FTP REST. BitTorrent sources
  *   treat a positive value as their peer connection limit instead.
  * @property headers custom HTTP headers to include in every request
- *   (HEAD and GET) for this download.
+ *   (HEAD and GET) for this download. Names must be tokens and values
+ *   must not contain line breaks or other control characters, or
+ *   [KetchApi.download] rejects the request. `Host`, `Range`,
+ *   `Content-Length` and hop-by-hop headers such as `Connection` are
+ *   ignored. When a redirect leads to another scheme, host or port, the
+ *   Ktor engine's next request keeps only `User-Agent`, `Accept`,
+ *   `Accept-Encoding`, `Accept-Language` and the origin of `Referer`, so
+ *   cookies and other credentials stay with the site they were meant for.
  * @property properties arbitrary key-value pairs for use by custom
  *   extensions. The engine does not read these values. By convention
  *   `ketch.origin` names where a download was added from (`browser`,

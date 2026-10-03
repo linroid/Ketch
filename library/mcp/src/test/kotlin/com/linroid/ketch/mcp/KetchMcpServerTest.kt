@@ -253,7 +253,7 @@ class KetchMcpServerTest {
       )
       // Optional parameters are still described
       assertEquals(
-        setOf("url", "destination", "connections", "priority", "speedLimit"),
+        setOf("url", "destination", "connections", "priority", "speedLimit", "headers"),
         schemas.getValue("startDownload").getValue("properties").jsonObject.keys,
       )
     }

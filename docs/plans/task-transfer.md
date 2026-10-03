@@ -776,14 +776,15 @@ still delete its copy.
 
 > **Status:** part of it exists. `DestinationPathPolicy` (public, `core/file`) holds the roots and
 > the containment check (`contains`, symlinks followed, dangling links refused), `confine` for a
-> new download's destination (relative paths rebased, file name sanitized, existing files
-> deduplicated), `confineFile` for a resume destination, `sanitizeFileName` (applied by the engine
-> to every source-suggested name) and `deduplicate`. The server applies it through
-> `DestinationGuard` with roots = `ServerConfig.allowedDirectories` + the live download directory:
-> always without a token, with one when the list is set (open question 5). Imports should reuse
-> it with the same roots, rather than a separate `transferRoots`. Still to do: NFC, the
-> `.ketch-` escape, `PathReservations`, and rejecting (rather than rebasing) relative or `..`
-> paths for imports.
+> new download's destination (relative paths rebased, the name through `sanitizeFileName()`, a
+> path that exists or `OutputPathReservations` holds replaced by a free `name (n).ext`) and
+> `confineFile` for a resume destination. The server applies it through `DestinationGuard` with
+> roots = `ServerConfig.allowedDirectories` + the live download directory: always without a
+> token, with one when the list is set (open question 5). Imports should reuse it with the same
+> roots, rather than a separate `transferRoots`. Still to do: NFC, the `.ketch-` escape,
+> reserving the path at check time, and rejecting (rather than rebasing) relative or `..` paths
+> for imports.
+
 - **Rebasing**: roots are the live `defaultDirectory` (else `defaultDownloadDirectory()`) plus a
   new `ServerConfig.transferRoots`. Remote callers may name only a relative sub-folder (`..`,
   absolute paths, drive letters, schemes → 403 `path_rejected`); in-process callers may pass any

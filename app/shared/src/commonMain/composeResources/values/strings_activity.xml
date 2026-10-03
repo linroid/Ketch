@@ -118,6 +118,15 @@
   <string name="feedback_reconnect_failed">Couldn't reconnect to %1$s</string>
   <string name="feedback_remove_device_failed">Couldn't remove %1$s</string>
   <string name="feedback_discovery_failed">Failed to discover LAN servers</string>
+  <!-- Shown once when the settings file, config.toml, could not be read as Ketch started. It
+       was moved aside, so Ketch runs with the default settings. -->
+  <string name="feedback_settings_unreadable">Couldn't read your settings, so Ketch started with the defaults</string>
+  <!-- Shown once when the list of this device's downloads could not be read. Its file was
+       moved aside, so the list starts empty. -->
+  <string name="feedback_downloads_unreadable">Couldn't read the list of downloads, so Ketch started with an empty one</string>
+  <!-- Under the two messages above. %1$s is the name the unreadable file was given, in the same
+       folder, such as "config.toml.broken-20261003T142530Z". -->
+  <string name="feedback_unreadable_kept">The old file was kept as %1$s</string>
 
   <!-- Follows a message's title after " · ": how many of its downloads failed. -->
   <plurals name="feedback_part_failed">

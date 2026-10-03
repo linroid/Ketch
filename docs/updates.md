@@ -5,10 +5,11 @@ The desktop app and the native `ketch` command update themselves from the projec
 browser extension do not: they update through their stores, the hosted page or a new release
 download.
 
-The shared code lives in the `updater` module (`com.linroid.ketch.updater`); the command's
-installer is in `cli` (`SelfUpdate.kt`, `CliInstallation.kt`, `Archives.kt`) and the desktop's in
-`app/desktop` (`DesktopUpdater.kt`, `UpdateInstaller.kt`, the scripts in
-`src/main/resources/update/`).
+The shared code lives in the `updater` module (`com.linroid.ketch.updater`), including
+`extractArchive` (`Archives.kt`), which unpacks the command's archives and the portable Windows
+app's `.zip`. The command's installer is in `cli` (`SelfUpdate.kt`, `CliInstallation.kt`) and the
+desktop's in `app/desktop` (`DesktopUpdater.kt`, `UpdateInstaller.kt`, `PortableApp.kt`, and the
+scripts in `src/main/resources/update/`, `install-update-windows-portable.ps1` among them).
 
 ## Finding and checking a release
 
@@ -21,8 +22,10 @@ installer is in `cli` (`SelfUpdate.kt`, `CliInstallation.kt`, `Archives.kt`) and
   there, the desktop app treats the release as not out yet and the command says to try again
   later.
 - `Release.asset` picks the file of this system by the names the release workflow gives them:
-  `ketch-cli-<version>-<os>-<arch>.tar.gz` (`.zip` on Windows) and
-  `ketch-desktop-<version>-<os>-<arch>.dmg`, `.msi` or `.deb`. Renaming those files in
+  `ketch-cli-<version>-<os>-<arch>.tar.gz` (`.zip` on Windows),
+  `ketch-desktop-<version>-<os>-<arch>.dmg`, `.msi` or `.deb`, and
+  `ketch-desktop-<version>-windows-<arch>-portable.zip`, which
+  [portable copies](#the-portable-windows-app) update from. Renaming those files in
   `.github/workflows/release.yml` breaks updates of every installed copy.
 - `ReleaseDownloader` downloads the file with a Ketch engine of its own and checks it against the
   SHA-256 digest GitHub computes for each uploaded asset. A file without a digest is refused.
@@ -56,7 +59,53 @@ See the [CLI README](../cli/README.md#update) for the options.
 |---|---|---|
 | macOS | `hdiutil` mounts the `.dmg` while downloading; the script copies the new `Ketch.app` beside the old one and swaps them by renaming | Needs a writable folder. An app run from the disk image, from App Translocation or from a folder the user cannot write opens the `.dmg` instead |
 | Windows | `msiexec /i … /passive`, which upgrades the installed app | Windows asks to allow the change |
+| Windows (portable) | The `-portable.zip` is unpacked while downloading; the script renames the old files aside and the new ones into the app's folder | Needs a writable folder, otherwise the `.zip` opens in Explorer. See [the portable Windows app](#the-portable-windows-app) |
 | Linux | `pkexec dpkg -i` | Asks for the user's password. Without `pkexec` or `dpkg` the `.deb` opens in the system's installer |
+
+## The portable Windows app
+
+Each Windows release also ships `ketch-desktop-<version>-windows-<arch>-portable.zip`: the app's
+`Ketch` folder, which runs from wherever it is unpacked, such as a USB drive, without installing.
+There is no portable build for macOS or Linux.
+
+- **What makes it portable**: a folder named `data` beside `Ketch.exe`, which the `.zip` brings
+  empty (`PortableApp.kt`; jpackage gives the app the launcher's path as `jpackage.app-path`).
+  Without it the copy behaves like the installed app, and updates by installing the `.msi`.
+- **Where its data goes**: everything the app writes, from `config.toml`, the downloads list and
+  `torrent-state` to `logs\` and `updates\`, goes to `data` instead of `%APPDATA%\ketch`. The
+  downloaded files still go to the folder set in Settings → Downloads. When `data` cannot be
+  written, the app keeps its data in `%APPDATA%\ketch`, as an installed copy does, and logs a
+  warning.
+- **Updates**: the app downloads the `-portable.zip` instead of the `.msi` and unpacks it into
+  `data\updates\` before offering Restart. `install-update-windows-portable.ps1` waits for the
+  app to quit and up to a minute for other processes running from its folder, such as the browser
+  extension's host (`Ketch.exe --native-messaging-host`), because Windows cannot rename open
+  files; if some still run, the old version stays. It then renames the old files and folders
+  (`Ketch.exe`, `app\`, `runtime\` and the rest) into `data\updates\previous\` and the new ones
+  into their place, all renames on one drive, and puts the old ones back if a rename fails; any
+  that cannot go back are kept in `data\update-backup-<time>\`.
+  `data` itself is never touched. The app opens again, updated or not, and the script writes to
+  `data\logs\update.log`. The next launch deletes `data\updates\`, the old files with it.
+- **A folder Ketch cannot write**, such as one under `Program Files` or on a read-only drive, or
+  a `data` folder it cannot write or that links to another drive: the update opens the downloaded
+  `.zip` in Explorer, to replace the files by hand once Ketch quits.
+- **Next to an installed copy**: both can run at once, with separate data, settings and downloads
+  lists. The browser extension, magnet links, `.torrent` files and the login item go to whichever
+  copy registered them last: every launch registers the browser extension's host, and the
+  others too when they are turned on in that copy's Settings (Integration, and Open Ketch at
+  login under General).
+- **What it leaves on the computer**: the registrations above live in the Windows user's
+  registry (`HKEY_CURRENT_USER`), pointing at the copy's `Ketch.exe` and `data\native-messaging\`.
+  They stay when the copy is moved or its drive removed, until another copy registers again;
+  until then the browser extension falls back to the browser. Like other programs, it also leaves
+  temporary files in `%TEMP%`, such as the SQLite library it unpacks there.
+- **The `ketch` command** keeps using `%APPDATA%\ketch`, so it does not see a portable copy's
+  settings, AI keys or downloads list.
+- **Moving from an installed copy**: with neither copy running, copy the contents of
+  `%APPDATA%\ketch` into the portable copy's `data` folder.
+- **Windows may warn the first time** `Ketch.exe` runs: the builds are not signed, and files
+  unpacked with Explorer carry the mark of a downloaded file, which SmartScreen checks. Choose
+  More info → Run anyway, or select Unblock in the `.zip`'s Properties before unpacking it.
 
 ## Installer versions
 

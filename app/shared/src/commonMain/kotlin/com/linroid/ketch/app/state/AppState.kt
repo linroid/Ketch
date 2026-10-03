@@ -26,6 +26,8 @@ import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.ToastMode
+import com.linroid.ketch.app.feedback.UnreadableFiles
+import com.linroid.ketch.app.feedback.postUnreadable
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.sizeText
@@ -216,6 +218,8 @@ val InstanceEntry.deviceId: String
  * @param scope runs the commands; it should use a `SupervisorJob` and the main dispatcher.
  * @param speedMode speed mode of the embedded device, owned by the host, such as the service whose
  *   notification switches it; `null` when the host keeps none.
+ * @param unreadableFiles files the host moved aside because it could not read them, such as
+ *   `config.toml`; each is reported to the user once.
  * @property incoming downloads and pairing links opened from outside the app; the shell asks
  *   before it connects to a device a pairing link names.
  * @property clock current time of the task list, the speed history and the time labels.
@@ -230,6 +234,7 @@ class AppState(
   val messages: MessageCenter = MessageCenter(),
   val speedMode: SpeedModeController? = null,
   val clock: Clock = Clock.System,
+  unreadableFiles: UnreadableFiles = UnreadableFiles(),
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()
@@ -528,6 +533,9 @@ class AppState(
       incoming.failures.collect {
         postError(Res.string.feedback_open_failed.text(it.label), detail = it.reason)
       }
+    }
+    scope.launch {
+      unreadableFiles.reported.collect { messages.postUnreadable(it) }
     }
     scope.launch {
       activeInstance.collect {

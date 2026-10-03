@@ -24,11 +24,13 @@ import okhttp3.Dns
  *
  * @param localAddress a concrete IP address assigned to a local interface
  * @param logRequests whether request and transport details may be logged
+ * @param userAgent the `User-Agent` of requests whose headers name none, or `null` for none
  * @throws IllegalArgumentException if the address is not a local unicast address
  */
 fun KtorHttpEngine.Companion.forLocalAddress(
   localAddress: InetAddress,
   logRequests: Boolean = true,
+  userAgent: String? = KtorHttpEngine.DEFAULT_USER_AGENT,
 ): KtorHttpEngine {
   require(!localAddress.isAnyLocalAddress && !localAddress.isMulticastAddress) {
     "A concrete local unicast address is required"
@@ -52,5 +54,5 @@ fun KtorHttpEngine.Companion.forLocalAddress(
       requestTimeoutMillis = Long.MAX_VALUE
     }
   }
-  return KtorHttpEngine(client, logRequests)
+  return KtorHttpEngine(client, logRequests, userAgent)
 }

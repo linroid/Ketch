@@ -98,6 +98,12 @@ class KetchToolSet(
         "or 'unlimited'",
     )
     speedLimit: String = "unlimited",
+    @LLMDescription(
+      "HTTP request headers the site needs, such as Cookie or Referer, " +
+        "one 'Name: value' per line. Omit for none. Ketch sends its own " +
+        "User-Agent unless one is given.",
+    )
+    headers: String = "",
   ): String {
     val request = DownloadRequest(
       url = url,
@@ -105,6 +111,7 @@ class KetchToolSet(
       connections = connections,
       priority = parsePriority(priority),
       speedLimit = parseSpeedLimit(speedLimit),
+      headers = parseHeaders(headers),
       properties = mapOf(ORIGIN_PROPERTY to AGENT_ORIGIN),
     )
     val task = ketch.download(request)
@@ -336,6 +343,17 @@ class KetchToolSet(
     DownloadPriority.entries.find {
       it.name.equals(value, ignoreCase = true)
     } ?: DownloadPriority.NORMAL
+
+  /** Header lines as `Name: value`, one per line; blank lines are skipped. */
+  private fun parseHeaders(value: String): Map<String, String> = buildMap {
+    for (line in value.lines()) {
+      if (line.isBlank()) continue
+      val separator = line.indexOf(':')
+      // The line is not quoted back: it may hold a credential.
+      require(separator > 0) { "Invalid header line. Use 'Name: value', one per line." }
+      put(line.substring(0, separator).trim(), line.substring(separator + 1).trim())
+    }
+  }
 
   private fun parseSpeedLimit(value: String): SpeedLimit =
     if (value.equals("unlimited", ignoreCase = true) || value.isEmpty()) {

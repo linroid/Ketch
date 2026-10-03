@@ -79,6 +79,9 @@
   <string name="feedback_reconnect_failed">Erneute Verbindung mit %1$s fehlgeschlagen</string>
   <string name="feedback_remove_device_failed">%1$s konnte nicht entfernt werden</string>
   <string name="feedback_discovery_failed">Suche nach Servern im lokalen Netzwerk fehlgeschlagen</string>
+  <string name="feedback_settings_unreadable">Deine Einstellungen konnten nicht gelesen werden, daher startete Ketch mit den Standardwerten</string>
+  <string name="feedback_downloads_unreadable">Die Liste der Downloads konnte nicht gelesen werden, daher startete Ketch mit einer leeren Liste</string>
+  <string name="feedback_unreadable_kept">Die alte Datei wurde als %1$s aufbewahrt</string>
 
   <plurals name="feedback_part_failed">
     <item quantity="one">%1$d fehlgeschlagen</item>

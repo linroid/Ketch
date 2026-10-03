@@ -16,12 +16,14 @@ import java.net.NetworkInterface
  */
 fun KtorHttpEngine.Companion.withNetworkInterfaces(
   logRequests: Boolean = true,
+  userAgent: String? = KtorHttpEngine.DEFAULT_USER_AGENT,
 ): ConfigurableNetworkHttpEngine = ConfigurableNetworkHttpEngine(
-  JvmNetworkInterfaceProvider(logRequests)
+  JvmNetworkInterfaceProvider(logRequests, userAgent)
 )
 
 internal class JvmNetworkInterfaceProvider(
   private val logRequests: Boolean,
+  private val userAgent: String? = KtorHttpEngine.DEFAULT_USER_AGENT,
 ) : NetworkInterfaceProvider {
   override suspend fun availableInterfaces(): List<NetworkInterfaceInfo> =
     NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
@@ -36,7 +38,8 @@ internal class JvmNetworkInterfaceProvider(
       }
       .sortedBy { it.id }
 
-  override fun createDefaultEngine(): HttpEngine = KtorHttpEngine(logRequests = logRequests)
+  override fun createDefaultEngine(): HttpEngine =
+    KtorHttpEngine(logRequests = logRequests, userAgent = userAgent)
 
   override fun createEngine(networkInterface: NetworkInterfaceInfo): HttpEngine {
     val network = requireNotNull(NetworkInterface.getByName(networkInterface.id)) {
@@ -48,7 +51,7 @@ internal class JvmNetworkInterfaceProvider(
     val address = requireNotNull(addresses(network).firstOrNull()) {
       "Interface has no usable address: ${networkInterface.id}"
     }
-    return KtorHttpEngine.forLocalAddress(address, logRequests)
+    return KtorHttpEngine.forLocalAddress(address, logRequests, userAgent)
   }
 
   private fun addresses(network: NetworkInterface): List<InetAddress> =

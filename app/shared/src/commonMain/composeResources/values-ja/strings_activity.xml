@@ -72,6 +72,9 @@
   <string name="feedback_reconnect_failed">%1$sに再接続できませんでした</string>
   <string name="feedback_remove_device_failed">%1$sを削除できませんでした</string>
   <string name="feedback_discovery_failed">LAN上のサーバーを検出できませんでした</string>
+  <string name="feedback_settings_unreadable">設定を読み込めなかったため、デフォルトの設定でKetchを起動しました</string>
+  <string name="feedback_downloads_unreadable">ダウンロードの一覧を読み込めなかったため、空の一覧でKetchを起動しました</string>
+  <string name="feedback_unreadable_kept">以前のファイルは %1$s として保存されています</string>
 
   <plurals name="feedback_part_failed">
     <item quantity="other">%1$d件失敗</item>

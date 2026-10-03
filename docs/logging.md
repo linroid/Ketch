@@ -68,7 +68,7 @@ val ketch = Ketch(
 - Magnet metadata lookups and their timeouts
 
 ### Debug Level (Recommended for Development)
-- HEAD requests, response headers and segment calculations
+- HEAD requests and GET probes, redirects, response headers and segment calculations
 - Each segment's start and completion
 - File preallocation and resume validation
 - Tracker announces per tracker, DHT bootstrap and lookups
@@ -152,7 +152,7 @@ app logs to the browser console only.
 | App | Log folder |
 |---|---|
 | macOS | `~/Library/Application Support/ketch/logs/` |
-| Windows | `%APPDATA%\ketch\logs\` |
+| Windows | `%APPDATA%\ketch\logs\`; `data\logs\` beside `Ketch.exe` for the [portable app](updates.md#the-portable-windows-app) |
 | Linux | `$XDG_CONFIG_HOME/ketch/logs/`, or `~/.config/ketch/logs/` |
 | Android | `files/logs/` in the app's private storage |
 | iOS | `Library/Application Support/logs/` in the app's container |
@@ -161,6 +161,9 @@ Records are appended to `ketch.log` in the [format above](#log-format), at the s
 console, and earlier runs are kept. Before a record would take `ketch.log` past 5 MiB, the file
 is renamed to `ketch.1.log`, the previous `ketch.1.log` becomes `ketch.2.log` and the previous
 `ketch.2.log` is deleted, so the logs never take much more than 15 MiB.
+
+The desktop app also logs exceptions nothing caught, on any thread, at error level, including
+one that stops it from starting: it then quits rather than run without a window.
 
 To attach them to a bug report, open **Settings → About → Troubleshooting**:
 
@@ -198,6 +201,9 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
   the real exception
 - Magnet links keep only their `xt` topic and `dn` name; tracker and source parameters are
   counted, not printed
+- Request header values are never logged. A redirect to another origin logs the names of the
+  headers left behind, such as `Not sending Cookie, Authorization to another origin`, and
+  `Cookie`, `Set-Cookie` and `Authorization` response headers are logged as `***`
 - Tracker URLs are reduced to `scheme://host:port`, including URLs quoted in error messages,
   because paths and queries carry private tracker passkeys
 - Cookie and authorization header values are masked in HTTP debug logs, and request headers

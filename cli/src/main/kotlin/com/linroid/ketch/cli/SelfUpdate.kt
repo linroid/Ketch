@@ -11,6 +11,7 @@ import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseProduct
 import com.linroid.ketch.updater.ReleaseVersion
 import com.linroid.ketch.updater.UpdateException
+import com.linroid.ketch.updater.extractArchive
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.IOException

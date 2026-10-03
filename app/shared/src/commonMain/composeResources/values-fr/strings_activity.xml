@@ -79,6 +79,9 @@
   <string name="feedback_reconnect_failed">Impossible de se reconnecter à %1$s</string>
   <string name="feedback_remove_device_failed">Impossible de retirer %1$s</string>
   <string name="feedback_discovery_failed">Échec de la recherche de serveurs sur le réseau local</string>
+  <string name="feedback_settings_unreadable">Impossible de lire vos réglages, Ketch a démarré avec les réglages par défaut</string>
+  <string name="feedback_downloads_unreadable">Impossible de lire la liste des téléchargements, Ketch a démarré avec une liste vide</string>
+  <string name="feedback_unreadable_kept">L'ancien fichier a été conservé sous %1$s</string>
 
   <plurals name="feedback_part_failed">
     <item quantity="one">%1$d en échec</item>

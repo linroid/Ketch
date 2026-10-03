@@ -93,6 +93,9 @@
   <string name="feedback_reconnect_failed">Не удалось переподключиться к %1$s</string>
   <string name="feedback_remove_device_failed">Не удалось удалить %1$s</string>
   <string name="feedback_discovery_failed">Не удалось найти серверы в локальной сети</string>
+  <string name="feedback_settings_unreadable">Не удалось прочитать настройки, поэтому Ketch запущен с настройками по умолчанию</string>
+  <string name="feedback_downloads_unreadable">Не удалось прочитать список загрузок, поэтому Ketch запущен с пустым списком</string>
+  <string name="feedback_unreadable_kept">Старый файл сохранён как %1$s</string>
 
   <plurals name="feedback_part_failed">
     <item quantity="one">%1$d с ошибкой</item>

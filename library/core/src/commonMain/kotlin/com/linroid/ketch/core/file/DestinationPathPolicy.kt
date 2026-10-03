@@ -3,7 +3,6 @@ package com.linroid.ketch.core.file
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
-import okio.FileSystem
 import okio.IOException
 import okio.Path
 import okio.Path.Companion.toPath
@@ -22,12 +21,8 @@ import okio.Path.Companion.toPath
  * @param roots folders, as absolute paths or URIs; relative paths are resolved against the
  *   current directory
  */
-class DestinationPathPolicy internal constructor(
-  roots: List<String>,
-  private val fileSystem: FileSystem,
-) {
-  constructor(roots: List<String>) : this(roots, platformFileSystem)
-
+class DestinationPathPolicy(roots: List<String>) {
+  private val fileSystem = platformFileSystem
   private val currentDirectory: Path by lazy { fileSystem.canonicalize(".".toPath()) }
   private val rootUris = roots.filter(::isUri).map { it.trimEnd('/') }
   private val rootPaths = roots.filterNot(::isUri).mapNotNull { realPath(it.toPath()) }
@@ -45,11 +40,11 @@ class DestinationPathPolicy internal constructor(
 
   /**
    * [destination] of a new download, made safe to save in:
-   * - a bare file name is [sanitized][sanitizeFileName] and saved in [baseDirectory]
+   * - a bare file name goes through [sanitizeFileName] and is saved in [baseDirectory]
    * - a relative path is resolved against [baseDirectory], and `.` and `..` are resolved
-   * - the file name of a file path is sanitized, and an existing file gets a free name such as
-   *   `name (1).ext` instead of being overwritten; a path naming an existing folder is taken as
-   *   that folder
+   * - the file name of a file path goes through [sanitizeFileName], and a path that exists or
+   *   that a running download reserved gets a free name such as `name (1).ext` instead; a path
+   *   naming an existing folder is taken as that folder
    * - a URI is kept as it is
    *
    * @param baseDirectory the folder downloads go to when they name no folder
@@ -64,7 +59,7 @@ class DestinationPathPolicy internal constructor(
     }
     if (destination.isName()) {
       if (!contains(baseDirectory)) throw PathRejectedException(baseDirectory)
-      return Destination(sanitizeFileName(value))
+      return Destination(safeName(value))
     }
     if (isUri(baseDirectory) && !value.toPath().isAbsolute) throw PathRejectedException(value)
     val path = resolve(value.toPath(), baseDirectory.toPath())
@@ -74,9 +69,9 @@ class DestinationPathPolicy internal constructor(
       return Destination(folder + Path.DIRECTORY_SEPARATOR)
     }
     val parent = path.parent ?: throw PathRejectedException(value)
-    val file = deduplicate(parent / sanitizeFileName(path.name), fileSystem)
+    val file = OutputPathReservations.freePath((parent / safeName(path.name)).toString())
     if (!contains(file)) throw PathRejectedException(value)
-    return Destination(file.toString())
+    return Destination(file)
   }
 
   /**
@@ -143,91 +138,8 @@ class DestinationPathPolicy internal constructor(
     false
   }
 
-  companion object {
-    /** Name given to a file whose name has nothing left once sanitized. */
-    private const val FALLBACK_NAME = "download"
-
-    /** Longest file name most file systems store, in UTF-8 bytes. */
-    private const val MAX_NAME_BYTES = 255
-
-    /** Longest extension kept when a long name is shortened, with its dot. */
-    private const val MAX_EXTENSION_LENGTH = 16
-
-    /** Characters no Windows file name may hold, which also include both path separators. */
-    private const val UNSAFE_CHARS = "/\\:*?\"<>|"
-
-    private val WINDOWS_RESERVED = setOf("CON", "PRN", "AUX", "NUL") +
-      (0..9).map { "COM$it" } + (0..9).map { "LPT$it" }
-
-    /**
-     * [name] as a single file name every platform can store: path separators, characters
-     * Windows forbids (`: * ? " < > |`) and control characters become `_`; surrounding spaces
-     * and trailing dots go, which also turns `.` and `..` into the fallback `download`; a
-     * Windows device name such as `CON` gets a `_`; and a name longer than 255 UTF-8 bytes is
-     * shortened, keeping its extension.
-     */
-    fun sanitizeFileName(name: String): String {
-      val replaced = buildString(name.length) {
-        for (char in name) append(if (char in UNSAFE_CHARS || char.isISOControl()) '_' else char)
-      }
-      // Windows drops trailing dots and spaces, so `name.` would open `name`.
-      val trimmed = replaced.trim().trimEnd('.', ' ')
-      if (trimmed.isEmpty()) return FALLBACK_NAME
-      val stem = trimmed.substringBefore('.')
-      val safe = if (stem.uppercase() in WINDOWS_RESERVED) {
-        stem + "_" + trimmed.removePrefix(stem)
-      } else {
-        trimmed
-      }
-      return shortened(safe)
-    }
-
-    private fun shortened(name: String): String {
-      if (name.encodeToByteArray().size <= MAX_NAME_BYTES) return name
-      val dot = name.lastIndexOf('.')
-      val extension = if (dot > 0 && name.length - dot <= MAX_EXTENSION_LENGTH) {
-        name.substring(dot)
-      } else {
-        ""
-      }
-      val budget = MAX_NAME_BYTES - extension.encodeToByteArray().size
-      // Every character takes a byte at least, so the stem never needs more characters.
-      var stem = name.substring(0, name.length - extension.length).take(budget)
-      if (stem.last().isHighSurrogate()) stem = stem.dropLast(1)
-      while (stem.encodeToByteArray().size > budget) {
-        stem = stem.dropLast(if (stem.length > 1 && stem.last().isLowSurrogate()) 2 else 1)
-      }
-      return stem.trimEnd('.', ' ').ifEmpty { FALLBACK_NAME } + extension
-    }
-
-    /**
-     * [candidate], or when it exists, the first free `name (1).ext`, `name (2).ext`, … beside
-     * it.
-     */
-    internal fun deduplicate(candidate: Path, fileSystem: FileSystem = platformFileSystem): Path {
-      val fileName = candidate.name
-      val directory = candidate.parent ?: return candidate
-      if (!fileSystem.exists(candidate)) return candidate
-
-      val dotIndex = fileName.lastIndexOf('.')
-      val baseName: String
-      val extension: String
-      if (dotIndex > 0) {
-        baseName = fileName.take(dotIndex)
-        extension = fileName.substring(dotIndex)
-      } else {
-        baseName = fileName
-        extension = ""
-      }
-
-      var seq = 1
-      while (true) {
-        val path = directory / "$baseName ($seq)$extension"
-        if (!fileSystem.exists(path)) return path
-        seq++
-      }
-    }
-  }
+  private fun safeName(name: String): String =
+    sanitizeFileName(name) ?: DefaultFileNameResolver.FALLBACK
 }
 
 /**
