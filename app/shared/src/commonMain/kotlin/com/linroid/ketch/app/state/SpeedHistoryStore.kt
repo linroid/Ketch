@@ -262,9 +262,6 @@ class SpeedHistoryStore(
   /** Rates of the connections of the task [key], empty unless it downloads over HTTP or FTP. */
   fun rates(key: TaskKey): List<SegmentRate> = rateState.value[key].orEmpty()
 
-  /** What happened to the task [key] since the app opened, oldest first. */
-  fun timeline(key: TaskKey): List<TimelineEntry> = timelineState.value[key].orEmpty()
-
   /**
    * Takes one sample at [now]. [speeds] has every listed task: the speed of a downloading one,
    * `null` for the others. Tasks missing from it are forgotten. [segments] has the segments of
@@ -324,7 +321,7 @@ class SpeedHistoryStore(
     record(clock.now(), speeds, segments)
     trackers.keys.retainAll(segments.keys)
     rateState.value = segments.mapValues { (key, list) ->
-      trackers.getOrPut(key) { SegmentRateTracker(timeSource) }.update(list, downloading = true)
+      trackers.getOrPut(key) { SegmentRateTracker(timeSource) }.update(list)
     }
   }
 

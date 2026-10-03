@@ -112,27 +112,25 @@ fun DownloadSettings(state: AppState, device: InstanceEntry) {
   val controller = state.settingsFor(device)
   LaunchedEffect(controller) { controller.loadDownload() }
   val config = controller.download
-  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
-    if (controller.isRemote) {
-      SettingsNotice(
-        text = stringResource(Res.string.settings_downloads_remote, device.label),
-        tone = NoticeTone.Info,
-      )
-    }
-    DeviceSettingsError(controller.downloadError, loaded = config != null) {
-      controller.loadDownload()
-    }
-    if (config == null) {
-      if (controller.downloadError == null) {
-        SettingsLoading(stringResource(Res.string.settings_loading_from, device.label))
-      }
-      return@Column
-    }
-    val onChange = { updated: DownloadConfig -> controller.updateDownload(updated) }
-    FolderGroup(device, config, onChange)
-    FolderShortcuts(state, device, config)
-    QueueGroup(config, onChange)
+  if (controller.isRemote) {
+    SettingsNotice(
+      text = stringResource(Res.string.settings_downloads_remote, device.label),
+      tone = NoticeTone.Info,
+    )
   }
+  DeviceSettingsError(controller.downloadError, loaded = config != null) {
+    controller.loadDownload()
+  }
+  if (config == null) {
+    if (controller.downloadError == null) {
+      SettingsLoading(stringResource(Res.string.settings_loading_from, device.label))
+    }
+    return
+  }
+  val onChange = { updated: DownloadConfig -> controller.updateDownload(updated) }
+  FolderGroup(device, config, onChange)
+  FolderShortcuts(state, device, config)
+  QueueGroup(config, onChange)
 }
 
 /** Where [device] saves downloads, with the free space there and ways to change it. */
@@ -403,7 +401,7 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
     footer = stringResource(Res.string.settings_downloads_queue_footer),
   ) {
     val atOnce = config.maxConcurrentDownloads
-    StepperRow(
+    SettingsStepperRow(
       title = stringResource(Res.string.settings_downloads_run_at_once),
       description = stringResource(Res.string.settings_downloads_run_at_once_hint),
       value = atOnce,
@@ -419,7 +417,7 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
       onChange = { onChange(config.copy(maxConcurrentDownloads = it)) },
     )
     val perServer = config.maxConnectionsPerHost
-    StepperRow(
+    SettingsStepperRow(
       title = stringResource(Res.string.settings_downloads_per_server),
       description = stringResource(Res.string.settings_downloads_per_server_hint),
       value = perServer,
@@ -435,7 +433,7 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
       onChange = { onChange(config.copy(maxConnectionsPerHost = it)) },
     )
     val retries = config.retryCount
-    StepperRow(
+    SettingsStepperRow(
       title = stringResource(Res.string.settings_downloads_retries),
       description = stringResource(Res.string.settings_downloads_retries_hint),
       value = retries,
@@ -457,36 +455,6 @@ private fun QueueGroup(config: DownloadConfig, onChange: (DownloadConfig) -> Uni
 @Composable
 private fun countLabel(count: Int, zero: StringResource): String =
   if (count == 0) stringResource(zero) else count.toString()
-
-/** A count chosen with a [SettingsStepper]; see it for [label], [state], [fewer] and [more]. */
-@Composable
-private fun StepperRow(
-  title: String,
-  description: String,
-  value: Int,
-  values: List<Int>,
-  label: String,
-  state: String,
-  fewer: String,
-  more: String,
-  onChange: (Int) -> Unit,
-) {
-  SettingsRow(
-    title = title,
-    description = description,
-    trailing = {
-      SettingsStepper(
-        value = value,
-        values = values,
-        label = label,
-        state = state,
-        fewer = fewer,
-        more = more,
-        onChange = onChange,
-      )
-    },
-  )
-}
 
 private suspend fun readSystem(device: InstanceEntry): SystemInfo? = try {
   device.instance.status().system

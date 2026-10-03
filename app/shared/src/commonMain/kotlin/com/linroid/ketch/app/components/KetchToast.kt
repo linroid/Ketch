@@ -2,7 +2,6 @@ package com.linroid.ketch.app.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -32,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -228,12 +226,7 @@ private fun ToastAction(label: String, onClick: () -> Unit) {
         colors.inverseOnSurface.copy(alpha = if (hovered) HOVER_OVERLAY_ALPHA else 0f),
         KetchTheme.shapes.xs,
       )
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, onClick = onClick)
       .padding(horizontal = KetchTheme.spacing.s2, vertical = KetchTheme.spacing.s1),
   )
 }
@@ -249,12 +242,7 @@ private fun ToastClose(onClick: () -> Unit) {
     modifier = Modifier
       .size(CloseTarget)
       .semantics { contentDescription = description }
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      ),
+      .ketchClickable(interactions, onClick = onClick),
   ) {
     KetchIconImage(
       icon = KetchIcon.Close,

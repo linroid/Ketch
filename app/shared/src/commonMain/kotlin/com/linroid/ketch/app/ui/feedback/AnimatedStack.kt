@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
@@ -25,7 +24,6 @@ internal fun <T : Any> AnimatedStack(
   enter: EnterTransition,
   exit: ExitTransition,
   modifier: Modifier = Modifier,
-  verticalArrangement: Arrangement.Vertical = Arrangement.Top,
   horizontalAlignment: Alignment.Horizontal = Alignment.Start,
   content: @Composable (T) -> Unit,
 ) {
@@ -37,11 +35,7 @@ internal fun <T : Any> AnimatedStack(
   for (item in items) {
     shown.getOrPut(id(item)) { Shown(item, MutableTransitionState(false)) }.item = item
   }
-  Column(
-    modifier = modifier,
-    verticalArrangement = verticalArrangement,
-    horizontalAlignment = horizontalAlignment,
-  ) {
+  Column(modifier = modifier, horizontalAlignment = horizontalAlignment) {
     for ((key, entry) in shown) {
       key(key) {
         val item = entry.item

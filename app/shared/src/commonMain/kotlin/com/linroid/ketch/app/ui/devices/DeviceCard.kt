@@ -1,6 +1,5 @@
 package com.linroid.ketch.app.ui.devices
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -40,8 +38,8 @@ import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.healthColor
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.isEmpty
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
@@ -149,11 +147,9 @@ private fun CardHeader(
       modifier = Modifier
         .weight(1f)
         .focusRing(focus.visible, KetchTheme.shapes.md, colors.focusRing)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
-          role = Role.Button,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           onClickLabel = stringResource(Res.string.device_show_downloads),
           onClick = { state.showDeviceTab(device.entry) },
         )

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,6 +22,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.SpeedHistory
@@ -32,7 +32,6 @@ import com.linroid.ketch.app.state.TimelineKind
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.inspector.tabs.ActivityTab
 import com.linroid.ketch.app.ui.inspector.tabs.ActivityTabContent
@@ -40,9 +39,6 @@ import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.FilesTab
 import com.linroid.ketch.app.util.SegmentRate
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.TimeZone
 import kotlin.math.PI
 import kotlin.math.roundToLong
@@ -178,13 +174,8 @@ class InspectorTabsSnapshots {
   fun tabs_overApp_followTheStores() {
     val size = SnapshotSize(720.dp, 560.dp, KetchDensity.Compact)
     for (theme in SnapshotTheme.entries) {
-      val data = SampleData.downloads()
-      val environment = runBlocking(SnapshotHarness.ui) {
-        SampleEnvironment(data, theme, DensityMode.Compact)
-      }
-      try {
-        runBlocking(SnapshotHarness.ui) { withTimeout(5.seconds) { environment.start() } }
-        val state = environment.controller.state
+      withSample(theme) { env ->
+        val state = env.controller.state
         snapshot("inspector-tabs-live", size, theme) {
           val rows by state.taskList.rows.collectAsState()
           val row = rows.firstOrNull { it.name == "ubuntu-24.04-desktop-amd64.iso" }
@@ -198,8 +189,6 @@ class InspectorTabsSnapshots {
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }
@@ -237,7 +226,7 @@ private fun TabCard(label: String, width: Dp, content: @Composable () -> Unit) {
       .ketchSurface(KetchElevationLevel.E1, KetchTheme.shapes.lg, colors.surface, colors.hairline)
       .padding(spacing.s3),
   ) {
-    Text(eyebrowText(label), style = KetchTheme.typography.eyebrow, color = colors.textTertiary)
+    KetchEyebrow(label)
     content()
   }
 }

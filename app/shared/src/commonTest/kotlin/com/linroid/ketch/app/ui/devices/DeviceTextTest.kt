@@ -1,12 +1,9 @@
 package com.linroid.ketch.app.ui.devices
 
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
-import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.i18n.isEmpty
 import com.linroid.ketch.app.i18n.load
@@ -20,8 +17,9 @@ import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.LocalDeviceKind
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
-import com.linroid.ketch.app.state.PulseCounts
-import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.testStatus
+import com.linroid.ketch.app.testSystem
+import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.remote.ConnectionState
@@ -47,25 +45,16 @@ class DeviceTextTest {
   )
 
   private fun status(os: String = "Linux", arch: String = "amd64", uptime: Long = 3600) =
-    KetchStatus(
+    testStatus(
       name = "NAS-Basement",
       version = "0.0.1",
-      revision = "test",
       uptime = uptime,
-      config = DownloadConfig(),
-      system = SystemInfo(
+      system = testSystem(
         os = os,
         arch = arch,
-        separator = "/",
         javaVersion = "21",
         availableProcessors = 4,
-        maxMemory = 0,
-        totalMemory = 0,
-        freeMemory = 0,
         downloadDirectory = "/volume1/downloads",
-        totalSpace = 0,
-        freeSpace = 0,
-        usableSpace = 0,
       ),
     )
 
@@ -76,24 +65,15 @@ class DeviceTextTest {
     status: KetchStatus? = null,
     statusAt: Instant? = null,
     lastSeen: Instant? = null,
-  ) = DevicePresence(
+  ) = presence(
     entry = entry,
-    name = verbatim("NAS-Basement"),
+    name = "NAS-Basement",
     detail = "nas.local:8642",
     health = health,
     connected = connected,
-    watched = true,
     status = status,
     statusAt = statusAt,
     lastSeen = lastSeen,
-    speed = 0,
-    counts = PulseCounts(),
-    failures = 0,
-    unseenFailures = 0,
-    cap = SpeedLimit.Unlimited,
-    disk = null,
-    speedMode = SpeedMode.Full,
-    history = emptyList(),
   )
 
   @Test

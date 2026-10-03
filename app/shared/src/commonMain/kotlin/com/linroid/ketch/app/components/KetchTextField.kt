@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -30,11 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,7 +72,6 @@ fun KetchTextField(
   clearable: Boolean = true,
   onPaste: (() -> Unit)? = null,
   trailing: (@Composable RowScope.() -> Unit)? = null,
-  minLines: Int = 1,
   maxLines: Int = 1,
   textStyle: TextStyle? = null,
   keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -84,7 +80,9 @@ fun KetchTextField(
   visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
   val interactions = remember { MutableInteractionSource() }
-  val style = fieldTextStyle(mono, textStyle)
+  val type = KetchTheme.typography
+  val style = (textStyle ?: if (mono) type.mono else type.bodyS)
+    .copy(color = KetchTheme.colors.textPrimary)
   FieldFrame(
     modifier = modifier,
     label = label,
@@ -98,7 +96,6 @@ fun KetchTextField(
       onValueChange = onValueChange,
       enabled = enabled,
       singleLine = maxLines == 1,
-      minLines = minLines,
       maxLines = maxLines,
       textStyle = style,
       cursorBrush = SolidColor(KetchTheme.colors.accent),
@@ -126,84 +123,6 @@ fun KetchTextField(
       },
     )
   }
-}
-
-/**
- * [KetchTextField] over a [TextFieldValue], for callers that set the selection, such as the
- * intake sheet selecting text it prefilled from the clipboard.
- */
-@Composable
-fun KetchTextField(
-  value: TextFieldValue,
-  onValueChange: (TextFieldValue) -> Unit,
-  modifier: Modifier = Modifier,
-  placeholder: String = "",
-  leadingIcon: KetchIcon? = null,
-  mono: Boolean = false,
-  enabled: Boolean = true,
-  label: String? = null,
-  error: String? = null,
-  clearable: Boolean = true,
-  onPaste: (() -> Unit)? = null,
-  trailing: (@Composable RowScope.() -> Unit)? = null,
-  minLines: Int = 1,
-  maxLines: Int = 1,
-  textStyle: TextStyle? = null,
-  keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-  keyboardActions: KeyboardActions = KeyboardActions.Default,
-  onFocusChange: (Boolean) -> Unit = {},
-  visualTransformation: VisualTransformation = VisualTransformation.None,
-) {
-  val interactions = remember { MutableInteractionSource() }
-  val style = fieldTextStyle(mono, textStyle)
-  FieldFrame(
-    modifier = modifier,
-    label = label,
-    error = error,
-    enabled = enabled,
-    interactions = interactions,
-    onFocusChange = onFocusChange,
-  ) { fieldModifier ->
-    BasicTextField(
-      value = value,
-      onValueChange = onValueChange,
-      enabled = enabled,
-      singleLine = maxLines == 1,
-      minLines = minLines,
-      maxLines = maxLines,
-      textStyle = style,
-      cursorBrush = SolidColor(KetchTheme.colors.accent),
-      keyboardOptions = keyboardOptions,
-      keyboardActions = keyboardActions,
-      visualTransformation = visualTransformation,
-      interactionSource = interactions,
-      modifier = fieldModifier,
-      decorationBox = { inner ->
-        FieldDecoration(
-          isEmpty = value.text.isEmpty(),
-          placeholder = placeholder,
-          textStyle = style,
-          leadingIcon = leadingIcon,
-          multiline = maxLines > 1,
-          onClear = if (clearable && enabled && value.text.isNotEmpty()) {
-            { onValueChange(TextFieldValue("")) }
-          } else {
-            null
-          },
-          onPaste = onPaste.takeIf { enabled },
-          trailing = trailing,
-          inner = inner,
-        )
-      },
-    )
-  }
-}
-
-@Composable
-private fun fieldTextStyle(mono: Boolean, override: TextStyle?): TextStyle {
-  val type = KetchTheme.typography
-  val base = override ?: if (mono) type.mono else type.bodyS
-  return base.copy(color = KetchTheme.colors.textPrimary)
 }
 
 /** Label above, the bordered field, and the error below. */
@@ -338,12 +257,7 @@ private fun FieldAction(text: String, onClick: () -> Unit) {
     color = KetchTheme.colors.accentText,
     modifier = Modifier
       .background(overlay, shape)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, onClick = onClick)
       .padding(horizontal = KetchTheme.spacing.s2, vertical = KetchTheme.spacing.s1),
   )
 }

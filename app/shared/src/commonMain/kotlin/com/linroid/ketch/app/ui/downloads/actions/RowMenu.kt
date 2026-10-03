@@ -149,7 +149,6 @@ internal fun RowMenuAnchor(menu: RowMenuState, key: TaskKey, runner: RowActionRu
   Box(Modifier.absoluteOffset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }) {
     // Cancels the menu's gap below its anchor, so its corner sits at the pointer.
     RowMenu(
-      expanded = true,
       onDismissRequest = menu::close,
       rows = request.rows,
       runner = runner,
@@ -167,26 +166,18 @@ internal fun RowMenuAnchor(menu: RowMenuState, key: TaskKey, runner: RowActionRu
  */
 @Composable
 internal fun RowMenu(
-  expanded: Boolean,
   onDismissRequest: () -> Unit,
   rows: List<TaskRow>,
   runner: RowActionRunner,
   modifier: Modifier = Modifier,
   offset: DpOffset = DpOffset.Zero,
 ) {
-  if (!expanded || rows.isEmpty()) return
+  if (rows.isEmpty()) return
   val single = rows.singleOrNull()
   LaunchedEffect(single?.key) { single?.let(runner::checkFile) }
   val instances by runner.state.instances.collectAsState()
   val presence by runner.state.instanceManager.presence.collectAsState()
-  val context = RowMenuContext(
-    revealLabel = runner.files?.revealLabel,
-    devices = sendTargets(instances, rows, presence),
-    now = LocalClock.current.now(),
-    zone = TimeZone.currentSystemDefault(),
-    urgentVictim = urgentVictim(rows, runner),
-    send = rememberSendMode(),
-  )
+  val context = rowMenuContext(rows, runner, sendTargets(instances, rows, presence))
   val title = single?.name
     ?: pluralStringResource(Res.plurals.count_downloads, rows.size, rows.size)
   KetchMenu(
@@ -225,6 +216,21 @@ internal data class RowMenuContext(
   val zone: TimeZone = TimeZone.currentSystemDefault(),
   val urgentVictim: String? = null,
   val send: SendMode = SendMode(),
+)
+
+/** The [RowMenuContext] of a menu of [rows] open now, which can send them to [devices]. */
+@Composable
+internal fun rowMenuContext(
+  rows: List<TaskRow>,
+  runner: RowActionRunner,
+  devices: List<SendTarget>,
+): RowMenuContext = RowMenuContext(
+  revealLabel = runner.files?.revealLabel,
+  devices = devices,
+  now = LocalClock.current.now(),
+  zone = TimeZone.currentSystemDefault(),
+  urgentVictim = if (rows.isEmpty()) null else urgentVictim(rows, runner),
+  send = rememberSendMode(),
 )
 
 /**

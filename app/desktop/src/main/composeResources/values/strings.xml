@@ -27,11 +27,6 @@
   -->
   <string name="menu_item_keys">%1$s (%2$s)</string>
 
-  <!-- The speed modes, in the tray's Speed menus and in messages. -->
-  <string name="speed_full">Full speed</string>
-  <string name="speed_slow_lane">Slow lane</string>
-  <string name="speed_auto">Auto</string>
-
   <!-- The tray icon's menu. -->
   <string name="tray_devices">Devices</string>
   <!-- Submenu of the downloads that finished last on this computer. -->

@@ -74,22 +74,8 @@ internal object ListFixtures {
     device: DeviceInfo = this.device,
     speedSamples: List<Long> = emptyList(),
     now: Instant = START,
-  ): TaskRow {
-    val context = RowContext(device, now, TimeZone.UTC)
-    return TaskRow(
-      key = TaskKey(deviceId, id),
-      task = ListTestTask(id, state, request, createdAt),
-      request = request,
-      state = state,
-      segments = emptyList(),
-      createdAt = createdAt,
-      device = device,
-      content = rowContent(request, state, createdAt, context),
-      deviceName = device.name.plain,
-      errorTitle = null,
-      speedSamples = speedSamples,
-    )
-  }
+  ): TaskRow =
+    rowOf(ListTestTask(id, state, request, createdAt), device, deviceId, speedSamples, now)
 
   /** A clock that reads the virtual time of [scope], starting at [START]. */
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -97,4 +83,29 @@ internal object ListFixtures {
     override fun now(): Instant =
       Instant.fromEpochMilliseconds(START.toEpochMilliseconds() + scope.testScheduler.currentTime)
   }
+}
+
+/** The row of [task] on [device], built like [TaskListModel] builds one. */
+internal fun rowOf(
+  task: DownloadTask,
+  device: DeviceInfo = ListFixtures.device,
+  deviceId: String = LOCAL_DEVICE_ID,
+  speedSamples: List<Long> = emptyList(),
+  now: Instant = ListFixtures.START,
+): TaskRow {
+  val request = task.requestState.value
+  val state = task.state.value
+  return TaskRow(
+    key = TaskKey(deviceId, task.taskId),
+    task = task,
+    request = request,
+    state = state,
+    segments = task.segments.value,
+    createdAt = task.createdAt,
+    device = device,
+    content = rowContent(request, state, task.createdAt, RowContext(device, now, TimeZone.UTC)),
+    deviceName = device.name.plain,
+    errorTitle = null,
+    speedSamples = speedSamples,
+  )
 }

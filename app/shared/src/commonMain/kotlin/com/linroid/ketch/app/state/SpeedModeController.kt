@@ -244,7 +244,7 @@ class SpeedModeController(
   }
 
   private suspend fun applyLimit(settings: SpeedSettings, current: DownloadConfig) {
-    val limit = limitFor(settings, window)
+    val limit = limitFor(settings)
     if (current.speedLimit == limit) return
     log.i { "Speed limit on deviceId=$deviceId set to $limit, mode ${_mode.value}" }
     apply(current.copy(speedLimit = limit))
@@ -267,13 +267,9 @@ class SpeedModeController(
     }
   }
 
-  private fun limitFor(settings: SpeedSettings, window: SpeedWindow?): SpeedLimit {
-    val slowLane = when (settings.mode) {
-      SpeedLimitMode.Full -> false
-      SpeedLimitMode.SlowLane -> true
-      SpeedLimitMode.Auto -> window?.slowLane == true
-    }
-    if (!slowLane) return settings.standard
+  // The mode refreshMode just published for settings says whether the slow lane is on.
+  private fun limitFor(settings: SpeedSettings): SpeedLimit {
+    if (!_mode.value.isSlowLane) return settings.standard
     // The slow lane never runs faster than the standing cap.
     val speed = settings.slowLane ?: suggestedSlowLane
     return if (settings.standard.isUnlimited ||

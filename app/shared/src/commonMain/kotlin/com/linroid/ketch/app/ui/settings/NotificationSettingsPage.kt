@@ -9,6 +9,7 @@ import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.KetchSwitch
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -254,8 +255,8 @@ internal fun notifiesAbout(device: InstanceEntry, muted: List<String>): Boolean 
 
 @Composable
 private fun ModeSegmented(value: NotificationMode, onSelect: (NotificationMode) -> Unit) {
-  SettingsSegmented(
-    value = value,
+  KetchSegmented(
+    selected = value,
     options = NotificationMode.entries,
     label = { mode ->
       stringResource(

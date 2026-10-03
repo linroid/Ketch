@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -367,21 +366,6 @@ private class SettingsAnchorNode(var name: String) :
         color = jump.highlight.copy(alpha = jump.highlight.alpha * strength),
       )
     }
-  }
-}
-
-/** Runs [request] on the page once it is laid out; see [SettingsJump.jump]. */
-@Composable
-internal fun SettingsJumpEffect(
-  jump: SettingsJump,
-  request: SettingsJumpRequest?,
-  scroll: ScrollState,
-  content: () -> LayoutCoordinates?,
-  margin: Float,
-  animate: Boolean,
-) {
-  LaunchedEffect(jump, request) {
-    if (request != null) jump.jump(request.anchors, scroll, content, margin, animate)
   }
 }
 

@@ -14,13 +14,14 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.testStatus
+import com.linroid.ketch.app.testSystem
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.KetchConfig
@@ -699,38 +700,21 @@ class IntakeStateTest {
   fun intakeOutcome_freeSlots_startNowWithTheTime() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 2)
     val running = listOf(task("a", downloading(speed = 1_000_000)))
-    val outcome = intakeOutcome(
-      hosts = listOf("a.example"),
-      priority = DownloadPriority.NORMAL,
-      schedule = DownloadSchedule.Immediate,
-      config = config,
-      tasks = running,
-      bytes = 240_000_000,
-      now = NOW,
-      zone = TimeZone.UTC,
-    )
+    val outcome =
+      outcome(listOf("a.example"), DownloadPriority.NORMAL, config, running, 240_000_000)
 
-    assertEquals("Starts now · 1 of 2 slots free · ≈ 4 min at current speed", outcome.load())
+    assertEquals("Starts now · 1 of 2 slots free · ≈ 4 min at current speed", outcome)
   }
 
   @Test
   fun intakeOutcome_lessThanAMinuteLeft_saysSoWithoutApproximating() = runTest {
     val config = DownloadConfig(maxConcurrentDownloads = 2)
     val running = listOf(task("a", downloading(speed = 1_000_000)))
-    val outcome = intakeOutcome(
-      hosts = listOf("a.example"),
-      priority = DownloadPriority.NORMAL,
-      schedule = DownloadSchedule.Immediate,
-      config = config,
-      tasks = running,
-      bytes = 30_000_000,
-      now = NOW,
-      zone = TimeZone.UTC,
-    )
+    val outcome = outcome(listOf("a.example"), DownloadPriority.NORMAL, config, running, 30_000_000)
 
     assertEquals(
       "Starts now · 1 of 2 slots free · under a minute at current speed",
-      outcome.load(),
+      outcome,
     )
   }
 
@@ -824,13 +808,14 @@ class IntakeStateTest {
     priority: DownloadPriority,
     config: DownloadConfig,
     tasks: List<ListTestTask>,
+    bytes: Long? = null,
   ): String? = intakeOutcome(
     hosts = hosts,
     priority = priority,
     schedule = DownloadSchedule.Immediate,
     config = config,
     tasks = tasks,
-    bytes = null,
+    bytes = bytes,
     now = NOW,
     zone = TimeZone.UTC,
   ).load()
@@ -884,21 +869,16 @@ private class IntakeTestApi(
   override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
     check(url, properties)
 
-  override suspend fun status(): KetchStatus = KetchStatus(
+  override suspend fun status(): KetchStatus = testStatus(
     name = "This Mac",
+    config = DownloadConfig(maxConcurrentDownloads = 3),
     version = "1",
     revision = "r",
-    uptime = 0,
-    config = DownloadConfig(maxConcurrentDownloads = 3),
-    system = SystemInfo(
+    system = testSystem(
       os = "Mac OS X",
       arch = "aarch64",
-      separator = "/",
       javaVersion = "21",
       availableProcessors = 8,
-      maxMemory = 0,
-      totalMemory = 0,
-      freeMemory = 0,
       downloadDirectory = "/Users/me/Downloads",
       totalSpace = 1L shl 40,
       freeSpace = 1L shl 39,

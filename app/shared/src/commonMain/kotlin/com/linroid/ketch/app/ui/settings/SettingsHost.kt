@@ -207,11 +207,7 @@ internal fun SettingsContent(
         category = category,
         state = state,
         device = device,
-        appSettings = appSettings,
-        aiSettings = aiSettings,
         systemDeviceName = systemDeviceName,
-        onTestAi = { state.launchCommand { aiSettings.testConnection(aiSettings.settings) } },
-        fileLogger = fileLogger,
       )
     }
     val closeOrBack = {

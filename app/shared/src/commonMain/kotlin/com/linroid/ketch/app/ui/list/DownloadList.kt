@@ -31,25 +31,16 @@ internal fun DownloadList(
 ) {
   val spacing = KetchTheme.spacing
   val touch = KetchTheme.density == KetchDensity.Comfortable
-  val groups = view.groups
-  val entries = listEntries(groups, collapse)
   TaskLazyList(
-    entries = entries,
-    groups = groups,
+    groups = view.groups,
     actions = actions,
     collapse = collapse,
     listState = listState,
+    headerHeight = if (touch) spacing.s8 else spacing.tableGroupHeaderHeight,
+    headerPadding = spacing.s4,
     modifier = modifier,
     contentPadding = PaddingValues(top = spacing.s1, bottom = bottomPadding),
-    header = { entry ->
-      GroupHeader(
-        entry = entry,
-        onToggle = { collapse.toggle(entry.group) },
-        height = if (touch) spacing.s8 else spacing.tableGroupHeaderHeight,
-        padding = spacing.s4,
-        trailing = { groupAction(entry.group) },
-      )
-    },
+    groupAction = groupAction,
     row = { row -> DownloadListRow(row, actions, Modifier.then(placement())) },
   )
 }

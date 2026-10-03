@@ -18,19 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.feedback.ToastMode
 import com.linroid.ketch.app.i18n.verbatim
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DevicePulse
@@ -67,17 +62,12 @@ import com.linroid.ketch.app.ui.pulse.SpeedModePillContent
 import com.linroid.ketch.app.ui.pulse.SpeedModeView
 import com.linroid.ketch.app.ui.pulse.speedModeLabelText
 import com.linroid.ketch.app.ui.pulse.totalHistory
-import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedSettings
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.yield
 import kotlinx.datetime.TimeZone
 import kotlin.math.PI
 import kotlin.math.roundToLong
@@ -478,70 +468,29 @@ private fun withPulseApp(
   setup: suspend AppState.() -> Unit = {},
   render: (AppState) -> Unit,
 ) {
-  val data = SampleData.downloads()
-  val density = if (size.density == KetchDensity.Compact) {
-    DensityMode.Compact
-  } else {
-    DensityMode.Comfortable
-  }
-  val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
-  val manager = runBlocking(SnapshotHarness.ui) {
-    InstanceManager(
-      factory = InstanceFactory(
-        deviceName = data.deviceName,
-        embeddedFactory = { SampleKetchApi(data) },
-      ),
-      initialRemotes = data.remotes,
-      configStore = RecordingConfigStore(data.config(theme, density)),
+  val environment = {
+    SampleEnvironment(
+      data = SampleData.downloads(),
+      theme = theme,
+      density = size.density.toMode(),
+      speedMode = { engine, scope ->
+        SpeedModeController(
+          config = { engine.status().config },
+          apply = { engine.updateConfig(it) },
+          scope = scope,
+          settings = SpeedSettings(
+            mode = if (slowLane) SpeedLimitMode.SlowLane else SpeedLimitMode.Full,
+          ),
+          observedPeak = ObservedPeak(10L shl 20, SampleData.NOW.toEpochMilliseconds()),
+        )
+      },
+      wave = { second, _ -> 0.8 + 0.18 * sin(second * PI / 23) },
     )
   }
-  val engine = checkNotNull(manager.embedded)
-  val speedMode = runBlocking(SnapshotHarness.ui) {
-    SpeedModeController(
-      config = { engine.status().config },
-      apply = { engine.updateConfig(it) },
-      scope = speedScope,
-      settings = SpeedSettings(
-        mode = if (slowLane) SpeedLimitMode.SlowLane else SpeedLimitMode.Full,
-      ),
-      observedPeak = ObservedPeak(10L shl 20, SampleData.NOW.toEpochMilliseconds()),
-    )
-  }
-  val controller = runBlocking(SnapshotHarness.ui) {
-    AppController(
-      instanceManager = manager,
-      context = SnapshotHarness.ui,
-      speedMode = speedMode,
-      clock = SampleData.CLOCK,
-    )
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      repeat(3) { yield() }
-      seedHistory(controller, data)
-      withTimeout(5.seconds) { controller.taskList.rows.first { it.size == data.tasks.size } }
-      controller.state.setup()
-    }
+  withEnvironment(environment) {
+    runBlocking(SnapshotHarness.ui) { it.controller.state.setup() }
     // The harness renders on the UI thread itself, so the snapshot is taken from this one.
-    render(controller.state)
-  } finally {
-    runBlocking(SnapshotHarness.ui) {
-      controller.close()
-      speedScope.cancel()
-      manager.instances.value.filterIsInstance<RemoteInstance>().forEach { it.instance.close() }
-      manager.close()
-    }
-  }
-}
-
-private fun seedHistory(controller: AppController, data: SampleData) {
-  val keys = data.tasks.associate { TaskKey(LOCAL_DEVICE_ID, it.taskId) to it.state.value }
-  for (second in 180 downTo 0) {
-    val speeds = keys.mapValues { (_, state) ->
-      val speed = (state as? DownloadState.Downloading)?.progress?.bytesPerSecond
-      speed?.let { (it * (0.8 + 0.18 * sin(second * PI / 23))).roundToLong() }
-    }
-    controller.speedHistory.record(SampleData.NOW - second.seconds, speeds)
+    render(it.controller.state)
   }
 }
 

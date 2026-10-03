@@ -1,13 +1,11 @@
 package com.linroid.ketch.app.ui.shell
 
 import com.linroid.ketch.app.RecordingConfigStore
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.RecordingKetchApi
+import com.linroid.ketch.app.testController
 import com.linroid.ketch.config.KetchConfig
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -17,13 +15,8 @@ import kotlin.test.assertTrue
 
 class ShellStateTest {
 
-  private fun TestScope.controller(): AppController = AppController(
-    instanceManager = InstanceManager(
-      factory = InstanceFactory(deviceName = "This phone", embeddedFactory = ::RecordingKetchApi),
-      configStore = RecordingConfigStore(KetchConfig()),
-    ),
-    context = StandardTestDispatcher(testScheduler),
-  )
+  private fun TestScope.controller(): AppController =
+    testController(RecordingKetchApi(), RecordingConfigStore(KetchConfig()), "This phone")
 
   @Test
   fun show_otherDestinationWhilePhoneSearchIsOpen_clearsTheSearch() = runTest {

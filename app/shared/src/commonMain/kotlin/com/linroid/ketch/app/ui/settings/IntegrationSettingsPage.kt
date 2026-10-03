@@ -15,6 +15,7 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
@@ -254,8 +255,8 @@ private fun ClipboardGroup(appSettings: AppSettingsController) {
         },
       ),
       trailing = {
-        SettingsSegmented(
-          value = mode,
+        KetchSegmented(
+          selected = mode,
           options = ClipboardMode.entries,
           label = { option ->
             stringResource(

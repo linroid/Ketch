@@ -51,13 +51,7 @@ data class KetchMotion(
   val pulseAlpha: Float = 0.28f,
   val pulseGrowth: Dp = 5.dp,
   val reduced: Boolean = false,
-) {
-  /** Emphasized enter; the same curve as [easeDecelerate]. */
-  val easeEmphasized: Easing get() = easeDecelerate
-
-  /** No easing. */
-  val easeLinear: Easing get() = LinearEasing
-}
+)
 
 /** The motion tokens, or the still version when [reduceMotion] is set. */
 fun ketchMotion(reduceMotion: Boolean = false): KetchMotion {

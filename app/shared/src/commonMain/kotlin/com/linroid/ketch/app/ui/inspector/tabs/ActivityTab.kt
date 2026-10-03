@@ -23,6 +23,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
@@ -42,7 +43,7 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
+import com.linroid.ketch.app.util.clockTime
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_activity_empty
 import ketch.app.shared.generated.resources.inspector_activity_now
@@ -198,11 +199,7 @@ private fun Timeline(entries: List<TimelineEntry>, timeZone: TimeZone) {
   var expanded by remember { mutableStateOf(false) }
   val hidden = if (expanded) 0 else (entries.size - TIMELINE_SHOWN).coerceAtLeast(0)
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-    Text(
-      text = eyebrowText(stringResource(Res.string.inspector_activity_since)),
-      style = type.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow(stringResource(Res.string.inspector_activity_since))
     if (hidden > 0) {
       KetchButton(
         text = pluralStringResource(Res.plurals.inspector_activity_show_earlier, hidden, hidden),

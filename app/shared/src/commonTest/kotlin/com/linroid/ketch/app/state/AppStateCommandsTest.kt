@@ -9,16 +9,17 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.backgroundChild
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.EmbeddedInstance
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.testController
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.IntakePreferences
@@ -26,8 +27,6 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -52,18 +51,13 @@ class AppStateCommandsTest {
   @BeforeTest
   fun loadStrings() = runTest { warmStrings() }
 
-  private fun TestScope.controller(
-    api: KetchApi,
-    configStore: ConfigStore? = null,
-  ): AppController = AppController(
-    instanceManager = InstanceManager(
-      factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
-      configStore = configStore,
-    ),
-    // A child of the background scope, so a failed assertion never leaves its loops running.
-    context = backgroundScope.coroutineContext +
-      SupervisorJob(backgroundScope.coroutineContext[Job]),
-  )
+  private fun TestScope.controller(api: KetchApi, configStore: ConfigStore? = null) =
+    testController(api, configStore, context = backgroundChild())
+
+  private fun commandsTest(
+    api: RecordingKetchApi = RecordingKetchApi(),
+    block: suspend TestScope.(RecordingKetchApi, AppController) -> Unit,
+  ) = fixtureTest({ controller(api) }, AppController::close) { block(api, it) }
 
   private fun AppController.errors(): List<AppMessage> =
     messages.history.value.filter { it.level == MessageLevel.Error }
@@ -73,9 +67,7 @@ class AppStateCommandsTest {
   }
 
   @Test
-  fun runTaskCommand_failure_postsOneErrorNamingTheDevice() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun runTaskCommand_failure_postsOneErrorNamingTheDevice() = commandsTest { api, controller ->
     val task = api.add(downloading).apply { failure = IllegalStateException("Connection lost") }
 
     controller.state.runTaskCommand(task, "set speed limit", failure("set speed limit")) {
@@ -87,13 +79,10 @@ class AppStateCommandsTest {
     assertEquals("Couldn't set speed limit on This Mac", error.title.load())
     assertEquals(TaskKey(LOCAL_DEVICE_ID, task.taskId), error.taskKey)
     assertIs<IllegalStateException>(error.cause)
-    controller.close()
   }
 
   @Test
-  fun runTaskCommand_afterAFailure_scopeStillRunsCommands() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun runTaskCommand_afterAFailure_scopeStillRunsCommands() = commandsTest { api, controller ->
     val failing = api.add(downloading).apply { failure = IllegalStateException("Server said no") }
     val other = api.add(downloading)
 
@@ -104,13 +93,10 @@ class AppStateCommandsTest {
 
     assertEquals(listOf("pause"), other.calls)
     assertIs<DownloadState.Paused>(other.state.value)
-    controller.close()
   }
 
   @Test
-  fun runTaskCommand_cancelled_postsNothing() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun runTaskCommand_cancelled_postsNothing() = commandsTest { api, controller ->
     val task = api.add(downloading)
 
     val command = controller.state.runTaskCommand(task, "pause", failure("pause")) {
@@ -122,26 +108,20 @@ class AppStateCommandsTest {
 
     assertTrue(controller.errors().isEmpty())
     assertTrue(controller.state.pending.value.isEmpty())
-    controller.close()
   }
 
   @Test
-  fun runTaskCommand_callThrowsCancellation_postsOneError() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun runTaskCommand_callThrowsCancellation_postsOneError() = commandsTest { api, controller ->
     val task = api.add(downloading).apply { failure = CancellationException("Client closed") }
 
     controller.state.runTaskCommand(task, "pause", failure("pause")) { pause() }
     runCurrent()
 
     assertEquals("Couldn't pause on This Mac", controller.errors().single().title.load())
-    controller.close()
   }
 
   @Test
-  fun runTaskCommand_inFlight_isPending() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun runTaskCommand_inFlight_isPending() = commandsTest { api, controller ->
     val task = api.add(downloading)
     val gate = CompletableDeferred<Unit>()
 
@@ -156,31 +136,26 @@ class AppStateCommandsTest {
     gate.complete(Unit)
     runCurrent()
     assertTrue(controller.state.pending.value.isEmpty())
-    controller.close()
   }
 
   @Test
-  fun pauseAll_queueWouldPromote_leavesNothingDownloading() = runTest {
-    val api = RecordingKetchApi(maxActive = 2)
-    val controller = controller(api)
-    val running = List(2) { api.add(downloading) }
-    val queued = List(3) { api.add(DownloadState.Queued) }
-    val done = api.add(DownloadState.Completed("/downloads/done.iso"))
+  fun pauseAll_queueWouldPromote_leavesNothingDownloading() =
+    commandsTest(RecordingKetchApi(maxActive = 2)) { api, controller ->
+      val running = List(2) { api.add(downloading) }
+      val queued = List(3) { api.add(DownloadState.Queued) }
+      val done = api.add(DownloadState.Completed("/downloads/done.iso"))
 
-    controller.state.pauseAll()
-    runCurrent()
+      controller.state.pauseAll()
+      runCurrent()
 
-    assertTrue(api.tasks.value.none { it.state.value is DownloadState.Downloading })
-    assertTrue((running + queued).all { it.state.value is DownloadState.Paused })
-    assertTrue(done.calls.isEmpty())
-    assertEquals("Paused 5 downloads", controller.messages.active.value.last().title.load())
-    controller.close()
-  }
+      assertTrue(api.tasks.value.none { it.state.value is DownloadState.Downloading })
+      assertTrue((running + queued).all { it.state.value is DownloadState.Paused })
+      assertTrue(done.calls.isEmpty())
+      assertEquals("Paused 5 downloads", controller.messages.active.value.last().title.load())
+    }
 
   @Test
-  fun pauseAll_oneTaskFails_pausesTheOthersAndReportsIt() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun pauseAll_oneTaskFails_pausesTheOthersAndReportsIt() = commandsTest { api, controller ->
     val failing = api.add(downloading).apply { failure = CancellationException("Client closed") }
     val others = List(2) { api.add(downloading) }
 
@@ -192,13 +167,10 @@ class AppStateCommandsTest {
     val toast = controller.messages.active.value.last()
     assertEquals(MessageLevel.Warning, toast.level)
     assertEquals("Paused 2 downloads · 1 failed", toast.title.load())
-    controller.close()
   }
 
   @Test
-  fun pauseAll_nothingPaused_leavesUndoToTheEarlierOperation() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun pauseAll_nothingPaused_leavesUndoToTheEarlierOperation() = commandsTest { api, controller ->
     val removed = api.add(DownloadState.Completed("/downloads/a.iso"))
     api.add(downloading).apply { failure = IllegalStateException("Server said no") }
 
@@ -212,13 +184,10 @@ class AppStateCommandsTest {
     )
     assertEquals(1, controller.errors().size)
     assertTrue(controller.state.pendingOps.undoLast())
-    controller.close()
   }
 
   @Test
-  fun pauseAll_undo_resumesExactlyThePausedTasks() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun pauseAll_undo_resumesExactlyThePausedTasks() = commandsTest { api, controller ->
     val running = api.add(downloading)
     val queued = api.add(DownloadState.Queued)
     val alreadyPaused = api.add(paused)
@@ -231,13 +200,10 @@ class AppStateCommandsTest {
     assertEquals(listOf("pause", "resume"), running.calls)
     assertEquals(listOf("pause", "resume"), queued.calls)
     assertTrue(alreadyPaused.calls.isEmpty())
-    controller.close()
   }
 
   @Test
-  fun retryFailed_errorWithNothingToResume_downloadsAgain() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun retryFailed_errorWithNothingToResume_downloadsAgain() = commandsTest { api, controller ->
     val dropped = api.add(DownloadState.Failed(KetchError.Network()))
     val changed = api.add(DownloadState.Failed(KetchError.FileChanged("ETag changed")))
     val refused = api.add(DownloadState.Failed(KetchError.Http(416)))
@@ -254,13 +220,10 @@ class AppStateCommandsTest {
       listOf(changed, refused, unsupported).map { it.request.url },
       api.requests.map { it.url },
     )
-    controller.close()
   }
 
   @Test
-  fun retry_eachState_resumesOrStartsOver() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun retry_eachState_resumesOrStartsOver() = commandsTest { api, controller ->
     val dropped = api.add(DownloadState.Failed(KetchError.Network()))
     val changed = api.add(DownloadState.Failed(KetchError.FileChanged("ETag changed")))
     val canceled = api.add(DownloadState.Canceled)
@@ -276,13 +239,10 @@ class AppStateCommandsTest {
     assertEquals(listOf("remove deleteFiles=true"), canceled.calls)
     assertTrue(running.calls.isEmpty())
     assertEquals(listOf(changed, canceled).map { it.request.url }, api.requests.map { it.url })
-    controller.close()
   }
 
   @Test
-  fun redownload_delayedRequest_startsAtOnce() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun redownload_delayedRequest_startsAtOnce() = commandsTest { api, controller ->
     val request = DownloadRequest(
       url = "https://example.com/a.iso",
       schedule = DownloadSchedule.AfterDelay(30.minutes),
@@ -296,13 +256,10 @@ class AppStateCommandsTest {
     val again = api.requests.single()
     assertEquals(request.url, again.url)
     assertEquals(DownloadSchedule.Immediate, again.schedule)
-    controller.close()
   }
 
   @Test
-  fun remove_hidesRowsAtOnceAndUndoRestoresThem() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun remove_hidesRowsAtOnceAndUndoRestoresThem() = commandsTest { api, controller ->
     val state = controller.state
     val first = api.add(DownloadState.Completed("/downloads/a.iso"))
     val second = api.add(downloading)
@@ -318,13 +275,10 @@ class AppStateCommandsTest {
     runCurrent()
     assertEquals(listOf(first, second), state.tasks.value)
     assertTrue(first.calls.isEmpty())
-    controller.close()
   }
 
   @Test
-  fun remove_windowEnds_removesTheTaskAfterSixSeconds() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun remove_windowEnds_removesTheTaskAfterSixSeconds() = commandsTest { api, controller ->
     val task = api.add(DownloadState.Completed("/downloads/a.iso"))
 
     controller.state.remove(listOf(task))
@@ -336,7 +290,6 @@ class AppStateCommandsTest {
     runCurrent()
     assertEquals(listOf("remove deleteFiles=false"), task.calls)
     assertTrue(api.tasks.value.isEmpty())
-    controller.close()
   }
 
   @Test
@@ -354,10 +307,8 @@ class AppStateCommandsTest {
   }
 
   @Test
-  fun sendTo_copy_keepsTheTaskOptionsAndTheSource() = runTest {
-    val api = RecordingKetchApi()
+  fun sendTo_copy_keepsTheTaskOptionsAndTheSource() = commandsTest { api, controller ->
     val nas = RecordingKetchApi("NAS")
-    val controller = controller(api)
     val request = DownloadRequest(
       url = "https://example.com/ubuntu.iso",
       destination = Destination("/Users/me/Downloads/ubuntu.iso"),
@@ -380,14 +331,11 @@ class AppStateCommandsTest {
     assertEquals(Destination("ubuntu.iso"), sent.destination)
     assertTrue(task.calls.isEmpty())
     assertEquals("Sent ubuntu.iso to NAS", controller.messages.history.value.first().title.load())
-    controller.close()
   }
 
   @Test
-  fun sendTo_moveAndAdded_removesTheSourceWhenTheWindowEnds() = runTest {
-    val api = RecordingKetchApi()
+  fun sendTo_moveAndAdded_removesTheSourceWhenTheWindowEnds() = commandsTest { api, controller ->
     val nas = RecordingKetchApi("NAS")
-    val controller = controller(api)
     val task = api.add(paused)
     val key = TaskKey(LOCAL_DEVICE_ID, task.taskId)
     controller.state.selectedKeys = setOf(key)
@@ -403,16 +351,13 @@ class AppStateCommandsTest {
     runCurrent()
     // The paused source's partial file goes with it; the copy starts over on the NAS.
     assertEquals(listOf("remove deleteFiles=true"), task.calls)
-    controller.close()
   }
 
   @Test
-  fun sendTo_moveButAddFailed_keepsTheSource() = runTest {
-    val api = RecordingKetchApi()
+  fun sendTo_moveButAddFailed_keepsTheSource() = commandsTest { api, controller ->
     val nas = RecordingKetchApi("NAS").apply {
       downloadFailure = { IllegalStateException("Connection refused") }
     }
-    val controller = controller(api)
     val task = api.add(paused)
 
     controller.state.sendTo(listOf(task), EmbeddedInstance(nas, "NAS"), move = true)
@@ -422,31 +367,29 @@ class AppStateCommandsTest {
     assertTrue(task.calls.isEmpty())
     assertTrue(controller.state.pendingOps.hidden.value.isEmpty())
     assertEquals("Couldn't send file1.bin to NAS", controller.errors().single().title.load())
-    controller.close()
   }
 
   @Test
-  fun startNow_noFreeSlot_namesThePreemptedTaskAndUndoRestoresIt() = runTest {
-    val api = RecordingKetchApi(maxActive = 1)
-    val controller = controller(api)
-    val running = api.add(downloading, DownloadRequest("https://example.com/debian.iso"))
-    val waiting = api.add(DownloadState.Queued, DownloadRequest("https://example.com/blender.dmg"))
+  fun startNow_noFreeSlot_namesThePreemptedTaskAndUndoRestoresIt() =
+    commandsTest(RecordingKetchApi(maxActive = 1)) { api, controller ->
+      val running = api.add(downloading, DownloadRequest("https://example.com/debian.iso"))
+      val waiting =
+        api.add(DownloadState.Queued, DownloadRequest("https://example.com/blender.dmg"))
 
-    controller.state.startNow(waiting)
-    runCurrent()
-    assertEquals(
-      "Started blender.dmg now · paused debian.iso to make room",
-      controller.messages.active.value.last().title.load(),
-    )
-    assertIs<DownloadState.Downloading>(waiting.state.value)
+      controller.state.startNow(waiting)
+      runCurrent()
+      assertEquals(
+        "Started blender.dmg now · paused debian.iso to make room",
+        controller.messages.active.value.last().title.load(),
+      )
+      assertIs<DownloadState.Downloading>(waiting.state.value)
 
-    controller.click("Undo")
-    runCurrent()
-    assertEquals(DownloadPriority.NORMAL, waiting.request.priority)
-    assertIs<DownloadState.Downloading>(running.state.value)
-    assertIs<DownloadState.Queued>(waiting.state.value)
-    controller.close()
-  }
+      controller.click("Undo")
+      runCurrent()
+      assertEquals(DownloadPriority.NORMAL, waiting.request.priority)
+      assertIs<DownloadState.Downloading>(running.state.value)
+      assertIs<DownloadState.Queued>(waiting.state.value)
+    }
 
   @Test
   fun quickAdd_link_usesTheOptionsLastUsedOnTheDevice() = runTest {
@@ -476,10 +419,7 @@ class AppStateCommandsTest {
   }
 
   @Test
-  fun quickAdd_undo_removesTheTaskAndItsFile() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
-
+  fun quickAdd_undo_removesTheTaskAndItsFile() = commandsTest { api, controller ->
     controller.state.quickAdd(listOf("https://example.com/ubuntu.iso"))
     runCurrent()
     val task = api.tasks.value.single() as RecordingTask
@@ -487,7 +427,6 @@ class AppStateCommandsTest {
     runCurrent()
 
     assertEquals(listOf("remove deleteFiles=true"), task.calls)
-    controller.close()
   }
 }
 

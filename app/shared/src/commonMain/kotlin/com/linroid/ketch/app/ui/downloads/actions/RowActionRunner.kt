@@ -25,7 +25,6 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.platform.FileActions
-import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
@@ -40,6 +39,7 @@ import com.linroid.ketch.app.ui.dialog.RemovalPlan
 import com.linroid.ketch.app.ui.list.CopiedText
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.ui.list.TaskCommand
+import com.linroid.ketch.app.ui.list.outputFile
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_try_again
 import ketch.app.shared.generated.resources.action_undo
@@ -110,10 +110,7 @@ internal sealed interface RowDialog {
  * @property action what runs.
  * @property rows the rows among the targets it applies to, in display order.
  */
-internal data class BatchAction(val action: RowAction, val rows: List<TaskRow>) {
-  /** How many rows it applies to. */
-  val count: Int get() = rows.size
-}
+internal data class BatchAction(val action: RowAction, val rows: List<TaskRow>)
 
 /**
  * Runs the [RowAction]s of the Downloads list on one row or on every selected row, and holds the
@@ -124,19 +121,21 @@ internal data class BatchAction(val action: RowAction, val rows: List<TaskRow>) 
  * offer Try again for the rows that failed. Removing, clearing and discarding progress go through
  * the Undo of [AppState].
  *
- * @param files opens, reveals and trashes downloaded files; `null` where they are out of reach.
- * @param clipboard receives copied links and paths; `null` where there is none.
- * @param scope runs clipboard writes and file checks. Batches run in the app's scope instead,
- *   so leaving the screen never stops one with half the rows done, and Try again still works.
+ * @param scope runs file checks; [commands]' own by default. Batches run in the app's scope
+ *   instead, so leaving the screen never stops one with half the rows done, and Try again still
+ *   works.
  */
 @Stable
 internal class RowActionRunner(
-  val state: AppState,
   val commands: RowCommands,
-  val files: FileActions?,
-  private val clipboard: SystemClipboard?,
-  private val scope: CoroutineScope,
+  private val scope: CoroutineScope = commands.scope,
 ) {
+  /** The app the rows belong to. */
+  val state: AppState = commands.state
+
+  /** Opens, reveals and trashes downloaded files; `null` where they are out of reach. */
+  val files: FileActions? = commands.files
+
   private val log = KetchLogger("RowActions")
   private val missing = mutableStateMapOf<TaskKey, Boolean>()
 
@@ -158,7 +157,7 @@ internal class RowActionRunner(
    */
   fun checkFile(row: TaskRow) {
     val files = files ?: return
-    val path = (row.state as? DownloadState.Completed)?.outputPath?.ifBlank { null } ?: return
+    val path = row.outputFile ?: return
     if (row.device.capabilities.isRemote) return
     scope.launch {
       catchingUnlessCancelled { files.exists(path) }
@@ -258,18 +257,14 @@ internal class RowActionRunner(
   }
 
   /** Caps each of [rows] at [limit]. */
-  fun setSpeedLimit(rows: List<TaskRow>, limit: SpeedLimit) {
-    val row = rows.singleOrNull()
-    if (row != null) {
-      commands.setSpeedLimit(row, limit)
-      return
-    }
+  fun setSpeedLimit(rows: List<TaskRow>, limit: SpeedLimit): Job {
+    rows.singleOrNull()?.let { return commands.setSpeedLimit(it, limit) }
     val done = if (limit.isUnlimited) {
       { n: Int -> Res.plurals.downloads_batch_unlimited.text(n) }
     } else {
       { n: Int -> Res.plurals.downloads_batch_limited.text(n, n, speedLimitText(limit)) }
     }
-    launchBatch(rows, TaskCommand.SpeedLimit, done) { setSpeedLimit(limit) }
+    return launchBatch(rows, TaskCommand.SpeedLimit, done) { setSpeedLimit(limit) }
   }
 
   /** Splits [total] evenly between [rows], each capped at its share. */
@@ -282,37 +277,26 @@ internal class RowActionRunner(
   }
 
   /** Gives each of [rows] [priority]. */
-  fun setPriority(rows: List<TaskRow>, priority: DownloadPriority) {
-    val row = rows.singleOrNull()
-    if (row != null) {
-      commands.setPriority(row, priority)
-      return
-    }
-    launchBatch(rows, TaskCommand.Priority, { n ->
+  fun setPriority(rows: List<TaskRow>, priority: DownloadPriority): Job {
+    rows.singleOrNull()?.let { return commands.setPriority(it, priority) }
+    return launchBatch(rows, TaskCommand.Priority, { n ->
       Res.plurals.downloads_batch_priority.text(n, n, priorityText(priority))
     }) { setPriority(priority) }
   }
 
   /** Lets each of [rows] open [connections] connections, or peers for a torrent. */
-  fun setConnections(rows: List<TaskRow>, connections: Int) {
-    val row = rows.singleOrNull()
-    if (row != null) {
-      commands.setConnections(row, connections)
-      return
-    }
-    launchBatch(rows, TaskCommand.Connections, { n ->
+  fun setConnections(rows: List<TaskRow>, connections: Int): Job {
+    rows.singleOrNull()?.let { return commands.setConnections(it, connections) }
+    return launchBatch(rows, TaskCommand.Connections, { n ->
       Res.plurals.downloads_batch_connections.text(n, n, connections)
     }) { setConnections(connections) }
   }
 
   /** Starts each of [rows] at [schedule]. */
-  fun reschedule(rows: List<TaskRow>, schedule: DownloadSchedule) {
-    val row = rows.singleOrNull()
-    if (row != null) {
-      commands.reschedule(row, schedule)
-      return
-    }
-    launchBatch(rows, TaskCommand.Reschedule, counted(Res.plurals.downloads_batch_rescheduled)) {
+  fun reschedule(rows: List<TaskRow>, schedule: DownloadSchedule): Job {
+    rows.singleOrNull()?.let { return commands.reschedule(it, schedule) }
+    val done = counted(Res.plurals.downloads_batch_rescheduled)
+    return launchBatch(rows, TaskCommand.Reschedule, done) {
       reschedule(schedule)
     }
   }
@@ -384,8 +368,8 @@ internal class RowActionRunner(
         dialog = RowDialog.Remove(applies, withFiles = true)
       }
       RowAction.Remove -> state.remove(applies.map { it.task })
-      RowAction.CopyLink -> copy(applies.map { it.request.url }, CopiedText.Link)
-      RowAction.CopyPath -> copy(applies.mapNotNull { it.outputFile }, CopiedText.Path)
+      RowAction.CopyLink -> commands.copy(CopiedText.Link) { applies.map { it.request.url } }
+      RowAction.CopyPath -> commands.copy(CopiedText.Path) { applies.mapNotNull { it.outputFile } }
       else -> applies.forEach { commands.run(action, it) }
     }
   }
@@ -540,18 +524,6 @@ internal class RowActionRunner(
     }
   }
 
-  private fun copy(lines: List<String>, what: CopiedText) {
-    val clipboard = clipboard ?: return
-    if (lines.isEmpty()) return
-    scope.launch {
-      catchingUnlessCancelled { clipboard.writeText(lines.joinToString("\n")) }
-        .onSuccess { state.messages.post(MessageLevel.Success, what.copied(lines.size)) }
-        .onFailure { e ->
-          state.messages.post(MessageLevel.Error, what.failed(lines.size), cause = e)
-        }
-    }
-  }
-
   private companion object {
     /** Order of the actions a selection offers. */
     val BATCH_ORDER: List<RowAction> = listOf(
@@ -580,14 +552,19 @@ internal class RowActionRunner(
 /** [RowActionRunner] of the app shown around this composition. */
 @Composable
 internal fun rememberRowActionRunner(): RowActionRunner {
-  val state = LocalAppState.current
+  val commands = rememberRowCommands(LocalAppState.current)
+  return remember(commands) { RowActionRunner(commands) }
+}
+
+/** [RowCommands] of [state], with this platform's files, clipboard and browser. */
+@Composable
+internal fun rememberRowCommands(state: AppState): RowCommands {
   val files = rememberFileActions()
   val clipboard = rememberSystemClipboard()
   val uriHandler = LocalUriHandler.current
   val scope = rememberCoroutineScope()
   return remember(state, files, clipboard, uriHandler, scope) {
-    val commands = RowCommands(state, files, clipboard, scope, uriHandler::openUri)
-    RowActionRunner(state, commands, files, clipboard, scope)
+    RowCommands(state, files, clipboard, scope, uriHandler::openUri)
   }
 }
 
@@ -601,10 +578,6 @@ private class TrashResult(
   val trashError: Throwable? = null,
   val removeError: Throwable? = null,
 )
-
-/** Path of the file a completed row saved, or `null`. */
-internal val TaskRow.outputFile: String?
-  get() = (state as? DownloadState.Completed)?.outputPath?.ifBlank { null }
 
 /** "1 download" or "3 downloads", as messages name a number of downloads. */
 internal fun downloadsText(count: Int): UiText = Res.plurals.count_downloads.text(count)

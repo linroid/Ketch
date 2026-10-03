@@ -15,13 +15,13 @@ import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.ui.devices.RemoveDeviceDialog
 import com.linroid.ketch.app.ui.devices.RenameDeviceDialog
 import com.linroid.ketch.app.ui.devices.openDeviceSettings
+import com.linroid.ketch.app.ui.devices.renameAndRemoveItems
 import com.linroid.ketch.app.ui.devices.setSpeedLimit
 import com.linroid.ketch.app.ui.devices.speedModeOf
 import com.linroid.ketch.app.ui.devices.switchSpeedMode
@@ -32,15 +32,12 @@ import ketch.app.shared.generated.resources.device_switch_to
 import ketch.app.shared.generated.resources.sidebar_menu_full_speed
 import ketch.app.shared.generated.resources.sidebar_menu_no_limit
 import ketch.app.shared.generated.resources.sidebar_menu_pause_all
-import ketch.app.shared.generated.resources.sidebar_menu_remove
-import ketch.app.shared.generated.resources.sidebar_menu_rename
 import ketch.app.shared.generated.resources.sidebar_menu_resume_all
 import ketch.app.shared.generated.resources.sidebar_menu_retry_failed
 import ketch.app.shared.generated.resources.sidebar_menu_retry_failed_count
 import ketch.app.shared.generated.resources.sidebar_menu_settings
 import ketch.app.shared.generated.resources.sidebar_menu_slow_lane
 import ketch.app.shared.generated.resources.sidebar_menu_speed
-import ketch.app.shared.generated.resources.sidebar_menu_stay_connected
 
 /**
  * The menu of [device], opened by a right click or a long press on its sidebar row or rail
@@ -134,20 +131,7 @@ internal fun KetchMenuScope.deviceCommands(
     onClick = { state.openDeviceSettings(entry) },
     icon = KetchIcon.Settings,
   )
-  item(label = Res.string.sidebar_menu_rename.text(), onClick = onRename)
-  val remote = entry as? RemoteInstance ?: return
-  item(
-    label = Res.string.sidebar_menu_stay_connected.text(),
-    onClick = { state.instanceManager.setWatched(remote, !device.watched) },
-    checked = device.watched,
-  )
-  divider()
-  item(
-    label = Res.string.sidebar_menu_remove.text(),
-    onClick = onRemove,
-    icon = KetchIcon.Trash,
-    destructive = true,
-  )
+  renameAndRemoveItems(state, device, onRename, onRemove)
 }
 
 /**

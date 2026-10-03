@@ -29,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -66,7 +65,6 @@ fun <T> KetchSegmented(
   onSelect: (T) -> Unit,
   label: @Composable (T) -> String,
   modifier: Modifier = Modifier,
-  enabled: Boolean = true,
   count: (T) -> Int? = { null },
   alert: (T) -> Boolean = { false },
   icon: (T) -> KetchIcon? = { null },
@@ -105,7 +103,6 @@ fun <T> KetchSegmented(
   val density = LocalDensity.current
   Box(
     modifier = modifier
-      .graphicsLayer { alpha = if (enabled) 1f else DISABLED_ALPHA }
       .height(KetchTheme.density.chip + TrackGrowth)
       .then(if (fill) Modifier.fillMaxWidth() else Modifier)
       .background(colors.surfaceSunken, shape)
@@ -138,7 +135,6 @@ fun <T> KetchSegmented(
         Segment(
           text = label(option),
           selected = index == selectedIndex,
-          enabled = enabled,
           count = count(option),
           alert = alert(option),
           icon = icon(option),
@@ -156,7 +152,6 @@ fun <T> KetchSegmented(
 private fun Segment(
   text: String,
   selected: Boolean,
-  enabled: Boolean,
   count: Int?,
   alert: Boolean,
   icon: KetchIcon?,
@@ -172,7 +167,7 @@ private fun Segment(
   val hovered by interactions.collectIsHoveredAsState()
   val focus = rememberFocusVisibility()
   val ink by animateColorAsState(
-    targetValue = if (selected || hovered && enabled) colors.textPrimary else colors.textSecondary,
+    targetValue = if (selected || hovered) colors.textPrimary else colors.textSecondary,
     animationSpec = tween(KetchTheme.motion.micro),
   )
   val body = @Composable { bodyModifier: Modifier ->
@@ -186,7 +181,6 @@ private fun Segment(
           selected = selected,
           interactionSource = interactions,
           indication = null,
-          enabled = enabled,
           role = Role.Tab,
           onClick = onClick,
         )
@@ -220,11 +214,7 @@ private fun Segment(
       }
     }
   }
-  if (shortcut != null) {
-    KetchTooltip(text = text, shortcut = shortcut, modifier = modifier) { body(Modifier) }
-  } else {
-    body(modifier)
-  }
+  OptionalTooltip(text.takeIf { shortcut != null }, modifier, shortcut, body)
 }
 
 private val TrackGrowth = 4.dp

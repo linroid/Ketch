@@ -63,11 +63,9 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_retry
 import ketch.app.shared.generated.resources.action_review
 import ketch.app.shared.generated.resources.action_show
-import ketch.app.shared.generated.resources.action_undo
 import ketch.app.shared.generated.resources.count_downloads
 import ketch.app.shared.generated.resources.device_any_in_sentence
 import ketch.app.shared.generated.resources.duration_minutes
-import ketch.app.shared.generated.resources.feedback_undo_add
 import ketch.app.shared.generated.resources.intake_add_failed
 import ketch.app.shared.generated.resources.intake_added_failed
 import ketch.app.shared.generated.resources.intake_added_here
@@ -102,8 +100,8 @@ import ketch.app.shared.generated.resources.intake_option_urgent
 import ketch.app.shared.generated.resources.intake_outcome_eta
 import ketch.app.shared.generated.resources.intake_outcome_eta_soon
 import ketch.app.shared.generated.resources.intake_outcome_queued_behind
-import ketch.app.shared.generated.resources.intake_outcome_queued_next
 import ketch.app.shared.generated.resources.intake_outcome_queued_count
+import ketch.app.shared.generated.resources.intake_outcome_queued_next
 import ketch.app.shared.generated.resources.intake_outcome_slots_free
 import ketch.app.shared.generated.resources.intake_outcome_start_now
 import ketch.app.shared.generated.resources.intake_outcome_start_now_slots
@@ -144,7 +142,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -154,7 +151,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
 import org.jetbrains.compose.resources.StringResource
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -266,8 +262,7 @@ class IntakeEntry internal constructor(source: IntakeSource) {
   val isTorrent: Boolean
     get() = when (val current = source) {
       is IntakeSource.File -> true
-      is IntakeSource.Link -> current.kind == LinkKind.Magnet ||
-        current.kind == LinkKind.TorrentFile || resolved?.sourceType == TORRENT_SOURCE
+      is IntakeSource.Link -> current.kind.isTorrent || resolved?.sourceType == TORRENT_SOURCE
       is IntakeSource.Range -> false
     }
 
@@ -459,8 +454,9 @@ class IntakeHeaders {
     header(REFERER, referer)
     val agent = if (userAgent == UserAgentChoice.Custom) customUserAgent else userAgent.value
     agent?.let { header(USER_AGENT, it) }
-    header(COOKIE, cookie.lines().joinToString("; ") { it.trim().removeSuffix(";") }.trim(';', ' '))
-    header(AUTHORIZATION, authorization)
+    val cookies = cookie.lines().joinToString("; ") { it.trim().removeSuffix(";") }.trim(';', ' ')
+    header(COOKIE_HEADER, cookies)
+    header(AUTHORIZATION_HEADER, authorization)
     for (row in extra) header(row.name, row.value)
   }
 
@@ -470,8 +466,8 @@ class IntakeHeaders {
     for ((name, value) in headers) {
       when (name.lowercase()) {
         REFERER.lowercase() -> referer = value
-        COOKIE.lowercase() -> cookie = value
-        AUTHORIZATION.lowercase() -> authorization = value
+        COOKIE_HEADER.lowercase() -> cookie = value
+        AUTHORIZATION_HEADER.lowercase() -> authorization = value
         USER_AGENT.lowercase() -> {
           val known = UserAgentChoice.entries.firstOrNull { it.value == value }
           userAgent = known ?: UserAgentChoice.Custom
@@ -486,8 +482,6 @@ class IntakeHeaders {
     /** Names of the headers the section has a field for, which also label the fields. */
     const val REFERER = "Referer"
     const val USER_AGENT = "User-Agent"
-    const val COOKIE = "Cookie"
-    const val AUTHORIZATION = "Authorization"
   }
 }
 
@@ -506,11 +500,7 @@ enum class IntakeKind {
     /** [Torrents] when every one of [urls] and [files] is a torrent, else [Links]. */
     fun of(urls: List<String>, files: Int = 0): IntakeKind {
       if (urls.isEmpty() && files == 0) return Links
-      val torrents = urls.all { url ->
-        val kind = LinkKind.of(url)
-        kind == LinkKind.Magnet || kind == LinkKind.TorrentFile
-      }
-      return if (torrents) Torrents else Links
+      return if (urls.all { LinkKind.of(it).isTorrent }) Torrents else Links
     }
   }
 }
@@ -634,10 +624,10 @@ class IntakeSession internal constructor(
   val request: IntakeRequest,
   private val state: AppState,
   private val scope: CoroutineScope,
-  private val clock: Clock,
   private val carry: (IntakeRequest, List<DroppedFile>) -> Unit = { _, _ -> },
 ) {
   private val log = KetchLogger("Intake")
+  private val clock = state.clock
   private val limiter = Semaphore(PARALLEL_RESOLVES)
   private val seedsByUrl = mutableMapOf<String, IntakeSeed>()
   private var parseJob: Job? = null
@@ -805,8 +795,7 @@ class IntakeSession internal constructor(
     get() {
       val bound = boundRequest
       if (mode == IntakeMode.Edit && bound != null) {
-        val kind = LinkKind.of(bound.url)
-        return kind == LinkKind.Magnet || kind == LinkKind.TorrentFile ||
+        return LinkKind.of(bound.url).isTorrent ||
           bound.resolvedSource?.sourceType == TORRENT_SOURCE
       }
       return entries.isNotEmpty() && entries.all { it.isTorrent }
@@ -1037,8 +1026,7 @@ class IntakeSession internal constructor(
     if (links.isEmpty()) return false
     val detector = duplicateDetector()
     if (links.all { detector.find(it.url) != null }) return false
-    state.appSettings.saveUi { it.copy(lastClipHash = hash) }
-    filledClip = hash
+    rememberClip(hash)
     text = TextFieldValue(trimmed, TextRange(0, trimmed.length))
     fromClipboard = true
     reparse()
@@ -1052,13 +1040,21 @@ class IntakeSession internal constructor(
   fun pasteClipboard(clip: String) {
     val trimmed = clip.trim()
     if (trimmed.isEmpty() || mode != IntakeMode.Add) return
-    val hash = clipHash(trimmed)
+    rememberClip(clipHash(trimmed))
+    val current = text.text.trimEnd()
+    fromClipboard = current.isEmpty()
+    replaceText(if (current.isEmpty()) trimmed else "$current\n$trimmed")
+  }
+
+  // The clipboard text the sheet was filled from, which neither it nor the next sheet offers.
+  private fun rememberClip(hash: String) {
     state.appSettings.saveUi { it.copy(lastClipHash = hash) }
     filledClip = hash
-    val current = text.text.trimEnd()
-    val updated = if (current.isEmpty()) trimmed else "$current\n$trimmed"
+  }
+
+  // Puts updated in the input with the caret at its end, and reads it at once.
+  private fun replaceText(updated: String) {
     text = TextFieldValue(updated, TextRange(updated.length))
-    fromClipboard = current.isEmpty()
     reparse()
   }
 
@@ -1137,9 +1133,7 @@ class IntakeSession internal constructor(
     if (entry.source is IntakeSource.File) {
       fileEntries = fileEntries - entry
     } else {
-      val updated = replaceIntakeLink(text.text, entry.key, replacement = null)
-      text = TextFieldValue(updated, TextRange(updated.length))
-      reparse()
+      replaceText(replaceIntakeLink(text.text, entry.key, replacement = null))
     }
     if (torrentStage === entry) torrentStage = null
   }
@@ -1156,10 +1150,10 @@ class IntakeSession internal constructor(
       properties = seed?.properties.orEmpty(),
     )
     if (signed.url != link.url) {
-      val updated = replaceIntakeLink(text.text, link.url, signed.url)
-      text = TextFieldValue(updated, TextRange(updated.length))
+      replaceText(replaceIntakeLink(text.text, link.url, signed.url))
+    } else {
+      reparse()
     }
-    reparse()
     entries.firstOrNull { it.key == signed.url }?.let(::retry)
   }
 
@@ -1180,8 +1174,7 @@ class IntakeSession internal constructor(
     } else {
       listOf(current.trimEnd(), command).filter { it.isNotEmpty() }.joinToString("\n")
     }
-    text = TextFieldValue(updated, TextRange(updated.length))
-    reparse()
+    replaceText(updated)
     return true
   }
 
@@ -1219,8 +1212,7 @@ class IntakeSession internal constructor(
       }
       val updated = (listOf(text.text.trimEnd()) + links).filter { it.isNotEmpty() }
         .joinToString("\n")
-      text = TextFieldValue(updated, TextRange(updated.length))
-      reparse()
+      replaceText(updated)
     }
   }
 
@@ -1449,22 +1441,10 @@ class IntakeSession internal constructor(
     }
     if (shown) showNewRows()
     state.announceAdded(added.map { TaskKey(target.deviceId, it.taskId) })
-    val undoTitle = Res.string.feedback_undo_add.text()
-    val op = state.pendingOps.register(undoTitle, timeout = ADD_UNDO_WINDOW, undo = {
-      added.forEach { task ->
-        catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
-          log.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
-        }
-      }
-    })
-    val undo = MessageAction(Res.string.action_undo.text()) { state.pendingOps.undo(op.id) }
+    val undo = state.undoAddAction(added, log)
     val single = added.singleOrNull()?.takeIf { review.isEmpty() }
     val key = single?.let { TaskKey(target.deviceId, it.taskId) }
-    val show = MessageAction(Res.string.action_show.text()) {
-      if (target !in state.shownInstances.value) state.switchInstance(target)
-      state.showDownloads(StatusFilter.All)
-      key?.let(state::inspect)
-    }
+    val show = MessageAction(Res.string.action_show.text()) { state.showOn(target, single) }
     val what = if (single != null) {
       verbatim(displayName(single.request))
     } else {
@@ -1772,7 +1752,7 @@ class IntakeSession internal constructor(
         }
       }
     }
-    return api.resolveContent(file.readBytes(MAX_TORRENT_FILE_BYTES), file.name)
+    return api.resolveContent(file.readBytes(MAX_DROPPED_FILE_BYTES), file.name)
   }
 
   private fun watch(target: InstanceEntry) {
@@ -1784,10 +1764,7 @@ class IntakeSession internal constructor(
           .onFailure { e -> log.d { "No status from ${target.label}: ${e.describeCauses()}" } }
           .getOrNull()
       }
-      val deviceId = target.deviceId
-      combine(target.instance.tasks, state.pendingOps.hidden) { tasks, hidden ->
-        if (hidden.isEmpty()) tasks else tasks.filter { TaskKey(deviceId, it.taskId) !in hidden }
-      }.collect { tasks ->
+      state.visibleTasksOf(target).collect { tasks ->
         targetTasks = tasks
         if (!submitting) refreshDuplicates()
       }
@@ -1863,17 +1840,8 @@ class IntakeSession internal constructor(
     /** How long submitting waits for links still being checked before it adds them as they are. */
     val SUBMIT_CHECK_WAIT = 10.seconds
 
-    /** How long a new download can be undone, together with its file. */
-    val ADD_UNDO_WINDOW = 8.seconds
-
     /** Most connections the sheet offers. */
     const val MAX_CONNECTIONS = 32
-
-    /** Matches the daemon's upload limit; torrent metainfo is 4 MiB by default. */
-    const val MAX_TORRENT_FILE_BYTES = 16L * 1024 * 1024
-
-    /** Largest list of links read from a file. */
-    const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024
 
     /** Clipboard text searched for links. */
     const val MAX_CLIP_CHARS = 64 * 1024
@@ -1885,13 +1853,11 @@ class IntakeSession internal constructor(
  * torrent was left to load in the background.
  *
  * @param scope runs the checks and submits; it outlives one sheet.
- * @param clock the time of checks and start labels; the app's [AppState.clock] by default.
  */
 @Stable
 class IntakeController(
   private val state: AppState,
   private val scope: CoroutineScope,
-  private val clock: Clock = state.clock,
 ) {
   /** The session left to finish in the background, or `null`. */
   var background: IntakeSession? by mutableStateOf(null)
@@ -1908,7 +1874,7 @@ class IntakeController(
       session.inBackground = false
       return session
     }
-    val session = IntakeSession(request, state, scope, clock) { next, files ->
+    val session = IntakeSession(request, state, scope) { next, files ->
       carriedFiles = next to files
     }
     session.start()

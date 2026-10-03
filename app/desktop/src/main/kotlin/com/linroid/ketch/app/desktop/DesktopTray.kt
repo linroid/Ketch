@@ -59,6 +59,7 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.darkKetchColors
+import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.desktop.generated.resources.Res
@@ -102,8 +103,6 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-
-private val isMac = System.getProperty("os.name").startsWith("Mac")
 
 /**
  * What the tray icon, the menu bar, the Dock and the taskbar show, taken at most once a second:
@@ -272,7 +271,11 @@ fun ApplicationScope.KetchTray(
 ) {
   if (!isTraySupported) return
   // Read once, when the first tray icon is created.
-  remember { if (isMac) System.setProperty("apple.awt.enableTemplateImages", "true") }
+  remember {
+    if (DesktopOs.current == DesktopOs.MAC) {
+      System.setProperty("apple.awt.enableTemplateImages", "true")
+    }
+  }
   val files = rememberFileActions()
   val clipboard = rememberSystemClipboard()
   val commands = remember(controller, actions, speedMode, files, clipboard) {
@@ -608,7 +611,7 @@ private class TrayIconColors(val glyph: Color, val ring: Color, val failure: Col
 
 // A template image only keeps the alpha, which macOS tints for the menu bar; elsewhere the icon
 // sits on the dark taskbars and panels most systems use.
-private val trayIconColors: TrayIconColors = if (isMac) {
+private val trayIconColors: TrayIconColors = if (DesktopOs.current == DesktopOs.MAC) {
   TrayIconColors(Color.Black, Color.Black, Color.Black)
 } else {
   val colors = darkKetchColors()

@@ -12,21 +12,21 @@ import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
-import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.theme.KetchColors
+import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.KetchTypography
+import com.linroid.ketch.app.ui.list.outputFile
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.count_downloads
 import ketch.app.shared.generated.resources.row_files
@@ -62,9 +62,8 @@ internal data class DragPayload(
     /** The payload of dragging [rows]: finished files of this device as files, all as links. */
     fun of(rows: List<TaskRow>): DragPayload = DragPayload(
       files = rows.mapNotNull { row ->
-        val done = row.state as? DownloadState.Completed ?: return@mapNotNull null
-        done.outputPath.takeIf {
-          it.isNotBlank() && row.key.deviceId == LOCAL_DEVICE_ID && !it.startsWith("content://")
+        row.outputFile?.takeIf {
+          row.key.deviceId == LOCAL_DEVICE_ID && !it.startsWith("content://")
         }
       },
       links = rows.map { it.request.url },
@@ -98,11 +97,15 @@ internal fun Modifier.taskDragSource(
   count: () -> String?,
 ): Modifier {
   val measurer = rememberTextMeasurer()
-  val style = rememberDragPreviewStyle()
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val type = KetchTheme.typography
   val currentRows by rememberUpdatedState(rows)
   val currentCount by rememberUpdatedState(count)
   return dragAndDropSource(
-    drawDragDecoration = { drawDragPreview(currentRows(), measurer, style, currentCount()) },
+    drawDragDecoration = {
+      drawDragPreview(currentRows(), measurer, colors, spacing, type, currentCount())
+    },
   ) { _ ->
     val dragged = currentRows()
     if (dragged.isEmpty()) null else dragTransferData(DragPayload.of(dragged))
@@ -125,73 +128,29 @@ internal fun dragCount(rows: List<TaskRow>): String? {
 }
 
 /**
- * Colors, text and sizes of [drawDragPreview].
- *
- * @property name style of the first row's name.
- * @property badge style of the count.
- * @property fill fill of the pill.
- * @property border outline of the pill.
- * @property badgeFill fill of the count.
- * @property padding space at either end of the pill.
- * @property gap space between the name and the count, and around the count's text.
- * @property height height of the pill.
- * @property badgePadding space above and below the count's text.
- */
-@Immutable
-internal class DragPreviewStyle(
-  val name: TextStyle,
-  val badge: TextStyle,
-  val fill: Color,
-  val border: Color,
-  val badgeFill: Color,
-  val padding: Dp,
-  val gap: Dp,
-  val height: Dp,
-  val badgePadding: Dp,
-)
-
-/** The [DragPreviewStyle] of the current theme. */
-@Composable
-internal fun rememberDragPreviewStyle(): DragPreviewStyle {
-  val colors = KetchTheme.colors
-  val spacing = KetchTheme.spacing
-  val type = KetchTheme.typography
-  return remember(colors, spacing, type) {
-    DragPreviewStyle(
-      name = type.label.copy(color = colors.textPrimary),
-      badge = type.numeralS.copy(color = colors.onAccent),
-      fill = colors.surfaceRaised,
-      border = colors.borderStrong,
-      badgeFill = colors.accent,
-      padding = spacing.s3,
-      gap = spacing.s2,
-      height = spacing.s8,
-      badgePadding = spacing.s0_5,
-    )
-  }
-}
-
-/**
- * Draws what a drag of [rows] shows under the pointer: a pill with the first row's name and,
- * for several rows, [count], how many files or downloads come along, at the start of the
- * drawing area.
+ * Draws what a drag of [rows] shows under the pointer, in the theme's [colors], [spacing] and
+ * [type]: a pill with the first row's name and, for several rows, [count], how many files or
+ * downloads come along, at the start of the drawing area.
  */
 internal fun DrawScope.drawDragPreview(
   rows: List<TaskRow>,
   measurer: TextMeasurer,
-  style: DragPreviewStyle,
+  colors: KetchColors,
+  spacing: KetchSpacing,
+  type: KetchTypography,
   count: String?,
 ) {
   val first = rows.firstOrNull() ?: return
-  val padding = style.padding.toPx()
-  val gap = style.gap.toPx()
-  val height = style.height.toPx().coerceAtMost(size.height)
-  val badge = count?.takeIf { rows.size > 1 }?.let { measurer.measure(it, style.badge) }
+  val padding = spacing.s3.toPx()
+  val gap = spacing.s2.toPx()
+  val height = spacing.s8.toPx().coerceAtMost(size.height)
+  val badge = count?.takeIf { rows.size > 1 }
+    ?.let { measurer.measure(it, type.numeralS.copy(color = colors.onAccent)) }
   val badgeWidth = badge?.let { it.size.width + gap * 2 } ?: 0f
   val nameMax = (size.width - padding * 2 - badgeWidth - gap).coerceAtLeast(0f)
   val name = measurer.measure(
     text = first.name,
-    style = style.name,
+    style = type.label.copy(color = colors.textPrimary),
     overflow = TextOverflow.Ellipsis,
     maxLines = 1,
     constraints = Constraints(maxWidth = nameMax.toInt()),
@@ -200,20 +159,20 @@ internal fun DrawScope.drawDragPreview(
     .coerceAtMost(size.width)
   val corner = CornerRadius(height / 2)
   val top = (size.height - height) / 2
-  drawRoundRect(style.fill, Offset(0f, top), Size(width, height), corner)
+  drawRoundRect(colors.surfaceRaised, Offset(0f, top), Size(width, height), corner)
   // One dp.
-  drawRoundRect(style.border, Offset(0f, top), Size(width, height), corner, Stroke(density))
+  drawRoundRect(colors.borderStrong, Offset(0f, top), Size(width, height), corner, Stroke(density))
   drawText(name, topLeft = Offset(padding, top + (height - name.size.height) / 2))
   if (badge != null) {
-    val badgeHeight = badge.size.height + style.badgePadding.toPx() * 2
+    val badgeHeight = badge.size.height + spacing.s0_5.toPx() * 2
     val left = padding + name.size.width + gap
     val badgeTop = top + (height - badgeHeight) / 2
     drawRoundRect(
-      color = style.badgeFill,
+      color = colors.accent,
       topLeft = Offset(left, badgeTop),
       size = Size(badgeWidth, badgeHeight),
       cornerRadius = CornerRadius(badgeHeight / 2),
     )
-    drawText(badge, topLeft = Offset(left + gap, badgeTop + style.badgePadding.toPx()))
+    drawText(badge, topLeft = Offset(left + gap, badgeTop + spacing.s0_5.toPx()))
   }
 }

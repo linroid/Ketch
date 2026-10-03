@@ -10,13 +10,9 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.api.SystemInfo
-import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.components.DeviceOption
 import com.linroid.ketch.app.components.KetchMenuPanel
@@ -44,15 +40,11 @@ import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.io.File
-import kotlin.math.PI
-import kotlin.math.roundToLong
-import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -158,10 +150,7 @@ class AllDevicesSnapshots {
       ),
     )
     for (theme in SnapshotTheme.entries) {
-      val environment = runBlocking(SnapshotHarness.ui) {
-        AllDevicesEnvironment(theme, DensityMode.Compact).also { it.start() }
-      }
-      try {
+      withEnvironment({ AllDevicesEnvironment(theme, DensityMode.Compact) }) { environment ->
         val state = environment.controller.state
         val presence = runBlocking(SnapshotHarness.ui) {
           withTimeoutOrNull(START_TIMEOUT) {
@@ -184,8 +173,6 @@ class AllDevicesSnapshots {
             }
           }
         }
-      } finally {
-        runBlocking(SnapshotHarness.ui) { environment.close() }
       }
     }
   }
@@ -210,34 +197,11 @@ private fun allDevicesSnapshot(
   theme: SnapshotTheme,
   empty: Boolean,
   setup: suspend AppScenario.() -> Unit,
-): File {
-  val density = if (size.density == KetchDensity.Compact) {
-    DensityMode.Compact
-  } else {
-    DensityMode.Comfortable
-  }
-  val environment = runBlocking(SnapshotHarness.ui) {
-    AllDevicesEnvironment(theme, density, empty)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(START_TIMEOUT) { environment.start() }
-        ?: error("The task list of $name never listed every device's tasks")
-    }
-    return SnapshotHarness.capture(
-      name = "$name-${theme.id}-${size.id}",
-      size = size,
-      interact = {
-        val scenario = AppScenario(environment.controller, environment.data, this)
-        // The Pulse bar's history fills once a second; give it a few samples.
-        delay(HISTORY_WAIT)
-        scenario.setup()
-      },
-    ) {
-      App(environment.controller)
-    }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
+): File = withEnvironment({ AllDevicesEnvironment(theme, size.density.toMode(), empty) }) {
+  captureApp(name, size, theme, it) {
+    // The Pulse bar's history fills once a second; give it a few samples.
+    delay(HISTORY_WAIT)
+    setup()
   }
 }
 
@@ -246,12 +210,12 @@ private class AllDevicesEnvironment(
   theme: SnapshotTheme,
   density: DensityMode,
   empty: Boolean = false,
-) {
-  val data = SampleData(
+) : SnapshotEnvironment {
+  override val data = SampleData(
     tasks = if (empty) emptyList() else SampleData.downloads().tasks,
     remotes = listOf(RemoteConfig(host = "nas.local", port = 8642, name = "NAS-Basement")),
   )
-  private val nas = AllDevicesNas(if (empty) emptyList() else allDevicesNasTasks())
+  private val nas = allDevicesNas(if (empty) emptyList() else allDevicesNasTasks())
 
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
@@ -265,8 +229,7 @@ private class AllDevicesEnvironment(
     configStore = RecordingConfigStore(data.config(theme, density)),
   )
 
-  /** The controller the app root shows. */
-  val controller: AppController = AppController(
+  override val controller: AppController = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     clock = SampleData.CLOCK,
@@ -276,33 +239,20 @@ private class AllDevicesEnvironment(
    * Fills the speed history with three minutes of samples of both devices, shows every device
    * and waits until both devices' tasks are listed.
    */
-  suspend fun start() {
+  override suspend fun start() {
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
-    seedSpeedHistory()
+    val states = data.tasks.associate { TaskKey(LOCAL_DEVICE_ID, it.taskId) to it.state.value } +
+      nas.tasks.value.associate { TaskKey(NAS_ID, it.taskId) to it.state.value }
+    seedSpeedHistory(controller.speedHistory, states, Random(HISTORY_SEED))
     controller.state.taskList.allRows.first { it.size == data.tasks.size + nas.tasks.value.size }
     check(controller.state.showAllDevices()) { "Fewer than two devices" }
     controller.state.taskList.rows.first { it.size == data.tasks.size + nas.tasks.value.size }
   }
 
-  fun close() {
+  override fun close() {
     controller.close()
     instanceManager.close()
-  }
-
-  private fun seedSpeedHistory() {
-    val random = Random(HISTORY_SEED)
-    val states = data.tasks.associate { TaskKey(LOCAL_DEVICE_ID, it.taskId) to it.state.value } +
-      nas.tasks.value.associate { TaskKey(NAS_ID, it.taskId) to it.state.value }
-    for (second in HISTORY_SECONDS downTo 0) {
-      val speeds = states.mapValues { (_, state) ->
-        (state as? DownloadState.Downloading)?.progress?.bytesPerSecond?.let { speed ->
-          val wave = 0.8 + 0.15 * sin(second * PI / 23) + 0.1 * random.nextDouble()
-          (speed * wave).roundToLong()
-        }
-      }
-      controller.speedHistory.record(SampleData.NOW - second.seconds, speeds)
-    }
   }
 }
 
@@ -312,7 +262,6 @@ private const val NAS_DIR = "/volume1/downloads"
 private const val GIB = 1L shl 30
 private val START_TIMEOUT = 5.seconds
 private const val STARTUP_YIELDS = 3
-private const val HISTORY_SECONDS = 180
 private const val HISTORY_SEED = 7
 private val HISTORY_WAIT = 3.seconds
 private val SETTLE = 300.milliseconds
@@ -321,17 +270,32 @@ private val SETTLE = 300.milliseconds
 private const val SLOW_MAGNET = "magnet:?xt=urn:btih:8a19577fb5f690970ca43a57ff1011ae202244b8" +
   "&dn=Big.Buck.Bunny.4K"
 
-/** NAS-Basement: a few downloads of its own and a bigger disk. */
-private class AllDevicesNas(initial: List<DownloadTask>) : KetchApi {
-  override val backendLabel: String = "NAS-Basement"
-  override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(initial)
-
-  override suspend fun download(request: DownloadRequest): DownloadTask =
+/**
+ * NAS-Basement with [tasks] of its own and a bigger disk; it takes what is sent to it, and
+ * resolves links but no magnet.
+ */
+private fun allDevicesNas(tasks: List<DownloadTask>) = SampleDeviceApi(
+  status = sampleStatus(
+    name = "NAS-Basement",
+    uptime = 12.days,
+    config = DownloadConfig(defaultDirectory = NAS_DIR, maxConcurrentDownloads = 2),
+    system = sampleSystem(
+      os = "Linux",
+      directory = NAS_DIR,
+      total = 4_000_000_000_000,
+      usable = 1_800_000_000_000,
+      maxMemory = 2 * GIB,
+      totalMemory = GIB,
+      freeMemory = GIB / 2,
+    ),
+  ),
+  tasks = tasks,
+  download = { request ->
     ListTestTask("sent-${request.url.hashCode()}", DownloadState.Queued, request)
-
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource {
+  },
+  resolve = { url ->
     if (url.startsWith("magnet:")) awaitCancellation()
-    return ResolvedSource(
+    ResolvedSource(
       url = url,
       sourceType = "http",
       totalBytes = 2_684_354_560,
@@ -339,36 +303,8 @@ private class AllDevicesNas(initial: List<DownloadTask>) : KetchApi {
       suggestedFileName = url.substringAfterLast('/'),
       maxSegments = 8,
     )
-  }
-
-  override suspend fun status(): KetchStatus = KetchStatus(
-    name = "NAS-Basement",
-    version = KetchApi.VERSION,
-    revision = KetchApi.REVISION,
-    uptime = 12.days.inWholeSeconds,
-    config = DownloadConfig(defaultDirectory = NAS_DIR, maxConcurrentDownloads = 2),
-    system = SystemInfo(
-      os = "Linux",
-      arch = "amd64",
-      separator = "/",
-      javaVersion = "21",
-      availableProcessors = 4,
-      maxMemory = 2 * GIB,
-      totalMemory = GIB,
-      freeMemory = GIB / 2,
-      downloadDirectory = NAS_DIR,
-      totalSpace = 4_000_000_000_000,
-      freeSpace = 1_800_000_000_000,
-      usableSpace = 1_800_000_000_000,
-    ),
-  )
-
-  override suspend fun updateConfig(config: DownloadConfig) {}
-
-  override suspend fun start() {}
-
-  override fun close() {}
-}
+  },
+)
 
 private fun allDevicesNasTasks(): List<ListTestTask> {
   val total = 38 * GIB

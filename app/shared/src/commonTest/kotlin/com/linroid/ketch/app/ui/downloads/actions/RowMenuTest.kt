@@ -14,6 +14,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.RowAction
+import com.linroid.ketch.app.state.rowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -28,8 +29,7 @@ class RowMenuTest {
   private val completed = DownloadState.Completed("/downloads/a.iso", totalBytes = 100)
 
   @Test
-  fun closeIfCurrent_menuReplacedByAnother_keepsTheNewOne() = runTest {
-    val f = ActionsFixture(this)
+  fun closeIfCurrent_menuReplacedByAnother_keepsTheNewOne() = actionsTest { f ->
     val first = rowOf(f.add(downloading))
     val second = rowOf(f.add(completed))
     val menu = RowMenuState()
@@ -43,12 +43,10 @@ class RowMenuTest {
     assertEquals(null, menu.request?.position)
     menu.closeIfCurrent(checkNotNull(menu.request))
     assertFalse(menu.isOpen)
-    f.close()
   }
 
   @Test
-  fun rowMenuEntries_downloadingRow_listsControlsThenDestructiveAfterADivider() = runTest {
-    val f = ActionsFixture(this)
+  fun rowMenuEntries_downloadingRow_listsControlsThenDestructiveAfterADivider() = actionsTest { f ->
     val entries = buildMenu {
       rowMenuEntries(listOf(rowOf(f.add(downloading))), f.runner, RowMenuContext())
     }
@@ -60,29 +58,26 @@ class RowMenuTest {
       ),
       entries.map { labelOf(it) },
     )
-    f.close()
   }
 
   @Test
-  fun rowMenuEntries_completedRow_namesThePlatformsFileManager() = runTest {
-    val f = ActionsFixture(this, canTrash = true)
-    val entries = buildMenu {
-      rowMenuEntries(
-        listOf(rowOf(f.add(completed))),
-        f.runner,
-        RowMenuContext(revealLabel = verbatim("Show in Finder")),
-      )
+  fun rowMenuEntries_completedRow_namesThePlatformsFileManager() =
+    actionsTest(canTrash = true) { f ->
+      val entries = buildMenu {
+        rowMenuEntries(
+          listOf(rowOf(f.add(completed))),
+          f.runner,
+          RowMenuContext(revealLabel = verbatim("Show in Finder")),
+        )
+      }
+
+      val labels = entries.map { labelOf(it) }
+      assertTrue("Show in Finder" in labels)
+      assertEquals("Remove and trash file…", labels.last())
     }
 
-    val labels = entries.map { labelOf(it) }
-    assertTrue("Show in Finder" in labels)
-    assertEquals("Remove and trash file…", labels.last())
-    f.close()
-  }
-
   @Test
-  fun rowMenuEntries_selection_countsWhatEachActionAppliesTo() = runTest {
-    val f = ActionsFixture(this)
+  fun rowMenuEntries_selection_countsWhatEachActionAppliesTo() = actionsTest { f ->
     val rows = listOf(f.add(downloading), f.add(downloading), f.add(completed)).map { rowOf(it) }
 
     val labels = buildMenu { rowMenuEntries(rows, f.runner, RowMenuContext()) }.map { labelOf(it) }
@@ -90,12 +85,10 @@ class RowMenuTest {
     assertEquals("Pause 2 downloads", labels.first())
     assertTrue("Copy 3 links" in labels)
     assertTrue("Remove 3 downloads from list" in labels)
-    f.close()
   }
 
   @Test
-  fun rowMenuEntries_otherDevices_offerSendToWithOfflineOnesDisabled() = runTest {
-    val f = ActionsFixture(this)
+  fun rowMenuEntries_otherDevices_offerSendToWithOfflineOnesDisabled() = actionsTest { f ->
     val row = rowOf(f.add(downloading))
     val laptop = SendTarget(
       EmbeddedInstance(f.api, "Laptop"),
@@ -117,24 +110,19 @@ class RowMenuTest {
       items.map { it.label.load() to it.enabled }
     )
     assertEquals("Offline", items.last().caption.load())
-    f.close()
   }
 
   @Test
-  fun rowMenuEntries_noOtherDevice_leavesSendToOut() = runTest {
-    val f = ActionsFixture(this)
-
+  fun rowMenuEntries_noOtherDevice_leavesSendToOut() = actionsTest { f ->
     val labels = buildMenu {
       rowMenuEntries(listOf(rowOf(f.add(downloading))), f.runner, RowMenuContext())
     }.map { labelOf(it) }
 
     assertFalse("Send to" in labels)
-    f.close()
   }
 
   @Test
-  fun speedEntries_selection_checksTheSharedLimitAndOffersSharing() = runTest {
-    val f = ActionsFixture(this)
+  fun speedEntries_selection_checksTheSharedLimitAndOffersSharing() = actionsTest { f ->
     val request = DownloadRequest("https://example.com/a.iso", speedLimit = SpeedLimit.mbps(2))
     val rows = List(2) { rowOf(f.add(downloading, request)) }
 
@@ -147,12 +135,10 @@ class RowMenuTest {
     val five = share.entries.filterIsInstance<MenuEntry.Item>()
       .single { it.label.load() == "5 MB/s" }
     assertEquals("2.5 MB/s each", five.caption.load())
-    f.close()
   }
 
   @Test
-  fun rowMenuEntries_mixedTorrentSelection_setsConnectionsOnTheOthersOnly() = runTest {
-    val f = ActionsFixture(this)
+  fun rowMenuEntries_mixedTorrentSelection_setsConnectionsOnTheOthersOnly() = actionsTest { f ->
     val magnet = DownloadRequest("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567")
     val torrent = f.add(downloading, magnet)
     val http = f.add(downloading)
@@ -169,12 +155,10 @@ class RowMenuTest {
 
     assertEquals(emptyList(), torrent.calls)
     assertEquals(listOf("connections 16"), http.calls)
-    f.close()
   }
 
   @Test
-  fun priorityEntries_urgentOnQueuedRow_startsItNowAndNamesTheVictim() = runTest {
-    val f = ActionsFixture(this)
+  fun priorityEntries_urgentOnQueuedRow_startsItNowAndNamesTheVictim() = actionsTest { f ->
     val queued = f.add(DownloadState.Queued)
 
     val entries = buildMenu { priorityEntries(listOf(rowOf(queued)), f.runner, "debian.iso") }
@@ -184,7 +168,6 @@ class RowMenuTest {
 
     assertEquals("Starts now · may pause debian.iso", urgent.caption.load())
     assertTrue("priority ${DownloadPriority.URGENT}" in queued.calls)
-    f.close()
   }
 
   @Test

@@ -1,24 +1,18 @@
 package com.linroid.ketch.app.ui.pulse
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,18 +20,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.app.components.KetchBottomSheet
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.resolve
@@ -50,7 +45,6 @@ import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.devices.storageLabel
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.pulse_active
@@ -90,13 +84,7 @@ fun PulseSubtitle(state: AppState, onClick: () -> Unit, modifier: Modifier = Mod
       .clip(shape)
       .background(overlay)
       .semantics(mergeDescendants = true) { contentDescription = description }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      ),
+      .ketchClickable(interactions, focus, onClick = onClick),
   ) {
     Text(
       text = text,
@@ -132,20 +120,7 @@ internal fun pulseSubtitle(pulse: PulseState, modeLabel: UiText): UiText {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PulseSheet(state: AppState, onDismissRequest: () -> Unit) {
-  val colors = KetchTheme.colors
-  val sheetState = rememberBottomSheetState(
-    initialValue = SheetValue.Hidden,
-    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-  )
-  ModalBottomSheet(
-    onDismissRequest = onDismissRequest,
-    sheetState = sheetState,
-    shape = KetchTheme.shapes.sheetTop,
-    containerColor = colors.surfaceRaised,
-    contentColor = colors.textPrimary,
-    tonalElevation = 0.dp,
-    scrimColor = colors.scrim,
-  ) {
+  KetchBottomSheet(onDismissRequest = onDismissRequest) {
     val pulse by state.pulse.state.collectAsState()
     Column(
       modifier = Modifier
@@ -202,11 +177,7 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
         )
       }
     }
-    Text(
-      text = eyebrowText(stringResource(Res.string.pulse_last_minute)),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow(stringResource(Res.string.pulse_last_minute))
     KetchSpeedChart(
       bands = listOf(SpeedBand(pulse.history, colors.accent)),
       limits = listOfNotNull(limit?.let { SpeedLimitLine(it) }),
@@ -231,22 +202,12 @@ internal fun PulseSummary(pulse: PulseState, limit: Long?, onShowTab: (StatusFil
           style = KetchTheme.typography.caption,
           color = if (pulse.isDiskShort) colors.status.paused.color else colors.textSecondary,
         )
-        Box(
-          Modifier
-            .fillMaxWidth()
-            .height(DiskBarHeight)
-            .clip(KetchTheme.shapes.full)
-            .background(colors.surfaceSunken)
-        ) {
-          Box(
-            Modifier
-              .fillMaxHeight()
-              .fillMaxWidth(diskUsed(disk))
-              .background(
-                if (pulse.isDiskShort) colors.status.paused.color else colors.textTertiary
-              )
-          )
-        }
+        DiskBar(
+          used = diskUsed(disk),
+          short = pulse.isDiskShort,
+          track = colors.surfaceSunken,
+          modifier = Modifier.fillMaxWidth().height(DiskBarHeight),
+        )
       }
     }
   }
@@ -273,13 +234,7 @@ private fun RowScope.CountTile(
       .clip(shape)
       .background(colors.surfaceSunken)
       .background(overlay)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = { onShowTab(filter) },
-      )
+      .ketchClickable(interactions, focus, onClick = { onShowTab(filter) })
       .padding(horizontal = KetchTheme.spacing.s3, vertical = KetchTheme.spacing.s2),
   ) {
     Text(

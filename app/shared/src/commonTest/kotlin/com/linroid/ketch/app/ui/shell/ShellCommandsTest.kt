@@ -3,11 +3,10 @@ package com.linroid.ketch.app.ui.shell
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FilePicker
 import com.linroid.ketch.app.platform.SystemClipboard
@@ -15,16 +14,16 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.testController
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -61,25 +60,23 @@ class ShellCommandsTest {
     val commands: ShellCommands,
   )
 
-  private fun TestScope.fixture(
+  private fun shellTest(
     clipboard: String? = null,
     platform: KeyboardPlatform = KeyboardPlatform.Mac,
     ui: UiPreferences = UiPreferences(quickAdd = true),
-  ): Fixture {
-    val api = RecordingKetchApi()
-    val store = RecordingConfigStore(KetchConfig(ui = ui))
-    val controller = AppController(
-      instanceManager = InstanceManager(
-        factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
-        configStore = store,
-      ),
-      context = StandardTestDispatcher(testScheduler),
-    )
-    val shell = ShellState(controller.state)
-    val commands =
-      ShellCommands(shell, backgroundScope, FakeClipboard(clipboard), NoFiles, platform)
-    return Fixture(api, controller, shell, commands)
-  }
+    block: suspend TestScope.(Fixture) -> Unit,
+  ): TestResult = fixtureTest(
+    create = {
+      val api = RecordingKetchApi()
+      val controller = testController(api, RecordingConfigStore(KetchConfig(ui = ui)))
+      val shell = ShellState(controller.state)
+      val commands =
+        ShellCommands(shell, backgroundScope, FakeClipboard(clipboard), NoFiles, platform)
+      Fixture(api, controller, shell, commands)
+    },
+    close = { it.controller.close() },
+    block = block,
+  )
 
   @Test
   fun pasteAction_onePlainLink_addsItAtOnce() {
@@ -130,115 +127,95 @@ class ShellCommandsTest {
   }
 
   @Test
-  fun run_pasteWithOneLink_addsItWithUndo() = runTest {
-    val fixture = fixture(clipboard = "https://example.com/ubuntu.iso")
+  fun run_pasteWithOneLink_addsItWithUndo() =
+    shellTest(clipboard = "https://example.com/ubuntu.iso") { fixture ->
+      assertTrue(fixture.commands.run(KetchCommands.PasteLinks))
+      runCurrent()
 
-    assertTrue(fixture.commands.run(KetchCommands.PasteLinks))
-    runCurrent()
-
-    assertEquals("https://example.com/ubuntu.iso", fixture.api.requests.single().url)
-    val toast = fixture.controller.messages.active.value.last()
-    assertTrue("Undo" in toast.actions.map { it.label.load() })
-    assertFalse(fixture.controller.state.showAddDialog)
-    fixture.controller.close()
-  }
+      assertEquals("https://example.com/ubuntu.iso", fixture.api.requests.single().url)
+      val toast = fixture.controller.messages.active.value.last()
+      assertTrue("Undo" in toast.actions.map { it.label.load() })
+      assertFalse(fixture.controller.state.showAddDialog)
+    }
 
   @Test
-  fun run_pasteOnTheWeb_leavesTheKeyToTheBrowser() = runTest {
-    val fixture = fixture(
-      clipboard = "https://example.com/ubuntu.iso",
-      platform = KeyboardPlatform.WebMac,
-    )
-
+  fun run_pasteOnTheWeb_leavesTheKeyToTheBrowser() = shellTest(
+    clipboard = "https://example.com/ubuntu.iso",
+    platform = KeyboardPlatform.WebMac,
+  ) { fixture ->
     assertFalse(fixture.commands.run(KetchCommands.PasteLinks))
     runCurrent()
 
     assertTrue(fixture.api.requests.isEmpty())
-    fixture.controller.close()
   }
 
   @Test
-  fun paste_browserPasteEvent_addsTheLink() = runTest {
-    val fixture = fixture(platform = KeyboardPlatform.WebMac)
+  fun paste_browserPasteEvent_addsTheLink() =
+    shellTest(platform = KeyboardPlatform.WebMac) { fixture ->
+      fixture.commands.paste("https://example.com/ubuntu.iso")
+      runCurrent()
 
-    fixture.commands.paste("https://example.com/ubuntu.iso")
-    runCurrent()
-
-    assertEquals("https://example.com/ubuntu.iso", fixture.api.requests.single().url)
-    fixture.controller.close()
-  }
+      assertEquals("https://example.com/ubuntu.iso", fixture.api.requests.single().url)
+    }
 
   @Test
-  fun paste_addSheetOpen_addsNothingBehindIt() = runTest {
-    val fixture = fixture(platform = KeyboardPlatform.WebMac)
-    fixture.controller.state.openIntake()
+  fun paste_addSheetOpen_addsNothingBehindIt() =
+    shellTest(platform = KeyboardPlatform.WebMac) { fixture ->
+      fixture.controller.state.openIntake()
 
-    fixture.commands.paste("https://example.com/ubuntu.iso")
-    runCurrent()
+      fixture.commands.paste("https://example.com/ubuntu.iso")
+      runCurrent()
 
-    assertTrue(fixture.api.requests.isEmpty())
-    assertTrue(fixture.controller.state.showAddDialog)
-    fixture.controller.close()
-  }
+      assertTrue(fixture.api.requests.isEmpty())
+      assertTrue(fixture.controller.state.showAddDialog)
+    }
 
   @Test
-  fun run_addClipboardLinkWithEmptyClipboard_saysSo() = runTest {
-    val fixture = fixture(clipboard = null)
-
+  fun run_addClipboardLinkWithEmptyClipboard_saysSo() = shellTest(clipboard = null) { fixture ->
     fixture.commands.run(KetchCommands.AddClipboardLink)
     runCurrent()
 
     val message = fixture.controller.messages.active.value.last()
     assertEquals(MessageLevel.Warning, message.level)
     assertEquals("The clipboard holds no link", message.title.load())
-    fixture.controller.close()
   }
 
   @Test
-  fun run_tabCommand_showsDownloadsOnThatTab() = runTest {
-    val fixture = fixture()
+  fun run_tabCommand_showsDownloadsOnThatTab() = shellTest { fixture ->
     fixture.shell.show(AppDestination.Devices)
 
     assertTrue(fixture.commands.run(KetchCommands.tab(StatusFilter.Failed)))
 
     assertEquals(AppDestination.Downloads, fixture.shell.destination)
     assertEquals(StatusFilter.Failed, fixture.controller.state.statusFilter)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_discoverWhileHidden_leavesTheKey() = runTest {
-    val fixture = fixture()
+  fun run_discoverWhileHidden_leavesTheKey() = shellTest { fixture ->
     fixture.shell.destinations = AppDestination.visible(aiSupported = false)
 
     assertFalse(fixture.commands.run(KetchCommands.Discover))
     assertEquals(AppDestination.Downloads, fixture.shell.destination)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_toggleSidebarOnMediumWindow_leavesTheKey() = runTest {
-    val fixture = fixture()
+  fun run_toggleSidebarOnMediumWindow_leavesTheKey() = shellTest { fixture ->
     fixture.shell.layout = KetchLayout.of(800.dp)
 
     assertFalse(fixture.commands.run(KetchCommands.ToggleSidebar))
     assertFalse(fixture.controller.appSettings.ui.sidebarCollapsed)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_toggleSidebarOnWideWindow_collapsesIt() = runTest {
-    val fixture = fixture()
+  fun run_toggleSidebarOnWideWindow_collapsesIt() = shellTest { fixture ->
     fixture.shell.layout = KetchLayout.of(1280.dp)
 
     assertTrue(fixture.commands.run(KetchCommands.ToggleSidebar))
     assertTrue(fixture.controller.appSettings.ui.sidebarCollapsed)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_search_asksForTheSearchField() = runTest {
-    val fixture = fixture()
+  fun run_search_asksForTheSearchField() = shellTest { fixture ->
     val requests = mutableListOf<Unit>()
     backgroundScope.launch { fixture.controller.state.focusSearchRequests.collect(requests::add) }
     runCurrent()
@@ -247,56 +224,60 @@ class ShellCommandsTest {
     runCurrent()
 
     assertEquals(1, requests.size)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_searchWhileSettingsShows_leavesTheKeyToSettings() = runTest {
-    val fixture = fixture()
+  fun run_searchWhileSettingsShows_leavesTheKeyToSettings() = shellTest { fixture ->
     fixture.shell.openSettings()
 
     assertFalse(fixture.commands.run(KetchCommands.Search))
     assertTrue(fixture.shell.settingsOpen)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_shortcuts_opensAndClosesTheSheet() = runTest {
-    val fixture = fixture()
+  fun run_paletteCommand_togglesThePaletteWithoutFocusingSearch() =
+    shellTest(ui = UiPreferences()) { fixture ->
+      val searchRequests = mutableListOf<Unit>()
+      backgroundScope.launch {
+        fixture.controller.state.focusSearchRequests.collect(searchRequests::add)
+      }
+      runCurrent()
 
+      assertTrue(fixture.commands.binds(KetchCommands.Palette))
+      assertTrue(fixture.commands.run(KetchCommands.Palette))
+      runCurrent()
+      assertTrue(fixture.shell.paletteOpen)
+      assertEquals(emptyList(), searchRequests)
+
+      fixture.commands.run(KetchCommands.Palette)
+      assertFalse(fixture.shell.paletteOpen)
+    }
+
+  @Test
+  fun run_shortcuts_opensAndClosesTheSheet() = shellTest { fixture ->
     fixture.commands.run(KetchCommands.Shortcuts)
     assertTrue(fixture.shell.shortcutsOpen)
     fixture.commands.run(KetchCommands.Shortcuts)
     assertFalse(fixture.shell.shortcutsOpen)
-    fixture.controller.close()
   }
 
   @Test
-  fun binds_deviceCommands_bindsEachOne() = runTest {
-    val fixture = fixture()
-
+  fun binds_deviceCommands_bindsEachOne() = shellTest { fixture ->
     assertTrue(fixture.commands.binds(KetchCommands.SwitchDevice))
     assertTrue(fixture.commands.binds(KetchCommands.AllDevices))
     assertTrue(fixture.commands.binds(KetchCommands.device(2)))
-    fixture.controller.close()
   }
 
   @Test
-  fun run_switchDevice_opensAndClosesTheSwitcher() = runTest {
-    val fixture = fixture()
-
+  fun run_switchDevice_opensAndClosesTheSwitcher() = shellTest { fixture ->
     assertTrue(fixture.commands.run(KetchCommands.SwitchDevice))
     assertTrue(fixture.controller.state.showInstanceSelector)
     fixture.commands.run(KetchCommands.SwitchDevice)
     assertFalse(fixture.controller.state.showInstanceSelector)
-    fixture.controller.close()
   }
 
   @Test
-  fun run_allDevicesWithOneDevice_leavesTheKey() = runTest {
-    val fixture = fixture()
-
+  fun run_allDevicesWithOneDevice_leavesTheKey() = shellTest { fixture ->
     assertFalse(fixture.commands.run(KetchCommands.AllDevices))
-    fixture.controller.close()
   }
 }

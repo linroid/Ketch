@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -38,12 +35,11 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
-import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
@@ -98,15 +94,27 @@ internal data class SpeedModeView(
 internal fun rememberSpeedModeView(state: AppState): SpeedModeView {
   val pulse by state.pulse.state.collectAsState()
   val active by state.activeInstance.collectAsState()
-  val controller = state.speedMode.takeIf { active is EmbeddedInstance }
+  return speedModeView(state.speedMode.takeIf { active is EmbeddedInstance }, pulse.mode, pulse.cap)
+}
+
+/**
+ * The view of [controller]'s mode, kept current; [fallbackMode] and [cap] stand in for a device
+ * without a speed mode.
+ */
+@Composable
+internal fun speedModeView(
+  controller: SpeedModeController?,
+  fallbackMode: SpeedMode,
+  cap: SpeedLimit,
+): SpeedModeView {
   val settings = controller?.settings?.collectAsState()?.value
-  val mode = controller?.mode?.collectAsState()?.value ?: pulse.mode
+  val mode = controller?.mode?.collectAsState()?.value ?: fallbackMode
   // The suggested slow lane speed follows the observed peak.
   controller?.observedPeak?.collectAsState()?.value
   val limit = if (controller == null || settings == null) {
-    pulse.cap
+    cap
   } else {
-    effectiveCap(mode, pulse.cap, controller.slowLaneSpeed, settings.standard)
+    effectiveCap(mode, cap, controller.slowLaneSpeed, settings.standard)
   }
   val now = LocalClock.current.now()
   val label = speedModeLabelText(mode, limit, now, TimeZone.currentSystemDefault())
@@ -274,13 +282,7 @@ private fun PillPart(
         contentDescription = description
         if (stateLabel != null) stateDescription = stateLabel
       }
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(start = startPadding, end = endPadding),
     content = content,
   )

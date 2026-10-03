@@ -2,15 +2,8 @@ package com.linroid.ketch.app.ui.shell
 
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.i18n.load
-import com.linroid.ketch.app.instance.InstanceEntry
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
-import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
@@ -18,57 +11,26 @@ import com.linroid.ketch.app.ui.shell.FleetFixtures.NAS_ID
 import com.linroid.ketch.app.ui.shell.FleetFixtures.mac
 import com.linroid.ketch.app.ui.shell.FleetFixtures.nas
 import com.linroid.ketch.config.KetchConfig
-import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.UiPreferences
-import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeviceDropsTest {
   private val rows = DeviceDrag.Rows(listOf("a", "b").map { TaskKey(LOCAL_DEVICE_ID, it) })
 
   /** This Mac and a connected NAS, with quick add on. */
-  private class Fleet(scope: TestScope) {
-    val mac = RecordingKetchApi("This Mac")
-    val nas = RecordingKetchApi("NAS")
-    val manager = InstanceManager(
-      factory = InstanceFactory(
-        deviceName = "This Mac",
-        embeddedFactory = { mac },
-        remoteFactory = { config ->
-          RemoteInstance(nas, config, MutableStateFlow(ConnectionState.Connected))
-        },
-      ),
-      initialRemotes = listOf(RemoteConfig(host = "nas.local", name = "NAS")),
-      configStore = RecordingConfigStore(KetchConfig(ui = UiPreferences(quickAdd = true))),
-      context = scope.backgroundScope.coroutineContext,
-    )
-    val controller = AppController(
-      instanceManager = manager,
-      context = scope.backgroundScope.coroutineContext +
-        SupervisorJob(scope.backgroundScope.coroutineContext[Job]),
-      clock = ListFixtures.clock(scope),
-    )
-    val state: AppState get() = controller.state
-    val remote: InstanceEntry get() = manager.instances.value.last()
-  }
-
-  private fun TestScope.fleet(): Fleet = Fleet(this).also {
-    runCurrent()
-    advanceTimeBy(1.seconds)
-  }
+  private fun TestScope.fleet() = fleet(
+    mac = RecordingKetchApi("This Mac"),
+    nas = RecordingKetchApi("NAS"),
+    store = RecordingConfigStore(KetchConfig(ui = UiPreferences(quickAdd = true))),
+  )
 
   @Test
   fun dropHint_content_offersTheFreeSpace() = runTest {

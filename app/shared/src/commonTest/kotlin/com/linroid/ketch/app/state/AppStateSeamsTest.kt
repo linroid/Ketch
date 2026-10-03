@@ -99,17 +99,6 @@ class AppStateSeamsTest {
   }
 
   @Test
-  fun addDroppedText_link_opensTheAddDialogPrefilled() = runTest {
-    val state = appState()
-
-    state.addDroppedText("  https://example.com/ubuntu.iso\n")
-    runCurrent()
-
-    assertTrue(state.showAddDialog)
-    assertEquals("https://example.com/ubuntu.iso", firstLink(state))
-  }
-
-  @Test
   fun addDroppedText_whileTheDialogShowsAFile_dropsItsResolution() = runTest {
     val state = appState()
     state.openIntake()

@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.downloads
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +36,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,9 +47,9 @@ import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
@@ -301,15 +299,8 @@ internal fun ArrangementMenu(
       MenuLabel(label, arrangement.sort.label.resolve() + arrow, open) { open = true }
     }
     KetchMenu(expanded = open, onDismissRequest = { open = false }) {
-      if (table) {
-        for (group in GroupBy.entries.filter { it != GroupBy.Device }) {
-          item(
-            label = group.label,
-            checked = arrangement.group == group,
-            onClick = { onChange(arrangement.copy(group = group)) },
-          )
-        }
-      } else {
+      // The table sorts by its headers, so its menu only groups.
+      if (!table) {
         header(Res.string.downloads_sort_by.text())
         for (key in ListSortKeys) {
           item(
@@ -320,13 +311,13 @@ internal fun ArrangementMenu(
         }
         divider()
         header(Res.string.downloads_group_by.text())
-        for (group in GroupBy.entries.filter { it != GroupBy.Device }) {
-          item(
-            label = group.label,
-            checked = arrangement.group == group,
-            onClick = { onChange(arrangement.copy(group = group)) },
-          )
-        }
+      }
+      for (group in GroupBy.entries.filter { it != GroupBy.Device }) {
+        item(
+          label = group.label,
+          checked = arrangement.group == group,
+          onClick = { onChange(arrangement.copy(group = group)) },
+        )
       }
     }
   }
@@ -352,13 +343,7 @@ internal fun MenuLabel(label: String, value: String, open: Boolean, onClick: () 
       .clip(shape)
       .background(if (open) colors.surfaceHover else Color.Transparent)
       .background(overlay)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(horizontal = spacing.s2),
   ) {
     Text(
@@ -399,13 +384,7 @@ internal fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = 
       .focusRing(focus.visible, shape, colors.focusRing)
       .clip(shape)
       .background(overlay)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(horizontal = spacing.s1, vertical = spacing.s0_5),
   )
 }

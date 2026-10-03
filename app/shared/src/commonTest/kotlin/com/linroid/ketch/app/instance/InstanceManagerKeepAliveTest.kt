@@ -4,6 +4,8 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.app.FakeInstanceFactory
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.FakeRemote
+import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.config.ConfigStore
@@ -12,6 +14,7 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.UiPreferences
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -28,13 +31,6 @@ import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InstanceManagerKeepAliveTest {
-
-  private class Store(var config: KetchConfig = KetchConfig()) : ConfigStore {
-    override fun load(): KetchConfig = config
-    override fun save(config: KetchConfig) {
-      this.config = config
-    }
-  }
 
   private class Engine : KetchApi by FakeKetchApi("Core") {
     var starts = 0
@@ -65,6 +61,14 @@ class InstanceManagerKeepAliveTest {
     return manager
   }
 
+  private fun managerTest(
+    remotes: List<RemoteConfig> = listOf(nas, den),
+    block: suspend TestScope.(FakeInstanceFactory, InstanceManager) -> Unit,
+  ): TestResult {
+    val fakes = FakeInstanceFactory()
+    return fixtureTest({ manager(fakes, remotes) }, InstanceManager::close) { block(fakes, it) }
+  }
+
   private fun InstanceManager.remote(host: String): RemoteInstance =
     instances.value.filterIsInstance<RemoteInstance>().single { it.host == host }
 
@@ -77,10 +81,7 @@ class InstanceManagerKeepAliveTest {
   }
 
   @Test
-  fun switchTo_watchedDevicesBackAndForth_neverReconnects() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
-
+  fun switchTo_watchedDevicesBackAndForth_neverReconnects() = managerTest { fakes, manager ->
     manager.switchTo(manager.remote("nas.local"))
     manager.switchTo(manager.remote("den-pc"))
     manager.switchTo(manager.remote("nas.local"))
@@ -92,32 +93,26 @@ class InstanceManagerKeepAliveTest {
       assertFalse(client.closed)
     }
     assertSame(manager.remote("nas.local").instance, manager.activeApi.value)
-    manager.close()
   }
 
   @Test
-  fun switchTo_unwatchedDevicesBackAndForth_reconnectsOnceWithFreshClient() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes, listOf(nas.copy(watch = false), den.copy(watch = false)))
+  fun switchTo_unwatchedDevicesBackAndForth_reconnectsOnceWithFreshClient() =
+    managerTest(listOf(nas.copy(watch = false), den.copy(watch = false))) { fakes, manager ->
+      manager.switchTo(manager.remote("nas.local"))
+      manager.switchTo(manager.remote("den-pc"))
+      manager.switchTo(manager.remote("nas.local"))
+      runCurrent()
 
-    manager.switchTo(manager.remote("nas.local"))
-    manager.switchTo(manager.remote("den-pc"))
-    manager.switchTo(manager.remote("nas.local"))
-    runCurrent()
-
-    val nasClients = fakes.started("nas.local:8642")
-    assertEquals(2, nasClients.size)
-    assertTrue(nasClients.first().closed)
-    assertTrue(fakes.remotes.none { it.startedAfterClose || it.startCount > 1 })
-    assertTrue(fakes.started("den-pc:8642").single().closed)
-    assertNoClosedClientListed(manager)
-    manager.close()
-  }
+      val nasClients = fakes.started("nas.local:8642")
+      assertEquals(2, nasClients.size)
+      assertTrue(nasClients.first().closed)
+      assertTrue(fakes.remotes.none { it.startedAfterClose || it.startCount > 1 })
+      assertTrue(fakes.started("den-pc:8642").single().closed)
+      assertNoClosedClientListed(manager)
+    }
 
   @Test
-  fun switchTo_awayFromWatchedDevice_keepsItConnected() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun switchTo_awayFromWatchedDevice_keepsItConnected() = managerTest { fakes, manager ->
     manager.switchTo(manager.remote("nas.local"))
 
     manager.switchTo(manager.instances.value.first())
@@ -126,7 +121,6 @@ class InstanceManagerKeepAliveTest {
     val nas = manager.remote("nas.local")
     assertEquals(ConnectionState.Connected, nas.connectionState.value)
     assertFalse((nas.instance as FakeRemote).closed)
-    manager.close()
   }
 
   @Test
@@ -156,9 +150,7 @@ class InstanceManagerKeepAliveTest {
   }
 
   @Test
-  fun setInForeground_backgroundPastGrace_closesInactiveRemotes() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun setInForeground_backgroundPastGrace_closesInactiveRemotes() = managerTest { fakes, manager ->
     manager.switchTo(manager.remote("nas.local"))
     val den = manager.remote("den-pc").instance as FakeRemote
 
@@ -171,33 +163,27 @@ class InstanceManagerKeepAliveTest {
     assertFalse((manager.remote("nas.local").instance as FakeRemote).closed)
     assertEquals(0, (manager.remote("den-pc").instance as FakeRemote).startCount)
     assertNoClosedClientListed(manager)
-    manager.close()
   }
 
   @Test
-  fun setInForeground_returnAfterGrace_reconnectsWithFreshClients() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
-    manager.setInForeground(false)
-    advanceTimeBy(11.minutes)
+  fun setInForeground_returnAfterGrace_reconnectsWithFreshClients() =
+    managerTest { fakes, manager ->
+      manager.setInForeground(false)
+      advanceTimeBy(11.minutes)
 
-    manager.setInForeground(true)
-    runCurrent()
+      manager.setInForeground(true)
+      runCurrent()
 
-    for (deviceId in listOf("nas.local:8642", "den-pc:8642")) {
-      val clients = fakes.started(deviceId)
-      assertEquals(2, clients.size)
-      assertSame(clients.last(), manager.instances.value.single { it.label == deviceId }.instance)
+      for (deviceId in listOf("nas.local:8642", "den-pc:8642")) {
+        val clients = fakes.started(deviceId)
+        assertEquals(2, clients.size)
+        assertSame(clients.last(), manager.instances.value.single { it.label == deviceId }.instance)
+      }
+      assertTrue(fakes.remotes.none { it.startedAfterClose })
     }
-    assertTrue(fakes.remotes.none { it.startedAfterClose })
-    manager.close()
-  }
 
   @Test
-  fun setInForeground_returnWithinGrace_keepsConnections() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
-
+  fun setInForeground_returnWithinGrace_keepsConnections() = managerTest { fakes, manager ->
     manager.setInForeground(false)
     advanceTimeBy(9.minutes)
     manager.setInForeground(true)
@@ -205,13 +191,12 @@ class InstanceManagerKeepAliveTest {
 
     assertEquals(2, fakes.remotes.size)
     assertTrue(fakes.remotes.none { it.closed })
-    manager.close()
   }
 
   @Test
   fun setWatched_offForInactiveDevice_disconnectsIt() = runTest {
     val fakes = FakeInstanceFactory()
-    val store = Store(KetchConfig(remotes = listOf(nas, den)))
+    val store = RecordingConfigStore(KetchConfig(remotes = listOf(nas, den)))
     val manager = manager(fakes, store = store)
     val client = manager.remote("den-pc").instance as FakeRemote
 
@@ -227,7 +212,7 @@ class InstanceManagerKeepAliveTest {
   @Test
   fun reconnectWith_newToken_startsFreshClientWithToken() = runTest {
     val fakes = FakeInstanceFactory()
-    val store = Store()
+    val store = RecordingConfigStore()
     val manager = manager(fakes, store = store)
     manager.switchTo(manager.remote("nas.local"))
     val old = manager.remote("nas.local")
@@ -247,9 +232,7 @@ class InstanceManagerKeepAliveTest {
   }
 
   @Test
-  fun removeInstance_activeRemote_closesItAndShowsEmbedded() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun removeInstance_activeRemote_closesItAndShowsEmbedded() = managerTest { fakes, manager ->
     manager.switchTo(manager.remote("nas.local"))
     val client = manager.remote("nas.local").instance as FakeRemote
 
@@ -261,7 +244,6 @@ class InstanceManagerKeepAliveTest {
     assertEquals(DeviceScope.Single(LOCAL_DEVICE_ID), manager.deviceScope.value)
     val remaining = manager.instances.value.filterIsInstance<RemoteInstance>()
     assertEquals(listOf("den-pc"), remaining.map { it.host })
-    manager.close()
   }
 
   @Test
@@ -286,7 +268,7 @@ class InstanceManagerKeepAliveTest {
   @Test
   fun connect_unnamedDevice_adoptsTheNameItAnnounces() = runTest {
     val fakes = FakeInstanceFactory().apply { announcedName = "NAS-Basement" }
-    val store = Store()
+    val store = RecordingConfigStore()
     val manager = manager(fakes, listOf(nas), store)
 
     assertEquals("NAS-Basement", manager.remote("nas.local").label)
@@ -305,40 +287,34 @@ class InstanceManagerKeepAliveTest {
   }
 
   @Test
-  fun rename_namedDevice_keepsItsClient() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes, listOf(nas.copy(name = "NAS")))
-    manager.switchTo(manager.remote("nas.local"))
-    val client = manager.remote("nas.local").instance
+  fun rename_namedDevice_keepsItsClient() =
+    managerTest(listOf(nas.copy(name = "NAS"))) { fakes, manager ->
+      manager.switchTo(manager.remote("nas.local"))
+      val client = manager.remote("nas.local").instance
 
-    manager.rename(manager.remote("nas.local"), "  Basement  ")
-    runCurrent()
+      manager.rename(manager.remote("nas.local"), "  Basement  ")
+      runCurrent()
 
-    assertEquals("Basement", manager.remote("nas.local").label)
-    assertEquals("Basement", manager.activeInstance.value?.label)
-    assertSame(client, manager.activeApi.value)
-    assertEquals(1, fakes.remotes.size)
-    manager.close()
-  }
+      assertEquals("Basement", manager.remote("nas.local").label)
+      assertEquals("Basement", manager.activeInstance.value?.label)
+      assertSame(client, manager.activeApi.value)
+      assertEquals(1, fakes.remotes.size)
+    }
 
   @Test
-  fun addRemote_discoveredName_namesTheDevice() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes, emptyList())
-
-    val added = manager.addRemote("10.0.0.5", name = "Den-PC")
-    val again = manager.addRemote("10.0.0.5")
+  fun addRemote_discoveredName_namesTheDevice() = managerTest(emptyList()) { fakes, manager ->
+    val added = manager.addRemote(RemoteConfig("10.0.0.5", name = "Den-PC"))
+    val again = manager.addRemote(RemoteConfig("10.0.0.5"))
 
     assertEquals("Den-PC", added.label)
     assertSame(added, again)
     assertEquals(2, manager.instances.value.size)
-    manager.close()
   }
 
   @Test
   fun init_lastDeviceSaved_showsItAgain() = runTest {
     val fakes = FakeInstanceFactory()
-    val store = Store(KetchConfig(ui = UiPreferences(lastDeviceId = "den-pc:8642")))
+    val store = RecordingConfigStore(KetchConfig(ui = UiPreferences(lastDeviceId = "den-pc:8642")))
 
     val manager = manager(fakes, store = store)
 

@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,7 +32,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -51,9 +49,9 @@ import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
@@ -65,7 +63,6 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.StatusFilter
-import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.util.LinkParser
@@ -262,11 +259,9 @@ private fun DeviceChip(state: AppState, modifier: Modifier = Modifier) {
       .background(colors.surface)
       .background(overlay)
       .border(HairlineWidth, colors.borderStrong, shape)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
+      .ketchClickable(
+        interactions = interactions,
+        focus = focus,
         onClickLabel = stringResource(Res.string.downloads_switch_device),
         onClick = { state.showInstanceSelector = true },
       )
@@ -433,7 +428,7 @@ private fun OverflowMenu(page: DownloadsPage, showsTable: Boolean) {
       item(
         label = Res.string.downloads_copy_all_links.text(),
         icon = KetchIcon.Copy,
-        onClick = { copyLinks(page, visible) },
+        onClick = { page.actions.runner.run(RowAction.CopyLink, visible) },
         enabled = visible.isNotEmpty(),
       )
       divider()
@@ -488,11 +483,9 @@ private fun ResolvingChip(state: AppState) {
         .clip(shape)
         .background(colors.accentSoft)
         .background(overlay)
-        .trackFocusVisibility(focus)
-        .clickable(
-          interactionSource = interactions,
-          indication = null,
-          role = Role.Button,
+        .ketchClickable(
+          interactions = interactions,
+          focus = focus,
           onClickLabel = stringResource(Res.string.downloads_show_add_sheet),
           onClick = { state.intake.resume(session) },
         )
@@ -529,10 +522,6 @@ internal fun clearMissingLabel(count: Int): UiText = if (count > 0) {
 /** What "Clear missing" removes, for its caption in menus. */
 internal val clearMissingCaption: UiText
   get() = Res.string.downloads_clear_missing_caption.text()
-
-private fun copyLinks(page: DownloadsPage, rows: List<TaskRow>) {
-  page.actions.runner.run(RowAction.CopyLink, rows)
-}
 
 /** Widest the Add button grows on a card [cardWidth] wide, as when it offers a copied link. */
 internal fun addButtonMaxWidth(cardWidth: Dp): Dp =

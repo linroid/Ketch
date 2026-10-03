@@ -27,33 +27,20 @@ class StatusFilterTest {
     listOf(scheduled, queued, downloading, paused, completed, failed, canceled)
 
   @Test
-  fun matches_all_matchesEveryState() {
-    assertMatchesOnly(StatusFilter.All, allStates)
-  }
-
-  @Test
-  fun matches_downloading_matchesOnlyDownloading() {
-    assertMatchesOnly(StatusFilter.Downloading, listOf(downloading))
-  }
-
-  @Test
-  fun matches_waiting_matchesQueuedAndScheduled() {
-    assertMatchesOnly(StatusFilter.Waiting, listOf(queued, scheduled))
-  }
-
-  @Test
-  fun matches_paused_matchesOnlyPaused() {
-    assertMatchesOnly(StatusFilter.Paused, listOf(paused))
-  }
-
-  @Test
-  fun matches_done_matchesOnlyCompleted() {
-    assertMatchesOnly(StatusFilter.Done, listOf(completed))
-  }
-
-  @Test
-  fun matches_failed_matchesFailedAndCanceled() {
-    assertMatchesOnly(StatusFilter.Failed, listOf(failed, canceled))
+  fun matches_eachTab_matchesItsStates() {
+    val tabs = mapOf(
+      StatusFilter.All to allStates,
+      StatusFilter.Downloading to listOf(downloading),
+      StatusFilter.Waiting to listOf(queued, scheduled),
+      StatusFilter.Paused to listOf(paused),
+      StatusFilter.Done to listOf(completed),
+      StatusFilter.Failed to listOf(failed, canceled),
+    )
+    for ((filter, expected) in tabs) {
+      allStates.forEach { state ->
+        assertEquals(state in expected, filter.matches(state), "$filter matches $state")
+      }
+    }
   }
 
   @Test
@@ -62,16 +49,6 @@ class StatusFilterTest {
     allStates.forEach { state ->
       assertEquals(1, tabs.count { it.matches(state) }, "tabs matching $state")
     }
-  }
-
-  @Test
-  fun count_all_countsEveryTask() {
-    assertEquals(allStates.size, StatusFilter.All.count(allStates))
-  }
-
-  @Test
-  fun count_failed_countsFailedAndCanceledTasks() {
-    assertEquals(2, StatusFilter.Failed.count(allStates + downloading))
   }
 
   @Test
@@ -84,11 +61,5 @@ class StatusFilterTest {
       assertEquals(states.count { filter.matches(it) }, counts[filter], "count of $filter")
     }
     assertEquals(states.size, counts.filterKeys { it != StatusFilter.All }.values.sum())
-  }
-
-  private fun assertMatchesOnly(filter: StatusFilter, expected: List<DownloadState>) {
-    allStates.forEach { state ->
-      assertEquals(state in expected, filter.matches(state), "$filter matches $state")
-    }
   }
 }

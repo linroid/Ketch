@@ -18,12 +18,12 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.ui.inspector.tabs.bytesOfText
-import com.linroid.ketch.app.ui.inspector.tabs.clockTime
 import com.linroid.ketch.app.ui.inspector.tabs.compactSizeText
 import com.linroid.ketch.app.ui.inspector.tabs.compactSpeedText
 import com.linroid.ketch.app.ui.inspector.tabs.sameByteUnit
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.TaskOrigin
+import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.urlHost
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.date_at_time
@@ -419,7 +419,10 @@ internal data class SharedSettings(
   }
 }
 
-/** Whether the inspector offers live controls for a task in this state. */
+/**
+ * Whether the inspector offers live controls for a task in this state, which can still download,
+ * so its speed cap and connections still apply.
+ */
 internal val DownloadState.hasControls: Boolean
   get() = when (this) {
     is DownloadState.Downloading,

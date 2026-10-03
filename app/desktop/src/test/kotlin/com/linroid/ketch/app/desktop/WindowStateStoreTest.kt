@@ -40,24 +40,20 @@ class WindowStateStoreTest {
   }
 
   @Test
-  fun load_malformedNumber_returnsNull() {
+  fun load_invalidFile_returnsNull() {
+    val files = listOf(
+      // A malformed number.
+      "x=10\ny=20\nwidth=wide\nheight=700\nmaximized=false\n",
+      // A missing key.
+      "x=10\ny=20\nwidth=1000\nmaximized=false\n",
+      // A size that is not positive.
+      "x=10\ny=20\nwidth=0\nheight=700\nmaximized=false\n",
+    )
     file.parentFile.mkdirs()
-    file.writeText("x=10\ny=20\nwidth=wide\nheight=700\nmaximized=false\n")
-    assertNull(store.load())
-  }
-
-  @Test
-  fun load_missingKey_returnsNull() {
-    file.parentFile.mkdirs()
-    file.writeText("x=10\ny=20\nwidth=1000\nmaximized=false\n")
-    assertNull(store.load())
-  }
-
-  @Test
-  fun load_nonPositiveSize_returnsNull() {
-    file.parentFile.mkdirs()
-    file.writeText("x=10\ny=20\nwidth=0\nheight=700\nmaximized=false\n")
-    assertNull(store.load())
+    for (text in files) {
+      file.writeText(text)
+      assertNull(store.load(), text)
+    }
   }
 
   @Test

@@ -88,21 +88,16 @@ class SpeedModeControllerTest {
   }
 
   @Test
-  fun suggestSlowLane_peak_isThirtyPercent() {
-    assertEquals(SpeedLimit.of(3_000_000), SpeedModeController.suggestSlowLane(10_000_000))
-  }
-
-  @Test
-  fun suggestSlowLane_slowPeak_neverBelowMinimum() {
-    assertEquals(
-      SpeedModeController.MIN_SLOW_LANE,
-      SpeedModeController.suggestSlowLane(SpeedLimit.kbps(500).bytesPerSecond)
+  fun suggestSlowLane_peak_isThirtyPercentButAtLeastTheMinimum() {
+    val cases = listOf(
+      10_000_000L to SpeedLimit.of(3_000_000),
+      SpeedLimit.kbps(500).bytesPerSecond to SpeedModeController.MIN_SLOW_LANE,
+      // Without a peak it is 1 MB/s.
+      0L to SpeedLimit.mbps(1),
     )
-  }
-
-  @Test
-  fun suggestSlowLane_noPeak_isOneMegabyte() {
-    assertEquals(SpeedLimit.mbps(1), SpeedModeController.suggestSlowLane(0))
+    for ((peak, expected) in cases) {
+      assertEquals(expected, SpeedModeController.suggestSlowLane(peak), "suggestSlowLane($peak)")
+    }
   }
 
   @Test

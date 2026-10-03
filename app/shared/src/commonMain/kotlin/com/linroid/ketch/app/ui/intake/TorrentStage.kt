@@ -56,9 +56,8 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.IntakeEntry
-import com.linroid.ketch.app.theme.KetchElevationLevel
+import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.downloads.MenuLabel
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_undo
@@ -184,14 +183,7 @@ internal fun TorrentStage(actions: IntakeActions, entry: IntakeEntry, onBack: ((
       }
     }
     Box(
-      modifier = Modifier
-        .fillMaxWidth()
-        .ketchSurface(
-          KetchElevationLevel.E0,
-          KetchTheme.shapes.lg,
-          colors.surface,
-          colors.hairline,
-        ),
+      modifier = Modifier.intakeCard(),
     ) {
       LazyColumn(
         modifier = Modifier
@@ -412,7 +404,7 @@ private fun SpaceNeeded(needed: Long, free: Long?, device: String) {
       text = listOfNotNull(
         Res.string.intake_space_needed.text(sizeText(needed)),
         free?.takeIf { it > 0 }
-          ?.let { Res.string.intake_space_free_on.text(freeSpace(it), device) },
+          ?.let { Res.string.intake_space_free_on.text(formatSpace(it), device) },
       ).joinText().resolve(),
       style = KetchTheme.typography.caption,
       color = if (free != null && needed > free) {

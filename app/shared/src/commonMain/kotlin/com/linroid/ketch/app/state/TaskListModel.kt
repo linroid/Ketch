@@ -232,7 +232,7 @@ class TaskListModel(
   // Only the rows pipeline below touches this state, one frame at a time.
   private val entries = HashMap<TaskKey, Entry>()
   private val moved = HashMap<TaskKey, Moved>()
-  private val rings = HashMap<TaskKey, SpeedRing>()
+  private val speeds = HashMap<TaskKey, List<Long>>()
   private val contexts = HashMap<String, RowContext>()
   private var lastShown: List<TaskRow> = emptyList()
   private val downloading = MutableStateFlow(false)
@@ -363,7 +363,7 @@ class TaskListModel(
     }
     entries.keys.retainAll(seen)
     moved.keys.retainAll(seen)
-    rings.keys.retainAll(seen)
+    speeds.keys.retainAll(seen)
     contexts.keys.retainAll(frame.devices.mapTo(HashSet()) { it.source.deviceId })
     downloading.value = rows.any { it.state is DownloadState.Downloading }
     val devicesShown = frame.shown
@@ -450,10 +450,12 @@ class TaskListModel(
     return (now - last.at).inWholeSeconds.seconds.takeIf { it > STALL_THRESHOLD }
   }
 
+  // A new list only when a sample is added, since rows compare their samples by identity.
   private fun speedSamples(key: TaskKey, state: DownloadState, sample: Boolean): List<Long> {
-    val ring = rings[key]
-    if (!sample || state !is DownloadState.Downloading) return ring?.samples ?: emptyList()
-    return (ring ?: SpeedRing().also { rings[key] = it }).add(state.progress.bytesPerSecond)
+    val samples = speeds[key]
+    if (!sample || state !is DownloadState.Downloading) return samples ?: emptyList()
+    return (samples.orEmpty() + state.progress.bytesPerSecond).takeLast(SPEED_SAMPLES)
+      .also { speeds[key] = it }
   }
 
   private class TaskSnapshot(
@@ -492,20 +494,6 @@ class TaskListModel(
     ): Boolean = snapshot.task === other.task && snapshot.request === other.request &&
       snapshot.state === other.state && snapshot.segments === other.segments &&
       this.context === context && this.samples === samples && this.stalledFor == stalledFor
-  }
-
-  private class SpeedRing {
-    private val values = ArrayDeque<Long>(SPEED_SAMPLES)
-
-    var samples: List<Long> = emptyList()
-      private set
-
-    fun add(value: Long): List<Long> {
-      if (values.size == SPEED_SAMPLES) values.removeFirst()
-      values.addLast(value)
-      samples = values.toList()
-      return samples
-    }
   }
 
   companion object {

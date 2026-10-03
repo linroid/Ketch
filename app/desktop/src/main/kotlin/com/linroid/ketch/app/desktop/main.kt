@@ -44,17 +44,14 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
-import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
-import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.log.FileLogger
-import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.rememberFileActions
@@ -70,8 +67,8 @@ import com.linroid.ketch.app.state.PulseModel
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.isPairingLink
-import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.theme.LocalWindowChrome
+import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.ConfigStore
@@ -399,7 +396,9 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
   if (DesktopOs.current == DesktopOs.MAC) {
     DockMenu(commands, status.pulse.counts)
-    DefaultMenuBar(defaultMenus(controller, status, speedMode, files), commands::perform)
+    val instances by controller.state.instances.collectAsState()
+    val menus = menuBar(menuBarContext(controller, status, speedMode, files, instances))
+    DefaultMenuBar(menus, commands::perform)
   }
   CloseDialogs(behavior, controller.appSettings)
 
@@ -435,7 +434,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       }
       val focused = LocalWindowInfo.current.isWindowFocused
       SideEffect { windowFocused = focused }
-      MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.isDarkTheme())
+      MacTitleBar(fullWindowContent, darkTheme = controller.appSettings.themeMode.isDark())
       KetchMenuBar(controller, status, actions, speedMode)
       val shellSkips = remember(speedMode) {
         hostShortcuts(DesktopOs.current, slowLane = speedMode != null)
@@ -644,37 +643,6 @@ private fun windowExceptionHandlers(controller: AppController) =
       )
     }
   }
-
-/** The menus of the macOS menu bar while no window is open, as [KetchMenuBar] builds them. */
-@Composable
-private fun defaultMenus(
-  controller: AppController,
-  status: DesktopStatus,
-  speedMode: SpeedModeController?,
-  files: FileActions?,
-): List<MenuBarMenu> {
-  val state = controller.state
-  val instances by state.instances.collectAsState()
-  val active by state.activeInstance.collectAsState()
-  val shown by state.deviceScope.collectAsState()
-  val ops by state.pendingOps.ops.collectAsState()
-  val mode = speedMode?.mode?.collectAsState()?.value
-  return menuBar(
-    MenuBarContext(
-      counts = status.pulse.counts,
-      failures = status.pulse.failures,
-      filter = state.statusFilter,
-      devices = instances.map { it.displayName },
-      activeDevice = instances.indexOf(active).takeIf { it >= 0 },
-      selection = emptyList(),
-      undoTitle = ops.lastOrNull()?.undoTitle,
-      slowLane = mode?.isSlowLane,
-      allDevices = shown == DeviceScope.All,
-      revealLabel = files?.revealLabel,
-      platform = KeyboardPlatform.Mac,
-    ),
-  )
-}
 
 /**
  * Reports what happens on the devices the app watches: as toasts while the window is [inFront],

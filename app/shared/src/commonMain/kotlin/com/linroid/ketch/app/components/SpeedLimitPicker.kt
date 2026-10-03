@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -120,17 +121,7 @@ fun SpeedLimitPicker(
   pending: Boolean = false,
 ) {
   val spacing = KetchTheme.spacing
-  var requested by remember { mutableStateOf<SpeedLimit?>(null) }
-  LaunchedEffect(value, pending, requested) {
-    val chosen = requested ?: return@LaunchedEffect
-    if (value == chosen) {
-      requested = null
-    } else if (!pending) {
-      // The command ended without the limit changing, or the caller tracks no command.
-      delay(SettleTimeout)
-      requested = null
-    }
-  }
+  var requested by rememberRequested(value, pending)
   val shown = requested ?: value
   val currentValue by rememberUpdatedState(value)
   val currentOnCommit by rememberUpdatedState(onCommit)
@@ -243,6 +234,26 @@ fun SpeedLimitPicker(
 
 private fun customText(limit: SpeedLimit): String =
   if (limit.isUnlimited) "" else formatSpeedAmount(limit, preferredUnit(limit))
+
+/**
+ * The value a picker asked for, which it shows in place of [value] until [value] takes it, or
+ * until a while after the command ends ([pending] goes off) without it, as when it failed.
+ */
+@Composable
+internal fun <T : Any> rememberRequested(value: T, pending: Boolean): MutableState<T?> {
+  val requested = remember { mutableStateOf<T?>(null) }
+  LaunchedEffect(value, pending, requested.value) {
+    val chosen = requested.value ?: return@LaunchedEffect
+    if (value == chosen) {
+      requested.value = null
+    } else if (!pending) {
+      // The command ended without the value changing, or the caller tracks no command.
+      delay(SettleTimeout)
+      requested.value = null
+    }
+  }
+  return requested
+}
 
 /**
  * Commits the last value given to [update] once no other arrives for [delay], or at once on

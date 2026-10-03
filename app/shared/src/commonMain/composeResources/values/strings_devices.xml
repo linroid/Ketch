@@ -158,12 +158,10 @@
 
   <!-- The speed popover of a device card. %1$s is the device's name. -->
   <string name="device_speed_of">Speed of %1$s</string>
-  <string name="device_speed_mode">Speed mode</string>
   <string name="device_speed_limit">Speed limit</string>
   <!-- %1$s is the device's name, %2$s why its limit could not be changed. -->
   <string name="device_speed_update_failed">Couldn't update %1$s · %2$s</string>
   <string name="device_speed_applies">Applies to every download on %1$s.</string>
-  <string name="device_speed_settings">Speed settings…</string>
 
   <!-- The Devices page. -->
   <string name="device_page_title">Devices</string>

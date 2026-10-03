@@ -35,7 +35,6 @@
   <string name="date_month_day_year">%1$s %3$d, %4$d</string>
   <string name="date_today">Today</string>
   <string name="date_yesterday">Yesterday</string>
-  <string name="date_tomorrow">Tomorrow</string>
   <!-- %1$s is a time of day, such as 09:05. -->
   <string name="date_today_at">Today %1$s</string>
   <string name="date_yesterday_at">Yesterday %1$s</string>
@@ -78,19 +77,14 @@
 
   <!-- Buttons used across the app. -->
   <string name="action_cancel">Cancel</string>
-  <string name="action_ok">OK</string>
   <string name="action_done">Done</string>
   <string name="action_close">Close</string>
   <string name="action_back">Back</string>
   <string name="action_next">Next</string>
   <string name="action_continue">Continue</string>
   <string name="action_skip">Skip</string>
-  <string name="action_save">Save</string>
   <string name="action_add">Add</string>
-  <string name="action_edit">Edit</string>
   <string name="action_remove">Remove</string>
-  <string name="action_delete">Delete</string>
-  <string name="action_copy">Copy</string>
   <string name="action_open">Open</string>
   <string name="action_show">Show</string>
   <string name="action_undo">Undo</string>
@@ -99,6 +93,4 @@
   <string name="action_dismiss">Dismiss</string>
   <string name="action_review">Review</string>
   <string name="action_connect">Connect</string>
-  <string name="action_pause">Pause</string>
-  <string name="action_resume">Resume</string>
 </resources>

@@ -61,6 +61,7 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.devices.askForToken
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_dismiss
 import ketch.app.shared.generated.resources.banner_connecting
@@ -204,13 +205,7 @@ fun BannerHost(state: AppState, modifier: Modifier = Modifier) {
         localName = local?.let { localDeviceNoun() },
         onRetry = { (state.activeInstance.value as? RemoteInstance)?.let(state::retryNow) },
         onSwitchToLocal = { local?.let(state::switchInstance) },
-        onEnterToken = {
-          val remote = state.activeInstance.value as? RemoteInstance
-          if (remote != null) {
-            state.unauthorizedInstance = remote
-            state.showAddRemoteDialog = true
-          }
-        },
+        onEnterToken = { (state.activeInstance.value as? RemoteInstance)?.let(state::askForToken) },
       )?.let(::add)
     }
     active.filter { it.placement == MessagePlacement.Banner }

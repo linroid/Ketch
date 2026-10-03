@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.intake
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +43,7 @@ import com.linroid.ketch.app.components.DeviceTargetChip
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchSegmented
@@ -54,6 +54,7 @@ import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.components.StartTimePicker
 import com.linroid.ketch.app.components.StepperCount
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
 import com.linroid.ketch.app.components.trackFocusVisibility
@@ -71,6 +72,8 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.state.AUTHORIZATION_HEADER
+import com.linroid.ketch.app.state.COOKIE_HEADER
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.HeaderRow
 import com.linroid.ketch.app.state.IntakeHeaders
@@ -85,10 +88,7 @@ import com.linroid.ketch.app.state.folderLabel
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.toDeviceHealth
-import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
-import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.inspector.FirstThatFits
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_active_downloads
@@ -158,7 +158,7 @@ internal fun OptionsRow(actions: IntakeActions) {
   val values = session.optionValues
   // The box keeps the line at the start; the variant that fits is only as wide as it needs.
   Box(Modifier.fillMaxWidth()) {
-    FirstThatFits(count = OPTION_LINE_VARIANTS) { variant ->
+    FirstThatFits(count = OptionLineStyle.entries.size) { variant ->
       OptionsLine(actions, values, OptionLineStyle.entries[variant])
     }
   }
@@ -185,8 +185,6 @@ private enum class OptionLineStyle(
   IconOnly(optionsLabel = false),
   Scrolling(optionsLabel = false, scrolls = true),
 }
-
-private val OPTION_LINE_VARIANTS = OptionLineStyle.entries.size
 
 @Composable
 private fun OptionsLine(
@@ -302,7 +300,7 @@ internal fun OptionsPanel(session: IntakeSession, modifier: Modifier = Modifier)
       caption = stringResource(priorityCaption(session.priority)),
     ) {
       KetchSegmented(
-        options = PRIORITIES,
+        options = DownloadPriority.entries,
         selected = session.priority,
         onSelect = { session.priority = it },
         label = { priorityText(it).resolve() },
@@ -369,11 +367,7 @@ private fun OptionField(
 ) {
   val colors = KetchTheme.colors
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2)) {
-    Text(
-      text = eyebrowText(label),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow(label)
     content()
     if (caption != null) {
       Text(text = caption, style = KetchTheme.typography.caption, color = colors.textSecondary)
@@ -421,13 +415,7 @@ private fun OptionPill(
       )
       .trackFocusVisibility(focus)
       .semantics { if (text.isEmpty() && description != null) contentDescription = description }
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        enabled = enabled,
-        role = Role.DropdownList,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, enabled = enabled, role = Role.DropdownList, onClick = onClick)
       .padding(start = if (text.isEmpty()) spacing.s2 else spacing.s3, end = spacing.s2),
   ) {
     if (icon != null) {
@@ -484,13 +472,7 @@ private fun ValueChip(
       .clip(shape)
       .background(colors.accentSoft)
       .background(overlay)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
       .padding(start = spacing.s3, end = if (onRemove != null) spacing.s1 else spacing.s3),
   ) {
     Text(
@@ -510,12 +492,7 @@ private fun ValueChip(
           .clip(shape)
           .background(removeOverlay)
           .semantics { contentDescription = removeLabel }
-          .clickable(
-            interactionSource = removeInteractions,
-            indication = null,
-            role = Role.Button,
-            onClick = onRemove,
-          ),
+          .ketchClickable(removeInteractions, onClick = onRemove),
       ) {
         KetchIconImage(KetchIcon.Close, size = spacing.s3, tint = colors.accentText)
       }
@@ -543,7 +520,7 @@ private fun SaveToPill(
       label = saveTo.takeIf { label },
       value = listOfNotNull(
         verbatim(name),
-        free?.takeIf { showFree }?.let { Res.string.device_free_space.text(freeSpace(it)) },
+        free?.takeIf { showFree }?.let { Res.string.device_free_space.text(formatSpace(it)) },
       ).joinText().resolve(),
       icon = KetchIcon.Folder,
       changed = folder != null,
@@ -661,7 +638,7 @@ internal fun TargetChip(session: IntakeSession, instances: List<InstanceEntry>) 
         health = health,
         pennantName = entry.label,
         summary = targetSummary(presence.firstOrNull { it.deviceId == entry.deviceId }, free),
-        shortcut = (index + 1).takeIf { it <= MAX_TARGET_SHORTCUTS }
+        shortcut = (index + 1).takeIf { it <= KetchCommands.NUMBERED_DEVICES }
           ?.let { KetchCommands.intakeTarget(it).shortcutLabel() },
       )
     }
@@ -688,18 +665,10 @@ internal fun AdvancedSection(actions: IntakeActions) {
   val changed = { session.onHeadersChanged() }
   Column(
     verticalArrangement = Arrangement.spacedBy(spacing.s3),
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
-      .padding(spacing.s3),
+    modifier = Modifier.intakeCard().padding(spacing.s3),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        text = eyebrowText(stringResource(Res.string.intake_advanced)),
-        style = KetchTheme.typography.eyebrow,
-        color = colors.textTertiary,
-        modifier = Modifier.weight(1f),
-      )
+      KetchEyebrow(stringResource(Res.string.intake_advanced), Modifier.weight(1f))
       KetchButton(
         text = stringResource(Res.string.intake_hide),
         onClick = { session.updateAdvancedOpen(false) },
@@ -778,7 +747,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
         headers.cookie = it
         changed()
       },
-      label = IntakeHeaders.COOKIE,
+      label = COOKIE_HEADER,
       placeholder = "name=value; other=value",
       multiline = true,
     )
@@ -788,7 +757,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
         headers.authorization = it
         changed()
       },
-      label = IntakeHeaders.AUTHORIZATION,
+      label = AUTHORIZATION_HEADER,
       placeholder = "Bearer …",
     )
     for (row in headers.extra.toList()) {
@@ -896,16 +865,11 @@ internal fun targetSummary(presence: DevicePresence?, free: Long? = null): UiTex
   val usable = free ?: presence?.disk?.usableBytes?.takeIf { it > 0 }
   val active = presence?.counts?.downloading ?: 0
   return listOfNotNull(
-    usable?.let { Res.string.device_free_space.text(freeSpace(it)) },
+    usable?.let { Res.string.device_free_space.text(formatSpace(it)) },
     Res.string.device_active_downloads.text(active).takeIf { active > 0 },
     Res.string.pulse_slow_lane.text().takeIf { presence?.speedMode?.isSlowLane == true },
   ).takeIf { it.isNotEmpty() }?.joinText()
 }
-
-private const val MAX_TARGET_SHORTCUTS = 9
-
-/** Free space as the Pulse bar says it, such as "412 GB", "3.1 GB" or "1.6 TB". */
-internal fun freeSpace(bytes: Long): UiText = formatSpace(bytes)
 
 private fun priorityCaption(priority: DownloadPriority): StringResource = when (priority) {
   DownloadPriority.LOW -> Res.string.intake_priority_low_caption
@@ -921,13 +885,6 @@ private fun resetLabel(option: IntakeOption): StringResource = when (option) {
   IntakeOption.Start -> Res.string.intake_reset_start
   IntakeOption.Connections -> Res.string.intake_reset_connections
 }
-
-private val PRIORITIES = listOf(
-  DownloadPriority.LOW,
-  DownloadPriority.NORMAL,
-  DownloadPriority.HIGH,
-  DownloadPriority.URGENT,
-)
 
 private const val SECRET_LINES = 3
 private const val HEADER_NAME_WEIGHT = 0.4f

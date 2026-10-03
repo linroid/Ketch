@@ -56,10 +56,10 @@ import com.linroid.ketch.app.ui.downloads.actions.SelectionBar
 import com.linroid.ketch.app.ui.downloads.actions.SendConfirmationDialog
 import com.linroid.ketch.app.ui.downloads.actions.TrackDragCount
 import com.linroid.ketch.app.ui.downloads.actions.isSelectionMode
-import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rememberListActions
 import com.linroid.ketch.app.ui.list.DownloadList
 import com.linroid.ketch.app.ui.list.GroupCollapse
+import com.linroid.ketch.app.ui.list.outputFile
 import com.linroid.ketch.app.ui.shell.KetchLayout
 import com.linroid.ketch.app.util.SearchQuery
 import com.linroid.ketch.config.DownloadsLayout
@@ -392,16 +392,7 @@ private fun WideDownloads(
       hasRows = !firstRun,
     )
     if (!firstRun) TabArea(page, view, showsTable)
-    if (!firstRun && !view.query.isEmpty) {
-      val onTab = rowsOnTab(state, view.filter)
-      FacetRow(
-        query = view.query,
-        rows = onTab,
-        matched = view.matched,
-        total = view.total,
-        onQueryChange = { state.searchQuery = it.format() },
-      )
-    }
+    if (!firstRun && !view.query.isEmpty) SearchFacetRow(state, view)
     Row(Modifier.weight(1f).fillMaxWidth()) {
       Box(Modifier.weight(1f).fillMaxHeight().hoverable(hover)) {
         PageBody(page, view, content, showsTable, phone = false)
@@ -598,10 +589,18 @@ private fun RowScope.RetryGroup(page: DownloadsPage, group: RowGroup) {
 private val DownloadState.needsAttention: Boolean
   get() = this is DownloadState.Failed || this is DownloadState.Canceled
 
+/** The facets of [view]'s search, over the rows of the tab it searches. */
 @Composable
-private fun rowsOnTab(state: AppState, filter: StatusFilter): List<TaskRow> {
+private fun SearchFacetRow(state: AppState, view: TaskListView) {
   val rows by state.taskList.rows.collectAsState()
-  return remember(rows, filter) { rows.filter { filter.matches(it.state) } }
+  val filter = view.filter
+  FacetRow(
+    query = view.query,
+    rows = remember(rows, filter) { rows.filter { filter.matches(it.state) } },
+    matched = view.matched,
+    total = view.total,
+    onQueryChange = { state.searchQuery = it.format() },
+  )
 }
 
 /**
@@ -632,15 +631,7 @@ private fun PhoneDownloads(page: DownloadsPage, view: TaskListView) {
         }
       }
       if (content == PageContent.Rows) ClipboardChip(state)
-      if (view.query.tokens.isNotEmpty()) {
-        FacetRow(
-          query = view.query,
-          rows = rowsOnTab(state, view.filter),
-          matched = view.matched,
-          total = view.total,
-          onQueryChange = { state.searchQuery = it.format() },
-        )
-      }
+      if (view.query.tokens.isNotEmpty()) SearchFacetRow(state, view)
       Box(Modifier.weight(1f).fillMaxWidth()) {
         PageBody(page, view, content, showsTable = false, phone = true)
       }

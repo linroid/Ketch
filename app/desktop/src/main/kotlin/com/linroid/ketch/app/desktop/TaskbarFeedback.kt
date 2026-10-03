@@ -22,8 +22,6 @@ import java.awt.Window
 import java.awt.image.BufferedImage
 import kotlin.math.roundToInt
 
-private val osName = System.getProperty("os.name")
-
 /**
  * Shows the downloads of every device the app keeps connected on the Dock icon (macOS) or the
  * taskbar button (Windows): a badge with the active count or "!" for unseen failures, the overall
@@ -202,7 +200,7 @@ private class TaskbarApplier(private val taskbar: Taskbar) {
   companion object {
     // Linux docks only show what the window manager offers, so Ketch leaves them alone.
     fun create(): TaskbarApplier? {
-      val supported = osName.startsWith("Mac") || osName.startsWith("Windows")
+      val supported = DesktopOs.current != DesktopOs.LINUX
       if (!supported || !Taskbar.isTaskbarSupported()) return null
       return TaskbarApplier(Taskbar.getTaskbar())
     }

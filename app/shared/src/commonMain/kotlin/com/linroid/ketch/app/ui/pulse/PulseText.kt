@@ -187,8 +187,8 @@ internal fun speedModeLabelText(
   }
 }
 
-/** Name of [mode] in sentence case, as the popover and messages show it. */
-internal fun speedModeText(mode: SpeedLimitMode): UiText = when (mode) {
+/** Name of [mode] in sentence case, as the popover, menus and messages show it. */
+fun speedModeName(mode: SpeedLimitMode): UiText = when (mode) {
   SpeedLimitMode.Full -> Res.string.pulse_mode_full.text()
   SpeedLimitMode.SlowLane -> Res.string.pulse_slow_lane.text()
   SpeedLimitMode.Auto -> Res.string.pulse_mode_auto_name.text()

@@ -558,17 +558,12 @@ private suspend fun fallbackItems(source: PaletteSource, query: String): List<Pa
 }
 
 private fun deviceChord(device: PaletteDevice, platform: KeyboardPlatform): String? =
-  if (device.number in 1..MAX_DEVICE_CHORDS) {
-    KetchCommands.device(device.number).shortcutLabel(platform)
-  } else {
-    null
-  }
+  KetchCommands.deviceOrNull(device.number)?.shortcutLabel(platform)
 
 private fun linkName(url: String): String = displayName(DownloadRequest(url))
 
 private fun KetchCommand.isTabOrDevice(): Boolean =
-  StatusFilter.entries.any { KetchCommands.tab(it) == this } ||
-    (1..MAX_DEVICE_CHORDS).any { KetchCommands.device(it) == this }
+  KetchCommands.tabFilter(this) != null || KetchCommands.deviceNumber(this) != null
 
 private val DownloadState.isQueued: Boolean
   get() = this is DownloadState.Queued
@@ -630,6 +625,5 @@ private val COPIES: Set<RowAction> = setOf(
 /** Kinds of link added without the add sheet, like a quick add. */
 private val QUICK_KINDS: Set<LinkKind> = setOf(LinkKind.Http, LinkKind.Ftp)
 
-private const val MAX_DEVICE_CHORDS = 9
 private const val NO_VALUE = "–"
 private val SPEED = Regex("""(\d+(?:[.,]\d+)?)\s*([km])(?:i?b)?(?:/s|ps)?""")

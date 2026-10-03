@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpeedChart
 import com.linroid.ketch.app.components.SpeedBand
 import com.linroid.ketch.app.components.SpeedLimitLine
@@ -31,7 +32,7 @@ import com.linroid.ketch.app.state.SpeedHistoryStore
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
+import com.linroid.ketch.app.util.clockTime
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.pulse_history_empty
 import ketch.app.shared.generated.resources.pulse_last_5_minutes
@@ -39,7 +40,6 @@ import ketch.app.shared.generated.resources.pulse_limit
 import ketch.app.shared.generated.resources.pulse_no_limit
 import ketch.app.shared.generated.resources.pulse_speed
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 import kotlin.time.Instant
@@ -98,11 +98,7 @@ internal fun SpeedHistoryContent(
   val spacing = KetchTheme.spacing
   val zone = remember { TimeZone.currentSystemDefault() }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
-    Text(
-      text = eyebrowText(stringResource(Res.string.pulse_last_5_minutes)),
-      style = KetchTheme.typography.eyebrow,
-      color = colors.textTertiary,
-    )
+    KetchEyebrow(stringResource(Res.string.pulse_last_5_minutes))
     if (samples.any { it > 0 }) {
       KetchSpeedChart(
         bands = listOf(SpeedBand(samples, colors.accent)),
@@ -110,7 +106,7 @@ internal fun SpeedHistoryContent(
         slots = SpeedHistoryStore.CAPACITY,
         timeLabel = { index ->
           val at = end?.minus(SpeedHistoryStore.INTERVAL * (SpeedHistoryStore.CAPACITY - 1 - index))
-          at?.let { secondsLabel(it, zone) }.orEmpty()
+          at?.let { clockTime(it, zone, seconds = true) }.orEmpty()
         },
         modifier = Modifier.fillMaxWidth().height(ChartHeight),
       )
@@ -193,12 +189,6 @@ internal fun totalHistory(histories: Collection<SpeedHistory>, now: Instant): To
     }
   }
   return TotalHistory(totals.toList(), end)
-}
-
-private fun secondsLabel(instant: Instant, zone: TimeZone): String {
-  val time = instant.toLocalDateTime(zone)
-  return listOf(time.hour, time.minute, time.second)
-    .joinToString(":") { it.toString().padStart(2, '0') }
 }
 
 private val PopoverWidth = 320.dp

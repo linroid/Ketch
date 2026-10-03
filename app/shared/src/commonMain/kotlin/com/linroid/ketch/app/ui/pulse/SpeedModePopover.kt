@@ -20,6 +20,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchCheckbox
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.SpeedLimitPicker
 import com.linroid.ketch.app.i18n.UiText
@@ -31,12 +32,12 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.clockLabel
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_any_in_sentence
@@ -59,7 +60,6 @@ import ketch.app.shared.generated.resources.pulse_speed_settings
 import ketch.app.shared.generated.resources.pulse_update_failed
 import ketch.app.shared.generated.resources.pulse_use_as_slow_lane
 import kotlinx.datetime.TimeZone
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 
@@ -80,7 +80,7 @@ fun SpeedModePopover(
   PulsePopover(
     expanded = expanded,
     onDismissRequest = onDismissRequest,
-    width = PopoverWidth,
+    width = SpeedPopoverWidth,
     modifier = modifier,
     title = stringResource(Res.string.pulse_speed),
   ) {
@@ -110,25 +110,15 @@ internal fun ColumnScope.SpeedModeOptions(
   var asSlowLane by remember(controller) { mutableStateOf(view.mode.isSlowLane) }
 
   if (controller != null) {
-    val settings by controller.settings.collectAsState()
-    Eyebrow(Res.string.pulse_speed_mode)
-    KetchSegmented(
-      options = SpeedLimitMode.entries,
-      selected = settings.mode,
+    SpeedModeControl(
+      controller = controller,
+      view = view,
       onSelect = { mode ->
         asSlowLane = mode == SpeedLimitMode.SlowLane ||
           mode == SpeedLimitMode.Auto && asSlowLane
         command.track(state.switchSpeedMode(mode))
       },
-      label = { speedModeText(it).resolve() },
       fill = fillModes,
-    )
-    Spacer(Modifier.height(spacing.s2))
-    val now = LocalClock.current.now()
-    Text(
-      text = modeCaptionText(view.mode, view.limit, settings.rules.isEmpty(), now).resolve(),
-      style = KetchTheme.typography.caption,
-      color = colors.textSecondary,
     )
     Spacer(Modifier.height(spacing.s4))
   }
@@ -141,7 +131,12 @@ internal fun ColumnScope.SpeedModeOptions(
   val error = state.instanceSettings.downloadError.takeIf { state.limitGoesToSettings(asSlowLane) }
   val caption = error?.let { Res.string.pulse_update_failed.text(deviceName, it) }
     ?: limitCaption(view, asSlowLane, deviceName)
-  Eyebrow(if (asSlowLane) Res.string.pulse_slow_lane_speed else Res.string.pulse_speed_limit)
+  KetchEyebrow(
+    text = stringResource(
+      if (asSlowLane) Res.string.pulse_slow_lane_speed else Res.string.pulse_speed_limit
+    ),
+    modifier = Modifier.padding(bottom = spacing.s2),
+  )
   SpeedLimitPicker(
     value = limit,
     onCommit = { command.track(state.setSpeedLimit(it, asSlowLane)) },
@@ -160,25 +155,48 @@ internal fun ColumnScope.SpeedModeOptions(
   Spacer(Modifier.height(spacing.s3))
   Spacer(Modifier.fillMaxWidth().height(1.dp).background(colors.divider))
   Spacer(Modifier.height(spacing.s2))
+  SpeedSettingsButton(state, active?.deviceId, onOpenSettings)
+}
+
+/** [controller]'s mode control and a caption of what the mode does now. */
+@Composable
+internal fun SpeedModeControl(
+  controller: SpeedModeController,
+  view: SpeedModeView,
+  onSelect: (SpeedLimitMode) -> Unit,
+  fill: Boolean = false,
+) {
+  val spacing = KetchTheme.spacing
+  val settings by controller.settings.collectAsState()
+  KetchEyebrow(stringResource(Res.string.pulse_speed_mode), Modifier.padding(bottom = spacing.s2))
+  KetchSegmented(
+    options = SpeedLimitMode.entries,
+    selected = settings.mode,
+    onSelect = onSelect,
+    label = { speedModeName(it).resolve() },
+    fill = fill,
+  )
+  Spacer(Modifier.height(spacing.s2))
+  val now = LocalClock.current.now()
+  Text(
+    text = modeCaptionText(view.mode, view.limit, settings.rules.isEmpty(), now).resolve(),
+    style = KetchTheme.typography.caption,
+    color = KetchTheme.colors.textSecondary,
+  )
+}
+
+/** The link to the Speed settings of the device with [deviceId], which closes the options. */
+@Composable
+internal fun SpeedSettingsButton(state: AppState, deviceId: String?, onOpenSettings: () -> Unit) {
   KetchButton(
     text = stringResource(Res.string.pulse_speed_settings),
     onClick = {
       onOpenSettings()
-      state.openSettings(SettingsTarget(SettingsTarget.Page.Speed, active?.deviceId))
+      state.openSettings(SettingsTarget(SettingsTarget.Page.Speed, deviceId))
     },
     variant = KetchButtonVariant.Ghost,
     size = KetchButtonSize.Small,
     leadingIcon = KetchIcon.Settings,
-  )
-}
-
-@Composable
-private fun Eyebrow(text: StringResource) {
-  Text(
-    text = eyebrowText(stringResource(text)),
-    style = KetchTheme.typography.eyebrow,
-    color = KetchTheme.colors.textTertiary,
-    modifier = Modifier.padding(bottom = KetchTheme.spacing.s2),
   )
 }
 
@@ -223,4 +241,5 @@ private fun limitCaption(view: SpeedModeView, asSlowLane: Boolean, deviceName: U
     else -> Res.string.pulse_limit_after_slow_lane.text()
   }
 
-private val PopoverWidth = 280.dp
+/** Width of the speed options popovers. */
+internal val SpeedPopoverWidth = 280.dp

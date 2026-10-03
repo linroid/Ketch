@@ -15,7 +15,6 @@ import com.linroid.ketch.app.ui.onboarding.WelcomePlatform
 import com.linroid.ketch.app.ui.onboarding.WelcomeState
 import com.linroid.ketch.app.ui.onboarding.WelcomeStep
 import com.linroid.ketch.config.AppearanceConfig
-import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.ThemeMode
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -130,22 +129,15 @@ class MobileWebSnapshots {
     kind: LocalDeviceKind = LocalDeviceKind.Phone,
     interact: suspend SnapshotScene.() -> Unit = {},
     state: () -> WelcomeState,
-  ): File {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SampleEnvironment(SampleData.empty(), theme, size.densityMode)
-    }
-    try {
-      return snapshot(name, size, theme, interact) {
-        WelcomeFlow(
-          state = environment.controller.state,
-          platform = platform,
-          onDone = {},
-          deviceKind = kind,
-          welcome = remember { state() },
-        )
-      }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
+  ): File = withSample(theme, size.density.toMode(), SampleData.empty()) { env ->
+    snapshot(name, size, theme, interact) {
+      WelcomeFlow(
+        state = env.controller.state,
+        platform = platform,
+        onDone = {},
+        deviceKind = kind,
+        welcome = remember { state() },
+      )
     }
   }
 
@@ -159,9 +151,6 @@ class MobileWebSnapshots {
     scene.sendPointerEvent(PointerEventType.Scroll, position, scrollDelta = Offset(0f, ticks))
     settle()
   }
-
-  private val SnapshotSize.densityMode: DensityMode
-    get() = if (density == KetchDensity.Compact) DensityMode.Compact else DensityMode.Comfortable
 
   private companion object {
     val Phone = SnapshotSize.Phone

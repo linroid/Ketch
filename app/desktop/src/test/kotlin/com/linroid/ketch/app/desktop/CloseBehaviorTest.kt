@@ -33,40 +33,36 @@ class CloseBehaviorTest {
     quit = { quits += it },
   )
 
-  @Test
-  fun closeOutcome_askWithDownloads_asks() {
-    assertEquals(CloseOutcome.Ask, closeOutcome(CloseAction.Ask, 3, traySupported = true))
+  /** A behavior asking whether to keep [running] downloads going once the window closes. */
+  private fun asking(running: Int, traySupported: Boolean = true): CloseBehavior {
+    downloads = running
+    return behavior(traySupported = traySupported).apply { closeWindow() }
   }
 
-  @Test
-  fun closeOutcome_askWhileIdle_hides() {
-    assertEquals(CloseOutcome.Hide, closeOutcome(CloseAction.Ask, 0, traySupported = true))
-  }
+  private data class OutcomeCase(
+    val action: CloseAction,
+    val downloads: Int,
+    val traySupported: Boolean = true,
+    val answer: CloseAction? = null,
+  )
 
   @Test
-  fun closeOutcome_askAnsweredThisRun_followsTheAnswer() {
-    assertEquals(
-      CloseOutcome.Hide,
-      closeOutcome(CloseAction.Ask, 3, traySupported = true, answer = CloseAction.Background),
+  fun closeOutcome_eachSetting_decidesWhatClosingDoes() {
+    val cases = listOf(
+      OutcomeCase(CloseAction.Ask, 3) to CloseOutcome.Ask,
+      OutcomeCase(CloseAction.Ask, 0) to CloseOutcome.Hide,
+      // An answer given this run is followed.
+      OutcomeCase(CloseAction.Ask, 3, answer = CloseAction.Background) to CloseOutcome.Hide,
+      OutcomeCase(CloseAction.Ask, 3, answer = CloseAction.Quit) to CloseOutcome.Quit,
+      // Without a tray the window minimizes instead of hiding.
+      OutcomeCase(CloseAction.Background, 3, traySupported = false) to CloseOutcome.Minimize,
+      OutcomeCase(CloseAction.Ask, 0, traySupported = false) to CloseOutcome.Minimize,
+      OutcomeCase(CloseAction.Quit, 0) to CloseOutcome.Quit,
     )
-    assertEquals(
-      CloseOutcome.Quit,
-      closeOutcome(CloseAction.Ask, 3, traySupported = true, answer = CloseAction.Quit),
-    )
-  }
-
-  @Test
-  fun closeOutcome_noTray_minimizesInsteadOfHiding() {
-    assertEquals(
-      CloseOutcome.Minimize,
-      closeOutcome(CloseAction.Background, 3, traySupported = false),
-    )
-    assertEquals(CloseOutcome.Minimize, closeOutcome(CloseAction.Ask, 0, traySupported = false))
-  }
-
-  @Test
-  fun closeOutcome_quit_quitsWhateverRuns() {
-    assertEquals(CloseOutcome.Quit, closeOutcome(CloseAction.Quit, 0, traySupported = true))
+    for ((case, expected) in cases) {
+      val outcome = closeOutcome(case.action, case.downloads, case.traySupported, case.answer)
+      assertEquals(expected, outcome, "$case")
+    }
   }
 
   @Test
@@ -88,9 +84,7 @@ class CloseBehaviorTest {
 
   @Test
   fun closeWindow_afterKeepRunningThisRun_hidesWithoutAsking() {
-    downloads = 3
-    val behavior = behavior()
-    behavior.closeWindow()
+    val behavior = asking(3)
     behavior.confirm()
     behavior.showWindow()
 
@@ -103,9 +97,7 @@ class CloseBehaviorTest {
 
   @Test
   fun dismiss_dontAskAgain_savesQuitAndQuits() {
-    downloads = 2
-    val behavior = behavior()
-    behavior.closeWindow()
+    val behavior = asking(2)
 
     behavior.dismiss(dontAskAgain = true)
 
@@ -116,9 +108,7 @@ class CloseBehaviorTest {
 
   @Test
   fun confirm_dontAskAgain_savesBackground() {
-    downloads = 2
-    val behavior = behavior()
-    behavior.closeWindow()
+    val behavior = asking(2)
 
     behavior.confirm(dontAskAgain = true)
 
@@ -128,9 +118,7 @@ class CloseBehaviorTest {
 
   @Test
   fun cancel_keepRunningQuestion_leavesTheWindowOpen() {
-    downloads = 1
-    val behavior = behavior()
-    behavior.closeWindow()
+    val behavior = asking(1)
 
     behavior.cancel()
 
@@ -151,9 +139,7 @@ class CloseBehaviorTest {
 
   @Test
   fun confirm_keepRunningWithoutTray_minimizesInsteadOfHiding() {
-    downloads = 2
-    val behavior = behavior(traySupported = false)
-    behavior.closeWindow()
+    val behavior = asking(2, traySupported = false)
 
     behavior.confirm()
 
@@ -165,9 +151,7 @@ class CloseBehaviorTest {
 
   @Test
   fun closeAction_setAfterAnAnswer_asksAgain() {
-    downloads = 2
-    val behavior = behavior()
-    behavior.closeWindow()
+    val behavior = asking(2)
     behavior.confirm()
     behavior.showWindow()
 

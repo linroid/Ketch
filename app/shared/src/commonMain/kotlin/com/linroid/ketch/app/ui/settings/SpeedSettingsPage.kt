@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -146,48 +145,46 @@ fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
   val model = remember(state, device) { SpeedSettingsModel(state, device) }
   LaunchedEffect(controller) { controller.loadDownload() }
   val config = controller.download
-  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
-    if (controller.isRemote) {
-      SettingsNotice(
-        text = stringResource(Res.string.settings_speed_remote, device.label),
-        tone = NoticeTone.Info,
-      )
-    }
-    DeviceSettingsError(controller.downloadError, loaded = config != null) {
-      controller.loadDownload()
-    }
-    if (config == null) {
-      if (controller.downloadError == null) {
-        SettingsLoading(stringResource(Res.string.settings_loading_from, device.label))
-      }
-      return@Column
-    }
-    val speedMode = model.speedMode
-    if (speedMode == null) {
-      SettingsGroup(title = stringResource(Res.string.settings_speed_limit_group)) {
-        SettingsRow(
-          title = stringResource(Res.string.settings_speed_limit),
-          description = stringResource(Res.string.settings_speed_limit_hint),
-        ) {
-          SpeedLimitPicker(
-            value = config.speedLimit,
-            onCommit = model::setFullSpeedCap,
-            presets = speedChoices(SpeedLimitPickerPresets, config.speedLimit),
-          )
-        }
-      }
-    } else {
-      val settings by speedMode.settings.collectAsState()
-      val mode by speedMode.mode.collectAsState()
-      val peak by speedMode.observedPeak.collectAsState()
-      val cap = if (settings.mode == SpeedLimitMode.Full) config.speedLimit else settings.standard
-      val suggested = SpeedModeController.suggestSlowLane(peak.bytesPerSecond)
-      ModeGroup(settings, mode, cap, model)
-      LimitsGroup(settings, cap, suggested, hasPeak = peak.bytesPerSecond > 0, model)
-      RulesGroup(settings, model)
-    }
-    PerDownloadGroup(config, model)
+  if (controller.isRemote) {
+    SettingsNotice(
+      text = stringResource(Res.string.settings_speed_remote, device.label),
+      tone = NoticeTone.Info,
+    )
   }
+  DeviceSettingsError(controller.downloadError, loaded = config != null) {
+    controller.loadDownload()
+  }
+  if (config == null) {
+    if (controller.downloadError == null) {
+      SettingsLoading(stringResource(Res.string.settings_loading_from, device.label))
+    }
+    return
+  }
+  val speedMode = model.speedMode
+  if (speedMode == null) {
+    SettingsGroup(title = stringResource(Res.string.settings_speed_limit_group)) {
+      SettingsRow(
+        title = stringResource(Res.string.settings_speed_limit),
+        description = stringResource(Res.string.settings_speed_limit_hint),
+      ) {
+        SpeedLimitPicker(
+          value = config.speedLimit,
+          onCommit = model::setFullSpeedCap,
+          presets = speedChoices(SpeedLimitPickerPresets, config.speedLimit),
+        )
+      }
+    }
+  } else {
+    val settings by speedMode.settings.collectAsState()
+    val mode by speedMode.mode.collectAsState()
+    val peak by speedMode.observedPeak.collectAsState()
+    val cap = if (settings.mode == SpeedLimitMode.Full) config.speedLimit else settings.standard
+    val suggested = SpeedModeController.suggestSlowLane(peak.bytesPerSecond)
+    ModeGroup(settings, mode, cap, model)
+    LimitsGroup(settings, cap, suggested, hasPeak = peak.bytesPerSecond > 0, model)
+    RulesGroup(settings, model)
+  }
+  PerDownloadGroup(config, model)
 }
 
 /** Full speed, Slow lane or Auto, and what the chosen one does right now. */

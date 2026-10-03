@@ -31,13 +31,13 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.offset
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_show
@@ -58,12 +58,7 @@ internal fun InspectorSection(
     modifier = modifier.fillMaxWidth(),
     verticalArrangement = Arrangement.spacedBy(spacing.s1),
   ) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textTertiary,
-      modifier = Modifier.padding(bottom = spacing.s1),
-    )
+    KetchEyebrow(title, Modifier.padding(bottom = spacing.s1))
     content()
   }
 }

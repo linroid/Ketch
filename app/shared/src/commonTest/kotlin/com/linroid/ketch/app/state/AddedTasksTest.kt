@@ -1,10 +1,9 @@
 package com.linroid.ketch.app.state
 
 import com.linroid.ketch.app.RecordingConfigStore
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
+import com.linroid.ketch.app.backgroundChild
+import com.linroid.ketch.app.fixtureTest
+import com.linroid.ketch.app.testController
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -16,19 +15,16 @@ import kotlin.test.assertTrue
 
 /** [AppState.addedTasks]: which adds the Downloads page hears about. */
 class AddedTasksTest {
-  private fun TestScope.controller(api: RecordingKetchApi): AppController = AppController(
-    instanceManager = InstanceManager(
-      factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
-      configStore = RecordingConfigStore(),
-    ),
-    context = backgroundScope.coroutineContext +
-      SupervisorJob(backgroundScope.coroutineContext[Job]),
-  )
+  private fun TestScope.controller(api: RecordingKetchApi): AppController =
+    testController(api, RecordingConfigStore(), context = backgroundChild())
+
+  private fun addedTest(
+    api: RecordingKetchApi = RecordingKetchApi(),
+    block: suspend TestScope.(RecordingKetchApi, AppController) -> Unit,
+  ) = fixtureTest({ controller(api) }, AppController::close) { block(api, it) }
 
   @Test
-  fun quickAdd_links_announcesTheNewTasksOnTheirDevice() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun quickAdd_links_announcesTheNewTasksOnTheirDevice() = addedTest { api, controller ->
     val added = async { controller.state.addedTasks.first() }
     runCurrent()
 
@@ -37,7 +33,6 @@ class AddedTasksTest {
 
     val keys = api.tasks.value.map { TaskKey(LOCAL_DEVICE_ID, it.taskId) }
     assertEquals(keys.toSet(), added.await().toSet())
-    controller.close()
   }
 
   @Test
@@ -58,8 +53,7 @@ class AddedTasksTest {
   }
 
   @Test
-  fun announceAdded_noKeys_announcesNothing() = runTest {
-    val controller = controller(RecordingKetchApi())
+  fun announceAdded_noKeys_announcesNothing() = addedTest { _, controller ->
     val heard = mutableListOf<List<TaskKey>>()
     val listener = backgroundScope.async { controller.state.addedTasks.collect { heard += it } }
     runCurrent()
@@ -70,6 +64,5 @@ class AddedTasksTest {
 
     assertEquals(listOf(listOf(TaskKey("nas", "t1"))), heard)
     listener.cancel()
-    controller.close()
   }
 }

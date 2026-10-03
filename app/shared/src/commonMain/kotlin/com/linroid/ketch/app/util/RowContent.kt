@@ -120,8 +120,8 @@ data class RowContent(
   val statusText: UiText,
   val detail: UiText,
   val size: UiText,
-  val speed: UiText,
-  val time: UiText,
+  val speed: UiText = UiText.Empty,
+  val time: UiText = UiText.Empty,
   val added: UiText,
   val progress: Float? = null,
   val limited: Boolean = false,
@@ -197,8 +197,6 @@ fun rowContent(
         statusText = Res.string.row_status_paused.text(),
         detail = listOfNotNull(Res.string.row_paused.text(), percent).joinText(),
         size = runningSize(state),
-        speed = UiText.Empty,
-        time = UiText.Empty,
         added = added,
         progress = fraction(progress),
       )
@@ -209,8 +207,6 @@ fun rowContent(
       detail = (context.config?.let { QueueReason.of(request, it, context.running) }
         ?: QueueReason.Next).text,
       size = knownSize(request),
-      speed = UiText.Empty,
-      time = UiText.Empty,
       added = added,
     )
     is DownloadState.Scheduled -> RowContent(
@@ -218,8 +214,6 @@ fun rowContent(
       statusText = Res.string.row_status_scheduled.text(),
       detail = scheduleText(state.schedule, context.now, context.timeZone),
       size = knownSize(request),
-      speed = UiText.Empty,
-      time = UiText.Empty,
       added = added,
     )
     is DownloadState.Completed -> completedContent(state, host, context.device, missing, added)
@@ -230,8 +224,6 @@ fun rowContent(
         statusText = Res.string.row_status_failed.text(),
         detail = listOfNotNull(copy.title, copy.shortHint).joinText(),
         size = knownSize(request),
-        speed = UiText.Empty,
-        time = UiText.Empty,
         added = added,
         error = copy,
       )
@@ -241,8 +233,6 @@ fun rowContent(
       statusText = Res.string.row_status_canceled.text(),
       detail = listOfNotNull(Res.string.row_canceled.text(), host?.let(::verbatim)).joinText(),
       size = UiText.Empty,
-      speed = UiText.Empty,
-      time = UiText.Empty,
       added = added,
     )
   }
@@ -292,7 +282,6 @@ private fun completedContent(
     },
     detail = detail,
     size = size ?: UNKNOWN,
-    speed = UiText.Empty,
     time = state.downloadTime?.let { Res.string.row_took.text(durationText(it)) } ?: UiText.Empty,
     added = added,
   )

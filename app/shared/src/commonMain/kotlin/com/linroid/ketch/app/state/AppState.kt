@@ -26,7 +26,6 @@ import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.ToastMode
 import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.clockTime
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.sizeText
 import com.linroid.ketch.app.i18n.text
@@ -46,6 +45,7 @@ import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.TaskOrigin
+import com.linroid.ketch.app.util.clockTime
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.toCopy
@@ -169,9 +169,9 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.PluralStringResource
 import org.jetbrains.compose.resources.StringResource
+import kotlin.reflect.KProperty
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -297,37 +297,22 @@ class AppState(
   private val frozenState = FlowState(false)
 
   /** Status tab of the Downloads list. */
-  var statusFilter: StatusFilter
-    get() = filterState.value
-    set(value) {
-      filterState.value = value
-    }
+  var statusFilter: StatusFilter by filterState
 
   /** What is typed in the Downloads search field. */
-  var searchQuery: String
-    get() = searchState.value
-    set(value) {
-      searchState.value = value
-    }
+  var searchQuery: String by searchState
 
   /** Sort order and grouping of the Downloads list; newest first and ungrouped until changed. */
-  var listArrangement: ListArrangement
-    get() = arrangementState.value
-    set(value) {
-      arrangementState.value = value
-    }
+  var listArrangement: ListArrangement by arrangementState
 
   /**
    * Whether the pointer is over the Downloads list, a row has focus or a menu is open, which
    * holds the list's order still.
    */
-  var listFrozen: Boolean
-    get() = frozenState.value
-    set(value) {
-      frozenState.value = value
-    }
+  var listFrozen: Boolean by frozenState
 
-  var showAddDialog by mutableStateOf(false)
+  /** Whether the add sheet shows, which it does while [intakeRequest] is set. */
+  val showAddDialog: Boolean get() = intakeRequest != null
   var showInstanceSelector by mutableStateOf(false)
   var showAddRemoteDialog by mutableStateOf(false)
 
@@ -439,8 +424,7 @@ class AppState(
   )
     private set
   private var discoveryJob: Job? = null
-  var switchingInstance by
-    mutableStateOf<InstanceEntry?>(null)
+  private var switchingInstance by mutableStateOf<InstanceEntry?>(null)
   var unauthorizedInstance by
     mutableStateOf<RemoteInstance?>(null)
   var resolveState by mutableStateOf<ResolveState>(
@@ -448,12 +432,12 @@ class AppState(
   )
     private set
 
-  /** A dropped `.torrent` file added in place of a typed URL. */
+  /**
+   * A dropped `.torrent` file added in place of a typed URL; [resolveState] reflects its
+   * resolution.
+   */
   var droppedFile by mutableStateOf<DroppedFile?>(null)
     private set
-
-  /** The dropped file whose resolution [resolveState] reflects. */
-  private var resolving: DroppedFile? = null
 
   /** The device [droppedFile] is resolved on, whose result the add sheet can reuse. */
   internal var droppedFileApi: KetchApi? = null
@@ -638,21 +622,11 @@ class AppState(
     }
     if (request != intakeRequest) resetResolveState()
     intakeRequest = request
-    showAddDialog = true
-  }
-
-  /**
-   * Handle "New Task" action. If no backend is available,
-   * show the add-remote-server dialog instead.
-   */
-  fun requestAddDownload() {
-    openIntake()
   }
 
   /** Closes the add dialog; the next opened download or links, if any are waiting, then show. */
   fun closeAddDialog() {
     resetResolveState()
-    showAddDialog = false
     intakeRequest = null
     openedDownload?.let(incoming::complete)
     openedLinks?.let(incoming::complete)
@@ -742,7 +716,7 @@ class AppState(
       it.name.endsWith(".torrent", ignoreCase = true)
     }
     if (torrent != null) {
-      requestAddDownload()
+      openIntake()
       if (showAddDialog) resolveDroppedFile(torrent)
       return
     }
@@ -782,19 +756,18 @@ class AppState(
     val api = target?.instance ?: activeApi.value
     droppedFile = file
     droppedFileApi = api
-    resolving = file
     resolveState = ResolveState.Resolving
     scope.launch {
       runCatching {
         val content = file.readBytes(MAX_DROPPED_FILE_BYTES)
         api.resolveContent(content, file.name)
       }.onSuccess { result ->
-        if (resolving === file) {
+        if (droppedFile === file) {
           resolveState = ResolveState.Resolved(result)
         }
       }.onFailure { e ->
         if (e is CancellationException) throw e
-        if (resolving === file) {
+        if (droppedFile === file) {
           resolveState = ResolveState.Error(
             text = when (e) {
               is KetchError.SourceError -> Res.string.feedback_torrent_invalid.text(file.name)
@@ -810,7 +783,6 @@ class AppState(
 
   /** Clears the resolved URL or dropped file. */
   fun resetResolveState() {
-    resolving = null
     droppedFile = null
     droppedFileApi = null
     resolveState = ResolveState.Idle
@@ -831,7 +803,7 @@ class AppState(
       val folder = defaults.folder?.let { folderDestination(entry, it) }
       val requests = urls.mapNotNull { url ->
         // Torrents write their own files, which an Android content:// folder cannot take.
-        val torrent = LinkKind.of(url).let { it == LinkKind.Magnet || it == LinkKind.TorrentFile }
+        val torrent = LinkKind.of(url).isTorrent
         val destination = folder?.takeUnless { torrent && it.value.startsWith("content://") }
         try {
           DownloadRequest(
@@ -1014,7 +986,13 @@ class AppState(
   fun pauseAll(targets: List<InstanceEntry> = shownInstances.value): Job =
     scope.launch {
       val results = supervisorScope {
-        targets.map { entry -> async { entry to pauseDevice(entry) } }.awaitAll()
+        targets.map { entry ->
+          async {
+            entry to pauseActiveTasks({ visibleTasks(entry) }) { group ->
+              runEach(group) { it.pause() }
+            }
+          }
+        }.awaitAll()
       }
       val paused = results.flatMap { (_, result) -> result.paused }
       val failures = results.flatMap { (_, result) -> result.failures }
@@ -1053,18 +1031,13 @@ class AppState(
 
   /** Resumes every paused task on each of [targets], the shown devices by default. */
   fun resumeAll(targets: List<InstanceEntry> = shownInstances.value): Job =
-    scope.launch {
-      val tasks = targets.flatMap { entry ->
-        visibleTasks(entry).filter { it.state.value is DownloadState.Paused }.map { entry to it }
-      }
-      if (tasks.isEmpty()) return@launch
-      val results = runEach(tasks) { (_, task) -> task.resume() }
-      reportBatch(
-        verb = BatchVerb.Resumed,
-        command = FailedCommand.Resume,
-        results = results.map { (pair, error) -> pair.second to error },
-        devices = tasks.distinctBy { it.first.deviceId }.size,
-      )
+    runOnAll(
+      targets = targets,
+      matches = { it is DownloadState.Paused },
+      verb = BatchVerb.Resumed,
+      command = FailedCommand.Resume,
+    ) { _, task ->
+      task.resume()
     }
 
   /**
@@ -1073,19 +1046,13 @@ class AppState(
    * refused to resume) start over.
    */
   fun retryFailed(targets: List<InstanceEntry> = shownInstances.value): Job =
-    scope.launch {
-      val tasks = targets.flatMap { entry ->
-        visibleTasks(entry).filter { it.state.value is DownloadState.Failed }.map { entry to it }
-      }
-      if (tasks.isEmpty()) return@launch
-      val results = runEach(tasks) { (entry, task) -> retryOn(entry, task) }
-      reportBatch(
-        verb = BatchVerb.Retrying,
-        command = FailedCommand.Retry,
-        results = results.map { (pair, error) -> pair.second to error },
-        devices = tasks.distinctBy { it.first.deviceId }.size,
-      )
-    }
+    runOnAll(
+      targets = targets,
+      matches = { it is DownloadState.Failed },
+      verb = BatchVerb.Retrying,
+      command = FailedCommand.Retry,
+      action = ::retryOn,
+    )
 
   /**
    * Removes the finished tasks of each of [targets] (the shown devices by default) from the
@@ -1156,12 +1123,8 @@ class AppState(
 
   private fun removeTasks(tasks: List<DownloadTask>, deleteFiles: (DownloadTask) -> Boolean) {
     if (tasks.isEmpty()) return
-    deferRemoval(tasks, deleteFiles, Res.string.feedback_undo_remove.text()) { count ->
-      if (count == 1) {
-        Res.string.feedback_removed_one.text(tasks.single().displayName())
-      } else {
-        Res.plurals.feedback_removed.text(count)
-      }
+    deferRemoval(tasks, deleteFiles, Res.string.feedback_undo_remove.text()) {
+      what(tasks, Res.string.feedback_removed_one, Res.plurals.feedback_removed)
     }
   }
 
@@ -1181,11 +1144,7 @@ class AppState(
       commit = { reportFailures(FailedCommand.Discard, runEach(tasks) { it.cancel() }) },
       undo = { reportFailures(FailedCommand.Resume, runEach(paused) { it.resume() }) },
     )
-    val title = if (tasks.size == 1) {
-      Res.string.feedback_discarded_one.text(tasks.single().displayName())
-    } else {
-      Res.plurals.feedback_discarded.text(tasks.size)
-    }
+    val title = what(tasks, Res.string.feedback_discarded_one, Res.plurals.feedback_discarded)
     messages.post(MessageLevel.Success, title, actions = listOf(undoAction(op)))
   }
 
@@ -1231,11 +1190,7 @@ class AppState(
       return@launch
     }
     val title = listOfNotNull(
-      if (done.size == 1) {
-        Res.string.feedback_restarted_one.text(done.single().displayName())
-      } else {
-        Res.plurals.feedback_restarted.text(done.size)
-      },
+      what(done, Res.string.feedback_restarted_one, Res.plurals.feedback_restarted),
       failedNote(failed.size),
     ).joinText()
     messages.post(
@@ -1276,8 +1231,7 @@ class AppState(
    * it resumes, or starts over when its progress cannot be reused or it was canceled.
    */
   internal suspend fun retryInBatch(task: DownloadTask) {
-    val entry = deviceOf(task) ?: return
-    retryOn(entry, task)
+    deviceOf(task)?.let { retryOn(it, task) }
   }
 
   /**
@@ -1333,10 +1287,9 @@ class AppState(
       val results = runEach(started) { it.undo() }.map { (start, e) -> start.task to e }
       reportFailures(FailedCommand.UndoStartNow, results)
     })
+    val startedTasks = started.map { it.task }
     val title = listOfNotNull(
-      started.singleOrNull()?.task?.displayName()
-        ?.let { Res.string.feedback_started_now_one.text(it) }
-        ?: Res.plurals.feedback_started_now.text(started.size),
+      what(startedTasks, Res.string.feedback_started_now_one, Res.plurals.feedback_started_now),
       preempted.takeIf { it.isNotEmpty() }?.let { tasks ->
         Res.string.feedback_started_preempted.text(tasks.joinToString(", ") { it.displayName() })
       },
@@ -1413,20 +1366,20 @@ class AppState(
       }
       val targetText = deviceNameOf(target)
       if (sent.isEmpty()) {
-        val (task, e) = failures.first()
+        val e = failures.first().second
         postError(
-          title = if (failures.size == 1) {
-            Res.string.feedback_send_failed_one.text(task.displayName(), targetText)
-          } else {
-            Res.plurals.feedback_send_failed.text(failures.size, failures.size, targetText)
-          },
+          title = what(
+            failures.map { it.first },
+            Res.string.feedback_send_failed_one,
+            Res.plurals.feedback_send_failed,
+            targetText
+          ),
           detail = e.detail(),
           cause = e,
           actions = listOf(tryAgainAction { sendTo(tasks, target, move, confirmed = true) }),
         )
         return@launch
       }
-      val single = sent.singleOrNull()?.first?.displayName()
       val sources = sent.map { it.first }
       if (move) {
         val op = pendingOps.register(
@@ -1443,26 +1396,22 @@ class AppState(
             reportFailures(FailedCommand.Remove, runEach(copies) { it.remove(deleteFiles = true) })
           },
         )
-        val moved = if (single != null) {
-          Res.string.feedback_moved_one.text(single, targetText)
-        } else {
-          Res.plurals.feedback_moved.text(sent.size, sent.size, targetText)
-        }
         messages.post(
           level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
-          title = listOfNotNull(moved, failedNote(failures.size)).joinText(),
+          title = listOfNotNull(
+            what(sources, Res.string.feedback_moved_one, Res.plurals.feedback_moved, targetText),
+            failedNote(failures.size),
+          ).joinText(),
           deviceId = target.deviceId,
           actions = listOf(undoAction(op)),
         )
       } else {
-        val sentTitle = if (single != null) {
-          Res.string.feedback_sent_one.text(single, targetText)
-        } else {
-          Res.plurals.feedback_sent.text(sent.size, sent.size, targetText)
-        }
         messages.post(
           level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
-          title = listOfNotNull(sentTitle, failedNote(failures.size)).joinText(),
+          title = listOfNotNull(
+            what(sources, Res.string.feedback_sent_one, Res.plurals.feedback_sent, targetText),
+            failedNote(failures.size),
+          ).joinText(),
           deviceId = target.deviceId,
           actions = listOf(
             MessageAction(Res.string.action_show.text()) {
@@ -1480,7 +1429,7 @@ class AppState(
    * Shows the Downloads list with [task] of [target] inspected, switching to [target] only when
    * it is not shown already, such as under All devices.
    */
-  private fun showOn(target: InstanceEntry, task: DownloadTask?) {
+  internal fun showOn(target: InstanceEntry, task: DownloadTask?) {
     if (target !in shownInstances.value) switchInstance(target)
     showDownloads()
     task?.let { inspect(TaskKey(target.deviceId, it.taskId)) }
@@ -1589,7 +1538,7 @@ class AppState(
   }
 
   /** Tasks of [entry] as they change, without the ones a pending operation hides. */
-  private fun visibleTasksOf(entry: InstanceEntry): Flow<List<DownloadTask>> {
+  internal fun visibleTasksOf(entry: InstanceEntry): Flow<List<DownloadTask>> {
     val deviceId = entry.deviceId
     return combine(entry.instance.tasks, pendingOps.hidden) { tasks, hidden ->
       if (hidden.isEmpty()) tasks else tasks.filter { TaskKey(deviceId, it.taskId) !in hidden }
@@ -1628,32 +1577,6 @@ class AppState(
         else -> serverState.map { it.toDeviceHealth() }
       },
     )
-  }
-
-  private class PauseResult(
-    val paused: List<DownloadTask>,
-    val failures: List<Pair<DownloadTask, Throwable>>,
-  )
-
-  private suspend fun pauseDevice(entry: InstanceEntry): PauseResult {
-    val paused = mutableListOf<DownloadTask>()
-    val failures = mutableListOf<Pair<DownloadTask, Throwable>>()
-    val attempted = mutableSetOf<String>()
-    // A paused download frees its slot, and the queue may start a task that was not queued when
-    // the round began, such as one a preemption re-queued; later rounds catch those.
-    repeat(MAX_PAUSE_ROUNDS) {
-      val tasks = visibleTasks(entry).filter { it.taskId !in attempted }
-      val queued = tasks.filter { it.state.value is DownloadState.Queued }
-      val running = tasks.filter { it.state.value is DownloadState.Downloading }
-      if (queued.isEmpty() && running.isEmpty()) return PauseResult(paused, failures)
-      for (group in listOf(queued, running)) {
-        attempted += group.map { it.taskId }
-        runEach(group) { it.pause() }.forEach { (task, error) ->
-          if (error == null) paused += task else failures += task to error
-        }
-      }
-    }
-    return PauseResult(paused, failures)
   }
 
   private fun deferRemoval(
@@ -1764,14 +1687,13 @@ class AppState(
 
   /** Adds each of [requests] to [entry] on its own and reports the outcome. */
   private suspend fun addRequests(
-    entry: InstanceEntry?,
+    entry: InstanceEntry,
     requests: List<DownloadRequest>,
     offerOptions: Boolean = false,
   ) {
-    val api = entry?.instance ?: activeApi.value
     val results = supervisorScope {
       requests.map { request ->
-        async { request to catchingUnlessCancelled { api.download(request) } }
+        async { request to catchingUnlessCancelled { entry.instance.download(request) } }
       }.awaitAll()
     }
     val added = results.mapNotNull { it.second.getOrNull() }
@@ -1781,8 +1703,7 @@ class AppState(
     failed.forEach { (request, e) ->
       log.w { "Couldn't add ${redactUrl(request.url)}: ${e.describeCauses()}" }
     }
-    val deviceId = entry?.deviceId ?: activeInstance.value?.deviceId ?: LOCAL_DEVICE_ID
-    announceAdded(added.map { TaskKey(deviceId, it.taskId) })
+    announceAdded(added.map { TaskKey(entry.deviceId, it.taskId) })
     reportAdded(
       entry = entry,
       added = added,
@@ -1793,7 +1714,7 @@ class AppState(
   }
 
   private fun reportAdded(
-    entry: InstanceEntry?,
+    entry: InstanceEntry,
     added: List<DownloadTask>,
     failures: List<Pair<String, Throwable>>,
     offerOptions: Boolean = false,
@@ -1829,7 +1750,7 @@ class AppState(
       ).joinText()
     }
     val actions = buildList {
-      if (single != null && offerOptions && entry != null) {
+      if (single != null && offerOptions) {
         add(
           MessageAction(Res.string.feedback_options.text()) {
             openIntake(IntakeRequest(editTask = TaskKey(entry.deviceId, single.taskId)))
@@ -1842,24 +1763,36 @@ class AppState(
       level = if (failures.isEmpty()) MessageLevel.Success else MessageLevel.Warning,
       title = title,
       detail = failures.firstOrNull()?.first?.let(::verbatim),
-      taskKey = single?.let { TaskKey(entry?.deviceId ?: LOCAL_DEVICE_ID, it.taskId) },
-      deviceId = entry?.deviceId,
+      taskKey = single?.let { TaskKey(entry.deviceId, it.taskId) },
+      deviceId = entry.deviceId,
       actions = actions,
       cause = failures.firstOrNull()?.second,
     )
   }
 
-  private fun reportBatch(
+  /**
+   * Runs [action] on each task of [targets] whose state [matches], all at once, and reports them
+   * in one message, such as "Resumed 3 downloads on 2 devices".
+   */
+  private fun runOnAll(
+    targets: List<InstanceEntry>,
+    matches: (DownloadState) -> Boolean,
     verb: BatchVerb,
     command: FailedCommand,
-    results: List<Pair<DownloadTask, Throwable?>>,
-    devices: Int = 1,
-  ) {
+    action: suspend (InstanceEntry, DownloadTask) -> Unit,
+  ): Job = scope.launch {
+    val tasks = targets.flatMap { entry ->
+      visibleTasks(entry).filter { matches(it.state.value) }.map { entry to it }
+    }
+    if (tasks.isEmpty()) return@launch
+    val results = runEach(tasks) { (entry, task) -> action(entry, task) }
+      .map { (pair, error) -> pair.second to error }
+    val devices = tasks.distinctBy { it.first.deviceId }.size
     val done = results.count { it.second == null }
     val failures = results.mapNotNull { (task, error) -> error?.let { task to it } }
     if (done == 0) {
       reportFailures(command, results)
-      return
+      return@launch
     }
     val title = listOfNotNull(
       if (devices > 1) verb.onDevices.text(done, done, devices) else verb.here.text(done),
@@ -1885,13 +1818,8 @@ class AppState(
     }
     val (task, e) = failures.first()
     val device = deviceOf(task)
-    val deviceName = deviceNameOf(device)
     postError(
-      title = if (failures.size == 1) {
-        command.one.text(task.displayName(), deviceName)
-      } else {
-        command.many.text(failures.size, failures.size, deviceName)
-      },
+      title = what(failures.map { it.first }, command.one, command.many, deviceNameOf(device)),
       detail = e.detail(),
       cause = e,
       taskKey = TaskKey(device?.deviceId ?: LOCAL_DEVICE_ID, task.taskId),
@@ -1945,6 +1873,25 @@ class AppState(
   private fun tryAgainAction(onClick: () -> Unit): MessageAction =
     MessageAction(Res.string.action_try_again.text(), onClick)
 
+  /**
+   * Registers the Undo of adding [tasks], which removes them with their files, and returns its
+   * button; [logger] notes each task that could not be removed.
+   */
+  internal fun undoAddAction(tasks: List<DownloadTask>, logger: KetchLogger): MessageAction {
+    val op = pendingOps.register(
+      undoTitle = Res.string.feedback_undo_add.text(),
+      timeout = ADD_UNDO_WINDOW,
+      undo = {
+        tasks.forEach { task ->
+          catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
+            logger.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
+          }
+        }
+      },
+    )
+    return undoAction(op)
+  }
+
   /** How logs name [entry]. */
   private fun nameOf(entry: InstanceEntry?): String = entry?.label ?: LOCAL_DEVICE_ID
 
@@ -1971,23 +1918,11 @@ class AppState(
   }
 
   private companion object {
-    /** Matches the daemon's upload limit; torrent metainfo is 4 MiB by default. */
-    const val MAX_DROPPED_FILE_BYTES = 16L * 1024 * 1024
-
-    /** Largest link list read from a dropped file. */
-    const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024
-
     /** Dropped files read as text and handed to the add sheet. */
     val LINK_LIST_EXTENSIONS = setOf("txt", "csv", "url", "webloc")
 
-    /** Bulk pauses repeat until nothing is left to pause, at most this often. */
-    const val MAX_PAUSE_ROUNDS = 3
-
     /** How long Start now waits for the task to start before naming what it preempted. */
     val START_TIMEOUT = 2.seconds
-
-    /** How long a new download can be undone, together with its file. */
-    val ADD_UNDO_WINDOW = 8.seconds
 
     /** Order of the Downloads list until it is changed: newest first, ungrouped. */
     val DEFAULT_ARRANGEMENT = ListArrangement(
@@ -2044,9 +1979,20 @@ internal fun credentialWarningText(
     null -> null
   }
 
-// Header names, compared ignoring case.
-private const val COOKIE_HEADER = "cookie"
-private const val AUTHORIZATION_HEADER = "authorization"
+internal const val COOKIE_HEADER = "Cookie"
+internal const val AUTHORIZATION_HEADER = "Authorization"
+
+/**
+ * Largest dropped `.torrent` file read; matches the daemon's upload limit, while torrent metainfo
+ * is 4 MiB by default.
+ */
+internal const val MAX_DROPPED_FILE_BYTES = 16L * 1024 * 1024
+
+/** Largest link list read from a dropped file. */
+internal const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024
+
+/** How long a new download can be undone, together with its file. */
+internal val ADD_UNDO_WINDOW = 8.seconds
 
 /** What [AppState.pending] holds a task with while it starts over or starts now; never shown. */
 private const val PENDING_REDOWNLOAD = "redownload"
@@ -2068,12 +2014,12 @@ private class FlowState<T>(initial: T) {
   /** The value as it changes. */
   val flow = MutableStateFlow(initial)
 
-  var value: T
-    get() = state
-    set(value) {
-      state = value
-      flow.value = value
-    }
+  operator fun getValue(thisRef: Any?, property: KProperty<*>): T = state
+
+  operator fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+    state = value
+    flow.value = value
+  }
 }
 
 /**
@@ -2100,7 +2046,7 @@ private fun scheduledNote(schedules: List<DownloadSchedule>): UiText? {
   val count = schedules.size
   val first = schedules.filterIsInstance<DownloadSchedule.AtTime>().minOfOrNull { it.startAt }
     ?: return Res.plurals.feedback_scheduled_on_time.text(count)
-  val time = clockTime(first.toLocalDateTime(TimeZone.currentSystemDefault()))
+  val time = clockTime(first, TimeZone.currentSystemDefault())
   return Res.plurals.feedback_scheduled_at.text(count, count, time)
 }
 
@@ -2135,6 +2081,18 @@ private enum class BatchVerb(val here: PluralStringResource, val onDevices: Plur
 
 /** Name of this task for messages, from its current request and state. */
 private fun DownloadTask.displayName(): String = displayName(requestState.value, state.value)
+
+/**
+ * [one] with the name of the only one of [tasks], else [many] with how many they are, such as
+ * "Removed 3 downloads"; [args] follow the name or the count, such as the device.
+ */
+private fun what(
+  tasks: List<DownloadTask>,
+  one: StringResource,
+  many: PluralStringResource,
+  vararg args: Any,
+): UiText = tasks.singleOrNull()?.let { one.text(it.displayName(), *args) }
+  ?: many.text(tasks.size, tasks.size, *args)
 
 /**
  * Whether this task's file is unfinished, so removing the task once it was sent elsewhere takes

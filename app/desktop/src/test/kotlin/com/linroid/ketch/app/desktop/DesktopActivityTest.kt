@@ -11,8 +11,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class DesktopActivityTest {
@@ -55,20 +53,18 @@ class DesktopActivityTest {
   }
 
   @Test
-  fun announcesAdded_windowNotInFront_announces() {
-    assertTrue(announcesAdded(added("a.iso"), NotificationSettings(), inFront = false))
-  }
-
-  @Test
-  fun announcesAdded_windowInFront_leavesItToTheToast() {
-    assertFalse(announcesAdded(added("a.iso"), NotificationSettings(), inFront = true))
-  }
-
-  @Test
-  fun announcesAdded_mutedDevice_staysQuiet() {
-    val settings = NotificationSettings(mutedDevices = listOf("nas"))
-
-    assertFalse(announcesAdded(added("a.iso", deviceId = "nas"), settings, inFront = false))
+  fun announcesAdded_eachCase_announcesWhatNoToastShows() {
+    val muted = NotificationSettings(mutedDevices = listOf("nas"))
+    val cases = listOf(
+      Triple(added("a.iso"), NotificationSettings(), false) to true,
+      // The window in front leaves it to the toast.
+      Triple(added("a.iso"), NotificationSettings(), true) to false,
+      Triple(added("a.iso", deviceId = "nas"), muted, false) to false,
+    )
+    for ((input, expected) in cases) {
+      val (event, settings, inFront) = input
+      assertEquals(expected, announcesAdded(event, settings, inFront = inFront), "$input")
+    }
   }
 
   @Test

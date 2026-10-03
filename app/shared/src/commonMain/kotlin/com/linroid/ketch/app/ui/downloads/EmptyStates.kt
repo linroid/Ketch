@@ -85,9 +85,9 @@ import org.jetbrains.compose.resources.stringResource
  */
 internal data class EmptyCopy(
   val title: UiText,
-  val hint: UiText?,
+  val hint: UiText? = null,
   val icon: KetchIcon,
-  val action: EmptyAction?,
+  val action: EmptyAction? = null,
   val actionLabel: UiText? = action?.label,
 )
 
@@ -154,9 +154,7 @@ internal fun emptyCopy(
   return when (filter) {
     StatusFilter.All -> EmptyCopy(
       title = Res.string.downloads_empty_all.text(),
-      hint = null,
       icon = KetchIcon.Active,
-      action = null,
     )
     StatusFilter.Downloading -> EmptyCopy(
       title = Res.string.downloads_empty_downloading.text(),
@@ -206,7 +204,6 @@ internal fun fleetEmptyCopy(targetName: UiText): EmptyCopy = EmptyCopy(
 /** The copy of a remote device that has no downloads yet, with a button that adds one to it. */
 internal fun remoteEmptyCopy(deviceName: UiText): EmptyCopy = EmptyCopy(
   title = Res.string.downloads_empty_remote.text(deviceName),
-  hint = null,
   icon = KetchIcon.Server,
   action = EmptyAction.Add,
   actionLabel = Res.string.downloads_empty_add_to.text(deviceName),
@@ -224,7 +221,6 @@ internal fun offlineCopy(deviceName: UiText, unauthorized: Boolean): EmptyCopy =
   },
   hint = Res.string.downloads_empty_offline_hint.text(),
   icon = KetchIcon.Server,
-  action = null,
 )
 
 /** "This Mac runs 3 at a time.", or "This Mac runs one download at a time." for one [slots]. */

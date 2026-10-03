@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
@@ -30,9 +31,7 @@ import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
-import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.common.AdaptiveModal
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_done
@@ -84,24 +83,25 @@ internal fun shortcutGroups(
   val global = KetchCommands.all.filter { it.scope == CommandScope.Global && runs(it) }
   val list = KetchCommands.all.filter { it.scope == CommandScope.List }
   val intake = KetchCommands.all.filter { it.scope == CommandScope.Intake }
-  val deviceCommands = (1..DEVICE_SHORTCUTS).map(KetchCommands::device)
-  val targetCommands = (1..DEVICE_SHORTCUTS).map(KetchCommands::intakeTarget)
+  val numbered = KetchCommands.NUMBERED_DEVICES
+  val deviceCommands = (1..numbered).map(KetchCommands::device)
+  val targetCommands = (1..numbered).map(KetchCommands::intakeTarget)
   return listOf(
     ShortcutGroup(
       Res.string.shortcut_group_general.text(),
-      lines(global, deviceCommands, Res.string.shortcut_switch_to_devices.text(DEVICE_SHORTCUTS)),
+      lines(global, deviceCommands, Res.string.shortcut_switch_to_devices.text(numbered)),
     ),
     ShortcutGroup(Res.string.shortcut_group_list.text(), lines(list, emptyList(), null)),
     ShortcutGroup(
       Res.string.shortcut_group_intake.text(),
-      lines(intake, targetCommands, Res.string.shortcut_add_to_devices.text(DEVICE_SHORTCUTS)),
+      lines(intake, targetCommands, Res.string.shortcut_add_to_devices.text(numbered)),
     ),
   ).filter { it.lines.isNotEmpty() }
 }
 
 // A tab command is named after its tab alone, such as "Failed".
 private fun lineLabel(command: KetchCommand): UiText =
-  if (StatusFilter.entries.any { KetchCommands.tab(it) == command }) {
+  if (KetchCommands.tabFilter(command) != null) {
     Res.string.shortcut_tab.text(command.label)
   } else {
     command.label
@@ -141,12 +141,7 @@ private fun ShortcutGroupView(group: ShortcutGroup, columns: Int) {
   val spacing = KetchTheme.spacing
   val rows = remember(group, columns) { group.lines.chunked(columns) }
   Column(verticalArrangement = Arrangement.spacedBy(spacing.s1)) {
-    Text(
-      text = eyebrowText(group.title.resolve()),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textTertiary,
-      modifier = Modifier.padding(bottom = spacing.s1),
-    )
+    KetchEyebrow(group.title.resolve(), Modifier.padding(bottom = spacing.s1))
     for (row in rows) {
       Row(horizontalArrangement = Arrangement.spacedBy(spacing.s6)) {
         for (line in row) ShortcutLineView(line, Modifier.weight(1f))
@@ -180,8 +175,9 @@ private fun ShortcutLineView(line: ShortcutLine, modifier: Modifier) {
   }
 }
 
+/** A key or chord on a sunken cap, such as "⌘K", in the shortcut sheet and the palette. */
 @Composable
-private fun KeyCap(text: String) {
+internal fun KeyCap(text: String) {
   val colors = KetchTheme.colors
   Box(
     contentAlignment = Alignment.Center,
@@ -193,8 +189,6 @@ private fun KeyCap(text: String) {
     Text(text = text, style = KetchTheme.typography.labelS, color = colors.textSecondary)
   }
 }
-
-private const val DEVICE_SHORTCUTS = 9
 
 private val SheetMaxWidth: Dp = 720.dp
 private val SheetMaxHeight: Dp = 560.dp

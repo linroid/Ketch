@@ -77,6 +77,22 @@ internal fun DiscoverFooter(
     adding = state.addDiscovered(selected)
   }
   val review = { state.reviewDiscovered(selected) }
+  val buttons = @Composable { modifier: Modifier ->
+    KetchButton(
+      text = addNowLabel,
+      onClick = addNow,
+      variant = KetchButtonVariant.Secondary,
+      enabled = selected.isNotEmpty(),
+      loading = busy,
+      modifier = modifier,
+    )
+    KetchButton(
+      text = reviewLabel,
+      onClick = review,
+      enabled = selected.isNotEmpty() && !busy,
+      modifier = modifier,
+    )
+  }
   Spacer(Modifier.fillMaxWidth().height(HairlineWidth).background(colors.hairline))
   Column(
     verticalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -99,37 +115,11 @@ internal fun DiscoverFooter(
         modifier = Modifier.weight(1f),
       )
       TargetChip(state)
-      if (!stacked) {
-        KetchButton(
-          text = addNowLabel,
-          onClick = addNow,
-          variant = KetchButtonVariant.Secondary,
-          enabled = selected.isNotEmpty(),
-          loading = busy,
-        )
-        KetchButton(
-          text = reviewLabel,
-          onClick = review,
-          enabled = selected.isNotEmpty() && !busy,
-        )
-      }
+      if (!stacked) buttons(Modifier)
     }
     if (stacked) {
       Row(horizontalArrangement = Arrangement.spacedBy(spacing.s2)) {
-        KetchButton(
-          text = addNowLabel,
-          onClick = addNow,
-          variant = KetchButtonVariant.Secondary,
-          enabled = selected.isNotEmpty(),
-          loading = busy,
-          modifier = Modifier.weight(1f),
-        )
-        KetchButton(
-          text = reviewLabel,
-          onClick = review,
-          enabled = selected.isNotEmpty() && !busy,
-          modifier = Modifier.weight(1f),
-        )
+        buttons(Modifier.weight(1f))
       }
     }
   }

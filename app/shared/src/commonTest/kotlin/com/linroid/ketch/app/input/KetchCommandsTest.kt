@@ -7,8 +7,6 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class KetchCommandsTest {
@@ -165,17 +163,6 @@ class KetchCommandsTest {
     assertFailsWith<IllegalArgumentException> { KetchCommands.device(0) }
     assertFailsWith<IllegalArgumentException> { KetchCommands.device(10) }
     assertFailsWith<IllegalArgumentException> { KetchCommands.intakeTarget(0) }
-  }
-
-  @Test
-  fun byId_knownId_returnsCommand() {
-    assertSame(KetchCommands.PauseAll, KetchCommands.byId("pauseAll"))
-    assertSame(KetchCommands.intakeTarget(3), KetchCommands.byId("intake.target.3"))
-  }
-
-  @Test
-  fun byId_unknownId_returnsNull() {
-    assertNull(KetchCommands.byId("nope"))
   }
 
   private fun presses(scope: CommandScope, platform: KeyboardPlatform): Set<KeyPress> =

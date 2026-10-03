@@ -18,7 +18,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isCtrlPressed
@@ -182,7 +181,7 @@ internal fun Modifier.rubberBand(
       drawRoundRect(
         color = colors.accent,
         topLeft = rect.topLeft,
-        size = Size(rect.width, rect.height),
+        size = rect.size,
         cornerRadius = corner,
         // One dp.
         style = Stroke(width = density),

@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,100 +61,98 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   val torrent = controller.torrent
   // Trackers taken away by "Remove all", offered back until restored.
   var removed by remember { mutableStateOf(emptyList<String>()) }
-  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.sectionGap)) {
-    if (torrent == null) {
-      SettingsNotice(
-        text = stringResource(Res.string.settings_torrent_remote, device.label),
-        tone = NoticeTone.Info,
-      )
-      return@Column
-    }
-    val trackers = torrent.trackers
-    val save = { list: List<String> -> controller.updateTorrent(torrent.copy(trackers = list)) }
-    controller.torrentError?.let {
-      SettingsNotice(text = it.resolve(), tone = NoticeTone.Error)
-    }
-    if (removed.isNotEmpty()) {
-      SettingsNotice(
-        text = pluralStringResource(
-          Res.plurals.settings_torrent_removed,
-          removed.size,
-          removed.size,
-        ),
-        tone = NoticeTone.Info,
-        action = {
-          KetchButton(
-            text = stringResource(Res.string.action_undo),
-            onClick = {
-              save((removed + trackers).distinct())
-              removed = emptyList()
-            },
-            variant = KetchButtonVariant.Secondary,
-            size = KetchButtonSize.Small,
-            leadingIcon = KetchIcon.Undo,
-          )
-        },
-      )
-    }
-    SettingsGroup(
-      title = stringResource(Res.string.settings_torrent_trackers),
-      footer = if (trackers.size > MAX_EXTRA_TRACKERS) {
-        stringResource(Res.string.settings_torrent_footer_first_only, MAX_EXTRA_TRACKERS)
-      } else {
-        stringResource(Res.string.settings_torrent_footer)
-      },
-      action = if (trackers.isNotEmpty()) {
-        {
-          KetchButton(
-            text = stringResource(Res.string.settings_torrent_remove_all),
-            onClick = {
-              removed = trackers
-              save(emptyList())
-            },
-            variant = KetchButtonVariant.Ghost,
-            size = KetchButtonSize.Small,
-          )
-        }
-      } else {
-        null
-      },
-    ) {
-      AddTrackersRow(
-        onAdd = { text ->
-          val added = addTrackers(trackers, text)
-          if (added.trackers != trackers) save(added.trackers)
-          added.rejected
-        },
-      )
-      if (trackers.isEmpty()) {
-        SettingsRow(title = stringResource(Res.string.settings_torrent_no_trackers))
-      }
-      trackers.forEachIndexed { index, url ->
-        val host = trackerHost(url)
-        SettingsRow(
-          title = host,
-          description = url,
-          trailing = {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
-            ) {
-              if (index >= MAX_EXTRA_TRACKERS) {
-                KetchBadge(
-                  text = stringResource(Res.string.settings_torrent_unused),
-                  tone = KetchBadgeTone.Warning,
-                )
-              }
-              KetchIconButton(
-                icon = KetchIcon.Close,
-                onClick = { save(trackers - url) },
-                size = KetchButtonSize.Small,
-                contentDescription = stringResource(Res.string.settings_torrent_remove, host),
-              )
-            }
+  if (torrent == null) {
+    SettingsNotice(
+      text = stringResource(Res.string.settings_torrent_remote, device.label),
+      tone = NoticeTone.Info,
+    )
+    return
+  }
+  val trackers = torrent.trackers
+  val save = { list: List<String> -> controller.updateTorrent(torrent.copy(trackers = list)) }
+  controller.torrentError?.let {
+    SettingsNotice(text = it.resolve(), tone = NoticeTone.Error)
+  }
+  if (removed.isNotEmpty()) {
+    SettingsNotice(
+      text = pluralStringResource(
+        Res.plurals.settings_torrent_removed,
+        removed.size,
+        removed.size,
+      ),
+      tone = NoticeTone.Info,
+      action = {
+        KetchButton(
+          text = stringResource(Res.string.action_undo),
+          onClick = {
+            save((removed + trackers).distinct())
+            removed = emptyList()
           },
+          variant = KetchButtonVariant.Secondary,
+          size = KetchButtonSize.Small,
+          leadingIcon = KetchIcon.Undo,
+        )
+      },
+    )
+  }
+  SettingsGroup(
+    title = stringResource(Res.string.settings_torrent_trackers),
+    footer = if (trackers.size > MAX_EXTRA_TRACKERS) {
+      stringResource(Res.string.settings_torrent_footer_first_only, MAX_EXTRA_TRACKERS)
+    } else {
+      stringResource(Res.string.settings_torrent_footer)
+    },
+    action = if (trackers.isNotEmpty()) {
+      {
+        KetchButton(
+          text = stringResource(Res.string.settings_torrent_remove_all),
+          onClick = {
+            removed = trackers
+            save(emptyList())
+          },
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
         )
       }
+    } else {
+      null
+    },
+  ) {
+    AddTrackersRow(
+      onAdd = { text ->
+        val added = addTrackers(trackers, text)
+        if (added.trackers != trackers) save(added.trackers)
+        added.rejected
+      },
+    )
+    if (trackers.isEmpty()) {
+      SettingsRow(title = stringResource(Res.string.settings_torrent_no_trackers))
+    }
+    trackers.forEachIndexed { index, url ->
+      val host = trackerHost(url)
+      SettingsRow(
+        title = host,
+        description = url,
+        trailing = {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+          ) {
+            if (index >= MAX_EXTRA_TRACKERS) {
+              KetchBadge(
+                text = stringResource(Res.string.settings_torrent_unused),
+                tone = KetchBadgeTone.Warning,
+              )
+            }
+            KetchIconButton(
+              icon = KetchIcon.Close,
+              onClick = { save(trackers - url) },
+              size = KetchButtonSize.Small,
+              contentDescription = stringResource(Res.string.settings_torrent_remove, host),
+            )
+          }
+        },
+      )
     }
   }
 }

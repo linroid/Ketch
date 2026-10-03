@@ -72,13 +72,13 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.downloads.actions.command
 import com.linroid.ketch.app.ui.downloads.actions.icon
-import com.linroid.ketch.app.ui.downloads.actions.outputFile
 import com.linroid.ketch.app.ui.downloads.actions.rememberSendMode
 import com.linroid.ketch.app.ui.downloads.actions.rowActionLabel
 import com.linroid.ketch.app.ui.downloads.actions.sendEntries
 import com.linroid.ketch.app.ui.downloads.actions.sendTargets
 import com.linroid.ketch.app.ui.inspector.tabs.compactSizeText
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
+import com.linroid.ketch.app.ui.list.outputFile
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_close
 import ketch.app.shared.generated.resources.inspector_copy_name

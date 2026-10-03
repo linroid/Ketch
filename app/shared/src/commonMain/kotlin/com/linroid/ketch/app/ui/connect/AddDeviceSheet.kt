@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.connect
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,22 +23,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DiscoveredServer
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -53,8 +50,8 @@ import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.common.AdaptiveModal
+import com.linroid.ketch.app.ui.settings.Chevron
 import com.linroid.ketch.app.util.PairingLink
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_cancel
@@ -267,11 +264,10 @@ private fun NearbySection(
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
       modifier = Modifier.fillMaxWidth().heightIn(min = KetchTheme.density.buttonSmall),
     ) {
-      Text(
-        text = eyebrowText(stringResource(Res.string.connect_on_your_network)),
-        style = type.eyebrow,
-        color = colors.textSecondary,
+      KetchEyebrow(
+        text = stringResource(Res.string.connect_on_your_network),
         modifier = Modifier.weight(1f),
+        color = colors.textSecondary,
       )
       when {
         nearby.searching -> {
@@ -360,12 +356,10 @@ private fun NearbyRow(
       // Drawn inside the row, since the list clips what reaches past its rounded edge.
       .focusRing(focus.visible, KetchTheme.shapes.sm, colors.focusRing, gap = -spacing.s0_5)
       .background(overlay)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
+      .ketchClickable(
+        interactions = interactions,
+        focus = focus,
         enabled = enabled,
-        role = Role.Button,
         onClickLabel = stringResource(
           if (added) Res.string.action_show else Res.string.action_connect,
         ),
@@ -407,12 +401,7 @@ private fun NearbyRow(
           style = type.labelS,
           color = colors.textTertiary,
         )
-        else -> KetchIconImage(
-          icon = KetchIcon.Chevron,
-          size = KetchTheme.density.controlGlyph,
-          tint = colors.textTertiary,
-          modifier = Modifier.size(KetchTheme.density.controlGlyph),
-        )
+        else -> Chevron()
       }
     }
   }

@@ -59,6 +59,3 @@ data class KetchSpacing(
   val cellPadding: Dp = 8.dp,
   val sectionGap: Dp = 24.dp,
 )
-
-/** The spacing scale. */
-fun ketchSpacing(): KetchSpacing = KetchSpacing()

@@ -2,15 +2,14 @@ package com.linroid.ketch.app.ui.discover
 
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.state.AiCandidate
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RecordingKetchApi
-import kotlinx.coroutines.test.StandardTestDispatcher
+import com.linroid.ketch.app.testController
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -20,12 +19,13 @@ import kotlin.test.assertTrue
 
 class DiscoverActionsTest {
 
-  private fun TestScope.controller(api: RecordingKetchApi): AppController = AppController(
-    instanceManager = InstanceManager(
-      factory = InstanceFactory(deviceName = "Lins-MacBook-Pro", embeddedFactory = { api }),
-    ),
-    context = StandardTestDispatcher(testScheduler),
-  )
+  private fun TestScope.controller(api: RecordingKetchApi): AppController =
+    testController(api, deviceName = "Lins-MacBook-Pro")
+
+  private fun discoverTest(
+    api: RecordingKetchApi = RecordingKetchApi(),
+    block: suspend TestScope.(RecordingKetchApi, AppController) -> Unit,
+  ) = fixtureTest({ controller(api) }, AppController::close) { block(api, it) }
 
   private fun candidate(name: String) = AiCandidate(
     url = "https://example.com/$name",
@@ -73,9 +73,7 @@ class DiscoverActionsTest {
   }
 
   @Test
-  fun addDiscovered_oneCandidate_namesItAndOffersShow() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun addDiscovered_oneCandidate_namesItAndOffersShow() = discoverTest { api, controller ->
     runCurrent()
 
     controller.state.addDiscovered(listOf(candidate("blender.dmg")))
@@ -85,7 +83,6 @@ class DiscoverActionsTest {
     assertEquals(MessageLevel.Success, message.level)
     assertEquals("Added blender.dmg → ${controller.deviceName()}", message.title.load())
     assertEquals(listOf("Show", "Undo"), message.actions.map { it.label }.load())
-    controller.close()
   }
 
   @Test
@@ -107,9 +104,7 @@ class DiscoverActionsTest {
   }
 
   @Test
-  fun addDiscovered_undo_removesTheAddedTasksAndTheirFiles() = runTest {
-    val api = RecordingKetchApi()
-    val controller = controller(api)
+  fun addDiscovered_undo_removesTheAddedTasksAndTheirFiles() = discoverTest { api, controller ->
     runCurrent()
     controller.state.addDiscovered(listOf(candidate("a.iso")))
     runCurrent()
@@ -118,20 +113,18 @@ class DiscoverActionsTest {
     runCurrent()
 
     assertTrue(api.tasks.value.isEmpty())
-    controller.close()
   }
 
   @Test
-  fun reviewDiscovered_unknownTarget_opensTheSheetForTheActiveDevice() = runTest {
-    val controller = controller(RecordingKetchApi())
-    runCurrent()
-    controller.state.aiDiscover.draft.target = "gone.local:8642"
+  fun reviewDiscovered_unknownTarget_opensTheSheetForTheActiveDevice() =
+    discoverTest { _, controller ->
+      runCurrent()
+      controller.state.aiDiscover.draft.target = "gone.local:8642"
 
-    controller.state.reviewDiscovered(listOf(candidate("a.iso"), candidate("b.iso")))
+      controller.state.reviewDiscovered(listOf(candidate("a.iso"), candidate("b.iso")))
 
-    val request = checkNotNull(controller.state.intakeRequest)
-    assertEquals(LOCAL_DEVICE_ID, request.targetDeviceId)
-    assertEquals(2, request.seeds.size)
-    controller.close()
-  }
+      val request = checkNotNull(controller.state.intakeRequest)
+      assertEquals(LOCAL_DEVICE_ID, request.targetDeviceId)
+      assertEquals(2, request.seeds.size)
+    }
 }

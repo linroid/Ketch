@@ -60,7 +60,7 @@ fun AppState.switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true): Jo
   val previous = controller.settings.value.mode
   if (mode == previous) return null
   return launchCommand {
-    val failure = Res.string.pulse_switch_failed.text(speedModeText(mode))
+    val failure = Res.string.pulse_switch_failed.text(speedModeName(mode))
     val applied = speedModeCommand("setMode(${mode.name})", failure) {
       controller.setMode(mode)
     }

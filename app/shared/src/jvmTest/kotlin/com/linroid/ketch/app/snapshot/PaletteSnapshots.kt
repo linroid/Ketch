@@ -18,8 +18,6 @@ import com.linroid.ketch.app.ui.palette.CommandPalette
 import com.linroid.ketch.app.ui.palette.PaletteHistory
 import com.linroid.ketch.app.ui.shell.ShellCommands
 import com.linroid.ketch.app.ui.shell.ShellState
-import com.linroid.ketch.config.DensityMode
-import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -150,22 +148,17 @@ class PaletteSnapshots {
     discover: Boolean = true,
     interact: suspend SnapshotScene.() -> Unit = {},
   ) {
-    val environment = runBlocking(SnapshotHarness.ui) {
-      SettingsEnvironment(theme, size.density.toMode())
-    }
     // The field starts with the query selected, as it does with the list's search; End puts
     // the caret after it, as if it had been typed.
     val typed: suspend SnapshotScene.() -> Unit = {
       if (query.isNotEmpty()) pressKey(Key.MoveEnd)
       interact()
     }
-    try {
+    withSettings(theme, size.density) { environment ->
       SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, typed) {
         App(environment.controller)
         PaletteOverlay(environment, theme, size.density, query, PaletteHistory(recent), discover)
       }
-    } finally {
-      runBlocking(SnapshotHarness.ui) { environment.close() }
     }
   }
 
@@ -224,9 +217,4 @@ private fun PaletteOverlay(
       )
     }
   }
-}
-
-private fun KetchDensity.toMode(): DensityMode = when (this) {
-  KetchDensity.Compact -> DensityMode.Compact
-  KetchDensity.Comfortable -> DensityMode.Comfortable
 }

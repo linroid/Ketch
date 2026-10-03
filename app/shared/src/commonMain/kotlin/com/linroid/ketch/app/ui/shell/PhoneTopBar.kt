@@ -2,7 +2,6 @@ package com.linroid.ketch.app.ui.shell
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +54,7 @@ import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchTextField
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
@@ -175,17 +175,10 @@ internal fun CollapsingBar(chrome: PhoneChromeState, content: @Composable () -> 
  * and the overflow menu. Search turns the bar into a field that filters the downloads, adds a
  * pasted link, or searches Discover for plain text.
  *
- * @param onShow shows a destination; the overflow lists Devices when [showsBottomBar] is off.
- * @param onOpenSettings opens Settings, which phones show as a page.
+ * @param showsBottomBar whether the bottom bar shows; without it the overflow lists Devices.
  */
 @Composable
-internal fun PhoneTopBar(
-  shell: ShellState,
-  title: String,
-  showsBottomBar: Boolean,
-  onShow: (AppDestination) -> Unit,
-  onOpenSettings: () -> Unit,
-) {
+internal fun PhoneTopBar(shell: ShellState, showsBottomBar: Boolean) {
   val state = shell.app
   if (shell.searchOpen) {
     Box {
@@ -211,7 +204,7 @@ internal fun PhoneTopBar(
     DeviceButton(shell)
     Column(Modifier.weight(1f).padding(start = spacing.s1)) {
       Text(
-        text = title,
+        text = shell.destination.label.resolve(),
         style = KetchTheme.typography.pageTitle,
         color = KetchTheme.colors.textPrimary,
         maxLines = 1,
@@ -224,7 +217,7 @@ internal fun PhoneTopBar(
       onClick = { shell.focusSearch() },
       contentDescription = KetchCommands.Search.label.resolve(),
     )
-    Overflow(shell, showsBottomBar, onShow, onOpenSettings)
+    Overflow(shell, showsBottomBar)
   }
 }
 
@@ -284,12 +277,7 @@ private fun DeviceButton(shell: ShellState) {
  * Activity, Devices without a bottom bar, and Settings.
  */
 @Composable
-private fun Overflow(
-  shell: ShellState,
-  showsBottomBar: Boolean,
-  onShow: (AppDestination) -> Unit,
-  onOpenSettings: () -> Unit,
-) {
+private fun Overflow(shell: ShellState, showsBottomBar: Boolean) {
   val state = shell.app
   val pulse by state.pulse.state.collectAsState()
   val unread by state.messages.unreadCount.collectAsState()
@@ -343,13 +331,13 @@ private fun Overflow(
       if (!showsBottomBar && AppDestination.Devices in shell.destinations) {
         item(
           label = AppDestination.Devices.label,
-          onClick = { onShow(AppDestination.Devices) },
+          onClick = { shell.show(AppDestination.Devices) },
           icon = AppDestination.Devices.icon,
         )
       }
       item(
         label = Res.string.shell_settings.text(),
-        onClick = onOpenSettings,
+        onClick = { state.openSettings() },
         icon = KetchIcon.Settings,
       )
     }
@@ -512,12 +500,7 @@ private fun SuggestionRow(icon: KetchIcon, text: String, detail: String?, onClic
       .padding(horizontal = spacing.s3, vertical = spacing.s1)
       .clip(KetchTheme.shapes.md)
       .background(colors.accentSoft)
-      .clickable(
-        interactionSource = remember { MutableInteractionSource() },
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(remember { MutableInteractionSource() }, onClick = onClick)
       .heightIn(min = KetchTheme.density.menuItem)
       .padding(horizontal = spacing.s3),
   ) {

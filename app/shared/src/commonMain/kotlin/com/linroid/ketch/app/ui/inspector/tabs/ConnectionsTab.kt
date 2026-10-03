@@ -64,11 +64,12 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.inspector.hasControls
+import com.linroid.ketch.app.ui.inspector.rememberServerLimited
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.ui.list.TaskCommand
 import com.linroid.ketch.app.util.LaneHealth
 import com.linroid.ketch.app.util.SegmentRate
-import com.linroid.ketch.app.util.SegmentRateTracker
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_connections_active
 import ketch.app.shared.generated.resources.inspector_connections_active_speed
@@ -80,7 +81,6 @@ import ketch.app.shared.generated.resources.inspector_lane_description
 import ketch.app.shared.generated.resources.inspector_percent_spoken
 import ketch.app.shared.generated.resources.inspector_server_one_connection
 import ketch.app.shared.generated.resources.inspector_single_connection
-import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -157,17 +157,8 @@ internal fun ConnectionsTabContent(
   DisposableEffect(Unit) { onDispose { currentOnHighlight(null) } }
 
   val requested = row.request.connections
-  val single = downloading && requested > 1 && row.segments.size == 1
-  var singleConfirmed by remember { mutableStateOf(false) }
-  LaunchedEffect(single) {
-    singleConfirmed = false
-    if (single) {
-      delay(SegmentRateTracker.STALL_AFTER)
-      singleConfirmed = true
-    }
-  }
-  val serverLimited = row.request.resolvedSource?.maxSegments == 1 || singleConfirmed
-  val editable = onConnectionsChange != null && row.state.acceptsConnections()
+  val serverLimited = rememberServerLimited(row)
+  val editable = onConnectionsChange != null && row.state.hasControls
 
   Column(
     modifier = modifier.fillMaxWidth(),
@@ -359,7 +350,6 @@ private fun LaneRow(
       phase = phase,
       progress = null,
       height = LaneStripDefaults.LaneHeight,
-      heads = phase == LanePhase.Downloading,
       stalled = if (stalled) StalledOwnLane else emptySet(),
       modifier = Modifier.weight(1f).clearAndSetSemantics {},
     )
@@ -594,17 +584,6 @@ private fun laneDescription(lane: ConnectionLane): UiText {
     else -> compactSpeedText(rate.bytesPerSecond)
   }
   return Res.string.inspector_lane_description.text(lane.number, range, status)
-}
-
-/** Whether a new number of connections can be asked for in this state. */
-private fun DownloadState.acceptsConnections(): Boolean = when (this) {
-  is DownloadState.Downloading,
-  is DownloadState.Paused,
-  is DownloadState.Queued,
-  is DownloadState.Scheduled -> true
-  is DownloadState.Completed,
-  is DownloadState.Failed,
-  is DownloadState.Canceled -> false
 }
 
 /** This segment as a file of its own, starting at byte 0, for its lane. */

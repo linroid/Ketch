@@ -15,6 +15,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -111,28 +112,17 @@ internal object SnapshotHarness {
     scale: Float = SCALE,
     interact: suspend SnapshotScene.() -> Unit = {},
     content: @Composable () -> Unit,
-  ): Image = runBlocking(ui) {
-    // Compose logs an exception thrown while recomposing and carries on, so a broken composition
-    // would still render a picture; the handler collects it to fail the capture instead.
-    val errors = ConcurrentLinkedQueue<Throwable>()
-    val scene = ImageComposeScene(
-      width = (width.value * scale).roundToInt(),
-      height = (height.value * scale).roundToInt(),
-      density = Density(scale),
-      coroutineContext = ui + CoroutineExceptionHandler { _, error -> errors += error },
-      content = content,
-    )
-    try {
-      val snapshotScene = SnapshotScene(scene, scale)
-      snapshotScene.settle()
-      snapshotScene.interact()
-      snapshotScene.settle()
-      snapshotScene.renderFrame().also {
-        errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
-      }
-    } finally {
-      scene.close()
-    }
+  ): Image = withScene(
+    width = (width.value * scale).roundToInt(),
+    height = (height.value * scale).roundToInt(),
+    density = Density(scale),
+    content = content,
+  ) {
+    val snapshotScene = SnapshotScene(this, scale)
+    snapshotScene.settle()
+    snapshotScene.interact()
+    snapshotScene.settle()
+    snapshotScene.renderFrame()
   }
 
   /** Writes [image] to `<name>.png` in [outputDir] and returns the file. */
@@ -157,6 +147,78 @@ internal object SnapshotHarness {
 
   private const val FLAT_GRID = 16
 }
+
+/**
+ * Composes [content] in a [width] by [height] pixel scene at [density] on [SnapshotHarness.ui],
+ * runs [test] on it and closes it.
+ */
+internal fun <T> withScene(
+  width: Int,
+  height: Int,
+  density: Density = Density(1f),
+  content: @Composable () -> Unit,
+  test: suspend ImageComposeScene.() -> T,
+): T = runBlocking(SnapshotHarness.ui) {
+  // Compose logs an exception thrown while recomposing and carries on, so a broken composition
+  // would still render a picture; the handler collects it to fail the scene instead.
+  val errors = ConcurrentLinkedQueue<Throwable>()
+  val scene = ImageComposeScene(
+    width = width,
+    height = height,
+    density = density,
+    coroutineContext = SnapshotHarness.ui +
+      CoroutineExceptionHandler { _, error -> errors += error },
+    content = content,
+  )
+  try {
+    scene.test().also {
+      errors.peek()?.let { throw AssertionError("The scene failed while composing", it) }
+    }
+  } finally {
+    scene.close()
+  }
+}
+
+/** Renders [count] frames 16 ms apart, each at the time [clock] gives for its index. */
+internal suspend fun ImageComposeScene.frames(
+  count: Int,
+  clock: (Int) -> Long = { System.nanoTime() },
+) {
+  repeat(count) { frame ->
+    render(clock(frame))
+    delay(16.milliseconds)
+  }
+}
+
+/** Presses and releases [key] with the modifiers that are set. */
+@OptIn(InternalComposeUiApi::class)
+internal fun ImageComposeScene.sendKey(
+  key: Key,
+  meta: Boolean = false,
+  ctrl: Boolean = false,
+  alt: Boolean = false,
+  shift: Boolean = false,
+) {
+  // Compose has no public way to make a key event without a window.
+  for (type in listOf(KeyEventType.KeyDown, KeyEventType.KeyUp)) {
+    val event = KeyEvent(
+      key = key,
+      type = type,
+      isMetaPressed = meta,
+      isCtrlPressed = ctrl,
+      isAltPressed = alt,
+      isShiftPressed = shift,
+    )
+    sendKeyEvent(event)
+  }
+}
+
+/** Every semantics node of the scene, unmerged, parents before their children. */
+internal fun ImageComposeScene.nodes(): List<SemanticsNode> =
+  semanticsOwners.flatMap { it.unmergedRootSemanticsNode.withDescendants() }
+
+private fun SemanticsNode.withDescendants(): List<SemanticsNode> =
+  listOf(this) + children.flatMap { it.withDescendants() }
 
 /** Light or dark colors of a snapshot, and its name in file names. */
 internal enum class SnapshotTheme(val id: String) {
@@ -223,12 +285,8 @@ internal class SnapshotScene(
   }
 
   /** Presses and releases [key], with Shift held when [shift] is set. */
-  @OptIn(InternalComposeUiApi::class)
   suspend fun pressKey(key: Key, shift: Boolean = false) {
-    // Compose has no public way to make a key event without a window.
-    for (type in listOf(KeyEventType.KeyDown, KeyEventType.KeyUp)) {
-      scene.sendKeyEvent(KeyEvent(key = key, type = type, isShiftPressed = shift))
-    }
+    scene.sendKey(key, shift = shift)
     settle(minimum = INTERACTION_SETTLE)
   }
 
@@ -408,25 +466,8 @@ internal fun appSnapshot(
   data: SampleData = SampleData.downloads(),
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   setup: suspend AppScenario.() -> Unit = {},
-): File {
-  val environment = runBlocking(SnapshotHarness.ui) {
-    SampleEnvironment(data, theme, size.density.toMode(), aiProviderFactory)
-  }
-  try {
-    runBlocking(SnapshotHarness.ui) {
-      withTimeoutOrNull(START_TIMEOUT) { environment.start() }
-        ?: error("The task list of $name never listed every sample task")
-    }
-    return SnapshotHarness.capture(
-      name = fileName(name, theme, size),
-      size = size,
-      interact = { AppScenario(environment.controller, data, this).setup() },
-    ) {
-      App(environment.controller)
-    }
-  } finally {
-    runBlocking(SnapshotHarness.ui) { environment.close() }
-  }
+): File = withSample(theme, size.density.toMode(), data, aiProviderFactory) {
+  captureApp(name, size, theme, it, setup)
 }
 
 /** Renders [appSnapshot] at each of [sizes] in each of [themes], over fresh [data] each time. */
@@ -441,12 +482,79 @@ internal fun appSnapshots(
   themes.map { theme -> appSnapshot(name, size, theme, data(), aiProviderFactory, setup) }
 }
 
+/**
+ * An app a snapshot renders: the controller its root shows and the devices and downloads it
+ * shows; see [withEnvironment].
+ */
+internal interface SnapshotEnvironment {
+  /** The controller the app root shows. */
+  val controller: AppController
+
+  /** The devices and downloads it shows. */
+  val data: SampleData
+
+  /** Gets the app ready to render, such as by waiting until it lists every sample task. */
+  suspend fun start() {}
+
+  /** Closes the controller and the devices. */
+  fun close()
+}
+
+/**
+ * Creates the environment [create] makes, starts it within [timeout], runs [block] with it and
+ * closes it; the environment is created, started and closed on [SnapshotHarness.ui].
+ */
+internal fun <E : SnapshotEnvironment, T> withEnvironment(
+  create: () -> E,
+  timeout: Duration = START_TIMEOUT,
+  block: (E) -> T,
+): T {
+  val environment = runBlocking(SnapshotHarness.ui) { create() }
+  try {
+    runBlocking(SnapshotHarness.ui) {
+      withTimeoutOrNull(timeout) { environment.start() }
+        ?: error("${environment::class.simpleName} never got ready")
+    }
+    return block(environment)
+  } finally {
+    runBlocking(SnapshotHarness.ui) { environment.close() }
+  }
+}
+
+/** Runs [block] over a started [SampleEnvironment] of [data]; see [withEnvironment]. */
+internal fun <T> withSample(
+  theme: SnapshotTheme,
+  density: DensityMode = DensityMode.Compact,
+  data: SampleData = SampleData.downloads(),
+  aiProviderFactory: AiDiscoveryProviderFactory? = null,
+  block: (SampleEnvironment) -> T,
+): T = withEnvironment({ SampleEnvironment(data, theme, density, aiProviderFactory) }, block = block)
+
+/**
+ * Renders the real [App] root of [environment] to `<name>-<theme>-<width>x<height>.png` and
+ * returns the file; [setup] runs once the app is composed, like [appSnapshot]'s.
+ */
+internal fun captureApp(
+  name: String,
+  size: SnapshotSize,
+  theme: SnapshotTheme,
+  environment: SnapshotEnvironment,
+  setup: suspend AppScenario.() -> Unit = {},
+): File = SnapshotHarness.capture(
+  name = fileName(name, theme, size),
+  size = size,
+  interact = { AppScenario(environment.controller, environment.data, this).setup() },
+) {
+  App(environment.controller)
+}
+
 private val START_TIMEOUT = 5.seconds
 
 private fun fileName(name: String, theme: SnapshotTheme, size: SnapshotSize): String =
   "$name-${theme.id}-${size.id}"
 
-private fun KetchDensity.toMode(): DensityMode = when (this) {
+/** The [DensityMode] the app's settings name [this] by. */
+internal fun KetchDensity.toMode(): DensityMode = when (this) {
   KetchDensity.Compact -> DensityMode.Compact
   KetchDensity.Comfortable -> DensityMode.Comfortable
 }

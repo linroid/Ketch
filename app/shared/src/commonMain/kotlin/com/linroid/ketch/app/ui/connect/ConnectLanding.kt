@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.connect
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,13 +39,14 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.SailLanesIllustration
 import com.linroid.ketch.app.components.SailLanesIllustrationDefaults
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.healthColor
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
@@ -57,7 +56,6 @@ import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.theme.ketchSurface
 import com.linroid.ketch.app.ui.devices.SERVER_COMMAND
 import com.linroid.ketch.app.ui.devices.styledPart
@@ -144,7 +142,7 @@ internal fun ConnectLandingContent(
   BoxWithConstraints(
     modifier
       .fillMaxSize()
-      .canvasWash(colors, EmberRadius)
+      .canvasWash(colors)
       .windowInsetsPadding(WindowInsets.safeDrawing),
   ) {
     val narrow = maxWidth < CardWidth + spacing.s4 * 2
@@ -242,11 +240,7 @@ internal fun ConnectLandingContent(
 @Composable
 private fun LandingSection(title: String, content: @Composable () -> Unit) {
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2)) {
-    Text(
-      text = eyebrowText(title),
-      style = KetchTheme.typography.eyebrow,
-      color = KetchTheme.colors.textSecondary,
-    )
+    KetchEyebrow(title, color = KetchTheme.colors.textSecondary)
     content()
   }
 }
@@ -278,11 +272,9 @@ private fun LandingDeviceRow(device: DevicePresence, onClick: () -> Unit) {
       .focusRing(focus.visible, shape, colors.focusRing)
       .clip(shape)
       .background(overlay)
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
+      .ketchClickable(
+        interactions = interactions,
+        focus = focus,
         onClickLabel = stringResource(
           if (device.needsCode) Res.string.connect_enter_code else Res.string.action_show,
         ),
@@ -354,6 +346,3 @@ private fun Modifier.bleed(horizontal: Dp): Modifier = layout { measurable, cons
 private const val NarrowPlaceholder = "nas.local:8642"
 private val CardWidth = 480.dp
 private val HairlineWidth = 1.dp
-
-// Radius of the wash's ember glow, as behind the shell.
-private val EmberRadius = 520.dp

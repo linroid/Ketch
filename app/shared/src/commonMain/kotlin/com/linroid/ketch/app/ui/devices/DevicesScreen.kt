@@ -48,6 +48,7 @@ import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.dashedOutline
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
 import com.linroid.ketch.app.ui.shell.ShellNavigation
 import ketch.app.shared.generated.resources.Res
@@ -254,7 +255,7 @@ private fun AddDeviceCard(actions: PageActions, modifier: Modifier = Modifier) {
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(spacing.s3, Alignment.CenterVertically),
     modifier = modifier
-      .dashedBorder(colors.borderStrong, KetchTheme.shapes.card)
+      .dashedOutline(colors.borderStrong, KetchTheme.shapes.card)
       .padding(spacing.s6),
   ) {
     Box(

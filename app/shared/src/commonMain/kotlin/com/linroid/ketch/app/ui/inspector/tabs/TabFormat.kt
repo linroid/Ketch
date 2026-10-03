@@ -9,11 +9,8 @@ import ketch.app.shared.generated.resources.inspector_stalled_minutes
 import ketch.app.shared.generated.resources.inspector_stalled_seconds
 import ketch.app.shared.generated.resources.size_progress
 import ketch.app.shared.generated.resources.speed_per_second
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToLong
 import kotlin.time.Duration
-import kotlin.time.Instant
 
 /** A size as compact as a column needs: "1.2 GB", "284 MB", "512 B". */
 internal fun compactSizeText(bytes: Long): UiText {
@@ -53,7 +50,6 @@ internal fun stallText(stalledFor: Duration): UiText {
   }
 }
 
-
 /**
  * [text] shortened in the middle with "…" to the longest form that [fits], keeping twice as much
  * of its end as of its start, where names keep their numbers and extensions.
@@ -71,14 +67,6 @@ internal fun middleEllipsis(text: String, fits: (String) -> Boolean): String {
     if (fits(kept(mid))) low = mid else high = mid - 1
   }
   return kept(low)
-}
-
-
-/** "14:22", or "14:22:08" with [seconds], in [zone]. */
-internal fun clockTime(at: Instant, zone: TimeZone, seconds: Boolean = false): String {
-  val time = at.toLocalDateTime(zone)
-  val minutes = "${time.hour.twoDigits()}:${time.minute.twoDigits()}"
-  return if (seconds) "$minutes:${time.second.twoDigits()}" else minutes
 }
 
 /**
@@ -105,6 +93,3 @@ private fun localAmount(bytes: Long, unit: ByteUnit): String {
 }
 
 private const val WHOLE_FROM_TENTHS = 1000L
-
-private fun Int.twoDigits(): String = toString().padStart(2, '0')
-

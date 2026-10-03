@@ -1,7 +1,5 @@
 package com.linroid.ketch.app.ui.pulse
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -11,18 +9,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -34,10 +27,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.linroid.ketch.app.components.KetchBottomSheet
+import com.linroid.ketch.app.components.popupAppear
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
@@ -70,19 +64,7 @@ internal fun PulsePopover(
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   if (KetchTheme.density == KetchDensity.Comfortable) {
-    val sheetState = rememberBottomSheetState(
-      initialValue = SheetValue.Hidden,
-      enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-    )
-    ModalBottomSheet(
-      onDismissRequest = onDismissRequest,
-      sheetState = sheetState,
-      shape = KetchTheme.shapes.sheetTop,
-      containerColor = colors.surfaceRaised,
-      contentColor = colors.textPrimary,
-      tonalElevation = 0.dp,
-      scrimColor = colors.scrim,
-    ) {
+    KetchBottomSheet(onDismissRequest = onDismissRequest) {
       Column(
         modifier = modifier
           .fillMaxWidth()
@@ -109,20 +91,9 @@ internal fun PulsePopover(
     properties = PopupProperties(focusable = true),
   ) {
     val focus = remember { FocusRequester() }
-    val appear = remember { Animatable(0f) }
-    val motion = KetchTheme.motion
-    LaunchedEffect(Unit) {
-      focus.requestFocus()
-      appear.animateTo(1f, tween(motion.short, easing = motion.easeDecelerate))
-    }
     Column(
       modifier = modifier
-        .graphicsLayer {
-          alpha = appear.value
-          val scale = APPEAR_SCALE + (1f - APPEAR_SCALE) * appear.value
-          scaleX = scale
-          scaleY = scale
-        }
+        .popupAppear(focus)
         .onPreviewKeyEvent { event ->
           if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
             onDismissRequest()
@@ -172,4 +143,3 @@ private class AbovePositionProvider(
   }
 }
 
-private const val APPEAR_SCALE = 0.96f

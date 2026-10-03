@@ -201,7 +201,7 @@ private fun ConnectionsRow(
  * segment for a while after more were asked for.
  */
 @Composable
-private fun rememberServerLimited(row: TaskRow): Boolean {
+internal fun rememberServerLimited(row: TaskRow): Boolean {
   val single = row.state is DownloadState.Downloading && row.request.connections > 1 &&
     row.segments.size == 1
   var confirmed by remember(row.key) { mutableStateOf(false) }

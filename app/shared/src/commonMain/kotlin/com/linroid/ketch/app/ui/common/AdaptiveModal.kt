@@ -13,11 +13,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -31,7 +29,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.window.core.layout.WindowSizeClass
+import com.linroid.ketch.app.components.KetchBottomSheet
 import com.linroid.ketch.app.components.KetchDialogDefaults
+import com.linroid.ketch.app.components.rememberKetchSheetState
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
@@ -86,7 +86,6 @@ fun AdaptiveModal(
   maxWidth: Dp = KetchDialogDefaults.MaxWidth,
   content: @Composable ColumnScope.() -> Unit,
 ) {
-  val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val window = LocalWindowInfo.current.containerSize
   val density = LocalDensity.current
@@ -100,19 +99,10 @@ fun AdaptiveModal(
     val confirmChange = remember {
       { value: SheetValue -> currentDismissible || value != SheetValue.Hidden }
     }
-    val sheetState = rememberBottomSheetState(
-      initialValue = SheetValue.Hidden,
-      enabledValues = SheetValues,
-      confirmValueChange = confirmChange,
-    )
-    ModalBottomSheet(
+    KetchBottomSheet(
       onDismissRequest = onDismissRequest,
       modifier = modifier,
-      sheetState = sheetState,
-      shape = KetchTheme.shapes.sheetTop,
-      containerColor = colors.surfaceRaised,
-      contentColor = colors.textPrimary,
-      scrimColor = colors.scrim,
+      sheetState = rememberKetchSheetState(confirmChange),
       properties = ModalBottomSheetProperties(
         shouldDismissOnBackPress = dismissible,
         shouldDismissOnClickOutside = dismissible,
@@ -237,6 +227,3 @@ private fun ModalBody(
 }
 
 private const val TOUCH_ANCHOR_FRACTION = 0.15f
-
-@OptIn(ExperimentalMaterial3Api::class)
-private val SheetValues = setOf(SheetValue.Hidden, SheetValue.Expanded)

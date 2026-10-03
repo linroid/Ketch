@@ -9,6 +9,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.app.FakeInstanceFactory
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.FakeRemote
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.ListFixtures
@@ -20,6 +21,7 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -71,6 +73,14 @@ class DevicePresenceTest {
     return manager
   }
 
+  private fun managerTest(
+    remotes: List<RemoteConfig> = listOf(nas),
+    block: suspend TestScope.(FakeInstanceFactory, InstanceManager) -> Unit,
+  ): TestResult {
+    val fakes = FakeInstanceFactory()
+    return fixtureTest({ manager(fakes, remotes) }, InstanceManager::close) { block(fakes, it) }
+  }
+
   private fun InstanceManager.presenceOf(deviceId: String): DevicePresence =
     presence.value.single { it.deviceId == deviceId }
 
@@ -81,9 +91,7 @@ class DevicePresenceTest {
   }
 
   @Test
-  fun presence_tasksInEveryState_countsMatchStatusFilter() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun presence_tasksInEveryState_countsMatchStatusFilter() = managerTest { fakes, manager ->
     val remote = fakes.remotes.single()
     remote.tasks.value = tasks(everyState)
     settle()
@@ -95,13 +103,10 @@ class DevicePresenceTest {
     }
     assertEquals(1, presence.failures)
     assertEquals(75, presence.speed)
-    manager.close()
   }
 
   @Test
-  fun presence_devices_namesEmbeddedByNounAndRemotesByName() = runTest {
-    val manager = manager(FakeInstanceFactory())
-
+  fun presence_devices_namesEmbeddedByNounAndRemotesByName() = managerTest { _, manager ->
     val (embedded, remote) = manager.presence.value
 
     assertEquals("MacBook Pro", embedded.detail)
@@ -109,13 +114,10 @@ class DevicePresenceTest {
     assertEquals("nas.local:8642", remote.detail)
     assertEquals(DeviceHealth.Live, remote.health)
     assertTrue(remote.connected)
-    manager.close()
   }
 
   @Test
-  fun presence_onlineDevice_readsVersionUptimeAndDisk() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun presence_onlineDevice_readsVersionUptimeAndDisk() = managerTest { fakes, manager ->
     settle()
 
     val presence = manager.presenceOf("nas.local:8642")
@@ -124,29 +126,26 @@ class DevicePresenceTest {
     assertEquals("/volume1/downloads", presence.disk?.directory)
     val readAt = presence.statusAt ?: error("No status read")
     assertEquals(1.hours + 5.seconds, presence.uptimeAt(readAt + 5.seconds))
-    manager.close()
   }
 
   @Test
-  fun presence_failureWhileAnotherDeviceShows_staysUnseenUntilShown() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
-    val remote = fakes.remotes.single()
-    val failing = ListTestTask("t1", ListFixtures.downloading(10))
-    remote.tasks.value = listOf(failing)
-    settle()
-    assertEquals(0, manager.presenceOf("nas.local:8642").unseenFailures)
+  fun presence_failureWhileAnotherDeviceShows_staysUnseenUntilShown() =
+    managerTest { fakes, manager ->
+      val remote = fakes.remotes.single()
+      val failing = ListTestTask("t1", ListFixtures.downloading(10))
+      remote.tasks.value = listOf(failing)
+      settle()
+      assertEquals(0, manager.presenceOf("nas.local:8642").unseenFailures)
 
-    failing.state.value = DownloadState.Failed(KetchError.Network())
-    settle()
-    assertEquals(1, manager.presenceOf("nas.local:8642").unseenFailures)
+      failing.state.value = DownloadState.Failed(KetchError.Network())
+      settle()
+      assertEquals(1, manager.presenceOf("nas.local:8642").unseenFailures)
 
-    manager.switchTo(manager.instances.value.last())
-    settle()
-    assertEquals(0, manager.presenceOf("nas.local:8642").unseenFailures)
-    assertEquals(1, manager.presenceOf("nas.local:8642").failures)
-    manager.close()
-  }
+      manager.switchTo(manager.instances.value.last())
+      settle()
+      assertEquals(0, manager.presenceOf("nas.local:8642").unseenFailures)
+      assertEquals(1, manager.presenceOf("nas.local:8642").failures)
+    }
 
   @Test
   fun presence_failuresWhileAppInBackground_countAsUnseen() = runTest {
@@ -170,9 +169,7 @@ class DevicePresenceTest {
   }
 
   @Test
-  fun presence_freshClientLoadsSeenFailures_keepsThemSeen() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun presence_freshClientLoadsSeenFailures_keepsThemSeen() = managerTest { fakes, manager ->
     val failed = tasks(List(2) { DownloadState.Failed(KetchError.Network()) })
     fakes.remotes.single().tasks.value = failed
     manager.switchTo(manager.instances.value.last())
@@ -193,13 +190,10 @@ class DevicePresenceTest {
     val presence = manager.presenceOf("nas.local:8642")
     assertEquals(2, presence.failures)
     assertEquals(0, presence.unseenFailures)
-    manager.close()
   }
 
   @Test
-  fun presence_freshClientNotConnected_keepsLastKnownCounts() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun presence_freshClientNotConnected_keepsLastKnownCounts() = managerTest { fakes, manager ->
     fakes.remotes.single().tasks.value = tasks(everyState)
     settle()
 
@@ -212,13 +206,10 @@ class DevicePresenceTest {
     val listed = everyState.count(StatusFilter.All::matches)
     assertEquals(listed, presence.counts.count(StatusFilter.All))
     assertEquals(0, presence.speed)
-    manager.close()
   }
 
   @Test
-  fun presence_deviceGoesOffline_remembersWhenItWasLastSeen() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun presence_deviceGoesOffline_remembersWhenItWasLastSeen() = managerTest { fakes, manager ->
     val remote = fakes.remotes.single()
     settle()
     assertNull(manager.presenceOf("nas.local:8642").lastSeen)
@@ -234,25 +225,20 @@ class DevicePresenceTest {
     assertEquals(offlineAt, presence.lastSeen)
     assertEquals(DeviceHealth.Offline("Connection refused"), presence.health)
     assertEquals(0, presence.speed)
-    manager.close()
   }
 
   @Test
-  fun presence_unwatchedInactiveDevice_isNotConnected() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes, listOf(nas.copy(watch = false)))
+  fun presence_unwatchedInactiveDevice_isNotConnected() =
+    managerTest(listOf(nas.copy(watch = false))) { fakes, manager ->
+      val presence = manager.presenceOf("nas.local:8642")
 
-    val presence = manager.presenceOf("nas.local:8642")
-
-    assertFalse(presence.connected)
-    assertFalse(presence.watched)
-    assertEquals(0, fakes.remotes.single().startCount)
-    manager.close()
-  }
+      assertFalse(presence.connected)
+      assertFalse(presence.watched)
+      assertEquals(0, fakes.remotes.single().startCount)
+    }
 
   @Test
-  fun presence_hostSpeedMode_appliesToEmbeddedDeviceOnly() = runTest {
-    val manager = manager(FakeInstanceFactory())
+  fun presence_hostSpeedMode_appliesToEmbeddedDeviceOnly() = managerTest { _, manager ->
     val mode = MutableStateFlow<SpeedMode>(SpeedMode.Full)
     manager.setLocalSpeedMode(mode)
 
@@ -262,13 +248,10 @@ class DevicePresenceTest {
     val (embedded, remote) = manager.presence.value
     assertEquals(SpeedMode.SlowLane, embedded.speedMode)
     assertEquals(SpeedMode.Full, remote.speedMode)
-    manager.close()
   }
 
   @Test
-  fun presence_newClientAfterReconnect_keepsHistoryOfDevice() = runTest {
-    val fakes = FakeInstanceFactory()
-    val manager = manager(fakes)
+  fun presence_newClientAfterReconnect_keepsHistoryOfDevice() = managerTest { fakes, manager ->
     fakes.remotes.single().tasks.value = listOf(ListTestTask("t1", ListFixtures.downloading(10)))
     advanceTimeBy(5.seconds)
     runCurrent()
@@ -281,6 +264,5 @@ class DevicePresenceTest {
     assertTrue(before > 0)
     assertTrue(after.history.size >= before)
     assertEquals(fakes.remotes.last(), after.api as FakeRemote)
-    manager.close()
   }
 }

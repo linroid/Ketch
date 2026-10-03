@@ -2,14 +2,9 @@ package com.linroid.ketch.app.desktop
 
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.window.Notification
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.DownloadTask
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.KetchStatus
-import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.NotificationCopy
@@ -45,6 +40,7 @@ import kotlin.time.Instant
 
 class DesktopTrayModelTest {
   private val now = Instant.parse("2026-10-01T10:00:00Z")
+  private val watch = FailureWatch()
 
   @Test
   fun trayMenu_nothingRuns_disablesPauseAll() {
@@ -350,29 +346,18 @@ class DesktopTrayModelTest {
 
   @Test
   fun menuShortcut_globalChords_belongToTheMenu() {
-    val mac = KeyboardPlatform.Mac
+    val owned = listOf(
+      KetchCommands.Add to KeyChord(Key.N, primary = true),
+      KetchCommands.AddClipboardLink to KeyChord(Key.V, primary = true, shift = true),
+      KetchCommands.PauseAll to KeyChord(Key.P, primary = true, shift = true),
+      KetchCommands.SlowLane to KeyChord(Key.L, primary = true, shift = true),
+      KetchCommands.tab(StatusFilter.All) to KeyChord(Key.One, primary = true),
+      KetchCommands.AllDevices to KeyChord(Key.Zero, primary = true, alt = true),
+    )
 
-    assertEquals(KeyChord(Key.N, primary = true), menuShortcut(KetchCommands.Add, mac))
-    assertEquals(
-      KeyChord(Key.V, primary = true, shift = true),
-      menuShortcut(KetchCommands.AddClipboardLink, mac),
-    )
-    assertEquals(
-      KeyChord(Key.P, primary = true, shift = true),
-      menuShortcut(KetchCommands.PauseAll, mac),
-    )
-    assertEquals(
-      KeyChord(Key.L, primary = true, shift = true),
-      menuShortcut(KetchCommands.SlowLane, mac),
-    )
-    assertEquals(
-      KeyChord(Key.One, primary = true),
-      menuShortcut(KetchCommands.tab(StatusFilter.All), mac),
-    )
-    assertEquals(
-      KeyChord(Key.Zero, primary = true, alt = true),
-      menuShortcut(KetchCommands.AllDevices, mac),
-    )
+    for ((command, chord) in owned) {
+      assertEquals(chord, menuShortcut(command, KeyboardPlatform.Mac), command.id)
+    }
   }
 
   @Test
@@ -579,15 +564,12 @@ class DesktopTrayModelTest {
 
   @Test
   fun failureWatch_firstCount_isUnseenButNotNew() {
-    val watch = FailureWatch()
-
     assertEquals(0, watch.update(failing(tasks = 3, failures = 2), NONE))
     assertEquals(2, watch.unseen)
   }
 
   @Test
   fun failureWatch_newFailure_isUnseenUntilViewed() {
-    val watch = FailureWatch()
     watch.update(failing(tasks = 2, failures = 0), NONE)
 
     assertEquals(1, watch.update(failing(tasks = 2, failures = 1), NONE))
@@ -598,7 +580,6 @@ class DesktopTrayModelTest {
 
   @Test
   fun failureWatch_retriedThenFailedAgain_countsAgain() {
-    val watch = FailureWatch()
     watch.update(failing(tasks = 1, failures = 1), setOf(LOCAL))
     watch.update(failing(tasks = 1, failures = 0), NONE)
 
@@ -608,7 +589,6 @@ class DesktopTrayModelTest {
 
   @Test
   fun failureWatch_failureRemoved_forgetsIt() {
-    val watch = FailureWatch()
     watch.update(failing(tasks = 2, failures = 0), NONE)
     watch.update(failing(tasks = 2, failures = 2), NONE)
 
@@ -619,7 +599,6 @@ class DesktopTrayModelTest {
 
   @Test
   fun failureWatch_deviceConnecting_takesItsBaselineOnceOnline() {
-    val watch = FailureWatch()
     watch.update(failing(tasks = 0, failures = 0, health = DeviceHealth.Connecting), NONE)
 
     assertEquals(0, watch.update(failing(tasks = 4, failures = 2), NONE))
@@ -628,7 +607,6 @@ class DesktopTrayModelTest {
 
   @Test
   fun failureWatch_failedTasksArrivingWithTheList_areUnseenButNotNew() {
-    val watch = FailureWatch()
     watch.update(failing(tasks = 0, failures = 0), NONE)
 
     assertEquals(0, watch.update(failing(tasks = 5, failures = 2), NONE))
@@ -637,7 +615,6 @@ class DesktopTrayModelTest {
 
   @Test
   fun failureWatch_deviceOffline_keepsItsCount() {
-    val watch = FailureWatch()
     watch.update(failing(tasks = 2, failures = 1), NONE)
     watch.update(failing(tasks = 0, failures = 0, health = DeviceHealth.Offline()), NONE)
 
@@ -647,7 +624,6 @@ class DesktopTrayModelTest {
 
   @Test
   fun failureWatch_switchingDevices_keepsWhatEachDeviceHasSeen() {
-    val watch = FailureWatch()
     val mac = failing(tasks = 3, failures = 2)
     val nas = failing(tasks = 1, failures = 1, deviceId = "nas:8642")
     watch.update(mac, setOf(LOCAL))
@@ -660,7 +636,6 @@ class DesktopTrayModelTest {
 
   @Test
   fun failureWatch_viewingOneDevice_leavesTheOthersUnseen() {
-    val watch = FailureWatch()
     val both = failing(tasks = 1, failures = 1) +
       failing(tasks = 1, failures = 1, deviceId = NAS)
 
@@ -747,9 +722,9 @@ class DesktopTrayModelTest {
   ): DevicePresence {
     val entry = if (remote) {
       val config = RemoteConfig(host = name.lowercase(), name = name, watch = watched)
-      RemoteInstance(NoApi, config, MutableStateFlow(ConnectionState.Connected))
+      RemoteInstance(FakeDevice(), config, MutableStateFlow(ConnectionState.Connected))
     } else {
-      EmbeddedInstance(NoApi, "Lins-MacBook-Pro")
+      EmbeddedInstance(FakeDevice(), "Lins-MacBook-Pro")
     }
     return DevicePresence(
       entry = entry,
@@ -875,21 +850,4 @@ class DesktopTrayModelTest {
     val NONE = emptySet<String>()
   }
 
-  private object NoApi : KetchApi {
-    override val backendLabel: String = "Test"
-    override val tasks = MutableStateFlow(emptyList<DownloadTask>())
-
-    override suspend fun download(request: DownloadRequest): DownloadTask = error("Not used")
-
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-      error("Not used")
-
-    override suspend fun start() {}
-
-    override suspend fun status(): KetchStatus = error("Not used")
-
-    override suspend fun updateConfig(config: DownloadConfig) {}
-
-    override fun close() {}
-  }
 }

@@ -164,7 +164,8 @@ private fun btihHex(hash: String): String? = when {
   else -> null
 }
 
-private fun base32ToHex(value: String): String? {
+/** Hex form of a base32 info hash, or `null` when [value] is not base32. */
+internal fun base32ToHex(value: String): String? {
   val hex = StringBuilder()
   var buffer = 0
   var bits = 0
@@ -190,11 +191,31 @@ private fun magnetParams(url: String): List<Pair<String, String>>? {
   }
 }
 
-private fun hexValue(byte: Byte): Int = when (val char = byte.toInt().toChar()) {
+/** Value of the hex digit [char], or -1. */
+internal fun hexValue(char: Char): Int = when (char) {
   in '0'..'9' -> char - '0'
   in 'a'..'f' -> char - 'a' + 10
   in 'A'..'F' -> char - 'A' + 10
   else -> -1
+}
+
+private fun hexValue(byte: Byte): Int = hexValue(byte.toInt().toChar())
+
+/** [value] as UTF-8, every byte but the unreserved characters of RFC 3986 escaped as `%XX`. */
+internal fun percentEncode(value: String): String = buildString {
+  for (byte in value.encodeToByteArray()) {
+    val code = byte.toInt() and 0xFF
+    if (code < 0x80 && isUnreserved(code.toChar())) append(code.toChar()) else appendEscaped(code)
+  }
+}
+
+/** Whether [char] is an unreserved character of RFC 3986, which never needs an escape. */
+internal fun isUnreserved(char: Char): Boolean = char in 'A'..'Z' || char in 'a'..'z' ||
+  char in '0'..'9' || char == '-' || char == '.' || char == '_' || char == '~'
+
+/** Appends [byte] as a `%XX` escape with upper-case digits. */
+internal fun StringBuilder.appendEscaped(byte: Int) {
+  append('%').append(HEX_UPPER[byte shr 4]).append(HEX_UPPER[byte and 0x0F])
 }
 
 private fun isHexDigit(char: Char): Boolean = char in '0'..'9' || char in 'a'..'f'
@@ -207,6 +228,7 @@ private const val BTIH = "urn:btih:"
 private const val BTMH = "urn:btmh:"
 private const val BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 private const val HEX = "0123456789abcdef"
+private const val HEX_UPPER = "0123456789ABCDEF"
 private const val PERCENT = '%'.code.toByte()
 private const val PLUS = '+'.code.toByte()
 private const val SPACE = ' '.code.toByte()

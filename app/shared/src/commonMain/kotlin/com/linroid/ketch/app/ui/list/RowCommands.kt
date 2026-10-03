@@ -22,7 +22,6 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.catchingUnlessCancelled
-import com.linroid.ketch.app.state.taskActions
 import com.linroid.ketch.app.util.errorDetails
 import com.linroid.ketch.app.util.referer
 import ketch.app.shared.generated.resources.Res
@@ -122,38 +121,23 @@ internal enum class CopiedText(
  * device and never cancels another command. Removing a task and discarding its progress go
  * through [AppState]'s Undo.
  *
- * @param files opens and reveals downloaded files; `null` where they are out of reach.
- * @param clipboard receives copied links, paths and error details; `null` where there is none.
- * @param scope runs clipboard writes.
+ * @property files opens and reveals downloaded files; `null` where they are out of reach.
+ * @property clipboard receives copied links, paths and error details; `null` where there is none.
+ * @property scope runs clipboard writes.
  * @param openUri opens a web page, such as the page a link was captured from.
  */
 internal class RowCommands(
-  private val state: AppState,
-  private val files: FileActions?,
-  private val clipboard: SystemClipboard?,
-  private val scope: CoroutineScope,
+  val state: AppState,
+  val files: FileActions?,
+  val clipboard: SystemClipboard?,
+  val scope: CoroutineScope,
   private val openUri: (String) -> Unit,
 ) {
-  /** The actions [row] offers that can run here, in menu order, its primary one included. */
-  fun menu(row: TaskRow): List<RowAction> =
-    taskActions(row.request, row.state, row.device, stalled = row.isStalled).menu
-      .filter { canRun(it, row) }
-
-  /**
-   * The row's trailing button: its primary action, or, when that cannot run here, the first
-   * other fix of its failure that can.
-   */
-  fun trailing(row: TaskRow): RowAction? {
-    val primary = row.content.primary ?: return null
-    if (canRun(primary, row)) return primary
-    return row.content.error?.secondary?.firstOrNull { canRun(it, row) }
-  }
-
   /** Whether [action] can run on [row] here; files need [files] and copies a clipboard. */
   fun canRun(action: RowAction, row: TaskRow): Boolean = when (action) {
-    RowAction.Open -> files != null && outputPath(row) != null
+    RowAction.Open -> files != null && row.outputFile != null
     RowAction.ShowInFolder -> files?.revealLabel != null && folderPath(row) != null
-    RowAction.CopyPath -> clipboard != null && outputPath(row) != null
+    RowAction.CopyPath -> clipboard != null && row.outputFile != null
     RowAction.CopyLink, RowAction.CopyError, RowAction.CopyDetails -> clipboard != null
     RowAction.OpenSourcePage -> sourcePage(row) != null
     RowAction.FindAnotherSource -> row.device.capabilities.canDiscover
@@ -182,7 +166,7 @@ internal class RowCommands(
       RowAction.StartNow -> state.startNow(task)
       RowAction.DownloadAgain -> state.redownload(task)
       RowAction.Open -> {
-        val path = outputPath(row) ?: return
+        val path = row.outputFile ?: return
         val files = files ?: return
         command(row, TaskCommand.Open) { files.open(path) }
       }
@@ -191,15 +175,15 @@ internal class RowCommands(
         val files = files ?: return
         command(row, TaskCommand.Reveal) { files.reveal(path) }
       }
-      RowAction.CopyLink -> copy(CopiedText.Link) { row.request.url }
-      RowAction.CopyPath -> outputPath(row)?.let { path -> copy(CopiedText.Path) { path } }
+      RowAction.CopyLink -> copy(CopiedText.Link) { listOf(row.request.url) }
+      RowAction.CopyPath -> row.outputFile?.let { path -> copy(CopiedText.Path) { listOf(path) } }
       RowAction.CopyError -> row.content.error?.let { error ->
         copy(CopiedText.Error) {
-          listOfNotNull(error.title, error.hint).map { it.load() }.joinToString("\n")
+          listOf(listOfNotNull(error.title, error.hint).map { it.load() }.joinToString("\n"))
         }
       }
       RowAction.CopyDetails -> (row.state as? DownloadState.Failed)?.let { failed ->
-        copy(CopiedText.Details) { errorDetails(failed.error, row.request, task.taskId) }
+        copy(CopiedText.Details) { listOf(errorDetails(failed.error, row.request, task.taskId)) }
       }
       RowAction.EditLink,
       RowAction.RetryWithOptions,
@@ -235,11 +219,6 @@ internal class RowCommands(
   fun reschedule(row: TaskRow, schedule: DownloadSchedule): Job =
     command(row, TaskCommand.Reschedule) { reschedule(schedule) }
 
-  /** Removes [row]'s task, and its files with [deleteFiles], once the Undo window ends. */
-  fun remove(row: TaskRow, deleteFiles: Boolean) {
-    state.remove(listOf(row.task), deleteFiles)
-  }
-
   private fun command(
     row: TaskRow,
     command: TaskCommand,
@@ -251,12 +230,20 @@ internal class RowCommands(
     block = block,
   )
 
-  private fun copy(what: CopiedText, text: suspend () -> String) {
+  /**
+   * Copies the [lines] it reads, one per line, and confirms it as "Copied link" or "Copied 3
+   * links"; nothing when there are none.
+   */
+  fun copy(what: CopiedText, lines: suspend () -> List<String>) {
     val clipboard = clipboard ?: return
     scope.launch {
-      catchingUnlessCancelled { clipboard.writeText(text()) }
-        .onSuccess { state.messages.post(MessageLevel.Success, what.copied()) }
-        .onFailure { e -> state.messages.post(MessageLevel.Error, what.failed(), cause = e) }
+      val text = lines()
+      if (text.isEmpty()) return@launch
+      catchingUnlessCancelled { clipboard.writeText(text.joinToString("\n")) }
+        .onSuccess { state.messages.post(MessageLevel.Success, what.copied(text.size)) }
+        .onFailure { e ->
+          state.messages.post(MessageLevel.Error, what.failed(text.size), cause = e)
+        }
     }
   }
 
@@ -316,9 +303,9 @@ internal class RowCommands(
   }
 }
 
-/** Path of the file a completed row saved. */
-private fun outputPath(row: TaskRow): String? =
-  (row.state as? DownloadState.Completed)?.outputPath?.ifBlank { null }
+/** Path of the file a completed row saved, or `null`. */
+internal val TaskRow.outputFile: String?
+  get() = (state as? DownloadState.Completed)?.outputPath?.ifBlank { null }
 
 /** The web page [row]'s link was captured from; a `Referer` of another scheme is not opened. */
 private fun sourcePage(row: TaskRow): String? = row.request.referer?.takeIf { referer ->
@@ -329,4 +316,4 @@ private val WEB_SCHEMES = listOf("https://", "http://")
 
 /** Where [row]'s file is or goes: its output, else a destination that names a path. */
 private fun folderPath(row: TaskRow): String? =
-  outputPath(row) ?: row.request.destination?.takeUnless(Destination::isName)?.value
+  row.outputFile ?: row.request.destination?.takeUnless(Destination::isName)?.value

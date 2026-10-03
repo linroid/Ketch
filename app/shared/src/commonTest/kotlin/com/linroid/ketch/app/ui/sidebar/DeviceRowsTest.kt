@@ -1,14 +1,13 @@
 package com.linroid.ketch.app.ui.sidebar
 
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
-import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.ui.shell.FleetFixtures.presence
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,24 +21,15 @@ class DeviceRowsTest {
     counts: PulseCounts = PulseCounts(),
     speed: Long = 0,
     speedMode: SpeedMode = SpeedMode.Full,
-  ) = DevicePresence(
+  ) = presence(
     entry = EmbeddedInstance(FakeKetchApi(), "NAS-Basement"),
-    name = verbatim("NAS-Basement"),
+    name = "NAS-Basement",
     detail = "nas.local:8642",
     health = health,
     connected = connected,
-    watched = true,
-    status = null,
-    statusAt = null,
-    lastSeen = null,
     speed = speed,
     counts = counts,
-    failures = 0,
-    unseenFailures = 0,
-    cap = SpeedLimit.Unlimited,
-    disk = null,
     speedMode = speedMode,
-    history = emptyList(),
   )
 
   private fun expected(text: String, alert: Boolean = false) = DeviceLine(verbatim(text), alert)

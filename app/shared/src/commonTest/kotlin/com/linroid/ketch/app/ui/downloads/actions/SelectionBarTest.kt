@@ -6,8 +6,8 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.RowAction
+import com.linroid.ketch.app.state.rowOf
 import com.linroid.ketch.app.ui.list.TaskCommand
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -19,8 +19,7 @@ class SelectionBarTest {
   private val completed = DownloadState.Completed("/downloads/a.iso", totalBytes = 1_048_576)
 
   @Test
-  fun barVerbs_twoRunningOneFinished_countsPauseTwoOfThree() = runTest {
-    val f = ActionsFixture(this)
+  fun barVerbs_twoRunningOneFinished_countsPauseTwoOfThree() = actionsTest { f ->
     val rows = listOf(f.add(downloading), f.add(downloading), f.add(completed)).map { rowOf(it) }
 
     val (bar, _) = barVerbs(f.runner.batch(rows), canSend = false)
@@ -29,12 +28,10 @@ class SelectionBarTest {
     assertEquals(RowAction.Pause, pause.action)
     assertEquals(2, pause.count)
     assertEquals("Pause 2 of 3 selected", pause.tooltip(rows.size).load())
-    f.close()
   }
 
   @Test
-  fun barVerbs_mixedSelection_showsOnlyVerbsThatApplyInOrder() = runTest {
-    val f = ActionsFixture(this)
+  fun barVerbs_mixedSelection_showsOnlyVerbsThatApplyInOrder() = actionsTest { f ->
     val rows = listOf(
       f.add(downloading),
       f.add(downloading),
@@ -50,73 +47,61 @@ class SelectionBarTest {
     )
     assertEquals(listOf(2, 1, 1), bar.take(3).map { it.count })
     assertEquals("Resume 1 of 4 selected", bar[1].tooltip(rows.size).load())
-    f.close()
   }
 
   @Test
-  fun barVerbs_finishedFiles_leaveRunningVerbsOutAndOfferOpenInMore() = runTest {
-    val f = ActionsFixture(this)
+  fun barVerbs_finishedFiles_leaveRunningVerbsOutAndOfferOpenInMore() = actionsTest { f ->
     val rows = List(2) { rowOf(f.add(completed)) }
     val batch = f.runner.batch(rows)
 
     val (bar, more) = barVerbs(batch, canSend = false, revealLabel = verbatim("Show in Finder"))
 
     assertFalse(bar.any { it.action == RowAction.Pause || it.action == RowAction.Priority })
-    assertEquals("Copy 2 links", (bar.single { it.action == RowAction.CopyLink }.tooltip(2)).load())
+    assertEquals("Copy 2 links", bar.single { it.action == RowAction.CopyLink }.tooltip(2).load())
     assertTrue(more.any { it.label.load() == "Open" && it.count == 2 })
     assertTrue(more.any { it.label.load() == "Show in Finder" })
-    f.close()
   }
 
   @Test
-  fun barVerbs_withAnotherDevice_offersSendTo() = runTest {
-    val f = ActionsFixture(this)
+  fun barVerbs_withAnotherDevice_offersSendTo() = actionsTest { f ->
     val rows = List(2) { rowOf(f.add(downloading)) }
 
     val withDevice = barVerbs(f.runner.batch(rows), canSend = true).first
     val alone = barVerbs(f.runner.batch(rows), canSend = false).first
 
-    assertTrue(withDevice.any { it.kind == BarVerbKind.SendTo })
-    assertFalse(alone.any { it.kind == BarVerbKind.SendTo })
-    f.close()
+    assertTrue(withDevice.any { it.action == RowAction.SendTo })
+    assertFalse(alone.any { it.action == RowAction.SendTo })
   }
 
   @Test
-  fun barVerbs_remove_asksWithTheDialog() = runTest {
-    val f = ActionsFixture(this)
+  fun barVerbs_remove_asksWithTheDialog() = actionsTest { f ->
     val rows = List(3) { rowOf(f.add(downloading)) }
 
     val remove = barVerbs(f.runner.batch(rows), canSend = false).first.last()
 
-    assertEquals(BarVerbKind.RemoveDialog, remove.kind)
+    assertTrue(remove.asks)
     assertEquals("Remove 3 downloads…", remove.tooltip(rows.size).load())
-    f.close()
   }
 
   @Test
-  fun selectionSummary_countsRowsAndKnownBytes() = runTest {
-    val f = ActionsFixture(this)
+  fun selectionSummary_countsRowsAndKnownBytes() = actionsTest { f ->
     val rows = listOf(f.add(completed), f.add(completed), f.add(DownloadState.Queued))
       .map { rowOf(it) }
 
     assertEquals("3 selected · 2.0 MB", selectionSummary(rows).load())
     assertEquals("1 selected", selectionSummary(listOf(rows.last())).load())
-    f.close()
   }
 
   @Test
-  fun skipNote_groupsTheReasons() = runTest {
-    val f = ActionsFixture(this)
+  fun skipNote_groupsTheReasons() = actionsTest { f ->
     val rows = listOf(f.add(completed), f.add(paused), f.add(paused)).map { rowOf(it) }
 
     assertEquals("1 already finished · 2 already paused", skipNote(TaskCommand.Pause, rows).load())
     assertEquals(null, skipNote(TaskCommand.Pause, emptyList()))
-    f.close()
   }
 
   @Test
-  fun skipNote_resume_namesWhyEachRowWasLeftAlone() = runTest {
-    val f = ActionsFixture(this)
+  fun skipNote_resume_namesWhyEachRowWasLeftAlone() = actionsTest { f ->
     val rows = listOf(
       f.add(downloading),
       f.add(DownloadState.Failed(KetchError.Network())),
@@ -127,6 +112,5 @@ class SelectionBarTest {
       "1 already running · 1 with an error · 1 canceled",
       skipNote(TaskCommand.Resume, rows).load(),
     )
-    f.close()
   }
 }

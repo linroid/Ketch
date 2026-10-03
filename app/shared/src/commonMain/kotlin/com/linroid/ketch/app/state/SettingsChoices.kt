@@ -7,12 +7,12 @@ import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.app.i18n.ByteUnit
 import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.clockTime
 import com.linroid.ketch.app.i18n.decimalSeparator
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.i18n.weekdayShortText
+import com.linroid.ketch.app.util.clockText
 import com.linroid.ketch.app.util.percentDecode
 import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.Weekday
@@ -173,7 +173,7 @@ fun normalizeRuleTime(text: String): String? {
   val hour = hourText.toInt()
   val minute = minuteText.toInt()
   if (hour !in 0..23 || minute !in 0..59 || minuteText.length > 2) return null
-  return "${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}"
+  return clockText(hour, minute)
 }
 
 /**
@@ -198,12 +198,9 @@ private fun changeTime(at: Instant, now: Instant, zone: TimeZone): UiText {
   val time = at.toLocalDateTime(zone)
   val today = now.toLocalDateTime(zone).date
   return when (time.date) {
-    today -> verbatim(clockTime(time))
-    today.plus(1, DateTimeUnit.DAY) -> Res.string.settings_auto_tomorrow_at.text(clockTime(time))
-    else -> Res.string.settings_auto_day_at.text(
-      weekdayShortText(time.dayOfWeek),
-      clockTime(time),
-    )
+    today -> verbatim(time.clockText())
+    today.plus(1, DateTimeUnit.DAY) -> Res.string.settings_auto_tomorrow_at.text(time.clockText())
+    else -> Res.string.settings_auto_day_at.text(weekdayShortText(time.dayOfWeek), time.clockText())
   }
 }
 

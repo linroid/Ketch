@@ -1,42 +1,27 @@
 package com.linroid.ketch.app.snapshot
 
-import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
-import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.KetchStatus
-import com.linroid.ketch.api.ResolvedSource
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.state.AiDiscoverRequest
-import com.linroid.ketch.app.state.AiDiscoverResponse
-import com.linroid.ketch.app.state.AiDiscoveryProvider
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.TaskKey
-import com.linroid.ketch.app.util.extractFilename
-import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.UiPreferences
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.yield
@@ -118,6 +103,7 @@ internal object ShowcaseData {
       // Far enough from done that no lane finishes while the iOS sheet's rates settle.
       lanes = listOf(1.0, 0.89, 0.84, 0.78, 0.71, 0.64, 0.53, 0.42),
       ago = 7.minutes,
+      dir = STUDIO_DIR,
     ),
     downloading(
       id = "shard-03",
@@ -127,6 +113,7 @@ internal object ShowcaseData {
       lanes = listOf(0.71, 0.56, 0.47, 0.34),
       ago = 42.minutes,
       priority = DownloadPriority.HIGH,
+      dir = STUDIO_DIR,
     ),
     task(
       id = "timelapse",
@@ -137,24 +124,28 @@ internal object ShowcaseData {
       ),
       ago = 12.minutes,
       speedLimit = SpeedLimit.mbps(5),
+      dir = STUDIO_DIR,
     ),
     task(
       id = "shard-04",
       url = "https://data.example.net/corpus/dataset-shard-04.tar",
       state = DownloadState.Queued,
       ago = 41.minutes,
+      dir = STUDIO_DIR,
     ),
     task(
       id = "assets",
       url = "https://files.example.com/design/design-assets-2026.zip",
       state = DownloadState.Queued,
       ago = 3.minutes,
+      dir = STUDIO_DIR,
     ),
     task(
       id = "model",
       url = "https://models.example.net/weights/local-model-8b-q4.gguf",
       state = DownloadState.Scheduled(DownloadSchedule.AtTime(TONIGHT)),
       ago = 20.minutes,
+      dir = STUDIO_DIR,
     ),
     task(
       id = "sdk",
@@ -162,6 +153,7 @@ internal object ShowcaseData {
       state = DownloadState.Paused(DownloadProgress(497_025_024, 1_342_177_280)),
       ago = 1.days + 3.hours,
       segments = lanes(1_342_177_280, listOf(0.62, 0.41, 0.3, 0.15)),
+      dir = STUDIO_DIR,
     ),
     completed(
       id = "report",
@@ -169,6 +161,7 @@ internal object ShowcaseData {
       total = 2_621_440,
       time = 1.seconds,
       ago = 50.minutes,
+      dir = STUDIO_DIR,
     ),
     completed(
       id = "podcast",
@@ -176,6 +169,7 @@ internal object ShowcaseData {
       total = 86 * MIB,
       time = 9.seconds,
       ago = 2.hours,
+      dir = STUDIO_DIR,
     ),
     completed(
       id = "recording",
@@ -183,6 +177,7 @@ internal object ShowcaseData {
       total = 412 * MIB,
       time = 38.seconds,
       ago = 5.hours,
+      dir = STUDIO_DIR,
     ),
     completed(
       id = "photos",
@@ -190,6 +185,7 @@ internal object ShowcaseData {
       total = 1_932_735_283,
       time = 3.minutes + 12.seconds,
       ago = 1.days + 6.hours,
+      dir = STUDIO_DIR,
     ),
   )
 
@@ -273,7 +269,7 @@ internal class ShowcaseEnvironment(
   density: DensityMode,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   ui: (UiPreferences) -> UiPreferences = { it },
-) {
+) : SnapshotEnvironment {
   /** Studio's downloads, whose flows a scenario can move on. */
   val studioTasks: List<ListTestTask> = ShowcaseData.studioTasks()
 
@@ -282,7 +278,7 @@ internal class ShowcaseEnvironment(
   private val desktop = device == ShowcaseDevice.Desktop
   private val localTasks = if (desktop) laptopTasks else emptyList()
   private val laptopId = if (desktop) LOCAL_DEVICE_ID else ShowcaseData.LAPTOP_ID
-  private val data = SampleData(
+  override val data = SampleData(
     tasks = localTasks,
     downloadConfig = ShowcaseData.StudioConfig,
     remotes = listOfNotNull(
@@ -293,26 +289,27 @@ internal class ShowcaseEnvironment(
     deviceName = if (desktop) ShowcaseData.LAPTOP else PHONE_NAME,
     ui = { ui(it.copy(lastDeviceId = ShowcaseData.STUDIO_ID)) },
   )
-  private val studio = ShowcaseApi(
+  private val studio = SampleKetchApi(
     name = ShowcaseData.STUDIO,
-    os = "Mac OS X",
-    directory = ShowcaseData.STUDIO_DIR,
-    config = ShowcaseData.StudioConfig,
     initial = studioTasks,
+    config = ShowcaseData.StudioConfig,
+    directory = ShowcaseData.STUDIO_DIR,
+    version = ShowcaseData.VERSION,
   )
-  private val home = ShowcaseApi(
+  private val home = SampleKetchApi(
     name = "Home server",
+    initial = homeTasks,
+    config = DownloadConfig(defaultDirectory = ShowcaseData.HOME_DIR, maxConcurrentDownloads = 2),
     os = "Linux",
     directory = ShowcaseData.HOME_DIR,
-    config = DownloadConfig(defaultDirectory = ShowcaseData.HOME_DIR, maxConcurrentDownloads = 2),
-    initial = homeTasks,
+    version = ShowcaseData.VERSION,
   )
-  private val laptop = ShowcaseApi(
+  private val laptop = SampleKetchApi(
     name = ShowcaseData.LAPTOP,
-    os = "Mac OS X",
-    directory = ShowcaseData.LAPTOP_DIR,
-    config = DownloadConfig(defaultDirectory = ShowcaseData.LAPTOP_DIR),
     initial = laptopTasks,
+    config = DownloadConfig(defaultDirectory = ShowcaseData.LAPTOP_DIR),
+    directory = ShowcaseData.LAPTOP_DIR,
+    version = ShowcaseData.VERSION,
   )
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
@@ -332,8 +329,7 @@ internal class ShowcaseEnvironment(
     configStore = RecordingConfigStore(data.config(theme, density)),
   )
 
-  /** The controller the app root shows. */
-  val controller: AppController = AppController(
+  override val controller: AppController = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = aiProviderFactory,
     context = SnapshotHarness.ui,
@@ -347,10 +343,15 @@ internal class ShowcaseEnvironment(
    * Fills the speed history with three minutes of samples of every device, then waits until
    * the active device's downloads are listed and every device has reported its status.
    */
-  suspend fun start() {
+  override suspend fun start() {
     // Let the store forget the tasks of the empty list it starts from.
     repeat(STARTUP_YIELDS) { yield() }
-    seedSpeedHistory()
+    val states = studioTasks.associate { studioKey(it.taskId) to it.state.value } +
+      homeTasks.associate { TaskKey(ShowcaseData.HOME_ID, it.taskId) to it.state.value } +
+      laptopTasks.associate { TaskKey(laptopId, it.taskId) to it.state.value }
+    seedSpeedHistory(controller.speedHistory, states, Random(SEED)) { second, random ->
+      0.84 + 0.12 * sin(second * PI / 23) + 0.08 * random.nextDouble()
+    }
     controller.taskList.rows.first { it.size == studioTasks.size }
     instanceManager.presence.first { list -> list.all { it.disk != null } }
   }
@@ -387,32 +388,14 @@ internal class ShowcaseEnvironment(
     delay(SETTLE_SAMPLES.seconds)
   }
 
-  /** Closes the controller and the devices. */
-  fun close() {
+  override fun close() {
     controller.close()
     instanceManager.close()
-  }
-
-  private fun seedSpeedHistory() {
-    val random = Random(SEED)
-    val states = studioTasks.associate { studioKey(it.taskId) to it.state.value } +
-      homeTasks.associate { TaskKey(ShowcaseData.HOME_ID, it.taskId) to it.state.value } +
-      laptopTasks.associate { TaskKey(laptopId, it.taskId) to it.state.value }
-    for (second in HISTORY_SECONDS downTo 0) {
-      val speeds = states.mapValues { (_, state) ->
-        (state as? DownloadState.Downloading)?.progress?.bytesPerSecond?.let { speed ->
-          val wave = 0.84 + 0.12 * sin(second * PI / 23) + 0.08 * random.nextDouble()
-          (speed * wave).roundToLong()
-        }
-      }
-      controller.speedHistory.record(SampleData.NOW - second.seconds, speeds)
-    }
   }
 
   private companion object {
     const val PHONE_NAME = "Phone"
     const val SEED = 26
-    const val HISTORY_SECONDS = 180
     const val STARTUP_YIELDS = 3
     const val SWING_BASE = 0.76
     const val SWING_WAVE = 0.18
@@ -423,162 +406,6 @@ internal class ShowcaseEnvironment(
   }
 }
 
-/** Discovery that can run but is never asked, so a phone shows its Discover tab. */
-internal object ShowcaseDiscovery : AiDiscoveryProviderFactory {
-  override fun create(settings: AiSettings): AiDiscoveryProvider = object : AiDiscoveryProvider {
-    override suspend fun discover(request: AiDiscoverRequest, onStep: (DiscoveryStep) -> Unit) =
-      AiDiscoverResponse(request.query, emptyList())
-
-    override suspend fun verify(): String = "OK"
-  }
-}
-
-/** One device of the showcase: its downloads, settings and disk. */
-private class ShowcaseApi(
-  private val name: String,
-  private val os: String,
-  private val directory: String,
-  private var config: DownloadConfig,
-  initial: List<DownloadTask>,
-) : KetchApi {
-  private val taskList = MutableStateFlow(initial)
-
-  override val backendLabel: String = name
-  override val tasks: StateFlow<List<DownloadTask>> = taskList
-
-  override suspend fun download(request: DownloadRequest): DownloadTask {
-    val task = ListTestTask(
-      taskId = "added-${taskList.value.size}",
-      state = DownloadState.Queued,
-      request = request,
-      createdAt = SampleData.NOW,
-    )
-    taskList.update { it + task }
-    return task
-  }
-
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    ResolvedSource(
-      url = url,
-      sourceType = "http",
-      totalBytes = 734_003_200,
-      supportsResume = true,
-      suggestedFileName = extractFilename(url),
-      maxSegments = 8,
-    )
-
-  override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
-    throw KetchError.Unsupported()
-
-  override suspend fun status(): KetchStatus = KetchStatus(
-    name = name,
-    version = ShowcaseData.VERSION,
-    revision = KetchApi.REVISION,
-    uptime = 3.days.inWholeSeconds,
-    config = config,
-    system = SystemInfo(
-      os = os,
-      arch = "aarch64",
-      separator = "/",
-      javaVersion = "21",
-      availableProcessors = 10,
-      maxMemory = 4 * GIB,
-      totalMemory = GIB,
-      freeMemory = 512 * MIB,
-      downloadDirectory = directory,
-      totalSpace = 994_662_584_320,
-      freeSpace = 412_316_860_416,
-      usableSpace = 412_316_860_416,
-    ),
-  )
-
-  override suspend fun updateConfig(config: DownloadConfig) {
-    this.config = config
-  }
-
-  override suspend fun start() {}
-
-  override fun close() {}
-}
-
 private val TONIGHT = Instant.parse("2026-10-01T23:00:00Z")
 private const val GIB = 1L shl 30
 private const val MIB = 1L shl 20
-
-private fun task(
-  id: String,
-  url: String,
-  state: DownloadState,
-  ago: Duration,
-  segments: List<Segment> = emptyList(),
-  connections: Int = 0,
-  priority: DownloadPriority = DownloadPriority.NORMAL,
-  speedLimit: SpeedLimit = SpeedLimit.Unlimited,
-  dir: String = ShowcaseData.STUDIO_DIR,
-): ListTestTask = ListTestTask(
-  taskId = id,
-  state = state,
-  request = DownloadRequest(
-    url = url,
-    destination = Destination("$dir/"),
-    connections = connections,
-    priority = priority,
-    speedLimit = speedLimit,
-  ),
-  createdAt = SampleData.NOW - ago,
-  segments = segments,
-)
-
-/** A segmented HTTP download whose segment `i` is `lanes[i]` done. */
-private fun downloading(
-  id: String,
-  url: String,
-  total: Long,
-  speed: Long,
-  lanes: List<Double>,
-  ago: Duration,
-  priority: DownloadPriority = DownloadPriority.NORMAL,
-  dir: String = ShowcaseData.STUDIO_DIR,
-): ListTestTask {
-  val segments = lanes(total, lanes)
-  val progress = DownloadProgress(segments.sumOf { it.downloadedBytes }, total, speed)
-  return task(
-    id = id,
-    url = url,
-    state = DownloadState.Downloading(progress),
-    ago = ago,
-    segments = segments,
-    connections = lanes.size,
-    priority = priority,
-    dir = dir,
-  )
-}
-
-private fun completed(
-  id: String,
-  url: String,
-  total: Long,
-  time: Duration,
-  ago: Duration,
-  dir: String = ShowcaseData.STUDIO_DIR,
-) = task(
-  id = id,
-  url = url,
-  state = DownloadState.Completed(
-    outputPath = "$dir/${extractFilename(url)}",
-    totalBytes = total,
-    downloadTime = time,
-  ),
-  ago = ago,
-  dir = dir,
-)
-
-/** [total] bytes split evenly into one segment per entry of [done], each that much done. */
-private fun lanes(total: Long, done: List<Double>): List<Segment> {
-  val size = total / done.size
-  return done.mapIndexed { index, fraction ->
-    val start = index * size
-    val end = if (index == done.lastIndex) total - 1 else start + size - 1
-    Segment(index, start, end, ((end - start + 1) * fraction).toLong())
-  }
-}

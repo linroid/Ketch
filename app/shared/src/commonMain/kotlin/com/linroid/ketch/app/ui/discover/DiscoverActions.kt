@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.discover
 
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.joinText
@@ -14,20 +13,16 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.CandidateAddResult
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
-import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.state.deviceId
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_review
 import ketch.app.shared.generated.resources.action_show
-import ketch.app.shared.generated.resources.action_undo
 import ketch.app.shared.generated.resources.count_downloads
-import ketch.app.shared.generated.resources.feedback_undo_add
 import ketch.app.shared.generated.resources.intake_add_failed
 import ketch.app.shared.generated.resources.intake_added_failed
 import ketch.app.shared.generated.resources.intake_added_here
 import ketch.app.shared.generated.resources.intake_added_to
 import kotlinx.coroutines.Job
-import kotlin.time.Duration.Companion.seconds
 
 private val log = KetchLogger("DiscoverScreen")
 
@@ -92,14 +87,7 @@ private fun AppState.reportDiscovered(
     )
     return
   }
-  val undoTitle = Res.string.feedback_undo_add.text()
-  val op = pendingOps.register(undoTitle, timeout = ADD_UNDO_WINDOW, undo = {
-    tasks.forEach { task ->
-      catchingUnlessCancelled { task.remove(deleteFiles = true) }.onFailure { e ->
-        log.w { "Couldn't undo the add of taskId=${task.taskId}: ${e.describeCauses()}" }
-      }
-    }
-  })
+  val undo = undoAddAction(tasks, log)
   // Under All devices the target may show already; switching to it would hide the others.
   val shown = target in shownInstances.value
   val single = tasks.singleOrNull()?.takeIf { failed.isEmpty() }
@@ -126,10 +114,7 @@ private fun AppState.reportDiscovered(
     detail = firstError?.message?.let(::verbatim),
     taskKey = key,
     deviceId = target.deviceId,
-    actions = listOf(
-      review ?: show,
-      MessageAction(Res.string.action_undo.text()) { pendingOps.undo(op.id) }
-    ),
+    actions = listOf(review ?: show, undo),
     cause = firstError,
   )
 }
@@ -137,5 +122,3 @@ private fun AppState.reportDiscovered(
 /** The name a result is saved under, as messages and rows show it. */
 internal fun candidateName(candidate: AiCandidate): String =
   candidate.fileName?.takeIf { it.isNotBlank() } ?: candidate.title.ifBlank { candidate.url }
-
-private val ADD_UNDO_WINDOW = 8.seconds

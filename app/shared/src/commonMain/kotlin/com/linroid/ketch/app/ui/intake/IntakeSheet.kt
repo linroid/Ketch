@@ -24,10 +24,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
@@ -52,11 +50,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.app.components.KetchBottomSheet
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDialogDefaults
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.rememberKetchSheetState
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
@@ -400,24 +400,14 @@ private fun PhoneSheet(
   windowHeight: Dp,
   listRows: Int,
 ) {
-  val colors = KetchTheme.colors
   val session = actions.session
   // The sheet state is keyed on this lambda, so it must stay the same one.
   val confirmChange = remember(session) {
     { value: SheetValue -> value != SheetValue.Hidden || session.requestClose() }
   }
-  val sheetState = rememberBottomSheetState(
-    initialValue = SheetValue.Hidden,
-    enabledValues = SheetValues,
-    confirmValueChange = confirmChange,
-  )
-  ModalBottomSheet(
+  KetchBottomSheet(
     onDismissRequest = actions::discardAndClose,
-    sheetState = sheetState,
-    shape = KetchTheme.shapes.sheetTop,
-    containerColor = colors.surfaceRaised,
-    contentColor = colors.textPrimary,
-    scrimColor = colors.scrim,
+    sheetState = rememberKetchSheetState(confirmChange),
   ) {
     // Empty, the sheet is only as tall as its input; it takes the screen once links are in.
     val full = session.showsOptions || session.confirmingClose
@@ -621,10 +611,7 @@ private fun DiscoverOffer(actions: IntakeActions, query: String) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(spacing.s3),
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(KetchElevationLevel.E0, KetchTheme.shapes.lg, colors.surface, colors.hairline)
-      .padding(horizontal = spacing.s3, vertical = spacing.s2),
+    modifier = Modifier.intakeCard().padding(horizontal = spacing.s3, vertical = spacing.s2),
   ) {
     KetchIconImage(KetchIcon.Discover, size = KetchTheme.density.controlGlyph, tint = colors.accent)
     Text(
@@ -676,15 +663,7 @@ private fun EditBody(actions: IntakeActions) {
   // Changing options is all this sheet does, so they show in place rather than in a popover.
   OptionsPanel(
     session = session,
-    modifier = Modifier
-      .fillMaxWidth()
-      .ketchSurface(
-        KetchElevationLevel.E0,
-        KetchTheme.shapes.lg,
-        KetchTheme.colors.surface,
-        KetchTheme.colors.hairline,
-      )
-      .padding(KetchTheme.spacing.s4),
+    modifier = Modifier.intakeCard().padding(KetchTheme.spacing.s4),
   )
 }
 
@@ -818,16 +797,13 @@ private fun handleSheetKey(
       true
     }
     else -> {
-      val number = (1..9).firstOrNull { command == KetchCommands.intakeTarget(it) }
+      val number = command?.let(KetchCommands::intakeTargetNumber)
       val target = number?.let { session.instances.value.getOrNull(it - 1) }
       if (target != null) session.selectTarget(target)
       target != null
     }
   }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-private val SheetValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
 
 /** Handles ↩ and ⌥↩ in the input before the field types a line break; ⇧↩ types one. */
 internal fun handleInputKey(

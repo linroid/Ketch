@@ -11,22 +11,17 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.DeviceScope
-import com.linroid.ketch.app.instance.InstanceEntry
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
-import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.ui.downloads.actions.FakeFileActions
-import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.app.ui.shell.Fleet
+import com.linroid.ketch.app.ui.shell.fleet
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -77,43 +72,16 @@ class AllDevicesTest {
     }
   }
 
-  /** This Mac and a connected NAS, with the app over them. */
-  private class Fleet(scope: TestScope) {
-    val mac = ResolvingApi(RecordingKetchApi("This Mac"))
-    val nas = ResolvingApi(RecordingKetchApi("NAS"))
-    val manager = InstanceManager(
-      factory = InstanceFactory(
-        deviceName = "This Mac",
-        embeddedFactory = { mac },
-        remoteFactory = { config ->
-          RemoteInstance(nas, config, MutableStateFlow(ConnectionState.Connected))
-        },
-      ),
-      initialRemotes = listOf(RemoteConfig(host = "nas.local", name = "NAS")),
-      context = scope.backgroundScope.coroutineContext,
-    )
-    // A child of the background scope, so a failed test never leaves its loops running.
-    val controller = AppController(
-      instanceManager = manager,
-      context = scope.backgroundScope.coroutineContext +
-        SupervisorJob(scope.backgroundScope.coroutineContext[Job]),
-      clock = ListFixtures.clock(scope),
-    )
-    val state: AppState get() = controller.state
-    val local: InstanceEntry get() = manager.instances.value.first()
-    val remote: InstanceEntry get() = manager.instances.value.last()
+  private fun TestScope.fleet() =
+    fleet(ResolvingApi(RecordingKetchApi("This Mac")), ResolvingApi(RecordingKetchApi("NAS")))
 
-    fun messages(): List<AppMessage> = controller.messages.history.value
-  }
+  private fun Fleet<*>.messages(): List<AppMessage> = controller.messages.history.value
 
-  private fun TestScope.fleet(): Fleet = Fleet(this).also {
-    runCurrent()
-    advanceTimeBy(1.seconds)
-  }
+  private fun fleetTest(block: suspend TestScope.(Fleet<ResolvingApi>) -> Unit) =
+    fixtureTest({ fleet() }, { it.controller.close() }, block)
 
   @Test
-  fun showAllDevices_twoDevices_listsTheTasksOfBoth() = runTest {
-    val fleet = fleet()
+  fun showAllDevices_twoDevices_listsTheTasksOfBoth() = fleetTest { fleet ->
     val here = fleet.mac.recording.add(downloading)
     val there = fleet.nas.recording.add(DownloadState.Paused(RecordingTask.PROGRESS))
     advanceTimeBy(1.seconds)
@@ -127,7 +95,6 @@ class AllDevicesTest {
     val pulse = fleet.state.pulse.state.value
     assertTrue(pulse.allDevices)
     assertEquals(PulseCounts(downloading = 1, paused = 1), pulse.counts)
-    fleet.controller.close()
   }
 
   @Test
@@ -161,19 +128,16 @@ class AllDevicesTest {
   }
 
   @Test
-  fun showAllDevices_oneDevice_keepsShowingIt() = runTest {
-    val fleet = fleet()
+  fun showAllDevices_oneDevice_keepsShowingIt() = fleetTest { fleet ->
     fleet.manager.removeInstance(fleet.remote)
     runCurrent()
 
     assertTrue(!fleet.state.showAllDevices())
     assertEquals(DeviceScope.Single(LOCAL_DEVICE_ID), fleet.state.deviceScope.value)
-    fleet.controller.close()
   }
 
   @Test
-  fun taskCommand_nasTaskUnderAllDevices_callsTheNasApi() = runTest {
-    val fleet = fleet()
+  fun taskCommand_nasTaskUnderAllDevices_callsTheNasApi() = fleetTest { fleet ->
     fleet.mac.recording.add(downloading)
     val task = fleet.nas.recording.add(downloading)
     fleet.state.showAllDevices()
@@ -185,12 +149,10 @@ class AllDevicesTest {
 
     assertEquals(listOf("pause"), task.calls)
     assertEquals(fleet.remote, fleet.state.deviceOf(shown))
-    fleet.controller.close()
   }
 
   @Test
-  fun tasksOf_keysOfTwoDevices_findsEachOnItsDevice() = runTest {
-    val fleet = fleet()
+  fun tasksOf_keysOfTwoDevices_findsEachOnItsDevice() = fleetTest { fleet ->
     val here = fleet.mac.recording.add(downloading)
     val there = fleet.nas.recording.add(downloading)
 
@@ -203,12 +165,10 @@ class AllDevicesTest {
     val tasks = fleet.state.tasksOf(keys)
 
     assertEquals(listOf<DownloadTask>(there, here), tasks)
-    fleet.controller.close()
   }
 
   @Test
-  fun clearMissing_allDevices_leavesTheRemoteDevicesTasksAlone() = runTest {
-    val fleet = fleet()
+  fun clearMissing_allDevices_leavesTheRemoteDevicesTasksAlone() = fleetTest { fleet ->
     val gone = DownloadState.Completed("/downloads/a.iso", totalBytes = 100)
     val here = fleet.mac.recording.add(gone)
     val there = fleet.nas.recording.add(gone)
@@ -222,12 +182,10 @@ class AllDevicesTest {
     assertEquals(listOf("remove deleteFiles=false"), here.calls)
     assertTrue(there.calls.isEmpty())
     assertEquals(listOf<DownloadTask>(there), fleet.state.tasks.value)
-    fleet.controller.close()
   }
 
   @Test
-  fun pauseAll_allDevices_pausesEveryDeviceInOneMessage() = runTest {
-    val fleet = fleet()
+  fun pauseAll_allDevices_pausesEveryDeviceInOneMessage() = fleetTest { fleet ->
     val here = fleet.mac.recording.add(downloading)
     val there = fleet.nas.recording.add(downloading)
     fleet.state.showAllDevices()
@@ -239,12 +197,10 @@ class AllDevicesTest {
     assertEquals(listOf("pause"), here.calls)
     assertEquals(listOf("pause"), there.calls)
     assertEquals("Paused 2 downloads on 2 devices", fleet.messages().first().title.load())
-    fleet.controller.close()
   }
 
   @Test
-  fun pauseAll_oneDeviceShown_leavesTheOtherAlone() = runTest {
-    val fleet = fleet()
+  fun pauseAll_oneDeviceShown_leavesTheOtherAlone() = fleetTest { fleet ->
     val here = fleet.mac.recording.add(downloading)
     val there = fleet.nas.recording.add(downloading)
 
@@ -254,12 +210,10 @@ class AllDevicesTest {
     assertEquals(listOf("pause"), here.calls)
     assertTrue(there.calls.isEmpty())
     assertEquals("Paused 1 download", fleet.messages().first().title.load())
-    fleet.controller.close()
   }
 
   @Test
-  fun switchInstance_activeDeviceUnderAllDevices_showsItAlone() = runTest {
-    val fleet = fleet()
+  fun switchInstance_activeDeviceUnderAllDevices_showsItAlone() = fleetTest { fleet ->
     fleet.state.showAllDevices()
     runCurrent()
 
@@ -268,12 +222,10 @@ class AllDevicesTest {
 
     assertEquals(DeviceScope.Single(LOCAL_DEVICE_ID), fleet.state.deviceScope.value)
     assertEquals(listOf(fleet.local), fleet.state.shownInstances.value)
-    fleet.controller.close()
   }
 
   @Test
-  fun sendTo_cookiesToARemoteDevice_asksFirstAndThenSendsTheHeaders() = runTest {
-    val fleet = fleet()
+  fun sendTo_cookiesToARemoteDevice_asksFirstAndThenSendsTheHeaders() = fleetTest { fleet ->
     val headers = mapOf("Cookie" to "session=1", "Referer" to "https://example.com/")
     val task = fleet.mac.recording.add(
       DownloadState.Paused(RecordingTask.PROGRESS),
@@ -295,12 +247,10 @@ class AllDevicesTest {
     assertNull(fleet.state.sendConfirmation)
     assertEquals(headers, fleet.nas.recording.requests.single().headers)
     assertEquals("Sent ubuntu.iso to NAS", fleet.messages().first().title.load())
-    fleet.controller.close()
   }
 
   @Test
-  fun sendTo_noCredentials_sendsAtOnce() = runTest {
-    val fleet = fleet()
+  fun sendTo_noCredentials_sendsAtOnce() = fleetTest { fleet ->
     val task = fleet.mac.recording.add(
       DownloadState.Paused(RecordingTask.PROGRESS),
       DownloadRequest("https://example.com/a.iso", headers = mapOf("Referer" to "https://x/")),
@@ -311,12 +261,10 @@ class AllDevicesTest {
 
     assertNull(fleet.state.sendConfirmation)
     assertEquals(1, fleet.nas.recording.requests.size)
-    fleet.controller.close()
   }
 
   @Test
-  fun sendTo_move_removesTheOriginalsOnceTheUndoWindowEnds() = runTest {
-    val fleet = fleet()
+  fun sendTo_move_removesTheOriginalsOnceTheUndoWindowEnds() = fleetTest { fleet ->
     val partial = fleet.mac.recording.add(DownloadState.Paused(RecordingTask.PROGRESS))
     val finished = fleet.mac.recording.add(DownloadState.Completed("/downloads/a.iso"))
 
@@ -329,12 +277,10 @@ class AllDevicesTest {
     assertEquals(listOf("remove deleteFiles=true"), partial.calls)
     assertEquals(listOf("remove deleteFiles=false"), finished.calls)
     assertEquals(2, fleet.nas.recording.requests.size)
-    fleet.controller.close()
   }
 
   @Test
-  fun sendTo_tasksAlreadyOnTheTarget_sendsNothing() = runTest {
-    val fleet = fleet()
+  fun sendTo_tasksAlreadyOnTheTarget_sendsNothing() = fleetTest { fleet ->
     val there = fleet.nas.recording.add(DownloadState.Paused(RecordingTask.PROGRESS))
 
     fleet.state.sendTo(listOf(there), fleet.remote)
@@ -342,12 +288,10 @@ class AllDevicesTest {
 
     assertTrue(fleet.nas.recording.requests.isEmpty())
     assertTrue(fleet.messages().isEmpty())
-    fleet.controller.close()
   }
 
   @Test
-  fun sendTo_showUnderAllDevices_inspectsTheCopyWithoutLeavingAllDevices() = runTest {
-    val fleet = fleet()
+  fun sendTo_showUnderAllDevices_inspectsTheCopyWithoutLeavingAllDevices() = fleetTest { fleet ->
     val task = fleet.mac.recording.add(DownloadState.Paused(RecordingTask.PROGRESS))
     fleet.state.showAllDevices()
     runCurrent()
@@ -360,7 +304,6 @@ class AllDevicesTest {
     assertEquals(DeviceScope.All, fleet.state.deviceScope.value)
     val copy = fleet.nas.recording.tasks.value.single()
     assertEquals(TaskKey(NAS_ID, copy.taskId), fleet.state.inspectedTask)
-    fleet.controller.close()
   }
 
   @Test
@@ -378,8 +321,7 @@ class AllDevicesTest {
   }
 
   @Test
-  fun intake_targetedAtTheNas_resolvesThroughTheNas() = runTest {
-    val fleet = fleet()
+  fun intake_targetedAtTheNas_resolvesThroughTheNas() = fleetTest { fleet ->
     val request = IntakeRequest(
       text = "https://example.com/ubuntu.iso",
       targetDeviceId = fleet.remote.deviceId,
@@ -392,12 +334,10 @@ class AllDevicesTest {
     assertEquals(listOf("https://example.com/ubuntu.iso"), fleet.nas.resolved)
     assertTrue(fleet.mac.resolved.isEmpty())
     fleet.state.intake.release(session)
-    fleet.controller.close()
   }
 
   @Test
-  fun intake_magnetSentToTheNas_sendsTheNextMagnetThereToo() = runTest {
-    val fleet = fleet()
+  fun intake_magnetSentToTheNas_sendsTheNextMagnetThereToo() = fleetTest { fleet ->
     val first = fleet.state.intake.start(IntakeRequest(text = magnet))
     runCurrent()
     assertEquals(fleet.local, first.target)
@@ -412,12 +352,10 @@ class AllDevicesTest {
     assertEquals(fleet.local, links.target)
     fleet.state.intake.release(magnets)
     fleet.state.intake.release(links)
-    fleet.controller.close()
   }
 
   @Test
-  fun intake_linkAfterAMagnetSentToTheNas_goesBackToTheActiveDevice() = runTest {
-    val fleet = fleet()
+  fun intake_linkAfterAMagnetSentToTheNas_goesBackToTheActiveDevice() = fleetTest { fleet ->
     fleet.state.rememberTarget(IntakeKind.Torrents, fleet.remote)
     val session = fleet.state.intake.start(IntakeRequest(text = magnet))
     runCurrent()
@@ -428,7 +366,6 @@ class AllDevicesTest {
 
     assertEquals(fleet.local, session.target)
     fleet.state.intake.release(session)
-    fleet.controller.close()
   }
 
   @Test
@@ -440,8 +377,7 @@ class AllDevicesTest {
   }
 
   @Test
-  fun quickAddTarget_allDevices_isTheLastLinkTarget() = runTest {
-    val fleet = fleet()
+  fun quickAddTarget_allDevices_isTheLastLinkTarget() = fleetTest { fleet ->
     fleet.state.rememberTarget(IntakeKind.Links, fleet.remote)
     assertEquals(fleet.local, fleet.state.quickAddTarget())
 
@@ -449,12 +385,10 @@ class AllDevicesTest {
     runCurrent()
 
     assertEquals(fleet.remote, fleet.state.quickAddTarget())
-    fleet.controller.close()
   }
 
   @Test
-  fun redownload_severalTasks_postsOneMessage() = runTest {
-    val fleet = fleet()
+  fun redownload_severalTasks_postsOneMessage() = fleetTest { fleet ->
     val tasks = List(3) { fleet.mac.recording.add(DownloadState.Canceled) }
 
     fleet.state.redownload(tasks)
@@ -463,12 +397,10 @@ class AllDevicesTest {
     assertTrue(tasks.all { it.calls == listOf("remove deleteFiles=true") })
     assertEquals(3, fleet.mac.recording.requests.size)
     assertEquals(listOf("Restarted 3 downloads"), fleet.messages().map { it.title }.load())
-    fleet.controller.close()
   }
 
   @Test
-  fun redownload_addFails_tryAgainAddsTheRequestAgain() = runTest {
-    val fleet = fleet()
+  fun redownload_addFails_tryAgainAddsTheRequestAgain() = fleetTest { fleet ->
     var failing = true
     fleet.mac.recording.downloadFailure = {
       if (failing) IllegalStateException("Connection lost") else null
@@ -490,12 +422,10 @@ class AllDevicesTest {
 
     assertEquals(listOf("remove deleteFiles=true"), task.calls)
     assertEquals("https://example.com/ubuntu.iso", fleet.mac.recording.requests.single().url)
-    fleet.controller.close()
   }
 
   @Test
-  fun startNow_severalTasks_postsOneMessageWithOneUndo() = runTest {
-    val fleet = fleet()
+  fun startNow_severalTasks_postsOneMessageWithOneUndo() = fleetTest { fleet ->
     val tasks = List(2) { fleet.mac.recording.add(DownloadState.Queued) }
 
     fleet.state.startNow(tasks)
@@ -507,12 +437,10 @@ class AllDevicesTest {
     message.actions.single { it.label.load() == "Undo" }.onClick()
     runCurrent()
     assertTrue(tasks.all { it.request.priority == DownloadPriority.NORMAL })
-    fleet.controller.close()
   }
 
   @Test
-  fun retryFailed_allDevices_retriesEveryDevice() = runTest {
-    val fleet = fleet()
+  fun retryFailed_allDevices_retriesEveryDevice() = fleetTest { fleet ->
     val here = fleet.mac.recording.add(DownloadState.Failed(KetchError.Network()))
     val there = fleet.nas.recording.add(DownloadState.Failed(KetchError.Network()))
     fleet.state.showAllDevices()
@@ -524,7 +452,6 @@ class AllDevicesTest {
     assertEquals(listOf("resume"), here.calls)
     assertEquals(listOf("resume"), there.calls)
     assertEquals("Retrying 2 downloads on 2 devices", fleet.messages().first().title.load())
-    fleet.controller.close()
   }
 }
 

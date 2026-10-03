@@ -462,9 +462,7 @@ internal fun Modifier.onMenuKey(onMenu: () -> Unit): Modifier = onKeyEvent { eve
 
 /** The chord that switches to the device listed [number]th, or `null` past the ninth. */
 internal fun deviceShortcut(number: Int): String? =
-  if (number in 1..MAX_DEVICE_SHORTCUTS) KetchCommands.device(number).shortcutLabel() else null
-
-private const val MAX_DEVICE_SHORTCUTS = 9
+  KetchCommands.deviceOrNull(number)?.shortcutLabel()
 
 private const val MAX_CLUSTERED = 3
 

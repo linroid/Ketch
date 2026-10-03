@@ -2,16 +2,12 @@ package com.linroid.ketch.app.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -123,7 +119,6 @@ fun LaneStrip(
     progress = state.laneProgress(),
     modifier = modifier,
     height = height,
-    heads = phase == LanePhase.Downloading,
     highlight = highlight,
     stalled = stalled,
     onCompletionShown = onCompletionShown,
@@ -164,8 +159,8 @@ private fun DownloadState.laneProgress(): DownloadProgress? = when (this) {
 }
 
 /**
- * The strip behind [LaneStrip], also drawn by the older segment components. A single connection's
- * own lane is one segment moved to start at byte 0, with no [progress].
+ * The strip behind [LaneStrip], also drawn by the inspector's Connections and Files tabs. A
+ * single connection's own lane is one segment moved to start at byte 0, with no [progress].
  *
  * @param heads whether unfinished segments carry write heads.
  */
@@ -222,16 +217,7 @@ internal fun LaneStripCanvas(
 
   val indeterminate = segments.isEmpty() && (progress == null || progress.totalBytes <= 0)
   val shimmering = indeterminate && phase == LanePhase.Downloading && !motion.reduced
-  val shimmer: State<Float>? = if (shimmering) {
-    rememberInfiniteTransition(label = "laneShimmer").animateFloat(
-      initialValue = 0f,
-      targetValue = 1f,
-      animationSpec = infiniteRepeatable(tween(SHIMMER_MILLIS, easing = LinearEasing)),
-      label = "laneShimmer",
-    )
-  } else {
-    null
-  }
+  val shimmer = if (shimmering) rememberLoop(SHIMMER_MILLIS, "laneShimmer") else null
   val description = remember(segments, progress, phase, stalled) {
     laneStripDescription(segments, progress, phase, stalled.size)
   }.resolve()
@@ -300,7 +286,7 @@ private class LaneFrame {
   var highlight: Long = 0L
 
   /** Where segment [i] begins. */
-  fun start(i: Int): Float = lerp(layout.startsFrom[i], layout.starts[i], reseg)
+  fun start(i: Int): Float = between(layout.startsFrom[i], layout.starts[i], reseg)
 
   /** Length of segment [i]'s downloaded part, as a fraction of the file. */
   fun filled(i: Int): Float {
@@ -533,7 +519,7 @@ internal class LaneLayout(
   val resegmented: Boolean,
 ) {
   /** Where segment [i]'s downloaded part is drawn [glide] of the way through the glide. */
-  fun displayedFill(i: Int, glide: Float): Float = lerp(fillsFrom[i], fills[i], glide)
+  fun displayedFill(i: Int, glide: Float): Float = between(fillsFrom[i], fills[i], glide)
 
   companion object {
     /** A strip with nothing to draw: no segments, and no size. */
@@ -636,7 +622,7 @@ internal fun laneLayout(
       val match = matches[i]
       if (match < 0 || newSeams[i]) continue
       if (resegmented) {
-        startsFrom[i] = lerp(previous.startsFrom[match], previous.starts[match], reseg)
+        startsFrom[i] = between(previous.startsFrom[match], previous.starts[match], reseg)
       } else {
         startsFrom[i] = previous.startsFrom[match]
         newSeams[i] = seams[i] && previous.newSeams[match]
@@ -753,8 +739,8 @@ private fun LongArray.indexOfKey(key: Long): Int {
   return -(low + 1)
 }
 
-private fun lerp(start: Float, stop: Float, fraction: Float): Float =
-  start + (stop - start) * fraction
+/** The value [fraction] of the way from [from] to [to]. */
+internal fun between(from: Float, to: Float, fraction: Float): Float = from + (to - from) * fraction
 
 private const val SEAM_FLASH_MILLIS = 400
 private const val SHIMMER_MILLIS = 1200

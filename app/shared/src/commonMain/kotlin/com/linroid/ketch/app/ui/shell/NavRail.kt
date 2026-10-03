@@ -97,20 +97,18 @@ import org.jetbrains.compose.resources.stringResource
  * downloading. Each device's pennant switches to it, opens its menu on a right click or a long
  * press, and takes links, files and rows dragged onto it.
  *
+ * The destination [shell] shows, or Settings while it shows, is selected.
+ *
  * @param showSidebarToggle whether the window is wide enough to expand the sidebar again.
  */
 @Composable
 internal fun NavRail(
-  state: AppState,
+  shell: ShellState,
   destinations: List<AppDestination>,
-  destination: AppDestination,
-  settingsSelected: Boolean,
   showSidebarToggle: Boolean,
-  onSelect: (AppDestination) -> Unit,
-  onOpenSettings: () -> Unit,
-  onToggleSidebar: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val state = shell.app
   val spacing = KetchTheme.spacing
   val chrome = KetchTheme.windowChrome
   val pulse by state.pulse.state.collectAsState()
@@ -127,7 +125,7 @@ internal fun NavRail(
     if (showSidebarToggle) {
       KetchIconButton(
         icon = KetchIcon.Sidebar,
-        onClick = onToggleSidebar,
+        onClick = { shell.toggleSidebar() },
         size = KetchButtonSize.Small,
         contentDescription = stringResource(Res.string.shell_show_sidebar),
         shortcut = KetchCommands.ToggleSidebar.shortcutLabel(),
@@ -144,9 +142,9 @@ internal fun NavRail(
           label = entry.label.resolve(),
           icon = entry.icon,
           shortcut = entry.command.shortcutLabel(),
-          selected = entry == destination && !settingsSelected,
+          selected = entry == shell.destination && !shell.settingsOpen,
           badge = if (entry == AppDestination.Downloads) pulse.counts.downloading else 0,
-          onClick = { onSelect(entry) },
+          onClick = { shell.show(entry) },
         )
       }
     }
@@ -182,9 +180,9 @@ internal fun NavRail(
       label = stringResource(Res.string.shell_settings),
       icon = KetchIcon.Settings,
       shortcut = KetchCommands.Settings.shortcutLabel(),
-      selected = settingsSelected,
+      selected = shell.settingsOpen,
       badge = 0,
-      onClick = onOpenSettings,
+      onClick = { state.openSettings() },
       modifier = Modifier.padding(bottom = spacing.s3),
     )
   }

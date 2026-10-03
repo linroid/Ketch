@@ -39,6 +39,7 @@ import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
 import com.linroid.ketch.app.ui.settings.SettingsHost
 import ketch.app.desktop.generated.resources.Res
@@ -196,7 +197,7 @@ internal fun SettingsWindow(
       if (focused) withContext(Dispatchers.IO) { integration.refresh() }
     }
     val appSettings = controller.appSettings
-    val darkTheme = appSettings.isDarkTheme()
+    val darkTheme = appSettings.themeMode.isDark()
     MacTitleBar(fullWindowContent = false, darkTheme = darkTheme)
     val systemReducesMotion = rememberReduceMotion()
     CompositionLocalProvider(

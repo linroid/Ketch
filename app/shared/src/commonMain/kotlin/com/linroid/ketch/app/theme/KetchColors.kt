@@ -4,10 +4,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
-import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
-import com.linroid.ketch.remote.ConnectionState
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_accent_beacon
 import ketch.app.shared.generated.resources.settings_accent_fathom
@@ -103,21 +101,6 @@ data class KetchColors(
     for (char in deviceId) hash = 31 * hash + char.code
     return deviceHues[hash.mod(deviceHues.size)]
   }
-
-  /** Tint of [hue] for chips and chart bands. */
-  fun deviceTint(hue: FileTypeHue): Color {
-    return if (isDark) hue.dark.copy(alpha = 0.16f) else hue.light.copy(alpha = 0.13f)
-  }
-
-  /**
-   * Health of a device's connection [state], or of the embedded device when it is `null`.
-   * Pennant rings, connection dots and the Pulse bar badge all use it.
-   */
-  fun healthColor(state: ConnectionState?): Color = when (state) {
-    null, is ConnectionState.Connected -> status.completed.color
-    is ConnectionState.Connecting -> status.paused.color
-    is ConnectionState.Disconnected, is ConnectionState.Unauthorized -> status.failed.color
-  }
 }
 
 /**
@@ -158,20 +141,7 @@ data class KetchStatusColors(
   val failed: KetchStatusColor,
   val canceled: KetchStatusColor,
   val seeding: KetchStatusColor,
-) {
-  /** Colors of [state]. */
-  fun forState(state: DownloadState): KetchStatusColor {
-    return when (state) {
-      is DownloadState.Downloading -> downloading
-      is DownloadState.Queued -> queued
-      is DownloadState.Scheduled -> scheduled
-      is DownloadState.Paused -> paused
-      is DownloadState.Completed -> completed
-      is DownloadState.Failed -> failed
-      is DownloadState.Canceled -> canceled
-    }
-  }
-}
+)
 
 /** Accent palettes, chosen in Settings → General → Accent. */
 enum class KetchAccent(private val nameResource: StringResource) {
@@ -196,112 +166,6 @@ internal object KetchPalette {
   val DeviceHues = listOf(
     FileTypeHue.Sky, FileTypeHue.Teal, FileTypeHue.Magenta, FileTypeHue.Lime,
     FileTypeHue.Orange, FileTypeHue.Slate, FileTypeHue.Jade, FileTypeHue.Brown,
-  )
-
-  class Neutrals(
-    val canvas: Color,
-    val wash: KetchWash,
-    val surface: Color,
-    val surfaceRaised: Color,
-    val surfaceSunken: Color,
-    val surfaceHover: Color,
-    val surfacePressed: Color,
-    val sidebarItemSelected: Color,
-    val sidebarItemHover: Color,
-    val hairline: Color,
-    val borderStrong: Color,
-    val divider: Color,
-    val scrim: Color,
-    val inverseSurface: Color,
-    val inverseOnSurface: Color,
-    val textPrimary: Color,
-    val textSecondary: Color,
-    val textTertiary: Color,
-    val textDisabled: Color,
-    val dangerFill: Color,
-    val queued: Color,
-    val scheduled: Color,
-    val paused: Color,
-    val completed: Color,
-    val failed: Color,
-    val seeding: Color,
-    val selectedAlpha: Float,
-    val selectedFocusedAlpha: Float,
-    val hoverOverlay: Color,
-  )
-
-  val Light = Neutrals(
-    canvas = Color(0xFFEEF1F8),
-    wash = KetchWash(
-      start = Color(0xFFE9EEFC),
-      mid = Color(0xFFF1F0FA),
-      end = Color(0xFFFBF0EA),
-      ember = Color(0xFFFFD9C2).copy(alpha = 0.35f),
-    ),
-    surface = Color(0xFFFFFFFF),
-    surfaceRaised = Color(0xFFFFFFFF),
-    surfaceSunken = Color(0xFFF4F6FA),
-    surfaceHover = Color(0xFFF1F3F8),
-    surfacePressed = Color(0xFFE9ECF3),
-    sidebarItemSelected = Color.White.copy(alpha = 0.72f),
-    sidebarItemHover = Color.White.copy(alpha = 0.45f),
-    hairline = Color(0xFFE2E6EE),
-    borderStrong = Color(0xFFC9D0DC),
-    divider = Color(0xFFEDF0F4),
-    scrim = ScrimInk.copy(alpha = 0.32f),
-    inverseSurface = Ink,
-    inverseOnSurface = Color(0xFFF4F6FA),
-    textPrimary = Ink,
-    textSecondary = Color(0xFF4B5466),
-    textTertiary = Color(0xFF667080),
-    textDisabled = Color(0xFFA3AAB7),
-    dangerFill = Color(0xFFC8344A),
-    queued = Color(0xFF646D7E),
-    scheduled = Color(0xFF6E4FE0),
-    paused = Color(0xFF965700),
-    completed = Color(0xFF1B7540),
-    failed = Color(0xFFBE2F44),
-    seeding = Color(0xFF00747F),
-    selectedAlpha = 0.10f,
-    selectedFocusedAlpha = 0.15f,
-    hoverOverlay = Color.Black.copy(alpha = 0.08f),
-  )
-
-  val Dark = Neutrals(
-    canvas = Color(0xFF0C0E13),
-    wash = KetchWash(
-      start = Color(0xFF151A33),
-      mid = Color(0xFF0E1016),
-      end = Color(0xFF1C1310),
-      ember = EmberEnd.copy(alpha = 0.10f),
-    ),
-    surface = Color(0xFF16181D),
-    surfaceRaised = Color(0xFF1E2128),
-    surfaceSunken = Color(0xFF101217),
-    surfaceHover = Color(0xFF1F232A),
-    surfacePressed = Color(0xFF272B33),
-    sidebarItemSelected = Color.White.copy(alpha = 0.08f),
-    sidebarItemHover = Color.White.copy(alpha = 0.05f),
-    hairline = Color(0xFF2A2E37),
-    borderStrong = Color(0xFF3A404C),
-    divider = Color(0xFF22252C),
-    scrim = ScrimInk.copy(alpha = 0.56f),
-    inverseSurface = Color(0xFFEEF0F4),
-    inverseOnSurface = Ink,
-    textPrimary = Color(0xFFEEF0F4),
-    textSecondary = Color(0xFFAEB4C0),
-    textTertiary = Color(0xFF858D9C),
-    textDisabled = Color(0xFF565D6A),
-    dangerFill = Color(0xFFD2353F),
-    queued = Color(0xFF8C94A3),
-    scheduled = Color(0xFFA891FF),
-    paused = Color(0xFFE8A93F),
-    completed = Color(0xFF45C27A),
-    failed = Color(0xFFFF6B6B),
-    seeding = Color(0xFF4FD1DB),
-    selectedAlpha = 0.16f,
-    selectedFocusedAlpha = 0.24f,
-    hoverOverlay = Color.White.copy(alpha = 0.08f),
   )
 
   class AccentTone(val fill: Color, val text: Color, val soft: Color)
@@ -360,62 +224,79 @@ enum class FileTypeHue(val light: Color, val dark: Color) {
 
 /** Light theme colors with [accent]. */
 fun lightKetchColors(accent: KetchAccent = KetchAccent.Signal): KetchColors =
-  ketchColors(accent, dark = false)
+  ketchColors(accent, isDark = false)
 
 /** Dark theme colors with [accent]. */
 fun darkKetchColors(accent: KetchAccent = KetchAccent.Signal): KetchColors =
-  ketchColors(accent, dark = true)
+  ketchColors(accent, isDark = true)
 
-private fun ketchColors(accent: KetchAccent, dark: Boolean): KetchColors {
-  val n = if (dark) KetchPalette.Dark else KetchPalette.Light
-  val tone = KetchPalette.accentTone(accent, dark)
-  val inverseTone = KetchPalette.accentTone(accent, !dark)
+/** The colors of [accent]; each neutral is written as `pick(light, dark)`. */
+private fun ketchColors(accent: KetchAccent, isDark: Boolean): KetchColors {
+  fun <T> pick(light: T, dark: T): T = if (isDark) dark else light
+  val tone = KetchPalette.accentTone(accent, isDark)
+  val inverseTone = KetchPalette.accentTone(accent, !isDark)
+  val surface = pick(Color(0xFFFFFFFF), Color(0xFF16181D))
+  val surfaceSunken = pick(Color(0xFFF4F6FA), Color(0xFF101217))
+  val textTertiary = pick(Color(0xFF667080), Color(0xFF858D9C))
   fun status(color: Color): KetchStatusColor {
-    return KetchStatusColor(color, color.copy(alpha = 0.10f).compositeOver(n.surface))
+    return KetchStatusColor(color, color.copy(alpha = 0.10f).compositeOver(surface))
   }
   return KetchColors(
-    canvas = n.canvas,
-    wash = n.wash,
-    surface = n.surface,
-    surfaceRaised = n.surfaceRaised,
-    surfaceSunken = n.surfaceSunken,
-    surfaceHover = n.surfaceHover,
-    surfacePressed = n.surfacePressed,
-    rowSelected = tone.fill.copy(alpha = n.selectedAlpha).compositeOver(n.surface),
-    rowSelectedFocused = tone.fill.copy(alpha = n.selectedFocusedAlpha).compositeOver(n.surface),
-    sidebarItemSelected = n.sidebarItemSelected,
-    sidebarItemHover = n.sidebarItemHover,
-    hairline = n.hairline,
-    borderStrong = n.borderStrong,
-    divider = n.divider,
-    scrim = n.scrim,
-    inverseSurface = n.inverseSurface,
-    inverseOnSurface = n.inverseOnSurface,
+    canvas = pick(Color(0xFFEEF1F8), Color(0xFF0C0E13)),
+    wash = pick(
+      KetchWash(
+        start = Color(0xFFE9EEFC),
+        mid = Color(0xFFF1F0FA),
+        end = Color(0xFFFBF0EA),
+        ember = Color(0xFFFFD9C2).copy(alpha = 0.35f),
+      ),
+      KetchWash(
+        start = Color(0xFF151A33),
+        mid = Color(0xFF0E1016),
+        end = Color(0xFF1C1310),
+        ember = KetchPalette.EmberEnd.copy(alpha = 0.10f),
+      ),
+    ),
+    surface = surface,
+    surfaceRaised = pick(Color(0xFFFFFFFF), Color(0xFF1E2128)),
+    surfaceSunken = surfaceSunken,
+    surfaceHover = pick(Color(0xFFF1F3F8), Color(0xFF1F232A)),
+    surfacePressed = pick(Color(0xFFE9ECF3), Color(0xFF272B33)),
+    rowSelected = tone.fill.copy(alpha = pick(0.10f, 0.16f)).compositeOver(surface),
+    rowSelectedFocused = tone.fill.copy(alpha = pick(0.15f, 0.24f)).compositeOver(surface),
+    sidebarItemSelected = Color.White.copy(alpha = pick(0.72f, 0.08f)),
+    sidebarItemHover = Color.White.copy(alpha = pick(0.45f, 0.05f)),
+    hairline = pick(Color(0xFFE2E6EE), Color(0xFF2A2E37)),
+    borderStrong = pick(Color(0xFFC9D0DC), Color(0xFF3A404C)),
+    divider = pick(Color(0xFFEDF0F4), Color(0xFF22252C)),
+    scrim = KetchPalette.ScrimInk.copy(alpha = pick(0.32f, 0.56f)),
+    inverseSurface = pick(KetchPalette.Ink, Color(0xFFEEF0F4)),
+    inverseOnSurface = pick(Color(0xFFF4F6FA), KetchPalette.Ink),
     inverseAccent = inverseTone.text,
-    textPrimary = n.textPrimary,
-    textSecondary = n.textSecondary,
-    textTertiary = n.textTertiary,
-    textDisabled = n.textDisabled,
+    textPrimary = pick(KetchPalette.Ink, Color(0xFFEEF0F4)),
+    textSecondary = pick(Color(0xFF4B5466), Color(0xFFAEB4C0)),
+    textTertiary = textTertiary,
+    textDisabled = pick(Color(0xFFA3AAB7), Color(0xFF565D6A)),
     accent = tone.fill,
-    accentHover = n.hoverOverlay.compositeOver(tone.fill),
+    accentHover = pick(Color.Black, Color.White).copy(alpha = 0.08f).compositeOver(tone.fill),
     accentSoft = tone.soft,
     accentText = tone.text,
     onAccent = onFill(tone.fill),
-    dangerFill = n.dangerFill,
+    dangerFill = pick(Color(0xFFC8344A), Color(0xFFD2353F)),
     brandEmber = listOf(KetchPalette.EmberStart, KetchPalette.EmberEnd),
     status = KetchStatusColors(
       downloading = status(tone.fill),
-      queued = status(n.queued),
-      scheduled = status(n.scheduled),
-      paused = status(n.paused),
-      completed = status(n.completed),
-      failed = status(n.failed),
-      canceled = status(n.textTertiary),
-      seeding = status(n.seeding),
+      queued = status(pick(Color(0xFF646D7E), Color(0xFF8C94A3))),
+      scheduled = status(pick(Color(0xFF6E4FE0), Color(0xFFA891FF))),
+      paused = status(pick(Color(0xFF965700), Color(0xFFE8A93F))),
+      completed = status(pick(Color(0xFF1B7540), Color(0xFF45C27A))),
+      failed = status(pick(Color(0xFFBE2F44), Color(0xFFFF6B6B))),
+      canceled = status(textTertiary),
+      seeding = status(pick(Color(0xFF00747F), Color(0xFF4FD1DB))),
     ),
-    lanes = laneColors(tone.fill, n.surfaceSunken),
+    lanes = laneColors(tone.fill, surfaceSunken),
     deviceHues = KetchPalette.DeviceHues,
-    isDark = dark,
+    isDark = isDark,
   )
 }
 

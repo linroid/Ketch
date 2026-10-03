@@ -92,9 +92,6 @@ internal class ListSelection(private val state: AppState) {
     return current.targets(key, visible)
   }
 
-  /** The selected keys among [visible], in display order. */
-  fun visibleSelection(visible: List<TaskKey>): List<TaskKey> = current.visibleSelection(visible)
-
   /** Clears the selection, keeping the focus. */
   fun clear() {
     update(current.clear())

@@ -29,9 +29,7 @@ fun Modifier.ketchSurface(
   val elevation = KetchTheme.elevation
   val highlightFade = with(LocalDensity.current) { TopHighlightFade.toPx() }
   var modifier = this
-  for (layer in elevation.layers(level)) {
-    modifier = modifier.dropShadow(shape, layer.toShadow())
-  }
+  for (shadow in elevation.shadows(level)) modifier = modifier.dropShadow(shape, shadow)
   modifier = modifier.clip(shape).background(fill, shape)
   if (border != null) modifier = modifier.border(1.dp, border, shape)
   if (elevation.isDark && level != KetchElevationLevel.E0) {

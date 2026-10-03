@@ -16,6 +16,7 @@ import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
+import com.linroid.ketch.app.state.MAX_LINK_LIST_BYTES
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
@@ -25,7 +26,7 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
-import com.linroid.ketch.app.ui.pulse.speedModeText
+import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.config.SpeedLimitMode
@@ -87,7 +88,7 @@ internal fun AppState.switchSpeedMode(
   val previous = controller.settings.value.mode
   if (mode == previous) return null
   return launchCommand {
-    val name = speedModeText(mode)
+    val name = speedModeName(mode)
     try {
       controller.setMode(mode)
     } catch (e: CancellationException) {
@@ -224,5 +225,3 @@ internal fun AppState.dropFiles(entry: InstanceEntry, files: List<DroppedFile>) 
     dropText(entry, text)
   }
 }
-
-private const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024

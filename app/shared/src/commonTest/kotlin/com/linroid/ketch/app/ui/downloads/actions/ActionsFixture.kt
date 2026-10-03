@@ -2,36 +2,23 @@ package com.linroid.ketch.app.ui.downloads.actions
 
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.app.feedback.AppMessage
+import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.plain
 import com.linroid.ketch.app.i18n.verbatim
-import com.linroid.ketch.app.instance.InstanceFactory
-import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.SystemClipboard
-import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceInfo
-import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RecordingKetchApi
 import com.linroid.ketch.app.state.RecordingTask
 import com.linroid.ketch.app.state.RowCapabilities
-import com.linroid.ketch.app.state.TaskKey
-import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.testController
 import com.linroid.ketch.app.ui.list.RowCommands
-import com.linroid.ketch.app.util.RowContext
-import com.linroid.ketch.app.util.rowContent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
-import kotlinx.datetime.TimeZone
-import kotlin.time.Instant
-
-/** The embedded device of a test. */
-internal val LocalDevice = DeviceInfo(verbatim("This Mac"), RowCapabilities.local())
 
 /** A remote device of a test. */
 internal val RemoteDevice = DeviceInfo(verbatim("NAS"), RowCapabilities.remote())
@@ -41,29 +28,21 @@ internal val RemoteDevice = DeviceInfo(verbatim("NAS"), RowCapabilities.remote()
  *
  * @param revealLabel what the platform calls Show in folder; `null` where files cannot be shown.
  * @param canTrash whether removed files can go to the Trash.
+ * @param openUri opens a web page, such as a download's source page.
  */
 internal class ActionsFixture(
   scope: TestScope,
   revealLabel: UiText? = verbatim("Show in Finder"),
   canTrash: Boolean = false,
+  openUri: (String) -> Unit = {},
 ) {
   val api = RecordingKetchApi()
-  val controller = AppController(
-    instanceManager = InstanceManager(
-      factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { api }),
-    ),
-    context = StandardTestDispatcher(scope.testScheduler),
-  )
+  val controller = scope.testController(api)
   val files = FakeFileActions(revealLabel, canTrash)
   val clipboard = FakeClipboard()
   val state: AppState get() = controller.state
-  val runner = RowActionRunner(
-    state = controller.state,
-    commands = RowCommands(controller.state, files, clipboard, scope.backgroundScope) {},
-    files = files,
-    clipboard = clipboard,
-    scope = scope.backgroundScope,
-  )
+  val commands = RowCommands(controller.state, files, clipboard, scope.backgroundScope, openUri)
+  val runner = RowActionRunner(commands)
 
   /** Adds a task in [state] to the device. */
   fun add(
@@ -79,31 +58,14 @@ internal class ActionsFixture(
   }
 }
 
-/** The row of [task] on [device], built like the task list builds one. */
-internal fun rowOf(
-  task: DownloadTask,
-  device: DeviceInfo = LocalDevice,
-  deviceId: String = LOCAL_DEVICE_ID,
-): TaskRow {
-  val request = task.requestState.value
-  val state = task.state.value
-  val context = RowContext(device, NOW, TimeZone.UTC)
-  return TaskRow(
-    key = TaskKey(deviceId, task.taskId),
-    task = task,
-    request = request,
-    state = state,
-    segments = task.segments.value,
-    createdAt = task.createdAt,
-    device = device,
-    content = rowContent(request, state, task.createdAt, context),
-    deviceName = device.name.plain,
-    errorTitle = null,
-  )
-}
-
-/** The fixed time of the tests. */
-internal val NOW: Instant = Instant.parse("2026-10-01T12:00:00Z")
+/** Runs [block] over a new [ActionsFixture], closing it even when an assertion fails. */
+internal fun actionsTest(
+  revealLabel: UiText? = verbatim("Show in Finder"),
+  canTrash: Boolean = false,
+  openUri: (String) -> Unit = {},
+  block: suspend TestScope.(ActionsFixture) -> Unit,
+): TestResult =
+  fixtureTest({ ActionsFixture(this, revealLabel, canTrash, openUri) }, { it.close() }, block)
 
 /** File actions that record their calls. */
 internal class FakeFileActions(

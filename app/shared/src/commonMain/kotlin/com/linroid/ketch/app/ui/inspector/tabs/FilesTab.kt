@@ -231,7 +231,7 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
   } else {
     Res.string.inspector_file_description_no_share.text(name, size)
   }.resolve()
-  val row = @Composable {
+  KetchTooltip(text = file.pathText.resolve()) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -277,7 +277,6 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
       }
     }
   }
-  KetchTooltip(text = file.pathText.resolve()) { row() }
 }
 
 /**

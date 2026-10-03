@@ -6,98 +6,29 @@ import kotlin.test.assertEquals
 
 class FormatUtilsTest {
 
-  // -----------------------------------------------------------
-  // extractFilename
-  // -----------------------------------------------------------
-
   @Test
-  fun extractFilename_emptyUrl() {
-    assertEquals("", extractFilename(""))
-  }
-
-  @Test
-  fun extractFilename_simpleUrl() {
-    assertEquals(
-      "file.zip",
-      extractFilename("https://example.com/file.zip")
+  fun extractFilename_url_isItsLastPathSegment() {
+    val cases = listOf(
+      "https://example.com/file.zip" to "file.zip",
+      "https://example.com/file.zip?token=abc&v=2" to "file.zip",
+      "https://example.com/file.zip#section" to "file.zip",
+      "https://example.com/file.zip?v=1#top" to "file.zip",
+      "https://example.com/downloads/" to "downloads",
+      "https://cdn.example.com/a/b/c/archive.tar.gz" to "archive.tar.gz",
+      "  https://example.com/file.zip  " to "file.zip",
+      // Without a path, with or without a trailing slash, the host is all there is.
+      "https://example.com" to "example.com",
+      "https://example.com/" to "example.com",
     )
+    for ((url, expected) in cases) {
+      assertEquals(expected, extractFilename(url), "extractFilename(\"$url\")")
+    }
   }
 
   @Test
-  fun extractFilename_urlWithQueryParams() {
-    assertEquals(
-      "file.zip",
-      extractFilename(
-        "https://example.com/file.zip?token=abc&v=2"
-      )
-    )
-  }
-
-  @Test
-  fun extractFilename_urlWithFragment() {
-    assertEquals(
-      "file.zip",
-      extractFilename("https://example.com/file.zip#section")
-    )
-  }
-
-  @Test
-  fun extractFilename_urlWithQueryAndFragment() {
-    assertEquals(
-      "file.zip",
-      extractFilename(
-        "https://example.com/file.zip?v=1#top"
-      )
-    )
-  }
-
-  @Test
-  fun extractFilename_urlWithTrailingSlash() {
-    assertEquals(
-      "downloads",
-      extractFilename("https://example.com/downloads/")
-    )
-  }
-
-  @Test
-  fun extractFilename_urlWithDeepPath() {
-    assertEquals(
-      "archive.tar.gz",
-      extractFilename(
-        "https://cdn.example.com/a/b/c/archive.tar.gz"
-      )
-    )
-  }
-
-  @Test
-  fun extractFilename_urlWithNoPath() {
-    // No path component after host, substringAfterLast("/")
-    // returns the hostname portion
-    assertEquals(
-      "example.com",
-      extractFilename("https://example.com")
-    )
-  }
-
-  @Test
-  fun extractFilename_urlWithOnlySlash() {
-    // Trailing slash is trimmed, falls back to hostname
-    assertEquals(
-      "example.com",
-      extractFilename("https://example.com/")
-    )
-  }
-
-  @Test
-  fun extractFilename_whitespaceUrl() {
-    assertEquals("", extractFilename("   "))
-  }
-
-  @Test
-  fun extractFilename_urlWithSpacePadding() {
-    assertEquals(
-      "file.zip",
-      extractFilename("  https://example.com/file.zip  ")
-    )
+  fun extractFilename_blank_isEmpty() {
+    for (url in listOf("", "   ")) {
+      assertEquals("", extractFilename(url), "extractFilename(\"$url\")")
+    }
   }
 }

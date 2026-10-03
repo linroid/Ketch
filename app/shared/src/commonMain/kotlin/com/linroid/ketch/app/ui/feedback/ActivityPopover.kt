@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.ui.feedback
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -36,10 +34,11 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchDot
+import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.focusRing
+import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.rememberInteractionOverlay
-import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.UiText
@@ -58,7 +57,6 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.theme.eyebrowText
 import com.linroid.ketch.app.ui.pulse.PopoverAlignment
 import com.linroid.ketch.app.ui.pulse.PulsePopover
 import ketch.app.shared.generated.resources.Res
@@ -197,12 +195,7 @@ internal fun ActivityContent(
   LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = ListMaxHeight)) {
     groups.forEach { (day, messages) ->
       item(key = "group-${day.name}") {
-        Text(
-          text = eyebrowText(day.title.resolve()),
-          style = KetchTheme.typography.eyebrow,
-          color = colors.textTertiary,
-          modifier = Modifier.padding(top = spacing.s2, bottom = spacing.s1),
-        )
+        KetchEyebrow(day.title.resolve(), Modifier.padding(top = spacing.s2, bottom = spacing.s1))
       }
       items(messages, key = { it.id }) { message ->
         val taskKey = message.taskKey?.takeIf { it.deviceId == activeDeviceId }
@@ -239,13 +232,7 @@ private fun ActivityEntry(
   val focus = rememberFocusVisibility()
   val clickable = if (onClick != null) {
     Modifier
-      .trackFocusVisibility(focus)
-      .clickable(
-        interactionSource = interactions,
-        indication = null,
-        role = Role.Button,
-        onClick = onClick,
-      )
+      .ketchClickable(interactions, focus, onClick = onClick)
   } else {
     Modifier
   }

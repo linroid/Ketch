@@ -73,9 +73,6 @@
   <string name="sidebar_menu_retry_failed_count">Retry failed here (%1$d)</string>
   <string name="sidebar_menu_speed">Speed</string>
   <string name="sidebar_menu_settings">Settings for this device…</string>
-  <string name="sidebar_menu_rename">Rename…</string>
-  <string name="sidebar_menu_stay_connected">Stay connected</string>
-  <string name="sidebar_menu_remove">Remove…</string>
   <!-- The Speed submenu. -->
   <string name="sidebar_menu_full_speed">Full speed</string>
   <!-- %1$s is the Slow lane's speed, such as "1 MB/s". -->
