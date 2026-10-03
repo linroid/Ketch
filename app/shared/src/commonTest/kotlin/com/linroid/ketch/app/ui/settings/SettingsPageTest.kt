@@ -127,6 +127,8 @@ class SettingsPageTest {
     assertEquals("~/Videos", shortFolder("/home/sam/Videos/"))
     assertEquals("Linux ISOs", shortFolder("/Users/alex/Movies/Linux ISOs"))
     assertEquals("Downloads", shortFolder("D:\\Downloads"))
+    assertEquals("~\\Downloads", shortFolder("C:\\Users\\sam\\Downloads\\"))
+    assertEquals("Linux ISOs", shortFolder("C:\\Users\\sam\\Videos\\Linux ISOs"))
     assertEquals(
       "Download",
       shortFolder("content://com.android.externalstorage.documents/tree/primary%3ADownload"),

@@ -198,6 +198,17 @@ fun folderName(path: String): String {
 }
 
 /**
+ * [path] with the user's home folder as "~": `~/Downloads` for `/Users/alex/Downloads` or
+ * `/home/alex/Downloads`, `~\Downloads` for `C:\Users\alex\Downloads`, and the folder an
+ * Android document tree names; other paths are kept as they are.
+ */
+internal fun shortPath(path: String): String {
+  if (isDocumentTree(path)) return folderName(path)
+  val match = HomeFolder.find(path) ?: return path
+  return "~" + path.substring(match.range.last + 1)
+}
+
+/**
  * Folders the downloads in [tasks] were saved to, newest first and at most [limit] of them,
  * leaving out the ones in [exclude]. Paths are given without a trailing separator.
  */
@@ -272,3 +283,6 @@ fun parseHostList(text: String): List<String> =
 private const val RECENT_FOLDERS = 3
 private const val WORK_DAYS = 5
 private const val SHORT_DAY_LENGTH = 3
+
+private val HomeFolder =
+  Regex("""^(/Users/[^/]+|/home/[^/]+|[A-Za-z]:\\Users\\[^\\]+)(?=$|[/\\])""")

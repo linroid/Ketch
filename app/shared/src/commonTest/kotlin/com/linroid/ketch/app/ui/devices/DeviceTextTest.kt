@@ -13,6 +13,7 @@ import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
+import com.linroid.ketch.app.state.shortPath
 import com.linroid.ketch.app.testStatus
 import com.linroid.ketch.app.testSystem
 import com.linroid.ketch.app.ui.shell.FleetFixtures.presence

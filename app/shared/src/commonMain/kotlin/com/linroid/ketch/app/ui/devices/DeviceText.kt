@@ -7,9 +7,7 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
-import com.linroid.ketch.app.state.folderName
 import com.linroid.ketch.app.state.formatSpace
-import com.linroid.ketch.app.state.isDocumentTree
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -198,21 +196,8 @@ internal fun deviceIcon(device: DevicePresence, localNoun: String): KetchIcon {
   }
 }
 
-/**
- * [path] with the user's home folder as "~", as in "~/Downloads", for "/Users/alex/Downloads"
- * and "/home/alex/Downloads", or the name of an Android document tree; other paths are kept as
- * they are.
- */
-internal fun shortPath(path: String): String {
-  if (isDocumentTree(path)) return folderName(path)
-  val match = HomeFolder.find(path) ?: return path
-  return "~" + path.substring(match.range.last + 1)
-}
-
 /** [name] cut to [max] characters with "…" at the end, for a button label. */
 internal fun clipName(name: String, max: Int = MAX_NAME_LENGTH): String =
   if (name.length <= max) name else name.take(max - 1).trimEnd() + "…"
 
-private val HomeFolder =
-  Regex("""^(/Users/[^/]+|/home/[^/]+|[A-Za-z]:\\Users\\[^\\]+)(?=$|[/\\])""")
 private const val MAX_NAME_LENGTH = 20

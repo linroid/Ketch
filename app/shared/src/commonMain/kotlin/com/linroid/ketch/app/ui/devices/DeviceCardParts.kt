@@ -49,6 +49,7 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.state.shortPath
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.pulse.DiskBar
 import com.linroid.ketch.app.ui.pulse.diskUsed
