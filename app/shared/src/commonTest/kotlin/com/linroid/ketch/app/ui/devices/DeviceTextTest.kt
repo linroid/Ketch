@@ -8,13 +8,10 @@ import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.i18n.isEmpty
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
-import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
-import com.linroid.ketch.app.platform.LocalDeviceKind
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
 import com.linroid.ketch.app.state.shortPathText
@@ -248,20 +245,6 @@ class DeviceTextTest {
     assertEquals("Sharing on :9000", sharingLabel(quiet).load())
     assertNull(sharingLabel(local))
     assertNull(sharingLabel(ServerState.Stopped))
-  }
-
-  @Test
-  fun deviceIcon_eachKind_picksItsGlyph() {
-    val mac = device(entry = EmbeddedInstance(FakeKetchApi(), "MacBook Pro"))
-
-    assertEquals(KetchIcon.Laptop, deviceIcon(mac, LocalDeviceKind.Mac))
-    assertEquals(KetchIcon.Phone, deviceIcon(mac, LocalDeviceKind.Phone))
-    assertEquals(KetchIcon.Tablet, deviceIcon(mac, LocalDeviceKind.IPad))
-    assertEquals(KetchIcon.Server, deviceIcon(device(status = status()), LocalDeviceKind.Mac))
-    assertEquals(
-      KetchIcon.Desktop,
-      deviceIcon(device(status = status("Windows 11")), LocalDeviceKind.Mac)
-    )
   }
 
   @Test

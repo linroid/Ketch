@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.components.DevicePennant
+import com.linroid.ketch.app.components.DeviceType
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -371,7 +372,7 @@ private fun NearbyRow(
     DevicePennant(
       deviceId = address,
       name = name,
-      icon = KetchIcon.Server.takeIf { announced == null },
+      fallbackType = DeviceType.Server.takeIf { announced == null },
     )
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
       Text(

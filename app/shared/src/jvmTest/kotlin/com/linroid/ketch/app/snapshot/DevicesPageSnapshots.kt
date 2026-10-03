@@ -322,7 +322,8 @@ private class DevicesPageEnvironment(
     val Nas = RemoteConfig(host = "nas.local", name = "NAS-Basement")
     val DenPc = RemoteConfig(host = "den-pc.local", name = "Den-PC")
     val Seedbox = RemoteConfig(host = "seedbox.example.net", port = 443, secure = true)
-    val GaragePi = RemoteConfig(host = "garage-pi.local", name = "Garage-Pi", watch = false)
+    val GaragePi =
+      RemoteConfig(host = "garage-pi.local", name = "Garage-Pi", watch = false, os = "Linux")
     const val DEN_PC_ID = "den-pc.local:8642"
     val OFFLINE_FOR: Duration = 2.hours
     val START_TIMEOUT: Duration = 10.seconds

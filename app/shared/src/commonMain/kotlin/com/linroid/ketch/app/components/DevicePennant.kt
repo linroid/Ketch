@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -47,18 +48,36 @@ object DevicePennantDefaults {
   val XLarge: Dp = 40.dp
 }
 
+/** What kind of device a [DevicePennant] stands for, which picks the glyph it shows. */
+enum class DeviceType(internal val glyph: KetchIcon) {
+  Laptop(KetchIcon.PennantLaptop),
+  Desktop(KetchIcon.PennantDesktop),
+  Server(KetchIcon.PennantServer),
+  Phone(KetchIcon.PennantPhone),
+  Tablet(KetchIcon.PennantTablet),
+  Browser(KetchIcon.PennantBrowser),
+}
+
 /**
- * A device's flag: a circle in the device's own hue with a white two-letter monogram of [name]
- * ("NB" for NAS-Basement), or a device-type [icon] instead.
+ * The [DeviceType] of each device the app knows, by device id; a [DevicePennant] of a device
+ * missing from it shows a monogram.
+ */
+val LocalDeviceTypes = compositionLocalOf<Map<String, DeviceType>> { emptyMap() }
+
+/**
+ * A device's flag: a circle in the device's own hue with the white glyph of its [DeviceType]
+ * from [LocalDeviceTypes], or of [fallbackType] when that does not know the device. A device of
+ * unknown type shows a two-letter monogram of [name] ("NB" for NAS-Basement) instead.
  *
  * With a [health], a 2 dp ring 2 dp out from the circle shows how well the app is connected; a
  * halo pulses out of it while connecting. The ring stands for health only. A failure count over
  * zero adds a badge at the top end. The pennant takes the ring's room too, so a 24 dp pennant
  * with a ring is 32 dp across.
  *
- * @param deviceId picks the hue; the same id always gets the same one.
+ * @param deviceId picks the hue, always the same for one id, and the type in [LocalDeviceTypes].
  * @param name what the monogram is made from; the host name for the embedded device.
  * @param size diameter of the circle, one of the [DevicePennantDefaults] sizes.
+ * @param fallbackType the type shown while [LocalDeviceTypes] does not know the device.
  */
 @Composable
 fun DevicePennant(
@@ -68,8 +87,9 @@ fun DevicePennant(
   size: Dp = DevicePennantDefaults.Medium,
   health: DeviceHealth? = null,
   failures: Int = 0,
-  icon: KetchIcon? = null,
+  fallbackType: DeviceType? = null,
 ) {
+  val type = LocalDeviceTypes.current[deviceId] ?: fallbackType
   val colors = KetchTheme.colors
   val motion = KetchTheme.motion
   val fill = colors.deviceHue(deviceId).light
@@ -109,8 +129,8 @@ fun DevicePennant(
       contentAlignment = Alignment.Center,
       modifier = Modifier.size(size).background(fill, KetchTheme.shapes.full),
     ) {
-      if (icon != null) {
-        KetchIconImage(icon, size = size * ICON_SHARE, tint = Color.White)
+      if (type != null) {
+        KetchIconImage(type.glyph, size = size * GLYPH_SHARE, tint = Color.White)
       } else {
         val fontSize = with(LocalDensity.current) { (size * MONOGRAM_SHARE).toSp() }
         Text(
@@ -126,7 +146,7 @@ fun DevicePennant(
       }
     }
     if (failures > 0) {
-      // Where the badge sits on a ringed pennant, so it never covers the monogram without one.
+      // Where the badge sits on a ringed pennant, so it never covers the glyph without one.
       val overhang = BadgeOverhang + RingGap + RingWidth - ringRoom
       Box(
         contentAlignment = Alignment.Center,
@@ -192,7 +212,7 @@ private val Address = Regex("""([\w-]+(?:\.[\w-]+)+|[\w-]+(?=:\d+$))(?::\d+)?"""
 private val Ipv4 = Regex("""\d{1,3}(?:\.\d{1,3}){3}""")
 private const val MAX_BADGE_COUNT = 9
 private const val MONOGRAM_SHARE = 0.4f
-private const val ICON_SHARE = 0.55f
+private const val GLYPH_SHARE = 0.6f
 
 private val RingGap = 2.dp
 private val RingWidth = 2.dp

@@ -46,7 +46,6 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.RemoteInstance
-import com.linroid.ketch.app.platform.localDeviceKind
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.LocalClock
@@ -158,7 +157,6 @@ private fun CardHeader(
         deviceId = device.deviceId,
         name = device.entry.label,
         size = DevicePennantDefaults.Large,
-        icon = deviceIcon(device, localDeviceKind()),
       )
       Text(
         text = device.name.resolve(),

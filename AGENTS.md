@@ -286,7 +286,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   never saved
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, mDNS, `autoStart`
   (apps start the server on launch)
-- `RemoteConfig`: pre-configured remote server connections
+- `RemoteConfig`: pre-configured remote server connections, with the system each device last
+  reported, which picks its `DeviceType` glyph in the apps' pennants
 - `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
   `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
   uses `WebConfigStore` (TOML in localStorage)

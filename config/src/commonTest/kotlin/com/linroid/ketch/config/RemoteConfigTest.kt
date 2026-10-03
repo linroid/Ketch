@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class RemoteConfigTest {
 
   @Test
-  fun decode_remoteSavedBeforeNamesAndWatching_isUnnamedAndWatched() {
+  fun decode_remoteSavedBeforeNamesWatchingAndSystems_isUnnamedWatchedAndUnknown() {
     val decoded = ConfigStore.toml.decodeFromString(
       KetchConfig.serializer(),
       """
@@ -24,6 +24,7 @@ class RemoteConfigTest {
     val remote = decoded.remotes.single()
     assertNull(remote.name)
     assertTrue(remote.watch)
+    assertNull(remote.os)
     assertEquals("token", remote.apiToken)
   }
 

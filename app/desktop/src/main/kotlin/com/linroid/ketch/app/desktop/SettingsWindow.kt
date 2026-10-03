@@ -25,6 +25,7 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
+import com.linroid.ketch.app.components.LocalDeviceTypes
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
@@ -41,6 +42,7 @@ import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.isDark
+import com.linroid.ketch.app.ui.devices.rememberDeviceTypes
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
 import com.linroid.ketch.app.ui.settings.SettingsHost
 import ketch.app.desktop.generated.resources.Res
@@ -211,6 +213,7 @@ internal fun SettingsWindow(
       LocalFileLogger provides fileLogger,
       LocalDesktopHooks provides hooks,
       LocalIntegrationStatus provides integration.status,
+      LocalDeviceTypes provides rememberDeviceTypes(controller.state),
     ) {
       KetchTheme(
         darkTheme = darkTheme,

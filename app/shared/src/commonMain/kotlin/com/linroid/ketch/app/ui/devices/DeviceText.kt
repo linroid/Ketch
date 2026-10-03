@@ -8,11 +8,8 @@ import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
-import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.DevicePresence
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.ServerState
-import com.linroid.ketch.app.platform.LocalDeviceKind
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DiskSpace
 import com.linroid.ketch.app.state.formatSpace
@@ -208,28 +205,6 @@ internal fun sharingLabel(server: ServerState): UiText? {
     Res.string.device_sharing_on
   }
   return resource.text(server.port)
-}
-
-/**
- * Glyph of the kind of device: the form factor of the embedded one, which is a [localKind], and
- * for a remote one what its system suggests; most remote devices are servers.
- */
-internal fun deviceIcon(device: DevicePresence, localKind: LocalDeviceKind): KetchIcon {
-  if (device.entry is EmbeddedInstance) {
-    return when (localKind) {
-      LocalDeviceKind.Phone -> KetchIcon.Phone
-      LocalDeviceKind.IPad, LocalDeviceKind.Tablet -> KetchIcon.Tablet
-      LocalDeviceKind.Browser -> KetchIcon.Browser
-      LocalDeviceKind.Mac -> KetchIcon.Laptop
-      LocalDeviceKind.Pc, LocalDeviceKind.Computer -> KetchIcon.Desktop
-    }
-  }
-  val os = device.status?.system?.os.orEmpty()
-  return when {
-    os.startsWith("mac", ignoreCase = true) -> KetchIcon.Laptop
-    os.startsWith("windows", ignoreCase = true) -> KetchIcon.Desktop
-    else -> KetchIcon.Server
-  }
 }
 
 /** [name] cut to [max] characters with "…" at the end, for a button label. */

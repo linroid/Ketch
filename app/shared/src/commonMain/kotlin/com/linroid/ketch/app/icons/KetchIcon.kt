@@ -2,6 +2,7 @@ package com.linroid.ketch.app.icons
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -13,8 +14,9 @@ import androidx.compose.ui.unit.dp
  * Ketch icon set.
  *
  * Every icon is authored against a 20×20 viewport with a 1.7px outlined stroke
- * (round caps + joins). Arc flags use explicit separators because Compose
- * PathParser does not accept the compact SVG flag syntax used in the web mock.
+ * (round caps + joins), except the solid device pennant glyphs. Arc flags use explicit
+ * separators because Compose PathParser does not accept the compact SVG flag syntax used in the
+ * web mock.
  *
  * Render with [KetchIconImage].
  */
@@ -245,6 +247,47 @@ enum class KetchIcon(internal val data: IconData) {
     ),
   )),
 
+  // Device pennants: solid, drawn white inside a DevicePennant. Holes are subpaths inside
+  // another of the same path, which the even-odd fill cuts out.
+  PennantLaptop(IconData.fills(
+    "M5.5 3.75h9a1.5 1.5 0 0 1 1.5 1.5v5.75a1.5 1.5 0 0 1 -1.5 1.5h-9a1.5 1.5 0 0 1 -1.5 -1.5" +
+      "v-5.75a1.5 1.5 0 0 1 1.5 -1.5z",
+    "M3 13.75h14a1.25 1.25 0 0 1 0 2.5h-14a1.25 1.25 0 0 1 0 -2.5z" +
+      "M8.25 13.75h3.5v0.9h-3.5z"
+  )),
+  PennantDesktop(IconData.fills(
+    "M3.85 3h12.3a1.6 1.6 0 0 1 1.6 1.6v7.3a1.6 1.6 0 0 1 -1.6 1.6h-12.3" +
+      "a1.6 1.6 0 0 1 -1.6 -1.6v-7.3a1.6 1.6 0 0 1 1.6 -1.6z",
+    "M8.75 13h2.5v3h-2.5z",
+    "M6.875 15.5h6.25a0.875 0.875 0 0 1 0 1.75h-6.25a0.875 0.875 0 0 1 0 -1.75z"
+  )),
+  PennantServer(IconData.fills(
+    "M4.1 3h11.8a1.6 1.6 0 0 1 1.6 1.6v3.05a1.6 1.6 0 0 1 -1.6 1.6h-11.8" +
+      "a1.6 1.6 0 0 1 -1.6 -1.6v-3.05a1.6 1.6 0 0 1 1.6 -1.6z" +
+      "M5.75 5.125a1 1 0 1 0 0 2a1 1 0 1 0 0 -2z" +
+      "M9.125 5.5h5a0.625 0.625 0 0 1 0 1.25h-5a0.625 0.625 0 0 1 0 -1.25z",
+    "M4.1 10.75h11.8a1.6 1.6 0 0 1 1.6 1.6v3.05a1.6 1.6 0 0 1 -1.6 1.6h-11.8" +
+      "a1.6 1.6 0 0 1 -1.6 -1.6v-3.05a1.6 1.6 0 0 1 1.6 -1.6z" +
+      "M5.75 12.875a1 1 0 1 0 0 2a1 1 0 1 0 0 -2z" +
+      "M9.125 13.25h5a0.625 0.625 0 0 1 0 1.25h-5a0.625 0.625 0 0 1 0 -1.25z"
+  )),
+  PennantPhone(IconData.fills(
+    "M7.75 1.75h4.5a2.25 2.25 0 0 1 2.25 2.25v12a2.25 2.25 0 0 1 -2.25 2.25h-4.5" +
+      "a2.25 2.25 0 0 1 -2.25 -2.25v-12a2.25 2.25 0 0 1 2.25 -2.25z" +
+      "M9 15.1h2a0.5 0.5 0 0 1 0 1h-2a0.5 0.5 0 0 1 0 -1z"
+  )),
+  PennantTablet(IconData.fills(
+    "M5.5 2h9a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-9a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2z" +
+      "M9 15.25h2a0.5 0.5 0 0 1 0 1h-2a0.5 0.5 0 0 1 0 -1z"
+  )),
+  PennantBrowser(IconData.fills(
+    "M4 3h12a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2z" +
+      "M2 7.5h16v1.1h-16z" +
+      "M4.75 4.45a0.85 0.85 0 1 0 0 1.7a0.85 0.85 0 1 0 0 -1.7z" +
+      "M7.15 4.45a0.85 0.85 0 1 0 0 1.7a0.85 0.85 0 1 0 0 -1.7z" +
+      "M9.55 4.45a0.85 0.85 0 1 0 0 1.7a0.85 0.85 0 1 0 0 -1.7z"
+  )),
+
   // File types, see FileKind
   FileTorrent(IconData.paths(
     stroke = listOf("M3.5 3.5v6.5a6.5 6.5 0 0 0 13 0V3.5h-4.5v6.5a2 2 0 0 1 -4 0V3.5z"),
@@ -375,9 +418,9 @@ internal const val ICON_SOFT_FILL_ALPHA = 0.65f
 internal data class IconData(
   /** Paths rendered with a stroke (outlined). */
   val strokes: List<String> = emptyList(),
-  /** Paths rendered with a fill. */
+  /** Paths rendered with a fill; a subpath inside another of the same path cuts a hole. */
   val fills: List<String> = emptyList(),
-  /** Paths filled at [ICON_SOFT_FILL_ALPHA] of the tint. */
+  /** Paths filled at [ICON_SOFT_FILL_ALPHA] of the tint, with holes as in [fills]. */
   val softFills: List<String> = emptyList(),
 ) {
   companion object {
@@ -414,11 +457,16 @@ internal fun IconData.toImageVector(name: String): ImageVector {
     )
   }
   fills.forEach { d ->
-    builder.addPath(pathData = PathParser().parsePathString(d).toNodes(), fill = brush)
+    builder.addPath(
+      pathData = PathParser().parsePathString(d).toNodes(),
+      pathFillType = PathFillType.EvenOdd,
+      fill = brush,
+    )
   }
   softFills.forEach { d ->
     builder.addPath(
       pathData = PathParser().parsePathString(d).toNodes(),
+      pathFillType = PathFillType.EvenOdd,
       fill = brush,
       fillAlpha = ICON_SOFT_FILL_ALPHA,
     )

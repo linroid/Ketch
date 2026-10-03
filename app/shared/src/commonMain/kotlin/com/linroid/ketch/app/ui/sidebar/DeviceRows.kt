@@ -332,7 +332,7 @@ internal fun PennantCluster(
     else -> listOf(ClusterCenter to 0.dp, 0.dp to ClusterStep, ClusterStep to ClusterStep)
   }
   Box(modifier.size(ClusterSize).clearAndSetSemantics {}) {
-    // The first device stays in front, so its monogram reads whole.
+    // The first device stays in front, so its pennant reads whole.
     shown.zip(places).reversed().forEach { (device, place) ->
       DevicePennant(
         deviceId = device.deviceId,
