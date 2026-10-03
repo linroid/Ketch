@@ -314,6 +314,14 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   code outside `theme/` and `components/` adds literal radii, colors or text sizes,
   `MaterialTheme.` or Material icons; keep its allowlist (`design-token-allowlist.txt`) empty.
   Composables read the time from `LocalClock`, never `Clock.System`
+- Localization: the apps follow the system or per-app language and fall back to English; the
+  languages are listed in [localization](docs/development/localization.md#languages). UI text
+  lives in `composeResources/values/strings_<area>.xml`; state and model code returns `UiText`
+  (`i18n/UiText.kt`), which composables `resolve()` and coroutines `load()`, and sizes, speeds,
+  durations and dates come from `i18n/Formats.kt`. Never put a `UiText` in a string template: it
+  prints `⟦key⟧`. `HardcodedTextTest` counts the literals left per file
+  (`hardcoded-text-allowlist.txt`, which only shrinks) and `LocalizationResourcesTest` checks the
+  translations against English
 - Desktop: closing the window follows `[desktop] closeAction` (asks the first time while
   downloads run, then keeps Ketch in the menu bar or notification area; minimizes where there
   is no tray). The tray lists every device with its own actions, and the macOS menu bar, the

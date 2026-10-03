@@ -68,3 +68,5 @@ When writing Kotlin code for this project:
   (e.g., `KetchError`)
 - **Simplicity**: Favor simple correctness over micro-optimizations
 - **Final newline**: Always end files with a trailing empty line
+- **User-facing text**: New UI text goes through string resources, never literals in
+  `app/shared` code; see [localization](localization.md)

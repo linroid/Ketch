@@ -63,6 +63,8 @@ A full-featured Kotlin Multiplatform download manager — run locally, remotely,
 - **HLS streaming** `🔜` -- Download and merge HTTP Live Streaming videos
 - **Media extraction** `🔜` -- Extract and download media from websites (like yt-dlp)
 - **Resource sniffer** `🔜` -- Detect downloadable resources from web pages
+- **Localized apps** `✅` -- the apps and the browser extension follow the system language
+  ([languages](docs/development/localization.md#languages))
 - **Browser extension** `✅` -- [Send downloads, links and magnet links](app/browser-extension/)
   from Chrome, Edge, Firefox and other browsers to Ketch on this computer or a remote server
 - **AI-driven discovery** `🚧` -- Find download links from natural language queries using an
@@ -191,8 +193,9 @@ servers.
 ## Contributing
 
 Contributions are welcome! Please open an issue to discuss your idea before submitting a PR.
-See the [code style rules](docs/development/code-style.md) and
-[testing rules](docs/development/testing.md) for development guidelines.
+See the [code style rules](docs/development/code-style.md),
+[testing rules](docs/development/testing.md) and [localization guide](docs/development/localization.md)
+for development guidelines; translations come in by pull request.
 
 Coding agents should start with [AGENTS.md](AGENTS.md), the shared instructions for all agents
 and editors. If your tool does not load it automatically, ask it to read `AGENTS.md` and its linked
