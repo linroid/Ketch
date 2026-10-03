@@ -19,7 +19,9 @@ val gitRevision: String by lazy {
 val generateVersion by tasks.registering {
   val outputDir = layout.buildDirectory.dir("generated/version")
   val ver = findProperty("VERSION_NAME")?.toString() ?: "dev"
-  val revision = gitRevision
+  // Test CI can keep this stable so unrelated commits do not invalidate every API consumer.
+  // Normal builds and publications continue to embed the actual Git revision.
+  val revision = providers.gradleProperty("testBuildRevision").orNull ?: gitRevision
   inputs.property("version", ver)
   inputs.property("revision", revision)
   outputs.dir(outputDir)

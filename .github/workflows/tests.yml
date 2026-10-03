@@ -118,8 +118,31 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      - name: Read Xcode build version
+        id: xcode
+        run: |
+          echo "build=$(xcodebuild -version | awk '/Build version/ {print $3}')" >> "$GITHUB_OUTPUT"
+
+      # setup-gradle caches ~/.gradle, but the native toolchain and compiler caches live here.
+      # Refresh the cache per commit, restoring only from a compatible toolchain.
+      - name: Cache Kotlin/Native
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: >-
+            ${{ format('konan-{0}-{1}-{2}-{3}-{4}', runner.os, runner.arch,
+                steps.xcode.outputs.build,
+                hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties'),
+                github.sha) }}
+          restore-keys: >-
+            ${{ format('konan-{0}-{1}-{2}-{3}-', runner.os, runner.arch,
+                steps.xcode.outputs.build,
+                hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties')) }}
+
       - name: Run iOS simulator tests
-        run: ./gradlew iosSimulatorArm64Test -PenableIosSimulatorTests=true
+        run: >-
+          ./gradlew iosSimulatorArm64Test -PenableIosSimulatorTests=true
+          -PtestBuildRevision=ci-test
 
       - name: Upload test results
         if: always()
