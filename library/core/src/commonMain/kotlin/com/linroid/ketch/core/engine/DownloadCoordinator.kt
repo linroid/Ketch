@@ -15,6 +15,7 @@ import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.task.TaskHandle
+import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.savedProgress
 import kotlin.concurrent.Volatile
@@ -155,6 +156,11 @@ internal class DownloadCoordinator(
 
     val taskRecord = handle.record.value
     val segments = taskRecord.segments ?: return false
+    if (segments.isEmpty() && taskRecord.totalBytes > 0 && !managesOwnFileIo(taskRecord)) {
+      // Older versions saved [] when a download stopped before its first segments.
+      log.i { "No saved progress for taskId=$taskId, starting it again" }
+      return false
+    }
     log.d {
       "Resume loaded record: taskId=$taskId, " +
         "segments=${segments.size}, " +
@@ -183,13 +189,23 @@ internal class DownloadCoordinator(
     return true
   }
 
-  suspend fun cancel(handle: TaskHandle) {
+  /**
+   * Stops the task's download, if any, and marks it canceled.
+   *
+   * @param deletePartialFile whether a running download deletes the file it was writing: `true`
+   *   for an explicit cancel or `remove(deleteFiles = true)`, `false` for
+   *   `remove(deleteFiles = false)`
+   */
+  suspend fun cancel(handle: TaskHandle, deletePartialFile: Boolean) {
     val taskId = handle.taskId
-    log.i { "Canceling download for taskId=$taskId" }
+    log.i { "Canceling download for taskId=$taskId, deletePartialFile=$deletePartialFile" }
     val job = mutex.withLock {
       val entry = activeDownloads[taskId]
       val stopping = entry?.job ?: stoppingDownloads[taskId]
-      entry?.execution?.stopReportingProgress()
+      entry?.execution?.let { execution ->
+        execution.stopReportingProgress()
+        if (deletePartialFile) execution.discardPartialFile()
+      }
       stopping?.cancel()
       activeDownloads.remove(taskId)
       stopping
@@ -299,6 +315,19 @@ internal class DownloadCoordinator(
     }
   }
 
+  /**
+   * Whether the record's source writes its own files, like torrents, whose saved segments only
+   * mirror progress the source checks itself. Unknown sources count as engine-managed.
+   */
+  private fun managesOwnFileIo(record: TaskRecord): Boolean {
+    val sourceType = record.sourceType ?: return false
+    return try {
+      sourceResolver.resolveByType(sourceType).managesOwnFileIo
+    } catch (_: KetchError) {
+      false
+    }
+  }
+
   private fun createExecution(handle: TaskHandle): DownloadExecution {
     return DownloadExecution(
       handle = handle,
@@ -308,7 +337,6 @@ internal class DownloadCoordinator(
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
       clock = clock,
-      shuttingDown = { closing },
     )
   }
 

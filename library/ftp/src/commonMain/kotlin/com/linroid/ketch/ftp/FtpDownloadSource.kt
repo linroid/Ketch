@@ -208,7 +208,13 @@ class FtpDownloadSource : DownloadSource {
     val totalBytes = state.totalBytes
     val requested = context.maxConnections.value
 
-    if (!supportsRest) {
+    if (segments.isEmpty() && totalBytes > 0) {
+      // Stopped before any segments were saved: nothing was downloaded, whatever the file size.
+      log.w { "No saved segments for taskId=${context.taskId}, restarting from zero" }
+      val connections = if (supportsRest) context.effectiveConnections(requested) else 1
+      segments = SegmentCalculator.calculateSegments(totalBytes, connections)
+      context.segments.value = segments
+    } else if (!supportsRest) {
       // Without REST every transfer starts at byte zero, so saved progress cannot be used.
       log.w { "Server does not support REST, restarting taskId=${context.taskId} from zero" }
       segments = SegmentCalculator.singleSegment(totalBytes)

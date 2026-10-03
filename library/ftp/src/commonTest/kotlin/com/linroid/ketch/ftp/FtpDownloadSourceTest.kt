@@ -169,6 +169,20 @@ class FtpDownloadSourceTest {
   }
 
   @Test
+  fun resume_emptySegmentsWithFullSizeFile_downloadsFromZero() = runTest {
+    val server = FakeFtpServer(content(1000))
+    // A zero-filled file of the full size passes the local file check.
+    val file = MemoryFileAccessor()
+    file.preallocate(1000)
+    val context = context(file, connections = 1)
+
+    source(server).resume(context, FtpDownloadSource.buildResumeState(1000, null))
+
+    assertEquals(listOf(0L), server.retrieveOffsets)
+    assertContentEquals(server.content, file.bytes)
+  }
+
+  @Test
   fun download_noRestSupport_ignoresLiveConnectionChange() = runTest {
     val server = FakeFtpServer(content(1000), supportsRest = false)
     val file = MemoryFileAccessor()

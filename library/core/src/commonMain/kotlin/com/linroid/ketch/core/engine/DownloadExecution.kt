@@ -25,10 +25,12 @@ import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
@@ -55,8 +57,7 @@ import okio.Path.Companion.toPath
  *   calls apply to the next start or resume
  * @param timeSource measures download speed and the time added to [TaskRecord.downloadTime]
  * @param clock stamps [TaskRecord.completedAt] when the download completes
- * @param shuttingDown whether the Ketch instance is closing; a cancelled execution then keeps
- *   its partial file so the task can resume when the instance starts again
+ * @param openFile opens the output file of a source that does not write its own files
  */
 internal class DownloadExecution(
   private val handle: TaskHandle,
@@ -67,7 +68,8 @@ internal class DownloadExecution(
   private val dispatchers: KetchDispatchers,
   private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
   private val clock: Clock = Clock.System,
-  private val shuttingDown: () -> Boolean = { false },
+  private val openFile: (path: String, ioDispatcher: CoroutineDispatcher) -> FileAccessor =
+    ::createFileAccessor,
 ) {
   private val log = KetchLogger("Execution")
 
@@ -78,6 +80,16 @@ internal class DownloadExecution(
 
   /** Stop callbacks before a pause/cancel state is published while a source is still joining. */
   fun stopReportingProgress() { reportsProgress.value = false }
+
+  @Volatile
+  private var discardsPartialFile = false
+
+  /**
+   * Deletes the partial file once this execution stops. Set before an explicit cancel or
+   * `remove(deleteFiles = true)` cancels it; every other stop (pause, failure, `Ketch.close()`,
+   * `remove(deleteFiles = false)`) keeps the file that the saved segments describe.
+   */
+  fun discardPartialFile() { discardsPartialFile = true }
 
   /**
    * Per-task limiter, created from the persisted request so a limit set
@@ -269,7 +281,7 @@ internal class DownloadExecution(
     val fa = if (selfManagedIo) {
       NoOpFileAccessor
     } else {
-      createFileAccessor(outputPath, dispatchers.io)
+      openFile(outputPath, dispatchers.io)
     }
     fileAccessor = fa
 
@@ -277,6 +289,12 @@ internal class DownloadExecution(
     val previousTime = handle.record.value.downloadTime
     val runMark = timeSource.markNow()
     fun downloadTime() = previousTime?.plus(runMark.elapsedNow())
+
+    // Segments are the only progress of a file of known size Ketch writes, so until the source
+    // publishes them the record keeps none: a saved [] would resume as a finished transfer of a
+    // zero-filled file. Content of unknown size keeps [], and resuming it streams it again.
+    fun savedSegments(snapshot: List<Segment>) =
+      snapshot.takeUnless { it.isEmpty() && total > 0 && !selfManagedIo }
 
     var completed = false
     try {
@@ -291,7 +309,7 @@ internal class DownloadExecution(
             val updatedResume = source.updateResumeState(ctx)
             handle.record.update {
               it.copy(
-                segments = snapshot,
+                segments = savedSegments(snapshot),
                 sourceResumeState = updatedResume
                   ?: it.sourceResumeState,
                 downloadTime = downloadTime(),
@@ -308,7 +326,7 @@ internal class DownloadExecution(
             val updatedResume = source.updateResumeState(ctx)
             val snapshot = handle.mutableSegments.value
             handle.record.update {
-              it.copy(segments = snapshot,
+              it.copy(segments = savedSegments(snapshot),
                 sourceResumeState = updatedResume ?: it.sourceResumeState,
                 downloadTime = downloadTime(),
                 updatedAt = Clock.System.now())
@@ -334,6 +352,8 @@ internal class DownloadExecution(
           if (total < 0) finalTotal = fa.size()
         } catch (e: Exception) {
           if (e is CancellationException) throw e
+          // The written bytes may not have reached the disk, so none of them count as progress.
+          withContext(NonCancellable) { discardProgress() }
           if (e is KetchError) throw e
           throw KetchError.Disk(e)
         }
@@ -368,12 +388,19 @@ internal class DownloadExecution(
     }
   }
 
+  /** Keeps the segment layout but drops its progress, so a resume downloads every byte again. */
+  private suspend fun discardProgress() {
+    val reset = handle.mutableSegments.value.map { it.copy(downloadedBytes = 0) }
+    handle.mutableSegments.value = reset
+    handle.record.update { it.copy(segments = reset, updatedAt = Clock.System.now()) }
+  }
+
   private suspend fun completeZeroByteFile(
     outputPath: String,
     sourceType: String,
   ) {
     log.i { "Zero-byte file for taskId=$taskId, completing" }
-    val fa = createFileAccessor(outputPath, dispatchers.io)
+    val fa = openFile(outputPath, dispatchers.io)
     try {
       // Create or truncate the destination; flushing a lazy accessor alone is insufficient.
       fa.preallocate(0)
@@ -424,20 +451,15 @@ internal class DownloadExecution(
     } catch (e: Exception) {
       log.w(e) { "Failed to close file for taskId=$taskId" }
     }
+    // Decided by the caller, not the state: a failure, Ketch.close() or remove(false) stops
+    // the execution while it still reports Downloading, and the record keeps its segments.
+    if (completed || !discardsPartialFile) return
     withContext(NonCancellable) {
-      val state = handle.mutableState.value
-      if (!completed && !shuttingDown() && state !is DownloadState.Paused &&
-        state !is DownloadState.Queued &&
-        state !is DownloadState.Canceled
-      ) {
-        try {
-          fa.delete()
-          log.d { "Deleted partial file for failed taskId=$taskId" }
-        } catch (e: Exception) {
-          log.w(e) {
-            "Failed to delete partial file for taskId=$taskId"
-          }
-        }
+      try {
+        fa.delete()
+        log.d { "Deleted partial file for discarded taskId=$taskId" }
+      } catch (e: Exception) {
+        log.w(e) { "Failed to delete partial file for taskId=$taskId" }
       }
     }
   }
