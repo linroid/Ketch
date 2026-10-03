@@ -59,6 +59,9 @@ import kotlinx.serialization.json.Json
  * Remote implementation of [KetchApi] that communicates with a
  * Ketch daemon server over HTTP + SSE.
  *
+ * Calls the server refuses, here and on its tasks, throw [RemoteApiException] with the server's
+ * reason, unless [KetchApi] names another exception for the case.
+ *
  * @param host server hostname or IP address
  * @param port server port (default 8642)
  * @param apiToken optional Bearer token for authentication
@@ -411,14 +414,11 @@ class RemoteKetch internal constructor(
     _tasks.update { taskMap.values.toList() }
   }
 
-  private fun checkSuccess(response: HttpResponse) {
-    if (!response.status.isSuccess()) {
-      log.w { "HTTP error ${response.status.value}" }
-      throw IllegalStateException(
-        "HTTP ${response.status.value}: " +
-          response.status.description,
-      )
-    }
+  private suspend fun checkSuccess(response: HttpResponse) {
+    if (response.status.isSuccess()) return
+    val error = response.toRemoteApiException()
+    log.w { "HTTP error ${error.status}: ${error.errorCode ?: "no error code"}" }
+    throw error
   }
 
   private class UnauthorizedException :

@@ -14,6 +14,8 @@
   <string name="error_check_connection_short">请检查网络连接后重试</string>
   <string name="error_not_supported">此设备不支持</string>
   <string name="error_something_went_wrong">出现问题</string>
+  <string name="error_path_rejected">该设备不允许使用此文件夹</string>
+  <string name="error_path_rejected_hint">只能使用其下载文件夹和所有者允许的文件夹。</string>
 
   <string name="error_disk">无法写入文件</string>
   <string name="error_disk_hint">请检查可用空间和文件夹权限。</string>

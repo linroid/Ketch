@@ -8,6 +8,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.RowCapabilities
+import com.linroid.ketch.remote.RemoteApiException
 import kotlinx.coroutines.test.runTest
 import okio.IOException
 import kotlin.test.Test
@@ -228,6 +229,21 @@ class ErrorCopyTest {
 
     assertEquals("Not supported on this device", copy.title.load())
     assertEquals("Rescheduling is not supported", copy.hint.load())
+  }
+
+  @Test
+  fun throwableToCopy_folderRefusedByDevice_explainsItAndKeepsServerMessage() = runTest {
+    val message = "/srv/a.iso is outside the folders this device saves downloads to"
+    val error = IllegalStateException("wrapper", RemoteApiException(403, "path_rejected", message))
+
+    val copy = error.toCopy()
+
+    assertEquals("Folder not allowed on that device", copy.title.load())
+    assertEquals(
+      "It only uses its download folder and the folders its owner allows.",
+      copy.hint.load()
+    )
+    assertEquals(message, copy.details)
   }
 
   @Test

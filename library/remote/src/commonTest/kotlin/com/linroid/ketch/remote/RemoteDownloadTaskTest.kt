@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.TaskSnapshot
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -20,6 +21,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.time.Instant
 
 class RemoteDownloadTaskTest {
@@ -101,6 +103,49 @@ class RemoteDownloadTaskTest {
   }
 
   @Test
+  fun setConnections_autoRejectedForAnotherReason_throwsServerMessage() = runTest {
+    val client = client {
+      respond(
+        content = """{"error":"bad_request","message":"Task has finished"}""",
+        status = HttpStatusCode.BadRequest,
+        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    }
+    try {
+      val error = assertFailsWith<RemoteApiException> { task(client).setConnections(0) }
+      assertEquals("bad_request", error.errorCode)
+      assertEquals("Task has finished", error.message)
+    } finally {
+      client.close()
+    }
+  }
+
+  @Test
+  fun remove_filesOutsideAllowedFolders_throwsServerMessageAndKeepsTask() = runTest {
+    val message = "/mnt/old/file is outside the folders files can be deleted from"
+    val client = client {
+      respond(
+        content = Json.encodeToString(ErrorResponse("path_rejected", message)),
+        status = HttpStatusCode.Forbidden,
+        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    }
+    try {
+      var removed = false
+      val task = task(client, onRemoved = { removed = true })
+
+      val error = assertFailsWith<RemoteApiException> { task.remove(deleteFiles = true) }
+
+      assertEquals(403, error.status)
+      assertEquals("path_rejected", error.errorCode)
+      assertEquals(message, error.message)
+      assertFalse(removed)
+    } finally {
+      client.close()
+    }
+  }
+
+  @Test
   fun setConnections_snapshotResponse_updatesQueuePosition() = runTest {
     val request = DownloadRequest(url = "https://example.com/file", connections = 4)
     val snapshot = TaskSnapshot(
@@ -168,6 +213,7 @@ class RemoteDownloadTaskTest {
   private fun task(
     client: HttpClient,
     request: DownloadRequest = DownloadRequest(url = "https://example.com/file"),
+    onRemoved: suspend (String) -> Unit = {},
   ) = RemoteDownloadTask(
     taskId = "task",
     request = request,
@@ -176,7 +222,7 @@ class RemoteDownloadTaskTest {
     initialSegments = emptyList(),
     initialQueuePosition = null,
     httpClient = client,
-    onRemoved = {},
+    onRemoved = onRemoved,
   )
 
   // Configured like RemoteKetch's, so responses decode as they do in production.

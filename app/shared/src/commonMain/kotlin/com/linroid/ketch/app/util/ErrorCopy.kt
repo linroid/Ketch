@@ -12,6 +12,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.RowAction
+import com.linroid.ketch.remote.RemoteApiException
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.error_browser_yours
 import ketch.app.shared.generated.resources.error_canceled
@@ -60,6 +61,8 @@ import ketch.app.shared.generated.resources.error_network_hint_server
 import ketch.app.shared.generated.resources.error_network_hint_server_short
 import ketch.app.shared.generated.resources.error_network_hint_short
 import ketch.app.shared.generated.resources.error_not_supported
+import ketch.app.shared.generated.resources.error_path_rejected
+import ketch.app.shared.generated.resources.error_path_rejected_hint
 import ketch.app.shared.generated.resources.error_retried
 import ketch.app.shared.generated.resources.error_retried_once
 import ketch.app.shared.generated.resources.error_something_went_wrong
@@ -139,14 +142,22 @@ fun KetchError.toCopy(request: DownloadRequest, retryCount: Int, device: DeviceI
 
 /**
  * Explains a failure that is not tied to a task's download, such as a command that could not
- * reach a device. A [KetchError] anywhere in the causes is explained as such; other I/O failures
- * read as a lost connection.
+ * reach a device. A [KetchError] anywhere in the causes is explained as such, as is a device
+ * refusing a folder (`path_rejected`); other I/O failures read as a lost connection.
  */
 fun Throwable.toCopy(): ErrorCopy {
   val causes = causeChain()
   val ketchError = causes.firstNotNullOfOrNull { it as? KetchError }
+  val refusal = causes.firstNotNullOfOrNull { it as? RemoteApiException }
   return when {
     ketchError != null -> copyOf(ketchError, request = null, retryCount = 0, device = null)
+    // The server's message says "this device" of itself, which here reads as the user's own.
+    refusal?.errorCode == "path_rejected" -> ErrorCopy(
+      title = Res.string.error_path_rejected.text(),
+      hint = Res.string.error_path_rejected_hint.text(),
+      primary = RowAction.CopyDetails,
+      details = refusal.message,
+    )
     causes.any { it is IOException } -> ErrorCopy(
       title = Res.string.error_connection_lost.text(),
       hint = Res.string.error_check_connection.text(),

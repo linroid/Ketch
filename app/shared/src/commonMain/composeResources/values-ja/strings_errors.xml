@@ -14,6 +14,8 @@
   <string name="error_check_connection_short">接続を確認して、もう一度お試しください</string>
   <string name="error_not_supported">このデバイスではサポートされていません</string>
   <string name="error_something_went_wrong">問題が発生しました</string>
+  <string name="error_path_rejected">そのデバイスではこのフォルダを使用できません</string>
+  <string name="error_path_rejected_hint">使用できるのは、そのデバイスのダウンロードフォルダと所有者が許可したフォルダだけです。</string>
 
   <string name="error_disk">ファイルを書き込めませんでした</string>
   <string name="error_disk_hint">空き容量とフォルダのアクセス権を確認してください。</string>

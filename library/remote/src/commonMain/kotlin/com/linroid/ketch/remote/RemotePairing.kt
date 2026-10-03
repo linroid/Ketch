@@ -78,7 +78,7 @@ class RemotePairing internal constructor(
    * Sends [request] and waits until the server's owner answers or the request expires.
    * Cancelling the call withdraws the request, so the owner is no longer asked.
    *
-   * @throws IllegalStateException when the server answers with an unexpected error
+   * @throws RemoteApiException when the server answers with an unexpected error
    * @throws Exception when the server cannot be reached
    */
   suspend fun request(request: PairingRequest): PairingResult {
@@ -132,9 +132,10 @@ class RemotePairing internal constructor(
     }
   }
 
-  private fun fail(response: HttpResponse): Nothing {
-    log.w { "Pairing failed: HTTP ${response.status.value}" }
-    throw IllegalStateException("HTTP ${response.status.value}: ${response.status.description}")
+  private suspend fun fail(response: HttpResponse): Nothing {
+    val error = response.toRemoteApiException()
+    log.w { "Pairing failed: HTTP ${error.status}: ${error.errorCode ?: "no error code"}" }
+    throw error
   }
 
   override fun close() {

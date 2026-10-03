@@ -15,6 +15,8 @@
   <string name="error_check_connection_short">vérifiez la connexion et réessayez</string>
   <string name="error_not_supported">Non pris en charge sur cet appareil</string>
   <string name="error_something_went_wrong">Une erreur s'est produite</string>
+  <string name="error_path_rejected">Dossier non autorisé sur cet appareil</string>
+  <string name="error_path_rejected_hint">Il n'utilise que son dossier de téléchargement et les dossiers autorisés par son propriétaire.</string>
 
   <string name="error_disk">Impossible d'écrire le fichier</string>
   <string name="error_disk_hint">Vérifiez l'espace libre et les autorisations du dossier.</string>

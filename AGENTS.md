@@ -129,7 +129,7 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
 
 ### `library:remote`
 - `com.linroid.ketch.remote` -- `RemoteKetch` (implements `KetchApi`), `RemoteDownloadTask`,
-  `ConnectionState`, `RemotePairing`, `PairingResult`
+  `ConnectionState`, `RemotePairing`, `PairingResult`, `RemoteApiException`
 
 ### `library:server`, `library:mcp` (JVM only)
 - `com.linroid.ketch.server` -- `KetchServer`, `TaskMapper`, `PairingApprover`; `server.api`
@@ -406,7 +406,10 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   minutes, one per address and four in all wait, and web pages (`Origin` http/https/null) are
   refused because CORS may admit them with a token. mDNS TXT adds `pairing=1`. The apps pass
   an approver backed by `PairingRequests`; the CLI passes none
-- Remote backend (`RemoteKetch`) communicates via HTTP + SSE
+- Remote backend (`RemoteKetch`) communicates via HTTP + SSE. Calls the server refuses throw
+  `RemoteApiException` with the status, the `ErrorResponse` code and message (the HTTP status
+  without one) and `Retry-After`, unless `KetchApi` names another exception for the case. The
+  apps show the server's message, except for `path_rejected`, which their own text explains
 - Auto-reconnection with exponential backoff
 - `ketch server` starts listening, then restores the tasks saved in `ketch.db`, so a daemon that
   cannot bind never resumes them
