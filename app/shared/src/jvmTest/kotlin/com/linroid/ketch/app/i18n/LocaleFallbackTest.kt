@@ -10,6 +10,7 @@ import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 /**
  * Checks which translation each system language gets (docs/development/localization.md): the
@@ -20,6 +21,15 @@ class LocaleFallbackTest {
 
   @Test fun eachTranslation_isShownInItsLanguage() = runTest {
     for (folder in translations()) assertShows(folder, tagOf(folder))
+  }
+
+  @Test fun eachTranslation_namesItsLanguage() {
+    for (folder in translations()) {
+      val tag = stringIn(folder, "strings_common.xml", "language_tag")
+      assertNotNull(tag, "$folder needs language_tag, which the web app marks its page with")
+      assertEquals(Locale.forLanguageTag(tag).toLanguageTag(), tag, "$folder: $tag")
+      assertEquals(tagOf(folder).substringBefore('-'), tag.substringBefore('-'), folder)
+    }
   }
 
   @Test fun chinese_byRegionOrScript_getsItsScript() = runTest {
@@ -62,15 +72,19 @@ class LocaleFallbackTest {
   }
 
   // The language name as the strings file of folder writes it.
-  private fun languageName(folder: String): String {
-    val file = File(RESOURCES, "$folder/strings_settings.xml")
-    val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
+  private fun languageName(folder: String): String =
+    checkNotNull(stringIn(folder, "strings_settings.xml", KEY)) { "$folder has no $KEY" }
+
+  // The string key in file of folder, or null when it has none.
+  private fun stringIn(folder: String, file: String, key: String): String? {
+    val document = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+      .parse(File(RESOURCES, "$folder/$file"))
     val strings = document.getElementsByTagName("string")
     for (i in 0 until strings.length) {
       val node = strings.item(i)
-      if (node.attributes.getNamedItem("name")?.nodeValue == KEY) return node.textContent
+      if (node.attributes.getNamedItem("name")?.nodeValue == key) return node.textContent
     }
-    error("$file has no $KEY")
+    return null
   }
 
   private companion object {

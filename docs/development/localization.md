@@ -132,7 +132,8 @@ lacks falls back to English.
 1. Copy each `strings_*.xml` of `app/shared/src/commonMain/composeResources/values` and the
    desktop's `strings.xml` into a `values-<language>` folder next to it, and translate them.
    Folders take an ISO 639-1 code, a region after `-r` (`values-pt-rBR`) or a BCP 47 tag
-   (`values-b+sr+Latn`).
+   (`values-b+sr+Latn`). Set `language_tag` in `strings_common.xml` to the language's tag, such
+   as `pt-BR` or `zh-Hant`: the web app marks its page with it.
 2. Translate `app/android/src/main/res/values/strings.xml` into `values-<language>`. Android
    13+ offers the languages of these folders in the app's language setting; the build generates
    the list.
