@@ -6,6 +6,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Why a task is [DownloadState.Paused].
@@ -62,14 +65,25 @@ internal object PauseReasonSerializer : KSerializer<PauseReason> {
   }
 
   override fun deserialize(decoder: Decoder): PauseReason {
-    val wire = decoder.decodeSerializableValue(PauseReasonWire.serializer())
-    return when (wire.type) {
-      PREEMPTED -> wire.byTaskId?.let(PauseReason::Preempted) ?: PauseReason.User
+    // From JSON the object is read as it is, so a newer reason with fields of its own decodes
+    // as User even where unknown keys are rejected, such as with Json.Default.
+    val (type, byTaskId) = if (decoder is JsonDecoder) {
+      val fields = decoder.decodeJsonElement() as? JsonObject ?: return PauseReason.User
+      fields.string("type") to fields.string("byTaskId")
+    } else {
+      val wire = decoder.decodeSerializableValue(PauseReasonWire.serializer())
+      wire.type to wire.byTaskId
+    }
+    return when (type) {
+      PREEMPTED -> byTaskId?.let(PauseReason::Preempted) ?: PauseReason.User
       WAITING_FOR_CONDITION -> PauseReason.WaitingForCondition
       SHUTDOWN -> PauseReason.Shutdown
       else -> PauseReason.User
     }
   }
+
+  private fun JsonObject.string(key: String): String? =
+    (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
   private const val USER = "user"
   private const val PREEMPTED = "preempted"

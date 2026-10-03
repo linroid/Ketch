@@ -116,6 +116,22 @@ class DownloadStateTest {
   }
 
   @Test
+  fun pauseReason_unknownTypeWithItsOwnFields_decodesAsUserWithDefaultJson() {
+    // Json.Default rejects unknown keys; the reason's own fields must not trip it.
+    val reason = Json.decodeFromString(
+      PauseReason.serializer(),
+      """{"type":"thermal","celsius":90}""",
+    )
+    val preempted = Json.decodeFromString(
+      PauseReason.serializer(),
+      """{"type":"preempted","byTaskId":"b","since":"2026-10-03T08:00:00Z"}""",
+    )
+
+    assertEquals(PauseReason.User, reason)
+    assertEquals(PauseReason.Preempted("b"), preempted)
+  }
+
+  @Test
   fun pauseReason_preemptedWithoutTaskId_decodesAsUser() {
     val reason = Json.decodeFromString(PauseReason.serializer(), """{"type":"preempted"}""")
 
