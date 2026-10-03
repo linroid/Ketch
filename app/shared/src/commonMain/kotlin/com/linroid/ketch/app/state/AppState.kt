@@ -101,10 +101,8 @@ sealed interface ResolveState {
   data object Idle : ResolveState
   data object Resolving : ResolveState
   data class Resolved(val result: ResolvedSource) : ResolveState
-  data class Error(
-    val message: String,
-    val cause: Throwable? = null,
-  ) : ResolveState
+  /** The device could not read the file; the add sheet words [cause] for its row. */
+  data class Error(val cause: Throwable) : ResolveState
 }
 
 /** Id of this device in [TaskKey]s: [LOCAL_DEVICE_ID] for the embedded one, else `host:port`. */
@@ -682,16 +680,7 @@ class AppState(
         }
       }.onFailure { e ->
         if (e is CancellationException) throw e
-        if (droppedFile === file) {
-          resolveState = ResolveState.Error(
-            message = when (e) {
-              is KetchError.SourceError -> "${file.name} is not a valid torrent file"
-              is KetchError.Unsupported -> "${file.name} is not a supported file"
-              else -> e.message ?: "Failed to read ${file.name}"
-            },
-            cause = e,
-          )
-        }
+        if (droppedFile === file) resolveState = ResolveState.Error(e)
       }
     }
   }

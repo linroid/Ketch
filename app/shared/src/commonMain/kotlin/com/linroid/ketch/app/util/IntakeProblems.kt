@@ -67,10 +67,29 @@ enum class IntakeAction(val label: String) {
  * The add-sheet problem for this failure to resolve [url]. A missing scheme never gets here:
  * [LinkParser] adds `https://` on its own.
  *
+ * @param url the link, or the name of a dropped [file].
  * @param discoverAvailable whether Discover can look for another source, which a missing file
  *   then offers.
+ * @param file whether a dropped file's content was resolved, such as a `.torrent` file's.
  */
-fun Throwable.toIntakeProblem(url: String, discoverAvailable: Boolean = false): IntakeProblem =
+fun Throwable.toIntakeProblem(
+  url: String,
+  discoverAvailable: Boolean = false,
+  file: Boolean = false,
+): IntakeProblem =
+  when {
+    // No source on the device takes it: a magnet or a .torrent there means no torrents at all.
+    this is KetchError.Unsupported && (file || LinkKind.of(url) == LinkKind.Magnet) -> {
+      IntakeProblem(title = "This device can't download torrents")
+    }
+    file && this !is KetchError -> IntakeProblem(
+      title = "Couldn't read this file",
+      detail = message?.takeIf { it.isNotBlank() },
+    )
+    else -> linkProblem(url, discoverAvailable)
+  }
+
+private fun Throwable.linkProblem(url: String, discoverAvailable: Boolean): IntakeProblem =
   when (this) {
     is KetchError.Unsupported -> IntakeProblem(
       title = "Ketch can't download this kind of link",

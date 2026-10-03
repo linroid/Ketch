@@ -15,6 +15,22 @@ class IntakeProblemsTest {
   private val url = "https://user:secret@files.example.com:8443/q3-report.pdf?token=abc"
 
   @Test
+  fun toIntakeProblem_torrentsOrFiles_sayWhatTheDeviceCantDo() {
+    val noTorrents = IntakeProblem("This device can't download torrents")
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+    assertEquals(noTorrents, KetchError.Unsupported().toIntakeProblem(magnet))
+    assertEquals(noTorrents, KetchError.Unsupported().toIntakeProblem("a.torrent", file = true))
+    assertEquals(
+      IntakeProblem("Couldn't read this file", "too large"),
+      IllegalArgumentException("too large").toIntakeProblem("a.torrent", file = true),
+    )
+    assertEquals(
+      IntakeProblem("Couldn't read this torrent", actions = listOf(Retry)),
+      KetchError.SourceError("torrent").toIntakeProblem("a.torrent", file = true),
+    )
+  }
+
+  @Test
   fun toIntakeProblem_eachFailure_matchesTheCatalog() {
     val cases = listOf(
       KetchError.Unsupported() to IntakeProblem(

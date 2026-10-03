@@ -168,12 +168,12 @@ class AppStateDroppedFileTest {
     )
     runCurrent()
 
-    assertEquals("too large", assertIs<ResolveState.Error>(state.resolveState).message)
+    assertEquals("too large", assertIs<ResolveState.Error>(state.resolveState).cause.message)
     assertNull(api.lastResolvedContent)
   }
 
   @Test
-  fun resolveDroppedFile_malformedTorrent_explainsTheFileIsInvalid() = runTest {
+  fun resolveDroppedFile_malformedTorrent_keepsTheDevicesError() = runTest {
     val api = object : KetchApi by FakeKetchApi() {
       override suspend fun resolveContent(content: ByteArray, fileName: String?) =
         throw KetchError.SourceError("torrent")
@@ -184,10 +184,7 @@ class AppStateDroppedFileTest {
     state.addDroppedFiles(listOf(DroppedFile("broken.torrent") { byteArrayOf(1) }))
     runCurrent()
 
-    assertEquals(
-      "broken.torrent is not a valid torrent file",
-      assertIs<ResolveState.Error>(state.resolveState).message,
-    )
+    assertIs<KetchError.SourceError>(assertIs<ResolveState.Error>(state.resolveState).cause)
   }
 
   @Test

@@ -1584,10 +1584,11 @@ class IntakeSession internal constructor(
       }
       if (!submitting) entry.duplicate = duplicateOf(duplicateDetector(), entry)
     }.onFailure { e ->
-      val url = entry.url ?: (entry.source as? IntakeSource.File)?.file?.name.orEmpty()
+      val file = (entry.source as? IntakeSource.File)?.file
+      val url = entry.url ?: file?.name.orEmpty()
       log.d { "Couldn't check ${redactUrl(url)}: ${e.describeCauses()}" }
       entry.status = IntakeStatus.Problem(
-        e.toIntakeProblem(url, discoverAvailable = state.aiSettings.available),
+        e.toIntakeProblem(url, discoverAvailable = state.aiSettings.available, file = file != null),
         e,
       )
     }
@@ -1614,9 +1615,7 @@ class IntakeSession internal constructor(
       if (current === file) {
         when (resolveState) {
           is ResolveState.Resolved -> return resolveState.result
-          is ResolveState.Error -> throw resolveState.cause ?: IllegalStateException(
-            resolveState.message,
-          )
+          is ResolveState.Error -> throw resolveState.cause
           else -> Unit
         }
       }
