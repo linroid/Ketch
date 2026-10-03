@@ -9,6 +9,7 @@ import com.linroid.ketch.updater.ReleaseAsset
 import com.linroid.ketch.updater.ReleaseFeed
 import com.linroid.ketch.updater.ReleaseOs
 import com.linroid.ketch.updater.ReleasePlatform
+import com.linroid.ketch.updater.ReleaseProduct
 import com.linroid.ketch.updater.ReleaseVersion
 import com.linroid.ketch.updater.UpdateException
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -152,6 +153,28 @@ class DesktopUpdaterTest {
   }
 
   @Test
+  fun download_portableCopy_fetchesThePortableArchive() = runTest {
+    val windows = ReleasePlatform(ReleaseOs.Windows, ReleaseArch.X64)
+    feed.latest = newer.copy(
+      assets = listOf(
+        asset("ketch-desktop-0.0.2-windows-x64.msi"),
+        asset("ketch-desktop-0.0.2-windows-x64-portable.zip"),
+      ),
+    )
+    val updater = updater(
+      installer = FakeInstaller(ReleaseProduct.PortableDesktop),
+      platform = windows,
+    )
+    updater.check()
+    runCurrent()
+    updater.download()
+    runCurrent()
+
+    assertEquals("ketch-desktop-0.0.2-windows-x64-portable.zip", downloads.single().name)
+    assertIs<AppUpdateState.Ready>(updater.state.value)
+  }
+
+  @Test
   fun download_failure_keepsTheReleaseToTryAgain() = runTest {
     downloadFails = true
     val updater = available()
@@ -249,6 +272,7 @@ class DesktopUpdaterTest {
   private fun TestScope.updater(
     current: String = "0.0.1",
     installer: UpdateInstaller? = this@DesktopUpdaterTest.installer,
+    platform: ReleasePlatform = this@DesktopUpdaterTest.platform,
   ) = DesktopUpdater(
     scope = backgroundScope,
     feed = feed,
@@ -271,14 +295,14 @@ class DesktopUpdaterTest {
   private fun release(version: String) = Release(
     version = ReleaseVersion.parse(version)!!,
     pageUrl = "https://github.com/linroid/Ketch/releases/tag/v$version",
-    assets = listOf(
-      ReleaseAsset(
-        name = "ketch-desktop-$version-macos-arm64.dmg",
-        url = "https://example.com/ketch.dmg",
-        size = 1000,
-        sha256 = "00",
-      ),
-    ),
+    assets = listOf(asset("ketch-desktop-$version-macos-arm64.dmg")),
+  )
+
+  private fun asset(name: String) = ReleaseAsset(
+    name = name,
+    url = "https://example.com/$name",
+    size = 1000,
+    sha256 = "00",
   )
 
   private class FakeFeed(var latest: Release) : ReleaseFeed {
@@ -295,7 +319,9 @@ class DesktopUpdaterTest {
     override suspend fun release(version: ReleaseVersion): Release = error("Not used")
   }
 
-  private class FakeInstaller : UpdateInstaller {
+  private class FakeInstaller(
+    override val product: ReleaseProduct = ReleaseProduct.Desktop,
+  ) : UpdateInstaller {
     override var restarts = true
     var installFailure: Exception? = null
     val prepared = mutableListOf<File>()

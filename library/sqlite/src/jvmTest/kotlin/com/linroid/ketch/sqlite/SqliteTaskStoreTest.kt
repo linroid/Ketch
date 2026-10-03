@@ -1,5 +1,6 @@
 package com.linroid.ketch.sqlite
 
+import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.SpeedLimit
@@ -74,6 +75,53 @@ class SqliteTaskStoreTest {
       driver.close()
     }
   }
+
+  @Test
+  fun loadAll_unreadableRows_skipsThemAndKeepsThemStored() = runTest {
+    val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+    try {
+      KetchDatabase.Schema.create(driver)
+      val store = SqliteTaskStore(driver)
+      store.save(
+        TaskRecord(
+          taskId = "good",
+          request = DownloadRequest(url = "https://example.com/good"),
+          state = TaskState.COMPLETED,
+          createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000),
+          updatedAt = Instant.fromEpochMilliseconds(1_700_000_000_000),
+        )
+      )
+      driver.insertRow("malformed", "{\"url\":", "QUEUED")
+      // DownloadRequest refuses a blank URL.
+      driver.insertRow("blank-url", "{\"url\":\"\"}", "QUEUED")
+      driver.insertRow(
+        "unknown-priority",
+        "{\"url\":\"https://example.com/a\",\"priority\":\"CRITICAL\"}",
+        "QUEUED"
+      )
+      driver.insertRow("unknown-state", "{\"url\":\"https://example.com/b\"}", "ARCHIVED")
+
+      assertEquals(listOf("good"), store.loadAll().map { it.taskId })
+      assertEquals(5, driver.countRows())
+    } finally {
+      driver.close()
+    }
+  }
+
+  private fun JdbcSqliteDriver.insertRow(taskId: String, requestJson: String, state: String) {
+    execute(null, "INSERT INTO task_records(task_id, request_json, state) VALUES (?, ?, ?)", 3) {
+      bindString(0, taskId)
+      bindString(1, requestJson)
+      bindString(2, state)
+    }
+  }
+
+  private fun JdbcSqliteDriver.countRows(): Long = executeQuery(
+    null,
+    "SELECT count(*) FROM task_records",
+    { cursor -> QueryResult.Value(if (cursor.next().value) cursor.getLong(0) else null) },
+    0,
+  ).value ?: 0
 
   private companion object {
     val VERSION_4_TABLE = """

@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
@@ -16,12 +17,15 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.defaultDownloadDirectory
+import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.NoOpFileAccessor
+import com.linroid.ketch.core.file.OutputPathReservations
 import com.linroid.ketch.core.file.createFileAccessor
-import com.linroid.ketch.core.file.platformFileSystem
+import com.linroid.ketch.core.file.isInsideDirectory
 import com.linroid.ketch.core.file.resolveChildPath
+import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
@@ -39,8 +43,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okio.Path
-import okio.Path.Companion.toPath
 
 /**
  * Encapsulates the execution logic for a single download task.
@@ -100,6 +102,9 @@ internal class DownloadExecution(
   var fileAccessor: FileAccessor? = null
   var totalBytes: Long = 0
 
+  /** The output path held in [OutputPathReservations] until this execution stops. */
+  private var reservedPath: String? = null
+
   /**
    * Executes a download — either fresh or resumed.
    *
@@ -108,10 +113,15 @@ internal class DownloadExecution(
    * download from the request URL.
    */
   suspend fun execute(resumeInfo: ResumeInfo? = null) {
-    if (resumeInfo != null) {
-      executeResume(resumeInfo)
-    } else {
-      executeFresh()
+    try {
+      if (resumeInfo != null) {
+        executeResume(resumeInfo)
+      } else {
+        executeFresh()
+      }
+    } finally {
+      reservedPath?.let(OutputPathReservations::release)
+      reservedPath = null
     }
   }
 
@@ -196,7 +206,6 @@ internal class DownloadExecution(
           ?: defaultDownloadDirectory()
       },
       serverFileName = fileName,
-      deduplicate = true,
     )
     log.i {
       "Resolved taskId=$taskId: source=${source.type}, totalBytes=$total, " +
@@ -249,6 +258,7 @@ internal class DownloadExecution(
           "No outputPath for taskId=${taskRecord.taskId}",
         ),
       )
+    reserve(outputPath)
     totalBytes = taskRecord.totalBytes
 
     val resumeState = taskRecord.sourceResumeState
@@ -587,14 +597,21 @@ internal class DownloadExecution(
     }
   }
 
+  /**
+   * Picks the output path and reserves it until the execution stops. A file [destination] is
+   * used as it is. Otherwise the name, a [destination] name or else [serverFileName] made safe
+   * with [sanitizeFileName], is joined to the folder, must stay inside it, and gets a ` (n)`
+   * suffix when the file exists or another download reserved the path.
+   *
+   * @throws KetchError.Disk if the name would leave the folder
+   */
   private fun resolveDestPath(
-    destination: com.linroid.ketch.api.Destination?,
+    destination: Destination?,
     defaultDir: () -> String,
-    serverFileName: String?,
-    deduplicate: Boolean,
+    serverFileName: String,
   ): String {
     if (destination != null && destination.isFile()) {
-      return destination.value
+      return destination.value.also(::reserve)
     }
     val directory = when {
       destination != null && destination.isDirectory() ->
@@ -604,15 +621,24 @@ internal class DownloadExecution(
     val fileName = when {
       destination != null && destination.isName() ->
         destination.value
-      else -> serverFileName
+      else -> sanitizeFileName(serverFileName) ?: DefaultFileNameResolver.FALLBACK
     }
-    if (fileName == null) return directory
     val outputPath = resolveChildPath(directory, fileName)
-    return if (deduplicate && !directory.contains("://")) {
-      deduplicatePath(outputPath.toPath()).toString()
-    } else {
-      outputPath
+    // A content:// document was just created under a name its provider made unique.
+    if (directory.contains("://")) return outputPath
+    if (!isInsideDirectory(directory, outputPath)) {
+      throw KetchError.Disk(
+        IllegalArgumentException("File name \"$fileName\" leaves the folder $directory"),
+      )
     }
+    return OutputPathReservations.reserveUnique(outputPath).also { reservedPath = it }
+  }
+
+  /** Reserves [path], used as it is, unless it is a content:// document. */
+  private fun reserve(path: String) {
+    if (path.contains("://")) return
+    OutputPathReservations.reserve(path)
+    reservedPath = path
   }
 
   /**
@@ -623,29 +649,4 @@ internal class DownloadExecution(
     val segments: List<Segment>,
   )
 
-  companion object {
-    internal fun deduplicatePath(candidate: Path): Path {
-      val fileName = candidate.name
-      val directory = candidate.parent ?: return candidate
-      if (!platformFileSystem.exists(candidate)) return candidate
-
-      val dotIndex = fileName.lastIndexOf('.')
-      val baseName: String
-      val extension: String
-      if (dotIndex > 0) {
-        baseName = fileName.take(dotIndex)
-        extension = fileName.substring(dotIndex)
-      } else {
-        baseName = fileName
-        extension = ""
-      }
-
-      var seq = 1
-      while (true) {
-        val path = directory / "$baseName ($seq)$extension"
-        if (!platformFileSystem.exists(path)) return path
-        seq++
-      }
-    }
-  }
 }

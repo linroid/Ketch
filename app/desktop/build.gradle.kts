@@ -238,6 +238,35 @@ compose.desktop {
   }
 }
 
+// The portable Windows app: the release app folder with an empty data folder beside Ketch.exe,
+// zipped. The data folder makes the app keep everything it writes there instead of in
+// %APPDATA%\ketch (PortableApp.kt). The release workflow uploads it as
+// ketch-desktop-<version>-windows-<arch>-portable.zip.
+val portableDataFolder = tasks.register("portableDataFolder") {
+  val outputDir = layout.buildDirectory.dir("portable/data-folder")
+  outputs.dir(outputDir)
+  doLast { outputDir.get().dir("data").asFile.mkdirs() }
+}
+
+tasks.register<Zip>("packageReleasePortableZip") {
+  group = "compose desktop"
+  description = "Packages the release app folder as the portable Windows app, a .zip."
+  // Elsewhere the app folder is a macOS bundle or a Linux app, which the data folder doesn't
+  // make portable; skipped there like packageReleaseMsi, without building the app first.
+  val windows = providers.systemProperty("os.name").get().startsWith("Windows")
+  enabled = windows
+  if (windows) {
+    // createReleaseDistributable writes the app to <packageName>\, here Ketch\.
+    val appFolder = checkNotNull(compose.desktop.application.nativeDistributions.packageName)
+    from(tasks.named("createReleaseDistributable"))
+    from(portableDataFolder) { into(appFolder) }
+  }
+  destinationDirectory = layout.buildDirectory.dir("compose/binaries/main-release/portable")
+  archiveFileName = "Ketch-portable.zip"
+  isPreserveFileTimestamps = false
+  isReproducibleFileOrder = true
+}
+
 /**
  * The version the installers carry for [version], such as `0.0.1-rc15`. jpackage wants a MAJOR
  * above 0 on macOS, and Windows Installer only upgrades to a higher MAJOR.MINOR.BUILD (MAJOR and

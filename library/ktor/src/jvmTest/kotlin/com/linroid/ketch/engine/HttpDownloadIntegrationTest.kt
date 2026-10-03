@@ -198,6 +198,17 @@ class HttpDownloadIntegrationTest {
   }
 
   @Test
+  fun download_headForbidden_probesWithRangedGet() = runTest(timeout = 20.seconds) {
+    withFixture(65539, Mode.GET_ONLY) { fixture ->
+      val state = fixture.download(connections = 2)
+      assertContentEquals(fixture.content, File(assertIs<DownloadState.Completed>(state).outputPath)
+        .readBytes())
+      assertEquals("bytes=0-0", fixture.requests.first())
+      assertEquals(setOf("bytes=0-32769", "bytes=32770-65538"), fixture.requests.drop(1).toSet())
+    }
+  }
+
+  @Test
   fun download_missingResource_failsWithoutRetryOrOutputFile() = runTest(timeout = 20.seconds) {
     withFixture(17, Mode.NOT_FOUND) { fixture ->
       val state = assertIs<DownloadState.Failed>(fixture.download(connections = 1))
@@ -284,6 +295,9 @@ class HttpDownloadIntegrationTest {
     NORMAL, NO_RANGES, NO_RANGES_PAUSE_FIRST, IGNORE_RANGES, WRONG_RANGE, FAIL_FIRST,
     TRUNCATE_FIRST, PAUSE_FIRST, HEAD_FAIL_FIRST, NOT_FOUND, UNICODE_NAME,
 
+    /** `HEAD` is refused with 403, as for a URL presigned for `GET` only. */
+    GET_ONLY,
+
     /** No size and no ranges: the body is sent chunked, like a generated archive. */
     STREAMED, STREAMED_PAUSE_FIRST,
   }
@@ -354,8 +368,14 @@ class HttpDownloadIntegrationTest {
             }
             if (it.requestMethod == "HEAD") {
               val headAttempt = headAttempts.incrementAndGet()
-              if (mode == Mode.NOT_FOUND || mode == Mode.HEAD_FAIL_FIRST && headAttempt == 1) {
-                it.sendResponseHeaders(if (mode == Mode.NOT_FOUND) 404 else 503, -1)
+              val refusal = when {
+                mode == Mode.NOT_FOUND -> 404
+                mode == Mode.GET_ONLY -> 403
+                mode == Mode.HEAD_FAIL_FIRST && headAttempt == 1 -> 503
+                else -> 0
+              }
+              if (refusal != 0) {
+                it.sendResponseHeaders(refusal, -1)
                 return@use
               }
               if (!streamed) it.responseHeaders.add("Content-Length", content.size.toString())
@@ -364,6 +384,10 @@ class HttpDownloadIntegrationTest {
             }
             val range = it.requestHeaders.getFirst("Range")
             requests.add(range ?: "none")
+            if (mode == Mode.NOT_FOUND) {
+              it.sendResponseHeaders(404, -1)
+              return@use
+            }
             val attempt = attempts.incrementAndGet()
             if (mode == Mode.FAIL_FIRST && attempt == 1) {
               it.sendResponseHeaders(503, -1)

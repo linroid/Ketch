@@ -99,9 +99,9 @@ internal class SingleInstance private constructor(
           } catch (_: IOException) {
             continue // Closed on exit.
           }
+          // On Linux an accept already waiting in the kernel can still take a connection after
+          // close() returns; a closed instance must not answer it.
           if (server.isClosed) {
-            // close() returns before this thread lets go of the socket, so a connection made
-            // after it can still be accepted; an instance that closed answers none.
             socket.close()
             break
           }

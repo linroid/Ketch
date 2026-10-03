@@ -13,7 +13,6 @@ import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoveryException
-import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.SearchProvider
@@ -97,6 +96,8 @@ private fun runDownload(args: DownloadArgs.Download) {
     println("Priority: ${args.priority}")
   }
   println("Max concurrent: ${args.maxConcurrent}")
+  // Names only: values such as cookies are credentials.
+  if (args.headers.isNotEmpty()) println("Headers: ${args.headers.keys.joinToString()}")
   println()
 
   val config = DownloadConfig(
@@ -111,7 +112,7 @@ private fun runDownload(args: DownloadArgs.Download) {
     httpEngine = KtorHttpEngine.withNetworkInterfaces(),
     config = config,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), torrentSource(defaultTorrentSettings())),
+    additionalSources = listOf(FtpDownloadSource(), torrentSource(readDefaultConfig().torrent)),
   )
 
   runBlocking {
@@ -364,8 +365,7 @@ private fun runServer(args: Array<String>) {
   File(downloadConfig.defaultDirectory).mkdirs()
 
   val dbPath = defaultDbPath()
-  val driver = DriverFactory(dbPath).createDriver()
-  val taskStore = SqliteTaskStore(driver)
+  val taskStore = openTaskStore(dbPath)
 
   val ketch = Ketch(
     httpEngine = KtorHttpEngine.withNetworkInterfaces(),
@@ -483,13 +483,7 @@ private fun runAiDiscover(args: List<String>) {
     return
   }
 
-  val defaultPath = defaultConfigPath()
-  val stored = if (File(defaultPath).exists()) {
-    FileConfigStore(defaultPath).load().ai
-  } else {
-    AiSettings()
-  }
-  val settings = resolveAiSettingsFromEnv(stored)
+  val settings = resolveAiSettingsFromEnv(readDefaultConfig().ai)
   if (!settings.isUsable) {
     println("AI discovery is not configured.")
     println("Set a provider and API token on the app's Settings page,")
@@ -607,14 +601,15 @@ private fun runMcp(args: List<String>) {
   printBanner()
 
   val fileConfig = if (configPath != null) {
-    FileConfigStore(configPath).load()
-  } else {
-    val defaultPath = defaultConfigPath()
-    if (File(defaultPath).exists()) {
-      FileConfigStore(defaultPath).load()
-    } else {
-      KetchConfig()
+    try {
+      FileConfigStore(configPath).load()
+    } catch (e: Exception) {
+      // A failing status, so the MCP client reports the server as failed rather than closed
+      System.err.println("Error loading config from $configPath: ${e.message}")
+      exitProcess(1)
     }
+  } else {
+    readDefaultConfig()
   }
 
   val defaultDownloadDir = System.getProperty("user.home") +
@@ -627,9 +622,7 @@ private fun runMcp(args: List<String>) {
 
   File(downloadConfig.defaultDirectory!!).mkdirs()
 
-  val dbPath = defaultDbPath()
-  val driver = DriverFactory(dbPath).createDriver()
-  val taskStore = SqliteTaskStore(driver)
+  val taskStore = openTaskStore(defaultDbPath())
 
   val ketch = Ketch(
     httpEngine = KtorHttpEngine.withNetworkInterfaces(),
@@ -691,15 +684,40 @@ private fun torrentSource(settings: TorrentSettings) = TorrentDownloadSource(
   ),
 )
 
-/** The `[torrent]` section of the default config file, when one exists. */
-private fun defaultTorrentSettings(): TorrentSettings {
+/**
+ * The default config file's settings, or the defaults when there is none or it cannot be read,
+ * which stderr reports. The file stays as it is: the CLI never saves it, and the apps that share
+ * it move an unreadable one aside and tell the user.
+ */
+private fun readDefaultConfig(): KetchConfig {
   val path = defaultConfigPath()
-  if (!File(path).exists()) return TorrentSettings()
+  if (!File(path).exists()) return KetchConfig()
   return try {
-    FileConfigStore(path).load().torrent
+    FileConfigStore(path).load()
   } catch (e: Exception) {
-    System.err.println("Ignoring torrent settings in $path: ${e.message}")
-    TorrentSettings()
+    System.err.println("Ignoring $path, which can't be read: ${e.message}")
+    KetchConfig()
+  }
+}
+
+/**
+ * Opens the task database at [dbPath], which the desktop app shares. A file SQLite cannot read
+ * is moved aside, which stderr reports, and an empty database replaces it. When the database
+ * cannot be opened at all, such as when it is locked, the process exits with status 1 after
+ * reporting why, so a service manager or MCP client sees the failure.
+ */
+private fun openTaskStore(dbPath: String): SqliteTaskStore {
+  val driverFactory = DriverFactory(dbPath) { unreadable ->
+    System.err.println(
+      "Moved $dbPath aside to ${unreadable.movedTo}, as it can't be read " +
+        "(${unreadable.cause?.message}); starting with no downloads"
+    )
+  }
+  return try {
+    SqliteTaskStore(driverFactory.createDriver())
+  } catch (e: Exception) {
+    System.err.println("Error opening $dbPath: ${e.message}")
+    exitProcess(1)
   }
 }
 
@@ -722,6 +740,11 @@ private fun printUsage() {
   println("                           Values: low, normal, high, urgent")
   println("  --max-concurrent <n>     Max simultaneous downloads")
   println("                           Default: 3")
+  println("  -H, --header <header>    Send a request header, e.g.")
+  println("                           -H 'Cookie: sid=1'; repeatable")
+  println("  --user-agent <value>     Send this User-Agent instead of")
+  println("                           Ketch/<version>")
+  println("  --referer <url>          Send this Referer")
   println()
   println("Server:")
   println("  server [options]         Start Ketch daemon server")

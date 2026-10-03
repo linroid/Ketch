@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageCenter
+import com.linroid.ketch.app.feedback.UnreadableFiles
 import com.linroid.ketch.app.instance.InstanceManager
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +31,8 @@ import kotlin.time.Clock
  *   service whose notification switches it, so the app and the host never fight over the speed
  *   limit; `null` when the host keeps none. Its mode also feeds the devices' presence.
  * @param clock current time of the task list and the speed history.
+ * @param unreadableFiles files the host moved aside because it could not read them, such as
+ *   `config.toml`, which the app reports to the user once.
  */
 class AppController(
   val instanceManager: InstanceManager,
@@ -38,6 +41,7 @@ class AppController(
   context: CoroutineContext = Dispatchers.Main,
   speedMode: SpeedModeController? = null,
   clock: Clock = Clock.System,
+  unreadableFiles: UnreadableFiles = UnreadableFiles(),
 ) {
   private val log = KetchLogger("AppController")
   private var closed = false
@@ -65,6 +69,7 @@ class AppController(
     incoming = incoming,
     speedMode = speedMode,
     clock = clock,
+    unreadableFiles = unreadableFiles,
   )
 
   init {
@@ -111,13 +116,17 @@ fun rememberAppController(
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   incoming: IncomingDownloads? = null,
   speedMode: SpeedModeController? = null,
+  unreadableFiles: UnreadableFiles? = null,
 ): AppController {
-  val controller = remember(instanceManager, aiProviderFactory, incoming, speedMode) {
+  val controller = remember(
+    instanceManager, aiProviderFactory, incoming, speedMode, unreadableFiles
+  ) {
     AppController(
       instanceManager = instanceManager,
       aiProviderFactory = aiProviderFactory,
       incoming = incoming ?: IncomingDownloads(),
       speedMode = speedMode,
+      unreadableFiles = unreadableFiles ?: UnreadableFiles(),
     )
   }
   DisposableEffect(controller) {

@@ -270,7 +270,8 @@ val aiModule = AiModule.create(
 The desktop and Android apps configure discovery on the **Settings**
 page (provider, API token, model, endpoint and web search). Settings are
 persisted in `config.toml` under `[ai]`, so the CLI picks up the same
-configuration. See [docs/ai-discovery.md](../../docs/ai-discovery.md).
+configuration, except from the portable Windows app, which keeps its own.
+See [docs/ai-discovery.md](../../docs/ai-discovery.md).
 
 ### CLI
 

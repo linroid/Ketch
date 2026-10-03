@@ -72,6 +72,9 @@
   <string name="feedback_reconnect_failed">無法重新連線至 %1$s</string>
   <string name="feedback_remove_device_failed">無法移除 %1$s</string>
   <string name="feedback_discovery_failed">尋找區域網路中的伺服器失敗</string>
+  <string name="feedback_settings_unreadable">無法讀取設定，Ketch 已使用預設設定啟動</string>
+  <string name="feedback_downloads_unreadable">無法讀取下載清單，Ketch 已使用空白清單啟動</string>
+  <string name="feedback_unreadable_kept">舊檔案已保留為 %1$s</string>
 
   <plurals name="feedback_part_failed">
     <item quantity="other">%1$d 個失敗</item>

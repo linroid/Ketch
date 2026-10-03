@@ -32,6 +32,9 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
   override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
     nextEngine().head(url, headers)
 
+  override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
+    nextEngine().probe(url, headers)
+
   override suspend fun download(
     url: String,
     range: LongRange?,

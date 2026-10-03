@@ -19,8 +19,9 @@ import com.linroid.ketch.core.engine.NetworkInterfaceProvider
 fun KtorHttpEngine.Companion.withNetworkInterfaces(
   connectivityManager: ConnectivityManager,
   logRequests: Boolean = true,
+  userAgent: String? = KtorHttpEngine.DEFAULT_USER_AGENT,
 ): ConfigurableNetworkHttpEngine = ConfigurableNetworkHttpEngine(
-  AndroidNetworkInterfaceProvider(connectivityManager, logRequests)
+  AndroidNetworkInterfaceProvider(connectivityManager, logRequests, userAgent)
 )
 
 // Point-in-time discovery; callbacks and network retention belong to the app.
@@ -28,6 +29,7 @@ fun KtorHttpEngine.Companion.withNetworkInterfaces(
 internal class AndroidNetworkInterfaceProvider(
   private val manager: ConnectivityManager,
   private val logRequests: Boolean,
+  private val userAgent: String? = KtorHttpEngine.DEFAULT_USER_AGENT,
 ) : NetworkInterfaceProvider {
   override suspend fun availableInterfaces(): List<NetworkInterfaceInfo> =
     nameNetworks(
@@ -46,13 +48,14 @@ internal class AndroidNetworkInterfaceProvider(
       }
     ).sortedBy { it.id }
 
-  override fun createDefaultEngine(): HttpEngine = KtorHttpEngine(logRequests = logRequests)
+  override fun createDefaultEngine(): HttpEngine =
+    KtorHttpEngine(logRequests = logRequests, userAgent = userAgent)
 
   override fun createEngine(networkInterface: NetworkInterfaceInfo): HttpEngine {
     val network = requireNotNull(manager.allNetworks.find {
       it.networkHandle.toString() == networkInterface.id && isAvailable(it)
     }) { "Unknown or unavailable network: ${networkInterface.id}" }
-    return KtorHttpEngine.forNetwork(network, logRequests)
+    return KtorHttpEngine.forNetwork(network, logRequests, userAgent)
   }
 
   private fun isAvailable(network: Network): Boolean =

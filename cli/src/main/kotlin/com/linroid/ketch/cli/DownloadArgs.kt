@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
+import com.linroid.ketch.core.engine.RequestHeaders
 import java.io.File
 
 /** Arguments of the single-file download command, `ketch [options] <url> [destination]`. */
@@ -21,10 +22,13 @@ internal sealed interface DownloadArgs {
     val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
     val priority: DownloadPriority = DownloadPriority.NORMAL,
     val maxConcurrent: Int = 3,
+    val headers: Map<String, String> = emptyMap(),
   ) : DownloadArgs
 }
 
-private val valueOptions = setOf("--speed-limit", "--priority", "--max-concurrent")
+private val valueOptions = setOf(
+  "--speed-limit", "--priority", "--max-concurrent", "-H", "--header", "--user-agent", "--referer",
+)
 
 /**
  * [DownloadRequest.properties] key naming the client a task was added from. Ketch never reads
@@ -42,6 +46,12 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var speedLimit = SpeedLimit.Unlimited
   var priority = DownloadPriority.NORMAL
   var maxConcurrent = 3
+  val headers = LinkedHashMap<String, String>()
+  // Header names ignore case, so a later option replaces an earlier one however it is spelled.
+  fun setHeader(name: String, value: String) {
+    headers.keys.removeAll { it.equals(name, ignoreCase = true) }
+    headers[name] = value
+  }
 
   var i = 0
   while (i < args.size) {
@@ -65,6 +75,13 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
               return DownloadArgs.Invalid("--max-concurrent must be > 0")
             }
           }
+          "-H", "--header" -> {
+            val separator = value.indexOf(':')
+            if (separator <= 0) return DownloadArgs.Invalid("$arg expects 'Name: value'")
+            setHeader(value.substring(0, separator).trim(), value.substring(separator + 1).trim())
+          }
+          "--user-agent" -> setHeader("User-Agent", value)
+          "--referer" -> setHeader("Referer", value)
         }
         i++
       }
@@ -77,12 +94,18 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   }
 
   if (url == null) return DownloadArgs.Invalid("missing <url>")
+  try {
+    RequestHeaders.requireValid(headers)
+  } catch (e: IllegalArgumentException) {
+    return DownloadArgs.Invalid(e.message ?: "invalid header")
+  }
   return DownloadArgs.Download(
     url = url,
     destination = destination,
     speedLimit = speedLimit,
     priority = priority,
     maxConcurrent = maxConcurrent,
+    headers = headers,
   )
 }
 
@@ -93,6 +116,7 @@ internal fun DownloadArgs.Download.toRequest(destination: Destination): Download
     destination = destination,
     speedLimit = speedLimit,
     priority = priority,
+    headers = headers,
     properties = mapOf(ORIGIN_PROPERTY to CLI_ORIGIN),
   )
 

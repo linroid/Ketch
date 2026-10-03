@@ -127,7 +127,12 @@ DownloadRequest
   |           DownloadRequest.resolvedSource already names it. HttpDownloadSource
   |           sends HEAD to get size, range support, ETag, Last-Modified
   |           (ServerInfo). The output path is resolved against the default
-  |           directory and deduplicated.
+  |           directory and deduplicated. A name from the server, the link or a
+  |           FileNameResolver passes through sanitizeFileName (last segment
+  |           only, no control or Windows-reserved characters, at most 255
+  |           bytes) and must stay inside the folder; a file Destination is used
+  |           as it is. OutputPathReservations keeps the path of every running
+  |           download, so two started together never share a file.
   |
   v
 [4. Plan]  SegmentCalculator splits the file into N segments, N being the task's

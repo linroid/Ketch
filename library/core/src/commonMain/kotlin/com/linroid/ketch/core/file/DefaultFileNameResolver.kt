@@ -12,6 +12,9 @@ import com.linroid.ketch.api.log.redactUrl
  * 2. Last non-empty URL path segment (percent-decoded, query/fragment stripped)
  * 3. Fallback: `"download"`
  *
+ * Names from the header and the URL are passed through [sanitizeFileName]; one that leaves
+ * nothing usable, such as `..`, falls through to the next.
+ *
  * Explicit names set via [DownloadRequest.destination] are handled by
  * the coordinator before this resolver is called.
  */
@@ -44,8 +47,7 @@ internal class DefaultFileNameResolver : FileNameResolver {
         RegexOption.IGNORE_CASE
       )
       extRegex.find(header)?.groupValues?.get(1)?.let { encoded ->
-        val decoded = percentDecode(encoded).trim()
-        if (decoded.isNotBlank()) return decoded
+        sanitizeFileName(percentDecode(encoded))?.let { return it }
       }
 
       // Try filename="<value>"
@@ -54,18 +56,16 @@ internal class DefaultFileNameResolver : FileNameResolver {
         RegexOption.IGNORE_CASE
       )
       quotedRegex.find(header)?.groupValues?.get(1)?.let { value ->
-        val trimmed = value.trim()
-        if (trimmed.isNotBlank()) return trimmed
+        sanitizeFileName(value)?.let { return it }
       }
 
-      // Try filename=<value> (unquoted)
+      // Try filename=<value> (unquoted; a quoted value the regex above rejected stays rejected)
       val unquotedRegex = Regex(
-        """filename\s*=\s*([^\s;]+)""",
+        """filename\s*=\s*([^\s;"][^\s;]*)""",
         RegexOption.IGNORE_CASE
       )
       unquotedRegex.find(header)?.groupValues?.get(1)?.let { value ->
-        val trimmed = value.trim()
-        if (trimmed.isNotBlank()) return trimmed
+        sanitizeFileName(value)?.let { return it }
       }
 
       return null
@@ -84,9 +84,8 @@ internal class DefaultFileNameResolver : FileNameResolver {
         withoutQuery
       }
       val segment = pathPart.trimEnd('/').substringAfterLast("/")
-      if (segment.isBlank()) return null
-      val decoded = percentDecode(segment).trim()
-      return decoded.ifBlank { null }
+      // Decoding may reveal separators (%2F, %5C), which the sanitizer strips with what precedes.
+      return sanitizeFileName(percentDecode(segment))
     }
 
     internal fun percentDecode(encoded: String): String {
