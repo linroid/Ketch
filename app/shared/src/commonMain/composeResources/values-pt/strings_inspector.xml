@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="inspector_tab_overview">Visão geral</string>
+  <string name="inspector_tab_connections">Conexões</string>
+  <string name="inspector_tab_files">Arquivos</string>
+  <string name="inspector_tab_activity">Atividade</string>
+
+  <string name="inspector_stalled_seconds">Parada há %1$d s</string>
+  <string name="inspector_stalled_minutes">Parada há %1$d min</string>
+  <string name="inspector_size_of">%1$s de %2$s</string>
+
+  <string name="inspector_metric_left">faltam %1$s</string>
+  <string name="inspector_metric_done_at">termina ≈ %1$s</string>
+
+  <string name="inspector_reason_reconnect">Reconectar</string>
+  <string name="inspector_reason_full_speed">Velocidade máxima</string>
+  <string name="inspector_reason_remove_limit">Remover limite</string>
+  <string name="inspector_reason_speed_settings">Configurações de velocidade</string>
+  <string name="inspector_reason_paused_resumes">Pausado · retoma de onde parou</string>
+  <string name="inspector_reason_paused_restarts">Pausado · ao retomar, começa do zero</string>
+  <string name="inspector_file_missing">Arquivo movido ou apagado</string>
+  <string name="inspector_reason_slow_lane">Limitado pela Faixa lenta (%1$s)</string>
+  <string name="inspector_reason_global_limit">Limitado pelo limite global (%1$s)</string>
+  <string name="inspector_reason_own_limit">Limitado a %1$s</string>
+
+  <string name="inspector_source_magnet">BitTorrent · magnet</string>
+  <string name="inspector_source_torrent_file">BitTorrent · arquivo torrent</string>
+  <string name="inspector_source_link">Link</string>
+
+  <string name="inspector_origin_browser">Do navegador</string>
+  <string name="inspector_origin_discover">Do Descobrir</string>
+  <string name="inspector_origin_agent">De um agente de IA</string>
+  <string name="inspector_origin_app">Adicionado no Ketch</string>
+  <string name="inspector_origin_cli">Da linha de comando</string>
+  <string name="inspector_with_cookies">com cookies</string>
+  <string name="inspector_with_referrer">com página de origem</string>
+  <string name="inspector_with_cookies_referrer">com cookies e página de origem</string>
+  <string name="inspector_with_cookies_alone">Com cookies</string>
+  <string name="inspector_with_referrer_alone">Com página de origem</string>
+  <string name="inspector_with_cookies_referrer_alone">Com cookies e página de origem</string>
+  <string name="inspector_captured">%1$s, %2$s</string>
+
+  <string name="inspector_urgent_note">Começa agora; pode pausar “%1$s” (%2$s)</string>
+  <plurals name="inspector_urgent_note_count">
+    <item quantity="one">Inicia %1$d agora; pode pausar “%2$s” (%3$s)</item>
+    <item quantity="other">Inicia %1$d agora; pode pausar “%2$s” (%3$s)</item>
+  </plurals>
+  <string name="inspector_reschedule_note">Pausa agora e %1$s</string>
+
+  <plurals name="inspector_selected">
+    <item quantity="one">%1$d selecionado</item>
+    <item quantity="other">%1$d selecionados</item>
+  </plurals>
+  <plurals name="inspector_selection_more">
+    <item quantity="one">e mais %1$d</item>
+    <item quantity="other">e mais %1$d</item>
+  </plurals>
+  <plurals name="inspector_controls_apply_to">
+    <item quantity="one">Os controles valem para %1$d de %2$d; os outros já terminaram.</item>
+    <item quantity="other">Os controles valem para %1$d de %2$d; os outros já terminaram.</item>
+  </plurals>
+
+  <string name="inspector_close">Fechar inspetor</string>
+  <string name="inspector_copy_name">Copiar nome</string>
+  <string name="inspector_copied_name">Nome copiado</string>
+  <string name="inspector_copy_failed_name">Não foi possível copiar o nome</string>
+  <string name="inspector_share">Compartilhar</string>
+  <string name="inspector_share_failed">Não foi possível compartilhar %1$s (%2$s)</string>
+  <string name="inspector_more_actions">Mais ações</string>
+
+  <string name="inspector_section_controls">Controles</string>
+  <string name="inspector_control_speed">Velocidade</string>
+  <string name="inspector_control_connections">Conexões</string>
+  <string name="inspector_control_peer_limit">Limite de peers</string>
+  <string name="inspector_control_priority">Prioridade</string>
+  <string name="inspector_control_start">Início</string>
+  <string name="inspector_global_slow_lane">Faixa lenta</string>
+  <string name="inspector_global_limit">Limite global</string>
+  <string name="inspector_limit_marker">%1$s %2$s</string>
+  <string name="inspector_speed_limit">Limite de velocidade</string>
+  <string name="inspector_speed_more">Outro limite de velocidade</string>
+  <string name="inspector_mixed_limits">Estes downloads têm limites diferentes</string>
+  <string name="inspector_mixed_priorities">Estes downloads têm prioridades diferentes</string>
+  <string name="inspector_server_one_connection">Este servidor permite apenas 1 conexão</string>
+  <string name="inspector_remote_schedule">Ainda não é possível agendar downloads remotos</string>
+  <string name="inspector_start_now">Iniciar agora</string>
+  <plurals name="inspector_start_count_now">
+    <item quantity="one">Iniciar %1$d agora</item>
+    <item quantity="other">Iniciar %1$d agora</item>
+  </plurals>
+  <string name="inspector_reschedule">Reagendar</string>
+
+  <string name="inspector_section_details">Detalhes</string>
+  <string name="inspector_detail_source">Fonte</string>
+  <string name="inspector_detail_link">Link</string>
+  <string name="inspector_detail_path">Salvo em</string>
+  <string name="inspector_detail_size">Tamanho</string>
+  <string name="inspector_detail_added">Adicionado</string>
+  <string name="inspector_detail_time">Tempo gasto</string>
+  <string name="inspector_detail_average">Velocidade média</string>
+  <string name="inspector_detail_connections">Conexões</string>
+  <string name="inspector_detail_device">Dispositivo</string>
+  <string name="inspector_detail_captured">Capturado</string>
+  <string name="inspector_section_advanced">Avançado</string>
+  <string name="inspector_detail_task_id">ID da tarefa</string>
+  <string name="inspector_detail_headers">Cabeçalhos</string>
+  <string name="inspector_detail_property">Propriedade</string>
+  <string name="inspector_copy_detail">Copiar %1$s</string>
+  <string name="inspector_copied">Copiado</string>
+  <string name="inspector_copy_failed_source">Não foi possível copiar a fonte</string>
+  <string name="inspector_copy_failed_link">Não foi possível copiar o link</string>
+  <string name="inspector_copy_failed_path">Não foi possível copiar o local salvo</string>
+  <string name="inspector_copy_failed_size">Não foi possível copiar o tamanho</string>
+  <string name="inspector_copy_failed_added">Não foi possível copiar a data de adição</string>
+  <string name="inspector_copy_failed_time">Não foi possível copiar o tempo gasto</string>
+  <string name="inspector_copy_failed_average">Não foi possível copiar a velocidade média</string>
+  <string name="inspector_copy_failed_connections">Não foi possível copiar as conexões</string>
+  <string name="inspector_copy_failed_device">Não foi possível copiar o dispositivo</string>
+  <string name="inspector_copy_failed_captured">Não foi possível copiar a origem da captura</string>
+  <string name="inspector_copy_failed_task_id">Não foi possível copiar o ID da tarefa</string>
+  <string name="inspector_copy_failed_headers">Não foi possível copiar os cabeçalhos</string>
+  <string name="inspector_copy_failed_property">Não foi possível copiar a propriedade</string>
+  <string name="inspector_show_full_link">Mostrar link completo</string>
+  <string name="inspector_hide_full_link">Ocultar link completo</string>
+  <string name="inspector_hide">Ocultar</string>
+
+  <string name="inspector_technical_details">Detalhes técnicos</string>
+  <string name="inspector_copy_details">Copiar detalhes</string>
+  <string name="inspector_open_logs">Abrir logs</string>
+  <string name="inspector_share_logs">Compartilhar logs</string>
+  <string name="inspector_open_logs_failed">Não foi possível abrir os logs</string>
+
+  <string name="inspector_activity_empty">A velocidade e os eventos aparecem aqui quando o download começar.</string>
+  <string name="inspector_activity_now">Agora</string>
+  <string name="inspector_activity_since">Desde que o Ketch foi aberto</string>
+  <plurals name="inspector_activity_show_earlier">
+    <item quantity="one">Mostrar %1$d anterior</item>
+    <item quantity="other">Mostrar %1$d anteriores</item>
+  </plurals>
+  <string name="inspector_limit_task">Tarefa %1$s</string>
+  <string name="inspector_limit_global">Global</string>
+  <string name="inspector_stat_peak">Pico</string>
+  <string name="inspector_stat_average">Média</string>
+  <string name="inspector_stat_connections">Conexões</string>
+
+  <plurals name="inspector_connections_unfinished">
+    <item quantity="one">%1$d não concluída · %2$s</item>
+    <item quantity="other">%1$d não concluídas · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active_speed">
+    <item quantity="one">%1$d ativa · %2$s</item>
+    <item quantity="other">%1$d ativas · %2$s</item>
+  </plurals>
+  <plurals name="inspector_connections_active">
+    <item quantity="one">%1$d ativa</item>
+    <item quantity="other">%1$d ativas</item>
+  </plurals>
+  <plurals name="inspector_connections_finished">
+    <item quantity="one">%1$d concluída · %2$s</item>
+    <item quantity="other">%1$d concluídas · %2$s</item>
+  </plurals>
+  <string name="inspector_single_connection">Conexão única</string>
+  <string name="inspector_connections_live">Uma nova quantidade redivide os bytes restantes na hora.</string>
+  <string name="inspector_connections_on_resume">Uma nova quantidade vale quando o download for retomado.</string>
+  <string name="inspector_lane_description">Conexão %1$d, %2$s, %3$s</string>
+  <string name="inspector_percent_spoken">%1$d por cento</string>
+
+  <string name="inspector_files_waiting">A lista de arquivos chega com os metadados do torrent.</string>
+  <plurals name="inspector_files_done_of">
+    <item quantity="one">%1$d de %2$d arquivo concluído</item>
+    <item quantity="other">%1$d de %2$d arquivos concluídos</item>
+  </plurals>
+  <string name="inspector_files_one_done">1 arquivo concluído</string>
+  <plurals name="inspector_files_all_done">
+    <item quantity="one">Todos os %1$d arquivos concluídos</item>
+    <item quantity="other">Todos os %1$d arquivos concluídos</item>
+  </plurals>
+  <plurals name="inspector_files_not_selected">
+    <item quantity="one">%1$d não selecionado</item>
+    <item quantity="other">%1$d não selecionados</item>
+  </plurals>
+  <plurals name="inspector_files_map">
+    <item quantity="one">%1$d arquivo, %2$d concluído, %3$d por cento</item>
+    <item quantity="other">%1$d arquivos, %2$d concluídos, %3$d por cento</item>
+  </plurals>
+  <string name="inspector_files_filter">Filtrar arquivos</string>
+  <string name="inspector_files_no_match">Nenhum arquivo corresponde a “%1$s”</string>
+  <string name="inspector_files_sort">Ordenar arquivos</string>
+  <string name="inspector_sort_incomplete">Incompletos primeiro</string>
+  <string name="inspector_sort_name">Nome</string>
+  <string name="inspector_sort_size">Tamanho</string>
+  <string name="inspector_file_unnamed">Arquivo %1$d</string>
+  <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
+  <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+</resources>
