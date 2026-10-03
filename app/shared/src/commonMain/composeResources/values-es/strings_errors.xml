@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="error_title_hint">%1$s. %2$s</string>
+  <string name="error_connection_lost">Se perdió la conexión</string>
+  <string name="error_network_hint">No se pudo conectar con %1$s.</string>
+  <string name="error_network_hint_short">no se pudo conectar con %1$s</string>
+  <string name="error_network_hint_server">No se pudo conectar con el servidor.</string>
+  <string name="error_network_hint_server_short">no se pudo conectar con el servidor</string>
+  <string name="error_retried_once">Ketch lo reintentó una vez.</string>
+  <plurals name="error_retried">
+    <item quantity="one">Ketch lo reintentó %1$d vez.</item>
+    <item quantity="other">Ketch lo reintentó %1$d veces.</item>
+  </plurals>
+  <string name="error_check_connection">Comprueba la conexión y vuelve a intentarlo.</string>
+  <string name="error_check_connection_short">comprueba la conexión y vuelve a intentarlo</string>
+  <string name="error_not_supported">No disponible en este dispositivo</string>
+  <string name="error_something_went_wrong">Algo salió mal</string>
+
+  <string name="error_disk">No se pudo escribir el archivo</string>
+  <string name="error_disk_hint">Comprueba el espacio libre y los permisos de la carpeta.</string>
+  <string name="error_disk_hint_short">comprueba el espacio libre y los permisos de la carpeta</string>
+  <string name="error_disk_hint_on">Comprueba el espacio libre y los permisos de la carpeta en %1$s.</string>
+  <string name="error_disk_hint_on_short">comprueba el espacio libre y los permisos de la carpeta en %1$s</string>
+  <string name="error_disk_hint_free">%1$s libres en %2$s. Comprueba el espacio y los permisos de la carpeta.</string>
+  <string name="error_disk_hint_free_short">%1$s libres en %2$s</string>
+
+  <string name="error_unsupported">Este servidor no permite esta descarga</string>
+  <string name="error_unsupported_hint">No indica el tamaño ni admite rangos.</string>
+  <string name="error_unsupported_hint_short">no indica el tamaño ni admite rangos</string>
+  <string name="error_file_changed">El archivo cambió en el servidor</string>
+  <string name="error_file_changed_hint">Reanudar lo dañaría (%1$s).</string>
+  <string name="error_file_changed_hint_short">reanudar lo dañaría (%1$s)</string>
+  <string name="error_corrupt_resume">El progreso guardado está dañado</string>
+  <string name="error_corrupt_resume_hint">La parte descargada no se puede reutilizar.</string>
+  <string name="error_corrupt_resume_hint_short">la parte descargada no se puede reutilizar</string>
+  <string name="error_canceled">Cancelada</string>
+  <string name="error_wrong_credentials">Usuario o contraseña incorrectos</string>
+  <string name="error_wrong_credentials_hint">El servidor %1$s rechazó el inicio de sesión.</string>
+  <string name="error_wrong_credentials_hint_short">el servidor %1$s rechazó el inicio de sesión</string>
+  <string name="error_torrent_stopped">El torrent se detuvo</string>
+  <string name="error_torrent_stopped_hint">No hay pares ni trackers accesibles.</string>
+  <string name="error_torrent_stopped_hint_short">no hay pares ni trackers accesibles</string>
+  <string name="error_source">El servidor %1$s devolvió un error</string>
+
+  <string name="error_http_sign_in">Hay que iniciar sesión (%1$d)</string>
+  <string name="error_http_sign_in_hint">%1$s pide que inicies sesión. Envía la descarga desde la extensión del navegador de Ketch para que se incluyan tus cookies.</string>
+  <string name="error_http_sign_in_hint_short">%1$s pide que inicies sesión</string>
+  <string name="error_http_sign_in_hint_server">El servidor pide que inicies sesión. Envía la descarga desde la extensión del navegador de Ketch para que se incluyan tus cookies.</string>
+  <string name="error_http_sign_in_hint_server_short">el servidor pide que inicies sesión</string>
+  <string name="error_http_forbidden">Acceso denegado (403)</string>
+  <string name="error_http_forbidden_hint">Puede que el enlace haya caducado.</string>
+  <string name="error_http_forbidden_hint_browser">Puede que el enlace haya caducado. ¿Lo capturaste desde %1$s? Vuelve a capturarlo desde la página.</string>
+  <string name="error_http_forbidden_hint_short">puede que el enlace haya caducado</string>
+  <string name="error_browser_yours">tu navegador</string>
+  <string name="error_http_not_found">Archivo no encontrado (%1$d)</string>
+  <string name="error_http_not_found_hint">El servidor ya no tiene este archivo.</string>
+  <string name="error_http_not_found_hint_short">el servidor ya no tiene este archivo</string>
+  <string name="error_http_range">El servidor no permitió reanudar</string>
+  <string name="error_http_range_hint">La posición guardada ya no es válida.</string>
+  <string name="error_http_range_hint_short">la posición guardada ya no es válida</string>
+  <string name="error_http_rate_limited">El servidor está limitando las solicitudes</string>
+  <string name="error_http_rate_limited_hint_in">Vuelve a intentarlo dentro de %1$d s con menos conexiones.</string>
+  <string name="error_http_rate_limited_hint_in_short">vuelve a intentarlo dentro de %1$d s con menos conexiones</string>
+  <string name="error_http_rate_limited_hint">Vuelve a intentarlo más tarde con menos conexiones.</string>
+  <string name="error_http_rate_limited_hint_short">vuelve a intentarlo más tarde con menos conexiones</string>
+  <string name="error_http_server">Error del servidor (%1$d)</string>
+  <string name="error_http_server_hint">Suele ser temporal.</string>
+  <string name="error_http_server_hint_short">suele ser temporal</string>
+  <string name="error_http_other">El servidor respondió %1$d</string>
+</resources>
