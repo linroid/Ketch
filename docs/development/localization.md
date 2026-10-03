@@ -13,6 +13,7 @@ prompts AI discovery sends to the model and the bug report "Copy details" puts o
 | Chinese, Simplified | `values-zh` | `values-zh-rCN` | `zh-Hans.lproj` | `zh_CN` |
 | Chinese, Traditional | `values-zh-rTW` | `values-zh-rTW` | `zh-Hant.lproj` | `zh_TW` |
 | Korean | `values-ko` | `values-ko` | `ko.lproj` | `ko` |
+| Japanese | `values-ja` | `values-ja` | `ja.lproj` | `ja` |
 
 [The glossary](translation-glossary.md) fixes how each language names the app's features and
 units; keep translations to it.

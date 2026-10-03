@@ -1,0 +1,526 @@
+{
+  "extension_name": {
+    "message": "Ketch"
+  },
+  "extension_description": {
+    "message": "ダウンロード、リンク、マグネットリンクを、このコンピュータまたはリモートサーバーのKetchに送信します。"
+  },
+  "extension_action_title": {
+    "message": "Ketch"
+  },
+  "language_tag": {
+    "message": "ja"
+  },
+  "menu_download_link": {
+    "message": "Ketchでリンクをダウンロード"
+  },
+  "menu_download_image": {
+    "message": "Ketchで画像をダウンロード"
+  },
+  "menu_download_video": {
+    "message": "Ketchで動画をダウンロード"
+  },
+  "menu_download_audio": {
+    "message": "Ketchで音声をダウンロード"
+  },
+  "notify_sent_to": {
+    "message": "$NAME$に送信しました",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_sent_to_ketch": {
+    "message": "Ketchに送信しました"
+  },
+  "notify_download_added": {
+    "message": "ダウンロードを追加しました"
+  },
+  "notify_fallback_browser": {
+    "message": "代わりにブラウザでダウンロードします"
+  },
+  "notify_fallback_magnet": {
+    "message": "マグネットリンクを別のアプリで開きます"
+  },
+  "notify_send_failed": {
+    "message": "$NAME$に送信できませんでした",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "notify_unsupported": {
+    "message": "Ketchではダウンロードできません"
+  },
+  "notify_unsupported_stream": {
+    "message": "このメディアはページ自体がストリーミングしているため、ダウンロードできるリンクがありません。"
+  },
+  "notify_unsupported_scheme": {
+    "message": "Ketchに送信できるのは、http、https、ftp、マグネットリンクのみです。"
+  },
+  "error_with_hint": {
+    "message": "$ERROR$。$HINT$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      },
+      "hint": {
+        "content": "$2"
+      }
+    }
+  },
+  "error_no_response": {
+    "message": "$ADDRESS$のKetchから応答がありません",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_unreachable": {
+    "message": "$ADDRESS$のKetchに接続できません",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_token_rejected": {
+    "message": "Ketchがアクセストークンを拒否しました"
+  },
+  "error_token_required": {
+    "message": "Ketchにはアクセストークンが必要です"
+  },
+  "error_http_status": {
+    "message": "KetchからHTTP $STATUS$が返されました",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_start_timeout": {
+    "message": "Ketchが時間内に起動しませんでした"
+  },
+  "error_app_not_installed": {
+    "message": "このコンピュータにKetchアプリが設定されていません"
+  },
+  "error_app_unreachable": {
+    "message": "Ketchアプリに接続できませんでした"
+  },
+  "error_app_not_running": {
+    "message": "Ketchは実行されていません"
+  },
+  "error_app_connect_failed": {
+    "message": "Ketchアプリが接続できませんでした"
+  },
+  "error_app_invalid_reply": {
+    "message": "Ketchアプリから無効な応答が返されました"
+  },
+  "error_unsupported_link": {
+    "message": "この種類のリンクはKetchでダウンロードできません"
+  },
+  "error_torrent_http": {
+    "message": "トレントファイルを取得できませんでした（HTTP $STATUS$）",
+    "placeholders": {
+      "status": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_torrent_timeout": {
+    "message": "トレントファイルの取得がタイムアウトしました"
+  },
+  "error_torrent_too_large": {
+    "message": "トレントファイルが大きすぎます"
+  },
+  "error_address_required": {
+    "message": "Ketchサーバーのアドレスを入力してください"
+  },
+  "error_address_invalid": {
+    "message": "「$ADDRESS$」は有効なアドレスではありません",
+    "placeholders": {
+      "address": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_address_scheme": {
+    "message": "アドレスはhttp://またはhttps://で始まる必要があります"
+  },
+  "error_address_credentials": {
+    "message": "アクセストークンはアドレスではなく、トークン欄に入力してください"
+  },
+  "error_not_ketch": {
+    "message": "このアドレスはKetchサーバーではないようです"
+  },
+  "hint_app_not_installed": {
+    "message": "Ketchデスクトップアプリをインストールして一度開いてから、もう一度お試しください。「ketch server」を使う場合や、ブラウザをFlatpakまたはSnapでインストールした場合は、代わりにKetchをサーバーとして追加してください。"
+  },
+  "hint_app_not_running": {
+    "message": "Ketchは、ダウンロードを送信すると自動的に開きます。"
+  },
+  "hint_open_app": {
+    "message": "Ketchを開いて、もう一度お試しください。"
+  },
+  "hint_local_server": {
+    "message": "Ketchを開いて「設定 → リモートアクセス → サーバー」をオンにするか、「ketch server」を実行してください。"
+  },
+  "hint_remote_server": {
+    "message": "サーバーが実行中で、ここからこのアドレスにアクセスできることを確認してください。"
+  },
+  "hint_access_token": {
+    "message": "Ketchの「設定 → リモートアクセス」に表示されているアクセストークンを入力してください。"
+  },
+  "task_magnet_link": {
+    "message": "マグネットリンク"
+  },
+  "task_torrent": {
+    "message": "トレント"
+  },
+  "task_downloading_of": {
+    "message": "$DOWNLOADED$ / $TOTAL$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      },
+      "speed": {
+        "content": "$3"
+      }
+    }
+  },
+  "task_downloading": {
+    "message": "$DOWNLOADED$ · $SPEED$",
+    "placeholders": {
+      "downloaded": {
+        "content": "$1"
+      },
+      "speed": {
+        "content": "$2"
+      }
+    }
+  },
+  "task_paused": {
+    "message": "一時停止中"
+  },
+  "task_paused_percent": {
+    "message": "一時停止中 · $PERCENT$%",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_queued": {
+    "message": "キュー待ち"
+  },
+  "task_scheduled": {
+    "message": "予約済み"
+  },
+  "task_completed": {
+    "message": "完了"
+  },
+  "task_failed": {
+    "message": "失敗：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
+  "task_unknown_error": {
+    "message": "不明なエラー"
+  },
+  "task_canceled": {
+    "message": "キャンセル済み"
+  },
+  "task_pause": {
+    "message": "一時停止"
+  },
+  "task_resume": {
+    "message": "再開"
+  },
+  "size_bytes": {
+    "message": "$SIZE$ B",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_kilobytes": {
+    "message": "$SIZE$ KB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_megabytes": {
+    "message": "$SIZE$ MB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_gigabytes": {
+    "message": "$SIZE$ GB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "size_terabytes": {
+    "message": "$SIZE$ TB",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "speed_per_second": {
+    "message": "$SIZE$/s",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected": {
+    "message": "接続済み · Ketch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "status_connected_to": {
+    "message": "$NAME$に接続済み · Ketch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_on": {
+    "message": "接続済み · $OS$上のKetch $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      },
+      "os": {
+        "content": "$2"
+      }
+    }
+  },
+  "status_connected_to_on": {
+    "message": "$NAME$に接続済み · $OS$上のKetch $VERSION$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      },
+      "os": {
+        "content": "$3"
+      }
+    }
+  },
+  "status_connecting": {
+    "message": "接続中…"
+  },
+  "status_opening_app": {
+    "message": "Ketchを開いています…"
+  },
+  "instance_this_computer": {
+    "message": "このコンピュータ"
+  },
+  "instance_name_default": {
+    "message": "$NAME$（デフォルト）",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "instance_name": {
+    "message": "名前"
+  },
+  "instance_default": {
+    "message": "デフォルト"
+  },
+  "instance_app_detail": {
+    "message": "このコンピュータのKetchアプリです。ダウンロードが必要になると、拡張機能が自動的に開きます。"
+  },
+  "instance_address": {
+    "message": "アドレス"
+  },
+  "instance_token": {
+    "message": "アクセストークン"
+  },
+  "instance_token_placeholder": {
+    "message": "任意"
+  },
+  "instance_insecure": {
+    "message": "このアドレスは暗号化されていません。アクセストークンや、ダウンロードと一緒に送信されるCookieが平文でネットワークを流れます。httpsを使うか、信頼できるネットワークでのみ使用してください。"
+  },
+  "instance_test": {
+    "message": "接続をテスト"
+  },
+  "instance_remove": {
+    "message": "削除"
+  },
+  "instance_enter_address": {
+    "message": "Ketchサーバーのアドレスを入力してください。"
+  },
+  "popup_instance_picker": {
+    "message": "Ketchインスタンス"
+  },
+  "popup_settings": {
+    "message": "設定"
+  },
+  "popup_open_app": {
+    "message": "Ketchを開く"
+  },
+  "popup_add_placeholder": {
+    "message": "リンクまたはマグネットリンクを貼り付け"
+  },
+  "popup_add_label": {
+    "message": "ダウンロードするリンク"
+  },
+  "popup_add_button": {
+    "message": "ダウンロード"
+  },
+  "popup_added": {
+    "message": "$NAME$を追加しました",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_unsupported_link": {
+    "message": "http、https、ftp、またはマグネットリンクを入力してください。"
+  },
+  "popup_capture": {
+    "message": "ブラウザのダウンロードを取り込む"
+  },
+  "popup_capture_target": {
+    "message": "送信先：$NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_recent": {
+    "message": "最近"
+  },
+  "popup_no_downloads": {
+    "message": "ダウンロードはまだありません。"
+  },
+  "options_title": {
+    "message": "Ketch拡張機能の設定"
+  },
+  "options_intro": {
+    "message": "このブラウザのダウンロードを、このコンピュータまたはリモートサーバーのKetchに送信します。"
+  },
+  "options_saved": {
+    "message": "保存しました"
+  },
+  "options_permission": {
+    "message": "サイトのダウンロードを取り込み、そのCookieを送信し、Ketchサーバーに接続するには、Webサイトへのアクセスが必要です。"
+  },
+  "options_allow_access": {
+    "message": "アクセスを許可"
+  },
+  "options_instances": {
+    "message": "Ketchインスタンス"
+  },
+  "options_instances_detail": {
+    "message": "取り込んだダウンロードとマグネットリンクは、デフォルトのインスタンスに送信されます。リンク、画像、動画を右クリックすると、どのインスタンスにも送信できます。"
+  },
+  "options_add_app": {
+    "message": "このコンピュータのKetchを追加"
+  },
+  "options_add_server": {
+    "message": "サーバーを追加"
+  },
+  "options_browser_downloads": {
+    "message": "ブラウザのダウンロード"
+  },
+  "options_capture": {
+    "message": "ダウンロードを取り込む"
+  },
+  "options_capture_detail": {
+    "message": "ブラウザで開始したダウンロードを、代わりにKetchで行います。Ketchに接続できない場合は、通常どおりブラウザでダウンロードします。"
+  },
+  "options_min_size": {
+    "message": "小さいファイルはブラウザに任せる"
+  },
+  "options_min_size_detail": {
+    "message": "これより小さいファイルはブラウザでダウンロードします。サイズが不明なファイルは常にKetchに送信します。0にするとすべて送信します。"
+  },
+  "options_min_size_unit": {
+    "message": "MB"
+  },
+  "options_excluded": {
+    "message": "ブラウザに任せるサイト"
+  },
+  "options_excluded_detail": {
+    "message": "1行に1つずつ入力します。サブドメインも含まれるため、example.comはdownloads.example.comも対象になります。"
+  },
+  "options_cookies": {
+    "message": "Cookieとリファラーを送信"
+  },
+  "options_cookies_detail": {
+    "message": "サインインが必要なファイルもKetchでダウンロードできるようにします。Ketchは後で再開できるよう、これらをタスクと一緒に保存します。"
+  },
+  "options_links_notifications": {
+    "message": "リンクと通知"
+  },
+  "options_magnet": {
+    "message": "クリックしたマグネットリンクをKetchに送信"
+  },
+  "options_magnet_detail": {
+    "message": "別のアプリで開くには、Altキーを押しながらマグネットリンクをクリックします。"
+  },
+  "options_notify": {
+    "message": "ダウンロードを送信したときに通知"
+  },
+  "options_notify_detail": {
+    "message": "問題は常に表示されます。"
+  },
+  "options_help": {
+    "message": "Ketchのセットアップ"
+  },
+  "options_help_this_computer": {
+    "message": "このコンピュータで"
+  },
+  "options_help_this_computer_detail": {
+    "message": "Ketchデスクトップアプリをインストールして一度開くと、ブラウザから見つけられるようになります。以降は、ダウンロードが必要になると拡張機能がKetchを開きます。サーバーをオンにしたり、トークンをコピーしたりする必要はありません。"
+  },
+  "options_help_other_device": {
+    "message": "別のデバイスで"
+  },
+  "options_help_other_device_detail": {
+    "message": "そのデバイスで「設定 → リモートアクセス」を開き、<b>サーバー</b>と<b>他のデバイスを許可</b>をオンにしてから、アクセストークンを生成します。ここで<b>サーバーを追加</b>を選び、そのアドレス（例：<code>http://192.168.1.20:8642</code>）とトークンを入力してデバイスを追加します。<code>ketch server</code>の場合は、そのconfig.tomlで<code>apiToken</code>を設定します。"
+  },
+  "options_help_command_line": {
+    "message": "コマンドラインまたはサンドボックス化されたブラウザ"
+  },
+  "options_help_command_line_detail": {
+    "message": "このコンピュータで<code>ketch server</code>を使う場合や、他のアプリを起動できないFlatpak版またはSnap版のブラウザから使う場合は、<code>http://127.0.0.1:8642</code>のサーバーとして追加してください。"
+  }
+}
