@@ -48,7 +48,9 @@ extension is in the browser stores:
   after Ketch, open Ketch once more.
 - **CLI, or a browser installed as a Flatpak or Snap** (which can't start other apps): run
   `ketch server`, or choose **Allow another device** under Settings → Sharing in the app, then
-  choose **Add server** in the extension's settings and enter `http://127.0.0.1:8642`.
+  choose **Add server** in the extension's settings and enter `http://127.0.0.1:8642`. Sharing
+  from the app always has an access code: enter the **Access code** under **Advanced** as the
+  access token.
 - **Another device**: on that device, open Settings → Sharing and choose **Allow another
   device** (for `ketch server`, set `apiToken` in `config.toml`). In the extension's settings,
   choose **Add server** and enter the address Ketch shows, such as `http://192.168.1.20:8642`,
