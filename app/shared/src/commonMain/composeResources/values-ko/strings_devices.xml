@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="device_this_mac">이 Mac</string>
+  <string name="device_this_pc">이 PC</string>
+  <string name="device_this_computer">이 컴퓨터</string>
+  <string name="device_this_phone">이 휴대폰</string>
+  <string name="device_this_tablet">이 태블릿</string>
+  <string name="device_this_ipad">이 iPad</string>
+  <string name="device_this_browser">이 브라우저</string>
+  <string name="device_this_mac_in_sentence">이 Mac</string>
+  <string name="device_this_pc_in_sentence">이 PC</string>
+  <string name="device_this_computer_in_sentence">이 컴퓨터</string>
+  <string name="device_this_phone_in_sentence">이 휴대폰</string>
+  <string name="device_this_tablet_in_sentence">이 태블릿</string>
+  <string name="device_this_ipad_in_sentence">이 iPad</string>
+  <string name="device_this_browser_in_sentence">이 브라우저</string>
+  <string name="device_any_in_sentence">이 기기</string>
+
+  <string name="device_free_space">%1$s 남음</string>
+  <string name="device_free_of_total">%2$s 중 %1$s 남음</string>
+  <string name="device_storage_short">공간 부족</string>
+  <string name="device_active_downloads">%1$d개 진행 중</string>
+
+  <string name="device_switch_to">%1$s(으)로 전환</string>
+
+  <string name="device_target_on">기기</string>
+  <string name="device_target_label">%1$s:</string>
+  <string name="device_target_choose">기기 선택</string>
+  <string name="device_target_menu_title">다운로드할 기기</string>
+  <string name="device_target_connecting">연결 중…</string>
+  <string name="device_target_offline">오프라인</string>
+  <string name="device_target_unauthorized">새 액세스 토큰 필요</string>
+
+  <string name="device_server_start_failed">서버를 시작할 수 없습니다.</string>
+
+  <string name="device_duration_minutes">%1$d분</string>
+  <string name="device_duration_hours">%1$d시간</string>
+  <string name="device_duration_days">%1$d일</string>
+
+  <string name="device_meta_uptime">가동 시간 %1$s</string>
+  <string name="device_show_downloads">다운로드 보기</string>
+  <string name="device_not_connected">연결되지 않음</string>
+
+  <string name="device_problem_unauthorized">새 액세스 토큰 필요</string>
+  <string name="device_problem_token_rejected">이 기기에 저장된 액세스 토큰이 거부되었습니다.</string>
+  <string name="device_problem_over_limit">Ketch는 한 번에 몇 대의 기기만 연결해 둡니다. 이 기기는 화면에 표시되는 동안 연결됩니다.</string>
+  <string name="device_problem_not_kept">Ketch는 이 기기가 화면에 표시되는 동안이나 연결 유지가 켜져 있을 때 연결합니다.</string>
+  <string name="device_problem_connecting">연결 중…</string>
+  <string name="device_problem_offline_for">%1$s째 오프라인 · 재시도 중</string>
+  <string name="device_problem_offline">오프라인 · 재시도 중</string>
+  <string name="device_fix_retry_now">지금 재시도</string>
+  <string name="device_fix_enter_token">토큰 입력</string>
+
+  <string name="device_sharing_on">공유 중 :%1$d</string>
+  <string name="device_sharing_discoverable">공유 중 :%1$d · 검색 가능</string>
+
+  <string name="device_drop_to_download">%1$s에 놓아서 다운로드</string>
+  <string name="device_idle">유휴</string>
+  <string name="device_lane_empty">다운로드 중인 항목 없음</string>
+  <plurals name="device_lane_downloads">
+    <item quantity="other">다운로드 %1$d개, %2$s 남음</item>
+  </plurals>
+  <string name="device_count_active">진행 중</string>
+  <string name="device_count_waiting">대기 중</string>
+  <string name="device_count_paused">일시정지됨</string>
+  <string name="device_count_failed">실패</string>
+  <plurals name="device_count_downloading_on">
+    <item quantity="other">%2$s에서 %1$d개 다운로드 중</item>
+  </plurals>
+  <plurals name="device_count_waiting_on">
+    <item quantity="other">%2$s에서 %1$d개 대기 중</item>
+  </plurals>
+  <plurals name="device_count_paused_on">
+    <item quantity="other">%2$s에서 %1$d개 일시정지됨</item>
+  </plurals>
+  <plurals name="device_count_failed_on">
+    <item quantity="other">%2$s에서 %1$d개 실패</item>
+  </plurals>
+  <string name="device_free_space_unknown">여유 공간 알 수 없음</string>
+  <string name="device_chip_networks">다운로드에 사용하는 네트워크</string>
+  <string name="device_chip_sharing_settings">공유 설정</string>
+  <string name="device_chip_share_tooltip">다른 기기에서 제어할 수 있도록 허용</string>
+  <string name="device_chip_not_shared">공유 안 함 · 공유…</string>
+  <plurals name="device_retry_failed">
+    <item quantity="other">실패한 %1$d개 재시도</item>
+  </plurals>
+  <string name="device_pause_all_here">이 기기에서 모두 일시정지</string>
+  <string name="device_start_now">%1$s 지금 시작</string>
+
+  <string name="device_speed_mode_failed">%1$s 모드로 전환할 수 없음</string>
+  <string name="device_slow_lane_on">저속 차로 켜짐 · %1$s</string>
+  <string name="device_slow_lane_off">저속 차로 꺼짐</string>
+  <string name="device_speed_follows_rules">규칙에 따라 속도 조절</string>
+  <string name="device_reconnect_failed">%1$s에 다시 연결할 수 없음</string>
+  <string name="device_drop_unsupported">.torrent 파일과 링크 목록만 놓아서 다운로드를 추가할 수 있습니다</string>
+  <string name="device_drop_read_failed">%1$s 파일을 읽을 수 없음</string>
+
+  <string name="device_more_for">%1$s 추가 옵션</string>
+  <string name="device_menu_settings">이 기기 설정…</string>
+  <string name="device_menu_rename">이름 변경…</string>
+  <string name="device_menu_stay_connected">연결 유지</string>
+  <string name="device_menu_remove">제거…</string>
+  <string name="device_rename_title">%1$s 이름 변경</string>
+  <string name="device_rename_confirm">이름 변경</string>
+  <string name="device_rename_remote_hint">비워 두면 기기가 알리는 이름을 사용합니다.</string>
+  <string name="device_rename_local_hint">다른 기기에서는 다시 시작한 후에 이 이름이 표시됩니다.</string>
+  <string name="device_rename_name">이름</string>
+  <string name="device_remove_title">%1$s 기기를 제거할까요?</string>
+  <string name="device_remove_body">이 기기의 다운로드가 여기에 더 이상 표시되지 않습니다. 다운로드는 %1$s에서 계속 진행되며, 나중에 다시 추가할 수 있습니다.</string>
+
+  <string name="device_speed_of">%1$s 속도</string>
+  <string name="device_speed_limit">속도 제한</string>
+  <string name="device_speed_update_failed">%1$s의 설정을 변경할 수 없음 · %2$s</string>
+  <string name="device_speed_applies">%1$s의 모든 다운로드에 적용됩니다.</string>
+
+  <string name="device_page_title">기기</string>
+  <string name="device_add">기기 추가</string>
+  <string name="device_add_card_title">기기 추가</string>
+  <string name="device_add_card_body">여기에서 NAS나 다른 컴퓨터를 제어하세요. 해당 기기에서 %1$s를 실행하거나 Ketch 앱의 설정 › 공유를 켜세요.</string>
+  <string name="device_pair_computer">컴퓨터 페어링</string>
+  <string name="device_pair_phone">휴대폰 페어링</string>
+
+  <string name="connect_link_label">페어링 링크 또는 주소</string>
+  <string name="connect_link_placeholder">ketch://pair… 또는 nas.local:8642</string>
+  <string name="connect_link_has_code">액세스 코드 포함</string>
+  <string name="connect_error_link_empty">페어링 링크를 붙여넣거나 주소를 입력하세요</string>
+  <string name="connect_error_link_invalid">페어링 링크나 nas.local:8642 같은 주소를 사용하세요</string>
+  <string name="connect_error_host">호스트 이름이나 IP 주소를 입력하세요</string>
+  <string name="connect_error_port">1~65535 사이의 포트를 사용하세요</string>
+  <string name="connect_code_label">액세스 코드</string>
+  <string name="connect_code_placeholder">코드를 붙여넣거나 입력하세요</string>
+  <string name="connect_code_link_rejected">링크에 있는 코드가 더 이상 유효하지 않습니다. 해당 기기의 설정 › 공유에서 현재 코드를 확인해 입력하세요.</string>
+  <string name="connect_code_rejected">코드가 올바르지 않습니다. 코드를 확인하거나 새 페어링 링크를 복사하세요.</string>
+  <string name="connect_code_requested">%1$s에서 액세스 코드를 요구합니다. 해당 기기의 설정 › 공유에서 확인할 수 있습니다.</string>
+  <string name="connect_details_manually">세부 정보 직접 입력</string>
+  <string name="connect_address_manually">주소 직접 입력</string>
+  <string name="connect_host">호스트</string>
+  <string name="connect_port">포트</string>
+  <string name="connect_use_https">HTTPS 사용</string>
+  <string name="connect_unreachable">%1$s에 연결할 수 없습니다. 해당 기기에서 Ketch 공유가 켜져 있고 두 기기가 같은 네트워크에 있는지 확인하세요.</string>
+  <string name="connect_add_anyway">그래도 추가</string>
+  <string name="connect_add_failed">기기를 추가할 수 없음: %1$s</string>
+  <string name="connect_connected">%1$s에 연결됨</string>
+  <string name="connect_added">%1$s 추가됨</string>
+  <string name="connect_added_detail">연결할 수 있게 되면 Ketch가 연결합니다</string>
+  <string name="connect_link_incomplete">페어링 링크가 완전하지 않습니다</string>
+  <string name="connect_link_incomplete_detail">다른 기기의 설정 › 공유에서 다시 복사하세요</string>
+
+  <string name="connect_add_title">기기 추가</string>
+  <string name="connect_new_code_title">%1$s의 새 액세스 코드</string>
+  <string name="connect_code_no_longer_accepted">%1$s에서 Ketch에 저장된 코드를 더 이상 받지 않습니다. 해당 기기의 설정 › 공유에서 새 페어링 링크를 붙여넣거나 액세스 코드를 입력하세요.</string>
+  <string name="connect_scan_hint">다른 기기의 설정 › 공유에 있는 페어링 코드를 카메라 앱으로 스캔하거나 페어링 링크를 붙여넣으세요.</string>
+  <string name="connect_paste_hint">다른 기기의 설정 › 공유에서 페어링 링크를 붙여넣거나 주소를 입력하세요.</string>
+  <string name="connect_find_on_network">네트워크에서 찾기</string>
+  <string name="connect_on_your_network">내 네트워크</string>
+  <string name="connect_searching">검색 중…</string>
+  <string name="connect_search_again">다시 검색</string>
+  <string name="connect_looking">이 네트워크에서 Ketch 기기를 찾는 중…</string>
+  <string name="connect_nearby_failed">네트워크를 검색할 수 없음</string>
+  <string name="connect_nearby_failed_hint">%1$s. 대신 페어링 링크를 붙여넣으세요.</string>
+  <string name="connect_none_found">기기를 찾지 못했습니다. 다른 기기에서 설정 › 공유를 열고 다른 기기를 허용하세요.</string>
+  <string name="connect_asks_for_code">%1$s · 코드 필요</string>
+  <string name="connect_added_badge">추가됨</string>
+  <string name="connect_share_instead">다른 기기에서 %1$s을(를) 제어하고 싶나요?</string>
+  <string name="connect_show_pairing_code">페어링 코드 보기</string>
+
+  <string name="connect_landing_title">Ketch 기기에 연결</string>
+  <string name="connect_landing_body">Ketch를 실행 중인 컴퓨터, NAS 또는 휴대폰의 다운로드를 제어하세요.</string>
+  <string name="connect_your_devices">내 기기</string>
+  <string name="connect_where_link">링크는 어디에 있나요?</string>
+  <string name="connect_where_link_body">Ketch를 실행 중인 컴퓨터에서 설정 › 공유 › 다른 기기 허용을 열고 페어링 링크를 복사하세요. NAS나 서버에서는 %1$s를 실행하세요.</string>
+  <string name="connect_enter_code">액세스 코드 입력</string>
+  <string name="connect_status_needs_code">코드 필요</string>
+  <string name="connect_status_online">온라인</string>
+
+  <string name="connect_pairing_title">%1$s에 연결할까요?</string>
+  <string name="connect_not_now">나중에</string>
+  <string name="connect_pairing_new">여기에서 이 기기의 다운로드를 보고 %1$s에서 새 다운로드를 추가할 수 있습니다.</string>
+  <string name="connect_pairing_known">%1$s 기기는 이미 추가되어 있습니다. 연결하면 이 기기가 표시됩니다.</string>
+  <string name="connect_pairing_known_code">%1$s 기기는 이미 추가되어 있습니다. 연결하면 이 기기가 표시되고 이 링크의 코드가 적용됩니다.</string>
+  <string name="connect_pairing_has_code">링크에 액세스 코드가 포함되어 있습니다.</string>
+
+  <string name="device_pick_torrents">토렌트 파일 열기</string>
+  <string name="device_pick_folder">다운로드 폴더 선택</string>
+  <string name="device_pick_choose">선택</string>
+</resources>
