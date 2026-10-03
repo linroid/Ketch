@@ -107,9 +107,10 @@ interface DownloadSource {
    * from the progress in [DownloadContext.segments] rather than restart.
    *
    * The engine also calls this method when [ResolvedSource.totalBytes] is
-   * -1. A source that cannot transfer content of unknown size throws
-   * [KetchError.SourceError]; one that can writes it from offset zero, and
-   * the engine records the final file size as the task's size.
+   * -1, unless [managesOwnFileIo] is `true`: such a download fails with
+   * [KetchError.SourceError]. A source that cannot transfer content of
+   * unknown size throws that error too; one that can writes it from offset
+   * zero, and the engine records the final file size as the task's size.
    */
   suspend fun download(context: DownloadContext)
 

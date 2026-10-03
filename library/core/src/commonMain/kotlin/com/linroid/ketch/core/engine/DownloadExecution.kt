@@ -154,7 +154,15 @@ internal class DownloadExecution(
         sum + file.size
       }
     } else resolvedUrl.totalBytes
-    // An unknown size (-1) is left to the source, which streams the content or fails.
+    // A source streams content of unknown size (-1) or fails, and the engine then measures the
+    // file it wrote. A source that writes its own files leaves the engine nothing to measure.
+    if (total < 0 && source.managesOwnFileIo) {
+      log.e { "Unknown file size for taskId=$taskId: url=${redactUrl(request.url)}" }
+      throw KetchError.SourceError(
+        sourceType = source.type,
+        cause = Exception("Unknown file size for ${redactUrl(request.url)}"),
+      )
+    }
     totalBytes = total
 
     val fileName = resolvedUrl.suggestedFileName
