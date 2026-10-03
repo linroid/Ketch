@@ -16,6 +16,7 @@ import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.createFileAccessor
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskState
+import com.linroid.ketch.core.task.savedProgress
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
@@ -246,21 +247,26 @@ internal class DownloadCoordinator(
           execution.execute(resumeInfo)
         } catch (e: CancellationException) {
           val s = handle.mutableState.value
-          // A download that completed just before the cancellation keeps its state.
-          if (!s.isTerminal && s !is DownloadState.Paused && s !is DownloadState.Queued) {
-            // Closing keeps the task resumable: its record stays DOWNLOADING, so the next
-            // start() resumes it.
-            handle.mutableState.value = if (closing) {
-              DownloadState.Paused(
+          when {
+            // A download that completed just before the cancellation keeps its state.
+            s.isTerminal || s is DownloadState.Paused -> Unit
+            // Closing keeps the task resumable, also one still starting in its slot: its
+            // record stays DOWNLOADING or QUEUED, so the next start() resumes it.
+            closing -> handle.mutableState.value = DownloadState.Paused(
+              if (s is DownloadState.Queued) {
+                // Not resolved yet: what the record saved from earlier runs.
+                handle.record.value.savedProgress()
+              } else {
                 DownloadProgress(
                   handle.mutableSegments.value.sumOf { it.downloadedBytes },
                   execution.totalBytes,
-                ),
-                PauseReason.Shutdown,
-              )
-            } else {
-              DownloadState.Canceled
-            }
+                )
+              },
+              PauseReason.Shutdown,
+            )
+            // Put back in the queue, it waits for a slot again.
+            s is DownloadState.Queued -> Unit
+            else -> handle.mutableState.value = DownloadState.Canceled
           }
           throw e
         } catch (e: Exception) {
